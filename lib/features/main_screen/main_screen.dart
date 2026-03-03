@@ -1,9 +1,10 @@
 import 'package:bitsdojo_window/bitsdojo_window.dart';
-import 'package:flutter/material.dart' as material show Scaffold, Container, MainAxisSize, GestureDetector, MouseRegion, SystemMouseCursors, HitTestBehavior;
+import 'package:flutter/material.dart' as material show Scaffold, Container, MainAxisSize, GestureDetector, MouseRegion, SystemMouseCursors, HitTestBehavior, Icons, Icon;
 import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 import 'connections_panel.dart';
+import 'new_connection_dialog.dart';
 import 'workspace_panel.dart';
 
 class MainScreen extends StatefulWidget {
@@ -81,14 +82,19 @@ class _VerticalResizeHandle extends StatelessWidget {
   }
 }
 
-class _CustomTitleBar extends StatelessWidget {
+class _CustomTitleBar extends StatefulWidget {
   const _CustomTitleBar({required this.theme});
 
   final ColorScheme theme;
 
   @override
+  State<_CustomTitleBar> createState() => _CustomTitleBarState();
+}
+
+class _CustomTitleBarState extends State<_CustomTitleBar> {
+  @override
   Widget build(BuildContext context) {
-    final c = theme;
+    final c = widget.theme;
     final buttonColors = WindowButtonColors(
       iconNormal: c.mutedForeground,
       mouseOver: c.muted.withValues(alpha: 0.5),
@@ -117,9 +123,80 @@ class _CustomTitleBar extends StatelessWidget {
                     material.Container(width: 16),
                     Text('Querya').semiBold().small(),
                     const Gap(24),
-                    Text('File').muted().small(),
-                    const Gap(16),
-                    Text('Help').muted().small(),
+                    Menubar(
+                      border: false,
+                      popoverOffset: const Offset(0, 8),
+                      children: [
+                        MenuButton(
+                          child: const Text('File'),
+                          subMenu: [
+                            MenuButton(child: const Text('New'), onPressed: (_) {}),
+                            MenuButton(child: const Text('Open...'), onPressed: (_) {}),
+                            MenuButton(child: const Text('Save'), onPressed: (_) {}),
+                            const MenuDivider(),
+                            MenuButton(child: const Text('Exit'), onPressed: (_) {}),
+                          ],
+                        ),
+                        MenuButton(
+                          child: const Text('Connection'),
+                          subMenu: [
+                            MenuButton(
+                              leading: material.Icon(material.Icons.add_link_rounded, size: 18),
+                              trailing: Text('Shift+Ctrl+N').xSmall().muted(),
+                              onPressed: (ctx) async {
+                                final type = await showNewConnectionDialog(ctx);
+                                if (type != null) {
+                                  // TODO: add connection (no folder)
+                                }
+                              },
+                              child: const Text('New Database Connection'),
+                            ),
+                            MenuButton(
+                              leading: material.Icon(material.Icons.link_rounded, size: 18),
+                              onPressed: (_) {},
+                              child: const Text('New Connection from URL'),
+                            ),
+                            MenuButton(
+                              leading: material.Icon(material.Icons.settings_rounded, size: 18),
+                              onPressed: (_) {},
+                              child: const Text('Driver Manager'),
+                            ),
+                            const MenuDivider(),
+                            MenuButton(
+                              enabled: false,
+                              leading: material.Icon(material.Icons.power_rounded, size: 18),
+                              onPressed: (_) {},
+                              child: const Text('Connect'),
+                            ),
+                            MenuButton(
+                              leading: material.Icon(material.Icons.refresh_rounded, size: 18),
+                              onPressed: (_) {},
+                              child: const Text('Invalidate/Reconnect'),
+                            ),
+                            MenuButton(
+                              leading: material.Icon(material.Icons.power_off_rounded, size: 18),
+                              onPressed: (_) {},
+                              child: const Text('Disconnect'),
+                            ),
+                            MenuButton(child: const Text('Disconnect All'), onPressed: (_) {}),
+                            MenuButton(child: const Text('Disconnect Others'), onPressed: (_) {}),
+                            const MenuDivider(),
+                            MenuButton(
+                              leading: material.Icon(material.Icons.lock_outline_rounded, size: 18),
+                              onPressed: (_) {},
+                              child: const Text('Read-only'),
+                            ),
+                          ],
+                        ),
+                        MenuButton(
+                          child: const Text('Help'),
+                          subMenu: [
+                            MenuButton(child: const Text('About'), onPressed: (_) {}),
+                            MenuButton(child: const Text('Documentation'), onPressed: (_) {}),
+                          ],
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
