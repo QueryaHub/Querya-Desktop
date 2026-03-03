@@ -3,6 +3,7 @@ import 'package:querya_desktop/core/storage/folders_storage.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
+import 'mongodb_connection_form.dart';
 import 'new_connection_dialog.dart';
 import 'new_folder_dialog.dart';
 
@@ -38,15 +39,26 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
   Future<void> _createConnectionInFolder(String folderName) async {
     final type = await showNewConnectionDialog(context);
     if (type == null || !mounted) return;
+    
     final folderId = await LocalDb.instance.getFolderIdByName(folderName);
-    final row = ConnectionRow(
-      type: type.name,
-      name: '${type.label} connection',
-      createdAt: DateTime.now().toUtc().toIso8601String(),
-      folderId: folderId,
-    );
-    await LocalDb.instance.addConnection(row);
-    if (mounted) setState(() {});
+    ConnectionRow? row;
+    
+    if (type == ConnectionType.mongodb) {
+      row = await showMongoConnectionForm(context, folderId: folderId);
+    } else {
+      // For other types, create default connection
+      row = ConnectionRow(
+        type: type.name,
+        name: '${type.label} connection',
+        createdAt: DateTime.now().toUtc().toIso8601String(),
+        folderId: folderId,
+      );
+    }
+    
+    if (row != null && mounted) {
+      await LocalDb.instance.addConnection(row);
+      if (mounted) setState(() {});
+    }
   }
 
   @override
@@ -111,8 +123,28 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
                             leading: material.Icon(material.Icons.settings_ethernet_rounded, size: 18, color: theme.colorScheme.mutedForeground),
                             onPressed: (menuContext) async {
                               final type = await showNewConnectionDialog(menuContext);
-                              if (type != null && mounted) {
-                                // TODO: open connection form for selected type
+                              if (type == null || !mounted) return;
+                              
+                              // Wait a bit for the dialog to fully close
+                              await Future.delayed(const Duration(milliseconds: 100));
+                              if (!mounted) return;
+                              
+                              ConnectionRow? row;
+                              if (type == ConnectionType.mongodb) {
+                                // Use the widget's context instead of menuContext for navigation
+                                row = await showMongoConnectionForm(context);
+                              } else {
+                                // For other types, create default connection
+                                row = ConnectionRow(
+                                  type: type.name,
+                                  name: '${type.label} connection',
+                                  createdAt: DateTime.now().toUtc().toIso8601String(),
+                                );
+                              }
+                              
+                              if (row != null && mounted) {
+                                await LocalDb.instance.addConnection(row);
+                                if (mounted) setState(() {});
                               }
                             },
                             child: const Text('New Connection'),
