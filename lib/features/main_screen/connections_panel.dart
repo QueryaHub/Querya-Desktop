@@ -9,7 +9,13 @@ import 'new_folder_dialog.dart';
 
 /// Left panel: Browser tree (pgAdmin-style). Uses shadcn layout widgets.
 class ConnectionsPanel extends StatefulWidget {
-  const ConnectionsPanel({super.key});
+  const ConnectionsPanel({
+    super.key,
+    this.onConnectionSelected,
+  });
+
+  /// Called when the user taps a connection tile.
+  final void Function(ConnectionRow connection)? onConnectionSelected;
 
   @override
   State<ConnectionsPanel> createState() => _ConnectionsPanelState();
@@ -137,6 +143,7 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
                             },
                             iconForType: _iconForType,
                             onRemoveConnection: _removeConnection,
+                            onConnectionTap: widget.onConnectionSelected,
                           ),
                         // Root connections (no folder)
                         for (final conn in rootConnections)
@@ -144,6 +151,7 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
                             connection: conn,
                             icon: _iconForType(conn.type),
                             onRemove: () => _removeConnection(conn.id!),
+                            onTap: () => widget.onConnectionSelected?.call(conn),
                           ),
                         // Empty state
                         if (_connections.isEmpty && _folders.isEmpty)
@@ -239,11 +247,13 @@ class _ConnectionTile extends StatelessWidget {
     required this.connection,
     required this.icon,
     required this.onRemove,
+    this.onTap,
   });
 
   final ConnectionRow connection;
   final material.IconData icon;
   final VoidCallback onRemove;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -261,7 +271,7 @@ class _ConnectionTile extends StatelessWidget {
         child: material.MouseRegion(
           cursor: material.SystemMouseCursors.click,
           child: material.InkWell(
-            onTap: () {},
+            onTap: onTap,
             borderRadius: material.BorderRadius.circular(6),
             child: material.Padding(
               padding: const material.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -298,6 +308,7 @@ class _FolderTile extends StatelessWidget {
     required this.onNewConnection,
     required this.iconForType,
     required this.onRemoveConnection,
+    this.onConnectionTap,
   });
 
   final String name;
@@ -306,6 +317,7 @@ class _FolderTile extends StatelessWidget {
   final void Function(String folderName) onNewConnection;
   final material.IconData Function(String type) iconForType;
   final Future<void> Function(int id) onRemoveConnection;
+  final void Function(ConnectionRow connection)? onConnectionTap;
 
   @override
   Widget build(BuildContext context) {
@@ -354,6 +366,7 @@ class _FolderTile extends StatelessWidget {
                   connection: conn,
                   icon: iconForType(conn.type),
                   onRemove: () => onRemoveConnection(conn.id!),
+                  onTap: () => onConnectionTap?.call(conn),
                 ),
               ),
           ],
