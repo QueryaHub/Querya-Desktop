@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart' as material show ListView, Padding, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, AnimatedContainer, Curves, SystemMouseCursors, DefaultTextStyle, TextStyle;
+import 'package:flutter/material.dart' as material show Padding, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, AnimatedContainer, Curves, SystemMouseCursors, DefaultTextStyle, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox;
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 import 'new_connection_dialog.dart';
@@ -39,28 +39,66 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
           ),
           Divider(height: 1, color: theme.colorScheme.border.withValues(alpha: 0.3)),
           Expanded(
-            child: material.ListView(
-              padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              children: [
-                _ExpandableSection(
-                  title: 'Servers',
-                  icon: material.Icons.dns_rounded,
-                  expanded: _serversExpanded,
-                  onToggle: () => setState(() => _serversExpanded = !_serversExpanded),
-                  contextMenuItems: [
-                    MenuButton(
-                      onPressed: (menuContext) async {
-                        final type = await showNewConnectionDialog(menuContext);
-                        if (type != null && mounted) {
-                          // TODO: open connection form for selected type
-                        }
-                      },
-                      child: const Text('New connection'),
+            child: material.CustomScrollView(
+              slivers: [
+                material.SliverPadding(
+                  padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  sliver: material.SliverToBoxAdapter(
+                    child: _ExpandableSection(
+                      title: 'Servers',
+                      icon: material.Icons.dns_rounded,
+                      expanded: _serversExpanded,
+                      onToggle: () => setState(() => _serversExpanded = !_serversExpanded),
+                      contextMenuItems: [
+                        MenuButton(
+                          onPressed: (menuContext) async {
+                            final type = await showNewConnectionDialog(menuContext);
+                            if (type != null && mounted) {
+                              // TODO: open connection form for selected type
+                            }
+                          },
+                          child: const Text('New connection'),
+                        ),
+                      ],
+                      child: material.Padding(
+                        padding: const material.EdgeInsets.only(left: 28, top: 6, bottom: 12),
+                        child: _EmptyState(message: 'No connections yet'),
+                      ),
                     ),
-                  ],
-                  child: material.Padding(
-                    padding: const material.EdgeInsets.only(left: 28, top: 6, bottom: 12),
-                    child: _EmptyState(message: 'No connections yet'),
+                  ),
+                ),
+                material.SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: ContextMenu(
+                    items: [
+                      MenuButton(
+                        leading: material.Icon(material.Icons.add_rounded, size: 18, color: theme.colorScheme.mutedForeground),
+                        subMenu: [
+                          MenuButton(
+                            leading: material.Icon(material.Icons.settings_ethernet_rounded, size: 18, color: theme.colorScheme.mutedForeground),
+                            onPressed: (menuContext) async {
+                              final type = await showNewConnectionDialog(menuContext);
+                              if (type != null && mounted) {
+                                // TODO: open connection form for selected type
+                              }
+                            },
+                            child: const Text('New Connection'),
+                          ),
+                          MenuButton(
+                            leading: material.Icon(material.Icons.folder_rounded, size: 18, color: theme.colorScheme.mutedForeground),
+                            onPressed: (_) {
+                              // TODO: create new folder
+                            },
+                            child: const Text('New Folder'),
+                          ),
+                        ],
+                        child: const Text('Create'),
+                      ),
+                    ],
+                    child: material.GestureDetector(
+                      behavior: material.HitTestBehavior.opaque,
+                      child: const material.SizedBox.expand(),
+                    ),
                   ),
                 ),
               ],
