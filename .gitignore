@@ -1,41 +1,21 @@
-# Prerequisites
-*.d
+# Dart / Flutter
+.dart_tool/
+.packages
+build/
+*.iml
+pubspec.lock
 
-# Compiled Object files
-*.slo
-*.lo
+# IDE
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Old C++/Qt (if still present)
 *.o
-*.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Linker files
-*.ilk
-
-# Debugger Files
-*.pdb
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
 *.a
-*.lib
-
-# Executables
+*.so
+*.dll
 *.exe
-*.out
-*.app
-
-# debug information files
-*.dwo
