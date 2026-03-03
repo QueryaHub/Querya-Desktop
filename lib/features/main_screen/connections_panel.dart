@@ -1,7 +1,10 @@
-import 'package:flutter/material.dart' as material show Padding, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, AnimatedContainer, Curves, SystemMouseCursors, DefaultTextStyle, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox;
+import 'package:flutter/material.dart' as material show Padding, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, AnimatedContainer, Curves, SystemMouseCursors, DefaultTextStyle, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, Column;
+import 'package:querya_desktop/core/storage/folders_storage.dart';
+import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 import 'new_connection_dialog.dart';
+import 'new_folder_dialog.dart';
 
 /// Left panel: Browser tree (pgAdmin-style). Uses shadcn layout widgets.
 class ConnectionsPanel extends StatefulWidget {
@@ -12,7 +15,39 @@ class ConnectionsPanel extends StatefulWidget {
 }
 
 class _ConnectionsPanelState extends State<ConnectionsPanel> {
-  bool _serversExpanded = true;
+  List<String> _folders = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFolders();
+  }
+
+  Future<void> _loadFolders() async {
+    final list = await FoldersStorage.instance.load();
+    if (mounted) setState(() => _folders = list);
+  }
+
+  Future<void> _createFolder(BuildContext menuContext) async {
+    final name = await showNewFolderDialog(menuContext);
+    if (name == null || !mounted) return;
+    await FoldersStorage.instance.add(name);
+    if (mounted) setState(() => _folders = FoldersStorage.instance.folders);
+  }
+
+  Future<void> _createConnectionInFolder(String folderName) async {
+    final type = await showNewConnectionDialog(context);
+    if (type == null || !mounted) return;
+    final folderId = await LocalDb.instance.getFolderIdByName(folderName);
+    final row = ConnectionRow(
+      type: type.name,
+      name: '${type.label} connection',
+      createdAt: DateTime.now().toUtc().toIso8601String(),
+      folderId: folderId,
+    );
+    await LocalDb.instance.addConnection(row);
+    if (mounted) setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,26 +79,24 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
                 material.SliverPadding(
                   padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   sliver: material.SliverToBoxAdapter(
-                    child: _ExpandableSection(
-                      title: 'Servers',
-                      icon: material.Icons.dns_rounded,
-                      expanded: _serversExpanded,
-                      onToggle: () => setState(() => _serversExpanded = !_serversExpanded),
-                      contextMenuItems: [
-                        MenuButton(
-                          onPressed: (menuContext) async {
-                            final type = await showNewConnectionDialog(menuContext);
-                            if (type != null && mounted) {
-                              // TODO: open connection form for selected type
-                            }
-                          },
-                          child: const Text('New connection'),
+                    child: material.Column(
+                      crossAxisAlignment: material.CrossAxisAlignment.start,
+                      mainAxisSize: material.MainAxisSize.min,
+                      children: [
+                        for (final name in _folders)
+                          _FolderTile(
+                            name: name,
+                            onRemove: () async {
+                              await FoldersStorage.instance.remove(name);
+                              if (mounted) setState(() => _folders = FoldersStorage.instance.folders);
+                            },
+                            onNewConnection: (folderName) => _createConnectionInFolder(folderName),
+                          ),
+                        material.Padding(
+                          padding: const material.EdgeInsets.only(top: 8),
+                          child: _EmptyState(message: 'No connections yet'),
                         ),
                       ],
-                      child: material.Padding(
-                        padding: const material.EdgeInsets.only(left: 28, top: 6, bottom: 12),
-                        child: _EmptyState(message: 'No connections yet'),
-                      ),
                     ),
                   ),
                 ),
@@ -86,9 +119,7 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
                           ),
                           MenuButton(
                             leading: material.Icon(material.Icons.folder_rounded, size: 18, color: theme.colorScheme.mutedForeground),
-                            onPressed: (_) {
-                              // TODO: create new folder
-                            },
+                            onPressed: (menuContext) => _createFolder(menuContext),
                             child: const Text('New Folder'),
                           ),
                         ],
@@ -146,86 +177,53 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-class _ExpandableSection extends StatefulWidget {
-  const _ExpandableSection({
-    required this.title,
-    required this.icon,
-    required this.expanded,
-    required this.onToggle,
-    required this.child,
-    this.contextMenuItems,
+class _FolderTile extends StatelessWidget {
+  const _FolderTile({
+    required this.name,
+    required this.onRemove,
+    required this.onNewConnection,
   });
 
-  final String title;
-  final material.IconData icon;
-  final bool expanded;
-  final VoidCallback onToggle;
-  final Widget child;
-  final List<MenuItem>? contextMenuItems;
-
-  @override
-  State<_ExpandableSection> createState() => _ExpandableSectionState();
-}
-
-class _ExpandableSectionState extends State<_ExpandableSection> {
-  bool _hovered = false;
+  final String name;
+  final VoidCallback onRemove;
+  final void Function(String folderName) onNewConnection;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final expanded = widget.expanded;
-
-    final headerRow = material.MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: material.SystemMouseCursors.click,
-      child: material.InkWell(
-        onTap: widget.onToggle,
-        borderRadius: material.BorderRadius.circular(8),
-        child: material.AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          curve: material.Curves.easeOut,
-          padding: const material.EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-          decoration: material.BoxDecoration(
-            color: _hovered
-                ? theme.colorScheme.muted.withValues(alpha: 0.35)
-                : Colors.transparent,
-            borderRadius: material.BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              material.Icon(
-                expanded ? material.Icons.expand_more : material.Icons.chevron_right,
-                size: 20,
-                color: theme.colorScheme.mutedForeground,
+    return ContextMenu(
+      items: [
+        MenuButton(
+          leading: material.Icon(material.Icons.settings_ethernet_rounded, size: 18, color: theme.colorScheme.mutedForeground),
+          onPressed: (menuContext) => onNewConnection(name),
+          child: const Text('New connection'),
+        ),
+        MenuButton(
+          leading: material.Icon(material.Icons.delete_outline_rounded, size: 18, color: theme.colorScheme.mutedForeground),
+          onPressed: (_) => onRemove(),
+          child: const Text('Remove folder'),
+        ),
+      ],
+      child: material.Padding(
+        padding: const material.EdgeInsets.only(bottom: 4),
+        child: material.MouseRegion(
+          cursor: material.SystemMouseCursors.click,
+          child: material.InkWell(
+            onTap: () {},
+            borderRadius: material.BorderRadius.circular(6),
+            child: material.Padding(
+              padding: const material.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: Row(
+                children: [
+                  material.Icon(material.Icons.folder_rounded, size: 18, color: theme.colorScheme.primary),
+                  const Gap(8),
+                  Expanded(child: Text(name).small()),
+                ],
               ),
-              const Gap(6),
-              material.Icon(
-                widget.icon,
-                size: 18,
-                color: theme.colorScheme.primary,
-              ),
-              const Gap(8),
-              Text(widget.title).semiBold().small(),
-            ],
+            ),
           ),
         ),
       ),
-    );
-
-    return Column(
-      crossAxisAlignment: material.CrossAxisAlignment.start,
-      mainAxisSize: material.MainAxisSize.min,
-      children: [
-        if (widget.contextMenuItems != null && widget.contextMenuItems!.isNotEmpty)
-          ContextMenu(
-            items: widget.contextMenuItems!,
-            child: headerRow,
-          )
-        else
-          headerRow,
-        if (expanded) widget.child,
-      ],
     );
   }
 }
