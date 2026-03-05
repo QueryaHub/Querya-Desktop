@@ -5,7 +5,7 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 void main() {
   group('RedisService.createConnection', () {
     test('creates RedisConnection from ConnectionRow', () {
-      final row = ConnectionRow(
+      const row = ConnectionRow(
         id: 10,
         type: 'redis',
         name: 'My Redis',
@@ -28,7 +28,7 @@ void main() {
     });
 
     test('uses default host and port when null', () {
-      final row = ConnectionRow(
+      const row = ConnectionRow(
         id: 1,
         type: 'redis',
         name: 'Defaults',
@@ -42,7 +42,7 @@ void main() {
     });
 
     test('uses id=0 when ConnectionRow.id is null', () {
-      final row = ConnectionRow(
+      const row = ConnectionRow(
         type: 'redis',
         name: 'No ID',
         createdAt: '2026-01-01T00:00:00Z',
@@ -53,7 +53,7 @@ void main() {
     });
 
     test('throws ArgumentError for non-redis type', () {
-      final row = ConnectionRow(
+      const row = ConnectionRow(
         id: 1,
         type: 'mongodb',
         name: 'Mongo',
@@ -67,14 +67,14 @@ void main() {
     });
 
     test('replaces existing connection with same ID', () {
-      final row1 = ConnectionRow(
+      const row1 = ConnectionRow(
         id: 99,
         type: 'redis',
         name: 'First',
         host: 'host1',
         createdAt: '2026-01-01T00:00:00Z',
       );
-      final row2 = ConnectionRow(
+      const row2 = ConnectionRow(
         id: 99,
         type: 'redis',
         name: 'Second',
@@ -95,7 +95,7 @@ void main() {
 
   group('RedisService.getConnection', () {
     test('returns connection by ID', () {
-      final row = ConnectionRow(
+      const row = ConnectionRow(
         id: 50,
         type: 'redis',
         name: 'Findable',
@@ -115,7 +115,7 @@ void main() {
 
   group('RedisService.disconnect', () {
     test('removes connection from service after disconnect', () async {
-      final row = ConnectionRow(
+      const row = ConnectionRow(
         id: 77,
         type: 'redis',
         name: 'ToDisconnect',

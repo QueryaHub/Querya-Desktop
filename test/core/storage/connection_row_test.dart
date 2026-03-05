@@ -4,7 +4,7 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 void main() {
   group('ConnectionRow', () {
     test('toMap produces correct keys and values', () {
-      final row = ConnectionRow(
+      const row = ConnectionRow(
         type: 'mongodb',
         name: 'Test Mongo',
         host: 'mongo.example.com',
@@ -38,7 +38,7 @@ void main() {
     });
 
     test('toMap encodes useSSL=false as 0', () {
-      final row = ConnectionRow(
+      const row = ConnectionRow(
         type: 'redis',
         name: 'Redis',
         createdAt: '2026-01-01T00:00:00Z',
@@ -99,7 +99,7 @@ void main() {
     });
 
     test('round-trip: toMap -> fromMap preserves data', () {
-      final original = ConnectionRow(
+      const original = ConnectionRow(
         type: 'mongodb',
         name: 'Round Trip',
         host: 'localhost',
@@ -160,7 +160,7 @@ void main() {
     });
 
     test('toMap does not include id field', () {
-      final row = ConnectionRow(
+      const row = ConnectionRow(
         id: 123,
         type: 'redis',
         name: 'R',
