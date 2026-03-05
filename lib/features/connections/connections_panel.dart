@@ -3,10 +3,10 @@ import 'package:querya_desktop/core/storage/folders_storage.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
-import 'mongodb_connection_form.dart';
+import 'package:querya_desktop/features/mongodb/mongodb_connection_form.dart';
+import 'package:querya_desktop/features/redis/redis_connection_form.dart';
 import 'new_connection_dialog.dart';
 import 'new_folder_dialog.dart';
-import 'redis_connection_form.dart';
 
 /// Left panel: Browser tree (pgAdmin-style). Uses shadcn layout widgets.
 class ConnectionsPanel extends StatefulWidget {
