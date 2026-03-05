@@ -8,19 +8,30 @@ class RedisService {
 
   final Map<int, RedisConnection> _connections = {};
 
+  /// Creates (or replaces) a [RedisConnection] for the given [ConnectionRow].
+  /// If a connection with the same ID already exists it is disconnected first.
   RedisConnection createConnection(ConnectionRow row) {
     if (row.type != 'redis') {
       throw ArgumentError('Connection type must be redis');
     }
+
+    final id = row.id ?? 0;
+
+    // Disconnect previous connection for this ID, if any.
+    final existing = _connections[id];
+    if (existing != null) {
+      existing.disconnect(); // fire-and-forget; disconnect is safe
+    }
+
     final conn = RedisConnection(
-      id: row.id ?? 0,
+      id: id,
       name: row.name,
       host: row.host ?? 'localhost',
       port: row.port ?? 6379,
       username: row.username,
       password: row.password,
     );
-    _connections[conn.id] = conn;
+    _connections[id] = conn;
     return conn;
   }
 

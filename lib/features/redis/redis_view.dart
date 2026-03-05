@@ -38,6 +38,7 @@ class _RedisViewState extends material.State<RedisView> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.connectionRow.id != widget.connectionRow.id) {
       _timer?.cancel();
+      _disconnectCurrent();
       _load();
     }
   }
@@ -45,11 +46,22 @@ class _RedisViewState extends material.State<RedisView> {
   @override
   void dispose() {
     _timer?.cancel();
+    _disconnectCurrent();
     super.dispose();
+  }
+
+  /// Safely disconnects and clears the current Redis connection.
+  void _disconnectCurrent() {
+    final conn = _connection;
+    _connection = null;
+    if (conn != null) {
+      conn.disconnect(); // fire-and-forget; disconnect handles errors
+    }
   }
 
   Future<void> _load() async {
     _timer?.cancel();
+    _disconnectCurrent();
     if (!mounted) return;
     setState(() {
       _loading = true;
@@ -59,7 +71,11 @@ class _RedisViewState extends material.State<RedisView> {
     try {
       final conn = RedisService.instance.createConnection(widget.connectionRow);
       await conn.connect();
-      if (!mounted) return;
+      if (!mounted) {
+        // Widget was disposed while connecting — clean up immediately.
+        conn.disconnect();
+        return;
+      }
       _connection = conn;
       await _fetch();
       if (mounted) _startTimer();
@@ -104,13 +120,13 @@ class _RedisViewState extends material.State<RedisView> {
         child: material.Column(
           mainAxisSize: material.MainAxisSize.min,
           children: [
-            material.SizedBox(
+            const material.SizedBox(
               width: 32,
               height: 32,
-              child: material.CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+              child: material.CircularProgressIndicator(strokeWidth: 2),
             ),
             const Gap(16),
-            Text('Connecting...').muted().small(),
+            const Text('Connecting...').muted().small(),
           ],
         ),
       );
@@ -126,7 +142,7 @@ class _RedisViewState extends material.State<RedisView> {
             children: [
               material.Icon(material.Icons.error_outline_rounded, size: 48, color: cs.destructive),
               const Gap(16),
-              Text('Connection Error').large().semiBold(),
+              const Text('Connection Error').large().semiBold(),
               const Gap(8),
               material.SelectableText(err, style: material.TextStyle(color: cs.mutedForeground, fontSize: 13)),
               const Gap(24),

@@ -3,10 +3,10 @@ import 'package:querya_desktop/core/storage/folders_storage.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
-import 'mongodb_connection_form.dart';
+import 'package:querya_desktop/features/mongodb/mongodb_connection_form.dart';
+import 'package:querya_desktop/features/redis/redis_connection_form.dart';
 import 'new_connection_dialog.dart';
 import 'new_folder_dialog.dart';
-import 'redis_connection_form.dart';
 
 /// Left panel: Browser tree (pgAdmin-style). Uses shadcn layout widgets.
 class ConnectionsPanel extends StatefulWidget {
@@ -142,7 +142,7 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
             padding: const material.EdgeInsets.fromLTRB(20, 24, 16, 16),
             child: material.DefaultTextStyle(
               style: material.TextStyle(color: theme.colorScheme.mutedForeground),
-              child: Text('Browser').semiBold().small(),
+                  child: const Text('Browser').semiBold().small(),
             ),
           ),
           Divider(height: 1, color: theme.colorScheme.border.withValues(alpha: 0.3)),
@@ -198,8 +198,8 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
                           ),
                         // Empty state
                         if (_connections.isEmpty && _folders.isEmpty)
-                          material.Padding(
-                            padding: const material.EdgeInsets.only(top: 8),
+                          const material.Padding(
+                            padding: material.EdgeInsets.only(top: 8),
                             child: _EmptyState(message: 'No connections yet'),
                           ),
                       ],

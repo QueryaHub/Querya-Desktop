@@ -56,7 +56,9 @@ class FoldersStorage {
   Future<void> save(List<String> folders) async {
     _folders = List.from(folders);
     await LocalDb.instance.clearFolders();
-    for (final name in _folders) await LocalDb.instance.addFolder(name);
+    for (final name in _folders) {
+      await LocalDb.instance.addFolder(name);
+    }
   }
 
   Future<void> add(String name) async {

@@ -157,22 +157,22 @@ class _RedisConnectionFormContentState extends material.State<_RedisConnectionFo
                     children: [
                       material.Icon(material.Icons.memory_rounded, size: 24, color: theme.primary),
                       const Gap(12),
-                      Text('Redis Connection').large().semiBold(),
+                      const Text('Redis Connection').large().semiBold(),
                     ],
                   ),
                   const Gap(8),
-                  Text('Configure Redis connection.').muted().small(),
+                  const Text('Configure Redis connection.').muted().small(),
                 ],
               ),
             ),
-            material.Divider(height: 1),
+            const material.Divider(height: 1),
             material.Expanded(
               child: material.SingleChildScrollView(
                 padding: const material.EdgeInsets.all(24),
                 child: material.Column(
                   crossAxisAlignment: material.CrossAxisAlignment.stretch,
                   children: [
-                    Text('Connection Name').small().semiBold(),
+                    const Text('Connection Name').small().semiBold(),
                     const Gap(8),
                     TextField(
                       controller: _nameController,
@@ -187,7 +187,7 @@ class _RedisConnectionFormContentState extends material.State<_RedisConnectionFo
                             crossAxisAlignment: material.CrossAxisAlignment.stretch,
                             mainAxisSize: material.MainAxisSize.min,
                             children: [
-                              Text('Host').small().semiBold(),
+                              const Text('Host').small().semiBold(),
                               const Gap(8),
                               TextField(
                                 controller: _hostController,
@@ -203,7 +203,7 @@ class _RedisConnectionFormContentState extends material.State<_RedisConnectionFo
                             crossAxisAlignment: material.CrossAxisAlignment.stretch,
                             mainAxisSize: material.MainAxisSize.min,
                             children: [
-                              Text('Port').small().semiBold(),
+                              const Text('Port').small().semiBold(),
                               const Gap(8),
                               TextField(
                                 controller: _portController,
@@ -215,14 +215,14 @@ class _RedisConnectionFormContentState extends material.State<_RedisConnectionFo
                       ],
                     ),
                     const Gap(16),
-                    Text('Username (optional, Redis 6+ ACL)').small().semiBold(),
+                    const Text('Username (optional, Redis 6+ ACL)').small().semiBold(),
                     const Gap(8),
                     TextField(
                       controller: _usernameController,
                       placeholder: const Text('default (leave empty for default user)'),
                     ),
                     const Gap(16),
-                    Text('Password (optional)').small().semiBold(),
+                    const Text('Password (optional)').small().semiBold(),
                     const Gap(8),
                     material.Stack(
                       children: [
@@ -255,7 +255,7 @@ class _RedisConnectionFormContentState extends material.State<_RedisConnectionFo
                 ),
               ),
             ),
-            material.Divider(height: 1),
+            const material.Divider(height: 1),
             if (_testResult != null)
               material.Padding(
                 padding: const material.EdgeInsets.fromLTRB(24, 8, 16, 8),
