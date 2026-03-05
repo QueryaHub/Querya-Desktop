@@ -2,8 +2,11 @@ import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart';
 
 import 'app/app.dart';
+import 'core/storage/local_db.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await LocalDb.initFfi();
   runApp(const QueryaApp());
   doWhenWindowReady(() {
     final win = appWindow;
