@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart' as material show Container, EdgeInsets, BoxDecoration, GestureDetector, Padding, BorderRadius, Spacer, Center, CrossAxisAlignment, Icon, Icons, MouseRegion, AnimatedContainer, AnimatedScale, Curves, SystemMouseCursors, LayoutBuilder, HitTestBehavior;
+import 'package:flutter/material.dart' as material show Container, EdgeInsets, BoxDecoration, GestureDetector, Padding, BorderRadius, Spacer, Center, CrossAxisAlignment, Icon, Icons, MouseRegion, AnimatedContainer, AnimatedScale, Curves, SystemMouseCursors, LayoutBuilder, HitTestBehavior, SizedBox;
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 import 'mongo_databases_view.dart';
 import 'query_editor_tab.dart';
+import 'redis_view.dart';
 import 'results_tab.dart';
 
 /// Main workspace: top = Query Editor / Query History, bottom = Data Output / Messages (pgAdmin-style). Uses shadcn layout.
@@ -35,6 +36,20 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
       return MongoDatabasesView(
         key: ValueKey(widget.activeConnection!.id),
         connectionRow: widget.activeConnection!,
+      );
+    }
+
+    // If a Redis connection is selected, show the Redis view (wrapped so it gets bounded constraints)
+    if (widget.activeConnection != null &&
+        widget.activeConnection!.type == 'redis') {
+      return material.Container(
+        color: theme.colorScheme.background,
+        child: material.SizedBox.expand(
+          child: RedisView(
+            key: ValueKey(widget.activeConnection!.id),
+            connectionRow: widget.activeConnection!,
+          ),
+        ),
       );
     }
 
