@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart' as material show Padding, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, DefaultTextStyle, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, Column;
+import 'package:flutter/material.dart' as material show Padding, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, DefaultTextStyle, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, Column, AnimatedRotation, Row, BoxFit;
 import 'package:querya_desktop/core/storage/folders_storage.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -6,6 +6,7 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'mongodb_connection_form.dart';
 import 'new_connection_dialog.dart';
 import 'new_folder_dialog.dart';
+import 'redis_connection_form.dart';
 
 /// Left panel: Browser tree (pgAdmin-style). Uses shadcn layout widgets.
 class ConnectionsPanel extends StatefulWidget {
@@ -24,6 +25,8 @@ class ConnectionsPanel extends StatefulWidget {
 class _ConnectionsPanelState extends State<ConnectionsPanel> {
   List<String> _folders = [];
   List<ConnectionRow> _connections = [];
+  Map<String, int> _folderIdByName = {};
+  final Set<String> _expandedFolders = {};
 
   @override
   void initState() {
@@ -33,13 +36,34 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
 
   Future<void> _loadData() async {
     final folders = await FoldersStorage.instance.load();
-    final connections = await LocalDb.instance.getConnections();
+    var connections = await LocalDb.instance.getConnections();
+    // Remove stub connections (PostgreSQL/MySQL placeholders) from DB and from list
+    for (final c in connections.where(_isStubConnection)) {
+      if (c.id != null) await LocalDb.instance.removeConnection(c.id!);
+    }
+    connections = connections.where((c) => !_isStubConnection(c)).toList();
+    final folderIdByName = <String, int>{};
+    for (final name in folders) {
+      final id = await LocalDb.instance.getFolderIdByName(name);
+      if (id != null) folderIdByName[name] = id;
+    }
     if (mounted) {
       setState(() {
+        final previousFolders = _folders.toSet();
         _folders = folders;
         _connections = connections;
+        _folderIdByName = folderIdByName;
+        for (final name in folders) {
+          if (!previousFolders.contains(name)) _expandedFolders.add(name);
+        }
+        _expandedFolders.removeWhere((n) => !folders.contains(n));
       });
     }
+  }
+
+  static bool _isStubConnection(ConnectionRow c) {
+    return (c.type == 'postgresql' && c.name == 'PostgreSQL connection') ||
+        (c.type == 'mysql' && c.name == 'MySQL connection');
   }
 
   Future<void> _createFolder(BuildContext menuContext) async {
@@ -54,13 +78,11 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
 
     if (type == ConnectionType.mongodb) {
       row = await showMongoConnectionForm(context, folderId: folderId);
+    } else if (type == ConnectionType.redis) {
+      row = await showRedisConnectionForm(context, folderId: folderId);
     } else {
-      row = ConnectionRow(
-        type: type.name,
-        name: '${type.label} connection',
-        createdAt: DateTime.now().toUtc().toIso8601String(),
-        folderId: folderId,
-      );
+      // PostgreSQL / MySQL: no connection form yet — do not create a stub
+      row = null;
     }
 
     if (row != null && mounted) {
@@ -74,14 +96,25 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
     await _loadData();
   }
 
-  /// Icon for a connection type.
+  /// Icon for a connection type (matches New Connection dialog).
   material.IconData _iconForType(String type) {
     return switch (type) {
       'mongodb' => material.Icons.eco_rounded,
       'postgresql' => material.Icons.storage_rounded,
-      'mysql' => material.Icons.dns_rounded,
-      'redis' => material.Icons.bolt_rounded,
+      'mysql' => material.Icons.table_chart_rounded,
+      'redis' => material.Icons.memory_rounded,
       _ => material.Icons.settings_ethernet_rounded,
+    };
+  }
+
+  /// Asset path for connection type logo (null = use icon).
+  static String? _iconAssetForType(String type) {
+    return switch (type) {
+      'postgresql' => 'assets/images/postgresql_icon.png',
+      'mysql' => 'assets/images/mysql_icon.png',
+      'redis' => 'assets/images/redis_icon.png',
+      'mongodb' => 'assets/images/mongodb_icon.png',
+      _ => null,
     };
   }
 
@@ -127,10 +160,19 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
                         for (final name in _folders)
                           _FolderTile(
                             name: name,
-                            connections: _connections.where((c) {
-                              // Match by folder_id — need to look up id
-                              return false; // TODO: match folder id
-                            }).toList(),
+                            isExpanded: _expandedFolders.contains(name),
+                            onToggle: () {
+                              setState(() {
+                                if (_expandedFolders.contains(name)) {
+                                  _expandedFolders.remove(name);
+                                } else {
+                                  _expandedFolders.add(name);
+                                }
+                              });
+                            },
+                            connections: _connections
+                                .where((c) => c.folderId == _folderIdByName[name])
+                                .toList(),
                             onRemove: () async {
                               await FoldersStorage.instance.remove(name);
                               await _loadData();
@@ -150,6 +192,7 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
                           _ConnectionTile(
                             connection: conn,
                             icon: _iconForType(conn.type),
+                            iconAsset: _iconAssetForType(conn.type),
                             onRemove: () => _removeConnection(conn.id!),
                             onTap: () => widget.onConnectionSelected?.call(conn),
                           ),
@@ -223,7 +266,7 @@ class _EmptyState extends StatelessWidget {
           width: 1,
         ),
       ),
-      child: Row(
+      child: material.Row(
         crossAxisAlignment: material.CrossAxisAlignment.center,
         children: [
           material.Icon(
@@ -246,18 +289,33 @@ class _ConnectionTile extends StatelessWidget {
   const _ConnectionTile({
     required this.connection,
     required this.icon,
+    this.iconAsset,
     required this.onRemove,
     this.onTap,
   });
 
   final ConnectionRow connection;
   final material.IconData icon;
+  final String? iconAsset;
   final VoidCallback onRemove;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final iconWidget = iconAsset != null
+        ? material.Image.asset(
+            iconAsset!,
+            width: 16,
+            height: 16,
+            fit: material.BoxFit.contain,
+            errorBuilder: (_, __, ___) => material.Icon(
+              icon,
+              size: 16,
+              color: theme.colorScheme.primary,
+            ),
+          )
+        : material.Icon(icon, size: 16, color: theme.colorScheme.primary);
     return ContextMenu(
       items: [
         MenuButton(
@@ -275,9 +333,9 @@ class _ConnectionTile extends StatelessWidget {
             borderRadius: material.BorderRadius.circular(6),
             child: material.Padding(
               padding: const material.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              child: Row(
+              child: material.Row(
                 children: [
-                  material.Icon(icon, size: 16, color: theme.colorScheme.primary),
+                  iconWidget,
                   const Gap(8),
                   Expanded(
                     child: Column(
@@ -303,6 +361,8 @@ class _ConnectionTile extends StatelessWidget {
 class _FolderTile extends StatelessWidget {
   const _FolderTile({
     required this.name,
+    required this.isExpanded,
+    required this.onToggle,
     required this.connections,
     required this.onRemove,
     required this.onNewConnection,
@@ -312,6 +372,8 @@ class _FolderTile extends StatelessWidget {
   });
 
   final String name;
+  final bool isExpanded;
+  final VoidCallback onToggle;
   final List<ConnectionRow> connections;
   final VoidCallback onRemove;
   final void Function(String folderName) onNewConnection;
@@ -344,12 +406,22 @@ class _FolderTile extends StatelessWidget {
             material.MouseRegion(
               cursor: material.SystemMouseCursors.click,
               child: material.InkWell(
-                onTap: () {},
+                onTap: onToggle,
                 borderRadius: material.BorderRadius.circular(6),
                 child: material.Padding(
                   padding: const material.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  child: Row(
+                  child: material.Row(
                     children: [
+                      material.AnimatedRotation(
+                        turns: isExpanded ? 0.25 : 0,
+                        duration: const Duration(milliseconds: 150),
+                        child: material.Icon(
+                          material.Icons.chevron_right_rounded,
+                          size: 18,
+                          color: theme.colorScheme.mutedForeground,
+                        ),
+                      ),
+                      const Gap(2),
                       material.Icon(material.Icons.folder_rounded, size: 18, color: theme.colorScheme.primary),
                       const Gap(8),
                       Expanded(child: Text(name).small()),
@@ -358,17 +430,19 @@ class _FolderTile extends StatelessWidget {
                 ),
               ),
             ),
-            // Show connections inside this folder
-            for (final conn in connections)
-              material.Padding(
-                padding: const material.EdgeInsets.only(left: 24),
-                child: _ConnectionTile(
-                  connection: conn,
-                  icon: iconForType(conn.type),
-                  onRemove: () => onRemoveConnection(conn.id!),
-                  onTap: () => onConnectionTap?.call(conn),
+            // Show connections inside this folder when expanded
+            if (isExpanded)
+              for (final conn in connections)
+                material.Padding(
+                  padding: const material.EdgeInsets.only(left: 24),
+                  child: _ConnectionTile(
+                    connection: conn,
+                    icon: iconForType(conn.type),
+                    iconAsset: _ConnectionsPanelState._iconAssetForType(conn.type),
+                    onRemove: () => onRemoveConnection(conn.id!),
+                    onTap: () => onConnectionTap?.call(conn),
+                  ),
                 ),
-              ),
           ],
         ),
       ),
