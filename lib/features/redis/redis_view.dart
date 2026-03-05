@@ -38,6 +38,7 @@ class _RedisViewState extends material.State<RedisView> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.connectionRow.id != widget.connectionRow.id) {
       _timer?.cancel();
+      _disconnectCurrent();
       _load();
     }
   }
@@ -45,11 +46,22 @@ class _RedisViewState extends material.State<RedisView> {
   @override
   void dispose() {
     _timer?.cancel();
+    _disconnectCurrent();
     super.dispose();
+  }
+
+  /// Safely disconnects and clears the current Redis connection.
+  void _disconnectCurrent() {
+    final conn = _connection;
+    _connection = null;
+    if (conn != null) {
+      conn.disconnect(); // fire-and-forget; disconnect handles errors
+    }
   }
 
   Future<void> _load() async {
     _timer?.cancel();
+    _disconnectCurrent();
     if (!mounted) return;
     setState(() {
       _loading = true;
@@ -59,7 +71,11 @@ class _RedisViewState extends material.State<RedisView> {
     try {
       final conn = RedisService.instance.createConnection(widget.connectionRow);
       await conn.connect();
-      if (!mounted) return;
+      if (!mounted) {
+        // Widget was disposed while connecting — clean up immediately.
+        conn.disconnect();
+        return;
+      }
       _connection = conn;
       await _fetch();
       if (mounted) _startTimer();
