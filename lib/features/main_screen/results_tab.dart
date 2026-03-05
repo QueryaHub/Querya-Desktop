@@ -7,7 +7,7 @@ class ResultsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return material.Center(
-      child: Text('Results').muted(),
+      child: const Text('Results').muted(),
     );
   }
 }
