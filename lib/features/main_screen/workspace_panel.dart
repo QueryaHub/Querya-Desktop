@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart' as material show Container, EdgeInsets, BoxDecoration, GestureDetector, Padding, BorderRadius, Spacer, Center, CrossAxisAlignment, Icon, Icons, MouseRegion, AnimatedContainer, AnimatedScale, Curves, SystemMouseCursors, LayoutBuilder, HitTestBehavior;
+import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
+import 'mongo_databases_view.dart';
 import 'query_editor_tab.dart';
 import 'results_tab.dart';
 
 /// Main workspace: top = Query Editor / Query History, bottom = Data Output / Messages (pgAdmin-style). Uses shadcn layout.
 class WorkspacePanel extends StatefulWidget {
-  const WorkspacePanel({super.key});
+  const WorkspacePanel({
+    super.key,
+    this.activeConnection,
+  });
+
+  /// Currently selected connection from the sidebar.
+  final ConnectionRow? activeConnection;
 
   @override
   State<WorkspacePanel> createState() => _WorkspacePanelState();
@@ -20,6 +28,16 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    // If a MongoDB connection is selected, show the databases view
+    if (widget.activeConnection != null &&
+        widget.activeConnection!.type == 'mongodb') {
+      return MongoDatabasesView(
+        key: ValueKey(widget.activeConnection!.id),
+        connectionRow: widget.activeConnection!,
+      );
+    }
+
     final topFlex = (_topFraction * 100).round().clamp(20, 80);
     final bottomFlex = 100 - topFlex;
 

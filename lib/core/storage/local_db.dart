@@ -5,7 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const _dbName = 'querya.db';
-const _dbVersion = 1;
+const _dbVersion = 2;
 
 /// Local SQLite database for folders and connections.
 /// File: [applicationSupport]/querya_desktop/querya.db
@@ -33,6 +33,7 @@ class LocalDb {
       options: OpenDatabaseOptions(
         version: _dbVersion,
         onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
       ),
     );
     return _db!;
@@ -54,11 +55,26 @@ class LocalDb {
         host TEXT,
         port INTEGER,
         username TEXT,
+        password TEXT,
+        database_name TEXT,
+        auth_source TEXT,
+        use_ssl INTEGER NOT NULL DEFAULT 0,
+        connection_string TEXT,
         folder_id INTEGER REFERENCES folders(id),
         sort_order INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL
       )
     ''');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE connections ADD COLUMN password TEXT');
+      await db.execute('ALTER TABLE connections ADD COLUMN database_name TEXT');
+      await db.execute('ALTER TABLE connections ADD COLUMN auth_source TEXT');
+      await db.execute('ALTER TABLE connections ADD COLUMN use_ssl INTEGER NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE connections ADD COLUMN connection_string TEXT');
+    }
   }
 
   Future<List<String>> getFolders() async {
@@ -121,6 +137,11 @@ class ConnectionRow {
     this.host,
     this.port,
     this.username,
+    this.password,
+    this.databaseName,
+    this.authSource,
+    this.useSSL = false,
+    this.connectionString,
     this.folderId,
     this.sortOrder = 0,
     required this.createdAt,
@@ -132,6 +153,11 @@ class ConnectionRow {
   final String? host;
   final int? port;
   final String? username;
+  final String? password;
+  final String? databaseName;
+  final String? authSource;
+  final bool useSSL;
+  final String? connectionString;
   final int? folderId;
   final int sortOrder;
   final String createdAt;
@@ -142,6 +168,11 @@ class ConnectionRow {
         'host': host,
         'port': port,
         'username': username,
+        'password': password,
+        'database_name': databaseName,
+        'auth_source': authSource,
+        'use_ssl': useSSL ? 1 : 0,
+        'connection_string': connectionString,
         'folder_id': folderId,
         'sort_order': sortOrder,
         'created_at': createdAt,
@@ -154,6 +185,11 @@ class ConnectionRow {
         host: m['host'] as String?,
         port: m['port'] as int?,
         username: m['username'] as String?,
+        password: m['password'] as String?,
+        databaseName: m['database_name'] as String?,
+        authSource: m['auth_source'] as String?,
+        useSSL: (m['use_ssl'] as int?) == 1,
+        connectionString: m['connection_string'] as String?,
         folderId: m['folder_id'] as int?,
         sortOrder: m['sort_order'] as int? ?? 0,
         createdAt: m['created_at'] as String,

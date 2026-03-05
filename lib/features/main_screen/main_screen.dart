@@ -1,5 +1,6 @@
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart' as material show Scaffold, Container, MainAxisSize, GestureDetector, MouseRegion, SystemMouseCursors, HitTestBehavior, Icons, Icon;
+import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -18,6 +19,15 @@ class _MainScreenState extends State<MainScreen> {
   static const double _minLeftWidth = 180;
   static const double _maxLeftWidth = 500;
   double _leftPanelWidth = 260;
+
+  /// Currently selected connection (null = no connection selected).
+  ConnectionRow? _activeConnection;
+
+  void _onConnectionSelected(ConnectionRow connection) {
+    setState(() {
+      _activeConnection = connection;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +48,9 @@ class _MainScreenState extends State<MainScreen> {
                   children: [
                     SizedBox(
                       width: _leftPanelWidth,
-                      child: const ConnectionsPanel(),
+                      child: ConnectionsPanel(
+                        onConnectionSelected: _onConnectionSelected,
+                      ),
                     ),
                     _VerticalResizeHandle(
                       onDrag: (dx) {
@@ -48,7 +60,11 @@ class _MainScreenState extends State<MainScreen> {
                         });
                       },
                     ),
-                    const Expanded(child: WorkspacePanel()),
+                    Expanded(
+                      child: WorkspacePanel(
+                        activeConnection: _activeConnection,
+                      ),
+                    ),
                   ],
                 ),
               ),
