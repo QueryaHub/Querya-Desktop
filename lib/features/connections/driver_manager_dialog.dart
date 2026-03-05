@@ -31,10 +31,10 @@ void showDriverManagerDialog(BuildContext context) {
   showDialog<void>(
     context: context,
     barrierColor: material.Colors.black54,
-    builder: (context) => material.Dialog(
+    builder: (context) => const material.Dialog(
       backgroundColor: material.Colors.transparent,
-      insetPadding: const material.EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-      child: const _DriverManagerDialogContent(),
+      insetPadding: material.EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+      child: _DriverManagerDialogContent(),
     ),
   );
 }
@@ -62,11 +62,6 @@ class _DriverManagerDialogContentState extends material.State<_DriverManagerDial
       final installed = await DriverStorage.instance.isInstalled(d);
       if (mounted) setState(() => _installed[d] = installed);
     }
-  }
-
-  Future<void> _refreshStatus(DownloadableDriver driver) async {
-    final installed = await DriverStorage.instance.isInstalled(driver);
-    if (mounted) setState(() => _installed[driver] = installed);
   }
 
   Future<void> _download(DownloadableDriver driver) async {
@@ -126,9 +121,9 @@ class _DriverManagerDialogContentState extends material.State<_DriverManagerDial
               child: material.Column(
                 crossAxisAlignment: material.CrossAxisAlignment.start,
                 children: [
-                  Text('Driver Manager').large().semiBold(),
-                  material.SizedBox(height: 6),
-                  Text(
+                  const Text('Driver Manager').large().semiBold(),
+                  const material.SizedBox(height: 6),
+                  const Text(
                     'Built-in database drivers. Add new connection types via Connection → New Database Connection.',
                   ).muted().small(),
                 ],
@@ -238,17 +233,17 @@ class _DriverRow extends material.StatelessWidget {
                   )
                 : material.Icon(type.icon, size: 40, color: theme.primary),
           ),
-          material.SizedBox(width: 16),
+          const material.SizedBox(width: 16),
           material.Expanded(
             child: material.Column(
               crossAxisAlignment: material.CrossAxisAlignment.start,
               mainAxisSize: material.MainAxisSize.min,
               children: [
                 Text(type.label).semiBold().small(),
-                material.SizedBox(height: 2),
+                const material.SizedBox(height: 2),
                 Text(description).muted().xSmall(),
                 if (error != null) ...[
-                  material.SizedBox(height: 4),
+                  const material.SizedBox(height: 4),
                   Text(
                     error!,
                     style: material.TextStyle(
@@ -261,7 +256,7 @@ class _DriverRow extends material.StatelessWidget {
             ),
           ),
           if (isBuiltIn) ...[
-            material.SizedBox(width: 8),
+            const material.SizedBox(width: 8),
             material.Container(
               padding: const material.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: material.BoxDecoration(
@@ -281,7 +276,7 @@ class _DriverRow extends material.StatelessWidget {
               ),
             ),
           ] else if (showDownload || showUninstall) ...[
-            material.SizedBox(width: 8),
+            const material.SizedBox(width: 8),
             if (showDownload)
               loading
                   ? material.SizedBox(
@@ -324,7 +319,7 @@ class _DriverRow extends material.StatelessWidget {
                     )
                   : IconButton.destructive(
                       onPressed: onUninstall,
-                      icon: material.Icon(
+                      icon: const material.Icon(
                         material.Icons.delete_outline_rounded,
                         size: 20,
                       ),
