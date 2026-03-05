@@ -98,10 +98,13 @@ class MongoConnection {
 
   /// Disconnects from MongoDB server.
   Future<void> disconnect() async {
-    if (_db != null && _isConnected) {
-      await _db!.close();
-      _db = null;
-      _isConnected = false;
+    _isConnected = false;
+    final db = _db;
+    _db = null;
+    try {
+      await db?.close();
+    } catch (_) {
+      // Connection may already be closed — ignore.
     }
   }
 
@@ -119,7 +122,9 @@ class MongoConnection {
 
     try {
       // Switch to admin database to list all databases
-      final adminUri = buildConnectionUri().replaceAll(RegExp(r'/[^/?]*(\?|$)'), '/admin\$1');
+      final baseUri = buildConnectionUri();
+      final uri = Uri.parse(baseUri);
+      final adminUri = uri.replace(path: '/admin').toString();
       final adminDb = await Db.create(adminUri);
       await adminDb.open();
       try {
@@ -147,7 +152,9 @@ class MongoConnection {
 
     try {
       // Create a new Db connection to the specified database
-      final dbUri = buildConnectionUri().replaceAll(RegExp(r'/[^/?]*(\?|$)'), '/$databaseName\$1');
+      final baseUri = buildConnectionUri();
+      final uri = Uri.parse(baseUri);
+      final dbUri = uri.replace(path: '/$databaseName').toString();
       final db = await Db.create(dbUri);
       await db.open();
       try {
