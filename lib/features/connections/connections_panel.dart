@@ -142,7 +142,7 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
             padding: const material.EdgeInsets.fromLTRB(20, 24, 16, 16),
             child: material.DefaultTextStyle(
               style: material.TextStyle(color: theme.colorScheme.mutedForeground),
-              child: Text('Browser').semiBold().small(),
+                  child: const Text('Browser').semiBold().small(),
             ),
           ),
           Divider(height: 1, color: theme.colorScheme.border.withValues(alpha: 0.3)),
@@ -198,8 +198,8 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
                           ),
                         // Empty state
                         if (_connections.isEmpty && _folders.isEmpty)
-                          material.Padding(
-                            padding: const material.EdgeInsets.only(top: 8),
+                          const material.Padding(
+                            padding: material.EdgeInsets.only(top: 8),
                             child: _EmptyState(message: 'No connections yet'),
                           ),
                       ],

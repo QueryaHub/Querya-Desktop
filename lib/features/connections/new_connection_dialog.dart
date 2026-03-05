@@ -44,10 +44,10 @@ Future<ConnectionType?> showNewConnectionDialog(BuildContext context) {
   return showDialog<ConnectionType>(
     context: context,
     barrierColor: material.Colors.black54,
-    builder: (context) => material.Dialog(
+    builder: (context) => const material.Dialog(
       backgroundColor: material.Colors.transparent,
-      insetPadding: const material.EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-      child: const _NewConnectionDialogContent(),
+      insetPadding: material.EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+      child: _NewConnectionDialogContent(),
     ),
   );
 }
@@ -109,12 +109,12 @@ class _NewConnectionDialogContentState extends material.State<_NewConnectionDial
               child: Column(
                 crossAxisAlignment: material.CrossAxisAlignment.stretch,
                 children: [
-                  Text('Select your database').large().semiBold(),
-                  material.SizedBox(height: 6),
-                  Text(
+                  const Text('Select your database').large().semiBold(),
+                  const material.SizedBox(height: 6),
+                  const Text(
                     'Create new database connection. Find your database driver in the list below.',
                   ).muted().small(),
-                  material.SizedBox(height: 12),
+                  const material.SizedBox(height: 12),
                   material.Container(
                     decoration: material.BoxDecoration(
                       color: theme.muted.withValues(alpha: 0.2),
@@ -129,7 +129,7 @@ class _NewConnectionDialogContentState extends material.State<_NewConnectionDial
                           size: 20,
                           color: theme.mutedForeground,
                         ),
-                        material.SizedBox(width: 10),
+                        const material.SizedBox(width: 10),
                         material.Expanded(
                           child: TextField(
                             controller: _searchController,
@@ -230,7 +230,7 @@ class _NewConnectionDialogContentState extends material.State<_NewConnectionDial
                     onPressed: () => material.Navigator.of(context).pop(),
                     child: const Text('Cancel'),
                   ),
-                  material.SizedBox(width: 12),
+                  const material.SizedBox(width: 12),
                   PrimaryButton(
                     onPressed: _selectedType == null
                         ? null
