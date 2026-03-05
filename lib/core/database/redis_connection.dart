@@ -46,10 +46,15 @@ class RedisConnection {
   }
 
   Future<void> disconnect() async {
-    await _conn?.close();
-    _conn = null;
-    _command = null;
     _isConnected = false;
+    _command = null;
+    final c = _conn;
+    _conn = null;
+    try {
+      await c?.close();
+    } catch (_) {
+      // Connection may already be closed — ignore.
+    }
   }
 
   Future<String> info() async {

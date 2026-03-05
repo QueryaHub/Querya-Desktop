@@ -5,7 +5,6 @@ import 'package:flutter/material.dart' as material
         Container,
         BoxDecoration,
         Border,
-        BorderSide,
         BorderRadius,
         Icon,
         IconData,
@@ -13,7 +12,6 @@ import 'package:flutter/material.dart' as material
         Center,
         CrossAxisAlignment,
         MainAxisSize,
-        MainAxisAlignment,
         Column,
         SizedBox,
         CircularProgressIndicator,
@@ -29,8 +27,7 @@ import 'package:flutter/material.dart' as material
         Curves,
         SelectableText,
         TextEditingController,
-        DefaultTextStyle,
-        Divider;
+        DefaultTextStyle;
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -222,7 +219,7 @@ class _MongoDatabasesViewState extends State<MongoDatabasesView> {
                 color: cs.destructive,
               ),
               const Gap(16),
-              Text('Connection Error').large().semiBold(),
+              const Text('Connection Error').large().semiBold(),
               const Gap(8),
               material.SelectableText(
                 _error!,
@@ -317,7 +314,7 @@ class _MongoDatabasesViewState extends State<MongoDatabasesView> {
             ),
             child: Row(
               children: [
-                Text('Databases').semiBold(),
+                const Text('Databases').semiBold(),
                 const Spacer(),
                 material.SizedBox(
                   width: 200,
@@ -355,7 +352,7 @@ class _MongoDatabasesViewState extends State<MongoDatabasesView> {
             material.Padding(
               padding: const material.EdgeInsets.all(24),
               child: material.Center(
-                child: Text('No databases found').muted(),
+                child: const Text('No databases found').muted(),
               ),
             ),
         ],
@@ -388,7 +385,7 @@ class _MongoDatabasesViewState extends State<MongoDatabasesView> {
                 topRight: Radius.circular(8),
               ),
             ),
-            child: Text('Server Status').semiBold(),
+            child: const Text('Server Status').semiBold(),
           ),
           // Status rows
           material.Padding(
@@ -488,8 +485,8 @@ class _DatabaseRowState extends State<_DatabaseRow> {
               child: material.InkWell(
                 onTap: widget.onView,
                 child: material.DefaultTextStyle(
-                  style: material.TextStyle(
-                    color: const Color(0xFF42A5F5),
+                  style: const material.TextStyle(
+                    color: Color(0xFF42A5F5),
                     fontSize: 15,
                     fontWeight: material.FontWeight.w500,
                   ),
@@ -556,7 +553,7 @@ class _ActionButtonState extends State<_ActionButton> {
               material.Icon(widget.icon, size: 16, color: material.Colors.white),
               const Gap(6),
               material.DefaultTextStyle(
-                style: material.TextStyle(
+                style: const material.TextStyle(
                   color: material.Colors.white,
                   fontSize: 13,
                   fontWeight: material.FontWeight.w500,

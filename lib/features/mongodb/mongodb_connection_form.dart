@@ -219,15 +219,15 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
                         color: theme.primary,
                       ),
                       const Gap(12),
-                      Text('MongoDB Connection').large().semiBold(),
+                      const Text('MongoDB Connection').large().semiBold(),
                     ],
                   ),
                   const Gap(8),
-                  Text('Configure your MongoDB connection settings').muted().small(),
+                  const Text('Configure your MongoDB connection settings').muted().small(),
                 ],
               ),
             ),
-            material.Divider(height: 1),
+            const material.Divider(height: 1),
             material.Expanded(
               child: material.SingleChildScrollView(
                 padding: const material.EdgeInsets.all(24),
@@ -242,12 +242,12 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
                           onChanged: (v) => setState(() => _useConnectionString = v ?? false),
                         ),
                         const Gap(8),
-                        Text('Use connection string').small(),
+                        const Text('Use connection string').small(),
                       ],
                     ),
                     const Gap(16),
                     if (_useConnectionString) ...[
-                      Text('Connection String').small().semiBold(),
+                      const Text('Connection String').small().semiBold(),
                       const Gap(8),
                       TextField(
                         controller: _connectionStringController,
@@ -256,7 +256,7 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
                       ),
                     ] else ...[
                       // Connection name
-                      Text('Connection Name').small().semiBold(),
+                      const Text('Connection Name').small().semiBold(),
                       const Gap(8),
                       TextField(
                         controller: _nameController,
@@ -272,7 +272,7 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
                               crossAxisAlignment: material.CrossAxisAlignment.stretch,
                               mainAxisSize: material.MainAxisSize.min,
                               children: [
-                                Text('Host').small().semiBold(),
+                                const Text('Host').small().semiBold(),
                                 const Gap(8),
                                 TextField(
                                   controller: _hostController,
@@ -288,7 +288,7 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
                               crossAxisAlignment: material.CrossAxisAlignment.stretch,
                               mainAxisSize: material.MainAxisSize.min,
                               children: [
-                                Text('Port').small().semiBold(),
+                                const Text('Port').small().semiBold(),
                                 const Gap(8),
                                 TextField(
                                   controller: _portController,
@@ -301,7 +301,7 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
                       ),
                       const Gap(16),
                       // Authentication
-                      Text('Authentication (Optional)').small().semiBold(),
+                      const Text('Authentication (Optional)').small().semiBold(),
                       const Gap(8),
                       TextField(
                         controller: _usernameController,
@@ -342,7 +342,7 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
                               crossAxisAlignment: material.CrossAxisAlignment.stretch,
                               mainAxisSize: material.MainAxisSize.min,
                               children: [
-                                Text('Default Database (Optional)').small().semiBold(),
+                                const Text('Default Database (Optional)').small().semiBold(),
                                 const Gap(8),
                                 TextField(
                                   controller: _databaseController,
@@ -357,7 +357,7 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
                               crossAxisAlignment: material.CrossAxisAlignment.stretch,
                               mainAxisSize: material.MainAxisSize.min,
                               children: [
-                                Text('Auth Source (Optional)').small().semiBold(),
+                                const Text('Auth Source (Optional)').small().semiBold(),
                                 const Gap(8),
                                 TextField(
                                   controller: _authSourceController,
@@ -377,7 +377,7 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
                             onChanged: (v) => setState(() => _useSSL = v ?? false),
                           ),
                           const Gap(8),
-                          Text('Use SSL/TLS').small(),
+                          const Text('Use SSL/TLS').small(),
                         ],
                       ),
                     ],
@@ -385,7 +385,7 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
                 ),
               ),
             ),
-            material.Divider(height: 1),
+            const material.Divider(height: 1),
             if (_testResult != null)
               material.Container(
                 padding: const material.EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -429,7 +429,7 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
                   OutlineButton(
                     onPressed: _isTesting ? null : _testConnection,
                     leading: _isTesting
-                        ? material.SizedBox(
+                        ? const material.SizedBox(
                             width: 16,
                             height: 16,
                             child: material.CircularProgressIndicator(strokeWidth: 2),
