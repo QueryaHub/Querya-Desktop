@@ -120,13 +120,13 @@ class _RedisViewState extends material.State<RedisView> {
         child: material.Column(
           mainAxisSize: material.MainAxisSize.min,
           children: [
-            material.SizedBox(
+            const material.SizedBox(
               width: 32,
               height: 32,
-              child: material.CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+              child: material.CircularProgressIndicator(strokeWidth: 2),
             ),
             const Gap(16),
-            Text('Connecting...').muted().small(),
+            const Text('Connecting...').muted().small(),
           ],
         ),
       );
@@ -142,7 +142,7 @@ class _RedisViewState extends material.State<RedisView> {
             children: [
               material.Icon(material.Icons.error_outline_rounded, size: 48, color: cs.destructive),
               const Gap(16),
-              Text('Connection Error').large().semiBold(),
+              const Text('Connection Error').large().semiBold(),
               const Gap(8),
               material.SelectableText(err, style: material.TextStyle(color: cs.mutedForeground, fontSize: 13)),
               const Gap(24),
