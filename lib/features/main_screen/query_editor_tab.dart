@@ -6,18 +6,18 @@ class QueryEditorTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return material.Padding(
-      padding: const material.EdgeInsets.all(12),
+    return const material.Padding(
+      padding: material.EdgeInsets.all(12),
       child: Card(
         padding: material.EdgeInsets.zero,
         child: TextField(
           maxLines: null,
           expands: true,
-          style: const material.TextStyle(
+          style: material.TextStyle(
             fontFamily: 'monospace',
             fontSize: 13,
           ),
-          placeholder: const Text('-- Enter SQL here…\nSELECT 1;'),
+          placeholder: Text('-- Enter SQL here…\nSELECT 1;'),
         ),
       ),
     );
