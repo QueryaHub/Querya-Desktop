@@ -5,6 +5,7 @@ import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 import 'connections_panel.dart';
+import 'driver_manager_dialog.dart';
 import 'new_connection_dialog.dart';
 import 'workspace_panel.dart';
 
@@ -174,7 +175,7 @@ class _CustomTitleBarState extends State<_CustomTitleBar> {
                             ),
                             MenuButton(
                               leading: material.Icon(material.Icons.settings_rounded, size: 18),
-                              onPressed: (_) {},
+                              onPressed: (ctx) => showDriverManagerDialog(ctx),
                               child: const Text('Driver Manager'),
                             ),
                             const MenuDivider(),
