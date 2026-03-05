@@ -4,9 +4,9 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
-import 'connections_panel.dart';
-import 'driver_manager_dialog.dart';
-import 'new_connection_dialog.dart';
+import 'package:querya_desktop/features/connections/connections_panel.dart';
+import 'package:querya_desktop/features/connections/driver_manager_dialog.dart';
+import 'package:querya_desktop/features/connections/new_connection_dialog.dart';
 import 'workspace_panel.dart';
 
 class MainScreen extends StatefulWidget {
@@ -137,29 +137,28 @@ class _CustomTitleBarState extends State<_CustomTitleBar> {
               child: MoveWindow(
                 child: Row(
                   children: [
-                    material.Container(width: 16),
-                    Text('Querya').semiBold().small(),
+                    const SizedBox(width: 16),
+                    const Text('Querya').semiBold().small(),
                     const Gap(24),
                     Menubar(
                       border: false,
                       popoverOffset: const Offset(0, 8),
                       children: [
                         MenuButton(
-                          child: const Text('File'),
                           subMenu: [
-                            MenuButton(child: const Text('New'), onPressed: (_) {}),
-                            MenuButton(child: const Text('Open...'), onPressed: (_) {}),
-                            MenuButton(child: const Text('Save'), onPressed: (_) {}),
+                            MenuButton(onPressed: (_) {}, child: const Text('New')),
+                            MenuButton(onPressed: (_) {}, child: const Text('Open...')),
+                            MenuButton(onPressed: (_) {}, child: const Text('Save')),
                             const MenuDivider(),
-                            MenuButton(child: const Text('Exit'), onPressed: (_) {}),
+                            MenuButton(onPressed: (_) {}, child: const Text('Exit')),
                           ],
+                          child: const Text('File'),
                         ),
                         MenuButton(
-                          child: const Text('Connection'),
                           subMenu: [
                             MenuButton(
-                              leading: material.Icon(material.Icons.add_link_rounded, size: 18),
-                              trailing: Text('Shift+Ctrl+N').xSmall().muted(),
+                              leading: const material.Icon(material.Icons.add_link_rounded, size: 18),
+                              trailing: const Text('Shift+Ctrl+N').xSmall().muted(),
                               onPressed: (ctx) async {
                                 final type = await showNewConnectionDialog(ctx);
                                 if (type != null) {
@@ -169,48 +168,49 @@ class _CustomTitleBarState extends State<_CustomTitleBar> {
                               child: const Text('New Database Connection'),
                             ),
                             MenuButton(
-                              leading: material.Icon(material.Icons.link_rounded, size: 18),
+                              leading: const material.Icon(material.Icons.link_rounded, size: 18),
                               onPressed: (_) {},
                               child: const Text('New Connection from URL'),
                             ),
                             MenuButton(
-                              leading: material.Icon(material.Icons.settings_rounded, size: 18),
+                              leading: const material.Icon(material.Icons.settings_rounded, size: 18),
                               onPressed: (ctx) => showDriverManagerDialog(ctx),
                               child: const Text('Driver Manager'),
                             ),
                             const MenuDivider(),
                             MenuButton(
                               enabled: false,
-                              leading: material.Icon(material.Icons.power_rounded, size: 18),
+                              leading: const material.Icon(material.Icons.power_rounded, size: 18),
                               onPressed: (_) {},
                               child: const Text('Connect'),
                             ),
                             MenuButton(
-                              leading: material.Icon(material.Icons.refresh_rounded, size: 18),
+                              leading: const material.Icon(material.Icons.refresh_rounded, size: 18),
                               onPressed: (_) {},
                               child: const Text('Invalidate/Reconnect'),
                             ),
                             MenuButton(
-                              leading: material.Icon(material.Icons.power_off_rounded, size: 18),
+                              leading: const material.Icon(material.Icons.power_off_rounded, size: 18),
                               onPressed: (_) {},
                               child: const Text('Disconnect'),
                             ),
-                            MenuButton(child: const Text('Disconnect All'), onPressed: (_) {}),
-                            MenuButton(child: const Text('Disconnect Others'), onPressed: (_) {}),
+                            MenuButton(onPressed: (_) {}, child: const Text('Disconnect All')),
+                            MenuButton(onPressed: (_) {}, child: const Text('Disconnect Others')),
                             const MenuDivider(),
                             MenuButton(
-                              leading: material.Icon(material.Icons.lock_outline_rounded, size: 18),
+                              leading: const material.Icon(material.Icons.lock_outline_rounded, size: 18),
                               onPressed: (_) {},
                               child: const Text('Read-only'),
                             ),
                           ],
+                          child: const Text('Connection'),
                         ),
                         MenuButton(
-                          child: const Text('Help'),
                           subMenu: [
-                            MenuButton(child: const Text('About'), onPressed: (_) {}),
-                            MenuButton(child: const Text('Documentation'), onPressed: (_) {}),
+                            MenuButton(onPressed: (_) {}, child: const Text('About')),
+                            MenuButton(onPressed: (_) {}, child: const Text('Documentation')),
                           ],
+                          child: const Text('Help'),
                         ),
                       ],
                     ),

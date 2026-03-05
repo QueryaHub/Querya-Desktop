@@ -2,9 +2,9 @@ import 'package:flutter/material.dart' as material show Container, EdgeInsets, B
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
-import 'mongo_databases_view.dart';
+import 'package:querya_desktop/features/mongodb/mongo_databases_view.dart';
+import 'package:querya_desktop/features/redis/redis_view.dart';
 import 'query_editor_tab.dart';
-import 'redis_view.dart';
 import 'results_tab.dart';
 
 /// Main workspace: top = Query Editor / Query History, bottom = Data Output / Messages (pgAdmin-style). Uses shadcn layout.

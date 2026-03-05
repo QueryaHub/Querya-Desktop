@@ -7,10 +7,10 @@ Future<String?> showNewFolderDialog(BuildContext context) {
   return showDialog<String>(
     context: context,
     barrierColor: material.Colors.black54,
-    builder: (context) => material.Dialog(
+    builder: (context) => const material.Dialog(
       backgroundColor: material.Colors.transparent,
-      insetPadding: const material.EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-      child: const _NewFolderDialogContent(),
+      insetPadding: material.EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+      child: _NewFolderDialogContent(),
     ),
   );
 }
@@ -54,12 +54,12 @@ class _NewFolderDialogContentState extends material.State<_NewFolderDialogConten
               child: material.Column(
                 crossAxisAlignment: material.CrossAxisAlignment.start,
                 children: [
-                  Text('New folder').large().semiBold(),
-                  material.SizedBox(height: 6),
-                  Text(
+                  const Text('New folder').large().semiBold(),
+                  const material.SizedBox(height: 6),
+                  const Text(
                     'Enter a name for the new folder in the browser tree.',
                   ).muted().small(),
-                  material.SizedBox(height: 16),
+                  const material.SizedBox(height: 16),
                   material.Container(
                     decoration: material.BoxDecoration(
                       color: theme.muted.withValues(alpha: 0.2),
@@ -74,7 +74,7 @@ class _NewFolderDialogContentState extends material.State<_NewFolderDialogConten
                           size: 20,
                           color: theme.mutedForeground,
                         ),
-                        material.SizedBox(width: 10),
+                        const material.SizedBox(width: 10),
                         material.Expanded(
                           child: TextField(
                             controller: _nameController,
@@ -102,7 +102,7 @@ class _NewFolderDialogContentState extends material.State<_NewFolderDialogConten
                     onPressed: () => material.Navigator.of(context).pop(),
                     child: const Text('Cancel'),
                   ),
-                  material.SizedBox(width: 12),
+                  const material.SizedBox(width: 12),
                   PrimaryButton(
                     onPressed: _name.isEmpty
                         ? null

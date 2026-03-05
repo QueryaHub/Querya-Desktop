@@ -1,6 +1,7 @@
 /// Official download URLs and file names for database drivers.
 /// Used by [DriverStorage] for download/install.
 /// Redis and MongoDB use Dart packages (built-in); only JAR-based drivers are listed here.
+library;
 
 /// PostgreSQL JDBC driver (official jdbc.postgresql.org).
 const postgresqlDriverUrl = 'https://jdbc.postgresql.org/download/postgresql-42.7.10.jar';
