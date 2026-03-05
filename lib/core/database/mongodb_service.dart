@@ -10,14 +10,23 @@ class MongoService {
 
   final Map<int, MongoConnection> _connections = {};
 
-  /// Creates a MongoDB connection from ConnectionRow.
+  /// Creates (or replaces) a [MongoConnection] for the given [ConnectionRow].
+  /// If a connection with the same ID already exists it is disconnected first.
   MongoConnection createConnection(ConnectionRow row) {
     if (row.type != 'mongodb') {
       throw ArgumentError('Connection type must be mongodb');
     }
 
+    final id = row.id ?? 0;
+
+    // Disconnect previous connection for this ID, if any.
+    final existing = _connections[id];
+    if (existing != null) {
+      existing.disconnect(); // fire-and-forget; disconnect is safe
+    }
+
     final connection = MongoConnection(
-      id: row.id ?? 0,
+      id: id,
       name: row.name,
       host: row.host ?? 'localhost',
       port: row.port ?? 27017,
@@ -67,7 +76,9 @@ class MongoService {
     }
 
     // Create a new Db connection to the specified database
-    final dbUri = connection.buildConnectionUri().replaceAll(RegExp(r'/[^/?]*(\?|$)'), '/$database\$1');
+    final baseUri = connection.buildConnectionUri();
+    final uri = Uri.parse(baseUri);
+    final dbUri = uri.replace(path: '/$database').toString();
     final db = await Db.create(dbUri);
     await db.open();
     try {
@@ -94,7 +105,9 @@ class MongoService {
     }
 
     // Create a new Db connection to the specified database
-    final dbUri = connection.buildConnectionUri().replaceAll(RegExp(r'/[^/?]*(\?|$)'), '/$database\$1');
+    final baseUri = connection.buildConnectionUri();
+    final uri = Uri.parse(baseUri);
+    final dbUri = uri.replace(path: '/$database').toString();
     final db = await Db.create(dbUri);
     await db.open();
     try {
@@ -133,7 +146,9 @@ class MongoService {
     }
 
     // Create a new Db connection to the specified database
-    final dbUri = connection.buildConnectionUri().replaceAll(RegExp(r'/[^/?]*(\?|$)'), '/$database\$1');
+    final baseUri = connection.buildConnectionUri();
+    final uri = Uri.parse(baseUri);
+    final dbUri = uri.replace(path: '/$database').toString();
     final db = await Db.create(dbUri);
     await db.open();
     try {
