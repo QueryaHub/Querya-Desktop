@@ -4,9 +4,9 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
-import 'connections_panel.dart';
-import 'driver_manager_dialog.dart';
-import 'new_connection_dialog.dart';
+import 'package:querya_desktop/features/connections/connections_panel.dart';
+import 'package:querya_desktop/features/connections/driver_manager_dialog.dart';
+import 'package:querya_desktop/features/connections/new_connection_dialog.dart';
 import 'workspace_panel.dart';
 
 class MainScreen extends StatefulWidget {
