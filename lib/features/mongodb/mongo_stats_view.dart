@@ -12,8 +12,21 @@ const _summaryChipHeight = 72.0;
 const _gridCardHeight = 220.0;
 
 class MongoStatsView extends material.StatefulWidget {
-  const MongoStatsView({super.key, required this.connectionRow});
+  const MongoStatsView({
+    super.key,
+    required this.connectionRow,
+    this.connection,
+    this.onBack,
+  });
+
   final ConnectionRow connectionRow;
+
+  /// An already-open [MongoConnection]. When provided the view re-uses it
+  /// instead of creating (and potentially killing) a shared one.
+  final MongoConnection? connection;
+
+  /// Called when the user taps the "back to explorer" button.
+  final material.VoidCallback? onBack;
 
   @override
   material.State<MongoStatsView> createState() => _MongoStatsViewState();
@@ -49,13 +62,17 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     super.dispose();
   }
 
+  /// Whether this view owns its connection (created it itself).
+  bool _ownsConnection = false;
+
   /// Safely disconnects and clears the current MongoDB connection.
   void _disconnectCurrent() {
     final conn = _connection;
     _connection = null;
-    if (conn != null) {
+    if (conn != null && _ownsConnection) {
       conn.disconnect(); // fire-and-forget; disconnect handles errors
     }
+    _ownsConnection = false;
   }
 
   Future<void> _load() async {
@@ -68,18 +85,31 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
       _serverStatus = null;
     });
     try {
-      final conn = MongoService.instance.createConnection(widget.connectionRow);
-      await conn.connect();
+      // Re-use the connection supplied by the parent when available.
+      final supplied = widget.connection;
+      MongoConnection conn;
+      if (supplied != null && supplied.isConnected) {
+        conn = supplied;
+        _ownsConnection = false;
+      } else {
+        conn = MongoService.instance.createConnection(widget.connectionRow);
+        await conn.connect();
+        _ownsConnection = true;
+      }
       if (!mounted) {
-        // Widget was disposed while connecting — clean up immediately.
-        conn.disconnect();
+        if (_ownsConnection) conn.disconnect();
         return;
       }
       _connection = conn;
       await _fetch();
       if (mounted) _startTimer();
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -244,9 +274,20 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
             ],
           ),
         ),
+        if (widget.onBack != null) ...[
+          OutlineButton(
+            onPressed: widget.onBack,
+            leading: const material.Icon(
+                material.Icons.grid_view_rounded,
+                size: 18),
+            child: const Text('Explorer'),
+          ),
+          const Gap(8),
+        ],
         OutlineButton(
           onPressed: _load,
-          leading: const material.Icon(material.Icons.refresh_rounded, size: 18),
+          leading: const material.Icon(
+              material.Icons.refresh_rounded, size: 18),
           child: const Text('Refresh'),
         ),
       ],
