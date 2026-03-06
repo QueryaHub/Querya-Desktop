@@ -9,6 +9,7 @@ import 'mongo_collections_view.dart';
 import 'mongo_databases_view.dart';
 import 'mongo_documents_view.dart';
 import 'mongo_document_editor.dart';
+import 'mongo_stats_view.dart';
 
 // ─── Navigation path model ──────────────────────────────────────────────────
 
@@ -37,6 +38,9 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
   MongoConnection? _connection;
   bool _connecting = true;
   String? _error;
+
+  // View mode
+  bool _showStats = false;
 
   // Navigation state
   String? _selectedDatabase;
@@ -237,6 +241,16 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
     final conn = _connection;
     if (conn == null) return const material.SizedBox.shrink();
 
+    // Statistics mode — render MongoStatsView full-screen
+    if (_showStats) {
+      return MongoStatsView(
+        key: ValueKey('stats_${widget.connectionRow.id}'),
+        connectionRow: widget.connectionRow,
+        connection: conn,
+        onBack: () => setState(() => _showStats = false),
+      );
+    }
+
     return material.Container(
       color: cs.background,
       child: material.Column(
@@ -250,6 +264,7 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
               // Force rebuild of current child
               setState(() {});
             },
+            onStats: () => setState(() => _showStats = true),
           ),
           const Divider(height: 1),
           // Content
@@ -314,11 +329,13 @@ class _BreadcrumbBar extends StatelessWidget {
     required this.crumbs,
     required this.onCrumbTap,
     required this.onRefresh,
+    required this.onStats,
   });
 
   final List<_Crumb> crumbs;
   final void Function(_Crumb) onCrumbTap;
   final VoidCallback onRefresh;
+  final VoidCallback onStats;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -364,13 +381,29 @@ class _BreadcrumbBar extends StatelessWidget {
             ),
           ),
           const Gap(8),
-          material.InkWell(
-            onTap: onRefresh,
-            borderRadius: material.BorderRadius.circular(6),
-            child: material.Padding(
-              padding: const material.EdgeInsets.all(6),
-              child: material.Icon(material.Icons.refresh_rounded,
-                  size: 18, color: cs.mutedForeground),
+          material.Tooltip(
+            message: 'Statistics',
+            child: material.InkWell(
+              onTap: onStats,
+              borderRadius: material.BorderRadius.circular(6),
+              child: material.Padding(
+                padding: const material.EdgeInsets.all(6),
+                child: material.Icon(material.Icons.bar_chart_rounded,
+                    size: 18, color: cs.mutedForeground),
+              ),
+            ),
+          ),
+          const Gap(4),
+          material.Tooltip(
+            message: 'Refresh',
+            child: material.InkWell(
+              onTap: onRefresh,
+              borderRadius: material.BorderRadius.circular(6),
+              child: material.Padding(
+                padding: const material.EdgeInsets.all(6),
+                child: material.Icon(material.Icons.refresh_rounded,
+                    size: 18, color: cs.mutedForeground),
+              ),
             ),
           ),
         ],
