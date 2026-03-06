@@ -2,7 +2,7 @@ import 'package:flutter/material.dart' as material show Container, EdgeInsets, B
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
-import 'package:querya_desktop/features/mongodb/mongo_stats_view.dart';
+import 'package:querya_desktop/features/mongodb/mongo_explorer_view.dart';
 import 'package:querya_desktop/features/redis/redis_view.dart';
 import 'query_editor_tab.dart';
 import 'results_tab.dart';
@@ -30,13 +30,13 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // If a MongoDB connection is selected, show the stats view
+    // If a MongoDB connection is selected, show the MongoDB explorer
     if (widget.activeConnection != null &&
         widget.activeConnection!.type == 'mongodb') {
       return material.Container(
         color: theme.colorScheme.background,
         child: material.SizedBox.expand(
-          child: MongoStatsView(
+          child: MongoExplorerView(
             key: ValueKey(widget.activeConnection!.id),
             connectionRow: widget.activeConnection!,
           ),
