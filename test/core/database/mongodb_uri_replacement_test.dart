@@ -11,13 +11,9 @@ void main() {
         username: 'root',
         password: 'root',
       );
-      final baseUri = conn.buildConnectionUri();
-      expect(baseUri, 'mongodb://root:root@127.0.0.1');
-      
-      // Simulate the replacement logic used in listDatabases
-      final uri = Uri.parse(baseUri);
-      final adminUri = uri.replace(path: '/admin').toString();
-      expect(adminUri, 'mongodb://root:root@127.0.0.1/admin');
+      final adminUri = conn.buildUriForDatabase('admin');
+      expect(adminUri, contains('/admin'));
+      expect(adminUri, contains('root:root'));
     });
 
     test('replaces database in URI with existing database', () {
@@ -29,16 +25,13 @@ void main() {
         password: 'root',
         database: 'mydb',
       );
-      final baseUri = conn.buildConnectionUri();
-      expect(baseUri, 'mongodb://root:root@127.0.0.1/mydb');
-      
-      // Simulate the replacement logic
-      final uri = Uri.parse(baseUri);
-      final adminUri = uri.replace(path: '/admin').toString();
-      expect(adminUri, 'mongodb://root:root@127.0.0.1/admin');
+      final adminUri = conn.buildUriForDatabase('admin');
+      expect(adminUri, contains('/admin'));
+      // Should have authSource=mydb because original db was mydb
+      expect(adminUri, contains('authSource=mydb'));
     });
 
-    test('preserves query parameters when replacing database', () {
+    test('preserves explicit authSource when replacing database', () {
       final conn = MongoConnection(
         id: 1,
         name: 'test',
@@ -47,15 +40,9 @@ void main() {
         password: 'root',
         authSource: 'admin',
       );
-      final baseUri = conn.buildConnectionUri();
-      expect(baseUri, contains('?authSource=admin'));
-      
-      // Simulate the replacement logic
-      final uri = Uri.parse(baseUri);
-      final adminUri = uri.replace(path: '/admin').toString();
-      expect(adminUri, contains('/admin'));
-      expect(adminUri, contains('?authSource=admin'));
-      expect(adminUri, 'mongodb://root:root@127.0.0.1/admin?authSource=admin');
+      final otherUri = conn.buildUriForDatabase('mydb');
+      expect(otherUri, contains('/mydb'));
+      expect(otherUri, contains('authSource=admin'));
     });
 
     test('preserves multiple query parameters when replacing database', () {
@@ -69,15 +56,11 @@ void main() {
         replicaSet: 'rs0',
         useSSL: true,
       );
-      final baseUri = conn.buildConnectionUri();
-      
-      // Simulate the replacement logic
-      final uri = Uri.parse(baseUri);
-      final adminUri = uri.replace(path: '/admin').toString();
-      expect(adminUri, contains('/admin'));
-      expect(adminUri, contains('authSource=admin'));
-      expect(adminUri, contains('replicaSet=rs0'));
-      expect(adminUri, contains('ssl=true'));
+      final otherUri = conn.buildUriForDatabase('testdb');
+      expect(otherUri, contains('/testdb'));
+      expect(otherUri, contains('authSource=admin'));
+      expect(otherUri, contains('replicaSet=rs0'));
+      expect(otherUri, contains('ssl=true'));
     });
 
     test('replaces database with custom database name', () {
@@ -87,13 +70,10 @@ void main() {
         host: 'localhost',
         database: 'olddb',
       );
-      final baseUri = conn.buildConnectionUri();
-      expect(baseUri, 'mongodb://localhost/olddb');
-      
-      // Simulate the replacement logic used in listCollections
-      final uri = Uri.parse(baseUri);
-      final newDbUri = uri.replace(path: '/newdb').toString();
-      expect(newDbUri, 'mongodb://localhost/newdb');
+      final newDbUri = conn.buildUriForDatabase('newdb');
+      expect(newDbUri, contains('/newdb'));
+      // No credentials → no authSource added
+      expect(newDbUri, isNot(contains('authSource')));
     });
 
     test('handles URI without authentication', () {
@@ -102,13 +82,10 @@ void main() {
         name: 'test',
         host: 'localhost',
       );
-      final baseUri = conn.buildConnectionUri();
-      expect(baseUri, 'mongodb://localhost');
-      
-      // Simulate the replacement logic
-      final uri = Uri.parse(baseUri);
-      final adminUri = uri.replace(path: '/admin').toString();
-      expect(adminUri, 'mongodb://localhost/admin');
+      final adminUri = conn.buildUriForDatabase('admin');
+      expect(adminUri, contains('/admin'));
+      // No credentials → no authSource added
+      expect(adminUri, isNot(contains('authSource')));
     });
 
     test('handles URI with custom port', () {
@@ -120,13 +97,9 @@ void main() {
         username: 'root',
         password: 'root',
       );
-      final baseUri = conn.buildConnectionUri();
-      expect(baseUri, 'mongodb://root:root@127.0.0.1:27018');
-      
-      // Simulate the replacement logic
-      final uri = Uri.parse(baseUri);
-      final adminUri = uri.replace(path: '/admin').toString();
-      expect(adminUri, 'mongodb://root:root@127.0.0.1:27018/admin');
+      final adminUri = conn.buildUriForDatabase('admin');
+      expect(adminUri, contains(':27018'));
+      expect(adminUri, contains('/admin'));
     });
 
     test('handles connectionString URI replacement', () {
@@ -134,15 +107,13 @@ void main() {
         id: 1,
         name: 'test',
         host: 'localhost',
-        connectionString: 'mongodb://user:pass@host:27017/mydb?authSource=admin',
+        connectionString:
+            'mongodb://user:pass@host:27017/mydb?authSource=admin',
       );
-      final baseUri = conn.buildConnectionUri();
-      expect(baseUri, 'mongodb://user:pass@host:27017/mydb?authSource=admin');
-      
-      // Simulate the replacement logic
-      final uri = Uri.parse(baseUri);
-      final adminUri = uri.replace(path: '/admin').toString();
-      expect(adminUri, 'mongodb://user:pass@host:27017/admin?authSource=admin');
+      final otherUri = conn.buildUriForDatabase('otherdb');
+      expect(otherUri, contains('/otherdb'));
+      // Explicit authSource in connection string is preserved
+      expect(otherUri, contains('authSource=admin'));
     });
 
     test('ensures no literal dollar sign appears in final URI', () {
@@ -153,17 +124,69 @@ void main() {
         username: 'root',
         password: 'root',
       );
-      final baseUri = conn.buildConnectionUri();
-      
-      // Simulate the replacement logic
-      final uri = Uri.parse(baseUri);
-      final adminUri = uri.replace(path: '/admin').toString();
-      
-      // Critical: ensure no literal $1 appears (the bug we fixed)
+      final adminUri = conn.buildUriForDatabase('admin');
       expect(adminUri, isNot(contains(r'$1')));
       expect(adminUri, isNot(contains('admin\$1')));
       expect(adminUri, isNot(contains(r'admin$1')));
       expect(adminUri, contains('/admin'));
+    });
+
+    // ─── authSource auto-injection tests ───────────────────────────────
+
+    test('auto-adds authSource=admin when credentials present and no db', () {
+      final conn = MongoConnection(
+        id: 1,
+        name: 'test',
+        host: '127.0.0.1',
+        username: 'root',
+        password: 'root',
+      );
+      // Original URI has no database path → authSource should default to admin
+      final uri = conn.buildUriForDatabase('testdb');
+      expect(uri, contains('/testdb'));
+      expect(uri, contains('authSource=admin'));
+    });
+
+    test('auto-adds authSource=origDb when credentials and db are present', () {
+      final conn = MongoConnection(
+        id: 1,
+        name: 'test',
+        host: '127.0.0.1',
+        username: 'root',
+        password: 'root',
+        database: 'mydb',
+      );
+      // Original URI has /mydb → authSource should be mydb
+      final uri = conn.buildUriForDatabase('otherdb');
+      expect(uri, contains('/otherdb'));
+      expect(uri, contains('authSource=mydb'));
+    });
+
+    test('does not override explicit authSource', () {
+      final conn = MongoConnection(
+        id: 1,
+        name: 'test',
+        host: '127.0.0.1',
+        username: 'root',
+        password: 'root',
+        database: 'mydb',
+        authSource: 'admin',
+      );
+      // Explicit authSource=admin should be preserved, NOT overridden to mydb
+      final uri = conn.buildUriForDatabase('otherdb');
+      expect(uri, contains('/otherdb'));
+      expect(uri, contains('authSource=admin'));
+    });
+
+    test('no authSource added when no credentials', () {
+      final conn = MongoConnection(
+        id: 1,
+        name: 'test',
+        host: '127.0.0.1',
+      );
+      final uri = conn.buildUriForDatabase('testdb');
+      expect(uri, contains('/testdb'));
+      expect(uri, isNot(contains('authSource')));
     });
   });
 }
