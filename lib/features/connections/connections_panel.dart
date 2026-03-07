@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart' as material show Padding, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, DefaultTextStyle, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, Column, AnimatedRotation, Row, BoxFit;
+import 'package:flutter/material.dart' as material show Padding, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, DefaultTextStyle, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, Column, AnimatedRotation, Row, BoxFit, Text, TextOverflow, Expanded;
 import 'package:querya_desktop/core/storage/folders_storage.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -337,22 +337,30 @@ class _ConnectionTile extends StatelessWidget {
                 children: [
                   iconWidget,
                   const Gap(8),
-                  Expanded(
-                    child: Column(
+                  material.Expanded(
+                    child: material.Column(
                       crossAxisAlignment: material.CrossAxisAlignment.start,
                       mainAxisSize: material.MainAxisSize.min,
                       children: [
-                        Text(
+                        material.Text(
                           connection.name,
-                          overflow: TextOverflow.ellipsis,
+                          overflow: material.TextOverflow.ellipsis,
                           maxLines: 1,
-                        ).small(),
+                          style: material.TextStyle(
+                            fontSize: 13,
+                            color: theme.colorScheme.foreground,
+                          ),
+                        ),
                         if (connection.host != null)
-                          Text(
+                          material.Text(
                             '${connection.host}:${connection.port ?? ''}',
-                            overflow: TextOverflow.ellipsis,
+                            overflow: material.TextOverflow.ellipsis,
                             maxLines: 1,
-                          ).muted().xSmall(),
+                            style: material.TextStyle(
+                              fontSize: 11,
+                              color: theme.colorScheme.mutedForeground,
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -432,12 +440,16 @@ class _FolderTile extends StatelessWidget {
                       const Gap(2),
                       material.Icon(material.Icons.folder_rounded, size: 18, color: theme.colorScheme.primary),
                       const Gap(8),
-                      Expanded(
-                        child: Text(
+                      material.Expanded(
+                        child: material.Text(
                           name,
-                          overflow: TextOverflow.ellipsis,
+                          overflow: material.TextOverflow.ellipsis,
                           maxLines: 1,
-                        ).small(),
+                          style: material.TextStyle(
+                            fontSize: 13,
+                            color: theme.colorScheme.foreground,
+                          ),
+                        ),
                       ),
                     ],
                   ),
