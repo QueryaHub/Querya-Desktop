@@ -342,9 +342,17 @@ class _ConnectionTile extends StatelessWidget {
                       crossAxisAlignment: material.CrossAxisAlignment.start,
                       mainAxisSize: material.MainAxisSize.min,
                       children: [
-                        Text(connection.name).small(),
+                        Text(
+                          connection.name,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ).small(),
                         if (connection.host != null)
-                          Text('${connection.host}:${connection.port ?? ''}').muted().xSmall(),
+                          Text(
+                            '${connection.host}:${connection.port ?? ''}',
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ).muted().xSmall(),
                       ],
                     ),
                   ),
@@ -424,7 +432,13 @@ class _FolderTile extends StatelessWidget {
                       const Gap(2),
                       material.Icon(material.Icons.folder_rounded, size: 18, color: theme.colorScheme.primary),
                       const Gap(8),
-                      Expanded(child: Text(name).small()),
+                      Expanded(
+                        child: Text(
+                          name,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ).small(),
+                      ),
                     ],
                   ),
                 ),
