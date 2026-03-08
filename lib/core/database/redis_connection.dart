@@ -65,7 +65,20 @@ class RedisConnection {
     return result?.toString() ?? '';
   }
 
-  /// Send an arbitrary command and return the raw result.
+  Future<bool> testConnection() async {
+    try {
+      await connect();
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      await disconnect();
+    }
+  }
+
+  // ─── Data commands ─────────────────────────────────────────────────────
+
+  /// Raw command helper.
   Future<dynamic> sendCommand(List<dynamic> args) async {
     if (!isConnected || _command == null) {
       throw StateError('Not connected to Redis');
@@ -73,71 +86,82 @@ class RedisConnection {
     return _command!.send_object(args);
   }
 
-  /// SELECT a database by index.
-  Future<void> select(int db) async {
-    await sendCommand(['SELECT', db.toString()]);
+  /// SELECT database index.
+  Future<void> selectDatabase(int db) async {
+    await sendCommand(['SELECT', db]);
   }
 
-  /// SCAN keys with optional pattern. Returns `(cursor, keys)`.
-  Future<(String, List<String>)> scan(
-    String cursor, {
-    String? pattern,
+  /// DBSIZE — number of keys in the currently selected database.
+  Future<int> dbSize() async {
+    final result = await sendCommand(['DBSIZE']);
+    return result is int ? result : int.tryParse(result.toString()) ?? 0;
+  }
+
+  /// CONFIG GET databases — max number of databases.
+  Future<int> getMaxDatabases() async {
+    try {
+      final result = await sendCommand(['CONFIG', 'GET', 'databases']);
+      if (result is List && result.length >= 2) {
+        return int.tryParse(result[1].toString()) ?? 16;
+      }
+    } catch (_) {
+      // Some Redis instances don't allow CONFIG; fall back.
+    }
+    return 16;
+  }
+
+  /// SCAN cursor [MATCH pattern] [COUNT count].
+  /// Returns (nextCursor, keys).
+  Future<(int, List<String>)> scan({
+    int cursor = 0,
+    String? match,
     int count = 100,
   }) async {
     final args = <dynamic>['SCAN', cursor];
-    if (pattern != null && pattern.isNotEmpty) {
-      args.addAll(['MATCH', pattern]);
+    if (match != null && match.isNotEmpty) {
+      args.addAll(['MATCH', match]);
     }
-    args.addAll(['COUNT', count.toString()]);
+    args.addAll(['COUNT', count]);
     final result = await sendCommand(args);
     if (result is List && result.length == 2) {
-      final nextCursor = result[0].toString();
-      final keys = (result[1] as List).map((e) => e.toString()).toList();
+      final nextCursor = int.tryParse(result[0].toString()) ?? 0;
+      final keys = (result[1] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [];
       return (nextCursor, keys);
     }
-    return ('0', <String>[]);
+    return (0, <String>[]);
   }
 
-  /// GET a string value.
+  /// TYPE key.
+  Future<String> keyType(String key) async {
+    final result = await sendCommand(['TYPE', key]);
+    return result?.toString() ?? 'none';
+  }
+
+  /// TTL key (returns -1 if no expiry, -2 if missing).
+  Future<int> ttl(String key) async {
+    final result = await sendCommand(['TTL', key]);
+    return result is int ? result : int.tryParse(result.toString()) ?? -1;
+  }
+
+  /// GET (string).
   Future<String?> get(String key) async {
     final result = await sendCommand(['GET', key]);
     return result?.toString();
   }
 
-  /// SET a string value.
-  Future<void> set(String key, String value) async {
-    await sendCommand(['SET', key, value]);
+  /// SET key value [EX seconds].
+  Future<void> set(String key, String value, {int? ttlSeconds}) async {
+    if (ttlSeconds != null && ttlSeconds > 0) {
+      await sendCommand(['SET', key, value, 'EX', ttlSeconds]);
+    } else {
+      await sendCommand(['SET', key, value]);
+    }
   }
 
-  /// DEL one or more keys.
-  Future<int> del(List<String> keys) async {
-    final result = await sendCommand(['DEL', ...keys]);
-    return int.tryParse(result.toString()) ?? 0;
-  }
-
-  /// TYPE of a key.
-  Future<String> type(String key) async {
-    final result = await sendCommand(['TYPE', key]);
-    return result.toString();
-  }
-
-  /// TTL of a key in seconds (-1 = no expiry, -2 = key missing).
-  Future<int> ttl(String key) async {
-    final result = await sendCommand(['TTL', key]);
-    return int.tryParse(result.toString()) ?? -2;
-  }
-
-  /// EXPIRE — set TTL in seconds.
-  Future<void> expire(String key, int seconds) async {
-    await sendCommand(['EXPIRE', key, seconds.toString()]);
-  }
-
-  /// PERSIST — remove TTL.
-  Future<void> persist(String key) async {
-    await sendCommand(['PERSIST', key]);
-  }
-
-  /// HGETALL — returns map of field:value.
+  /// HGETALL key. Returns a `Map<String, String>`.
   Future<Map<String, String>> hgetall(String key) async {
     final result = await sendCommand(['HGETALL', key]);
     final map = <String, String>{};
@@ -149,92 +173,131 @@ class RedisConnection {
     return map;
   }
 
-  /// HSET a field.
+  /// HSET key field value.
   Future<void> hset(String key, String field, String value) async {
     await sendCommand(['HSET', key, field, value]);
   }
 
-  /// HDEL a field.
+  /// HDEL key field.
   Future<void> hdel(String key, String field) async {
     await sendCommand(['HDEL', key, field]);
   }
 
-  /// LRANGE — list slice.
+  /// LRANGE key start stop.
   Future<List<String>> lrange(String key, int start, int stop) async {
-    final result = await sendCommand(['LRANGE', key, start.toString(), stop.toString()]);
-    if (result is List) return result.map((e) => e.toString()).toList();
+    final result = await sendCommand(['LRANGE', key, start, stop]);
+    if (result is List) {
+      return result.map((e) => e.toString()).toList();
+    }
     return [];
   }
 
-  /// LLEN — list length.
+  /// LLEN key.
   Future<int> llen(String key) async {
     final result = await sendCommand(['LLEN', key]);
-    return int.tryParse(result.toString()) ?? 0;
+    return result is int ? result : int.tryParse(result.toString()) ?? 0;
   }
 
-  /// RPUSH — append to list.
+  /// RPUSH key value.
   Future<void> rpush(String key, String value) async {
     await sendCommand(['RPUSH', key, value]);
   }
 
-  /// SMEMBERS — set members.
+  /// SMEMBERS key.
   Future<List<String>> smembers(String key) async {
     final result = await sendCommand(['SMEMBERS', key]);
-    if (result is List) return result.map((e) => e.toString()).toList();
+    if (result is List) {
+      return result.map((e) => e.toString()).toList();
+    }
     return [];
   }
 
-  /// SADD — add to set.
-  Future<void> sadd(String key, String value) async {
-    await sendCommand(['SADD', key, value]);
+  /// SCARD key.
+  Future<int> scard(String key) async {
+    final result = await sendCommand(['SCARD', key]);
+    return result is int ? result : int.tryParse(result.toString()) ?? 0;
   }
 
-  /// SREM — remove from set.
-  Future<void> srem(String key, String value) async {
-    await sendCommand(['SREM', key, value]);
+  /// SADD key member.
+  Future<void> sadd(String key, String member) async {
+    await sendCommand(['SADD', key, member]);
   }
 
-  /// ZRANGE with scores (WITHSCORES). Returns list of (member, score).
-  Future<List<(String, double)>> zrangeWithScores(String key, int start, int stop) async {
-    final result = await sendCommand(['ZRANGE', key, start.toString(), stop.toString(), 'WITHSCORES']);
+  /// SREM key member.
+  Future<void> srem(String key, String member) async {
+    await sendCommand(['SREM', key, member]);
+  }
+
+  /// ZRANGE key start stop WITHSCORES → list of (member, score).
+  Future<List<(String, double)>> zrangeWithScores(
+      String key, int start, int stop) async {
+    final result =
+        await sendCommand(['ZRANGE', key, start, stop, 'WITHSCORES']);
     final list = <(String, double)>[];
     if (result is List) {
       for (var i = 0; i + 1 < result.length; i += 2) {
-        list.add((result[i].toString(), double.tryParse(result[i + 1].toString()) ?? 0));
+        final member = result[i].toString();
+        final score = double.tryParse(result[i + 1].toString()) ?? 0;
+        list.add((member, score));
       }
     }
     return list;
   }
 
-  /// ZCARD — sorted set cardinality.
+  /// ZCARD key.
   Future<int> zcard(String key) async {
     final result = await sendCommand(['ZCARD', key]);
-    return int.tryParse(result.toString()) ?? 0;
+    return result is int ? result : int.tryParse(result.toString()) ?? 0;
   }
 
-  /// ZADD — add to sorted set.
+  /// ZADD key score member.
   Future<void> zadd(String key, double score, String member) async {
-    await sendCommand(['ZADD', key, score.toString(), member]);
+    await sendCommand(['ZADD', key, score, member]);
   }
 
-  /// ZREM — remove from sorted set.
+  /// ZREM key member.
   Future<void> zrem(String key, String member) async {
     await sendCommand(['ZREM', key, member]);
   }
 
-  /// RENAME a key.
+  /// DEL key.
+  Future<int> del(String key) async {
+    final result = await sendCommand(['DEL', key]);
+    return result is int ? result : int.tryParse(result.toString()) ?? 0;
+  }
+
+  /// RENAME old new.
   Future<void> rename(String oldKey, String newKey) async {
     await sendCommand(['RENAME', oldKey, newKey]);
   }
 
-  Future<bool> testConnection() async {
-    try {
-      await connect();
-      return true;
-    } catch (_) {
-      return false;
-    } finally {
-      await disconnect();
+  /// EXPIRE key seconds.
+  Future<void> expire(String key, int seconds) async {
+    await sendCommand(['EXPIRE', key, seconds]);
+  }
+
+  /// PERSIST key (remove TTL).
+  Future<void> persist(String key) async {
+    await sendCommand(['PERSIST', key]);
+  }
+
+  /// STRLEN / LLEN / SCARD / ZCARD / HLEN — get size for any type.
+  Future<int> keySize(String key, String type) async {
+    switch (type) {
+      case 'string':
+        final r = await sendCommand(['STRLEN', key]);
+        return r is int ? r : int.tryParse(r.toString()) ?? 0;
+      case 'list':
+        return llen(key);
+      case 'set':
+        return scard(key);
+      case 'zset':
+        return zcard(key);
+      case 'hash':
+        final r = await sendCommand(['HLEN', key]);
+        return r is int ? r : int.tryParse(r.toString()) ?? 0;
+      default:
+        return 0;
     }
   }
 }
