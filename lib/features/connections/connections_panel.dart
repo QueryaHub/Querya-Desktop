@@ -1,4 +1,6 @@
-import 'package:flutter/material.dart' as material show Padding, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, DefaultTextStyle, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, Column, AnimatedRotation, Row, BoxFit, Text, TextOverflow, Expanded;
+import 'package:flutter/material.dart' as material show Padding, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, DefaultTextStyle, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, Column, AnimatedRotation, Row, BoxFit, Text, TextOverflow, Expanded, CircularProgressIndicator;
+import 'package:querya_desktop/core/database/redis_connection.dart';
+import 'package:querya_desktop/core/database/redis_info.dart';
 import 'package:querya_desktop/core/storage/folders_storage.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -13,10 +15,15 @@ class ConnectionsPanel extends StatefulWidget {
   const ConnectionsPanel({
     super.key,
     this.onConnectionSelected,
+    this.onRedisDatabaseSelected,
   });
 
   /// Called when the user taps a connection tile.
   final void Function(ConnectionRow connection)? onConnectionSelected;
+
+  /// Called when the user taps a Redis database node in the tree.
+  final void Function(ConnectionRow connection, int database)?
+      onRedisDatabaseSelected;
 
   @override
   State<ConnectionsPanel> createState() => _ConnectionsPanelState();
@@ -171,31 +178,50 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
                               });
                             },
                             connections: _connections
-                                .where((c) => c.folderId == _folderIdByName[name])
+                                .where((c) =>
+                                    c.folderId == _folderIdByName[name])
                                 .toList(),
                             onRemove: () async {
                               await FoldersStorage.instance.remove(name);
                               await _loadData();
                             },
                             onNewConnection: (folderName) async {
-                              final type = await showNewConnectionDialog(context);
+                              final type =
+                                  await showNewConnectionDialog(context);
                               if (type == null || !mounted) return;
-                              final folderId = await LocalDb.instance.getFolderIdByName(folderName);
-                              await _createConnection(type, folderId: folderId);
+                              final folderId = await LocalDb.instance
+                                  .getFolderIdByName(folderName);
+                              await _createConnection(type,
+                                  folderId: folderId);
                             },
                             iconForType: _iconForType,
                             onRemoveConnection: _removeConnection,
                             onConnectionTap: widget.onConnectionSelected,
+                            onRedisDatabaseTap:
+                                widget.onRedisDatabaseSelected,
                           ),
                         // Root connections (no folder)
                         for (final conn in rootConnections)
-                          _ConnectionTile(
-                            connection: conn,
-                            icon: _iconForType(conn.type),
-                            iconAsset: _iconAssetForType(conn.type),
-                            onRemove: () => _removeConnection(conn.id!),
-                            onTap: () => widget.onConnectionSelected?.call(conn),
-                          ),
+                          conn.type == 'redis'
+                              ? _RedisConnectionTile(
+                                  connection: conn,
+                                  icon: _iconForType(conn.type),
+                                  iconAsset: _iconAssetForType(conn.type),
+                                  onRemove: () => _removeConnection(conn.id!),
+                                  onTap: () => widget.onConnectionSelected
+                                      ?.call(conn),
+                                  onDatabaseTap: (db) => widget
+                                      .onRedisDatabaseSelected
+                                      ?.call(conn, db),
+                                )
+                              : _ConnectionTile(
+                                  connection: conn,
+                                  icon: _iconForType(conn.type),
+                                  iconAsset: _iconAssetForType(conn.type),
+                                  onRemove: () => _removeConnection(conn.id!),
+                                  onTap: () => widget.onConnectionSelected
+                                      ?.call(conn),
+                                ),
                         // Empty state
                         if (_connections.isEmpty && _folders.isEmpty)
                           const material.Padding(
@@ -385,6 +411,7 @@ class _FolderTile extends StatelessWidget {
     required this.iconForType,
     required this.onRemoveConnection,
     this.onConnectionTap,
+    this.onRedisDatabaseTap,
   });
 
   final String name;
@@ -396,6 +423,8 @@ class _FolderTile extends StatelessWidget {
   final material.IconData Function(String type) iconForType;
   final Future<void> Function(int id) onRemoveConnection;
   final void Function(ConnectionRow connection)? onConnectionTap;
+  final void Function(ConnectionRow connection, int database)?
+      onRedisDatabaseTap;
 
   @override
   Widget build(BuildContext context) {
@@ -461,15 +490,340 @@ class _FolderTile extends StatelessWidget {
               for (final conn in connections)
                 material.Padding(
                   padding: const material.EdgeInsets.only(left: 24),
-                  child: _ConnectionTile(
-                    connection: conn,
-                    icon: iconForType(conn.type),
-                    iconAsset: _ConnectionsPanelState._iconAssetForType(conn.type),
-                    onRemove: () => onRemoveConnection(conn.id!),
-                    onTap: () => onConnectionTap?.call(conn),
-                  ),
+                  child: conn.type == 'redis'
+                      ? _RedisConnectionTile(
+                          connection: conn,
+                          icon: iconForType(conn.type),
+                          iconAsset: _ConnectionsPanelState
+                              ._iconAssetForType(conn.type),
+                          onRemove: () => onRemoveConnection(conn.id!),
+                          onTap: () => onConnectionTap?.call(conn),
+                          onDatabaseTap: (db) =>
+                              onRedisDatabaseTap?.call(conn, db),
+                        )
+                      : _ConnectionTile(
+                          connection: conn,
+                          icon: iconForType(conn.type),
+                          iconAsset: _ConnectionsPanelState
+                              ._iconAssetForType(conn.type),
+                          onRemove: () => onRemoveConnection(conn.id!),
+                          onTap: () => onConnectionTap?.call(conn),
+                        ),
                 ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Redis connection tile with expandable database tree ────────────────────
+
+class _RedisConnectionTile extends StatefulWidget {
+  const _RedisConnectionTile({
+    required this.connection,
+    required this.icon,
+    this.iconAsset,
+    required this.onRemove,
+    this.onTap,
+    this.onDatabaseTap,
+  });
+
+  final ConnectionRow connection;
+  final material.IconData icon;
+  final String? iconAsset;
+  final VoidCallback onRemove;
+  final VoidCallback? onTap;
+  final void Function(int database)? onDatabaseTap;
+
+  @override
+  State<_RedisConnectionTile> createState() => _RedisConnectionTileState();
+}
+
+class _RedisConnectionTileState extends State<_RedisConnectionTile> {
+  bool _expanded = false;
+  bool _loading = false;
+  String? _error;
+  List<({int index, int keys})> _databases = [];
+
+  void _toggle() {
+    setState(() => _expanded = !_expanded);
+    if (_expanded && _databases.isEmpty && !_loading) {
+      _loadDatabases();
+    }
+  }
+
+  Future<void> _loadDatabases() async {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      // Use a temporary connection (not registered in RedisService) so we
+      // don't kill the main view's connection.
+      final c = widget.connection;
+      final conn = RedisConnection(
+        id: -1,
+        name: 'sidebar_probe',
+        host: c.host ?? 'localhost',
+        port: c.port ?? 6379,
+        username: c.username,
+        password: c.password,
+      );
+      await conn.connect();
+      final raw = await conn.info();
+      await conn.disconnect();
+
+      final info = parseRedisInfo(raw);
+      final keyspace = info['Keyspace'] ?? {};
+
+      final dbs = <({int index, int keys})>[];
+      for (final entry in keyspace.entries) {
+        final match = RegExp(r'db(\d+)').firstMatch(entry.key);
+        if (match == null) continue;
+        final idx = int.parse(match.group(1)!);
+        int keys = 0;
+        for (final part in entry.value.split(',')) {
+          final kv = part.split('=');
+          if (kv.length == 2 && kv[0].trim() == 'keys') {
+            keys = int.tryParse(kv[1].trim()) ?? 0;
+          }
+        }
+        dbs.add((index: idx, keys: keys));
+      }
+      dbs.sort((a, b) => a.index.compareTo(b.index));
+
+      if (!mounted) return;
+      setState(() {
+        _databases = dbs;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final iconWidget = widget.iconAsset != null
+        ? material.Image.asset(
+            widget.iconAsset!,
+            width: 16,
+            height: 16,
+            fit: material.BoxFit.contain,
+            errorBuilder: (_, __, ___) => material.Icon(
+              widget.icon,
+              size: 16,
+              color: theme.colorScheme.primary,
+            ),
+          )
+        : material.Icon(widget.icon, size: 16, color: theme.colorScheme.primary);
+
+    return ContextMenu(
+      items: [
+        MenuButton(
+          leading: material.Icon(material.Icons.refresh_rounded,
+              size: 18, color: theme.colorScheme.mutedForeground),
+          onPressed: (_) {
+            _databases = [];
+            _loadDatabases();
+          },
+          child: const Text('Refresh databases'),
+        ),
+        MenuButton(
+          leading: material.Icon(material.Icons.delete_outline_rounded,
+              size: 18, color: theme.colorScheme.mutedForeground),
+          onPressed: (_) => widget.onRemove(),
+          child: const Text('Remove connection'),
+        ),
+      ],
+      child: material.Padding(
+        padding: const material.EdgeInsets.only(bottom: 2),
+        child: material.Column(
+          crossAxisAlignment: material.CrossAxisAlignment.start,
+          mainAxisSize: material.MainAxisSize.min,
+          children: [
+            // Connection row
+            material.Row(
+              children: [
+                // Expand/collapse arrow
+                material.MouseRegion(
+                  cursor: material.SystemMouseCursors.click,
+                  child: material.InkWell(
+                    onTap: _toggle,
+                    borderRadius: material.BorderRadius.circular(4),
+                    child: material.Padding(
+                      padding: const material.EdgeInsets.all(2),
+                      child: material.AnimatedRotation(
+                        turns: _expanded ? 0.25 : 0,
+                        duration: const Duration(milliseconds: 150),
+                        child: material.Icon(
+                          material.Icons.chevron_right_rounded,
+                          size: 16,
+                          color: theme.colorScheme.mutedForeground,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                // Connection name — clickable for stats
+                material.Expanded(
+                  child: material.MouseRegion(
+                    cursor: material.SystemMouseCursors.click,
+                    child: material.InkWell(
+                      onTap: widget.onTap,
+                      borderRadius: material.BorderRadius.circular(6),
+                      child: material.Padding(
+                        padding: const material.EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 6),
+                        child: material.Row(
+                          children: [
+                            iconWidget,
+                            const Gap(8),
+                            material.Expanded(
+                              child: material.Column(
+                                crossAxisAlignment:
+                                    material.CrossAxisAlignment.start,
+                                mainAxisSize: material.MainAxisSize.min,
+                                children: [
+                                  material.Text(
+                                    widget.connection.name,
+                                    overflow: material.TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                    style: material.TextStyle(
+                                      fontSize: 13,
+                                      color: theme.colorScheme.foreground,
+                                    ),
+                                  ),
+                                  if (widget.connection.host != null)
+                                    material.Text(
+                                      '${widget.connection.host}:${widget.connection.port ?? ''}',
+                                      overflow: material.TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                      style: material.TextStyle(
+                                        fontSize: 11,
+                                        color:
+                                            theme.colorScheme.mutedForeground,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            // Expanded database children
+            if (_expanded) ...[
+              if (_loading)
+                material.Padding(
+                  padding: const material.EdgeInsets.only(
+                      left: 28, top: 4, bottom: 4),
+                  child: material.Row(
+                    children: [
+                      const material.SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: material.CircularProgressIndicator(
+                            strokeWidth: 1.5),
+                      ),
+                      const Gap(8),
+                      const Text('Loading...').muted().xSmall(),
+                    ],
+                  ),
+                ),
+              if (_error != null)
+                material.Padding(
+                  padding: const material.EdgeInsets.only(
+                      left: 28, top: 4, bottom: 4),
+                  child: material.Text(
+                    'Error',
+                    overflow: material.TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: material.TextStyle(
+                        fontSize: 11, color: theme.colorScheme.destructive),
+                  ),
+                ),
+              if (_databases.isEmpty && !_loading && _error == null)
+                material.Padding(
+                  padding: const material.EdgeInsets.only(
+                      left: 28, top: 4, bottom: 4),
+                  child: const Text('No active databases').muted().xSmall(),
+                ),
+              for (final db in _databases)
+                _RedisDatabaseNode(
+                  index: db.index,
+                  keys: db.keys,
+                  onTap: () => widget.onDatabaseTap?.call(db.index),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RedisDatabaseNode extends StatelessWidget {
+  const _RedisDatabaseNode({
+    required this.index,
+    required this.keys,
+    required this.onTap,
+  });
+
+  final int index;
+  final int keys;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return material.Padding(
+      padding: const material.EdgeInsets.only(left: 24),
+      child: material.MouseRegion(
+        cursor: material.SystemMouseCursors.click,
+        child: material.InkWell(
+          onTap: onTap,
+          borderRadius: material.BorderRadius.circular(6),
+          child: material.Padding(
+            padding: const material.EdgeInsets.symmetric(
+                horizontal: 8, vertical: 5),
+            child: material.Row(
+              children: [
+                material.Icon(material.Icons.dns_rounded,
+                    size: 14,
+                    color:
+                        theme.colorScheme.primary.withValues(alpha: 0.7)),
+                const Gap(8),
+                material.Expanded(
+                  child: material.Text(
+                    'db$index',
+                    overflow: material.TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: material.TextStyle(
+                        fontSize: 12,
+                        color: theme.colorScheme.foreground),
+                  ),
+                ),
+                material.Text(
+                  '$keys',
+                  style: material.TextStyle(
+                      fontSize: 10,
+                      color: theme.colorScheme.mutedForeground),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
