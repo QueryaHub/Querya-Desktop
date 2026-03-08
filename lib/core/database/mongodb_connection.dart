@@ -78,6 +78,41 @@ class MongoConnection {
     return buffer.toString();
   }
 
+  /// Returns a connection URI targeting [databaseName].
+  ///
+  /// When credentials are present and no explicit `authSource` query parameter
+  /// exists, the method automatically adds `authSource=<original_db>` (defaults
+  /// to `admin`) so that authentication succeeds on databases other than the
+  /// one the user was created in.
+  String buildUriForDatabase(String databaseName) {
+    final baseUri = buildConnectionUri();
+    final uri = Uri.parse(baseUri);
+
+    // Determine the authSource that should be used.
+    // 1) Already present in the query → keep it.
+    // 2) Not present but credentials exist → use the original path db, or
+    //    fall back to "admin" (Mongo's default authSource).
+    final existingAuthSource = uri.queryParameters['authSource'];
+    final hasCredentials =
+        uri.userInfo.isNotEmpty ||
+        (username != null && username!.isNotEmpty);
+
+    Map<String, String>? newQueryParams;
+    if (existingAuthSource == null && hasCredentials) {
+      // Original db from the URI path (strip leading '/')
+      final origDb = uri.path.replaceFirst('/', '');
+      final source = (origDb.isNotEmpty) ? origDb : 'admin';
+      newQueryParams = Map<String, String>.from(uri.queryParameters)
+        ..['authSource'] = source;
+    }
+
+    final newUri = uri.replace(
+      path: '/$databaseName',
+      queryParameters: newQueryParams ?? uri.queryParameters,
+    );
+    return newUri.toString();
+  }
+
   /// Connects to MongoDB server.
   Future<void> connect() async {
     if (_isConnected && _db != null) {
@@ -98,10 +133,13 @@ class MongoConnection {
 
   /// Disconnects from MongoDB server.
   Future<void> disconnect() async {
-    if (_db != null && _isConnected) {
-      await _db!.close();
-      _db = null;
-      _isConnected = false;
+    _isConnected = false;
+    final db = _db;
+    _db = null;
+    try {
+      await db?.close();
+    } catch (_) {
+      // Connection may already be closed — ignore.
     }
   }
 
@@ -119,7 +157,7 @@ class MongoConnection {
 
     try {
       // Switch to admin database to list all databases
-      final adminUri = buildConnectionUri().replaceAll(RegExp(r'/[^/?]*(\?|$)'), '/admin\$1');
+      final adminUri = buildUriForDatabase('admin');
       final adminDb = await Db.create(adminUri);
       await adminDb.open();
       try {
@@ -147,7 +185,7 @@ class MongoConnection {
 
     try {
       // Create a new Db connection to the specified database
-      final dbUri = buildConnectionUri().replaceAll(RegExp(r'/[^/?]*(\?|$)'), '/$databaseName\$1');
+      final dbUri = buildUriForDatabase(databaseName);
       final db = await Db.create(dbUri);
       await db.open();
       try {
