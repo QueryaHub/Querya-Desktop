@@ -178,27 +178,22 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
                               });
                             },
                             connections: _connections
-                                .where((c) =>
-                                    c.folderId == _folderIdByName[name])
+                                .where((c) => c.folderId == _folderIdByName[name])
                                 .toList(),
                             onRemove: () async {
                               await FoldersStorage.instance.remove(name);
                               await _loadData();
                             },
                             onNewConnection: (folderName) async {
-                              final type =
-                                  await showNewConnectionDialog(context);
+                              final type = await showNewConnectionDialog(context);
                               if (type == null || !mounted) return;
-                              final folderId = await LocalDb.instance
-                                  .getFolderIdByName(folderName);
-                              await _createConnection(type,
-                                  folderId: folderId);
+                              final folderId = await LocalDb.instance.getFolderIdByName(folderName);
+                              await _createConnection(type, folderId: folderId);
                             },
                             iconForType: _iconForType,
                             onRemoveConnection: _removeConnection,
                             onConnectionTap: widget.onConnectionSelected,
-                            onRedisDatabaseTap:
-                                widget.onRedisDatabaseSelected,
+                            onRedisDatabaseTap: widget.onRedisDatabaseSelected,
                           ),
                         // Root connections (no folder)
                         for (final conn in rootConnections)
@@ -208,19 +203,15 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
                                   icon: _iconForType(conn.type),
                                   iconAsset: _iconAssetForType(conn.type),
                                   onRemove: () => _removeConnection(conn.id!),
-                                  onTap: () => widget.onConnectionSelected
-                                      ?.call(conn),
-                                  onDatabaseTap: (db) => widget
-                                      .onRedisDatabaseSelected
-                                      ?.call(conn, db),
+                                  onTap: () => widget.onConnectionSelected?.call(conn),
+                                  onDatabaseTap: (db) => widget.onRedisDatabaseSelected?.call(conn, db),
                                 )
                               : _ConnectionTile(
                                   connection: conn,
                                   icon: _iconForType(conn.type),
                                   iconAsset: _iconAssetForType(conn.type),
                                   onRemove: () => _removeConnection(conn.id!),
-                                  onTap: () => widget.onConnectionSelected
-                                      ?.call(conn),
+                                  onTap: () => widget.onConnectionSelected?.call(conn),
                                 ),
                         // Empty state
                         if (_connections.isEmpty && _folders.isEmpty)
@@ -423,8 +414,7 @@ class _FolderTile extends StatelessWidget {
   final material.IconData Function(String type) iconForType;
   final Future<void> Function(int id) onRemoveConnection;
   final void Function(ConnectionRow connection)? onConnectionTap;
-  final void Function(ConnectionRow connection, int database)?
-      onRedisDatabaseTap;
+  final void Function(ConnectionRow connection, int database)? onRedisDatabaseTap;
 
   @override
   Widget build(BuildContext context) {
@@ -494,18 +484,15 @@ class _FolderTile extends StatelessWidget {
                       ? _RedisConnectionTile(
                           connection: conn,
                           icon: iconForType(conn.type),
-                          iconAsset: _ConnectionsPanelState
-                              ._iconAssetForType(conn.type),
+                          iconAsset: _ConnectionsPanelState._iconAssetForType(conn.type),
                           onRemove: () => onRemoveConnection(conn.id!),
                           onTap: () => onConnectionTap?.call(conn),
-                          onDatabaseTap: (db) =>
-                              onRedisDatabaseTap?.call(conn, db),
+                          onDatabaseTap: (db) => onRedisDatabaseTap?.call(conn, db),
                         )
                       : _ConnectionTile(
                           connection: conn,
                           icon: iconForType(conn.type),
-                          iconAsset: _ConnectionsPanelState
-                              ._iconAssetForType(conn.type),
+                          iconAsset: _ConnectionsPanelState._iconAssetForType(conn.type),
                           onRemove: () => onRemoveConnection(conn.id!),
                           onTap: () => onConnectionTap?.call(conn),
                         ),
@@ -544,6 +531,7 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
   bool _expanded = false;
   bool _loading = false;
   String? _error;
+  // All 16 databases (db0–db15) with key counts
   List<({int index, int keys})> _databases = [];
 
   void _toggle() {
@@ -560,8 +548,7 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
       _error = null;
     });
     try {
-      // Use a temporary connection (not registered in RedisService) so we
-      // don't kill the main view's connection.
+      // Use a temporary connection so we don't kill the main view's connection.
       final c = widget.connection;
       final conn = RedisConnection(
         id: -1,
@@ -578,21 +565,22 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
       final info = parseRedisInfo(raw);
       final keyspace = info['Keyspace'] ?? {};
 
+      // Build all 16 databases with their key counts
       final dbs = <({int index, int keys})>[];
-      for (final entry in keyspace.entries) {
-        final match = RegExp(r'db(\d+)').firstMatch(entry.key);
-        if (match == null) continue;
-        final idx = int.parse(match.group(1)!);
+      for (var i = 0; i < 16; i++) {
+        final dbKey = 'db$i';
+        final dbInfo = keyspace[dbKey];
         int keys = 0;
-        for (final part in entry.value.split(',')) {
-          final kv = part.split('=');
-          if (kv.length == 2 && kv[0].trim() == 'keys') {
-            keys = int.tryParse(kv[1].trim()) ?? 0;
+        if (dbInfo != null) {
+          for (final part in dbInfo.split(',')) {
+            final kv = part.split('=');
+            if (kv.length == 2 && kv[0].trim() == 'keys') {
+              keys = int.tryParse(kv[1].trim()) ?? 0;
+            }
           }
         }
-        dbs.add((index: idx, keys: keys));
+        dbs.add((index: i, keys: keys));
       }
-      dbs.sort((a, b) => a.index.compareTo(b.index));
 
       if (!mounted) return;
       setState(() {
@@ -708,8 +696,7 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
                                       maxLines: 1,
                                       style: material.TextStyle(
                                         fontSize: 11,
-                                        color:
-                                            theme.colorScheme.mutedForeground,
+                                        color: theme.colorScheme.mutedForeground,
                                       ),
                                     ),
                                 ],
@@ -723,19 +710,17 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
                 ),
               ],
             ),
-            // Expanded database children
+            // Expanded database children — ALL 16 databases
             if (_expanded) ...[
               if (_loading)
                 material.Padding(
-                  padding: const material.EdgeInsets.only(
-                      left: 28, top: 4, bottom: 4),
+                  padding: const material.EdgeInsets.only(left: 28, top: 4, bottom: 4),
                   child: material.Row(
                     children: [
                       const material.SizedBox(
                         width: 12,
                         height: 12,
-                        child: material.CircularProgressIndicator(
-                            strokeWidth: 1.5),
+                        child: material.CircularProgressIndicator(strokeWidth: 1.5),
                       ),
                       const Gap(8),
                       const Text('Loading...').muted().xSmall(),
@@ -744,8 +729,7 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
                 ),
               if (_error != null)
                 material.Padding(
-                  padding: const material.EdgeInsets.only(
-                      left: 28, top: 4, bottom: 4),
+                  padding: const material.EdgeInsets.only(left: 28, top: 4, bottom: 4),
                   child: material.Text(
                     'Error',
                     overflow: material.TextOverflow.ellipsis,
@@ -753,12 +737,6 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
                     style: material.TextStyle(
                         fontSize: 11, color: theme.colorScheme.destructive),
                   ),
-                ),
-              if (_databases.isEmpty && !_loading && _error == null)
-                material.Padding(
-                  padding: const material.EdgeInsets.only(
-                      left: 28, top: 4, bottom: 4),
-                  child: const Text('No active databases').muted().xSmall(),
                 ),
               for (final db in _databases)
                 _RedisDatabaseNode(
@@ -800,10 +778,13 @@ class _RedisDatabaseNode extends StatelessWidget {
                 horizontal: 8, vertical: 5),
             child: material.Row(
               children: [
-                material.Icon(material.Icons.dns_rounded,
-                    size: 14,
-                    color:
-                        theme.colorScheme.primary.withValues(alpha: 0.7)),
+                material.Icon(
+                  material.Icons.dns_rounded,
+                  size: 14,
+                  color: keys > 0
+                      ? theme.colorScheme.primary.withValues(alpha: 0.7)
+                      : theme.colorScheme.mutedForeground.withValues(alpha: 0.5),
+                ),
                 const Gap(8),
                 material.Expanded(
                   child: material.Text(
@@ -811,16 +792,20 @@ class _RedisDatabaseNode extends StatelessWidget {
                     overflow: material.TextOverflow.ellipsis,
                     maxLines: 1,
                     style: material.TextStyle(
-                        fontSize: 12,
-                        color: theme.colorScheme.foreground),
+                      fontSize: 12,
+                      color: keys > 0
+                          ? theme.colorScheme.foreground
+                          : theme.colorScheme.mutedForeground,
+                    ),
                   ),
                 ),
-                material.Text(
-                  '$keys',
-                  style: material.TextStyle(
-                      fontSize: 10,
-                      color: theme.colorScheme.mutedForeground),
-                ),
+                if (keys > 0)
+                  material.Text(
+                    '$keys',
+                    style: material.TextStyle(
+                        fontSize: 10,
+                        color: theme.colorScheme.mutedForeground),
+                  ),
               ],
             ),
           ),
