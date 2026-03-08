@@ -30,7 +30,7 @@ class _MainScreenState extends State<MainScreen> {
   void _onConnectionSelected(ConnectionRow connection) {
     setState(() {
       _activeConnection = connection;
-      _activeRedisDb = null;
+      _activeRedisDb = null; // Reset: connection click → stats
     });
   }
 
