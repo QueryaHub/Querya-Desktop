@@ -398,7 +398,7 @@ class _DocumentCardState extends State<_DocumentCard> {
     final cs = widget.colorScheme;
     final scs = widget.shadcnCs;
     final idStr = widget.document['_id']?.toString() ?? '—';
-    final preview = _compactJson(widget.document);
+    final keysPreview = _keysPreview(widget.document);
 
     return material.MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -473,15 +473,25 @@ class _DocumentCardState extends State<_DocumentCard> {
             material.Padding(
               padding: const material.EdgeInsets.only(
                   left: 16, right: 16, bottom: 10),
-              child: material.SelectableText(
-                _expanded ? _prettyJson(widget.document) : preview,
-                style: material.TextStyle(
-                  fontSize: 12,
-                  fontFamily: 'monospace',
-                  color: scs.mutedForeground,
-                ),
-                maxLines: _expanded ? null : 2,
-              ),
+              child: _expanded
+                  ? material.SelectableText(
+                      _prettyJson(widget.document),
+                      style: material.TextStyle(
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                        color: scs.mutedForeground,
+                      ),
+                    )
+                  : Text(
+                      keysPreview,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      style: material.TextStyle(
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                        color: scs.mutedForeground,
+                      ),
+                    ),
             ),
           ],
         ),
@@ -489,12 +499,11 @@ class _DocumentCardState extends State<_DocumentCard> {
     );
   }
 
-  String _compactJson(Map<String, dynamic> doc) {
-    try {
-      return json.encode(doc);
-    } catch (_) {
-      return doc.toString();
-    }
+  /// Returns a compact list of top-level keys (excluding _id).
+  String _keysPreview(Map<String, dynamic> doc) {
+    final keys = doc.keys.where((k) => k != '_id').toList();
+    if (keys.isEmpty) return '{ }';
+    return keys.join(', ');
   }
 
   String _prettyJson(Map<String, dynamic> doc) {
