@@ -4,6 +4,7 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 import 'package:querya_desktop/features/mongodb/mongo_explorer_view.dart';
 import 'package:querya_desktop/features/redis/redis_explorer_view.dart';
+import 'package:querya_desktop/features/redis/redis_view.dart';
 import 'query_editor_tab.dart';
 import 'results_tab.dart';
 
@@ -12,10 +13,15 @@ class WorkspacePanel extends StatefulWidget {
   const WorkspacePanel({
     super.key,
     this.activeConnection,
+    this.selectedRedisDb,
   });
 
   /// Currently selected connection from the sidebar.
   final ConnectionRow? activeConnection;
+
+  /// When set, the user selected a specific Redis database in the sidebar tree.
+  /// null = show stats, non-null = show data explorer for that db.
+  final int? selectedRedisDb;
 
   @override
   State<WorkspacePanel> createState() => _WorkspacePanelState();
@@ -44,16 +50,25 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
       );
     }
 
-    // If a Redis connection is selected, show the Redis explorer
+    // If a Redis connection is selected
     if (widget.activeConnection != null &&
         widget.activeConnection!.type == 'redis') {
+      final redisDb = widget.selectedRedisDb;
       return material.Container(
         color: theme.colorScheme.background,
         child: material.SizedBox.expand(
-          child: RedisExplorerView(
-            key: ValueKey(widget.activeConnection!.id),
-            connectionRow: widget.activeConnection!,
-          ),
+          // DB selected → data explorer; no DB → stats
+          child: redisDb != null
+              ? RedisExplorerView(
+                  key: ValueKey(
+                      'redis_${widget.activeConnection!.id}_db_$redisDb'),
+                  connectionRow: widget.activeConnection!,
+                  database: redisDb,
+                )
+              : RedisView(
+                  key: ValueKey(widget.activeConnection!.id),
+                  connectionRow: widget.activeConnection!,
+                ),
         ),
       );
     }
