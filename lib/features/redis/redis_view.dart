@@ -13,8 +13,21 @@ const _summaryChipHeight = 72.0;
 const _gridCardHeight = 220.0;
 
 class RedisView extends material.StatefulWidget {
-  const RedisView({super.key, required this.connectionRow});
+  const RedisView({
+    super.key,
+    required this.connectionRow,
+    this.connection,
+    this.onBack,
+  });
+
   final ConnectionRow connectionRow;
+
+  /// An already-open [RedisConnection]. When provided the view re-uses it
+  /// instead of creating (and potentially killing) a shared one.
+  final RedisConnection? connection;
+
+  /// Called when the user taps the "back to explorer" button.
+  final material.VoidCallback? onBack;
 
   @override
   material.State<RedisView> createState() => _RedisViewState();
@@ -50,13 +63,17 @@ class _RedisViewState extends material.State<RedisView> {
     super.dispose();
   }
 
+  /// Whether this view owns its connection (created it itself).
+  bool _ownsConnection = false;
+
   /// Safely disconnects and clears the current Redis connection.
   void _disconnectCurrent() {
     final conn = _connection;
     _connection = null;
-    if (conn != null) {
-      conn.disconnect(); // fire-and-forget; disconnect handles errors
+    if (conn != null && _ownsConnection) {
+      conn.disconnect();
     }
+    _ownsConnection = false;
   }
 
   Future<void> _load() async {
@@ -69,18 +86,30 @@ class _RedisViewState extends material.State<RedisView> {
       _info = null;
     });
     try {
-      final conn = RedisService.instance.createConnection(widget.connectionRow);
-      await conn.connect();
+      final supplied = widget.connection;
+      RedisConnection conn;
+      if (supplied != null && supplied.isConnected) {
+        conn = supplied;
+        _ownsConnection = false;
+      } else {
+        conn = RedisService.instance.createConnection(widget.connectionRow);
+        await conn.connect();
+        _ownsConnection = true;
+      }
       if (!mounted) {
-        // Widget was disposed while connecting — clean up immediately.
-        conn.disconnect();
+        if (_ownsConnection) conn.disconnect();
         return;
       }
       _connection = conn;
       await _fetch();
       if (mounted) _startTimer();
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -244,9 +273,19 @@ class _RedisViewState extends material.State<RedisView> {
             ],
           ),
         ),
+        if (widget.onBack != null) ...[
+          OutlineButton(
+            onPressed: widget.onBack,
+            leading: const material.Icon(
+                material.Icons.grid_view_rounded, size: 18),
+            child: const Text('Explorer'),
+          ),
+          const Gap(8),
+        ],
         OutlineButton(
           onPressed: _load,
-          leading: const material.Icon(material.Icons.refresh_rounded, size: 18),
+          leading: const material.Icon(
+              material.Icons.refresh_rounded, size: 18),
           child: const Text('Refresh'),
         ),
       ],
