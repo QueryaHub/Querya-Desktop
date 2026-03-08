@@ -24,9 +24,20 @@ class _MainScreenState extends State<MainScreen> {
   /// Currently selected connection (null = no connection selected).
   ConnectionRow? _activeConnection;
 
+  /// Currently selected Redis database (null = show stats).
+  int? _activeRedisDb;
+
   void _onConnectionSelected(ConnectionRow connection) {
     setState(() {
       _activeConnection = connection;
+      _activeRedisDb = null;
+    });
+  }
+
+  void _onRedisDatabaseSelected(ConnectionRow connection, int database) {
+    setState(() {
+      _activeConnection = connection;
+      _activeRedisDb = database;
     });
   }
 
@@ -51,6 +62,7 @@ class _MainScreenState extends State<MainScreen> {
                       width: _leftPanelWidth,
                       child: ConnectionsPanel(
                         onConnectionSelected: _onConnectionSelected,
+                        onRedisDatabaseSelected: _onRedisDatabaseSelected,
                       ),
                     ),
                     _VerticalResizeHandle(
@@ -64,6 +76,7 @@ class _MainScreenState extends State<MainScreen> {
                     Expanded(
                       child: WorkspacePanel(
                         activeConnection: _activeConnection,
+                        selectedRedisDb: _activeRedisDb,
                       ),
                     ),
                   ],

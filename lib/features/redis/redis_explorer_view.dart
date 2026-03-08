@@ -5,7 +5,6 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
-import 'redis_databases_view.dart';
 import 'redis_keys_view.dart';
 import 'redis_key_editor.dart';
 import 'redis_view.dart';
@@ -18,15 +17,22 @@ class _Crumb {
   final _Level level;
 }
 
-enum _Level { databases, keys, key }
+enum _Level { keys, key }
 
 // ─── Main explorer widget ───────────────────────────────────────────────────
 
-/// Root widget for Redis data browsing.
-/// Manages navigation state (breadcrumbs) and the active connection.
+/// Redis data explorer for a specific database.
+/// Database selection is handled in the sidebar tree; this widget only shows
+/// keys and key editor for the given [database].
 class RedisExplorerView extends material.StatefulWidget {
-  const RedisExplorerView({super.key, required this.connectionRow});
+  const RedisExplorerView({
+    super.key,
+    required this.connectionRow,
+    required this.database,
+  });
+
   final ConnectionRow connectionRow;
+  final int database;
 
   @override
   material.State<RedisExplorerView> createState() => _RedisExplorerViewState();
@@ -41,7 +47,6 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
   bool _showStats = false;
 
   // Navigation state
-  int? _selectedDb;
   String? _selectedKey;
   String? _selectedKeyType;
 
@@ -54,7 +59,8 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
   @override
   void didUpdateWidget(covariant RedisExplorerView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.connectionRow.id != widget.connectionRow.id) {
+    if (oldWidget.connectionRow.id != widget.connectionRow.id ||
+        oldWidget.database != widget.database) {
       _disconnectCurrent();
       _connect();
     }
@@ -80,7 +86,6 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
     setState(() {
       _connecting = true;
       _error = null;
-      _selectedDb = null;
       _selectedKey = null;
       _selectedKeyType = null;
       _showStats = false;
@@ -109,26 +114,10 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
 
   // ─── Navigation helpers ─────────────────────────────────────────────────
 
-  void _navigateToDb(int db) {
-    setState(() {
-      _selectedDb = db;
-      _selectedKey = null;
-      _selectedKeyType = null;
-    });
-  }
-
   void _navigateToKey(String key, String type) {
     setState(() {
       _selectedKey = key;
       _selectedKeyType = type;
-    });
-  }
-
-  void _navigateToDatabases() {
-    setState(() {
-      _selectedDb = null;
-      _selectedKey = null;
-      _selectedKeyType = null;
     });
   }
 
@@ -143,11 +132,9 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
 
   List<_Crumb> get _crumbs {
     final list = <_Crumb>[
-      _Crumb(widget.connectionRow.name, _Level.databases),
+      _Crumb('${widget.connectionRow.name} › db${widget.database}',
+          _Level.keys),
     ];
-    if (_selectedDb != null) {
-      list.add(_Crumb('db$_selectedDb', _Level.keys));
-    }
     if (_selectedKey != null) {
       list.add(_Crumb(_selectedKey!, _Level.key));
     }
@@ -156,8 +143,6 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
 
   void _onCrumbTap(_Crumb crumb) {
     switch (crumb.level) {
-      case _Level.databases:
-        _navigateToDatabases();
       case _Level.keys:
         _navigateToKeys();
       case _Level.key:
@@ -252,11 +237,11 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
 
   material.Widget _buildContent(RedisConnection conn) {
     // Key editor
-    if (_selectedKey != null && _selectedDb != null) {
+    if (_selectedKey != null) {
       return RedisKeyEditor(
-        key: ValueKey('key_${_selectedDb}_$_selectedKey'),
+        key: ValueKey('key_${widget.database}_$_selectedKey'),
         connection: conn,
-        database: _selectedDb!,
+        database: widget.database,
         keyName: _selectedKey!,
         keyType: _selectedKeyType ?? 'string',
         onBack: _navigateToKeys,
@@ -265,21 +250,11 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
     }
 
     // Keys list
-    if (_selectedDb != null) {
-      return RedisKeysView(
-        key: ValueKey('keys_$_selectedDb'),
-        connection: conn,
-        database: _selectedDb!,
-        onKeyTap: _navigateToKey,
-      );
-    }
-
-    // Databases list
-    return RedisDatabasesView(
-      key: ValueKey(widget.connectionRow.id),
+    return RedisKeysView(
+      key: ValueKey('keys_${widget.database}'),
       connection: conn,
-      connectionRow: widget.connectionRow,
-      onDatabaseTap: _navigateToDb,
+      database: widget.database,
+      onKeyTap: _navigateToKey,
     );
   }
 }
