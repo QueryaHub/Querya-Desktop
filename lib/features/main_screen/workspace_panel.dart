@@ -3,7 +3,7 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 import 'package:querya_desktop/features/mongodb/mongo_explorer_view.dart';
-import 'package:querya_desktop/features/redis/redis_view.dart';
+import 'package:querya_desktop/features/redis/redis_explorer_view.dart';
 import 'query_editor_tab.dart';
 import 'results_tab.dart';
 
@@ -44,13 +44,13 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
       );
     }
 
-    // If a Redis connection is selected, show the Redis view (wrapped so it gets bounded constraints)
+    // If a Redis connection is selected, show the Redis explorer
     if (widget.activeConnection != null &&
         widget.activeConnection!.type == 'redis') {
       return material.Container(
         color: theme.colorScheme.background,
         child: material.SizedBox.expand(
-          child: RedisView(
+          child: RedisExplorerView(
             key: ValueKey(widget.activeConnection!.id),
             connectionRow: widget.activeConnection!,
           ),
