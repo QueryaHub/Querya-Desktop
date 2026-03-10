@@ -3,6 +3,7 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 import 'package:querya_desktop/features/mongodb/mongo_explorer_view.dart';
+import 'package:querya_desktop/features/mongodb/mongo_stats_view.dart';
 import 'package:querya_desktop/features/redis/redis_explorer_view.dart';
 import 'package:querya_desktop/features/redis/redis_view.dart';
 import 'query_editor_tab.dart';
@@ -56,7 +57,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
                   connectionRow: widget.activeConnection!,
                   database: mongoDb,
                 )
-              : MongoExplorerView(
+              : MongoStatsView(
                   key: ValueKey(widget.activeConnection!.id),
                   connectionRow: widget.activeConnection!,
                 ),

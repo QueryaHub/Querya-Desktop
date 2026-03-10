@@ -6,6 +6,7 @@ import 'package:querya_desktop/core/storage/folders_storage.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
+import 'package:querya_desktop/features/mongodb/mongo_database_dialog.dart';
 import 'package:querya_desktop/features/mongodb/mongodb_connection_form.dart';
 import 'package:querya_desktop/features/redis/redis_connection_form.dart';
 import 'new_connection_dialog.dart';
@@ -643,6 +644,12 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
     return ContextMenu(
       items: [
         MenuButton(
+          leading: material.Icon(material.Icons.add_rounded,
+              size: 18, color: theme.colorScheme.mutedForeground),
+          onPressed: (_) => _createDatabase(),
+          child: const Text('Create database'),
+        ),
+        MenuButton(
           leading: material.Icon(material.Icons.refresh_rounded,
               size: 18, color: theme.colorScheme.mutedForeground),
           onPressed: (_) {
@@ -916,6 +923,46 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
     }
   }
 
+  Future<void> _createDatabase() async {
+    final dbName = await showCreateMongoDBDialog(context);
+    if (dbName == null || !mounted) return;
+    _databases = [];
+    await _loadDatabases();
+  }
+
+  Future<void> _deleteDatabase(String dbName) async {
+    if (!mounted) return;
+    try {
+      final c = widget.connection;
+      final conn = MongoConnection(
+        id: -1,
+        name: 'sidebar_probe',
+        host: c.host ?? 'localhost',
+        port: c.port ?? 27017,
+        username: c.username,
+        password: c.password,
+        database: c.databaseName,
+        authSource: c.authSource,
+        useSSL: c.useSSL,
+        connectionString: c.connectionString,
+      );
+      await conn.connect();
+      await conn.dropDatabase(dbName);
+      await conn.disconnect();
+
+      if (mounted) {
+        _databases = [];
+        await _loadDatabases();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -935,6 +982,12 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
 
     return ContextMenu(
       items: [
+        MenuButton(
+          leading: material.Icon(material.Icons.add_rounded,
+              size: 18, color: theme.colorScheme.mutedForeground),
+          onPressed: (_) => _createDatabase(),
+          child: const Text('Create database'),
+        ),
         MenuButton(
           leading: material.Icon(material.Icons.refresh_rounded,
               size: 18, color: theme.colorScheme.mutedForeground),
@@ -1062,6 +1115,7 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
                 _MongoDatabaseNode(
                   name: db,
                   onTap: () => widget.onDatabaseTap?.call(db),
+                  onDelete: () => _deleteDatabase(db),
                 ),
             ],
           ],
@@ -1075,44 +1129,56 @@ class _MongoDatabaseNode extends StatelessWidget {
   const _MongoDatabaseNode({
     required this.name,
     required this.onTap,
+    required this.onDelete,
   });
 
   final String name;
   final VoidCallback onTap;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return material.Padding(
-      padding: const material.EdgeInsets.only(left: 24),
-      child: material.MouseRegion(
-        cursor: material.SystemMouseCursors.click,
-        child: material.InkWell(
-          onTap: onTap,
-          borderRadius: material.BorderRadius.circular(6),
-          child: material.Padding(
-            padding: const material.EdgeInsets.symmetric(
-                horizontal: 8, vertical: 5),
-            child: material.Row(
-              children: [
-                material.Icon(
-                  material.Icons.storage_rounded,
-                  size: 14,
-                  color: theme.colorScheme.primary.withValues(alpha: 0.7),
-                ),
-                const Gap(8),
-                material.Expanded(
-                  child: material.Text(
-                    name,
-                    overflow: material.TextOverflow.ellipsis,
-                    maxLines: 1,
-                    style: material.TextStyle(
-                      fontSize: 12,
-                      color: theme.colorScheme.foreground,
+    return ContextMenu(
+      items: [
+        MenuButton(
+          leading: material.Icon(material.Icons.delete_outline_rounded,
+              size: 18, color: theme.colorScheme.mutedForeground),
+          onPressed: (_) => onDelete(),
+          child: const Text('Delete database'),
+        ),
+      ],
+      child: material.Padding(
+        padding: const material.EdgeInsets.only(left: 24),
+        child: material.MouseRegion(
+          cursor: material.SystemMouseCursors.click,
+          child: material.InkWell(
+            onTap: onTap,
+            borderRadius: material.BorderRadius.circular(6),
+            child: material.Padding(
+              padding: const material.EdgeInsets.symmetric(
+                  horizontal: 8, vertical: 5),
+              child: material.Row(
+                children: [
+                  material.Icon(
+                    material.Icons.storage_rounded,
+                    size: 14,
+                    color: theme.colorScheme.primary.withValues(alpha: 0.7),
+                  ),
+                  const Gap(8),
+                  material.Expanded(
+                    child: material.Text(
+                      name,
+                      overflow: material.TextOverflow.ellipsis,
+                      maxLines: 1,
+                      style: material.TextStyle(
+                        fontSize: 12,
+                        color: theme.colorScheme.foreground,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
