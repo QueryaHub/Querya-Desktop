@@ -5,7 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const _dbName = 'querya.db';
-const _dbVersion = 2;
+const _dbVersion = 3;
 
 /// Local SQLite database for folders and connections.
 /// File: [applicationSupport]/querya_desktop/querya.db
@@ -60,7 +60,7 @@ class LocalDb {
         auth_source TEXT,
         use_ssl INTEGER NOT NULL DEFAULT 0,
         connection_string TEXT,
-        folder_id INTEGER REFERENCES folders(id),
+        folder_id INTEGER REFERENCES folders(id) ON DELETE CASCADE,
         sort_order INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL
       )
@@ -74,6 +74,35 @@ class LocalDb {
       await db.execute('ALTER TABLE connections ADD COLUMN auth_source TEXT');
       await db.execute('ALTER TABLE connections ADD COLUMN use_ssl INTEGER NOT NULL DEFAULT 0');
       await db.execute('ALTER TABLE connections ADD COLUMN connection_string TEXT');
+    }
+    if (oldVersion < 3) {
+      await db.execute('PRAGMA foreign_keys=ON');
+      await db.execute('''
+        CREATE TABLE connections_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          type TEXT NOT NULL,
+          name TEXT NOT NULL,
+          host TEXT,
+          port INTEGER,
+          username TEXT,
+          password TEXT,
+          database_name TEXT,
+          auth_source TEXT,
+          use_ssl INTEGER NOT NULL DEFAULT 0,
+          connection_string TEXT,
+          folder_id INTEGER REFERENCES folders(id) ON DELETE CASCADE,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL
+        )
+      ''');
+      await db.execute('''
+        INSERT INTO connections_new 
+        SELECT id, type, name, host, port, username, password, database_name, 
+               auth_source, use_ssl, connection_string, folder_id, sort_order, created_at 
+        FROM connections
+      ''');
+      await db.execute('DROP TABLE connections');
+      await db.execute('ALTER TABLE connections_new RENAME TO connections');
     }
   }
 
