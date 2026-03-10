@@ -644,12 +644,6 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
     return ContextMenu(
       items: [
         MenuButton(
-          leading: material.Icon(material.Icons.add_rounded,
-              size: 18, color: theme.colorScheme.mutedForeground),
-          onPressed: (_) => _createDatabase(),
-          child: const Text('Create database'),
-        ),
-        MenuButton(
           leading: material.Icon(material.Icons.refresh_rounded,
               size: 18, color: theme.colorScheme.mutedForeground),
           onPressed: (_) {
