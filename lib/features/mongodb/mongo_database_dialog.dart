@@ -6,10 +6,10 @@ Future<String?> showCreateMongoDBDialog(material.BuildContext context) async {
   return showDialog<String>(
     context: context,
     barrierColor: material.Colors.black54,
-    builder: (context) => material.Dialog(
+    builder: (context) => const material.Dialog(
       backgroundColor: material.Colors.transparent,
-      insetPadding: const material.EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-      child: const _CreateMongoDBDialogContent(),
+      insetPadding: material.EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+      child: _CreateMongoDBDialogContent(),
     ),
   );
 }
