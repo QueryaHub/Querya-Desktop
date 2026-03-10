@@ -27,8 +27,13 @@ enum _Level { databases, collections, documents, document }
 /// Root widget for MongoDB data browsing.
 /// Manages navigation state (breadcrumbs) and the active connection.
 class MongoExplorerView extends material.StatefulWidget {
-  const MongoExplorerView({super.key, required this.connectionRow});
+  const MongoExplorerView({
+    super.key,
+    required this.connectionRow,
+    this.database,
+  });
   final ConnectionRow connectionRow;
+  final String? database;
 
   @override
   material.State<MongoExplorerView> createState() => _MongoExplorerViewState();
@@ -51,6 +56,9 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
   void initState() {
     super.initState();
     _connect();
+    if (widget.database != null) {
+      _selectedDatabase = widget.database;
+    }
   }
 
   @override
