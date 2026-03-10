@@ -181,4 +181,18 @@ void main() {
       expect(conn.db, isNull);
     });
   });
+
+  group('MongoConnection.dropDatabase', () {
+    test('throws StateError when not connected', () async {
+      final conn = MongoConnection(id: 1, name: 'test', host: 'localhost');
+      expect(
+        () => conn.dropDatabase('mydb'),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Not connected'),
+        )),
+      );
+    });
+  });
 }
