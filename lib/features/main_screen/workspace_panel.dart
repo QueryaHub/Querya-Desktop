@@ -14,6 +14,7 @@ class WorkspacePanel extends StatefulWidget {
     super.key,
     this.activeConnection,
     this.selectedRedisDb,
+    this.selectedMongoDb,
   });
 
   /// Currently selected connection from the sidebar.
@@ -22,6 +23,10 @@ class WorkspacePanel extends StatefulWidget {
   /// When set, the user selected a specific Redis database in the sidebar tree.
   /// null = show stats, non-null = show data explorer for that db.
   final int? selectedRedisDb;
+
+  /// When set, the user selected a specific MongoDB database in the sidebar tree.
+  /// null = show stats, non-null = show data explorer for that db.
+  final String? selectedMongoDb;
 
   @override
   State<WorkspacePanel> createState() => _WorkspacePanelState();
@@ -36,16 +41,25 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // If a MongoDB connection is selected, show the MongoDB explorer
+    // If a MongoDB connection is selected
     if (widget.activeConnection != null &&
         widget.activeConnection!.type == 'mongodb') {
+      final mongoDb = widget.selectedMongoDb;
       return material.Container(
         color: theme.colorScheme.background,
         child: material.SizedBox.expand(
-          child: MongoExplorerView(
-            key: ValueKey(widget.activeConnection!.id),
-            connectionRow: widget.activeConnection!,
-          ),
+          // DB selected → data explorer; no DB → stats
+          child: mongoDb != null
+              ? MongoExplorerView(
+                  key: ValueKey(
+                      'mongo_${widget.activeConnection!.id}_db_$mongoDb'),
+                  connectionRow: widget.activeConnection!,
+                  database: mongoDb,
+                )
+              : MongoExplorerView(
+                  key: ValueKey(widget.activeConnection!.id),
+                  connectionRow: widget.activeConnection!,
+                ),
         ),
       );
     }
