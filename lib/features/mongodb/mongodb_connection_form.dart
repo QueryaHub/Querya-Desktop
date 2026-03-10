@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -75,6 +77,8 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
   bool _useSSL = false;
   bool _showPassword = false;
   bool _isTesting = false;
+  String? _testResult;
+  Timer? _dismissTimer;
 
   @override
   void initState() {
@@ -92,6 +96,7 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
 
   @override
   void dispose() {
+    _dismissTimer?.cancel();
     _nameController.removeListener(_onFieldChanged);
     _hostController.removeListener(_onFieldChanged);
     _portController.removeListener(_onFieldChanged);
@@ -121,9 +126,26 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
             : _connectionStringController.text.trim(),
       );
 
-  String? _testResult;
+  void _showTestResult(String result) {
+    _dismissTimer?.cancel();
+    setState(() {
+      _isTesting = false;
+      _testResult = result;
+    });
+    _dismissTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) setState(() => _testResult = null);
+    });
+  }
+
+  void _dismissResult() {
+    _dismissTimer?.cancel();
+    _dismissTimer = null;
+    setState(() => _testResult = null);
+  }
 
   Future<void> _testConnection() async {
+    _dismissTimer?.cancel();
+    _dismissTimer = null;
     setState(() {
       _isTesting = true;
       _testResult = null;
@@ -147,19 +169,9 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
       final success = await connection.testConnection();
       await connection.disconnect();
 
-      if (mounted) {
-        setState(() {
-          _isTesting = false;
-          _testResult = success ? 'success' : 'failed';
-        });
-      }
+      if (mounted) _showTestResult(success ? 'success' : 'failed');
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isTesting = false;
-          _testResult = 'error: $e';
-        });
-      }
+      if (mounted) _showTestResult('error: $e');
     }
   }
 
@@ -387,55 +399,102 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
             ),
             const material.Divider(height: 1),
             if (_testResult != null)
-              material.Container(
-                padding: const material.EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                color: _testResult == 'success'
-                    ? material.Colors.green.withValues(alpha: 0.1)
-                    : material.Colors.red.withValues(alpha: 0.1),
-                child: Row(
-                  children: [
-                    material.Icon(
-                      _testResult == 'success'
-                          ? material.Icons.check_circle_rounded
-                          : material.Icons.error_rounded,
-                      size: 16,
-                      color: _testResult == 'success'
-                          ? material.Colors.green
-                          : material.Colors.red,
+              material.Padding(
+                padding: const material.EdgeInsets.fromLTRB(24, 8, 16, 8),
+                child: material.Material(
+                  color: material.Colors.transparent,
+                  child: material.InkWell(
+                    onTap: _dismissResult,
+                    borderRadius: material.BorderRadius.circular(8),
+                    child: material.Container(
+                      padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: material.BoxDecoration(
+                        color: _testResult == 'success'
+                            ? theme.primary.withValues(alpha: 0.12)
+                            : theme.destructive.withValues(alpha: 0.12),
+                        borderRadius: material.BorderRadius.circular(8),
+                        border: material.Border.all(
+                          color: _testResult == 'success'
+                              ? theme.primary.withValues(alpha: 0.35)
+                              : theme.destructive.withValues(alpha: 0.35),
+                          width: 1,
+                        ),
+                      ),
+                      child: material.Row(
+                        children: [
+                          material.Icon(
+                            _testResult == 'success'
+                                ? material.Icons.check_circle_outline
+                                : material.Icons.info_outline_rounded,
+                            size: 18,
+                            color: _testResult == 'success'
+                                ? theme.primary
+                                : theme.destructive,
+                          ),
+                          const Gap(10),
+                          material.Expanded(
+                            child: Text(
+                              _testResult == 'success'
+                                  ? 'Connection successful!'
+                                  : _testResult!.startsWith('error:')
+                                      ? _testResult!.substring(7)
+                                      : 'Connection failed',
+                              style: material.TextStyle(
+                                fontSize: 13,
+                                color: theme.foreground,
+                              ),
+                            ).small(),
+                          ),
+                          material.IconButton(
+                            icon: material.Icon(
+                              material.Icons.close,
+                              size: 18,
+                              color: theme.mutedForeground,
+                            ),
+                            onPressed: _dismissResult,
+                            style: material.IconButton.styleFrom(
+                              minimumSize: const material.Size(28, 28),
+                              padding: material.EdgeInsets.zero,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    const Gap(8),
-                    material.Expanded(
-                      child: Text(
-                        _testResult == 'success'
-                            ? 'Connection successful!'
-                            : _testResult!.startsWith('error:')
-                                ? _testResult!.substring(7)
-                                : 'Connection failed',
-                      ).small(),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             material.Container(
               padding: const material.EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               child: material.Row(
-                mainAxisAlignment: material.MainAxisAlignment.end,
                 children: [
+                  OutlineButton(
+                    onPressed: _formData.isValid && !_isTesting ? _testConnection : null,
+                    leading: _isTesting
+                        ? material.SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: material.CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: theme.primary,
+                            ),
+                          )
+                        : material.Icon(
+                            material.Icons.link_rounded,
+                            size: 18,
+                            color: _formData.isValid ? theme.primary : theme.mutedForeground,
+                          ),
+                    child: Text(
+                      'Test Connection',
+                      style: material.TextStyle(
+                        fontWeight: material.FontWeight.w500,
+                        color: _formData.isValid ? theme.primary : theme.mutedForeground,
+                      ),
+                    ),
+                  ),
+                  const material.Spacer(),
                   GhostButton(
                     onPressed: () => material.Navigator.of(context).pop(),
                     child: const Text('Cancel'),
-                  ),
-                  const Gap(12),
-                  OutlineButton(
-                    onPressed: _isTesting ? null : _testConnection,
-                    leading: _isTesting
-                        ? const material.SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: material.CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const material.Icon(material.Icons.check_circle_outline, size: 18),
-                    child: const Text('Test Connection'),
                   ),
                   const Gap(12),
                   PrimaryButton(
