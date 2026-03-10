@@ -212,4 +212,24 @@ class MongoConnection {
       return false;
     }
   }
+
+  /// Drops (deletes) a database.
+  Future<void> dropDatabase(String databaseName) async {
+    if (!isConnected || _db == null) {
+      throw StateError('Not connected to MongoDB');
+    }
+
+    try {
+      final dbUri = buildUriForDatabase(databaseName);
+      final db = await Db.create(dbUri);
+      await db.open();
+      try {
+        await db.drop();
+      } finally {
+        await db.close();
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
 }
