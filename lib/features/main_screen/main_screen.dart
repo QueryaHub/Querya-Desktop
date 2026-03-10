@@ -27,10 +27,14 @@ class _MainScreenState extends State<MainScreen> {
   /// Currently selected Redis database (null = show stats).
   int? _activeRedisDb;
 
+  /// Currently selected MongoDB database (null = show stats).
+  String? _activeMongoDB;
+
   void _onConnectionSelected(ConnectionRow connection) {
     setState(() {
       _activeConnection = connection;
       _activeRedisDb = null; // Reset: connection click → stats
+      _activeMongoDB = null;
     });
   }
 
@@ -38,6 +42,15 @@ class _MainScreenState extends State<MainScreen> {
     setState(() {
       _activeConnection = connection;
       _activeRedisDb = database;
+      _activeMongoDB = null;
+    });
+  }
+
+  void _onMongoDBDatabaseSelected(ConnectionRow connection, String database) {
+    setState(() {
+      _activeConnection = connection;
+      _activeRedisDb = null;
+      _activeMongoDB = database;
     });
   }
 
@@ -63,6 +76,7 @@ class _MainScreenState extends State<MainScreen> {
                       child: ConnectionsPanel(
                         onConnectionSelected: _onConnectionSelected,
                         onRedisDatabaseSelected: _onRedisDatabaseSelected,
+                        onMongoDBDatabaseSelected: _onMongoDBDatabaseSelected,
                       ),
                     ),
                     _VerticalResizeHandle(
@@ -77,6 +91,7 @@ class _MainScreenState extends State<MainScreen> {
                       child: WorkspacePanel(
                         activeConnection: _activeConnection,
                         selectedRedisDb: _activeRedisDb,
+                        selectedMongoDb: _activeMongoDB,
                       ),
                     ),
                   ],
