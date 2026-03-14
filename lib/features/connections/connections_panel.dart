@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material show Padding, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, DefaultTextStyle, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, Column, AnimatedRotation, Row, BoxFit, Text, TextOverflow, Expanded, CircularProgressIndicator;
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
+import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/database/redis_info.dart';
 import 'package:querya_desktop/core/storage/folders_storage.dart';
@@ -8,6 +9,7 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 import 'package:querya_desktop/features/mongodb/mongo_database_dialog.dart';
 import 'package:querya_desktop/features/mongodb/mongodb_connection_form.dart';
+import 'package:querya_desktop/features/postgresql/postgresql_connection_form.dart';
 import 'package:querya_desktop/features/redis/redis_connection_form.dart';
 import 'new_connection_dialog.dart';
 import 'new_folder_dialog.dart';
@@ -76,8 +78,7 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
   }
 
   static bool _isStubConnection(ConnectionRow c) {
-    return (c.type == 'postgresql' && c.name == 'PostgreSQL connection') ||
-        (c.type == 'mysql' && c.name == 'MySQL connection');
+    return c.type == 'mysql' && c.name == 'MySQL connection';
   }
 
   Future<void> _createFolder(BuildContext menuContext) async {
@@ -90,12 +91,13 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
   Future<void> _createConnection(ConnectionType type, {int? folderId}) async {
     ConnectionRow? row;
 
-    if (type == ConnectionType.mongodb) {
+    if (type == ConnectionType.postgresql) {
+      row = await showPostgresConnectionForm(context, folderId: folderId);
+    } else if (type == ConnectionType.mongodb) {
       row = await showMongoConnectionForm(context, folderId: folderId);
     } else if (type == ConnectionType.redis) {
       row = await showRedisConnectionForm(context, folderId: folderId);
     } else {
-      // PostgreSQL / MySQL: no connection form yet — do not create a stub
       row = null;
     }
 
@@ -130,6 +132,43 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
       'mongodb' => 'assets/images/mongodb_icon.png',
       _ => null,
     };
+  }
+
+  Widget _buildConnectionTile(ConnectionRow conn) {
+    if (conn.type == 'postgresql') {
+      return _PostgresConnectionTile(
+        connection: conn,
+        icon: _iconForType(conn.type),
+        iconAsset: _iconAssetForType(conn.type),
+        onRemove: () => _removeConnection(conn.id!),
+        onTap: () => widget.onConnectionSelected?.call(conn),
+      );
+    } else if (conn.type == 'redis') {
+      return _RedisConnectionTile(
+        connection: conn,
+        icon: _iconForType(conn.type),
+        iconAsset: _iconAssetForType(conn.type),
+        onRemove: () => _removeConnection(conn.id!),
+        onTap: () => widget.onConnectionSelected?.call(conn),
+        onDatabaseTap: (db) => widget.onRedisDatabaseSelected?.call(conn, db),
+      );
+    } else if (conn.type == 'mongodb') {
+      return _MongoConnectionTile(
+        connection: conn,
+        icon: _iconForType(conn.type),
+        iconAsset: _iconAssetForType(conn.type),
+        onRemove: () => _removeConnection(conn.id!),
+        onTap: () => widget.onConnectionSelected?.call(conn),
+        onDatabaseTap: (db) => widget.onMongoDBDatabaseSelected?.call(conn, db),
+      );
+    }
+    return _ConnectionTile(
+      connection: conn,
+      icon: _iconForType(conn.type),
+      iconAsset: _iconAssetForType(conn.type),
+      onRemove: () => _removeConnection(conn.id!),
+      onTap: () => widget.onConnectionSelected?.call(conn),
+    );
   }
 
   @override
@@ -202,34 +241,11 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
                             onConnectionTap: widget.onConnectionSelected,
                             onRedisDatabaseTap: widget.onRedisDatabaseSelected,
                             onMongoDBDatabaseTap: widget.onMongoDBDatabaseSelected,
+                            buildConnectionTile: _buildConnectionTile,
                           ),
                         // Root connections (no folder)
                         for (final conn in rootConnections)
-                          conn.type == 'redis'
-                              ? _RedisConnectionTile(
-                                  connection: conn,
-                                  icon: _iconForType(conn.type),
-                                  iconAsset: _iconAssetForType(conn.type),
-                                  onRemove: () => _removeConnection(conn.id!),
-                                  onTap: () => widget.onConnectionSelected?.call(conn),
-                                  onDatabaseTap: (db) => widget.onRedisDatabaseSelected?.call(conn, db),
-                                )
-                              : conn.type == 'mongodb'
-                                  ? _MongoConnectionTile(
-                                      connection: conn,
-                                      icon: _iconForType(conn.type),
-                                      iconAsset: _iconAssetForType(conn.type),
-                                      onRemove: () => _removeConnection(conn.id!),
-                                      onTap: () => widget.onConnectionSelected?.call(conn),
-                                      onDatabaseTap: (db) => widget.onMongoDBDatabaseSelected?.call(conn, db),
-                                    )
-                                  : _ConnectionTile(
-                                      connection: conn,
-                                      icon: _iconForType(conn.type),
-                                      iconAsset: _iconAssetForType(conn.type),
-                                      onRemove: () => _removeConnection(conn.id!),
-                                      onTap: () => widget.onConnectionSelected?.call(conn),
-                                    ),
+                          _buildConnectionTile(conn),
                         // Empty state
                         if (_connections.isEmpty && _folders.isEmpty)
                           const material.Padding(
@@ -421,6 +437,7 @@ class _FolderTile extends StatelessWidget {
     this.onConnectionTap,
     this.onRedisDatabaseTap,
     this.onMongoDBDatabaseTap,
+    this.buildConnectionTile,
   });
 
   final String name;
@@ -434,6 +451,7 @@ class _FolderTile extends StatelessWidget {
   final void Function(ConnectionRow connection)? onConnectionTap;
   final void Function(ConnectionRow connection, int database)? onRedisDatabaseTap;
   final void Function(ConnectionRow connection, String database)? onMongoDBDatabaseTap;
+  final Widget Function(ConnectionRow conn)? buildConnectionTile;
 
   @override
   Widget build(BuildContext context) {
@@ -499,31 +517,15 @@ class _FolderTile extends StatelessWidget {
               for (final conn in connections)
                 material.Padding(
                   padding: const material.EdgeInsets.only(left: 24),
-                  child: conn.type == 'redis'
-                      ? _RedisConnectionTile(
+                  child: buildConnectionTile != null
+                      ? buildConnectionTile!(conn)
+                      : _ConnectionTile(
                           connection: conn,
                           icon: iconForType(conn.type),
                           iconAsset: _ConnectionsPanelState._iconAssetForType(conn.type),
                           onRemove: () => onRemoveConnection(conn.id!),
                           onTap: () => onConnectionTap?.call(conn),
-                          onDatabaseTap: (db) => onRedisDatabaseTap?.call(conn, db),
-                        )
-                      : conn.type == 'mongodb'
-                          ? _MongoConnectionTile(
-                              connection: conn,
-                              icon: iconForType(conn.type),
-                              iconAsset: _ConnectionsPanelState._iconAssetForType(conn.type),
-                              onRemove: () => onRemoveConnection(conn.id!),
-                              onTap: () => onConnectionTap?.call(conn),
-                              onDatabaseTap: (db) => onMongoDBDatabaseTap?.call(conn, db),
-                            )
-                          : _ConnectionTile(
-                              connection: conn,
-                              icon: iconForType(conn.type),
-                              iconAsset: _ConnectionsPanelState._iconAssetForType(conn.type),
-                              onRemove: () => onRemoveConnection(conn.id!),
-                              onTap: () => onConnectionTap?.call(conn),
-                            ),
+                        ),
                 ),
           ],
         ),
@@ -1176,6 +1178,751 @@ class _MongoDatabaseNode extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─── PostgreSQL connection tile with expandable database tree ────────────────
+
+class _PostgresConnectionTile extends StatefulWidget {
+  const _PostgresConnectionTile({
+    required this.connection,
+    required this.icon,
+    this.iconAsset,
+    required this.onRemove,
+    this.onTap,
+  });
+
+  final ConnectionRow connection;
+  final material.IconData icon;
+  final String? iconAsset;
+  final VoidCallback onRemove;
+  final VoidCallback? onTap;
+
+  @override
+  State<_PostgresConnectionTile> createState() =>
+      _PostgresConnectionTileState();
+}
+
+class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
+  bool _expanded = false;
+  bool _loading = false;
+  String? _error;
+  List<String> _databases = [];
+
+  void _toggle() {
+    setState(() => _expanded = !_expanded);
+    if (_expanded && _databases.isEmpty && !_loading) {
+      _loadDatabases();
+    }
+  }
+
+  Future<void> _loadDatabases() async {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final c = widget.connection;
+      final conn = PostgresConnection(
+        id: -1,
+        name: 'sidebar_probe',
+        host: c.host ?? 'localhost',
+        port: c.port ?? 5432,
+        username: c.username,
+        password: c.password,
+        database: c.databaseName ?? 'postgres',
+        useSSL: c.useSSL,
+      );
+      await conn.connect();
+      final dbs = await conn.listDatabases();
+      await conn.disconnect();
+
+      if (!mounted) return;
+      setState(() {
+        _databases = dbs;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final iconWidget = widget.iconAsset != null
+        ? material.Image.asset(
+            widget.iconAsset!,
+            width: 16,
+            height: 16,
+            fit: material.BoxFit.contain,
+            errorBuilder: (_, __, ___) => material.Icon(
+              widget.icon,
+              size: 16,
+              color: theme.colorScheme.primary,
+            ),
+          )
+        : material.Icon(widget.icon, size: 16, color: theme.colorScheme.primary);
+
+    return ContextMenu(
+      items: [
+        MenuButton(
+          leading: material.Icon(material.Icons.refresh_rounded,
+              size: 18, color: theme.colorScheme.mutedForeground),
+          onPressed: (_) {
+            _databases = [];
+            _loadDatabases();
+          },
+          child: const Text('Refresh databases'),
+        ),
+        MenuButton(
+          leading: material.Icon(material.Icons.delete_outline_rounded,
+              size: 18, color: theme.colorScheme.mutedForeground),
+          onPressed: (_) => widget.onRemove(),
+          child: const Text('Remove connection'),
+        ),
+      ],
+      child: material.Padding(
+        padding: const material.EdgeInsets.only(bottom: 2),
+        child: material.Column(
+          crossAxisAlignment: material.CrossAxisAlignment.start,
+          mainAxisSize: material.MainAxisSize.min,
+          children: [
+            material.Row(
+              children: [
+                material.MouseRegion(
+                  cursor: material.SystemMouseCursors.click,
+                  child: material.InkWell(
+                    onTap: _toggle,
+                    borderRadius: material.BorderRadius.circular(4),
+                    child: material.Padding(
+                      padding: const material.EdgeInsets.all(2),
+                      child: material.AnimatedRotation(
+                        turns: _expanded ? 0.25 : 0,
+                        duration: const Duration(milliseconds: 150),
+                        child: material.Icon(
+                          material.Icons.chevron_right_rounded,
+                          size: 16,
+                          color: theme.colorScheme.mutedForeground,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                material.Expanded(
+                  child: material.MouseRegion(
+                    cursor: material.SystemMouseCursors.click,
+                    child: material.InkWell(
+                      onTap: widget.onTap,
+                      borderRadius: material.BorderRadius.circular(6),
+                      child: material.Padding(
+                        padding: const material.EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 6),
+                        child: material.Row(
+                          children: [
+                            iconWidget,
+                            const Gap(8),
+                            material.Expanded(
+                              child: material.Column(
+                                crossAxisAlignment:
+                                    material.CrossAxisAlignment.start,
+                                mainAxisSize: material.MainAxisSize.min,
+                                children: [
+                                  material.Text(
+                                    widget.connection.name,
+                                    overflow: material.TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                    style: material.TextStyle(
+                                      fontSize: 13,
+                                      color: theme.colorScheme.foreground,
+                                    ),
+                                  ),
+                                  if (widget.connection.host != null)
+                                    material.Text(
+                                      '${widget.connection.host}:${widget.connection.port ?? ''}',
+                                      overflow: material.TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                      style: material.TextStyle(
+                                        fontSize: 11,
+                                        color: theme.colorScheme.mutedForeground,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (_expanded) ...[
+              if (_loading)
+                material.Padding(
+                  padding:
+                      const material.EdgeInsets.only(left: 28, top: 4, bottom: 4),
+                  child: material.Row(
+                    children: [
+                      const material.SizedBox(
+                        width: 12,
+                        height: 12,
+                        child:
+                            material.CircularProgressIndicator(strokeWidth: 1.5),
+                      ),
+                      const Gap(8),
+                      const Text('Loading...').muted().xSmall(),
+                    ],
+                  ),
+                ),
+              if (_error != null)
+                material.Padding(
+                  padding:
+                      const material.EdgeInsets.only(left: 28, top: 4, bottom: 4),
+                  child: material.Text(
+                    'Error',
+                    overflow: material.TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: material.TextStyle(
+                        fontSize: 11, color: theme.colorScheme.destructive),
+                  ),
+                ),
+              if (_databases.isNotEmpty)
+                _PgDatabasesNode(
+                  connection: widget.connection,
+                  databases: _databases,
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PgDatabasesNode extends StatefulWidget {
+  const _PgDatabasesNode({
+    required this.connection,
+    required this.databases,
+  });
+
+  final ConnectionRow connection;
+  final List<String> databases;
+
+  @override
+  State<_PgDatabasesNode> createState() => _PgDatabasesNodeState();
+}
+
+class _PgDatabasesNodeState extends State<_PgDatabasesNode> {
+  bool _expanded = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return material.Padding(
+      padding: const material.EdgeInsets.only(left: 20),
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.start,
+        mainAxisSize: material.MainAxisSize.min,
+        children: [
+          material.MouseRegion(
+            cursor: material.SystemMouseCursors.click,
+            child: material.InkWell(
+              onTap: () => setState(() => _expanded = !_expanded),
+              borderRadius: material.BorderRadius.circular(4),
+              child: material.Padding(
+                padding:
+                    const material.EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                child: material.Row(
+                  children: [
+                    material.AnimatedRotation(
+                      turns: _expanded ? 0.25 : 0,
+                      duration: const Duration(milliseconds: 150),
+                      child: material.Icon(
+                        material.Icons.chevron_right_rounded,
+                        size: 14,
+                        color: theme.colorScheme.mutedForeground,
+                      ),
+                    ),
+                    const Gap(4),
+                    material.Icon(material.Icons.dns_rounded,
+                        size: 14,
+                        color: theme.colorScheme.primary.withValues(alpha: 0.7)),
+                    const Gap(6),
+                    Text('Databases (${widget.databases.length})').small(),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (_expanded)
+            for (final db in widget.databases)
+              _PgDatabaseNode(
+                connection: widget.connection,
+                databaseName: db,
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PgDatabaseNode extends StatefulWidget {
+  const _PgDatabaseNode({
+    required this.connection,
+    required this.databaseName,
+  });
+
+  final ConnectionRow connection;
+  final String databaseName;
+
+  @override
+  State<_PgDatabaseNode> createState() => _PgDatabaseNodeState();
+}
+
+class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
+  bool _expanded = false;
+  bool _loading = false;
+  List<String> _schemas = [];
+
+  void _toggle() {
+    setState(() => _expanded = !_expanded);
+    if (_expanded && _schemas.isEmpty && !_loading) {
+      _loadSchemas();
+    }
+  }
+
+  Future<void> _loadSchemas() async {
+    if (!mounted) return;
+    setState(() => _loading = true);
+    try {
+      final c = widget.connection;
+      final conn = PostgresConnection(
+        id: -1,
+        name: 'probe',
+        host: c.host ?? 'localhost',
+        port: c.port ?? 5432,
+        username: c.username,
+        password: c.password,
+        database: widget.databaseName,
+        useSSL: c.useSSL,
+      );
+      await conn.connect();
+      final schemas = await conn.listSchemas();
+      await conn.disconnect();
+      if (!mounted) return;
+      setState(() {
+        _schemas = schemas;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return material.Padding(
+      padding: const material.EdgeInsets.only(left: 16),
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.start,
+        mainAxisSize: material.MainAxisSize.min,
+        children: [
+          material.MouseRegion(
+            cursor: material.SystemMouseCursors.click,
+            child: material.InkWell(
+              onTap: _toggle,
+              borderRadius: material.BorderRadius.circular(4),
+              child: material.Padding(
+                padding:
+                    const material.EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                child: material.Row(
+                  children: [
+                    material.AnimatedRotation(
+                      turns: _expanded ? 0.25 : 0,
+                      duration: const Duration(milliseconds: 150),
+                      child: material.Icon(
+                        material.Icons.chevron_right_rounded,
+                        size: 14,
+                        color: theme.colorScheme.mutedForeground,
+                      ),
+                    ),
+                    const Gap(4),
+                    material.Icon(material.Icons.storage_rounded,
+                        size: 14,
+                        color: theme.colorScheme.primary.withValues(alpha: 0.7)),
+                    const Gap(6),
+                    material.Expanded(
+                      child: material.Text(
+                        widget.databaseName,
+                        overflow: material.TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: material.TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.foreground,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (_expanded) ...[
+            if (_loading)
+              material.Padding(
+                padding:
+                    const material.EdgeInsets.only(left: 24, top: 2, bottom: 2),
+                child: material.Row(
+                  children: [
+                    const material.SizedBox(
+                      width: 10,
+                      height: 10,
+                      child:
+                          material.CircularProgressIndicator(strokeWidth: 1.5),
+                    ),
+                    const Gap(6),
+                    const Text('Loading...').muted().xSmall(),
+                  ],
+                ),
+              ),
+            if (_schemas.isNotEmpty)
+              _PgSchemasNode(
+                connection: widget.connection,
+                databaseName: widget.databaseName,
+                schemas: _schemas,
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PgSchemasNode extends StatefulWidget {
+  const _PgSchemasNode({
+    required this.connection,
+    required this.databaseName,
+    required this.schemas,
+  });
+
+  final ConnectionRow connection;
+  final String databaseName;
+  final List<String> schemas;
+
+  @override
+  State<_PgSchemasNode> createState() => _PgSchemasNodeState();
+}
+
+class _PgSchemasNodeState extends State<_PgSchemasNode> {
+  bool _expanded = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return material.Padding(
+      padding: const material.EdgeInsets.only(left: 16),
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.start,
+        mainAxisSize: material.MainAxisSize.min,
+        children: [
+          material.MouseRegion(
+            cursor: material.SystemMouseCursors.click,
+            child: material.InkWell(
+              onTap: () => setState(() => _expanded = !_expanded),
+              borderRadius: material.BorderRadius.circular(4),
+              child: material.Padding(
+                padding:
+                    const material.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                child: material.Row(
+                  children: [
+                    material.AnimatedRotation(
+                      turns: _expanded ? 0.25 : 0,
+                      duration: const Duration(milliseconds: 150),
+                      child: material.Icon(
+                        material.Icons.chevron_right_rounded,
+                        size: 14,
+                        color: theme.colorScheme.mutedForeground,
+                      ),
+                    ),
+                    const Gap(4),
+                    material.Icon(material.Icons.account_tree_rounded,
+                        size: 13, color: theme.colorScheme.mutedForeground),
+                    const Gap(6),
+                    Text('Schemas (${widget.schemas.length})').muted().xSmall(),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (_expanded)
+            for (final schema in widget.schemas)
+              _PgSchemaNode(
+                connection: widget.connection,
+                databaseName: widget.databaseName,
+                schemaName: schema,
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PgSchemaNode extends StatefulWidget {
+  const _PgSchemaNode({
+    required this.connection,
+    required this.databaseName,
+    required this.schemaName,
+  });
+
+  final ConnectionRow connection;
+  final String databaseName;
+  final String schemaName;
+
+  @override
+  State<_PgSchemaNode> createState() => _PgSchemaNodeState();
+}
+
+class _PgSchemaNodeState extends State<_PgSchemaNode> {
+  bool _expanded = false;
+  bool _loading = false;
+  List<String> _tables = [];
+  List<String> _views = [];
+  List<String> _functions = [];
+  List<String> _sequences = [];
+  bool _loaded = false;
+
+  void _toggle() {
+    setState(() => _expanded = !_expanded);
+    if (_expanded && !_loaded && !_loading) {
+      _loadObjects();
+    }
+  }
+
+  Future<void> _loadObjects() async {
+    if (!mounted) return;
+    setState(() => _loading = true);
+    try {
+      final c = widget.connection;
+      final conn = PostgresConnection(
+        id: -1,
+        name: 'probe',
+        host: c.host ?? 'localhost',
+        port: c.port ?? 5432,
+        username: c.username,
+        password: c.password,
+        database: widget.databaseName,
+        useSSL: c.useSSL,
+      );
+      await conn.connect();
+      final tables = await conn.listTables(schema: widget.schemaName);
+      final views = await conn.listViews(schema: widget.schemaName);
+      final functions = await conn.listFunctions(schema: widget.schemaName);
+      final sequences = await conn.listSequences(schema: widget.schemaName);
+      await conn.disconnect();
+      if (!mounted) return;
+      setState(() {
+        _tables = tables;
+        _views = views;
+        _functions = functions;
+        _sequences = sequences;
+        _loading = false;
+        _loaded = true;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return material.Padding(
+      padding: const material.EdgeInsets.only(left: 12),
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.start,
+        mainAxisSize: material.MainAxisSize.min,
+        children: [
+          material.MouseRegion(
+            cursor: material.SystemMouseCursors.click,
+            child: material.InkWell(
+              onTap: _toggle,
+              borderRadius: material.BorderRadius.circular(4),
+              child: material.Padding(
+                padding:
+                    const material.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                child: material.Row(
+                  children: [
+                    material.AnimatedRotation(
+                      turns: _expanded ? 0.25 : 0,
+                      duration: const Duration(milliseconds: 150),
+                      child: material.Icon(
+                        material.Icons.chevron_right_rounded,
+                        size: 14,
+                        color: theme.colorScheme.mutedForeground,
+                      ),
+                    ),
+                    const Gap(4),
+                    material.Icon(material.Icons.diamond_outlined,
+                        size: 13,
+                        color: theme.colorScheme.primary.withValues(alpha: 0.6)),
+                    const Gap(6),
+                    material.Expanded(
+                      child: material.Text(
+                        widget.schemaName,
+                        overflow: material.TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: material.TextStyle(
+                            fontSize: 12, color: theme.colorScheme.foreground),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (_expanded) ...[
+            if (_loading)
+              material.Padding(
+                padding:
+                    const material.EdgeInsets.only(left: 24, top: 2, bottom: 2),
+                child: material.Row(
+                  children: [
+                    const material.SizedBox(
+                      width: 10,
+                      height: 10,
+                      child:
+                          material.CircularProgressIndicator(strokeWidth: 1.5),
+                    ),
+                    const Gap(6),
+                    const Text('Loading...').muted().xSmall(),
+                  ],
+                ),
+              ),
+            if (_loaded) ...[
+              _PgObjectGroup(
+                  label: 'Tables',
+                  icon: material.Icons.table_chart_rounded,
+                  items: _tables),
+              _PgObjectGroup(
+                  label: 'Views',
+                  icon: material.Icons.view_agenda_rounded,
+                  items: _views),
+              _PgObjectGroup(
+                  label: 'Functions',
+                  icon: material.Icons.functions_rounded,
+                  items: _functions),
+              _PgObjectGroup(
+                  label: 'Sequences',
+                  icon: material.Icons.format_list_numbered_rounded,
+                  items: _sequences),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PgObjectGroup extends StatefulWidget {
+  const _PgObjectGroup({
+    required this.label,
+    required this.icon,
+    required this.items,
+  });
+
+  final String label;
+  final material.IconData icon;
+  final List<String> items;
+
+  @override
+  State<_PgObjectGroup> createState() => _PgObjectGroupState();
+}
+
+class _PgObjectGroupState extends State<_PgObjectGroup> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return material.Padding(
+      padding: const material.EdgeInsets.only(left: 16),
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.start,
+        mainAxisSize: material.MainAxisSize.min,
+        children: [
+          material.MouseRegion(
+            cursor: material.SystemMouseCursors.click,
+            child: material.InkWell(
+              onTap: () => setState(() => _expanded = !_expanded),
+              borderRadius: material.BorderRadius.circular(4),
+              child: material.Padding(
+                padding:
+                    const material.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                child: material.Row(
+                  children: [
+                    material.AnimatedRotation(
+                      turns: _expanded ? 0.25 : 0,
+                      duration: const Duration(milliseconds: 150),
+                      child: material.Icon(
+                        material.Icons.chevron_right_rounded,
+                        size: 13,
+                        color: theme.colorScheme.mutedForeground,
+                      ),
+                    ),
+                    const Gap(4),
+                    material.Icon(widget.icon,
+                        size: 13, color: theme.colorScheme.mutedForeground),
+                    const Gap(6),
+                    Text('${widget.label} (${widget.items.length})')
+                        .muted()
+                        .xSmall(),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (_expanded)
+            for (final item in widget.items)
+              material.Padding(
+                padding: const material.EdgeInsets.only(left: 22),
+                child: material.Padding(
+                  padding: const material.EdgeInsets.symmetric(
+                      horizontal: 4, vertical: 2),
+                  child: material.Row(
+                    children: [
+                      material.Icon(widget.icon,
+                          size: 12,
+                          color: theme.colorScheme.primary
+                              .withValues(alpha: 0.5)),
+                      const Gap(6),
+                      material.Expanded(
+                        child: material.Text(
+                          item,
+                          overflow: material.TextOverflow.ellipsis,
+                          maxLines: 1,
+                          style: material.TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.foreground,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+        ],
       ),
     );
   }
