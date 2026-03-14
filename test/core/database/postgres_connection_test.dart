@@ -263,6 +263,18 @@ void main() {
       await conn.connectToDatabase('other');
       expect(conn.database, 'mydb');
     });
+
+    test('returned connection has connectionString null', () async {
+      final conn = PostgresConnection(
+        id: 1,
+        name: 'test',
+        host: 'localhost',
+        connectionString: 'postgresql://u:p@h/db',
+      );
+      final newConn = await conn.connectToDatabase('targetdb');
+      expect(newConn.connectionString, isNull);
+      expect(newConn.database, 'targetdb');
+    });
   });
 
   group('PostgresConnectionException', () {

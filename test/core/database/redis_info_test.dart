@@ -187,5 +187,30 @@ void main() {
       final info = parseRedisInfo(_sampleInfo);
       expect(sectionDouble(info, 'Server', 'nope'), isNull);
     });
+
+    test('returns null for missing section', () {
+      final info = parseRedisInfo(_sampleInfo);
+      expect(sectionDouble(info, 'NoSuchSection', 'key'), isNull);
+    });
+  });
+
+  group('parseRedisInfo edge cases', () {
+    test('handles value containing colon', () {
+      const raw = '# Server\nredis_version:7.0.0:patch1\n';
+      final info = parseRedisInfo(raw);
+      expect(sectionValue(info, 'Server', 'redis_version'), '7.0.0:patch1');
+    });
+
+    test('handles multiple sections with same-name keys', () {
+      const raw = '''
+# A
+x:1
+# B
+x:2
+''';
+      final info = parseRedisInfo(raw);
+      expect(sectionValue(info, 'A', 'x'), '1');
+      expect(sectionValue(info, 'B', 'x'), '2');
+    });
   });
 }
