@@ -73,6 +73,25 @@ void main() {
       expect(conn.password, isNull);
       expect(conn.database, isNull);
     });
+
+    test('connectionString is stored when provided', () {
+      final conn = PostgresConnection(
+        id: 1,
+        name: 'test',
+        host: 'localhost',
+        connectionString: 'postgresql://user:pass@host/db',
+      );
+      expect(conn.connectionString, 'postgresql://user:pass@host/db');
+    });
+
+    test('connectionString defaults to null', () {
+      final conn = PostgresConnection(
+        id: 1,
+        name: 'test',
+        host: 'localhost',
+      );
+      expect(conn.connectionString, isNull);
+    });
   });
 
   group('PostgresConnection.disconnect', () {

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/postgresql/postgres_table_utils.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 const _defaultLimit = 200;
@@ -73,10 +74,6 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     conn?.disconnect();
   }
 
-  static String _quoteIdentifier(String name) {
-    return '"${name.replaceAll('"', '""')}"';
-  }
-
   Future<void> _connectAndLoad() async {
     _disconnectCurrent();
     if (!mounted) return;
@@ -124,8 +121,8 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       _loading = true;
       _error = null;
     });
-    final schemaQ = _quoteIdentifier(widget.schema);
-    final tableQ = _quoteIdentifier(widget.tableName);
+    final schemaQ = quotePostgresIdentifier(widget.schema);
+    final tableQ = quotePostgresIdentifier(widget.tableName);
     final sql = 'SELECT * FROM $schemaQ.$tableQ LIMIT ${widget.limit}';
     try {
       final result = await conn.execute(sql);
@@ -141,7 +138,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         return List<dynamic>.generate(row.length, (i) => row[i]);
       }).toList();
 
-      final stringRows = await compute(_convertRows, rawRows);
+      final stringRows = await compute(convertResultRowsToStrings, rawRows);
 
       if (!mounted) return;
       setState(() {
@@ -158,16 +155,6 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         });
       }
     }
-  }
-
-  static List<List<String>> _convertRows(List<List<dynamic>> rawRows) {
-    return rawRows.map((row) {
-      return row.map((value) {
-        if (value == null) return 'NULL';
-        if (value is DateTime) return value.toIso8601String();
-        return value.toString();
-      }).toList();
-    }).toList();
   }
 
   @override
