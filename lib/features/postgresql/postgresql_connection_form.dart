@@ -397,11 +397,14 @@ class _PostgresConnectionFormContentState
                   ),
                 ),
               ),
-            // Footer
+            // Footer — Wrap avoids overflow on narrow viewports (e.g. in tests)
             material.Container(
               padding: const material.EdgeInsets.symmetric(
                   horizontal: 24, vertical: 16),
-              child: material.Row(
+              child: material.Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                alignment: material.WrapAlignment.spaceBetween,
                 children: [
                   OutlineButton(
                     onPressed:
@@ -431,15 +434,19 @@ class _PostgresConnectionFormContentState
                       ),
                     ),
                   ),
-                  const material.Spacer(),
-                  GhostButton(
-                    onPressed: () => material.Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
-                  ),
-                  const Gap(12),
-                  PrimaryButton(
-                    onPressed: _formValid ? _save : null,
-                    child: const Text('Save'),
+                  material.Row(
+                    mainAxisSize: material.MainAxisSize.min,
+                    children: [
+                      GhostButton(
+                        onPressed: () => material.Navigator.of(context).pop(),
+                        child: const Text('Cancel'),
+                      ),
+                      const Gap(12),
+                      PrimaryButton(
+                        onPressed: _formValid ? _save : null,
+                        child: const Text('Save'),
+                      ),
+                    ],
                   ),
                 ],
               ),
