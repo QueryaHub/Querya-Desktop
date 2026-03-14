@@ -186,5 +186,16 @@ void main() {
       expect(row.type, 'postgresql');
       expect(row.databaseName, 'mydb');
     });
+
+    test('toMap includes database_name for postgresql', () {
+      const row = ConnectionRow(
+        type: 'postgresql',
+        name: 'PG',
+        host: 'localhost',
+        databaseName: 'appdb',
+        createdAt: '2026-01-01T00:00:00Z',
+      );
+      expect(row.toMap()['database_name'], 'appdb');
+    });
   });
 }
