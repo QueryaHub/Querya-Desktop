@@ -169,5 +169,33 @@ void main() {
       final map = row.toMap();
       expect(map.containsKey('id'), false);
     });
+
+    test('fromMap restores postgresql connection with databaseName', () {
+      final map = <String, Object?>{
+        'id': 1,
+        'type': 'postgresql',
+        'name': 'PG',
+        'host': 'localhost',
+        'port': 5432,
+        'database_name': 'mydb',
+        'use_ssl': 0,
+        'sort_order': 0,
+        'created_at': '2026-01-01T00:00:00Z',
+      };
+      final row = ConnectionRow.fromMap(map);
+      expect(row.type, 'postgresql');
+      expect(row.databaseName, 'mydb');
+    });
+
+    test('toMap includes database_name for postgresql', () {
+      const row = ConnectionRow(
+        type: 'postgresql',
+        name: 'PG',
+        host: 'localhost',
+        databaseName: 'appdb',
+        createdAt: '2026-01-01T00:00:00Z',
+      );
+      expect(row.toMap()['database_name'], 'appdb');
+    });
   });
 }

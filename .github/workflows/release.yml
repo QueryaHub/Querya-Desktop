@@ -1,0 +1,88 @@
+# Сборка релизов и публикация в GitHub Releases.
+# Запуск: создайте и запушьте тег, например v0.1.0:
+#   git tag v0.1.0
+#   git push origin v0.1.0
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'   # v0.1.0, v1.0.0, etc.
+
+jobs:
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.5'
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Windows (release)
+        run: flutter build windows --release
+
+      - name: Zip Windows artifact
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $dir = "build\windows\x64\runner\Release"
+          Compress-Archive -Path "$dir\*" -DestinationPath "Querya-Desktop-$tag-windows.zip"
+
+      - name: Create Release and upload Windows
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          generate_release_notes: true
+          files: Querya-Desktop-${{ github.ref_name }}-windows.zip
+          allow_updates: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux:
+    name: Build Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.5'
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Linux (release)
+        run: flutter build linux --release
+
+      - name: Zip Linux artifact
+        run: |
+          cd build/linux/x64/release/bundle
+          zip -r ../../../../../../Querya-Desktop-${{ github.ref_name }}-linux.zip .
+
+      - name: Upload to Release (Linux)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          generate_release_notes: true
+          files: Querya-Desktop-${{ github.ref_name }}-linux.zip
+          allow_updates: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
