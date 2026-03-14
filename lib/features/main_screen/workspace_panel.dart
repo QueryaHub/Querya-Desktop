@@ -4,6 +4,7 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 import 'package:querya_desktop/features/mongodb/mongo_explorer_view.dart';
 import 'package:querya_desktop/features/mongodb/mongo_stats_view.dart';
+import 'package:querya_desktop/features/postgresql/postgres_stats_view.dart';
 import 'package:querya_desktop/features/redis/redis_explorer_view.dart';
 import 'package:querya_desktop/features/redis/redis_view.dart';
 import 'query_editor_tab.dart';
@@ -41,6 +42,20 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    // If a PostgreSQL connection is selected → show stats
+    if (widget.activeConnection != null &&
+        widget.activeConnection!.type == 'postgresql') {
+      return material.Container(
+        color: theme.colorScheme.background,
+        child: material.SizedBox.expand(
+          child: PostgresStatsView(
+            key: ValueKey('pg_stats_${widget.activeConnection!.id}'),
+            connectionRow: widget.activeConnection!,
+          ),
+        ),
+      );
+    }
 
     // If a MongoDB connection is selected
     if (widget.activeConnection != null &&
