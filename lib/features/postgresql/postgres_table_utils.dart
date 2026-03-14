@@ -1,4 +1,5 @@
 /// Utilities for PostgreSQL table data view (quoting, row conversion).
+library;
 
 /// Quotes a PostgreSQL identifier (e.g. schema or table name).
 /// Doubles any internal double-quote.
