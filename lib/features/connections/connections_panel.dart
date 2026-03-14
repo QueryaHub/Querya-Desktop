@@ -21,6 +21,7 @@ class ConnectionsPanel extends StatefulWidget {
     this.onConnectionSelected,
     this.onRedisDatabaseSelected,
     this.onMongoDBDatabaseSelected,
+    this.onPostgresTableSelected,
   });
 
   /// Called when the user taps a connection tile.
@@ -33,6 +34,10 @@ class ConnectionsPanel extends StatefulWidget {
   /// Called when the user taps a MongoDB database node in the tree.
   final void Function(ConnectionRow connection, String database)?
       onMongoDBDatabaseSelected;
+
+  /// Called when the user taps a PostgreSQL table or view in the tree.
+  final void Function(ConnectionRow connection, String database, String schema,
+      String tableOrViewName, bool isView)? onPostgresTableSelected;
 
   @override
   State<ConnectionsPanel> createState() => _ConnectionsPanelState();
@@ -142,6 +147,7 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
         iconAsset: _iconAssetForType(conn.type),
         onRemove: () => _removeConnection(conn.id!),
         onTap: () => widget.onConnectionSelected?.call(conn),
+        onPostgresTableSelected: widget.onPostgresTableSelected,
       );
     } else if (conn.type == 'redis') {
       return _RedisConnectionTile(
@@ -1192,6 +1198,7 @@ class _PostgresConnectionTile extends StatefulWidget {
     this.iconAsset,
     required this.onRemove,
     this.onTap,
+    this.onPostgresTableSelected,
   });
 
   final ConnectionRow connection;
@@ -1199,6 +1206,8 @@ class _PostgresConnectionTile extends StatefulWidget {
   final String? iconAsset;
   final VoidCallback onRemove;
   final VoidCallback? onTap;
+  final void Function(ConnectionRow connection, String database, String schema,
+      String tableOrViewName, bool isView)? onPostgresTableSelected;
 
   @override
   State<_PostgresConnectionTile> createState() =>
@@ -1399,6 +1408,7 @@ class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
                 _PgDatabasesNode(
                   connection: widget.connection,
                   databases: _databases,
+                  onPostgresTableSelected: widget.onPostgresTableSelected,
                 ),
             ],
           ],
@@ -1412,10 +1422,13 @@ class _PgDatabasesNode extends StatefulWidget {
   const _PgDatabasesNode({
     required this.connection,
     required this.databases,
+    this.onPostgresTableSelected,
   });
 
   final ConnectionRow connection;
   final List<String> databases;
+  final void Function(ConnectionRow connection, String database, String schema,
+      String tableOrViewName, bool isView)? onPostgresTableSelected;
 
   @override
   State<_PgDatabasesNode> createState() => _PgDatabasesNodeState();
@@ -1468,6 +1481,7 @@ class _PgDatabasesNodeState extends State<_PgDatabasesNode> {
               _PgDatabaseNode(
                 connection: widget.connection,
                 databaseName: db,
+                onPostgresTableSelected: widget.onPostgresTableSelected,
               ),
         ],
       ),
@@ -1479,10 +1493,13 @@ class _PgDatabaseNode extends StatefulWidget {
   const _PgDatabaseNode({
     required this.connection,
     required this.databaseName,
+    this.onPostgresTableSelected,
   });
 
   final ConnectionRow connection;
   final String databaseName;
+  final void Function(ConnectionRow connection, String database, String schema,
+      String tableOrViewName, bool isView)? onPostgresTableSelected;
 
   @override
   State<_PgDatabaseNode> createState() => _PgDatabaseNodeState();
@@ -1601,6 +1618,7 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
                 connection: widget.connection,
                 databaseName: widget.databaseName,
                 schemas: _schemas,
+                onPostgresTableSelected: widget.onPostgresTableSelected,
               ),
           ],
         ],
@@ -1614,11 +1632,14 @@ class _PgSchemasNode extends StatefulWidget {
     required this.connection,
     required this.databaseName,
     required this.schemas,
+    this.onPostgresTableSelected,
   });
 
   final ConnectionRow connection;
   final String databaseName;
   final List<String> schemas;
+  final void Function(ConnectionRow connection, String database, String schema,
+      String tableOrViewName, bool isView)? onPostgresTableSelected;
 
   @override
   State<_PgSchemasNode> createState() => _PgSchemasNodeState();
@@ -1671,6 +1692,7 @@ class _PgSchemasNodeState extends State<_PgSchemasNode> {
                 connection: widget.connection,
                 databaseName: widget.databaseName,
                 schemaName: schema,
+                onPostgresTableSelected: widget.onPostgresTableSelected,
               ),
         ],
       ),
@@ -1683,11 +1705,14 @@ class _PgSchemaNode extends StatefulWidget {
     required this.connection,
     required this.databaseName,
     required this.schemaName,
+    this.onPostgresTableSelected,
   });
 
   final ConnectionRow connection;
   final String databaseName;
   final String schemaName;
+  final void Function(ConnectionRow connection, String database, String schema,
+      String tableOrViewName, bool isView)? onPostgresTableSelected;
 
   @override
   State<_PgSchemaNode> createState() => _PgSchemaNodeState();
@@ -1812,13 +1837,33 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
               ),
             if (_loaded) ...[
               _PgObjectGroup(
-                  label: 'Tables',
-                  icon: material.Icons.table_chart_rounded,
-                  items: _tables),
+                label: 'Tables',
+                icon: material.Icons.table_chart_rounded,
+                items: _tables,
+                onItemTap: widget.onPostgresTableSelected != null
+                    ? (name) => widget.onPostgresTableSelected!(
+                          widget.connection,
+                          widget.databaseName,
+                          widget.schemaName,
+                          name,
+                          false,
+                        )
+                    : null,
+              ),
               _PgObjectGroup(
-                  label: 'Views',
-                  icon: material.Icons.view_agenda_rounded,
-                  items: _views),
+                label: 'Views',
+                icon: material.Icons.view_agenda_rounded,
+                items: _views,
+                onItemTap: widget.onPostgresTableSelected != null
+                    ? (name) => widget.onPostgresTableSelected!(
+                          widget.connection,
+                          widget.databaseName,
+                          widget.schemaName,
+                          name,
+                          true,
+                        )
+                    : null,
+              ),
               _PgObjectGroup(
                   label: 'Functions',
                   icon: material.Icons.functions_rounded,
@@ -1840,11 +1885,13 @@ class _PgObjectGroup extends StatefulWidget {
     required this.label,
     required this.icon,
     required this.items,
+    this.onItemTap,
   });
 
   final String label;
   final material.IconData icon;
   final List<String> items;
+  final void Function(String itemName)? onItemTap;
 
   @override
   State<_PgObjectGroup> createState() => _PgObjectGroupState();
@@ -1900,25 +1947,36 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
                 child: material.Padding(
                   padding: const material.EdgeInsets.symmetric(
                       horizontal: 4, vertical: 2),
-                  child: material.Row(
-                    children: [
-                      material.Icon(widget.icon,
-                          size: 12,
-                          color: theme.colorScheme.primary
-                              .withValues(alpha: 0.5)),
-                      const Gap(6),
-                      material.Expanded(
-                        child: material.Text(
-                          item,
-                          overflow: material.TextOverflow.ellipsis,
-                          maxLines: 1,
-                          style: material.TextStyle(
-                            fontSize: 11,
-                            color: theme.colorScheme.foreground,
+                  child: material.MouseRegion(
+                    cursor: widget.onItemTap != null
+                        ? material.SystemMouseCursors.click
+                        : material.SystemMouseCursors.basic,
+                    child: material.InkWell(
+                      onTap: widget.onItemTap != null
+                          ? () => widget.onItemTap!(item)
+                          : null,
+                      borderRadius: material.BorderRadius.circular(4),
+                      child: material.Row(
+                        children: [
+                          material.Icon(widget.icon,
+                              size: 12,
+                              color: theme.colorScheme.primary
+                                  .withValues(alpha: 0.5)),
+                          const Gap(6),
+                          material.Expanded(
+                            child: material.Text(
+                              item,
+                              overflow: material.TextOverflow.ellipsis,
+                              maxLines: 1,
+                              style: material.TextStyle(
+                                fontSize: 11,
+                                color: theme.colorScheme.foreground,
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),

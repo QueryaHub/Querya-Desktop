@@ -5,6 +5,7 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/features/mongodb/mongo_explorer_view.dart';
 import 'package:querya_desktop/features/mongodb/mongo_stats_view.dart';
 import 'package:querya_desktop/features/postgresql/postgres_stats_view.dart';
+import 'package:querya_desktop/features/postgresql/postgres_table_view.dart';
 import 'package:querya_desktop/features/redis/redis_explorer_view.dart';
 import 'package:querya_desktop/features/redis/redis_view.dart';
 import 'query_editor_tab.dart';
@@ -17,6 +18,7 @@ class WorkspacePanel extends StatefulWidget {
     this.activeConnection,
     this.selectedRedisDb,
     this.selectedMongoDb,
+    this.selectedPostgresTable,
   });
 
   /// Currently selected connection from the sidebar.
@@ -29,6 +31,11 @@ class WorkspacePanel extends StatefulWidget {
   /// When set, the user selected a specific MongoDB database in the sidebar tree.
   /// null = show stats, non-null = show data explorer for that db.
   final String? selectedMongoDb;
+
+  /// When set, the user selected a PostgreSQL table/view in the sidebar tree.
+  /// null = show stats, non-null = show table data view.
+  final ({String database, String schema, String tableName, bool isView})?
+      selectedPostgresTable;
 
   @override
   State<WorkspacePanel> createState() => _WorkspacePanelState();
@@ -43,16 +50,27 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // If a PostgreSQL connection is selected → show stats
+    // If a PostgreSQL connection is selected → stats or table data
     if (widget.activeConnection != null &&
         widget.activeConnection!.type == 'postgresql') {
+      final pgTable = widget.selectedPostgresTable;
       return material.Container(
         color: theme.colorScheme.background,
         child: material.SizedBox.expand(
-          child: PostgresStatsView(
-            key: ValueKey('pg_stats_${widget.activeConnection!.id}'),
-            connectionRow: widget.activeConnection!,
-          ),
+          child: pgTable != null
+              ? PostgresTableView(
+                  key: ValueKey(
+                      'pg_table_${widget.activeConnection!.id}_${pgTable.schema}_${pgTable.tableName}'),
+                  connectionRow: widget.activeConnection!,
+                  database: pgTable.database,
+                  schema: pgTable.schema,
+                  tableName: pgTable.tableName,
+                  isView: pgTable.isView,
+                )
+              : PostgresStatsView(
+                  key: ValueKey('pg_stats_${widget.activeConnection!.id}'),
+                  connectionRow: widget.activeConnection!,
+                ),
         ),
       );
     }
