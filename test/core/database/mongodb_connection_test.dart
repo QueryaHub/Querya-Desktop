@@ -70,6 +70,16 @@ void main() {
       expect(conn.buildConnectionUri(), 'mongodb://localhost/mydb');
     });
 
+    test('empty database is omitted from path', () {
+      final conn = MongoConnection(
+        id: 1,
+        name: 'test',
+        host: 'localhost',
+        database: '',
+      );
+      expect(conn.buildConnectionUri(), 'mongodb://localhost');
+    });
+
     test('authSource is added as query parameter', () {
       final conn = MongoConnection(
         id: 1,
