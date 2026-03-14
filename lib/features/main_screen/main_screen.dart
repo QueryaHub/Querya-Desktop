@@ -30,11 +30,31 @@ class _MainScreenState extends State<MainScreen> {
   /// Currently selected MongoDB database (null = show stats).
   String? _activeMongoDB;
 
+  /// When set, user selected a PostgreSQL table/view in the tree.
+  ({String database, String schema, String tableName, bool isView})?
+      _activePostgresTable;
+
   void _onConnectionSelected(ConnectionRow connection) {
     setState(() {
       _activeConnection = connection;
-      _activeRedisDb = null; // Reset: connection click → stats
+      _activeRedisDb = null;
       _activeMongoDB = null;
+      _activePostgresTable = null;
+    });
+  }
+
+  void _onPostgresTableSelected(ConnectionRow connection, String database,
+      String schema, String tableOrViewName, bool isView) {
+    setState(() {
+      _activeConnection = connection;
+      _activeRedisDb = null;
+      _activeMongoDB = null;
+      _activePostgresTable = (
+        database: database,
+        schema: schema,
+        tableName: tableOrViewName,
+        isView: isView,
+      );
     });
   }
 
@@ -77,6 +97,7 @@ class _MainScreenState extends State<MainScreen> {
                         onConnectionSelected: _onConnectionSelected,
                         onRedisDatabaseSelected: _onRedisDatabaseSelected,
                         onMongoDBDatabaseSelected: _onMongoDBDatabaseSelected,
+                        onPostgresTableSelected: _onPostgresTableSelected,
                       ),
                     ),
                     _VerticalResizeHandle(
@@ -92,6 +113,7 @@ class _MainScreenState extends State<MainScreen> {
                         activeConnection: _activeConnection,
                         selectedRedisDb: _activeRedisDb,
                         selectedMongoDb: _activeMongoDB,
+                        selectedPostgresTable: _activePostgresTable,
                       ),
                     ),
                   ],

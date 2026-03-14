@@ -188,5 +188,16 @@ void main() {
       expect(uri, contains('/testdb'));
       expect(uri, isNot(contains('authSource')));
     });
+
+    test('buildUriForDatabase with empty database name uses root path', () {
+      final conn = MongoConnection(
+        id: 1,
+        name: 'test',
+        host: 'localhost',
+      );
+      final uri = conn.buildUriForDatabase('');
+      expect(uri, contains('mongodb://'));
+      expect(Uri.parse(uri).path, '/');
+    });
   });
 }
