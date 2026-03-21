@@ -13,6 +13,12 @@ import '../../support/layout_overflow.dart';
 
 String _isoNow() => DateTime.now().toUtc().toIso8601String();
 
+/// Avoid [findsOneWidget] here: it polls until a long timeout and can hang the suite.
+void _expectTextCount(String label, int expected) {
+  final n = find.text(label).evaluate().length;
+  expect(n, expected, reason: 'Text("$label"): expected $expected, found $n');
+}
+
 class _FakePathProvider extends PathProviderPlatform {
   _FakePathProvider(this._root);
   final String _root;
@@ -168,10 +174,10 @@ void main() {
         }
       });
 
-      expect(find.text('LayoutTestFolder'), findsOneWidget);
-      expect(find.text('PG local'), findsOneWidget);
-      expect(find.text('Redis local'), findsOneWidget);
-      expect(find.text('Mongo local'), findsOneWidget);
+      _expectTextCount('LayoutTestFolder', 1);
+      _expectTextCount('PG local', 1);
+      _expectTextCount('Redis local', 1);
+      _expectTextCount('Mongo local', 1);
     });
   });
 }
