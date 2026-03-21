@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/postgres_connection.dart';
+import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -24,7 +25,8 @@ class PostgresSequenceView extends material.StatefulWidget {
 }
 
 class _PostgresSequenceViewState extends material.State<PostgresSequenceView> {
-  PostgresConnection? _connection;
+  PgLease? _lease;
+
   bool _loading = true;
   String? _error;
   PostgresSequenceDetails? _details;
@@ -50,14 +52,21 @@ class _PostgresSequenceViewState extends material.State<PostgresSequenceView> {
 
   @override
   void dispose() {
-    _disconnectCurrent();
+    _scrollController.dispose();
+    _disconnectCurrent(interruptIfBusy: true);
     super.dispose();
   }
 
-  void _disconnectCurrent() {
-    final conn = _connection;
-    _connection = null;
-    conn?.disconnect();
+  void _disconnectCurrent({bool interruptIfBusy = false}) {
+    if (interruptIfBusy && _loading) {
+      PostgresService.instance.interrupt(
+        widget.connectionRow,
+        database: widget.database,
+        mode: PgSessionMode.readOnly,
+      );
+    }
+    _lease?.release();
+    _lease = null;
   }
 
   Future<void> _connectAndLoad() async {
@@ -69,23 +78,17 @@ class _PostgresSequenceViewState extends material.State<PostgresSequenceView> {
       _details = null;
     });
     try {
-      final c = widget.connectionRow;
-      final conn = PostgresConnection(
-        id: c.id ?? 0,
-        name: c.name,
-        host: c.host ?? 'localhost',
-        port: c.port ?? 5432,
-        username: c.username,
-        password: c.password,
+      final lease = await PostgresService.instance.acquire(
+        widget.connectionRow,
         database: widget.database,
-        useSSL: c.useSSL,
+        mode: PgSessionMode.readOnly,
       );
-      await conn.connect();
       if (!mounted) {
-        conn.disconnect();
+        lease.release();
         return;
       }
-      _connection = conn;
+      _lease = lease;
+      final conn = lease.connection;
       final d = await conn.getSequenceDetails(
         widget.schema,
         widget.sequenceName,

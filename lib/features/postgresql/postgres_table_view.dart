@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/postgres_connection.dart';
+import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/postgresql/postgres_sql_editor_dialog.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_privileges_dialog.dart';
@@ -37,7 +38,9 @@ class PostgresTableView extends material.StatefulWidget {
 }
 
 class _PostgresTableViewState extends material.State<PostgresTableView> {
-  PostgresConnection? _connection;
+  PgLease? _lease;
+  PostgresConnection? get _connection => _lease?.connection;
+
   bool _loading = true;
   String? _error;
 
@@ -85,14 +88,20 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
   void dispose() {
     _verticalController.dispose();
     _horizontalController.dispose();
-    _disconnectCurrent();
+    _disconnectCurrent(interruptIfBusy: true);
     super.dispose();
   }
 
-  void _disconnectCurrent() {
-    final conn = _connection;
-    _connection = null;
-    conn?.disconnect();
+  void _disconnectCurrent({bool interruptIfBusy = false}) {
+    if (interruptIfBusy && _loading) {
+      PostgresService.instance.interrupt(
+        widget.connectionRow,
+        database: widget.database,
+        mode: PgSessionMode.readWrite,
+      );
+    }
+    _lease?.release();
+    _lease = null;
   }
 
   Future<void> _connectAndLoad() async {
@@ -110,23 +119,17 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       _customSql = null;
     });
     try {
-      final c = widget.connectionRow;
-      final conn = PostgresConnection(
-        id: c.id ?? 0,
-        name: c.name,
-        host: c.host ?? 'localhost',
-        port: c.port ?? 5432,
-        username: c.username,
-        password: c.password,
+      final lease = await PostgresService.instance.acquire(
+        widget.connectionRow,
         database: widget.database,
-        useSSL: c.useSSL,
+        // Custom SQL + REFRESH MATERIALIZED VIEW need a read-write session.
+        mode: PgSessionMode.readWrite,
       );
-      await conn.connect();
       if (!mounted) {
-        conn.disconnect();
+        lease.release();
         return;
       }
-      _connection = conn;
+      _lease = lease;
       await _fetch(refreshCount: true);
     } catch (e) {
       if (mounted) {
