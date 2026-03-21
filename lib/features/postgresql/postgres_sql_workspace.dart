@@ -306,7 +306,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
                           color: theme.colorScheme.muted.withValues(alpha: 0.6),
                         ),
                         alignment: material.Alignment.centerLeft,
-                        child: Text('Data Output').semiBold().small(),
+                        child: const Text('Data Output').semiBold().small(),
                       ),
                       const Divider(height: 1),
                       Expanded(
@@ -375,7 +375,7 @@ class _SqlToolbar extends material.StatelessWidget {
         children: [
           material.Row(
             children: [
-              Text('Query').semiBold().small(),
+              const Text('Query').semiBold().small(),
               const Gap(12),
               Text(_txLabel()).muted().small(),
               const Spacer(),
@@ -407,7 +407,7 @@ class _SqlToolbar extends material.StatelessWidget {
               material.Row(
                 mainAxisSize: material.MainAxisSize.min,
                 children: [
-                  Text('Autocommit').small(),
+                  const Text('Autocommit').small(),
                   const Gap(6),
                   material.Switch(
                     value: autocommit,
@@ -418,7 +418,7 @@ class _SqlToolbar extends material.StatelessWidget {
               material.Row(
                 mainAxisSize: material.MainAxisSize.min,
                 children: [
-                  Text('Stmt timeout').small(),
+                  const Text('Stmt timeout').small(),
                   const Gap(6),
                   material.DropdownButton<int?>(
                     value: queryTimeoutSeconds,

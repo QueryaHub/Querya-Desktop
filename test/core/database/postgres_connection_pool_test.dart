@@ -12,9 +12,8 @@ ConnectionRow _row({int? id = 1}) => ConnectionRow(
 
 /// In-memory stand-in: no TCP, tracks refcount-related calls.
 class FakePostgresConnection extends PostgresConnection {
-  FakePostgresConnection({int id = 1})
+  FakePostgresConnection({super.id = 1})
       : super(
-          id: id,
           name: 'fake',
           host: 'localhost',
           port: 5432,

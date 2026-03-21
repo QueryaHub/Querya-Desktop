@@ -247,11 +247,11 @@ class _PostgresConnectionFormContentState
                     const Gap(16),
                     const Text('Connection URI (optional)').small().semiBold(),
                     const Gap(4),
-                    Text(
+                    const Text(
                       'If set, overrides Host / Port / Database below.',
                     ).muted().small(),
                     const Gap(4),
-                    Text(
+                    const Text(
                       'Supported query params include sslmode (disable, require, '
                       'verify-ca, verify-full), connect_timeout and query_timeout '
                       '(seconds). If sslmode is omitted, Use SSL/TLS below applies.',
