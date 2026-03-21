@@ -45,4 +45,11 @@ class RedisService {
     await connection.disconnect();
     _connections.remove(connection.id);
   }
+
+  /// Disconnects all Redis connections (e.g. app shutdown).
+  Future<void> disconnectAll() async {
+    for (final connection in _connections.values.toList()) {
+      await disconnect(connection);
+    }
+  }
 }

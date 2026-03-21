@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:postgres/postgres.dart' as pg;
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/postgres_sql.dart';
+import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/main_screen/query_editor_tab.dart';
 import 'package:querya_desktop/features/main_screen/results_tab.dart';
@@ -15,9 +18,13 @@ class PostgresSqlWorkspace extends material.StatefulWidget {
   const PostgresSqlWorkspace({
     super.key,
     required this.connectionRow,
+    this.transactionOpenNotifier,
   });
 
   final ConnectionRow connectionRow;
+
+  /// Updated when transaction state changes (for tab-switch warnings).
+  final material.ValueNotifier<bool?>? transactionOpenNotifier;
 
   @override
   material.State<PostgresSqlWorkspace> createState() =>
@@ -47,6 +54,29 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
   /// `null` = unknown (older server or error).
   bool? _txOpen;
 
+  @override
+  void initState() {
+    super.initState();
+    material.WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_loadStmtTimeoutSetting());
+    });
+  }
+
+  Future<void> _loadStmtTimeoutSetting() async {
+    final t = await AppSettings.instance.getPostgresSqlStmtTimeoutSeconds();
+    if (!mounted) return;
+    setState(() => _queryTimeoutSeconds = t);
+  }
+
+  void _onStmtTimeoutChanged(int? v) {
+    setState(() => _queryTimeoutSeconds = v);
+    unawaited(AppSettings.instance.setPostgresSqlStmtTimeoutSeconds(v));
+  }
+
+  void _notifyTransactionOpen() {
+    widget.transactionOpenNotifier?.value = _txOpen;
+  }
+
   Future<void> _ensureLease() async {
     if (_lease != null && _lease!.connection.isConnected) return;
     _lease?.release();
@@ -70,10 +100,12 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     final conn = _lease?.connection;
     if (conn == null || !conn.isConnected) {
       if (mounted) setState(() => _txOpen = null);
+      _notifyTransactionOpen();
       return;
     }
     final v = await conn.inOpenTransaction();
     if (mounted) setState(() => _txOpen = v);
+    _notifyTransactionOpen();
   }
 
   Future<void> _runTxCommand(String cmd) async {
@@ -262,8 +294,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
                         onAutocommitChanged: (v) =>
                             setState(() => _autocommit = v),
                         queryTimeoutSeconds: _queryTimeoutSeconds,
-                        onQueryTimeoutChanged: (v) =>
-                            setState(() => _queryTimeoutSeconds = v),
+                        onQueryTimeoutChanged: _onStmtTimeoutChanged,
                         txOpen: _txOpen,
                         onBegin: _running
                             ? null

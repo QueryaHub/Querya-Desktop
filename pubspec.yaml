@@ -24,6 +24,8 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  # Used in tests to mock paths (path_provider has no plugin in flutter test).
+  path_provider_platform_interface: ^2.1.2
 
 dependency_overrides:
   # Patched ToastLayer (fixes InheritedNotifier crash on resize / hot reload).

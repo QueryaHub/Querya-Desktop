@@ -119,4 +119,36 @@ void main() {
       expect(MongoService.instance.getConnection(999998), isNull);
     });
   });
+
+  group('MongoService.disconnectAll', () {
+    test('completes when no connections', () async {
+      await MongoService.instance.disconnectAll();
+    });
+
+    test('clears all tracked connections', () async {
+      MongoService.instance.createConnection(
+        const ConnectionRow(
+          id: 301,
+          type: 'mongodb',
+          name: 'a',
+          createdAt: '2026-01-01T00:00:00Z',
+        ),
+      );
+      MongoService.instance.createConnection(
+        const ConnectionRow(
+          id: 302,
+          type: 'mongodb',
+          name: 'b',
+          createdAt: '2026-01-01T00:00:00Z',
+        ),
+      );
+      expect(MongoService.instance.getConnection(301), isNotNull);
+      expect(MongoService.instance.getConnection(302), isNotNull);
+
+      await MongoService.instance.disconnectAll();
+
+      expect(MongoService.instance.getConnection(301), isNull);
+      expect(MongoService.instance.getConnection(302), isNull);
+    });
+  });
 }
