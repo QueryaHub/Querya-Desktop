@@ -24,6 +24,7 @@ class PostgresService {
   PostgresService._()
       : _pool = PostgresConnectionPool(
           createAndConnect: _defaultCreateAndConnect,
+          maxEntries: PostgresConnectionPool.defaultMaxEntries,
         );
 
   static final PostgresService instance = PostgresService._();
