@@ -28,6 +28,7 @@ class _PostgresRoutineViewState extends material.State<PostgresRoutineView> {
   bool _loading = true;
   String? _error;
   List<PgFunctionOverload> _overloads = [];
+  final _scrollController = material.ScrollController();
 
   @override
   void initState() {
@@ -49,6 +50,7 @@ class _PostgresRoutineViewState extends material.State<PostgresRoutineView> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _disconnectCurrent();
     super.dispose();
   }
@@ -206,8 +208,10 @@ class _PostgresRoutineViewState extends material.State<PostgresRoutineView> {
           ),
           material.Expanded(
             child: material.Scrollbar(
+              controller: _scrollController,
               thumbVisibility: true,
               child: material.SingleChildScrollView(
+                controller: _scrollController,
                 padding: const material.EdgeInsets.all(20),
                 child: material.Column(
                   crossAxisAlignment: material.CrossAxisAlignment.stretch,

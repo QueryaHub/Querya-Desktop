@@ -28,6 +28,7 @@ class _PostgresSequenceViewState extends material.State<PostgresSequenceView> {
   bool _loading = true;
   String? _error;
   PostgresSequenceDetails? _details;
+  final _scrollController = material.ScrollController();
 
   @override
   void initState() {
@@ -210,8 +211,10 @@ class _PostgresSequenceViewState extends material.State<PostgresSequenceView> {
           ),
           material.Expanded(
             child: material.Scrollbar(
+              controller: _scrollController,
               thumbVisibility: true,
               child: material.SingleChildScrollView(
+                controller: _scrollController,
                 padding: const material.EdgeInsets.all(20),
                 child: material.Column(
                   crossAxisAlignment: material.CrossAxisAlignment.stretch,
