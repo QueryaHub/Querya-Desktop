@@ -3,6 +3,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/postgresql/postgres_sql_editor_dialog.dart';
+import 'package:querya_desktop/features/postgresql/postgres_table_privileges_dialog.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_utils.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -16,6 +17,7 @@ class PostgresTableView extends material.StatefulWidget {
     required this.schema,
     required this.tableName,
     this.isView = false,
+    this.isMaterializedView = false,
     this.limit = _defaultLimit,
   });
 
@@ -24,6 +26,8 @@ class PostgresTableView extends material.StatefulWidget {
   final String schema;
   final String tableName;
   final bool isView;
+  /// When true, toolbar offers REFRESH MATERIALIZED VIEW and matview label.
+  final bool isMaterializedView;
   final int limit;
 
   @override
@@ -64,7 +68,8 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     if (oldWidget.connectionRow.id != widget.connectionRow.id ||
         oldWidget.database != widget.database ||
         oldWidget.schema != widget.schema ||
-        oldWidget.tableName != widget.tableName) {
+        oldWidget.tableName != widget.tableName ||
+        oldWidget.isMaterializedView != widget.isMaterializedView) {
       _customSqlActive = false;
       _customSql = null;
       _disconnectCurrent();
@@ -273,6 +278,34 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     }
   }
 
+  Future<void> _refreshMaterializedView() async {
+    final conn = _connection;
+    if (conn == null || !conn.isConnected || _loading) return;
+    try {
+      await conn.refreshMaterializedView(widget.schema, widget.tableName);
+      if (!mounted) return;
+      await _fetch(refreshCount: true);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  void _openPrivileges() {
+    final conn = _connection;
+    if (conn == null || !conn.isConnected) return;
+    showPostgresTablePrivilegesDialog(
+      context: context,
+      connection: conn,
+      schema: widget.schema,
+      tableName: widget.tableName,
+    );
+  }
+
   void _openSqlEditor() {
     showPostgresSqlEditorDialog(
       context: context,
@@ -435,9 +468,11 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
             child: material.Row(
               children: [
                 material.Icon(
-                  widget.isView
-                      ? material.Icons.view_agenda_rounded
-                      : material.Icons.table_chart_rounded,
+                  widget.isMaterializedView
+                      ? material.Icons.dynamic_feed_rounded
+                      : widget.isView
+                          ? material.Icons.view_agenda_rounded
+                          : material.Icons.table_chart_rounded,
                   size: 18,
                   color: cs.primary,
                 ),
@@ -445,7 +480,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
                 material.Expanded(
                   child: material.Text(
                     '${widget.schema}.${widget.tableName}'
-                        '${widget.isView ? ' (view)' : ''}',
+                        '${widget.isMaterializedView ? ' (materialized view)' : widget.isView ? ' (view)' : ''}',
                     style: material.TextStyle(
                       fontSize: 13,
                       fontWeight: material.FontWeight.w600,
@@ -477,6 +512,28 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
                   ),
                   child: const Text('SQL'),
                 ),
+                const Gap(4),
+                OutlineButton(
+                  size: ButtonSize.small,
+                  onPressed: _openPrivileges,
+                  leading: const material.Icon(
+                    material.Icons.admin_panel_settings_rounded,
+                    size: 15,
+                  ),
+                  child: const Text('Privileges'),
+                ),
+                if (widget.isMaterializedView && !_customSqlActive) ...[
+                  const Gap(4),
+                  OutlineButton(
+                    size: ButtonSize.small,
+                    onPressed: _loading ? null : _refreshMaterializedView,
+                    leading: const material.Icon(
+                      material.Icons.sync_rounded,
+                      size: 15,
+                    ),
+                    child: const Text('Refresh MV'),
+                  ),
+                ],
                 if (_customSqlActive) ...[
                   const Gap(4),
                   OutlineButton(
