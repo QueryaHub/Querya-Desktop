@@ -273,6 +273,154 @@ class PostgresConnection {
       useSSL: useSSL,
     );
   }
+
+  /// All overloads of a function in [schema] named [name] ([pg_get_functiondef]).
+  Future<List<PgFunctionOverload>> getFunctionDefinitions(
+    String schema,
+    String name,
+  ) async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final result = await _conn!.execute(
+      Sql.named(
+        r'''
+SELECT p.oid::regprocedure::text AS signature,
+       pg_get_functiondef(p.oid)::text AS definition
+FROM pg_proc p
+JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = @schema AND p.proname = @name
+ORDER BY p.oid
+''',
+      ),
+      parameters: {'schema': schema, 'name': name},
+    );
+    return result
+        .map(
+          (row) => PgFunctionOverload(
+            signature: row[0] as String,
+            definition: row[1] as String,
+          ),
+        )
+        .toList();
+  }
+
+  /// Metadata and approximate DDL for a sequence (requires PG 10+ [pg_sequences]).
+  Future<PostgresSequenceDetails?> getSequenceDetails(
+    String schema,
+    String name,
+  ) async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final result = await _conn!.execute(
+      Sql.named(
+        r'''
+SELECT last_value::text, start_value::text, min_value::text, max_value::text,
+       increment_by::text, cycle, cache_size::text,
+       schemaname::text, sequencename::text
+FROM pg_sequences
+WHERE schemaname = @schema AND sequencename = @name
+''',
+      ),
+      parameters: {'schema': schema, 'name': name},
+    );
+    if (result.isEmpty) return null;
+    final row = result.first;
+    final sc = row[7] as String;
+    final seq = row[8] as String;
+    final cycle = _parsePgBool(row[5]);
+    final ddl = _buildSequenceDdl(
+      schema: sc,
+      name: seq,
+      incrementBy: row[4] as String,
+      minValue: row[2] as String,
+      maxValue: row[3] as String,
+      startValue: row[1] as String,
+      cacheSize: row[6] as String,
+      cycle: cycle,
+    );
+    return PostgresSequenceDetails(
+      schema: sc,
+      name: seq,
+      lastValue: row[0] as String,
+      startValue: row[1] as String,
+      minValue: row[2] as String,
+      maxValue: row[3] as String,
+      incrementBy: row[4] as String,
+      cacheSize: row[6] as String,
+      cycle: cycle,
+      ddl: ddl,
+    );
+  }
+
+  static String _quoteIdent(String id) =>
+      '"${id.replaceAll('"', '""')}"';
+
+  static bool _parsePgBool(Object? v) {
+    if (v is bool) return v;
+    final s = v?.toString().toLowerCase() ?? '';
+    return s == 't' || s == 'true';
+  }
+
+  static String _buildSequenceDdl({
+    required String schema,
+    required String name,
+    required String incrementBy,
+    required String minValue,
+    required String maxValue,
+    required String startValue,
+    required String cacheSize,
+    required bool cycle,
+  }) {
+    final qSchema = _quoteIdent(schema);
+    final qName = _quoteIdent(name);
+    return 'CREATE SEQUENCE $qSchema.$qName\n'
+        '  INCREMENT BY $incrementBy\n'
+        '  MINVALUE $minValue\n'
+        '  MAXVALUE $maxValue\n'
+        '  START $startValue\n'
+        '  CACHE $cacheSize\n'
+        '  ${cycle ? 'CYCLE' : 'NO CYCLE'};';
+  }
+}
+
+/// One overload returned by [PostgresConnection.getFunctionDefinitions].
+class PgFunctionOverload {
+  const PgFunctionOverload({
+    required this.signature,
+    required this.definition,
+  });
+
+  final String signature;
+  final String definition;
+}
+
+/// Row from [pg_sequences] plus generated DDL.
+class PostgresSequenceDetails {
+  const PostgresSequenceDetails({
+    required this.schema,
+    required this.name,
+    required this.lastValue,
+    required this.startValue,
+    required this.minValue,
+    required this.maxValue,
+    required this.incrementBy,
+    required this.cacheSize,
+    required this.cycle,
+    required this.ddl,
+  });
+
+  final String schema;
+  final String name;
+  final String lastValue;
+  final String startValue;
+  final String minValue;
+  final String maxValue;
+  final String incrementBy;
+  final String cacheSize;
+  final bool cycle;
+  final String ddl;
 }
 
 class PostgresConnectionException implements Exception {
