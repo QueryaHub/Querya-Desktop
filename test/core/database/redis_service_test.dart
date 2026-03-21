@@ -129,4 +129,36 @@ void main() {
       expect(RedisService.instance.getConnection(77), isNull);
     });
   });
+
+  group('RedisService.disconnectAll', () {
+    test('completes when no connections', () async {
+      await RedisService.instance.disconnectAll();
+    });
+
+    test('clears all tracked connections', () async {
+      RedisService.instance.createConnection(
+        const ConnectionRow(
+          id: 201,
+          type: 'redis',
+          name: 'a',
+          createdAt: '2026-01-01T00:00:00Z',
+        ),
+      );
+      RedisService.instance.createConnection(
+        const ConnectionRow(
+          id: 202,
+          type: 'redis',
+          name: 'b',
+          createdAt: '2026-01-01T00:00:00Z',
+        ),
+      );
+      expect(RedisService.instance.getConnection(201), isNotNull);
+      expect(RedisService.instance.getConnection(202), isNotNull);
+
+      await RedisService.instance.disconnectAll();
+
+      expect(RedisService.instance.getConnection(201), isNull);
+      expect(RedisService.instance.getConnection(202), isNull);
+    });
+  });
 }

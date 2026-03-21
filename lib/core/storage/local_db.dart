@@ -5,7 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const _dbName = 'querya.db';
-const _dbVersion = 3;
+const _dbVersion = 4;
 
 /// Local SQLite database for folders and connections.
 /// File: [applicationSupport]/querya_desktop/querya.db
@@ -65,6 +65,12 @@ class LocalDb {
         created_at TEXT NOT NULL
       )
     ''');
+    await db.execute('''
+      CREATE TABLE app_settings (
+        key TEXT PRIMARY KEY NOT NULL,
+        value TEXT NOT NULL
+      )
+    ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -104,6 +110,40 @@ class LocalDb {
       await db.execute('DROP TABLE connections');
       await db.execute('ALTER TABLE connections_new RENAME TO connections');
     }
+    if (oldVersion < 4) {
+      await db.execute('''
+        CREATE TABLE app_settings (
+          key TEXT PRIMARY KEY NOT NULL,
+          value TEXT NOT NULL
+        )
+      ''');
+    }
+  }
+
+  Future<String?> getAppSetting(String key) async {
+    final db = await _open();
+    final rows = await db.query(
+      'app_settings',
+      columns: ['value'],
+      where: 'key = ?',
+      whereArgs: [key],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first['value'] as String?;
+  }
+
+  Future<void> setAppSetting(String key, String value) async {
+    final db = await _open();
+    await db.rawInsert(
+      'INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)',
+      [key, value],
+    );
+  }
+
+  Future<void> deleteAppSetting(String key) async {
+    final db = await _open();
+    await db.delete('app_settings', where: 'key = ?', whereArgs: [key]);
   }
 
   Future<List<String>> getFolders() async {
