@@ -161,8 +161,11 @@ void main() {
             ),
           ),
         );
-        // Avoid pumpAndSettle: chevron AnimatedRotation may not idle.
-        await tester.pump(const Duration(milliseconds: 400));
+        // ConnectionsPanel loads folders async; do not use pumpAndSettle (chevron animation).
+        for (var i = 0; i < 120; i++) {
+          await tester.pump(const Duration(milliseconds: 50));
+          if (find.text('LayoutTestFolder').evaluate().isNotEmpty) break;
+        }
       });
 
       expect(find.text('LayoutTestFolder'), findsOneWidget);
