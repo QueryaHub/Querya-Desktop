@@ -46,12 +46,18 @@ class PostgresConnectionPool {
   PostgresConnectionPool({
     required this.createAndConnect,
     this.idleDisposeDelay = defaultIdleDisposeDelay,
+    this.maxEntries = defaultMaxEntries,
   });
 
   static const Duration defaultIdleDisposeDelay = Duration(seconds: 8);
 
+  /// Max distinct pool keys `(connection id, database, mode)`. When full,
+  /// least-recently-used **idle** slots (`refs == 0`) are closed first.
+  static const int defaultMaxEntries = 32;
+
   final PostgresPoolConnectionFactory createAndConnect;
   final Duration idleDisposeDelay;
+  final int maxEntries;
 
   final Map<String, _PoolEntry> _pool = {};
 
@@ -67,6 +73,7 @@ class PostgresConnectionPool {
     final k = keyFor(row.id, database, mode);
     var entry = _pool[k];
     if (entry != null) {
+      entry.touch();
       entry.idleTimer?.cancel();
       entry.idleTimer = null;
       entry.refs++;
@@ -77,10 +84,33 @@ class PostgresConnectionPool {
       return PgLease._(this, k, entry.connection);
     }
 
+    _evictIfNeededBeforeNewSlot();
+
     final conn = await createAndConnect(row, database: database, mode: mode);
     entry = _PoolEntry(conn)..refs = 1;
     _pool[k] = entry;
     return PgLease._(this, k, conn);
+  }
+
+  /// Drops idle LRU slots until there is room for one more key.
+  void _evictIfNeededBeforeNewSlot() {
+    while (_pool.length >= maxEntries) {
+      final idle = _pool.entries.where((e) => e.value.refs == 0).toList();
+      if (idle.isEmpty) {
+        throw StateError(
+          'PostgreSQL connection pool exhausted: $maxEntries slots in use.',
+        );
+      }
+      idle.sort((a, b) => a.value.lastUsed.compareTo(b.value.lastUsed));
+      _removeEntryClosing(idle.first.key);
+    }
+  }
+
+  void _removeEntryClosing(String k) {
+    final entry = _pool.remove(k);
+    if (entry == null) return;
+    entry.idleTimer?.cancel();
+    unawaited(entry.connection.forceClose());
   }
 
   void _release(String k) {
@@ -106,10 +136,7 @@ class PostgresConnectionPool {
     PgSessionMode mode = PgSessionMode.readOnly,
   }) {
     final k = keyFor(row.id, database, mode);
-    final entry = _pool.remove(k);
-    if (entry == null) return;
-    entry.idleTimer?.cancel();
-    unawaited(entry.connection.forceClose());
+    _removeEntryClosing(k);
   }
 
   /// Closes all pooled connections (e.g. app shutdown).
@@ -123,9 +150,12 @@ class PostgresConnectionPool {
 }
 
 class _PoolEntry {
-  _PoolEntry(this.connection);
+  _PoolEntry(this.connection) : lastUsed = DateTime.now();
 
   final PostgresConnection connection;
   int refs = 0;
   Timer? idleTimer;
+  DateTime lastUsed;
+
+  void touch() => lastUsed = DateTime.now();
 }

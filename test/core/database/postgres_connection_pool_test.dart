@@ -253,6 +253,63 @@ void main() {
       a.release();
       b.release();
     });
+
+    test('evicts LRU idle slot when maxEntries is reached', () async {
+      final fakes = <int, FakePostgresConnection>{};
+      Future<PostgresConnection> factory(
+        ConnectionRow row, {
+        required String database,
+        required PgSessionMode mode,
+      }) async {
+        final id = row.id ?? 0;
+        final c = FakePostgresConnection(id: id);
+        await c.connect();
+        await c.setSessionReadOnly(mode == PgSessionMode.readOnly);
+        fakes[id] = c;
+        return c;
+      }
+
+      final pool = PostgresConnectionPool(
+        createAndConnect: factory,
+        maxEntries: 2,
+        idleDisposeDelay: const Duration(hours: 1),
+      );
+      final l1 = await pool.acquire(_row(id: 1), database: 'postgres');
+      await Future<void>.delayed(const Duration(milliseconds: 2));
+      final l2 = await pool.acquire(_row(id: 2), database: 'postgres');
+      expect(fakes.length, 2);
+      l1.release();
+      l2.release();
+      await Future<void>.delayed(const Duration(milliseconds: 2));
+      final l3 = await pool.acquire(_row(id: 3), database: 'postgres');
+      expect(fakes[1]!.forceCloseCount, 1);
+      expect(fakes[2]!.forceCloseCount, 0);
+      l3.release();
+    });
+
+    test('throws when pool full and all slots busy', () async {
+      Future<PostgresConnection> factory(
+        ConnectionRow row, {
+        required String database,
+        required PgSessionMode mode,
+      }) async {
+        final c = FakePostgresConnection(id: row.id ?? 0);
+        await c.connect();
+        await c.setSessionReadOnly(mode == PgSessionMode.readOnly);
+        return c;
+      }
+
+      final pool = PostgresConnectionPool(
+        createAndConnect: factory,
+        maxEntries: 1,
+      );
+      final l1 = await pool.acquire(_row(id: 1), database: 'postgres');
+      await expectLater(
+        pool.acquire(_row(id: 2), database: 'postgres'),
+        throwsA(isA<StateError>()),
+      );
+      l1.release();
+    });
   });
 
   group('PgLease idempotency', () {
