@@ -1,6 +1,32 @@
 import 'package:postgres/postgres.dart';
+import 'package:querya_desktop/core/storage/local_db.dart';
 
 import 'postgres_metadata.dart';
+
+/// Replaces the database in a `postgresql://` / `postgres://` URI (path or
+/// `database=` query param). Used when switching DB while keeping URI auth/SSL.
+String replaceDatabaseInConnectionString(
+  String connectionString,
+  String newDatabase,
+) {
+  final uri = Uri.parse(connectionString.trim());
+  if (uri.scheme != 'postgres' && uri.scheme != 'postgresql') {
+    throw ArgumentError(
+      'Invalid connection string scheme: ${uri.scheme}. '
+      'Expected "postgresql" or "postgres".',
+    );
+  }
+  final params = Map<String, String>.from(uri.queryParameters);
+  if (params.containsKey('database')) {
+    params['database'] = newDatabase;
+    return uri.replace(queryParameters: params).toString();
+  }
+  if (uri.pathSegments.isNotEmpty && uri.pathSegments.first.isNotEmpty) {
+    return uri.replace(path: '/$newDatabase').toString();
+  }
+  params['database'] = newDatabase;
+  return uri.replace(queryParameters: params).toString();
+}
 
 /// PostgreSQL connection using the pure-Dart `postgres` package.
 class PostgresConnection {
@@ -16,6 +42,24 @@ class PostgresConnection {
     this.connectionString,
   });
 
+  /// Builds a connection from a saved [ConnectionRow] (host/port or URI).
+  factory PostgresConnection.fromConnectionRow(
+    ConnectionRow row, {
+    String? database,
+  }) {
+    return PostgresConnection(
+      id: row.id ?? 0,
+      name: row.name,
+      host: row.host ?? 'localhost',
+      port: row.port ?? 5432,
+      username: row.username,
+      password: row.password,
+      database: database ?? row.databaseName ?? 'postgres',
+      useSSL: row.useSSL,
+      connectionString: row.connectionString,
+    );
+  }
+
   final int id;
   final String name;
   final String host;
@@ -30,6 +74,9 @@ class PostgresConnection {
   bool _isConnected = false;
 
   bool get isConnected => _isConnected && _conn != null;
+
+  bool get _usesConnectionString =>
+      connectionString != null && connectionString!.trim().isNotEmpty;
 
   Endpoint _buildEndpoint() {
     return Endpoint(
@@ -52,10 +99,14 @@ class PostgresConnection {
   Future<void> connect() async {
     if (_isConnected && _conn != null) return;
     try {
-      _conn = await Connection.open(
-        _buildEndpoint(),
-        settings: _buildSettings(),
-      );
+      if (_usesConnectionString) {
+        _conn = await Connection.openFromUrl(connectionString!.trim());
+      } else {
+        _conn = await Connection.open(
+          _buildEndpoint(),
+          settings: _buildSettings(),
+        );
+      }
       _isConnected = true;
     } catch (e) {
       _isConnected = false;
@@ -71,6 +122,27 @@ class PostgresConnection {
     try {
       await c?.close();
     } catch (_) {}
+  }
+
+  /// Drops the TCP session immediately (kills pending client I/O). Used when
+  /// cancelling a long query or [PostgresService.interrupt].
+  Future<void> forceClose() async {
+    _isConnected = false;
+    final c = _conn;
+    _conn = null;
+    try {
+      await c?.close(force: true);
+    } catch (_) {}
+  }
+
+  /// Session-level default for transactions (browse vs SQL editor).
+  Future<void> setSessionReadOnly(bool readOnly) async {
+    if (!isConnected) return;
+    await execute(
+      readOnly
+          ? 'SET default_transaction_read_only = ON'
+          : 'SET default_transaction_read_only = OFF',
+    );
   }
 
   Future<bool> testConnection() async {
@@ -262,8 +334,12 @@ class PostgresConnection {
     return stats;
   }
 
-  /// Connect to a specific database (creates a new connection).
+  /// Connect to a specific database (creates a new connection config).
   Future<PostgresConnection> connectToDatabase(String dbName) async {
+    final cs = connectionString;
+    final newCs = (cs != null && cs.trim().isNotEmpty)
+        ? replaceDatabaseInConnectionString(cs, dbName)
+        : null;
     return PostgresConnection(
       id: id,
       name: name,
@@ -273,6 +349,7 @@ class PostgresConnection {
       password: password,
       database: dbName,
       useSSL: useSSL,
+      connectionString: newCs,
     );
   }
 
