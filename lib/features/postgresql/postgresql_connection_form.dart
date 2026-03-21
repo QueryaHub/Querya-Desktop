@@ -250,6 +250,12 @@ class _PostgresConnectionFormContentState
                     Text(
                       'If set, overrides Host / Port / Database below.',
                     ).muted().small(),
+                    const Gap(4),
+                    Text(
+                      'Supported query params include sslmode (disable, require, '
+                      'verify-ca, verify-full), connect_timeout and query_timeout '
+                      '(seconds). If sslmode is omitted, Use SSL/TLS below applies.',
+                    ).muted().small(),
                     const Gap(8),
                     TextField(
                       controller: _connectionStringController,
