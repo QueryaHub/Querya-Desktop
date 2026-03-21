@@ -28,9 +28,8 @@ final _driverInfoList = <_DriverInfo>[
 
 /// Shows the Driver Manager dialog: list of built-in database drivers and their status.
 void showDriverManagerDialog(BuildContext context) {
-  showDialog<void>(
+  showAppDialog<void>(
     context: context,
-    barrierColor: material.Colors.black54,
     builder: (context) => const material.Dialog(
       backgroundColor: material.Colors.transparent,
       insetPadding: material.EdgeInsets.symmetric(horizontal: 40, vertical: 24),

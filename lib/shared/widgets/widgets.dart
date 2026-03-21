@@ -8,4 +8,5 @@
 /// - Gap, VerticalDivider
 library;
 
+export 'app_dialog.dart';
 export 'package:shadcn_flutter/shadcn_flutter.dart';
