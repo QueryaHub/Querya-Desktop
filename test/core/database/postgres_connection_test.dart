@@ -226,6 +226,28 @@ void main() {
         )),
       );
     });
+
+    test('getFunctionDefinitions throws StateError', () {
+      expect(
+        () => conn.getFunctionDefinitions('public', 'foo'),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Not connected to PostgreSQL'),
+        )),
+      );
+    });
+
+    test('getSequenceDetails throws StateError', () {
+      expect(
+        () => conn.getSequenceDetails('public', 'foo'),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Not connected to PostgreSQL'),
+        )),
+      );
+    });
   });
 
   group('PostgresConnection.connectToDatabase', () {

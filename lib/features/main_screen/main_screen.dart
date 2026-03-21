@@ -5,6 +5,7 @@ import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 import 'package:querya_desktop/features/connections/connections_panel.dart';
+import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
 import 'package:querya_desktop/features/connections/driver_manager_dialog.dart';
 import 'package:querya_desktop/features/connections/new_connection_dialog.dart';
 import 'workspace_panel.dart';
@@ -30,30 +31,35 @@ class _MainScreenState extends State<MainScreen> {
   /// Currently selected MongoDB database (null = show stats).
   String? _activeMongoDB;
 
-  /// When set, user selected a PostgreSQL table/view in the tree.
-  ({String database, String schema, String tableName, bool isView})?
-      _activePostgresTable;
+  /// When set, user selected a PostgreSQL object in the tree.
+  ({String database, String schema, String name, PostgresObjectKind kind})?
+      _selectedPostgresObject;
 
   void _onConnectionSelected(ConnectionRow connection) {
     setState(() {
       _activeConnection = connection;
       _activeRedisDb = null;
       _activeMongoDB = null;
-      _activePostgresTable = null;
+      _selectedPostgresObject = null;
     });
   }
 
-  void _onPostgresTableSelected(ConnectionRow connection, String database,
-      String schema, String tableOrViewName, bool isView) {
+  void _onPostgresObjectSelected(
+    ConnectionRow connection,
+    String database,
+    String schema,
+    String name,
+    PostgresObjectKind kind,
+  ) {
     setState(() {
       _activeConnection = connection;
       _activeRedisDb = null;
       _activeMongoDB = null;
-      _activePostgresTable = (
+      _selectedPostgresObject = (
         database: database,
         schema: schema,
-        tableName: tableOrViewName,
-        isView: isView,
+        name: name,
+        kind: kind,
       );
     });
   }
@@ -97,7 +103,7 @@ class _MainScreenState extends State<MainScreen> {
                         onConnectionSelected: _onConnectionSelected,
                         onRedisDatabaseSelected: _onRedisDatabaseSelected,
                         onMongoDBDatabaseSelected: _onMongoDBDatabaseSelected,
-                        onPostgresTableSelected: _onPostgresTableSelected,
+                        onPostgresObjectSelected: _onPostgresObjectSelected,
                       ),
                     ),
                     _VerticalResizeHandle(
@@ -113,7 +119,7 @@ class _MainScreenState extends State<MainScreen> {
                         activeConnection: _activeConnection,
                         selectedRedisDb: _activeRedisDb,
                         selectedMongoDb: _activeMongoDB,
-                        selectedPostgresTable: _activePostgresTable,
+                        selectedPostgresObject: _selectedPostgresObject,
                       ),
                     ),
                   ],
