@@ -20,6 +20,47 @@ class PostgresWorkspaceHome extends material.StatefulWidget {
 
 class _PostgresWorkspaceHomeState extends material.State<PostgresWorkspaceHome> {
   int _tab = 0;
+  late final material.ValueNotifier<bool?> _sqlTxNotifier;
+
+  @override
+  void initState() {
+    super.initState();
+    _sqlTxNotifier = material.ValueNotifier<bool?>(null);
+  }
+
+  @override
+  void dispose() {
+    _sqlTxNotifier.dispose();
+    super.dispose();
+  }
+
+  Future<void> _selectTab(int i) async {
+    if (i == _tab) return;
+    if (_tab == 1 && i == 0 && _sqlTxNotifier.value == true) {
+      final ok = await material.showDialog<bool>(
+        context: context,
+        builder: (ctx) => material.AlertDialog(
+          title: const material.Text('Open transaction'),
+          content: const material.Text(
+            'The SQL tab has an open transaction. Leave anyway? '
+            'Uncommitted work may be lost if the session ends.',
+          ),
+          actions: [
+            material.TextButton(
+              onPressed: () => material.Navigator.of(ctx).pop(false),
+              child: const material.Text('Stay'),
+            ),
+            material.TextButton(
+              onPressed: () => material.Navigator.of(ctx).pop(true),
+              child: const material.Text('Leave'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
+    setState(() => _tab = i);
+  }
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -45,7 +86,7 @@ class _PostgresWorkspaceHomeState extends material.State<PostgresWorkspaceHome> 
                   child: material.MouseRegion(
                     cursor: material.SystemMouseCursors.click,
                     child: material.GestureDetector(
-                      onTap: () => setState(() => _tab = i),
+                      onTap: () => _selectTab(i),
                       child: material.AnimatedContainer(
                         duration: const Duration(milliseconds: 120),
                         padding: const material.EdgeInsets.symmetric(
@@ -73,15 +114,21 @@ class _PostgresWorkspaceHomeState extends material.State<PostgresWorkspaceHome> 
         ),
         const Divider(height: 1),
         Expanded(
-          child: _tab == 0
-              ? PostgresStatsView(
-                  key: ValueKey('pg_stats_${widget.connectionRow.id}'),
-                  connectionRow: widget.connectionRow,
-                )
-              : PostgresSqlWorkspace(
-                  key: ValueKey('pg_sql_${widget.connectionRow.id}'),
-                  connectionRow: widget.connectionRow,
-                ),
+          child: material.IndexedStack(
+            index: _tab,
+            sizing: material.StackFit.expand,
+            children: [
+              PostgresStatsView(
+                key: ValueKey('pg_stats_${widget.connectionRow.id}'),
+                connectionRow: widget.connectionRow,
+              ),
+              PostgresSqlWorkspace(
+                key: ValueKey('pg_sql_${widget.connectionRow.id}'),
+                connectionRow: widget.connectionRow,
+                transactionOpenNotifier: _sqlTxNotifier,
+              ),
+            ],
+          ),
         ),
       ],
     );
