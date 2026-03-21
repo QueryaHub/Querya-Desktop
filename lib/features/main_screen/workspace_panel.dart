@@ -4,6 +4,7 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 import 'package:querya_desktop/features/mongodb/mongo_explorer_view.dart';
 import 'package:querya_desktop/features/mongodb/mongo_stats_view.dart';
+import 'package:querya_desktop/features/postgresql/postgres_browser_views.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
 import 'package:querya_desktop/features/postgresql/postgres_routine_view.dart';
 import 'package:querya_desktop/features/postgresql/postgres_sequence_view.dart';
@@ -20,6 +21,17 @@ Widget _pgObjectWorkspace({
 }) {
   switch (pg.kind) {
     case PostgresObjectKind.table:
+      return PostgresTableView(
+        key: ValueKey(
+          'pg_table_${connection.id}_${pg.schema}_${pg.name}_${pg.kind}',
+        ),
+        connectionRow: connection,
+        database: pg.database,
+        schema: pg.schema,
+        tableName: pg.name,
+        isView: false,
+        isMaterializedView: false,
+      );
     case PostgresObjectKind.view:
       return PostgresTableView(
         key: ValueKey(
@@ -29,7 +41,20 @@ Widget _pgObjectWorkspace({
         database: pg.database,
         schema: pg.schema,
         tableName: pg.name,
-        isView: pg.kind == PostgresObjectKind.view,
+        isView: true,
+        isMaterializedView: false,
+      );
+    case PostgresObjectKind.materializedView:
+      return PostgresTableView(
+        key: ValueKey(
+          'pg_mat_${connection.id}_${pg.schema}_${pg.name}_${pg.kind}',
+        ),
+        connectionRow: connection,
+        database: pg.database,
+        schema: pg.schema,
+        tableName: pg.name,
+        isView: false,
+        isMaterializedView: true,
       );
     case PostgresObjectKind.function:
       return PostgresRoutineView(
@@ -46,6 +71,39 @@ Widget _pgObjectWorkspace({
         database: pg.database,
         schema: pg.schema,
         sequenceName: pg.name,
+      );
+    case PostgresObjectKind.schemaIndexes:
+      return PostgresIndexListView(
+        key: ValueKey('pg_idx_${connection.id}_${pg.schema}'),
+        connectionRow: connection,
+        database: pg.database,
+        schema: pg.schema,
+      );
+    case PostgresObjectKind.schemaTriggers:
+      return PostgresTriggerListView(
+        key: ValueKey('pg_trg_${connection.id}_${pg.schema}'),
+        connectionRow: connection,
+        database: pg.database,
+        schema: pg.schema,
+      );
+    case PostgresObjectKind.schemaTypes:
+      return PostgresTypeListView(
+        key: ValueKey('pg_typ_${connection.id}_${pg.schema}'),
+        connectionRow: connection,
+        database: pg.database,
+        schema: pg.schema,
+      );
+    case PostgresObjectKind.databaseExtensions:
+      return PostgresExtensionListView(
+        key: ValueKey('pg_ext_${connection.id}_${pg.database}'),
+        connectionRow: connection,
+        database: pg.database,
+      );
+    case PostgresObjectKind.databaseForeignData:
+      return PostgresFdwListView(
+        key: ValueKey('pg_fdw_${connection.id}_${pg.database}'),
+        connectionRow: connection,
+        database: pg.database,
       );
   }
 }

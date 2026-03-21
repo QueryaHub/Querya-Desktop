@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart' as material show Padding, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, DefaultTextStyle, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, Column, AnimatedRotation, Row, BoxFit, Text, TextOverflow, Expanded, CircularProgressIndicator;
+import 'package:flutter/material.dart' as material show BuildContext, Widget, Padding, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, DefaultTextStyle, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, Column, AnimatedRotation, Row, BoxFit, Text, TextOverflow, Expanded, CircularProgressIndicator, Material, StatelessWidget, Colors;
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
@@ -1617,6 +1617,22 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
             ),
           ),
           if (_expanded) ...[
+            _PgDbToolRow(
+              connection: widget.connection,
+              databaseName: widget.databaseName,
+              label: 'Extensions',
+              icon: material.Icons.extension_rounded,
+              kind: PostgresObjectKind.databaseExtensions,
+              onPostgresObjectSelected: widget.onPostgresObjectSelected,
+            ),
+            _PgDbToolRow(
+              connection: widget.connection,
+              databaseName: widget.databaseName,
+              label: 'Foreign data',
+              icon: material.Icons.public_rounded,
+              kind: PostgresObjectKind.databaseForeignData,
+              onPostgresObjectSelected: widget.onPostgresObjectSelected,
+            ),
             if (_loading)
               material.Padding(
                 padding:
@@ -1643,6 +1659,73 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
               ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _PgDbToolRow extends material.StatelessWidget {
+  const _PgDbToolRow({
+    required this.connection,
+    required this.databaseName,
+    required this.label,
+    required this.icon,
+    required this.kind,
+    this.onPostgresObjectSelected,
+  });
+
+  final ConnectionRow connection;
+  final String databaseName;
+  final String label;
+  final material.IconData icon;
+  final PostgresObjectKind kind;
+  final void Function(
+    ConnectionRow connection,
+    String database,
+    String schema,
+    String name,
+    PostgresObjectKind kind,
+  )? onPostgresObjectSelected;
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    final theme = Theme.of(context);
+    return material.Padding(
+      padding: const material.EdgeInsets.only(left: 12, top: 2, bottom: 2),
+      child: material.Material(
+        color: material.Colors.transparent,
+        child: material.InkWell(
+          borderRadius: material.BorderRadius.circular(4),
+          onTap: onPostgresObjectSelected == null
+              ? null
+              : () => onPostgresObjectSelected!(
+                    connection,
+                    databaseName,
+                    '',
+                    '',
+                    kind,
+                  ),
+          child: material.Padding(
+            padding:
+                const material.EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            child: material.Row(
+              children: [
+                material.Icon(icon,
+                    size: 14,
+                    color: theme.colorScheme.primary.withValues(alpha: 0.85)),
+                const Gap(6),
+                material.Expanded(
+                  child: Text(label).small(),
+                ),
+                material.Icon(
+                  material.Icons.chevron_right_rounded,
+                  size: 14,
+                  color: theme.colorScheme.mutedForeground,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1754,6 +1837,7 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
   bool _loading = false;
   List<String> _tables = [];
   List<String> _views = [];
+  List<String> _matviews = [];
   List<String> _functions = [];
   List<String> _sequences = [];
   bool _loaded = false;
@@ -1783,6 +1867,13 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
       await conn.connect();
       final tables = await conn.listTables(schema: widget.schemaName);
       final views = await conn.listViews(schema: widget.schemaName);
+      List<String> matviews = [];
+      try {
+        matviews =
+            await conn.listMaterializedViews(schema: widget.schemaName);
+      } catch (_) {
+        // pg_matviews / permissions may fail on some servers; keep tree usable.
+      }
       final functions = await conn.listFunctions(schema: widget.schemaName);
       final sequences = await conn.listSequences(schema: widget.schemaName);
       await conn.disconnect();
@@ -1790,6 +1881,7 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
       setState(() {
         _tables = tables;
         _views = views;
+        _matviews = matviews;
         _functions = functions;
         _sequences = sequences;
         _loading = false;
@@ -1896,6 +1988,20 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
                     : null,
               ),
               _PgObjectGroup(
+                label: 'Materialized views',
+                icon: material.Icons.dynamic_feed_rounded,
+                items: _matviews,
+                onItemTap: widget.onPostgresObjectSelected != null
+                    ? (name) => widget.onPostgresObjectSelected!(
+                          widget.connection,
+                          widget.databaseName,
+                          widget.schemaName,
+                          name,
+                          PostgresObjectKind.materializedView,
+                        )
+                    : null,
+              ),
+              _PgObjectGroup(
                 label: 'Functions',
                 icon: material.Icons.functions_rounded,
                 items: _functions,
@@ -1923,9 +2029,104 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
                         )
                     : null,
               ),
+              _PgSchemaToolRow(
+                connection: widget.connection,
+                databaseName: widget.databaseName,
+                schemaName: widget.schemaName,
+                label: 'Indexes',
+                icon: material.Icons.table_rows_rounded,
+                kind: PostgresObjectKind.schemaIndexes,
+                onPostgresObjectSelected: widget.onPostgresObjectSelected,
+              ),
+              _PgSchemaToolRow(
+                connection: widget.connection,
+                databaseName: widget.databaseName,
+                schemaName: widget.schemaName,
+                label: 'Triggers',
+                icon: material.Icons.bolt_rounded,
+                kind: PostgresObjectKind.schemaTriggers,
+                onPostgresObjectSelected: widget.onPostgresObjectSelected,
+              ),
+              _PgSchemaToolRow(
+                connection: widget.connection,
+                databaseName: widget.databaseName,
+                schemaName: widget.schemaName,
+                label: 'Types',
+                icon: material.Icons.category_rounded,
+                kind: PostgresObjectKind.schemaTypes,
+                onPostgresObjectSelected: widget.onPostgresObjectSelected,
+              ),
             ],
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _PgSchemaToolRow extends material.StatelessWidget {
+  const _PgSchemaToolRow({
+    required this.connection,
+    required this.databaseName,
+    required this.schemaName,
+    required this.label,
+    required this.icon,
+    required this.kind,
+    this.onPostgresObjectSelected,
+  });
+
+  final ConnectionRow connection;
+  final String databaseName;
+  final String schemaName;
+  final String label;
+  final material.IconData icon;
+  final PostgresObjectKind kind;
+  final void Function(
+    ConnectionRow connection,
+    String database,
+    String schema,
+    String name,
+    PostgresObjectKind kind,
+  )? onPostgresObjectSelected;
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    final theme = Theme.of(context);
+    return material.Padding(
+      padding: const material.EdgeInsets.only(left: 16, top: 2, bottom: 2),
+      child: material.Material(
+        color: material.Colors.transparent,
+        child: material.InkWell(
+          borderRadius: material.BorderRadius.circular(4),
+          onTap: onPostgresObjectSelected == null
+              ? null
+              : () => onPostgresObjectSelected!(
+                    connection,
+                    databaseName,
+                    schemaName,
+                    '',
+                    kind,
+                  ),
+          child: material.Padding(
+            padding:
+                const material.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+            child: material.Row(
+              children: [
+                material.Icon(icon,
+                    size: 13, color: theme.colorScheme.mutedForeground),
+                const Gap(6),
+                material.Expanded(
+                  child: Text(label).muted().xSmall(),
+                ),
+                material.Icon(
+                  material.Icons.chevron_right_rounded,
+                  size: 13,
+                  color: theme.colorScheme.mutedForeground,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
