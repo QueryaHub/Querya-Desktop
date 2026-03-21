@@ -1692,8 +1692,9 @@ class _PgDbToolRow extends material.StatelessWidget {
   @override
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context);
+    // Match _PgSchemaToolRow / _PgObjectGroup: muted xSmall, 13px icons, same indent as Schemas.
     return material.Padding(
-      padding: const material.EdgeInsets.only(left: 12, top: 2, bottom: 2),
+      padding: const material.EdgeInsets.only(left: 16, top: 2, bottom: 2),
       child: material.Material(
         color: material.Colors.transparent,
         child: material.InkWell(
@@ -1709,19 +1710,26 @@ class _PgDbToolRow extends material.StatelessWidget {
                   ),
           child: material.Padding(
             padding:
-                const material.EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                const material.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
             child: material.Row(
               children: [
                 material.Icon(icon,
-                    size: 14,
-                    color: theme.colorScheme.primary.withValues(alpha: 0.85)),
+                    size: 13, color: theme.colorScheme.mutedForeground),
                 const Gap(6),
                 material.Expanded(
-                  child: Text(label).small(),
+                  child: material.Text(
+                    label,
+                    overflow: material.TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: material.TextStyle(
+                      fontSize: 11,
+                      color: theme.colorScheme.mutedForeground,
+                    ),
+                  ),
                 ),
                 material.Icon(
                   material.Icons.chevron_right_rounded,
-                  size: 14,
+                  size: 13,
                   color: theme.colorScheme.mutedForeground,
                 ),
               ],
