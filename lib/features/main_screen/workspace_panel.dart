@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart' as material show Container, EdgeInsets, BoxDecoration, GestureDetector, Padding, BorderRadius, Spacer, Center, CrossAxisAlignment, Icon, Icons, MouseRegion, AnimatedContainer, AnimatedScale, Curves, SystemMouseCursors, LayoutBuilder, HitTestBehavior, SizedBox;
+import 'package:flutter/material.dart' as material show Axis, Container, EdgeInsets, BoxDecoration, GestureDetector, Padding, BorderRadius, Center, CrossAxisAlignment, Icon, Icons, MouseRegion, AnimatedContainer, AnimatedScale, Curves, SystemMouseCursors, LayoutBuilder, HitTestBehavior, SizedBox, SingleChildScrollView, Row, MainAxisSize;
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -346,15 +346,24 @@ class _SectionBar extends StatelessWidget {
             padding: const material.EdgeInsets.only(right: 16),
             child: Text(title).semiBold().small(),
           ),
-          ...List.generate(tabs.length, (i) {
-            return _TabButton(
-              label: tabs[i],
-              selected: index == i,
-              onTap: () => onTabChanged(i),
-              theme: theme,
-            );
-          }),
-          const material.Spacer(),
+          Expanded(
+            child: material.SingleChildScrollView(
+              scrollDirection: material.Axis.horizontal,
+              child: material.Row(
+                mainAxisSize: material.MainAxisSize.min,
+                children: [
+                  ...List.generate(tabs.length, (i) {
+                    return _TabButton(
+                      label: tabs[i],
+                      selected: index == i,
+                      onTap: () => onTabChanged(i),
+                      theme: theme,
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
           if (trailing != null) trailing!,
         ],
       ),
