@@ -20,6 +20,7 @@ Future<T?> showAppDialog<T>({
       return _BlurredDialogScaffold(
         barrierDismissible: barrierDismissible,
         onDismiss: () => Navigator.of(ctx).pop(),
+        animation: animation,
         child: builder(ctx),
       );
     },
@@ -39,11 +40,13 @@ class _BlurredDialogScaffold extends StatelessWidget {
   const _BlurredDialogScaffold({
     required this.barrierDismissible,
     required this.onDismiss,
+    required this.animation,
     required this.child,
   });
 
   final bool barrierDismissible;
   final VoidCallback onDismiss;
+  final Animation<double> animation;
   final Widget child;
 
   @override
@@ -57,13 +60,20 @@ class _BlurredDialogScaffold extends StatelessWidget {
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: barrierDismissible ? onDismiss : null,
-              child: ClipRect(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                  child: Container(
-                    color: Colors.black.withValues(alpha: 0.32),
-                  ),
-                ),
+              child: AnimatedBuilder(
+                animation: animation,
+                builder: (ctx, _) {
+                  final blurSigma = 10.0 * animation.value;
+                  final alpha = 0.32 * animation.value;
+                  return ClipRect(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+                      child: Container(
+                        color: Colors.black.withValues(alpha: alpha),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ),
