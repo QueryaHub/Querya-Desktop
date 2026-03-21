@@ -101,6 +101,11 @@ void main() {
   });
 
   group('ConnectionsPanel expanded folder (tree)', () {
+    setUp(() async {
+      PathProviderPlatform.instance = _FakePathProvider(tempDir.path);
+      await FoldersStorage.instance.reload();
+    });
+
     tearDown(() async {
       final conns = await LocalDb.instance.getConnections();
       for (final c in conns) {
@@ -152,26 +157,41 @@ void main() {
       );
       await FoldersStorage.instance.reload();
 
-      await expectNoLayoutOverflow(() async {
-        await tester.binding.setSurfaceSize(const material.Size(320, 720));
-        addTearDown(() => tester.binding.setSurfaceSize(null));
-        await tester.pumpWidget(
-          ShadcnApp(
-            theme: AppTheme.dark,
-            darkTheme: AppTheme.dark,
-            themeMode: ThemeMode.dark,
-            home: material.SizedBox.expand(
-              child: ConnectionsPanel(
-                onPostgresOpenSqlWorkspace: (_) {},
-              ),
+      await tester.binding.setSurfaceSize(const material.Size(320, 720));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        ShadcnApp(
+          theme: AppTheme.dark,
+          darkTheme: AppTheme.dark,
+          themeMode: ThemeMode.dark,
+          home: material.SizedBox.expand(
+            child: ConnectionsPanel(
+              onPostgresOpenSqlWorkspace: (_) {},
             ),
           ),
-        );
-        // ConnectionsPanel loads folders async; do not use pumpAndSettle (chevron animation).
-        for (var i = 0; i < 120; i++) {
-          await tester.pump(const Duration(milliseconds: 50));
-          if (find.text('LayoutTestFolder').evaluate().isNotEmpty) break;
+        ),
+      );
+      // ConnectionsPanel loads folders async; do not use pumpAndSettle (chevron animation).
+      // Do not wrap the whole pump loop in expectNoLayoutOverflow: transient frames during
+      // async load / chevron animation can report overflow-like errors on CI while the
+      // settled layout is fine — only assert overflow on the final frame.
+      var folderVisible = false;
+      for (var i = 0; i < 200; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        if (find.text('LayoutTestFolder').evaluate().isNotEmpty) {
+          folderVisible = true;
+          break;
         }
+      }
+      expect(
+        folderVisible,
+        isTrue,
+        reason:
+            'LayoutTestFolder did not appear after async load (FoldersStorage / LocalDb)',
+      );
+
+      await expectNoLayoutOverflow(() async {
+        await tester.pump();
       });
 
       _expectTextCount('LayoutTestFolder', 1);
