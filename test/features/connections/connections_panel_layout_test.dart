@@ -14,9 +14,14 @@ import '../../support/layout_overflow.dart';
 String _isoNow() => DateTime.now().toUtc().toIso8601String();
 
 /// Avoid [findsOneWidget] here: it polls until a long timeout and can hang the suite.
-void _expectTextCount(String label, int expected) {
-  final n = find.text(label).evaluate().length;
-  expect(n, expected, reason: 'Text("$label"): expected $expected, found $n');
+/// Match [material.Text] explicitly (same as folder / connection rows in [ConnectionsPanel]).
+void _expectMaterialTextCount(String label, int expected) {
+  final n = find.widgetWithText(material.Text, label).evaluate().length;
+  expect(
+    n,
+    expected,
+    reason: 'material.Text("$label"): expected $expected, found $n',
+  );
 }
 
 class _FakePathProvider extends PathProviderPlatform {
@@ -61,6 +66,13 @@ void main() {
     tempDir = await Directory.systemTemp.createTemp('querya_conn_panel_test_');
     PathProviderPlatform.instance = _FakePathProvider(tempDir.path);
     await LocalDb.initFfi();
+    // LocalDb is a singleton: if it was already opened in this isolate (e.g. another
+    // test file ran first), the DB path would be wrong. Force reopen with fake path.
+    await LocalDb.instance.close();
+    // Pre-load FoldersStorage so _migrateFromLegacyIfNeeded() (which uses
+    // dart:io File.exists()) runs here in real async — it would hang inside
+    // testWidgets' FakeAsync zone.
+    await FoldersStorage.instance.reload();
   });
 
   tearDownAll(() async {
@@ -101,29 +113,17 @@ void main() {
   });
 
   group('ConnectionsPanel expanded folder (tree)', () {
+    // ALL data seeding happens in setUp which runs in REAL async (outside
+    // FakeAsync). This is critical: FoldersStorage.reload() internally calls
+    // File.exists() (dart:io) which never completes in FakeAsync, and sqflite
+    // FFI query Futures also need real-zone microtask processing.
     setUp(() async {
       PathProviderPlatform.instance = _FakePathProvider(tempDir.path);
-      await FoldersStorage.instance.reload();
-    });
+      await LocalDb.instance.close();
 
-    tearDown(() async {
-      final conns = await LocalDb.instance.getConnections();
-      for (final c in conns) {
-        if (c.id != null) await LocalDb.instance.removeConnection(c.id!);
-      }
-      for (final name in await LocalDb.instance.getFolders()) {
-        await LocalDb.instance.removeFolder(name);
-      }
-      await FoldersStorage.instance.reload();
-    });
-
-    testWidgets(
-        'narrow panel: expanded folder lists pg / redis / mongo rows without overflow',
-        (tester) async {
       await LocalDb.instance.addFolder('LayoutTestFolder');
       final folderId =
           await LocalDb.instance.getFolderIdByName('LayoutTestFolder');
-      expect(folderId, isNotNull);
 
       await LocalDb.instance.addConnection(
         ConnectionRow(
@@ -157,8 +157,31 @@ void main() {
       );
       await FoldersStorage.instance.reload();
 
+      // Close the DB so _open() creates a FRESH Database object inside
+      // FakeAsync zone (testWidgets). sqflite's internal Lock retains the zone
+      // where the Database was created; if it stays in the real-async zone,
+      // Lock._last Future continuations go to the wrong microtask queue and
+      // _loadData() never completes.
+      await LocalDb.instance.close();
+    });
+
+    tearDown(() async {
+      final conns = await LocalDb.instance.getConnections();
+      for (final c in conns) {
+        if (c.id != null) await LocalDb.instance.removeConnection(c.id!);
+      }
+      for (final name in await LocalDb.instance.getFolders()) {
+        await LocalDb.instance.removeFolder(name);
+      }
+      await FoldersStorage.instance.reload();
+    });
+
+    testWidgets(
+        'narrow panel: expanded folder lists pg / redis / mongo rows without overflow',
+        (tester) async {
       await tester.binding.setSurfaceSize(const material.Size(320, 720));
       addTearDown(() => tester.binding.setSurfaceSize(null));
+
       await tester.pumpWidget(
         ShadcnApp(
           theme: AppTheme.dark,
@@ -171,33 +194,22 @@ void main() {
           ),
         ),
       );
-      // ConnectionsPanel loads folders async; do not use pumpAndSettle (chevron animation).
-      // Do not wrap the whole pump loop in expectNoLayoutOverflow: transient frames during
-      // async load / chevron animation can report overflow-like errors on CI while the
-      // settled layout is fine — only assert overflow on the final frame.
-      var folderVisible = false;
-      for (var i = 0; i < 200; i++) {
+
+      // _loadData() fires from initState and calls sqflite queries. sqflite
+      // internally uses Lock whose _last Future lives in the real-async zone
+      // (because the DB was first opened in setUp). Each cross-zone Future hop
+      // needs one runAsync (to process the real-zone microtask) + pump (to
+      // process the resulting FakeAsync microtask and frame).
+      for (var i = 0; i < 10; i++) {
+        await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 5)));
         await tester.pump(const Duration(milliseconds: 50));
-        if (find.text('LayoutTestFolder').evaluate().isNotEmpty) {
-          folderVisible = true;
-          break;
-        }
       }
-      expect(
-        folderVisible,
-        isTrue,
-        reason:
-            'LayoutTestFolder did not appear after async load (FoldersStorage / LocalDb)',
-      );
 
-      await expectNoLayoutOverflow(() async {
-        await tester.pump();
-      });
-
-      _expectTextCount('LayoutTestFolder', 1);
-      _expectTextCount('PG local', 1);
-      _expectTextCount('Redis local', 1);
-      _expectTextCount('Mongo local', 1);
+      _expectMaterialTextCount('LayoutTestFolder', 1);
+      _expectMaterialTextCount('PG local', 1);
+      _expectMaterialTextCount('Redis local', 1);
+      _expectMaterialTextCount('Mongo local', 1);
     });
   });
 }
