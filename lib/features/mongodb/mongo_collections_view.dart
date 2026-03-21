@@ -11,11 +11,15 @@ class MongoCollectionsView extends material.StatefulWidget {
     required this.connection,
     required this.database,
     this.onCollectionTap,
+    this.refreshToken = 0,
   });
 
   final MongoConnection connection;
   final String database;
   final ValueChanged<String>? onCollectionTap;
+
+  /// Incremented by the parent when the user requests a refresh (toolbar).
+  final int refreshToken;
 
   @override
   material.State<MongoCollectionsView> createState() =>
@@ -33,6 +37,14 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant MongoCollectionsView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken) {
+      _load();
+    }
   }
 
   @override

@@ -47,6 +47,9 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
   // View mode
   bool _showStats = false;
 
+  /// Bumped when the user taps Refresh in the breadcrumb bar (reload active view).
+  int _refreshToken = 0;
+
   // Navigation state
   String? _selectedDatabase;
   String? _selectedCollection;
@@ -65,27 +68,24 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
   void didUpdateWidget(covariant MongoExplorerView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.connectionRow.id != widget.connectionRow.id) {
-      _disconnectCurrent();
+      _clearLocalConnectionRef();
       _connect();
     }
   }
 
   @override
   void dispose() {
-    _disconnectCurrent();
+    _connection = null;
     super.dispose();
   }
 
-  void _disconnectCurrent() {
-    final conn = _connection;
+  /// Clears the local reference only; pooled sockets stay in [MongoService].
+  void _clearLocalConnectionRef() {
     _connection = null;
-    if (conn != null) {
-      conn.disconnect();
-    }
   }
 
   Future<void> _connect() async {
-    _disconnectCurrent();
+    _clearLocalConnectionRef();
     if (!mounted) return;
     setState(() {
       _connecting = true;
@@ -96,10 +96,8 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
     });
     try {
       final conn =
-          MongoService.instance.createConnection(widget.connectionRow);
-      await conn.connect();
+          await MongoService.instance.ensureConnected(widget.connectionRow);
       if (!mounted) {
-        conn.disconnect();
         return;
       }
       setState(() {
@@ -268,10 +266,7 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
           _BreadcrumbBar(
             crumbs: _crumbs,
             onCrumbTap: _onCrumbTap,
-            onRefresh: () {
-              // Force rebuild of current child
-              setState(() {});
-            },
+            onRefresh: () => setState(() => _refreshToken++),
             onStats: () => setState(() => _showStats = true),
           ),
           const Divider(height: 1),
@@ -293,6 +288,7 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
         database: _selectedDatabase!,
         collection: _selectedCollection!,
         document: _selectedDocument!,
+        refreshToken: _refreshToken,
         onBack: _navigateToDocuments,
         onDocumentUpdated: _navigateToDocuments,
         onDocumentDeleted: _navigateToDocuments,
@@ -306,6 +302,7 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
         connection: conn,
         database: _selectedDatabase!,
         collection: _selectedCollection!,
+        refreshToken: _refreshToken,
         onDocumentTap: _navigateToDocument,
       );
     }
@@ -316,6 +313,7 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
         key: ValueKey('colls_$_selectedDatabase'),
         connection: conn,
         database: _selectedDatabase!,
+        refreshToken: _refreshToken,
         onCollectionTap: _navigateToCollection,
       );
     }
@@ -325,6 +323,7 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
       key: ValueKey(widget.connectionRow.id),
       connection: conn,
       connectionRow: widget.connectionRow,
+      refreshToken: _refreshToken,
       onDatabaseTap: _navigateToDatabase,
     );
   }
