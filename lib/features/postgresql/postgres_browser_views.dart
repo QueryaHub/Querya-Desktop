@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart' as material;
-import 'package:querya_desktop/core/database/postgres_connection.dart';
+import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/postgres_metadata.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -30,7 +30,8 @@ class PostgresIndexListView extends material.StatefulWidget {
 }
 
 class _PostgresIndexListViewState extends material.State<PostgresIndexListView> {
-  PostgresConnection? _connection;
+  PgLease? _lease;
+
   bool _loading = true;
   String? _error;
   List<PgIndexRow> _rows = [];
@@ -45,7 +46,14 @@ class _PostgresIndexListViewState extends material.State<PostgresIndexListView> 
   @override
   void dispose() {
     _scroll.dispose();
-    _connection?.disconnect();
+    if (_loading) {
+      PostgresService.instance.interrupt(
+        widget.connectionRow,
+        database: widget.database,
+        mode: PgSessionMode.readOnly,
+      );
+    }
+    _lease?.release();
     super.dispose();
   }
 
@@ -54,22 +62,20 @@ class _PostgresIndexListViewState extends material.State<PostgresIndexListView> 
       _loading = true;
       _error = null;
     });
-    _connection?.disconnect();
+    _lease?.release();
+    _lease = null;
     try {
-      final c = widget.connectionRow;
-      final conn = PostgresConnection(
-        id: c.id ?? 0,
-        name: c.name,
-        host: c.host ?? 'localhost',
-        port: c.port ?? 5432,
-        username: c.username,
-        password: c.password,
+      final lease = await PostgresService.instance.acquire(
+        widget.connectionRow,
         database: widget.database,
-        useSSL: c.useSSL,
+        mode: PgSessionMode.readOnly,
       );
-      await conn.connect();
-      _connection = conn;
-      final rows = await conn.listIndexesInSchema(widget.schema);
+      if (!mounted) {
+        lease.release();
+        return;
+      }
+      _lease = lease;
+      final rows = await lease.connection.listIndexesInSchema(widget.schema);
       if (!mounted) return;
       setState(() {
         _rows = rows;
@@ -199,7 +205,8 @@ class PostgresTriggerListView extends material.StatefulWidget {
 }
 
 class _PostgresTriggerListViewState extends material.State<PostgresTriggerListView> {
-  PostgresConnection? _connection;
+  PgLease? _lease;
+
   bool _loading = true;
   String? _error;
   List<PgTriggerRow> _rows = [];
@@ -214,7 +221,14 @@ class _PostgresTriggerListViewState extends material.State<PostgresTriggerListVi
   @override
   void dispose() {
     _scroll.dispose();
-    _connection?.disconnect();
+    if (_loading) {
+      PostgresService.instance.interrupt(
+        widget.connectionRow,
+        database: widget.database,
+        mode: PgSessionMode.readOnly,
+      );
+    }
+    _lease?.release();
     super.dispose();
   }
 
@@ -223,22 +237,20 @@ class _PostgresTriggerListViewState extends material.State<PostgresTriggerListVi
       _loading = true;
       _error = null;
     });
-    _connection?.disconnect();
+    _lease?.release();
+    _lease = null;
     try {
-      final c = widget.connectionRow;
-      final conn = PostgresConnection(
-        id: c.id ?? 0,
-        name: c.name,
-        host: c.host ?? 'localhost',
-        port: c.port ?? 5432,
-        username: c.username,
-        password: c.password,
+      final lease = await PostgresService.instance.acquire(
+        widget.connectionRow,
         database: widget.database,
-        useSSL: c.useSSL,
+        mode: PgSessionMode.readOnly,
       );
-      await conn.connect();
-      _connection = conn;
-      final rows = await conn.listTriggersInSchema(widget.schema);
+      if (!mounted) {
+        lease.release();
+        return;
+      }
+      _lease = lease;
+      final rows = await lease.connection.listTriggersInSchema(widget.schema);
       if (!mounted) return;
       setState(() {
         _rows = rows;
@@ -361,7 +373,8 @@ class PostgresTypeListView extends material.StatefulWidget {
 }
 
 class _PostgresTypeListViewState extends material.State<PostgresTypeListView> {
-  PostgresConnection? _connection;
+  PgLease? _lease;
+
   bool _loading = true;
   String? _error;
   List<PgTypeRow> _rows = [];
@@ -376,7 +389,14 @@ class _PostgresTypeListViewState extends material.State<PostgresTypeListView> {
   @override
   void dispose() {
     _scroll.dispose();
-    _connection?.disconnect();
+    if (_loading) {
+      PostgresService.instance.interrupt(
+        widget.connectionRow,
+        database: widget.database,
+        mode: PgSessionMode.readOnly,
+      );
+    }
+    _lease?.release();
     super.dispose();
   }
 
@@ -385,22 +405,20 @@ class _PostgresTypeListViewState extends material.State<PostgresTypeListView> {
       _loading = true;
       _error = null;
     });
-    _connection?.disconnect();
+    _lease?.release();
+    _lease = null;
     try {
-      final c = widget.connectionRow;
-      final conn = PostgresConnection(
-        id: c.id ?? 0,
-        name: c.name,
-        host: c.host ?? 'localhost',
-        port: c.port ?? 5432,
-        username: c.username,
-        password: c.password,
+      final lease = await PostgresService.instance.acquire(
+        widget.connectionRow,
         database: widget.database,
-        useSSL: c.useSSL,
+        mode: PgSessionMode.readOnly,
       );
-      await conn.connect();
-      _connection = conn;
-      final rows = await conn.listUserTypesInSchema(widget.schema);
+      if (!mounted) {
+        lease.release();
+        return;
+      }
+      _lease = lease;
+      final rows = await lease.connection.listUserTypesInSchema(widget.schema);
       if (!mounted) return;
       setState(() {
         _rows = rows;
@@ -505,7 +523,8 @@ class PostgresExtensionListView extends material.StatefulWidget {
 
 class _PostgresExtensionListViewState
     extends material.State<PostgresExtensionListView> {
-  PostgresConnection? _connection;
+  PgLease? _lease;
+
   bool _loading = true;
   String? _error;
   List<PgExtensionRow> _rows = [];
@@ -520,7 +539,14 @@ class _PostgresExtensionListViewState
   @override
   void dispose() {
     _scroll.dispose();
-    _connection?.disconnect();
+    if (_loading) {
+      PostgresService.instance.interrupt(
+        widget.connectionRow,
+        database: widget.database,
+        mode: PgSessionMode.readOnly,
+      );
+    }
+    _lease?.release();
     super.dispose();
   }
 
@@ -529,22 +555,20 @@ class _PostgresExtensionListViewState
       _loading = true;
       _error = null;
     });
-    _connection?.disconnect();
+    _lease?.release();
+    _lease = null;
     try {
-      final c = widget.connectionRow;
-      final conn = PostgresConnection(
-        id: c.id ?? 0,
-        name: c.name,
-        host: c.host ?? 'localhost',
-        port: c.port ?? 5432,
-        username: c.username,
-        password: c.password,
+      final lease = await PostgresService.instance.acquire(
+        widget.connectionRow,
         database: widget.database,
-        useSSL: c.useSSL,
+        mode: PgSessionMode.readOnly,
       );
-      await conn.connect();
-      _connection = conn;
-      final rows = await conn.listExtensions();
+      if (!mounted) {
+        lease.release();
+        return;
+      }
+      _lease = lease;
+      final rows = await lease.connection.listExtensions();
       if (!mounted) return;
       setState(() {
         _rows = rows;
@@ -644,7 +668,8 @@ class PostgresFdwListView extends material.StatefulWidget {
 }
 
 class _PostgresFdwListViewState extends material.State<PostgresFdwListView> {
-  PostgresConnection? _connection;
+  PgLease? _lease;
+
   bool _loading = true;
   String? _error;
   List<PgFdwRow> _fdws = [];
@@ -660,7 +685,14 @@ class _PostgresFdwListViewState extends material.State<PostgresFdwListView> {
   @override
   void dispose() {
     _scroll.dispose();
-    _connection?.disconnect();
+    if (_loading) {
+      PostgresService.instance.interrupt(
+        widget.connectionRow,
+        database: widget.database,
+        mode: PgSessionMode.readOnly,
+      );
+    }
+    _lease?.release();
     super.dispose();
   }
 
@@ -669,21 +701,20 @@ class _PostgresFdwListViewState extends material.State<PostgresFdwListView> {
       _loading = true;
       _error = null;
     });
-    _connection?.disconnect();
+    _lease?.release();
+    _lease = null;
     try {
-      final c = widget.connectionRow;
-      final conn = PostgresConnection(
-        id: c.id ?? 0,
-        name: c.name,
-        host: c.host ?? 'localhost',
-        port: c.port ?? 5432,
-        username: c.username,
-        password: c.password,
+      final lease = await PostgresService.instance.acquire(
+        widget.connectionRow,
         database: widget.database,
-        useSSL: c.useSSL,
+        mode: PgSessionMode.readOnly,
       );
-      await conn.connect();
-      _connection = conn;
+      if (!mounted) {
+        lease.release();
+        return;
+      }
+      _lease = lease;
+      final conn = lease.connection;
       final fdws = await conn.listForeignDataWrappers();
       final srv = await conn.listForeignServers();
       if (!mounted) return;

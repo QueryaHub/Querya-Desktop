@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/postgres_connection.dart';
+import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
@@ -23,7 +24,9 @@ class PostgresStatsView extends material.StatefulWidget {
 }
 
 class _PostgresStatsViewState extends material.State<PostgresStatsView> {
-  PostgresConnection? _connection;
+  PgLease? _lease;
+  PostgresConnection? get _connection => _lease?.connection;
+
   Map<String, dynamic>? _stats;
   bool _loading = true;
   String? _error;
@@ -48,14 +51,20 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
   @override
   void dispose() {
     _timer?.cancel();
-    _disconnectCurrent();
+    _disconnectCurrent(interruptIfBusy: _loading);
     super.dispose();
   }
 
-  void _disconnectCurrent() {
-    final conn = _connection;
-    _connection = null;
-    conn?.disconnect();
+  void _disconnectCurrent({bool interruptIfBusy = false}) {
+    if (interruptIfBusy && _loading) {
+      PostgresService.instance.interrupt(
+        widget.connectionRow,
+        database: widget.connectionRow.databaseName ?? 'postgres',
+        mode: PgSessionMode.readOnly,
+      );
+    }
+    _lease?.release();
+    _lease = null;
   }
 
   Future<void> _load() async {
@@ -68,23 +77,16 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
       _stats = null;
     });
     try {
-      final c = widget.connectionRow;
-      final conn = PostgresConnection(
-        id: c.id ?? 0,
-        name: c.name,
-        host: c.host ?? 'localhost',
-        port: c.port ?? 5432,
-        username: c.username,
-        password: c.password,
-        database: c.databaseName ?? 'postgres',
-        useSSL: c.useSSL,
+      final lease = await PostgresService.instance.acquire(
+        widget.connectionRow,
+        database: widget.connectionRow.databaseName ?? 'postgres',
+        mode: PgSessionMode.readOnly,
       );
-      await conn.connect();
       if (!mounted) {
-        conn.disconnect();
+        lease.release();
         return;
       }
-      _connection = conn;
+      _lease = lease;
       await _fetch();
       if (mounted) _startTimer();
     } catch (e) {
