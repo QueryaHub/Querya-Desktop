@@ -1,5 +1,7 @@
 import 'package:postgres/postgres.dart';
 
+import 'postgres_metadata.dart';
+
 /// PostgreSQL connection using the pure-Dart `postgres` package.
 class PostgresConnection {
   PostgresConnection({
@@ -273,6 +275,374 @@ class PostgresConnection {
       useSSL: useSSL,
     );
   }
+
+  /// All overloads of a function in [schema] named [name] ([pg_get_functiondef]).
+  Future<List<PgFunctionOverload>> getFunctionDefinitions(
+    String schema,
+    String name,
+  ) async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final result = await _conn!.execute(
+      Sql.named(
+        r'''
+SELECT p.oid::regprocedure::text AS signature,
+       pg_get_functiondef(p.oid)::text AS definition
+FROM pg_proc p
+JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = @schema AND p.proname = @name
+ORDER BY p.oid
+''',
+      ),
+      parameters: {'schema': schema, 'name': name},
+    );
+    return result
+        .map(
+          (row) => PgFunctionOverload(
+            signature: row[0] as String,
+            definition: row[1] as String,
+          ),
+        )
+        .toList();
+  }
+
+  /// Metadata and approximate DDL for a sequence (requires PG 10+ [pg_sequences]).
+  Future<PostgresSequenceDetails?> getSequenceDetails(
+    String schema,
+    String name,
+  ) async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final result = await _conn!.execute(
+      Sql.named(
+        r'''
+SELECT last_value::text, start_value::text, min_value::text, max_value::text,
+       increment_by::text, cycle, cache_size::text,
+       schemaname::text, sequencename::text
+FROM pg_sequences
+WHERE schemaname = @schema AND sequencename = @name
+''',
+      ),
+      parameters: {'schema': schema, 'name': name},
+    );
+    if (result.isEmpty) return null;
+    final row = result.first;
+    final sc = row[7] as String;
+    final seq = row[8] as String;
+    final cycle = _parsePgBool(row[5]);
+    final ddl = _buildSequenceDdl(
+      schema: sc,
+      name: seq,
+      incrementBy: row[4] as String,
+      minValue: row[2] as String,
+      maxValue: row[3] as String,
+      startValue: row[1] as String,
+      cacheSize: row[6] as String,
+      cycle: cycle,
+    );
+    return PostgresSequenceDetails(
+      schema: sc,
+      name: seq,
+      lastValue: row[0] as String,
+      startValue: row[1] as String,
+      minValue: row[2] as String,
+      maxValue: row[3] as String,
+      incrementBy: row[4] as String,
+      cacheSize: row[6] as String,
+      cycle: cycle,
+      ddl: ddl,
+    );
+  }
+
+  Future<List<String>> listMaterializedViews({String schema = 'public'}) async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final result = await _conn!.execute(
+      Sql.named(
+        'SELECT matviewname FROM pg_matviews WHERE schemaname = @schema '
+        'ORDER BY matviewname',
+      ),
+      parameters: {'schema': schema},
+    );
+    return result.map((row) => row[0] as String).toList();
+  }
+
+  Future<void> refreshMaterializedView(String schema, String name) async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final q = '${_quoteIdent(schema)}.${_quoteIdent(name)}';
+    await _conn!.execute('REFRESH MATERIALIZED VIEW $q');
+  }
+
+  Future<List<PgIndexRow>> listIndexesInSchema(String schema) async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final result = await _conn!.execute(
+      Sql.named(
+        r'''
+SELECT c.relname::text,
+       i.relname::text,
+       COALESCE(pg_relation_size(i.oid), 0)::bigint,
+       pg_get_indexdef(i.oid)::text
+FROM pg_index x
+JOIN pg_class c ON c.oid = x.indrelid
+JOIN pg_class i ON i.oid = x.indexrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = @schema
+  AND c.relkind IN ('r', 'm', 'p')
+ORDER BY c.relname, i.relname
+''',
+      ),
+      parameters: {'schema': schema},
+    );
+    return result
+        .map(
+          (row) => PgIndexRow(
+            tableName: row[0] as String,
+            indexName: row[1] as String,
+            indexDef: row[3] as String,
+            sizeBytes: _parseSize(row[2]),
+          ),
+        )
+        .toList();
+  }
+
+  static int? _parseSize(Object? v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is BigInt) return v.toInt();
+    return int.tryParse(v.toString());
+  }
+
+  Future<List<PgTriggerRow>> listTriggersInSchema(String schema) async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final result = await _conn!.execute(
+      Sql.named(
+        r'''
+SELECT c.relname::text,
+       t.tgname::text,
+       pg_get_triggerdef(t.oid)::text
+FROM pg_trigger t
+JOIN pg_class c ON c.oid = t.tgrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = @schema
+  AND NOT t.tgisinternal
+ORDER BY c.relname, t.tgname
+''',
+      ),
+      parameters: {'schema': schema},
+    );
+    return result
+        .map(
+          (row) => PgTriggerRow(
+            tableName: row[0] as String,
+            triggerName: row[1] as String,
+            definition: row[2] as String,
+          ),
+        )
+        .toList();
+  }
+
+  Future<List<PgTypeRow>> listUserTypesInSchema(String schema) async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final result = await _conn!.execute(
+      Sql.named(
+        r'''
+SELECT t.typname::text,
+       CASE t.typtype
+         WHEN 'b' THEN 'base'
+         WHEN 'c' THEN 'composite'
+         WHEN 'd' THEN 'domain'
+         WHEN 'e' THEN 'enum'
+         WHEN 'p' THEN 'pseudo'
+         WHEN 'r' THEN 'range'
+         WHEN 'm' THEN 'multirange'
+         ELSE t.typtype::text
+       END
+FROM pg_type t
+JOIN pg_namespace n ON n.oid = t.typnamespace
+WHERE n.nspname = @schema
+  AND t.typtype IN ('c', 'd', 'e', 'r', 'm')
+ORDER BY t.typname
+''',
+      ),
+      parameters: {'schema': schema},
+    );
+    return result
+        .map(
+          (row) => PgTypeRow(
+            name: row[0] as String,
+            kind: row[1] as String,
+          ),
+        )
+        .toList();
+  }
+
+  Future<List<PgExtensionRow>> listExtensions() async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final result = await _conn!.execute(
+      'SELECT extname::text, extversion::text FROM pg_extension ORDER BY extname',
+    );
+    return result
+        .map(
+          (row) => PgExtensionRow(
+            name: row[0] as String,
+            version: row[1] as String,
+          ),
+        )
+        .toList();
+  }
+
+  Future<List<PgFdwRow>> listForeignDataWrappers() async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final result = await _conn!.execute(
+      r'''
+SELECT fdwname::text, fdwhandler::regproc::text
+FROM pg_foreign_data_wrapper
+ORDER BY fdwname
+''',
+    );
+    return result
+        .map(
+          (row) => PgFdwRow(
+            name: row[0] as String,
+            handler: row[1] as String?,
+          ),
+        )
+        .toList();
+  }
+
+  Future<List<PgForeignServerRow>> listForeignServers() async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final result = await _conn!.execute(
+      r'''
+SELECT s.srvname::text, w.fdwname::text
+FROM pg_foreign_server s
+JOIN pg_foreign_data_wrapper w ON w.oid = s.srvfdw
+ORDER BY s.srvname
+''',
+    );
+    return result
+        .map(
+          (row) => PgForeignServerRow(
+            serverName: row[0] as String,
+            fdwName: row[1] as String,
+          ),
+        )
+        .toList();
+  }
+
+  Future<List<PgTablePrivilegeRow>> listTablePrivileges(
+    String schema,
+    String table,
+  ) async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final result = await _conn!.execute(
+      Sql.named(
+        r'''
+SELECT grantee::text, privilege_type::text, is_grantable::text
+FROM information_schema.role_table_grants
+WHERE table_schema = @schema AND table_name = @table
+ORDER BY grantee, privilege_type
+''',
+      ),
+      parameters: {'schema': schema, 'table': table},
+    );
+    return result
+        .map(
+          (row) => PgTablePrivilegeRow(
+            grantee: row[0] as String,
+            privilegeType: row[1] as String,
+            isGrantable: row[2] as String,
+          ),
+        )
+        .toList();
+  }
+
+  static String _quoteIdent(String id) =>
+      '"${id.replaceAll('"', '""')}"';
+
+  static bool _parsePgBool(Object? v) {
+    if (v is bool) return v;
+    final s = v?.toString().toLowerCase() ?? '';
+    return s == 't' || s == 'true';
+  }
+
+  static String _buildSequenceDdl({
+    required String schema,
+    required String name,
+    required String incrementBy,
+    required String minValue,
+    required String maxValue,
+    required String startValue,
+    required String cacheSize,
+    required bool cycle,
+  }) {
+    final qSchema = _quoteIdent(schema);
+    final qName = _quoteIdent(name);
+    return 'CREATE SEQUENCE $qSchema.$qName\n'
+        '  INCREMENT BY $incrementBy\n'
+        '  MINVALUE $minValue\n'
+        '  MAXVALUE $maxValue\n'
+        '  START $startValue\n'
+        '  CACHE $cacheSize\n'
+        '  ${cycle ? 'CYCLE' : 'NO CYCLE'};';
+  }
+}
+
+/// One overload returned by [PostgresConnection.getFunctionDefinitions].
+class PgFunctionOverload {
+  const PgFunctionOverload({
+    required this.signature,
+    required this.definition,
+  });
+
+  final String signature;
+  final String definition;
+}
+
+/// Row from [pg_sequences] plus generated DDL.
+class PostgresSequenceDetails {
+  const PostgresSequenceDetails({
+    required this.schema,
+    required this.name,
+    required this.lastValue,
+    required this.startValue,
+    required this.minValue,
+    required this.maxValue,
+    required this.incrementBy,
+    required this.cacheSize,
+    required this.cycle,
+    required this.ddl,
+  });
+
+  final String schema;
+  final String name;
+  final String lastValue;
+  final String startValue;
+  final String minValue;
+  final String maxValue;
+  final String incrementBy;
+  final String cacheSize;
+  final bool cycle;
+  final String ddl;
 }
 
 class PostgresConnectionException implements Exception {

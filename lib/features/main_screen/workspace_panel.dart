@@ -1,15 +1,112 @@
-import 'package:flutter/material.dart' as material show Container, EdgeInsets, BoxDecoration, GestureDetector, Padding, BorderRadius, Spacer, Center, CrossAxisAlignment, Icon, Icons, MouseRegion, AnimatedContainer, AnimatedScale, Curves, SystemMouseCursors, LayoutBuilder, HitTestBehavior, SizedBox;
+import 'package:flutter/material.dart' as material show Axis, Container, EdgeInsets, BoxDecoration, GestureDetector, Padding, BorderRadius, Center, CrossAxisAlignment, Icon, Icons, MouseRegion, AnimatedContainer, AnimatedScale, Curves, SystemMouseCursors, LayoutBuilder, HitTestBehavior, SizedBox, SingleChildScrollView, Row, MainAxisSize;
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 import 'package:querya_desktop/features/mongodb/mongo_explorer_view.dart';
 import 'package:querya_desktop/features/mongodb/mongo_stats_view.dart';
+import 'package:querya_desktop/features/postgresql/postgres_browser_views.dart';
+import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
+import 'package:querya_desktop/features/postgresql/postgres_routine_view.dart';
+import 'package:querya_desktop/features/postgresql/postgres_sequence_view.dart';
 import 'package:querya_desktop/features/postgresql/postgres_stats_view.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_view.dart';
 import 'package:querya_desktop/features/redis/redis_explorer_view.dart';
 import 'package:querya_desktop/features/redis/redis_view.dart';
 import 'query_editor_tab.dart';
 import 'results_tab.dart';
+
+Widget _pgObjectWorkspace({
+  required ConnectionRow connection,
+  required ({String database, String schema, String name, PostgresObjectKind kind}) pg,
+}) {
+  switch (pg.kind) {
+    case PostgresObjectKind.table:
+      return PostgresTableView(
+        key: ValueKey(
+          'pg_table_${connection.id}_${pg.schema}_${pg.name}_${pg.kind}',
+        ),
+        connectionRow: connection,
+        database: pg.database,
+        schema: pg.schema,
+        tableName: pg.name,
+        isView: false,
+        isMaterializedView: false,
+      );
+    case PostgresObjectKind.view:
+      return PostgresTableView(
+        key: ValueKey(
+          'pg_table_${connection.id}_${pg.schema}_${pg.name}_${pg.kind}',
+        ),
+        connectionRow: connection,
+        database: pg.database,
+        schema: pg.schema,
+        tableName: pg.name,
+        isView: true,
+        isMaterializedView: false,
+      );
+    case PostgresObjectKind.materializedView:
+      return PostgresTableView(
+        key: ValueKey(
+          'pg_mat_${connection.id}_${pg.schema}_${pg.name}_${pg.kind}',
+        ),
+        connectionRow: connection,
+        database: pg.database,
+        schema: pg.schema,
+        tableName: pg.name,
+        isView: false,
+        isMaterializedView: true,
+      );
+    case PostgresObjectKind.function:
+      return PostgresRoutineView(
+        key: ValueKey('pg_fn_${connection.id}_${pg.schema}_${pg.name}'),
+        connectionRow: connection,
+        database: pg.database,
+        schema: pg.schema,
+        routineName: pg.name,
+      );
+    case PostgresObjectKind.sequence:
+      return PostgresSequenceView(
+        key: ValueKey('pg_seq_${connection.id}_${pg.schema}_${pg.name}'),
+        connectionRow: connection,
+        database: pg.database,
+        schema: pg.schema,
+        sequenceName: pg.name,
+      );
+    case PostgresObjectKind.schemaIndexes:
+      return PostgresIndexListView(
+        key: ValueKey('pg_idx_${connection.id}_${pg.schema}'),
+        connectionRow: connection,
+        database: pg.database,
+        schema: pg.schema,
+      );
+    case PostgresObjectKind.schemaTriggers:
+      return PostgresTriggerListView(
+        key: ValueKey('pg_trg_${connection.id}_${pg.schema}'),
+        connectionRow: connection,
+        database: pg.database,
+        schema: pg.schema,
+      );
+    case PostgresObjectKind.schemaTypes:
+      return PostgresTypeListView(
+        key: ValueKey('pg_typ_${connection.id}_${pg.schema}'),
+        connectionRow: connection,
+        database: pg.database,
+        schema: pg.schema,
+      );
+    case PostgresObjectKind.databaseExtensions:
+      return PostgresExtensionListView(
+        key: ValueKey('pg_ext_${connection.id}_${pg.database}'),
+        connectionRow: connection,
+        database: pg.database,
+      );
+    case PostgresObjectKind.databaseForeignData:
+      return PostgresFdwListView(
+        key: ValueKey('pg_fdw_${connection.id}_${pg.database}'),
+        connectionRow: connection,
+        database: pg.database,
+      );
+  }
+}
 
 /// Main workspace: top = Query Editor / Query History, bottom = Data Output / Messages (pgAdmin-style). Uses shadcn layout.
 class WorkspacePanel extends StatefulWidget {
@@ -18,7 +115,7 @@ class WorkspacePanel extends StatefulWidget {
     this.activeConnection,
     this.selectedRedisDb,
     this.selectedMongoDb,
-    this.selectedPostgresTable,
+    this.selectedPostgresObject,
   });
 
   /// Currently selected connection from the sidebar.
@@ -32,10 +129,10 @@ class WorkspacePanel extends StatefulWidget {
   /// null = show stats, non-null = show data explorer for that db.
   final String? selectedMongoDb;
 
-  /// When set, the user selected a PostgreSQL table/view in the sidebar tree.
-  /// null = show stats, non-null = show table data view.
-  final ({String database, String schema, String tableName, bool isView})?
-      selectedPostgresTable;
+  /// When set, the user selected a PostgreSQL object in the sidebar tree.
+  /// null = show stats, non-null = show table/grid or definition view.
+  final ({String database, String schema, String name, PostgresObjectKind kind})?
+      selectedPostgresObject;
 
   @override
   State<WorkspacePanel> createState() => _WorkspacePanelState();
@@ -50,26 +147,21 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // If a PostgreSQL connection is selected → stats or table data
+    // If a PostgreSQL connection is selected → stats, table/view, function, or sequence
     if (widget.activeConnection != null &&
         widget.activeConnection!.type == 'postgresql') {
-      final pgTable = widget.selectedPostgresTable;
+      final pg = widget.selectedPostgresObject;
       return material.Container(
         color: theme.colorScheme.background,
         child: material.SizedBox.expand(
-          child: pgTable != null
-              ? PostgresTableView(
-                  key: ValueKey(
-                      'pg_table_${widget.activeConnection!.id}_${pgTable.schema}_${pgTable.tableName}'),
-                  connectionRow: widget.activeConnection!,
-                  database: pgTable.database,
-                  schema: pgTable.schema,
-                  tableName: pgTable.tableName,
-                  isView: pgTable.isView,
-                )
-              : PostgresStatsView(
+          child: pg == null
+              ? PostgresStatsView(
                   key: ValueKey('pg_stats_${widget.activeConnection!.id}'),
                   connectionRow: widget.activeConnection!,
+                )
+              : _pgObjectWorkspace(
+                  connection: widget.activeConnection!,
+                  pg: pg,
                 ),
         ),
       );
@@ -213,6 +305,7 @@ class _HorizontalResizeHandle extends StatelessWidget {
     return material.MouseRegion(
       cursor: material.SystemMouseCursors.resizeRow,
       child: material.GestureDetector(
+        key: const Key('workspace_panel_resize_handle'),
         behavior: material.HitTestBehavior.opaque,
         onVerticalDragUpdate: (e) => onDrag(e.delta.dy),
         child: material.Container(
@@ -254,15 +347,24 @@ class _SectionBar extends StatelessWidget {
             padding: const material.EdgeInsets.only(right: 16),
             child: Text(title).semiBold().small(),
           ),
-          ...List.generate(tabs.length, (i) {
-            return _TabButton(
-              label: tabs[i],
-              selected: index == i,
-              onTap: () => onTabChanged(i),
-              theme: theme,
-            );
-          }),
-          const material.Spacer(),
+          Expanded(
+            child: material.SingleChildScrollView(
+              scrollDirection: material.Axis.horizontal,
+              child: material.Row(
+                mainAxisSize: material.MainAxisSize.min,
+                children: [
+                  ...List.generate(tabs.length, (i) {
+                    return _TabButton(
+                      label: tabs[i],
+                      selected: index == i,
+                      onTap: () => onTabChanged(i),
+                      theme: theme,
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
           if (trailing != null) trailing!,
         ],
       ),

@@ -41,9 +41,8 @@ enum _Category { all, sql, nosql }
 /// Shows a dialog to choose database type (PostgreSQL, MySQL, Redis, MongoDB).
 /// Returns the selected type or null if cancelled.
 Future<ConnectionType?> showNewConnectionDialog(BuildContext context) {
-  return showDialog<ConnectionType>(
+  return showAppDialog<ConnectionType>(
     context: context,
-    barrierColor: material.Colors.black54,
     builder: (context) => const material.Dialog(
       backgroundColor: material.Colors.transparent,
       insetPadding: material.EdgeInsets.symmetric(horizontal: 40, vertical: 24),

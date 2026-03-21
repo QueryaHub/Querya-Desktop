@@ -43,9 +43,8 @@ Future<ConnectionRow?> showMongoConnectionForm(
   BuildContext context, {
   int? folderId,
 }) async {
-  return showDialog<ConnectionRow>(
+  return showAppDialog<ConnectionRow>(
     context: context,
-    barrierColor: material.Colors.black54,
     builder: (context) => material.Dialog(
       backgroundColor: material.Colors.transparent,
       insetPadding: const material.EdgeInsets.symmetric(horizontal: 40, vertical: 24),

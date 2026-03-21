@@ -14,6 +14,10 @@ class QueryaApp extends StatelessWidget {
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.dark,
       debugShowCheckedModeBanner: false,
+      // Less churn in ShadcnAnimatedTheme; helps stability with overlay layers.
+      enableThemeAnimation: false,
+      // Avoids scroll interception fighting nested Scrollbars in data views.
+      enableScrollInterception: false,
       home: const MainScreen(),
     );
   }

@@ -226,6 +226,127 @@ void main() {
         )),
       );
     });
+
+    test('getFunctionDefinitions throws StateError', () {
+      expect(
+        () => conn.getFunctionDefinitions('public', 'foo'),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Not connected to PostgreSQL'),
+        )),
+      );
+    });
+
+    test('getSequenceDetails throws StateError', () {
+      expect(
+        () => conn.getSequenceDetails('public', 'foo'),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Not connected to PostgreSQL'),
+        )),
+      );
+    });
+
+    test('listMaterializedViews throws StateError', () {
+      expect(
+        () => conn.listMaterializedViews(schema: 'public'),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Not connected to PostgreSQL'),
+        )),
+      );
+    });
+
+    test('refreshMaterializedView throws StateError', () {
+      expect(
+        () => conn.refreshMaterializedView('public', 'mv_stats'),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Not connected to PostgreSQL'),
+        )),
+      );
+    });
+
+    test('listIndexesInSchema throws StateError', () {
+      expect(
+        () => conn.listIndexesInSchema('public'),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Not connected to PostgreSQL'),
+        )),
+      );
+    });
+
+    test('listTriggersInSchema throws StateError', () {
+      expect(
+        () => conn.listTriggersInSchema('public'),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Not connected to PostgreSQL'),
+        )),
+      );
+    });
+
+    test('listUserTypesInSchema throws StateError', () {
+      expect(
+        () => conn.listUserTypesInSchema('public'),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Not connected to PostgreSQL'),
+        )),
+      );
+    });
+
+    test('listExtensions throws StateError', () {
+      expect(
+        () => conn.listExtensions(),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Not connected to PostgreSQL'),
+        )),
+      );
+    });
+
+    test('listForeignDataWrappers throws StateError', () {
+      expect(
+        () => conn.listForeignDataWrappers(),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Not connected to PostgreSQL'),
+        )),
+      );
+    });
+
+    test('listForeignServers throws StateError', () {
+      expect(
+        () => conn.listForeignServers(),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Not connected to PostgreSQL'),
+        )),
+      );
+    });
+
+    test('listTablePrivileges throws StateError', () {
+      expect(
+        () => conn.listTablePrivileges('public', 't'),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Not connected to PostgreSQL'),
+        )),
+      );
+    });
   });
 
   group('PostgresConnection.connectToDatabase', () {
