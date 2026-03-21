@@ -36,9 +36,8 @@ Future<void> showPostgresSqlEditorDialog({
   required String browseSql,
   required void Function(String sql) onRun,
 }) {
-  return showDialog<void>(
+  return showAppDialog<void>(
     context: context,
-    barrierColor: material.Colors.black54,
     builder: (ctx) => _PostgresSqlEditorDialog(
       initialSql: initialSql,
       browseSql: browseSql,
