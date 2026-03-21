@@ -4,9 +4,8 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 /// Shows a dialog to create a new folder (same style as new connection).
 /// Returns the folder name or null if cancelled.
 Future<String?> showNewFolderDialog(BuildContext context) {
-  return showDialog<String>(
+  return showAppDialog<String>(
     context: context,
-    barrierColor: material.Colors.black54,
     builder: (context) => const material.Dialog(
       backgroundColor: material.Colors.transparent,
       insetPadding: material.EdgeInsets.symmetric(horizontal: 40, vertical: 24),

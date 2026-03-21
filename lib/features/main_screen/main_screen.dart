@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart' as material show Scaffold, Container, MainAxisSize, GestureDetector, MouseRegion, SystemMouseCursors, HitTestBehavior, Icons, Icon;
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -5,6 +7,7 @@ import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 import 'package:querya_desktop/features/connections/connections_panel.dart';
+import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
 import 'package:querya_desktop/features/connections/driver_manager_dialog.dart';
 import 'package:querya_desktop/features/connections/new_connection_dialog.dart';
 import 'workspace_panel.dart';
@@ -19,6 +22,9 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   static const double _minLeftWidth = 180;
   static const double _maxLeftWidth = 500;
+  /// Minimum width reserved for workspace (avoid Row overflow when window is narrow).
+  static const double _minWorkspaceWidth = 64;
+  static const double _resizeHandleWidth = 6;
   double _leftPanelWidth = 260;
 
   /// Currently selected connection (null = no connection selected).
@@ -30,30 +36,35 @@ class _MainScreenState extends State<MainScreen> {
   /// Currently selected MongoDB database (null = show stats).
   String? _activeMongoDB;
 
-  /// When set, user selected a PostgreSQL table/view in the tree.
-  ({String database, String schema, String tableName, bool isView})?
-      _activePostgresTable;
+  /// When set, user selected a PostgreSQL object in the tree.
+  ({String database, String schema, String name, PostgresObjectKind kind})?
+      _selectedPostgresObject;
 
   void _onConnectionSelected(ConnectionRow connection) {
     setState(() {
       _activeConnection = connection;
       _activeRedisDb = null;
       _activeMongoDB = null;
-      _activePostgresTable = null;
+      _selectedPostgresObject = null;
     });
   }
 
-  void _onPostgresTableSelected(ConnectionRow connection, String database,
-      String schema, String tableOrViewName, bool isView) {
+  void _onPostgresObjectSelected(
+    ConnectionRow connection,
+    String database,
+    String schema,
+    String name,
+    PostgresObjectKind kind,
+  ) {
     setState(() {
       _activeConnection = connection;
       _activeRedisDb = null;
       _activeMongoDB = null;
-      _activePostgresTable = (
+      _selectedPostgresObject = (
         database: database,
         schema: schema,
-        tableName: tableOrViewName,
-        isView: isView,
+        name: name,
+        kind: kind,
       );
     });
   }
@@ -89,34 +100,64 @@ class _MainScreenState extends State<MainScreen> {
               _CustomTitleBar(theme: theme),
               const Divider(height: 1),
               Expanded(
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: _leftPanelWidth,
-                      child: ConnectionsPanel(
-                        onConnectionSelected: _onConnectionSelected,
-                        onRedisDatabaseSelected: _onRedisDatabaseSelected,
-                        onMongoDBDatabaseSelected: _onMongoDBDatabaseSelected,
-                        onPostgresTableSelected: _onPostgresTableSelected,
-                      ),
-                    ),
-                    _VerticalResizeHandle(
-                      onDrag: (dx) {
-                        setState(() {
-                          _leftPanelWidth = (_leftPanelWidth + dx)
-                              .clamp(_minLeftWidth, _maxLeftWidth);
-                        });
-                      },
-                    ),
-                    Expanded(
-                      child: WorkspacePanel(
-                        activeConnection: _activeConnection,
-                        selectedRedisDb: _activeRedisDb,
-                        selectedMongoDb: _activeMongoDB,
-                        selectedPostgresTable: _activePostgresTable,
-                      ),
-                    ),
-                  ],
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final maxLeft = constraints.maxWidth -
+                        _resizeHandleWidth -
+                        _minWorkspaceWidth;
+                    double leftW;
+                    if (maxLeft <= 0) {
+                      leftW = 0;
+                    } else if (maxLeft < _minLeftWidth) {
+                      leftW = maxLeft;
+                    } else {
+                      leftW = _leftPanelWidth.clamp(
+                        _minLeftWidth,
+                        math.min(_maxLeftWidth, maxLeft),
+                      );
+                    }
+                    return Row(
+                      children: [
+                        SizedBox(
+                          width: leftW,
+                          child: ConnectionsPanel(
+                            onConnectionSelected: _onConnectionSelected,
+                            onRedisDatabaseSelected: _onRedisDatabaseSelected,
+                            onMongoDBDatabaseSelected: _onMongoDBDatabaseSelected,
+                            onPostgresObjectSelected: _onPostgresObjectSelected,
+                          ),
+                        ),
+                        _VerticalResizeHandle(
+                          onDrag: (dx) {
+                            setState(() {
+                              final w = MediaQuery.sizeOf(context).width;
+                              final ml = w -
+                                  _resizeHandleWidth -
+                                  _minWorkspaceWidth;
+                              if (ml <= 0) return;
+                              final next = _leftPanelWidth + dx;
+                              if (ml < _minLeftWidth) {
+                                _leftPanelWidth = next.clamp(0, ml);
+                              } else {
+                                _leftPanelWidth = next.clamp(
+                                  _minLeftWidth,
+                                  math.min(_maxLeftWidth, ml),
+                                );
+                              }
+                            });
+                          },
+                        ),
+                        Expanded(
+                          child: WorkspacePanel(
+                            activeConnection: _activeConnection,
+                            selectedRedisDb: _activeRedisDb,
+                            selectedMongoDb: _activeMongoDB,
+                            selectedPostgresObject: _selectedPostgresObject,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ],

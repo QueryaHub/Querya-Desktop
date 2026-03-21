@@ -694,7 +694,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   void _showTtlDialog() {
     final controller =
         material.TextEditingController(text: _ttl > 0 ? '$_ttl' : '');
-    showDialog(
+    showAppDialog(
       context: context,
       builder: (ctx) {
         return AlertDialog(
