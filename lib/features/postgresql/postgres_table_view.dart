@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/postgresql/postgres_sql_editor_dialog.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_utils.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -44,6 +45,10 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
   /// Zero-based offset for LIMIT/OFFSET pagination.
   int _offset = 0;
 
+  /// When true, [dataSql] comes from [_customSql] (no pagination).
+  bool _customSqlActive = false;
+  String? _customSql;
+
   final _verticalController = material.ScrollController();
   final _horizontalController = material.ScrollController();
 
@@ -60,6 +65,8 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         oldWidget.database != widget.database ||
         oldWidget.schema != widget.schema ||
         oldWidget.tableName != widget.tableName) {
+      _customSqlActive = false;
+      _customSql = null;
       _disconnectCurrent();
       _connectAndLoad();
     }
@@ -90,6 +97,8 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       _rowsOnPage = 0;
       _totalRowCount = null;
       _offset = 0;
+      _customSqlActive = false;
+      _customSql = null;
     });
     try {
       final c = widget.connectionRow;
@@ -128,10 +137,20 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     return int.tryParse(v.toString()) ?? 0;
   }
 
+  String _browseDataSql() {
+    final schemaQ = quotePostgresIdentifier(widget.schema);
+    final tableQ = quotePostgresIdentifier(widget.tableName);
+    return 'SELECT * FROM $schemaQ.$tableQ LIMIT ${widget.limit} OFFSET $_offset';
+  }
+
   /// [refreshCount] runs `COUNT(*)` (e.g. first load or Refresh). Pagination only runs SELECT.
   Future<void> _fetch({bool refreshCount = false}) async {
     final conn = _connection;
     if (conn == null || !conn.isConnected) return;
+    if (_customSqlActive) {
+      await _fetchCustom();
+      return;
+    }
     if (!mounted) return;
     setState(() {
       _loading = true;
@@ -139,11 +158,8 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     });
     final schemaQ = quotePostgresIdentifier(widget.schema);
     final tableQ = quotePostgresIdentifier(widget.tableName);
-    final limit = widget.limit;
-    final offset = _offset;
     final countSql = 'SELECT COUNT(*) AS c FROM $schemaQ.$tableQ';
-    final dataSql =
-        'SELECT * FROM $schemaQ.$tableQ LIMIT $limit OFFSET $offset';
+    final dataSql = _browseDataSql();
     try {
       int totalRows;
       if (refreshCount || _totalRowCount == null) {
@@ -192,7 +208,92 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     }
   }
 
+  Future<void> _fetchCustom() async {
+    final conn = _connection;
+    if (conn == null || !conn.isConnected) return;
+    final sql = _customSql;
+    if (sql == null || sql.isEmpty) return;
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final result = await conn.execute(sql);
+      if (!mounted) return;
+
+      final colNames = List<String>.generate(
+        result.schema.columns.length,
+        (i) => result.schema.columns[i].columnName ?? 'col_$i',
+      );
+
+      final rawRows = result.map((row) {
+        return List<dynamic>.generate(row.length, (i) => row[i]);
+      }).toList();
+
+      final stringRows = await compute(convertResultRowsToStrings, rawRows);
+
+      if (!mounted) return;
+      setState(() {
+        _columnNames = colNames;
+        _rows = stringRows;
+        _rowsOnPage = stringRows.length;
+        _totalRowCount = null;
+        _loading = false;
+      });
+      if (_verticalController.hasClients) {
+        _verticalController.jumpTo(0);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  void _onSqlRun(String sql) {
+    final trimmed = sql.trim();
+    if (!isAllowedPostgresSelectQuery(trimmed)) return;
+    final browse = _browseDataSql().trim();
+    if (trimmed == browse) {
+      setState(() {
+        _customSqlActive = false;
+        _customSql = null;
+      });
+      _fetch(refreshCount: true);
+    } else {
+      setState(() {
+        _customSqlActive = true;
+        _customSql = trimmed;
+      });
+      _fetchCustom();
+    }
+  }
+
+  void _openSqlEditor() {
+    showPostgresSqlEditorDialog(
+      context: context,
+      initialSql: (_customSqlActive && _customSql != null)
+          ? _customSql!
+          : _browseDataSql(),
+      browseSql: _browseDataSql(),
+      onRun: _onSqlRun,
+    );
+  }
+
+  void _exitCustomMode() {
+    setState(() {
+      _customSqlActive = false;
+      _customSql = null;
+    });
+    _fetch(refreshCount: true);
+  }
+
   void _goToPreviousPage() {
+    if (_customSqlActive) return;
     if (_offset <= 0 || _loading) return;
     setState(() {
       final next = _offset - widget.limit;
@@ -202,6 +303,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
   }
 
   void _goToNextPage() {
+    if (_customSqlActive) return;
     if (_loading) return;
     final total = _totalRowCount;
     final limit = widget.limit;
@@ -213,9 +315,11 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     _fetch();
   }
 
-  bool get _canGoPrevious => _offset > 0 && !_loading;
+  bool get _canGoPrevious =>
+      !_customSqlActive && _offset > 0 && !_loading;
 
   bool get _canGoNext {
+    if (_customSqlActive) return false;
     if (_loading) return false;
     final total = _totalRowCount;
     final limit = widget.limit;
@@ -226,6 +330,10 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
   }
 
   String _paginationLabel() {
+    if (_customSqlActive) {
+      if (_rowsOnPage == 0) return '0 rows (custom SQL)';
+      return '$_rowsOnPage row${_rowsOnPage == 1 ? '' : 's'} (custom SQL)';
+    }
     if (_rowsOnPage == 0) {
       final t = _totalRowCount;
       if (t == null) return '0 rows';
@@ -283,7 +391,13 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
                         color: cs.mutedForeground, fontSize: 13)),
                 const Gap(24),
                 OutlineButton(
-                  onPressed: () => _fetch(refreshCount: true),
+                  onPressed: () {
+                    if (_customSqlActive) {
+                      _fetchCustom();
+                    } else {
+                      _fetch(refreshCount: true);
+                    }
+                  },
                   leading: const material.Icon(material.Icons.refresh_rounded,
                       size: 18),
                   child: const Text('Retry'),
@@ -356,6 +470,28 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
                 const Gap(6),
                 OutlineButton(
                   size: ButtonSize.small,
+                  onPressed: _openSqlEditor,
+                  leading: const material.Icon(
+                    material.Icons.code_rounded,
+                    size: 16,
+                  ),
+                  child: const Text('SQL'),
+                ),
+                if (_customSqlActive) ...[
+                  const Gap(4),
+                  OutlineButton(
+                    size: ButtonSize.small,
+                    onPressed: _loading ? null : _exitCustomMode,
+                    leading: const material.Icon(
+                      material.Icons.table_chart_rounded,
+                      size: 16,
+                    ),
+                    child: const Text('Table'),
+                  ),
+                ],
+                const Gap(4),
+                OutlineButton(
+                  size: ButtonSize.small,
                   onPressed: _canGoPrevious ? _goToPreviousPage : null,
                   leading: const material.Icon(
                       material.Icons.chevron_left_rounded,
@@ -376,7 +512,13 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
                   size: ButtonSize.small,
                   onPressed: _loading
                       ? null
-                      : () => _fetch(refreshCount: true),
+                      : () {
+                          if (_customSqlActive) {
+                            _fetchCustom();
+                          } else {
+                            _fetch(refreshCount: true);
+                          }
+                        },
                   leading: const material.Icon(
                       material.Icons.refresh_rounded,
                       size: 14),
@@ -430,7 +572,9 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
                                 itemBuilder: (context, rowIdx) {
                                   final row = _rows[rowIdx];
                                   final isEven = rowIdx % 2 == 0;
-                                  final displayRowNum = _offset + rowIdx + 1;
+                                  final displayRowNum = _customSqlActive
+                                      ? rowIdx + 1
+                                      : _offset + rowIdx + 1;
                                   return material.Container(
                                     height: rowHeight,
                                     decoration: material.BoxDecoration(
