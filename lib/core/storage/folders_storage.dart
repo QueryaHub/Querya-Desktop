@@ -75,4 +75,10 @@ class FoldersStorage {
     await LocalDb.instance.removeFolder(name);
     _folders = await LocalDb.instance.getFolders();
   }
+
+  /// Reloads folder names from [LocalDb] (e.g. after external seeding in tests).
+  Future<void> reload() async {
+    _loaded = false;
+    await load();
+  }
 }
