@@ -37,7 +37,12 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
 
   List<String> _columnNames = [];
   List<List<String>> _rows = [];
-  int _totalRows = 0;
+  /// Rows on the current page (same as _rows.length when not loading).
+  int _rowsOnPage = 0;
+  /// Total rows in table/view (from COUNT(*)).
+  int? _totalRowCount;
+  /// Zero-based offset for LIMIT/OFFSET pagination.
+  int _offset = 0;
 
   final _verticalController = material.ScrollController();
   final _horizontalController = material.ScrollController();
@@ -82,7 +87,9 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       _error = null;
       _columnNames = [];
       _rows = [];
-      _totalRows = 0;
+      _rowsOnPage = 0;
+      _totalRowCount = null;
+      _offset = 0;
     });
     try {
       final c = widget.connectionRow;
@@ -102,7 +109,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         return;
       }
       _connection = conn;
-      await _fetch();
+      await _fetch(refreshCount: true);
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -113,7 +120,16 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     }
   }
 
-  Future<void> _fetch() async {
+  static int _asInt(dynamic v) {
+    if (v == null) return 0;
+    if (v is int) return v;
+    if (v is BigInt) return v.toInt();
+    if (v is num) return v.toInt();
+    return int.tryParse(v.toString()) ?? 0;
+  }
+
+  /// [refreshCount] runs `COUNT(*)` (e.g. first load or Refresh). Pagination only runs SELECT.
+  Future<void> _fetch({bool refreshCount = false}) async {
     final conn = _connection;
     if (conn == null || !conn.isConnected) return;
     if (!mounted) return;
@@ -123,9 +139,23 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     });
     final schemaQ = quotePostgresIdentifier(widget.schema);
     final tableQ = quotePostgresIdentifier(widget.tableName);
-    final sql = 'SELECT * FROM $schemaQ.$tableQ LIMIT ${widget.limit}';
+    final limit = widget.limit;
+    final offset = _offset;
+    final countSql = 'SELECT COUNT(*) AS c FROM $schemaQ.$tableQ';
+    final dataSql =
+        'SELECT * FROM $schemaQ.$tableQ LIMIT $limit OFFSET $offset';
     try {
-      final result = await conn.execute(sql);
+      int totalRows;
+      if (refreshCount || _totalRowCount == null) {
+        final countResult = await conn.execute(countSql);
+        totalRows = countResult.isEmpty
+            ? 0
+            : _asInt(countResult.first[0]);
+      } else {
+        totalRows = _totalRowCount!;
+      }
+
+      final result = await conn.execute(dataSql);
       if (!mounted) return;
 
       final colNames = List<String>.generate(
@@ -133,7 +163,6 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         (i) => result.schema.columns[i].columnName ?? 'col_$i',
       );
 
-      // Convert to plain strings in isolate to avoid blocking UI
       final rawRows = result.map((row) {
         return List<dynamic>.generate(row.length, (i) => row[i]);
       }).toList();
@@ -144,9 +173,15 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       setState(() {
         _columnNames = colNames;
         _rows = stringRows;
-        _totalRows = stringRows.length;
+        _rowsOnPage = stringRows.length;
+        if (refreshCount || _totalRowCount == null) {
+          _totalRowCount = totalRows;
+        }
         _loading = false;
       });
+      if (_verticalController.hasClients) {
+        _verticalController.jumpTo(0);
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -155,6 +190,54 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         });
       }
     }
+  }
+
+  void _goToPreviousPage() {
+    if (_offset <= 0 || _loading) return;
+    setState(() {
+      final next = _offset - widget.limit;
+      _offset = next < 0 ? 0 : next;
+    });
+    _fetch();
+  }
+
+  void _goToNextPage() {
+    if (_loading) return;
+    final total = _totalRowCount;
+    final limit = widget.limit;
+    if (total != null && _offset + _rowsOnPage >= total) return;
+    if (total == null && _rowsOnPage < limit) return;
+    setState(() {
+      _offset += limit;
+    });
+    _fetch();
+  }
+
+  bool get _canGoPrevious => _offset > 0 && !_loading;
+
+  bool get _canGoNext {
+    if (_loading) return false;
+    final total = _totalRowCount;
+    final limit = widget.limit;
+    if (total != null) {
+      return _offset + _rowsOnPage < total;
+    }
+    return _rowsOnPage >= limit;
+  }
+
+  String _paginationLabel() {
+    if (_rowsOnPage == 0) {
+      final t = _totalRowCount;
+      if (t == null) return '0 rows';
+      return '0 of $t';
+    }
+    final start = _offset + 1;
+    final end = _offset + _rowsOnPage;
+    final total = _totalRowCount;
+    if (total != null) {
+      return '$start–$end of $total';
+    }
+    return '$start–$end';
   }
 
   @override
@@ -200,7 +283,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
                         color: cs.mutedForeground, fontSize: 13)),
                 const Gap(24),
                 OutlineButton(
-                  onPressed: _fetch,
+                  onPressed: () => _fetch(refreshCount: true),
                   leading: const material.Icon(material.Icons.refresh_rounded,
                       size: 18),
                   child: const Text('Retry'),
@@ -265,15 +348,35 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
                     borderRadius: material.BorderRadius.circular(4),
                   ),
                   child: material.Text(
-                    '$_totalRows rows',
+                    _paginationLabel(),
                     style: material.TextStyle(
                         fontSize: 11, color: cs.mutedForeground),
                   ),
                 ),
+                const Gap(6),
+                OutlineButton(
+                  size: ButtonSize.small,
+                  onPressed: _canGoPrevious ? _goToPreviousPage : null,
+                  leading: const material.Icon(
+                      material.Icons.chevron_left_rounded,
+                      size: 16),
+                  child: const Text('Back'),
+                ),
+                const Gap(4),
+                OutlineButton(
+                  size: ButtonSize.small,
+                  onPressed: _canGoNext ? _goToNextPage : null,
+                  leading: const material.Icon(
+                      material.Icons.chevron_right_rounded,
+                      size: 16),
+                  child: const Text('Next'),
+                ),
                 const Gap(8),
                 OutlineButton(
                   size: ButtonSize.small,
-                  onPressed: _fetch,
+                  onPressed: _loading
+                      ? null
+                      : () => _fetch(refreshCount: true),
                   leading: const material.Icon(
                       material.Icons.refresh_rounded,
                       size: 14),
@@ -322,11 +425,12 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
                               thumbVisibility: true,
                               child: material.ListView.builder(
                                 controller: _verticalController,
-                                itemCount: _totalRows,
+                                itemCount: _rowsOnPage,
                                 itemExtent: rowHeight,
                                 itemBuilder: (context, rowIdx) {
                                   final row = _rows[rowIdx];
                                   final isEven = rowIdx % 2 == 0;
+                                  final displayRowNum = _offset + rowIdx + 1;
                                   return material.Container(
                                     height: rowHeight,
                                     decoration: material.BoxDecoration(
@@ -343,7 +447,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
                                     child: material.Row(
                                       children: [
                                         _rowNumberCell(cs,
-                                            '${rowIdx + 1}'),
+                                            '$displayRowNum'),
                                         for (var c = 0;
                                             c < colCount;
                                             c++)
