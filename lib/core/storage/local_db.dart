@@ -14,6 +14,7 @@ class LocalDb {
   static final LocalDb instance = LocalDb._();
 
   Database? _db;
+  String? _cachedDbPath;
 
   static Future<void> initFfi() async {
     if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
@@ -24,12 +25,14 @@ class LocalDb {
   Future<Database> _open() async {
     if (_db != null && _db!.isOpen) return _db!;
     await initFfi();
-    final dir = await getApplicationSupportDirectory();
-    final sub = Directory(p.join(dir.path, 'querya_desktop'));
-    if (!await sub.exists()) await sub.create(recursive: true);
-    final path = p.join(sub.path, _dbName);
+    if (_cachedDbPath == null) {
+      final dir = await getApplicationSupportDirectory();
+      final sub = Directory(p.join(dir.path, 'querya_desktop'));
+      if (!await sub.exists()) await sub.create(recursive: true);
+      _cachedDbPath = p.join(sub.path, _dbName);
+    }
     _db = await databaseFactoryFfi.openDatabase(
-      path,
+      _cachedDbPath!,
       options: OpenDatabaseOptions(
         version: _dbVersion,
         onCreate: _onCreate,
