@@ -8,7 +8,7 @@ import 'package:querya_desktop/features/postgresql/postgres_browser_views.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
 import 'package:querya_desktop/features/postgresql/postgres_routine_view.dart';
 import 'package:querya_desktop/features/postgresql/postgres_sequence_view.dart';
-import 'package:querya_desktop/features/postgresql/postgres_stats_view.dart';
+import 'package:querya_desktop/features/postgresql/postgres_workspace_home.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_view.dart';
 import 'package:querya_desktop/features/redis/redis_explorer_view.dart';
 import 'package:querya_desktop/features/redis/redis_view.dart';
@@ -155,8 +155,8 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
         color: theme.colorScheme.background,
         child: material.SizedBox.expand(
           child: pg == null
-              ? PostgresStatsView(
-                  key: ValueKey('pg_stats_${widget.activeConnection!.id}'),
+              ? PostgresWorkspaceHome(
+                  key: ValueKey('pg_home_${widget.activeConnection!.id}'),
                   connectionRow: widget.activeConnection!,
                 )
               : _pgObjectWorkspace(
