@@ -1,5 +1,7 @@
 import 'package:postgres/postgres.dart';
 
+import 'postgres_metadata.dart';
+
 /// PostgreSQL connection using the pure-Dart `postgres` package.
 class PostgresConnection {
   PostgresConnection({
@@ -352,6 +354,226 @@ WHERE schemaname = @schema AND sequencename = @name
       cycle: cycle,
       ddl: ddl,
     );
+  }
+
+  Future<List<String>> listMaterializedViews({String schema = 'public'}) async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final result = await _conn!.execute(
+      Sql.named(
+        'SELECT matviewname FROM pg_matviews WHERE schemaname = @schema '
+        'ORDER BY matviewname',
+      ),
+      parameters: {'schema': schema},
+    );
+    return result.map((row) => row[0] as String).toList();
+  }
+
+  Future<void> refreshMaterializedView(String schema, String name) async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final q = '${_quoteIdent(schema)}.${_quoteIdent(name)}';
+    await _conn!.execute('REFRESH MATERIALIZED VIEW $q');
+  }
+
+  Future<List<PgIndexRow>> listIndexesInSchema(String schema) async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final result = await _conn!.execute(
+      Sql.named(
+        r'''
+SELECT c.relname::text,
+       i.relname::text,
+       COALESCE(pg_relation_size(i.oid), 0)::bigint,
+       pg_get_indexdef(i.oid)::text
+FROM pg_index x
+JOIN pg_class c ON c.oid = x.indrelid
+JOIN pg_class i ON i.oid = x.indexrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = @schema
+  AND c.relkind IN ('r', 'm', 'p')
+ORDER BY c.relname, i.relname
+''',
+      ),
+      parameters: {'schema': schema},
+    );
+    return result
+        .map(
+          (row) => PgIndexRow(
+            tableName: row[0] as String,
+            indexName: row[1] as String,
+            indexDef: row[3] as String,
+            sizeBytes: _parseSize(row[2]),
+          ),
+        )
+        .toList();
+  }
+
+  static int? _parseSize(Object? v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is BigInt) return v.toInt();
+    return int.tryParse(v.toString());
+  }
+
+  Future<List<PgTriggerRow>> listTriggersInSchema(String schema) async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final result = await _conn!.execute(
+      Sql.named(
+        r'''
+SELECT c.relname::text,
+       t.tgname::text,
+       pg_get_triggerdef(t.oid)::text
+FROM pg_trigger t
+JOIN pg_class c ON c.oid = t.tgrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = @schema
+  AND NOT t.tgisinternal
+ORDER BY c.relname, t.tgname
+''',
+      ),
+      parameters: {'schema': schema},
+    );
+    return result
+        .map(
+          (row) => PgTriggerRow(
+            tableName: row[0] as String,
+            triggerName: row[1] as String,
+            definition: row[2] as String,
+          ),
+        )
+        .toList();
+  }
+
+  Future<List<PgTypeRow>> listUserTypesInSchema(String schema) async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final result = await _conn!.execute(
+      Sql.named(
+        r'''
+SELECT t.typname::text,
+       CASE t.typtype
+         WHEN 'b' THEN 'base'
+         WHEN 'c' THEN 'composite'
+         WHEN 'd' THEN 'domain'
+         WHEN 'e' THEN 'enum'
+         WHEN 'p' THEN 'pseudo'
+         WHEN 'r' THEN 'range'
+         WHEN 'm' THEN 'multirange'
+         ELSE t.typtype::text
+       END
+FROM pg_type t
+JOIN pg_namespace n ON n.oid = t.typnamespace
+WHERE n.nspname = @schema
+  AND t.typtype IN ('c', 'd', 'e', 'r', 'm')
+ORDER BY t.typname
+''',
+      ),
+      parameters: {'schema': schema},
+    );
+    return result
+        .map(
+          (row) => PgTypeRow(
+            name: row[0] as String,
+            kind: row[1] as String,
+          ),
+        )
+        .toList();
+  }
+
+  Future<List<PgExtensionRow>> listExtensions() async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final result = await _conn!.execute(
+      'SELECT extname::text, extversion::text FROM pg_extension ORDER BY extname',
+    );
+    return result
+        .map(
+          (row) => PgExtensionRow(
+            name: row[0] as String,
+            version: row[1] as String,
+          ),
+        )
+        .toList();
+  }
+
+  Future<List<PgFdwRow>> listForeignDataWrappers() async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final result = await _conn!.execute(
+      r'''
+SELECT fdwname::text, fdwhandler::regproc::text
+FROM pg_foreign_data_wrapper
+ORDER BY fdwname
+''',
+    );
+    return result
+        .map(
+          (row) => PgFdwRow(
+            name: row[0] as String,
+            handler: row[1] as String?,
+          ),
+        )
+        .toList();
+  }
+
+  Future<List<PgForeignServerRow>> listForeignServers() async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final result = await _conn!.execute(
+      r'''
+SELECT s.srvname::text, w.fdwname::text
+FROM pg_foreign_server s
+JOIN pg_foreign_data_wrapper w ON w.oid = s.srvfdw
+ORDER BY s.srvname
+''',
+    );
+    return result
+        .map(
+          (row) => PgForeignServerRow(
+            serverName: row[0] as String,
+            fdwName: row[1] as String,
+          ),
+        )
+        .toList();
+  }
+
+  Future<List<PgTablePrivilegeRow>> listTablePrivileges(
+    String schema,
+    String table,
+  ) async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final result = await _conn!.execute(
+      Sql.named(
+        r'''
+SELECT grantee::text, privilege_type::text, is_grantable::text
+FROM information_schema.role_table_grants
+WHERE table_schema = @schema AND table_name = @table
+ORDER BY grantee, privilege_type
+''',
+      ),
+      parameters: {'schema': schema, 'table': table},
+    );
+    return result
+        .map(
+          (row) => PgTablePrivilegeRow(
+            grantee: row[0] as String,
+            privilegeType: row[1] as String,
+            isGrantable: row[2] as String,
+          ),
+        )
+        .toList();
   }
 
   static String _quoteIdent(String id) =>
