@@ -35,7 +35,7 @@ class _PostgresWorkspaceHomeState extends material.State<PostgresWorkspaceHome> 
           ),
           child: material.Row(
             children: [
-              Text('PostgreSQL').semiBold().small(),
+              const Text('PostgreSQL').semiBold().small(),
               const Spacer(),
               ...List.generate(2, (i) {
                 final labels = ['Server', 'SQL'];
