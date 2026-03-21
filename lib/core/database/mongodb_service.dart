@@ -60,7 +60,7 @@ class MongoService {
 
   /// Disconnects all connections.
   Future<void> disconnectAll() async {
-    for (final connection in _connections.values) {
+    for (final connection in _connections.values.toList()) {
       await disconnect(connection);
     }
   }

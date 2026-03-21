@@ -1,6 +1,7 @@
 import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
+import 'app_lifecycle_cleanup.dart';
 import '../features/main_screen/main_screen.dart';
 
 class QueryaApp extends StatelessWidget {
@@ -18,7 +19,9 @@ class QueryaApp extends StatelessWidget {
       enableThemeAnimation: false,
       // Avoids scroll interception fighting nested Scrollbars in data views.
       enableScrollInterception: false,
-      home: const MainScreen(),
+      home: const AppLifecycleCleanup(
+        child: MainScreen(),
+      ),
     );
   }
 }
