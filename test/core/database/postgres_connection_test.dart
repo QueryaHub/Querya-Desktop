@@ -115,6 +115,16 @@ void main() {
       await conn.disconnect();
       expect(conn.isConnected, false);
     });
+
+    test('forceClose on never-connected instance does not throw', () async {
+      final conn = PostgresConnection(
+        id: 1,
+        name: 'test',
+        host: 'localhost',
+      );
+      await conn.forceClose();
+      expect(conn.isConnected, false);
+    });
   });
 
   group('PostgresConnection when not connected', () {
@@ -137,6 +147,24 @@ void main() {
           contains('Not connected to PostgreSQL'),
         )),
       );
+    });
+
+    test('execute with timeout throws StateError when not connected', () {
+      expect(
+        () => conn.execute(
+          'SELECT 1',
+          timeout: const Duration(seconds: 1),
+        ),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Not connected to PostgreSQL'),
+        )),
+      );
+    });
+
+    test('inOpenTransaction returns null when not connected', () async {
+      expect(await conn.inOpenTransaction(), isNull);
     });
 
     test('listDatabases throws StateError', () {
@@ -385,7 +413,7 @@ void main() {
       expect(conn.database, 'mydb');
     });
 
-    test('returned connection has connectionString null', () async {
+    test('returned connection updates URI database', () async {
       final conn = PostgresConnection(
         id: 1,
         name: 'test',
@@ -393,7 +421,7 @@ void main() {
         connectionString: 'postgresql://u:p@h/db',
       );
       final newConn = await conn.connectToDatabase('targetdb');
-      expect(newConn.connectionString, isNull);
+      expect(newConn.connectionString, 'postgresql://u:p@h/targetdb');
       expect(newConn.database, 'targetdb');
     });
   });
@@ -403,6 +431,27 @@ void main() {
       final ex = PostgresConnectionException('connection refused');
       expect(ex.message, 'connection refused');
       expect(ex.toString(), 'connection refused');
+    });
+  });
+
+  group('replaceDatabaseInConnectionString', () {
+    test('replaces database in path', () {
+      expect(
+        replaceDatabaseInConnectionString(
+          'postgresql://u:p@h:5432/olddb',
+          'newdb',
+        ),
+        'postgresql://u:p@h:5432/newdb',
+      );
+    });
+
+    test('replaces database query param', () {
+      final out = replaceDatabaseInConnectionString(
+        'postgresql://u:p@h:5432/?database=olddb&sslmode=require',
+        'newdb',
+      );
+      expect(out, contains('database=newdb'));
+      expect(out, isNot(contains('database=olddb')));
     });
   });
 }

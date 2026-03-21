@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/postgres_connection.dart';
+import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -24,7 +25,8 @@ class PostgresRoutineView extends material.StatefulWidget {
 }
 
 class _PostgresRoutineViewState extends material.State<PostgresRoutineView> {
-  PostgresConnection? _connection;
+  PgLease? _lease;
+
   bool _loading = true;
   String? _error;
   List<PgFunctionOverload> _overloads = [];
@@ -51,14 +53,20 @@ class _PostgresRoutineViewState extends material.State<PostgresRoutineView> {
   @override
   void dispose() {
     _scrollController.dispose();
-    _disconnectCurrent();
+    _disconnectCurrent(interruptIfBusy: true);
     super.dispose();
   }
 
-  void _disconnectCurrent() {
-    final conn = _connection;
-    _connection = null;
-    conn?.disconnect();
+  void _disconnectCurrent({bool interruptIfBusy = false}) {
+    if (interruptIfBusy && _loading) {
+      PostgresService.instance.interrupt(
+        widget.connectionRow,
+        database: widget.database,
+        mode: PgSessionMode.readOnly,
+      );
+    }
+    _lease?.release();
+    _lease = null;
   }
 
   Future<void> _connectAndLoad() async {
@@ -70,23 +78,17 @@ class _PostgresRoutineViewState extends material.State<PostgresRoutineView> {
       _overloads = [];
     });
     try {
-      final c = widget.connectionRow;
-      final conn = PostgresConnection(
-        id: c.id ?? 0,
-        name: c.name,
-        host: c.host ?? 'localhost',
-        port: c.port ?? 5432,
-        username: c.username,
-        password: c.password,
+      final lease = await PostgresService.instance.acquire(
+        widget.connectionRow,
         database: widget.database,
-        useSSL: c.useSSL,
+        mode: PgSessionMode.readOnly,
       );
-      await conn.connect();
       if (!mounted) {
-        conn.disconnect();
+        lease.release();
         return;
       }
-      _connection = conn;
+      _lease = lease;
+      final conn = lease.connection;
       final list = await conn.getFunctionDefinitions(
         widget.schema,
         widget.routineName,

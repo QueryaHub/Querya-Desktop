@@ -40,6 +40,7 @@ class _PostgresConnectionFormContentState
   final _databaseController = material.TextEditingController(text: 'postgres');
   final _usernameController = material.TextEditingController(text: 'postgres');
   final _passwordController = material.TextEditingController();
+  final _connectionStringController = material.TextEditingController();
 
   bool _useSSL = false;
   bool _showPassword = false;
@@ -55,11 +56,21 @@ class _PostgresConnectionFormContentState
     _portController.addListener(_onFieldChanged);
     _databaseController.addListener(_onFieldChanged);
     _usernameController.addListener(_onFieldChanged);
+    _connectionStringController.addListener(_onFieldChanged);
   }
 
   void _onFieldChanged() => setState(() {});
 
+  bool _looksLikePostgresUri(String s) {
+    final t = s.trim().toLowerCase();
+    return t.startsWith('postgres://') || t.startsWith('postgresql://');
+  }
+
   bool get _formValid {
+    final uri = _connectionStringController.text.trim();
+    if (uri.isNotEmpty) {
+      return _looksLikePostgresUri(uri);
+    }
     final host = _hostController.text.trim();
     final db = _databaseController.text.trim();
     return host.isNotEmpty && db.isNotEmpty;
@@ -91,12 +102,13 @@ class _PostgresConnectionFormContentState
       _testResult = null;
     });
     try {
+      final uri = _connectionStringController.text.trim();
       final conn = PostgresConnection(
         id: 0,
         name: _nameController.text.trim().isEmpty
             ? 'test'
             : _nameController.text.trim(),
-        host: _hostController.text.trim(),
+        host: uri.isNotEmpty ? 'localhost' : _hostController.text.trim(),
         port: int.tryParse(_portController.text.trim()) ?? 5432,
         database: _databaseController.text.trim().isEmpty
             ? null
@@ -108,6 +120,7 @@ class _PostgresConnectionFormContentState
             ? null
             : _passwordController.text,
         useSSL: _useSSL,
+        connectionString: uri.isEmpty ? null : uri,
       );
       final ok = await conn.testConnection();
       if (mounted) _showTestResult(ok ? 'success' : 'failed');
@@ -122,20 +135,25 @@ class _PostgresConnectionFormContentState
     final host = _hostController.text.trim();
     final port = int.tryParse(_portController.text.trim()) ?? 5432;
     final database = _databaseController.text.trim();
-    final displayName =
-        name.isNotEmpty ? name : 'PostgreSQL $host:$port/$database';
+    final uri = _connectionStringController.text.trim();
+    final displayName = name.isNotEmpty
+        ? name
+        : (uri.isNotEmpty
+            ? 'PostgreSQL (URI)'
+            : 'PostgreSQL $host:$port/$database');
     final row = ConnectionRow(
       type: 'postgresql',
       name: displayName,
-      host: host,
-      port: port,
+      host: uri.isNotEmpty ? null : host,
+      port: uri.isNotEmpty ? null : port,
       username: _usernameController.text.trim().isEmpty
           ? null
           : _usernameController.text.trim(),
       password:
           _passwordController.text.isEmpty ? null : _passwordController.text,
-      databaseName: database.isEmpty ? null : database,
+      databaseName: uri.isNotEmpty ? null : (database.isEmpty ? null : database),
       useSSL: _useSSL,
+      connectionString: uri.isEmpty ? null : uri,
       folderId: widget.folderId,
       createdAt: DateTime.now().toUtc().toIso8601String(),
     );
@@ -150,12 +168,14 @@ class _PostgresConnectionFormContentState
     _portController.removeListener(_onFieldChanged);
     _databaseController.removeListener(_onFieldChanged);
     _usernameController.removeListener(_onFieldChanged);
+    _connectionStringController.removeListener(_onFieldChanged);
     _nameController.dispose();
     _hostController.dispose();
     _portController.dispose();
     _databaseController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
+    _connectionStringController.dispose();
     super.dispose();
   }
 
@@ -223,6 +243,25 @@ class _PostgresConnectionFormContentState
                     TextField(
                       controller: _nameController,
                       placeholder: const Text('My PostgreSQL Server'),
+                    ),
+                    const Gap(16),
+                    const Text('Connection URI (optional)').small().semiBold(),
+                    const Gap(4),
+                    const Text(
+                      'If set, overrides Host / Port / Database below.',
+                    ).muted().small(),
+                    const Gap(4),
+                    const Text(
+                      'Supported query params include sslmode (disable, require, '
+                      'verify-ca, verify-full), connect_timeout and query_timeout '
+                      '(seconds). If sslmode is omitted, Use SSL/TLS below applies.',
+                    ).muted().small(),
+                    const Gap(8),
+                    TextField(
+                      controller: _connectionStringController,
+                      placeholder: const Text(
+                        'postgresql://user:pass@host:5432/dbname?sslmode=require',
+                      ),
                     ),
                     const Gap(16),
                     // Host + Port

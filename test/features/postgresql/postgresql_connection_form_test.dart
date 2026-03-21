@@ -27,6 +27,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('PostgreSQL Connection'), findsOneWidget);
+      expect(find.text('Connection URI (optional)'), findsOneWidget);
       expect(find.text('Connection Name'), findsOneWidget);
       expect(find.text('Host'), findsOneWidget);
       expect(find.text('Port'), findsOneWidget);
