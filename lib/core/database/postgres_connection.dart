@@ -1,6 +1,9 @@
 import 'package:postgres/postgres.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 
+// ignore: implementation_imports
+import 'package:postgres/src/connection_string.dart' show parseConnectionString;
+
 import 'postgres_metadata.dart';
 
 /// Replaces the database in a `postgresql://` / `postgres://` URI (path or
@@ -96,11 +99,29 @@ class PostgresConnection {
     );
   }
 
+  /// [openFromUrl] already parses `sslmode`, `connect_timeout`, `query_timeout`
+  /// from the URI. If `sslmode` is omitted, we fall back to [useSSL] so the
+  /// form checkbox still applies; otherwise libpq-style URLs drive TLS mode.
   Future<void> connect() async {
     if (_isConnected && _conn != null) return;
     try {
       if (_usesConnectionString) {
-        _conn = await Connection.openFromUrl(connectionString!.trim());
+        final parsed = parseConnectionString(connectionString!.trim());
+        final sslMode =
+            parsed.sslMode ?? (useSSL ? SslMode.require : SslMode.disable);
+        _conn = await Connection.open(
+          parsed.endpoints.first,
+          settings: ConnectionSettings(
+            applicationName: parsed.applicationName,
+            connectTimeout:
+                parsed.connectTimeout ?? const Duration(seconds: 10),
+            encoding: parsed.encoding,
+            replicationMode: parsed.replicationMode,
+            queryTimeout: parsed.queryTimeout ?? const Duration(seconds: 30),
+            securityContext: parsed.securityContext,
+            sslMode: sslMode,
+          ),
+        );
       } else {
         _conn = await Connection.open(
           _buildEndpoint(),
@@ -160,11 +181,29 @@ class PostgresConnection {
     }
   }
 
-  Future<Result> execute(String sql) async {
+  /// Runs SQL on the underlying session. [timeout] overrides
+  /// [ConnectionSettings.queryTimeout] for this statement (see `postgres`
+  /// package).
+  Future<Result> execute(String sql, {Duration? timeout}) async {
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to PostgreSQL');
     }
-    return _conn!.execute(sql);
+    return _conn!.execute(sql, timeout: timeout);
+  }
+
+  /// Whether the session has an open transaction (PostgreSQL 13+).
+  /// Returns `null` if the server does not support the probe or an error occurs.
+  Future<bool?> inOpenTransaction() async {
+    if (!isConnected || _conn == null) return null;
+    try {
+      final r = await _conn!.execute(
+        'SELECT pg_current_xact_id_if_assigned() IS NOT NULL',
+      );
+      if (r.isEmpty) return null;
+      return r.first[0] as bool;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<List<String>> listDatabases() async {

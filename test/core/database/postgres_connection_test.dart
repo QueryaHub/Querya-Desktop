@@ -149,6 +149,24 @@ void main() {
       );
     });
 
+    test('execute with timeout throws StateError when not connected', () {
+      expect(
+        () => conn.execute(
+          'SELECT 1',
+          timeout: const Duration(seconds: 1),
+        ),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Not connected to PostgreSQL'),
+        )),
+      );
+    });
+
+    test('inOpenTransaction returns null when not connected', () async {
+      expect(await conn.inOpenTransaction(), isNull);
+    });
+
     test('listDatabases throws StateError', () {
       expect(
         () => conn.listDatabases(),
