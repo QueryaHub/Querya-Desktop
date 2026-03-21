@@ -182,9 +182,10 @@ class LocalDb {
     return rows.map(ConnectionRow.fromMap).toList();
   }
 
-  Future<void> addConnection(ConnectionRow row) async {
+  /// Inserts a row and returns the SQLite row id.
+  Future<int> addConnection(ConnectionRow row) async {
     final db = await _open();
-    await db.insert('connections', row.toMap());
+    return db.insert('connections', row.toMap());
   }
 
   Future<void> removeConnection(int id) async {

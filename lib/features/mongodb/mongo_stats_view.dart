@@ -62,17 +62,9 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     super.dispose();
   }
 
-  /// Whether this view owns its connection (created it itself).
-  bool _ownsConnection = false;
-
-  /// Safely disconnects and clears the current MongoDB connection.
+  /// Clears the local connection reference (pooled socket stays in [MongoService]).
   void _disconnectCurrent() {
-    final conn = _connection;
     _connection = null;
-    if (conn != null && _ownsConnection) {
-      conn.disconnect(); // fire-and-forget; disconnect handles errors
-    }
-    _ownsConnection = false;
   }
 
   Future<void> _load() async {
@@ -87,17 +79,13 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     try {
       // Re-use the connection supplied by the parent when available.
       final supplied = widget.connection;
-      MongoConnection conn;
+      final MongoConnection conn;
       if (supplied != null && supplied.isConnected) {
         conn = supplied;
-        _ownsConnection = false;
       } else {
-        conn = MongoService.instance.createConnection(widget.connectionRow);
-        await conn.connect();
-        _ownsConnection = true;
+        conn = await MongoService.instance.ensureConnected(widget.connectionRow);
       }
       if (!mounted) {
-        if (_ownsConnection) conn.disconnect();
         return;
       }
       _connection = conn;

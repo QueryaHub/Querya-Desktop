@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart' as material show BuildContext, Widget, Padding, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, DefaultTextStyle, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, Column, AnimatedRotation, Row, BoxFit, Text, TextOverflow, Expanded, CircularProgressIndicator, Material, StatelessWidget, Colors, Tooltip, Color, LayoutBuilder, TextPainter, TextSpan, TextDirection;
+import 'package:flutter/material.dart' as material show AlertDialog, BoxConstraints, BuildContext, Column, ConstrainedBox, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, DefaultTextStyle, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, AnimatedRotation, Row, BoxFit, Text, TextOverflow, Expanded, CircularProgressIndicator, Material, StatelessWidget, Colors, Tooltip, Color, LayoutBuilder, TextPainter, TextSpan, TextDirection, SelectableText, Padding, Widget, Navigator;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
-import 'package:querya_desktop/core/database/mongodb_connection.dart';
+import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/database/redis_info.dart';
@@ -124,6 +124,7 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
   }
 
   Future<void> _removeConnection(int id) async {
+    await MongoService.instance.disconnectByConnectionId(id);
     await LocalDb.instance.removeConnection(id);
     await _loadData();
   }
@@ -906,22 +907,8 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
       _error = null;
     });
     try {
-      final c = widget.connection;
-      final conn = MongoConnection(
-        id: -1,
-        name: 'sidebar_probe',
-        host: c.host ?? 'localhost',
-        port: c.port ?? 27017,
-        username: c.username,
-        password: c.password,
-        database: c.databaseName,
-        authSource: c.authSource,
-        useSSL: c.useSSL,
-        connectionString: c.connectionString,
-      );
-      await conn.connect();
+      final conn = await MongoService.instance.ensureConnected(widget.connection);
       final dbs = await conn.listDatabases();
-      await conn.disconnect();
 
       if (!mounted) return;
       setState(() {
@@ -946,23 +933,30 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
 
   Future<void> _deleteDatabase(String dbName) async {
     if (!mounted) return;
+    final ok = await showAppDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => material.AlertDialog(
+        title: const Text('Drop database?'),
+        content: Text(
+          'Permanently delete database "$dbName"? This cannot be undone.',
+        ),
+        actions: [
+          OutlineButton(
+            onPressed: () => material.Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          DestructiveButton(
+            onPressed: () => material.Navigator.of(ctx).pop(true),
+            child: const Text('Drop database'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
     try {
-      final c = widget.connection;
-      final conn = MongoConnection(
-        id: -1,
-        name: 'sidebar_probe',
-        host: c.host ?? 'localhost',
-        port: c.port ?? 27017,
-        username: c.username,
-        password: c.password,
-        database: c.databaseName,
-        authSource: c.authSource,
-        useSSL: c.useSSL,
-        connectionString: c.connectionString,
-      );
-      await conn.connect();
+      final conn = await MongoService.instance.ensureConnected(widget.connection);
       await conn.dropDatabase(dbName);
-      await conn.disconnect();
 
       if (mounted) {
         _databases = [];
@@ -1116,20 +1110,58 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
                 ),
               if (_error != null)
                 material.Padding(
-                  padding: const material.EdgeInsets.only(left: 28, top: 4, bottom: 4),
-                  child: material.Text(
-                    'Error',
-                    overflow: material.TextOverflow.ellipsis,
-                    maxLines: 1,
-                    style: material.TextStyle(
-                        fontSize: 11, color: theme.colorScheme.destructive),
+                  padding: const material.EdgeInsets.only(left: 28, top: 4, bottom: 4, right: 8),
+                  child: material.ConstrainedBox(
+                    constraints: const material.BoxConstraints(maxWidth: double.infinity),
+                    child: material.Column(
+                      crossAxisAlignment: material.CrossAxisAlignment.start,
+                      mainAxisSize: material.MainAxisSize.min,
+                      children: [
+                        material.Row(
+                          crossAxisAlignment: material.CrossAxisAlignment.start,
+                          children: [
+                            material.Icon(
+                              material.Icons.error_outline_rounded,
+                              size: 14,
+                              color: theme.colorScheme.destructive,
+                            ),
+                            const Gap(6),
+                            material.Expanded(
+                              child: material.Text(
+                                'Could not load databases',
+                                maxLines: 2,
+                                overflow: material.TextOverflow.ellipsis,
+                                style: material.TextStyle(
+                                  fontSize: 12,
+                                  color: theme.colorScheme.destructive,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Gap(6),
+                        material.SelectableText(
+                          _error!,
+                          style: material.TextStyle(
+                            fontSize: 10,
+                            height: 1.35,
+                            color: theme.colorScheme.mutedForeground,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               for (final db in _databases)
                 _MongoDatabaseNode(
+                  connection: widget.connection,
                   name: db,
                   onTap: () => widget.onDatabaseTap?.call(db),
                   onDelete: () => _deleteDatabase(db),
+                  onRefreshDatabases: () {
+                    setState(() => _databases = []);
+                    _loadDatabases();
+                  },
                 ),
             ],
           ],
@@ -1141,61 +1173,40 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
 
 class _MongoDatabaseNode extends StatelessWidget {
   const _MongoDatabaseNode({
+    required this.connection,
     required this.name,
     required this.onTap,
     required this.onDelete,
+    required this.onRefreshDatabases,
   });
 
+  final ConnectionRow connection;
   final String name;
   final VoidCallback onTap;
   final VoidCallback onDelete;
+  final VoidCallback onRefreshDatabases;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return ContextMenu(
-      items: [
-        MenuButton(
-          leading: material.Icon(material.Icons.delete_outline_rounded,
-              size: 18, color: theme.colorScheme.mutedForeground),
-          onPressed: (_) => onDelete(),
-          child: const Text('Delete database'),
+    return material.Padding(
+      padding: const material.EdgeInsets.only(left: 16, top: 2, bottom: 2),
+      child: _PgTreeRow(
+        label: name,
+        icon: material.Icons.storage_rounded,
+        iconSize: 13,
+        iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
+        textStyle: material.TextStyle(
+          fontSize: 12,
+          color: theme.colorScheme.foreground,
         ),
-      ],
-      child: material.Padding(
-        padding: const material.EdgeInsets.only(left: 24),
-        child: material.MouseRegion(
-          cursor: material.SystemMouseCursors.click,
-          child: material.InkWell(
-            onTap: onTap,
-            borderRadius: material.BorderRadius.circular(6),
-            child: material.Padding(
-              padding: const material.EdgeInsets.symmetric(
-                  horizontal: 8, vertical: 5),
-              child: material.Row(
-                children: [
-                  material.Icon(
-                    material.Icons.storage_rounded,
-                    size: 14,
-                    color: theme.colorScheme.primary.withValues(alpha: 0.7),
-                  ),
-                  const Gap(8),
-                  material.Expanded(
-                    child: material.Text(
-                      name,
-                      overflow: material.TextOverflow.ellipsis,
-                      maxLines: 1,
-                      style: material.TextStyle(
-                        fontSize: 12,
-                        color: theme.colorScheme.foreground,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
+        verticalPadding: 3,
+        onTap: onTap,
+        connection: connection,
+        onContextRefresh: onRefreshDatabases,
+        onOpenSqlWorkspace: null,
+        onContextDelete: onDelete,
+        contextDeleteLabel: 'Delete database',
       ),
     );
   }
@@ -1516,6 +1527,8 @@ class _PgTreeRow extends material.StatelessWidget {
     this.connection,
     this.onContextRefresh,
     this.onOpenSqlWorkspace,
+    this.onContextDelete,
+    this.contextDeleteLabel,
   });
 
   final String label;
@@ -1530,6 +1543,8 @@ class _PgTreeRow extends material.StatelessWidget {
   final ConnectionRow? connection;
   final VoidCallback? onContextRefresh;
   final void Function(ConnectionRow connection)? onOpenSqlWorkspace;
+  final VoidCallback? onContextDelete;
+  final String? contextDeleteLabel;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -1608,6 +1623,16 @@ class _PgTreeRow extends material.StatelessWidget {
             ),
             onPressed: (_) => onOpenSqlWorkspace!(connection!),
             child: const Text('Open in SQL'),
+          ),
+        if (onContextDelete != null)
+          MenuButton(
+            leading: material.Icon(
+              material.Icons.delete_outline_rounded,
+              size: 18,
+              color: theme.colorScheme.destructive,
+            ),
+            onPressed: (_) => onContextDelete!(),
+            child: Text(contextDeleteLabel ?? 'Delete'),
           ),
       ],
       child: row,
