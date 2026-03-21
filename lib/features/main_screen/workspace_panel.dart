@@ -305,6 +305,7 @@ class _HorizontalResizeHandle extends StatelessWidget {
     return material.MouseRegion(
       cursor: material.SystemMouseCursors.resizeRow,
       child: material.GestureDetector(
+        key: const Key('workspace_panel_resize_handle'),
         behavior: material.HitTestBehavior.opaque,
         onVerticalDragUpdate: (e) => onDrag(e.delta.dy),
         child: material.Container(
