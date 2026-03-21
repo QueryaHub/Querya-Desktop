@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart' as material show BuildContext, Widget, Padding, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, DefaultTextStyle, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, Column, AnimatedRotation, Row, BoxFit, Text, TextOverflow, Expanded, CircularProgressIndicator, Material, StatelessWidget, Colors;
+import 'package:flutter/material.dart' as material show BuildContext, Widget, Padding, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, DefaultTextStyle, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, Column, AnimatedRotation, Row, BoxFit, Text, TextOverflow, Expanded, CircularProgressIndicator, Material, StatelessWidget, Colors, Tooltip, Color;
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
@@ -1446,6 +1446,86 @@ class _PgDatabasesNode extends StatefulWidget {
   State<_PgDatabasesNode> createState() => _PgDatabasesNodeState();
 }
 
+/// Shared tree row: consistent ink hover, tooltips on truncated labels.
+class _PgTreeRow extends material.StatelessWidget {
+  const _PgTreeRow({
+    required this.label,
+    this.leading,
+    this.icon,
+    this.iconSize = 13,
+    this.iconColor,
+    this.trailing,
+    this.onTap,
+    this.verticalPadding = 3,
+    required this.textStyle,
+  });
+
+  final String label;
+  final material.Widget? leading;
+  final material.IconData? icon;
+  final double iconSize;
+  final material.Color? iconColor;
+  final material.Widget? trailing;
+  final void Function()? onTap;
+  final double verticalPadding;
+  final material.TextStyle textStyle;
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+    final muted = theme.colorScheme.mutedForeground;
+    return material.Material(
+      color: material.Colors.transparent,
+      child: material.InkWell(
+        onTap: onTap,
+        borderRadius: material.BorderRadius.circular(4),
+        hoverColor: primary.withValues(alpha: 0.07),
+        splashColor: primary.withValues(alpha: 0.10),
+        highlightColor: primary.withValues(alpha: 0.05),
+        mouseCursor: onTap != null
+            ? material.SystemMouseCursors.click
+            : material.SystemMouseCursors.basic,
+        child: material.Padding(
+          padding: material.EdgeInsets.symmetric(
+            horizontal: 4,
+            vertical: verticalPadding,
+          ),
+          child: material.Row(
+            children: [
+              if (leading != null) ...[
+                leading!,
+                const Gap(4),
+              ],
+              if (icon != null) ...[
+                material.Icon(
+                  icon,
+                  size: iconSize,
+                  color: iconColor ?? muted,
+                ),
+                const Gap(6),
+              ],
+              material.Expanded(
+                child: material.Tooltip(
+                  message: label,
+                  waitDuration: const Duration(milliseconds: 450),
+                  child: material.Text(
+                    label,
+                    overflow: material.TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: textStyle,
+                  ),
+                ),
+              ),
+              if (trailing != null) trailing!,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _PgDatabasesNodeState extends State<_PgDatabasesNode> {
   bool _expanded = true;
 
@@ -1458,45 +1538,26 @@ class _PgDatabasesNodeState extends State<_PgDatabasesNode> {
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
         children: [
-          material.MouseRegion(
-            cursor: material.SystemMouseCursors.click,
-            child: material.InkWell(
-              onTap: () => setState(() => _expanded = !_expanded),
-              borderRadius: material.BorderRadius.circular(4),
-              child: material.Padding(
-                padding:
-                    const material.EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                child: material.Row(
-                  children: [
-                    material.AnimatedRotation(
-                      turns: _expanded ? 0.25 : 0,
-                      duration: const Duration(milliseconds: 150),
-                      child: material.Icon(
-                        material.Icons.chevron_right_rounded,
-                        size: 14,
-                        color: theme.colorScheme.mutedForeground,
-                      ),
-                    ),
-                    const Gap(4),
-                    material.Icon(material.Icons.dns_rounded,
-                        size: 14,
-                        color: theme.colorScheme.primary.withValues(alpha: 0.7)),
-                    const Gap(6),
-                    material.Expanded(
-                      child: material.Text(
-                        'Databases (${widget.databases.length})',
-                        overflow: material.TextOverflow.ellipsis,
-                        maxLines: 1,
-                        style: material.TextStyle(
-                          fontSize: 12,
-                          color: theme.colorScheme.foreground,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+          _PgTreeRow(
+            label: 'Databases (${widget.databases.length})',
+            leading: material.AnimatedRotation(
+              turns: _expanded ? 0.25 : 0,
+              duration: const Duration(milliseconds: 150),
+              child: material.Icon(
+                material.Icons.chevron_right_rounded,
+                size: 14,
+                color: theme.colorScheme.mutedForeground,
               ),
             ),
+            icon: material.Icons.dns_rounded,
+            iconSize: 14,
+            iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
+            textStyle: material.TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.foreground,
+            ),
+            verticalPadding: 4,
+            onTap: () => setState(() => _expanded = !_expanded),
           ),
           if (_expanded)
             for (final db in widget.databases)
@@ -1578,45 +1639,26 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
         children: [
-          material.MouseRegion(
-            cursor: material.SystemMouseCursors.click,
-            child: material.InkWell(
-              onTap: _toggle,
-              borderRadius: material.BorderRadius.circular(4),
-              child: material.Padding(
-                padding:
-                    const material.EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                child: material.Row(
-                  children: [
-                    material.AnimatedRotation(
-                      turns: _expanded ? 0.25 : 0,
-                      duration: const Duration(milliseconds: 150),
-                      child: material.Icon(
-                        material.Icons.chevron_right_rounded,
-                        size: 14,
-                        color: theme.colorScheme.mutedForeground,
-                      ),
-                    ),
-                    const Gap(4),
-                    material.Icon(material.Icons.storage_rounded,
-                        size: 14,
-                        color: theme.colorScheme.primary.withValues(alpha: 0.7)),
-                    const Gap(6),
-                    material.Expanded(
-                      child: material.Text(
-                        widget.databaseName,
-                        overflow: material.TextOverflow.ellipsis,
-                        maxLines: 1,
-                        style: material.TextStyle(
-                          fontSize: 12,
-                          color: theme.colorScheme.foreground,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+          _PgTreeRow(
+            label: widget.databaseName,
+            leading: material.AnimatedRotation(
+              turns: _expanded ? 0.25 : 0,
+              duration: const Duration(milliseconds: 150),
+              child: material.Icon(
+                material.Icons.chevron_right_rounded,
+                size: 14,
+                color: theme.colorScheme.mutedForeground,
               ),
             ),
+            icon: material.Icons.storage_rounded,
+            iconSize: 14,
+            iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
+            textStyle: material.TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.foreground,
+            ),
+            verticalPadding: 4,
+            onTap: _toggle,
           ),
           if (_expanded) ...[
             _PgDbToolRow(
@@ -1692,49 +1734,31 @@ class _PgDbToolRow extends material.StatelessWidget {
   @override
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context);
-    // Match _PgSchemaToolRow / _PgObjectGroup: muted xSmall, 13px icons, same indent as Schemas.
+    final muted = theme.colorScheme.mutedForeground;
     return material.Padding(
       padding: const material.EdgeInsets.only(left: 16, top: 2, bottom: 2),
-      child: material.Material(
-        color: material.Colors.transparent,
-        child: material.InkWell(
-          borderRadius: material.BorderRadius.circular(4),
-          onTap: onPostgresObjectSelected == null
-              ? null
-              : () => onPostgresObjectSelected!(
-                    connection,
-                    databaseName,
-                    '',
-                    '',
-                    kind,
-                  ),
-          child: material.Padding(
-            padding:
-                const material.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-            child: material.Row(
-              children: [
-                material.Icon(icon,
-                    size: 13, color: theme.colorScheme.mutedForeground),
-                const Gap(6),
-                material.Expanded(
-                  child: material.Text(
-                    label,
-                    overflow: material.TextOverflow.ellipsis,
-                    maxLines: 1,
-                    style: material.TextStyle(
-                      fontSize: 11,
-                      color: theme.colorScheme.mutedForeground,
-                    ),
-                  ),
+      child: _PgTreeRow(
+        label: label,
+        icon: icon,
+        iconSize: 13,
+        iconColor: muted,
+        trailing: material.Icon(
+          material.Icons.chevron_right_rounded,
+          size: 13,
+          color: muted,
+        ),
+        onTap: onPostgresObjectSelected == null
+            ? null
+            : () => onPostgresObjectSelected!(
+                  connection,
+                  databaseName,
+                  '',
+                  '',
+                  kind,
                 ),
-                material.Icon(
-                  material.Icons.chevron_right_rounded,
-                  size: 13,
-                  color: theme.colorScheme.mutedForeground,
-                ),
-              ],
-            ),
-          ),
+        textStyle: material.TextStyle(
+          fontSize: 11,
+          color: muted,
         ),
       ),
     );
@@ -1776,44 +1800,25 @@ class _PgSchemasNodeState extends State<_PgSchemasNode> {
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
         children: [
-          material.MouseRegion(
-            cursor: material.SystemMouseCursors.click,
-            child: material.InkWell(
-              onTap: () => setState(() => _expanded = !_expanded),
-              borderRadius: material.BorderRadius.circular(4),
-              child: material.Padding(
-                padding:
-                    const material.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-                child: material.Row(
-                  children: [
-                    material.AnimatedRotation(
-                      turns: _expanded ? 0.25 : 0,
-                      duration: const Duration(milliseconds: 150),
-                      child: material.Icon(
-                        material.Icons.chevron_right_rounded,
-                        size: 14,
-                        color: theme.colorScheme.mutedForeground,
-                      ),
-                    ),
-                    const Gap(4),
-                    material.Icon(material.Icons.account_tree_rounded,
-                        size: 13, color: theme.colorScheme.mutedForeground),
-                    const Gap(6),
-                    material.Expanded(
-                      child: material.Text(
-                        'Schemas (${widget.schemas.length})',
-                        overflow: material.TextOverflow.ellipsis,
-                        maxLines: 1,
-                        style: material.TextStyle(
-                          fontSize: 11,
-                          color: theme.colorScheme.mutedForeground,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+          _PgTreeRow(
+            label: 'Schemas (${widget.schemas.length})',
+            leading: material.AnimatedRotation(
+              turns: _expanded ? 0.25 : 0,
+              duration: const Duration(milliseconds: 150),
+              child: material.Icon(
+                material.Icons.chevron_right_rounded,
+                size: 14,
+                color: theme.colorScheme.mutedForeground,
               ),
             ),
+            icon: material.Icons.account_tree_rounded,
+            iconSize: 13,
+            iconColor: theme.colorScheme.mutedForeground,
+            textStyle: material.TextStyle(
+              fontSize: 11,
+              color: theme.colorScheme.mutedForeground,
+            ),
+            onTap: () => setState(() => _expanded = !_expanded),
           ),
           if (_expanded)
             for (final schema in widget.schemas)
@@ -1919,43 +1924,25 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
         children: [
-          material.MouseRegion(
-            cursor: material.SystemMouseCursors.click,
-            child: material.InkWell(
-              onTap: _toggle,
-              borderRadius: material.BorderRadius.circular(4),
-              child: material.Padding(
-                padding:
-                    const material.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-                child: material.Row(
-                  children: [
-                    material.AnimatedRotation(
-                      turns: _expanded ? 0.25 : 0,
-                      duration: const Duration(milliseconds: 150),
-                      child: material.Icon(
-                        material.Icons.chevron_right_rounded,
-                        size: 14,
-                        color: theme.colorScheme.mutedForeground,
-                      ),
-                    ),
-                    const Gap(4),
-                    material.Icon(material.Icons.diamond_outlined,
-                        size: 13,
-                        color: theme.colorScheme.primary.withValues(alpha: 0.6)),
-                    const Gap(6),
-                    material.Expanded(
-                      child: material.Text(
-                        widget.schemaName,
-                        overflow: material.TextOverflow.ellipsis,
-                        maxLines: 1,
-                        style: material.TextStyle(
-                            fontSize: 12, color: theme.colorScheme.foreground),
-                      ),
-                    ),
-                  ],
-                ),
+          _PgTreeRow(
+            label: widget.schemaName,
+            leading: material.AnimatedRotation(
+              turns: _expanded ? 0.25 : 0,
+              duration: const Duration(milliseconds: 150),
+              child: material.Icon(
+                material.Icons.chevron_right_rounded,
+                size: 14,
+                color: theme.colorScheme.mutedForeground,
               ),
             ),
+            icon: material.Icons.diamond_outlined,
+            iconSize: 13,
+            iconColor: theme.colorScheme.primary.withValues(alpha: 0.6),
+            textStyle: material.TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.foreground,
+            ),
+            onTap: _toggle,
           ),
           if (_expanded) ...[
             if (_loading)
@@ -2109,40 +2096,31 @@ class _PgSchemaToolRow extends material.StatelessWidget {
   @override
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context);
+    final muted = theme.colorScheme.mutedForeground;
     return material.Padding(
       padding: const material.EdgeInsets.only(left: 16, top: 2, bottom: 2),
-      child: material.Material(
-        color: material.Colors.transparent,
-        child: material.InkWell(
-          borderRadius: material.BorderRadius.circular(4),
-          onTap: onPostgresObjectSelected == null
-              ? null
-              : () => onPostgresObjectSelected!(
-                    connection,
-                    databaseName,
-                    schemaName,
-                    '',
-                    kind,
-                  ),
-          child: material.Padding(
-            padding:
-                const material.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-            child: material.Row(
-              children: [
-                material.Icon(icon,
-                    size: 13, color: theme.colorScheme.mutedForeground),
-                const Gap(6),
-                material.Expanded(
-                  child: Text(label).muted().xSmall(),
+      child: _PgTreeRow(
+        label: label,
+        icon: icon,
+        iconSize: 13,
+        iconColor: muted,
+        trailing: material.Icon(
+          material.Icons.chevron_right_rounded,
+          size: 13,
+          color: muted,
+        ),
+        onTap: onPostgresObjectSelected == null
+            ? null
+            : () => onPostgresObjectSelected!(
+                  connection,
+                  databaseName,
+                  schemaName,
+                  '',
+                  kind,
                 ),
-                material.Icon(
-                  material.Icons.chevron_right_rounded,
-                  size: 13,
-                  color: theme.colorScheme.mutedForeground,
-                ),
-              ],
-            ),
-          ),
+        textStyle: material.TextStyle(
+          fontSize: 11,
+          color: muted,
         ),
       ),
     );
@@ -2178,83 +2156,44 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
         children: [
-          material.MouseRegion(
-            cursor: material.SystemMouseCursors.click,
-            child: material.InkWell(
-              onTap: () => setState(() => _expanded = !_expanded),
-              borderRadius: material.BorderRadius.circular(4),
-              child: material.Padding(
-                padding:
-                    const material.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-                child: material.Row(
-                  children: [
-                    material.AnimatedRotation(
-                      turns: _expanded ? 0.25 : 0,
-                      duration: const Duration(milliseconds: 150),
-                      child: material.Icon(
-                        material.Icons.chevron_right_rounded,
-                        size: 13,
-                        color: theme.colorScheme.mutedForeground,
-                      ),
-                    ),
-                    const Gap(4),
-                    material.Icon(widget.icon,
-                        size: 13, color: theme.colorScheme.mutedForeground),
-                    const Gap(6),
-                    material.Expanded(
-                      child: material.Text(
-                        '${widget.label} (${widget.items.length})',
-                        overflow: material.TextOverflow.ellipsis,
-                        maxLines: 1,
-                        style: material.TextStyle(
-                          fontSize: 11,
-                          color: theme.colorScheme.mutedForeground,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+          _PgTreeRow(
+            label: '${widget.label} (${widget.items.length})',
+            leading: material.AnimatedRotation(
+              turns: _expanded ? 0.25 : 0,
+              duration: const Duration(milliseconds: 150),
+              child: material.Icon(
+                material.Icons.chevron_right_rounded,
+                size: 13,
+                color: theme.colorScheme.mutedForeground,
               ),
             ),
+            icon: widget.icon,
+            iconSize: 13,
+            iconColor: theme.colorScheme.mutedForeground,
+            textStyle: material.TextStyle(
+              fontSize: 11,
+              color: theme.colorScheme.mutedForeground,
+            ),
+            onTap: () => setState(() => _expanded = !_expanded),
           ),
           if (_expanded)
             for (final item in widget.items)
               material.Padding(
                 padding: const material.EdgeInsets.only(left: 22),
-                child: material.Padding(
-                  padding: const material.EdgeInsets.symmetric(
-                      horizontal: 4, vertical: 2),
-                  child: material.MouseRegion(
-                    cursor: widget.onItemTap != null
-                        ? material.SystemMouseCursors.click
-                        : material.SystemMouseCursors.basic,
-                    child: material.InkWell(
-                      onTap: widget.onItemTap != null
-                          ? () => widget.onItemTap!(item)
-                          : null,
-                      borderRadius: material.BorderRadius.circular(4),
-                      child: material.Row(
-                        children: [
-                          material.Icon(widget.icon,
-                              size: 12,
-                              color: theme.colorScheme.primary
-                                  .withValues(alpha: 0.5)),
-                          const Gap(6),
-                          material.Expanded(
-                            child: material.Text(
-                              item,
-                              overflow: material.TextOverflow.ellipsis,
-                              maxLines: 1,
-                              style: material.TextStyle(
-                                fontSize: 11,
-                                color: theme.colorScheme.foreground,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                child: _PgTreeRow(
+                  label: item,
+                  icon: widget.icon,
+                  iconSize: 12,
+                  iconColor:
+                      theme.colorScheme.primary.withValues(alpha: 0.5),
+                  textStyle: material.TextStyle(
+                    fontSize: 11,
+                    color: theme.colorScheme.foreground,
                   ),
+                  verticalPadding: 2,
+                  onTap: widget.onItemTap != null
+                      ? () => widget.onItemTap!(item)
+                      : null,
                 ),
               ),
         ],
