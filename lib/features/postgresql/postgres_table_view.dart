@@ -26,13 +26,13 @@ class PostgresTableView extends material.StatefulWidget {
   final String schema;
   final String tableName;
   final bool isView;
+
   /// When true, toolbar offers REFRESH MATERIALIZED VIEW and matview label.
   final bool isMaterializedView;
   final int limit;
 
   @override
-  material.State<PostgresTableView> createState() =>
-      _PostgresTableViewState();
+  material.State<PostgresTableView> createState() => _PostgresTableViewState();
 }
 
 class _PostgresTableViewState extends material.State<PostgresTableView> {
@@ -42,10 +42,13 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
 
   List<String> _columnNames = [];
   List<List<String>> _rows = [];
+
   /// Rows on the current page (same as _rows.length when not loading).
   int _rowsOnPage = 0;
+
   /// Total rows in table/view (from COUNT(*)).
   int? _totalRowCount;
+
   /// Zero-based offset for LIMIT/OFFSET pagination.
   int _offset = 0;
 
@@ -169,9 +172,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       int totalRows;
       if (refreshCount || _totalRowCount == null) {
         final countResult = await conn.execute(countSql);
-        totalRows = countResult.isEmpty
-            ? 0
-            : _asInt(countResult.first[0]);
+        totalRows = countResult.isEmpty ? 0 : _asInt(countResult.first[0]);
       } else {
         totalRows = _totalRowCount!;
       }
@@ -348,8 +349,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     _fetch();
   }
 
-  bool get _canGoPrevious =>
-      !_customSqlActive && _offset > 0 && !_loading;
+  bool get _canGoPrevious => !_customSqlActive && _offset > 0 && !_loading;
 
   bool get _canGoNext {
     if (_customSqlActive) return false;
@@ -480,106 +480,133 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
                 material.Expanded(
                   child: material.Text(
                     '${widget.schema}.${widget.tableName}'
-                        '${widget.isMaterializedView ? ' (materialized view)' : widget.isView ? ' (view)' : ''}',
+                    '${widget.isMaterializedView ? ' (materialized view)' : widget.isView ? ' (view)' : ''}',
                     style: material.TextStyle(
                       fontSize: 13,
                       fontWeight: material.FontWeight.w600,
                       color: cs.foreground,
                     ),
                     overflow: material.TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 ),
-                material.Container(
-                  padding: const material.EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 3),
-                  decoration: material.BoxDecoration(
-                    color: cs.muted.withValues(alpha: 0.4),
-                    borderRadius: material.BorderRadius.circular(4),
+                material.Expanded(
+                  flex: 2,
+                  child: material.LayoutBuilder(
+                    builder: (context, constraints) {
+                      return material.SingleChildScrollView(
+                        scrollDirection: material.Axis.horizontal,
+                        child: material.ConstrainedBox(
+                          constraints: material.BoxConstraints(
+                            minWidth: constraints.maxWidth,
+                          ),
+                          child: material.Row(
+                            mainAxisAlignment: material.MainAxisAlignment.end,
+                            mainAxisSize: material.MainAxisSize.min,
+                            children: [
+                              material.Container(
+                                padding: const material.EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: material.BoxDecoration(
+                                  color: cs.muted.withValues(alpha: 0.4),
+                                  borderRadius:
+                                      material.BorderRadius.circular(4),
+                                ),
+                                child: material.Text(
+                                  _paginationLabel(),
+                                  style: material.TextStyle(
+                                      fontSize: 11, color: cs.mutedForeground),
+                                ),
+                              ),
+                              const Gap(6),
+                              OutlineButton(
+                                size: ButtonSize.small,
+                                onPressed: _openSqlEditor,
+                                leading: const material.Icon(
+                                  material.Icons.code_rounded,
+                                  size: 16,
+                                ),
+                                child: const Text('SQL'),
+                              ),
+                              const Gap(4),
+                              OutlineButton(
+                                size: ButtonSize.small,
+                                onPressed: _openPrivileges,
+                                leading: const material.Icon(
+                                  material.Icons.admin_panel_settings_rounded,
+                                  size: 15,
+                                ),
+                                child: const Text('Privileges'),
+                              ),
+                              if (widget.isMaterializedView &&
+                                  !_customSqlActive) ...[
+                                const Gap(4),
+                                OutlineButton(
+                                  size: ButtonSize.small,
+                                  onPressed: _loading
+                                      ? null
+                                      : _refreshMaterializedView,
+                                  leading: const material.Icon(
+                                    material.Icons.sync_rounded,
+                                    size: 15,
+                                  ),
+                                  child: const Text('Refresh MV'),
+                                ),
+                              ],
+                              if (_customSqlActive) ...[
+                                const Gap(4),
+                                OutlineButton(
+                                  size: ButtonSize.small,
+                                  onPressed: _loading ? null : _exitCustomMode,
+                                  leading: const material.Icon(
+                                    material.Icons.table_chart_rounded,
+                                    size: 16,
+                                  ),
+                                  child: const Text('Table'),
+                                ),
+                              ],
+                              const Gap(4),
+                              OutlineButton(
+                                size: ButtonSize.small,
+                                onPressed:
+                                    _canGoPrevious ? _goToPreviousPage : null,
+                                leading: const material.Icon(
+                                    material.Icons.chevron_left_rounded,
+                                    size: 16),
+                                child: const Text('Back'),
+                              ),
+                              const Gap(4),
+                              OutlineButton(
+                                size: ButtonSize.small,
+                                onPressed: _canGoNext ? _goToNextPage : null,
+                                leading: const material.Icon(
+                                    material.Icons.chevron_right_rounded,
+                                    size: 16),
+                                child: const Text('Next'),
+                              ),
+                              const Gap(8),
+                              OutlineButton(
+                                size: ButtonSize.small,
+                                onPressed: _loading
+                                    ? null
+                                    : () {
+                                        if (_customSqlActive) {
+                                          _fetchCustom();
+                                        } else {
+                                          _fetch(refreshCount: true);
+                                        }
+                                      },
+                                leading: const material.Icon(
+                                    material.Icons.refresh_rounded,
+                                    size: 14),
+                                child: const Text('Refresh'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                  child: material.Text(
-                    _paginationLabel(),
-                    style: material.TextStyle(
-                        fontSize: 11, color: cs.mutedForeground),
-                  ),
-                ),
-                const Gap(6),
-                OutlineButton(
-                  size: ButtonSize.small,
-                  onPressed: _openSqlEditor,
-                  leading: const material.Icon(
-                    material.Icons.code_rounded,
-                    size: 16,
-                  ),
-                  child: const Text('SQL'),
-                ),
-                const Gap(4),
-                OutlineButton(
-                  size: ButtonSize.small,
-                  onPressed: _openPrivileges,
-                  leading: const material.Icon(
-                    material.Icons.admin_panel_settings_rounded,
-                    size: 15,
-                  ),
-                  child: const Text('Privileges'),
-                ),
-                if (widget.isMaterializedView && !_customSqlActive) ...[
-                  const Gap(4),
-                  OutlineButton(
-                    size: ButtonSize.small,
-                    onPressed: _loading ? null : _refreshMaterializedView,
-                    leading: const material.Icon(
-                      material.Icons.sync_rounded,
-                      size: 15,
-                    ),
-                    child: const Text('Refresh MV'),
-                  ),
-                ],
-                if (_customSqlActive) ...[
-                  const Gap(4),
-                  OutlineButton(
-                    size: ButtonSize.small,
-                    onPressed: _loading ? null : _exitCustomMode,
-                    leading: const material.Icon(
-                      material.Icons.table_chart_rounded,
-                      size: 16,
-                    ),
-                    child: const Text('Table'),
-                  ),
-                ],
-                const Gap(4),
-                OutlineButton(
-                  size: ButtonSize.small,
-                  onPressed: _canGoPrevious ? _goToPreviousPage : null,
-                  leading: const material.Icon(
-                      material.Icons.chevron_left_rounded,
-                      size: 16),
-                  child: const Text('Back'),
-                ),
-                const Gap(4),
-                OutlineButton(
-                  size: ButtonSize.small,
-                  onPressed: _canGoNext ? _goToNextPage : null,
-                  leading: const material.Icon(
-                      material.Icons.chevron_right_rounded,
-                      size: 16),
-                  child: const Text('Next'),
-                ),
-                const Gap(8),
-                OutlineButton(
-                  size: ButtonSize.small,
-                  onPressed: _loading
-                      ? null
-                      : () {
-                          if (_customSqlActive) {
-                            _fetchCustom();
-                          } else {
-                            _fetch(refreshCount: true);
-                          }
-                        },
-                  leading: const material.Icon(
-                      material.Icons.refresh_rounded,
-                      size: 14),
-                  child: const Text('Refresh'),
                 ),
               ],
             ),
@@ -647,16 +674,10 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
                                     ),
                                     child: material.Row(
                                       children: [
-                                        _rowNumberCell(cs,
-                                            '$displayRowNum'),
-                                        for (var c = 0;
-                                            c < colCount;
-                                            c++)
+                                        _rowNumberCell(cs, '$displayRowNum'),
+                                        for (var c = 0; c < colCount; c++)
                                           _dataCell(
-                                              cs,
-                                              row.length > c
-                                                  ? row[c]
-                                                  : ''),
+                                              cs, row.length > c ? row[c] : ''),
                                       ],
                                     ),
                                   );
