@@ -116,6 +116,7 @@ class WorkspacePanel extends StatefulWidget {
     this.selectedRedisDb,
     this.selectedMongoDb,
     this.selectedPostgresObject,
+    this.postgresSqlTabRequestToken = 0,
   });
 
   /// Currently selected connection from the sidebar.
@@ -133,6 +134,9 @@ class WorkspacePanel extends StatefulWidget {
   /// null = show stats, non-null = show table/grid or definition view.
   final ({String database, String schema, String name, PostgresObjectKind kind})?
       selectedPostgresObject;
+
+  /// Incremented by [MainScreen] to switch the PostgreSQL home view to the SQL tab.
+  final int postgresSqlTabRequestToken;
 
   @override
   State<WorkspacePanel> createState() => _WorkspacePanelState();
@@ -158,6 +162,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
               ? PostgresWorkspaceHome(
                   key: ValueKey('pg_home_${widget.activeConnection!.id}'),
                   connectionRow: widget.activeConnection!,
+                  sqlTabRequestToken: widget.postgresSqlTabRequestToken,
                 )
               : _pgObjectWorkspace(
                   connection: widget.activeConnection!,
