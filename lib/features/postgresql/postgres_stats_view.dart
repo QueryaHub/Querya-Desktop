@@ -222,48 +222,68 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
 
   material.Widget _header(material.BuildContext context) {
     final cs = shadcn.Theme.of(context).colorScheme;
-    return material.Row(
-      children: [
-        material.Container(
-          padding: const material.EdgeInsets.all(10),
-          decoration: material.BoxDecoration(
-            color: cs.primary.withValues(alpha: 0.12),
-            borderRadius: material.BorderRadius.circular(12),
-          ),
-          child: material.SizedBox(
-            width: 28,
-            height: 28,
-            child: material.Image.asset(
-              'assets/images/postgresql_icon.png',
-              fit: material.BoxFit.contain,
-              errorBuilder: (_, __, ___) => material.Icon(
-                  material.Icons.storage_rounded,
-                  size: 28,
-                  color: cs.primary),
+    return material.LayoutBuilder(
+      builder: (context, constraints) {
+        return material.SingleChildScrollView(
+          scrollDirection: material.Axis.horizontal,
+          child: material.ConstrainedBox(
+            constraints:
+                material.BoxConstraints(minWidth: constraints.maxWidth),
+            child: material.Row(
+              mainAxisAlignment: material.MainAxisAlignment.spaceBetween,
+              children: [
+                material.Row(
+                  mainAxisSize: material.MainAxisSize.min,
+                  children: [
+                    material.Container(
+                      padding: const material.EdgeInsets.all(10),
+                      decoration: material.BoxDecoration(
+                        color: cs.primary.withValues(alpha: 0.12),
+                        borderRadius: material.BorderRadius.circular(12),
+                      ),
+                      child: material.SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: material.Image.asset(
+                          'assets/images/postgresql_icon.png',
+                          fit: material.BoxFit.contain,
+                          errorBuilder: (_, __, ___) => material.Icon(
+                              material.Icons.storage_rounded,
+                              size: 28,
+                              color: cs.primary),
+                        ),
+                      ),
+                    ),
+                    const Gap(16),
+                    material.ConstrainedBox(
+                      constraints:
+                          const material.BoxConstraints(maxWidth: 420),
+                      child: material.Column(
+                        crossAxisAlignment: material.CrossAxisAlignment.start,
+                        mainAxisSize: material.MainAxisSize.min,
+                        children: [
+                          Text(widget.connectionRow.name).large().semiBold(),
+                          const Gap(4),
+                          Text(
+                                  '${widget.connectionRow.host ?? 'localhost'}:${widget.connectionRow.port ?? 5432}')
+                              .muted()
+                              .small(),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                OutlineButton(
+                  onPressed: _load,
+                  leading: const material.Icon(
+                      material.Icons.refresh_rounded, size: 18),
+                  child: const Text('Refresh'),
+                ),
+              ],
             ),
           ),
-        ),
-        const Gap(16),
-        material.Expanded(
-          child: material.Column(
-            crossAxisAlignment: material.CrossAxisAlignment.start,
-            mainAxisSize: material.MainAxisSize.min,
-            children: [
-              Text(widget.connectionRow.name).large().semiBold(),
-              const Gap(4),
-              Text('${widget.connectionRow.host ?? 'localhost'}:${widget.connectionRow.port ?? 5432}')
-                  .muted()
-                  .small(),
-            ],
-          ),
-        ),
-        OutlineButton(
-          onPressed: _load,
-          leading:
-              const material.Icon(material.Icons.refresh_rounded, size: 18),
-          child: const Text('Refresh'),
-        ),
-      ],
+        );
+      },
     );
   }
 
