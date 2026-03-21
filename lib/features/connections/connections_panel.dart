@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart' as material show BuildContext, Widget, Padding, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, DefaultTextStyle, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, Column, AnimatedRotation, Row, BoxFit, Text, TextOverflow, Expanded, CircularProgressIndicator, Material, StatelessWidget, Colors;
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
-import 'package:querya_desktop/core/database/postgres_connection.dart';
+import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/database/redis_info.dart';
 import 'package:querya_desktop/core/storage/folders_storage.dart';
@@ -1244,21 +1244,15 @@ class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
       _loading = true;
       _error = null;
     });
+    PgLease? lease;
     try {
       final c = widget.connection;
-      final conn = PostgresConnection(
-        id: -1,
-        name: 'sidebar_probe',
-        host: c.host ?? 'localhost',
-        port: c.port ?? 5432,
-        username: c.username,
-        password: c.password,
+      lease = await PostgresService.instance.acquire(
+        c,
         database: c.databaseName ?? 'postgres',
-        useSSL: c.useSSL,
+        mode: PgSessionMode.readOnly,
       );
-      await conn.connect();
-      final dbs = await conn.listDatabases();
-      await conn.disconnect();
+      final dbs = await lease.connection.listDatabases();
 
       if (!mounted) return;
       setState(() {
@@ -1271,6 +1265,8 @@ class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
         _error = e.toString();
         _loading = false;
       });
+    } finally {
+      lease?.release();
     }
   }
 
@@ -1541,21 +1537,15 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
   Future<void> _loadSchemas() async {
     if (!mounted) return;
     setState(() => _loading = true);
+    PgLease? lease;
     try {
       final c = widget.connection;
-      final conn = PostgresConnection(
-        id: -1,
-        name: 'probe',
-        host: c.host ?? 'localhost',
-        port: c.port ?? 5432,
-        username: c.username,
-        password: c.password,
+      lease = await PostgresService.instance.acquire(
+        c,
         database: widget.databaseName,
-        useSSL: c.useSSL,
+        mode: PgSessionMode.readOnly,
       );
-      await conn.connect();
-      final schemas = await conn.listSchemas();
-      await conn.disconnect();
+      final schemas = await lease.connection.listSchemas();
       if (!mounted) return;
       setState(() {
         _schemas = schemas;
@@ -1564,6 +1554,8 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
+    } finally {
+      lease?.release();
     }
   }
 
@@ -1852,19 +1844,15 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
   Future<void> _loadObjects() async {
     if (!mounted) return;
     setState(() => _loading = true);
+    PgLease? lease;
     try {
       final c = widget.connection;
-      final conn = PostgresConnection(
-        id: -1,
-        name: 'probe',
-        host: c.host ?? 'localhost',
-        port: c.port ?? 5432,
-        username: c.username,
-        password: c.password,
+      lease = await PostgresService.instance.acquire(
+        c,
         database: widget.databaseName,
-        useSSL: c.useSSL,
+        mode: PgSessionMode.readOnly,
       );
-      await conn.connect();
+      final conn = lease.connection;
       final tables = await conn.listTables(schema: widget.schemaName);
       final views = await conn.listViews(schema: widget.schemaName);
       List<String> matviews = [];
@@ -1876,7 +1864,6 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
       }
       final functions = await conn.listFunctions(schema: widget.schemaName);
       final sequences = await conn.listSequences(schema: widget.schemaName);
-      await conn.disconnect();
       if (!mounted) return;
       setState(() {
         _tables = tables;
@@ -1890,6 +1877,8 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
+    } finally {
+      lease?.release();
     }
   }
 
