@@ -1482,7 +1482,17 @@ class _PgDatabasesNodeState extends State<_PgDatabasesNode> {
                         size: 14,
                         color: theme.colorScheme.primary.withValues(alpha: 0.7)),
                     const Gap(6),
-                    Text('Databases (${widget.databases.length})').small(),
+                    material.Expanded(
+                      child: material.Text(
+                        'Databases (${widget.databases.length})',
+                        overflow: material.TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: material.TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.foreground,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1781,7 +1791,17 @@ class _PgSchemasNodeState extends State<_PgSchemasNode> {
                     material.Icon(material.Icons.account_tree_rounded,
                         size: 13, color: theme.colorScheme.mutedForeground),
                     const Gap(6),
-                    Text('Schemas (${widget.schemas.length})').muted().xSmall(),
+                    material.Expanded(
+                      child: material.Text(
+                        'Schemas (${widget.schemas.length})',
+                        overflow: material.TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: material.TextStyle(
+                          fontSize: 11,
+                          color: theme.colorScheme.mutedForeground,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -2173,9 +2193,17 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
                     material.Icon(widget.icon,
                         size: 13, color: theme.colorScheme.mutedForeground),
                     const Gap(6),
-                    Text('${widget.label} (${widget.items.length})')
-                        .muted()
-                        .xSmall(),
+                    material.Expanded(
+                      child: material.Text(
+                        '${widget.label} (${widget.items.length})',
+                        overflow: material.TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: material.TextStyle(
+                          fontSize: 11,
+                          color: theme.colorScheme.mutedForeground,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
