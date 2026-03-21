@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart' as material show BuildContext, Widget, Padding, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, DefaultTextStyle, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, Column, AnimatedRotation, Row, BoxFit, Text, TextOverflow, Expanded, CircularProgressIndicator, Material, StatelessWidget, Colors, Tooltip, Color;
+import 'package:flutter/material.dart' as material show BuildContext, Widget, Padding, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, DefaultTextStyle, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, Column, AnimatedRotation, Row, BoxFit, Text, TextOverflow, Expanded, CircularProgressIndicator, Material, StatelessWidget, Colors, Tooltip, Color, LayoutBuilder, TextPainter, TextSpan, TextDirection;
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
@@ -23,6 +24,7 @@ class ConnectionsPanel extends StatefulWidget {
     this.onRedisDatabaseSelected,
     this.onMongoDBDatabaseSelected,
     this.onPostgresObjectSelected,
+    this.onPostgresOpenSqlWorkspace,
   });
 
   /// Called when the user taps a connection tile.
@@ -44,6 +46,9 @@ class ConnectionsPanel extends StatefulWidget {
     String name,
     PostgresObjectKind kind,
   )? onPostgresObjectSelected;
+
+  /// Opens the PostgreSQL workspace home and switches to the SQL tab (e.g. from tree context menu).
+  final void Function(ConnectionRow connection)? onPostgresOpenSqlWorkspace;
 
   @override
   State<ConnectionsPanel> createState() => _ConnectionsPanelState();
@@ -154,6 +159,7 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
         onRemove: () => _removeConnection(conn.id!),
         onTap: () => widget.onConnectionSelected?.call(conn),
         onPostgresObjectSelected: widget.onPostgresObjectSelected,
+        onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
       );
     } else if (conn.type == 'redis') {
       return _RedisConnectionTile(
@@ -337,7 +343,7 @@ class _EmptyState extends StatelessWidget {
             color: theme.colorScheme.mutedForeground,
           ),
           const Gap(10),
-          Expanded(
+          material.Expanded(
             child: Text(message).muted().small(),
           ),
         ],
@@ -1205,6 +1211,7 @@ class _PostgresConnectionTile extends StatefulWidget {
     required this.onRemove,
     this.onTap,
     this.onPostgresObjectSelected,
+    this.onPostgresOpenSqlWorkspace,
   });
 
   final ConnectionRow connection;
@@ -1219,6 +1226,7 @@ class _PostgresConnectionTile extends StatefulWidget {
     String name,
     PostgresObjectKind kind,
   )? onPostgresObjectSelected;
+  final void Function(ConnectionRow connection)? onPostgresOpenSqlWorkspace;
 
   @override
   State<_PostgresConnectionTile> createState() =>
@@ -1416,6 +1424,11 @@ class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
                   connection: widget.connection,
                   databases: _databases,
                   onPostgresObjectSelected: widget.onPostgresObjectSelected,
+                  onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
+                  onRefreshDatabases: () {
+                    setState(() => _databases = []);
+                    _loadDatabases();
+                  },
                 ),
             ],
           ],
@@ -1430,6 +1443,8 @@ class _PgDatabasesNode extends StatefulWidget {
     required this.connection,
     required this.databases,
     this.onPostgresObjectSelected,
+    this.onPostgresOpenSqlWorkspace,
+    required this.onRefreshDatabases,
   });
 
   final ConnectionRow connection;
@@ -1441,12 +1456,52 @@ class _PgDatabasesNode extends StatefulWidget {
     String name,
     PostgresObjectKind kind,
   )? onPostgresObjectSelected;
+  final void Function(ConnectionRow connection)? onPostgresOpenSqlWorkspace;
+  final VoidCallback onRefreshDatabases;
 
   @override
   State<_PgDatabasesNode> createState() => _PgDatabasesNodeState();
 }
 
-/// Shared tree row: consistent ink hover, tooltips on truncated labels.
+/// Ellipsis label; tooltip only when text overflows (intrinsic width > slot).
+class _PgTreeRowLabel extends material.StatelessWidget {
+  const _PgTreeRowLabel({
+    required this.label,
+    required this.textStyle,
+  });
+
+  final String label;
+  final material.TextStyle textStyle;
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    return material.LayoutBuilder(
+      builder: (context, constraints) {
+        final tp = material.TextPainter(
+          text: material.TextSpan(text: label, style: textStyle),
+          maxLines: 1,
+          textDirection: material.TextDirection.ltr,
+        );
+        tp.layout(maxWidth: double.infinity);
+        final overflow = tp.width > constraints.maxWidth + 0.5;
+        final text = material.Text(
+          label,
+          overflow: material.TextOverflow.ellipsis,
+          maxLines: 1,
+          style: textStyle,
+        );
+        if (!overflow) return text;
+        return material.Tooltip(
+          message: label,
+          waitDuration: const Duration(milliseconds: 450),
+          child: text,
+        );
+      },
+    );
+  }
+}
+
+/// Shared tree row: consistent ink hover, optional context menu, tooltips when truncated.
 class _PgTreeRow extends material.StatelessWidget {
   const _PgTreeRow({
     required this.label,
@@ -1458,6 +1513,9 @@ class _PgTreeRow extends material.StatelessWidget {
     this.onTap,
     this.verticalPadding = 3,
     required this.textStyle,
+    this.connection,
+    this.onContextRefresh,
+    this.onOpenSqlWorkspace,
   });
 
   final String label;
@@ -1469,13 +1527,16 @@ class _PgTreeRow extends material.StatelessWidget {
   final void Function()? onTap;
   final double verticalPadding;
   final material.TextStyle textStyle;
+  final ConnectionRow? connection;
+  final VoidCallback? onContextRefresh;
+  final void Function(ConnectionRow connection)? onOpenSqlWorkspace;
 
   @override
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
     final muted = theme.colorScheme.mutedForeground;
-    return material.Material(
+    final row = material.Material(
       color: material.Colors.transparent,
       child: material.InkWell(
         onTap: onTap,
@@ -1506,22 +1567,50 @@ class _PgTreeRow extends material.StatelessWidget {
                 const Gap(6),
               ],
               material.Expanded(
-                child: material.Tooltip(
-                  message: label,
-                  waitDuration: const Duration(milliseconds: 450),
-                  child: material.Text(
-                    label,
-                    overflow: material.TextOverflow.ellipsis,
-                    maxLines: 1,
-                    style: textStyle,
-                  ),
-                ),
+                child: _PgTreeRowLabel(label: label, textStyle: textStyle),
               ),
               if (trailing != null) trailing!,
             ],
           ),
         ),
       ),
+    );
+    if (connection == null) return row;
+    return ContextMenu(
+      items: [
+        if (onContextRefresh != null)
+          MenuButton(
+            leading: material.Icon(
+              material.Icons.refresh_rounded,
+              size: 18,
+              color: theme.colorScheme.mutedForeground,
+            ),
+            onPressed: (_) => onContextRefresh!(),
+            child: const Text('Refresh'),
+          ),
+        MenuButton(
+          leading: material.Icon(
+            material.Icons.copy_rounded,
+            size: 18,
+            color: theme.colorScheme.mutedForeground,
+          ),
+          onPressed: (_) {
+            Clipboard.setData(ClipboardData(text: label));
+          },
+          child: const Text('Copy name'),
+        ),
+        if (onOpenSqlWorkspace != null)
+          MenuButton(
+            leading: material.Icon(
+              material.Icons.terminal_rounded,
+              size: 18,
+              color: theme.colorScheme.mutedForeground,
+            ),
+            onPressed: (_) => onOpenSqlWorkspace!(connection!),
+            child: const Text('Open in SQL'),
+          ),
+      ],
+      child: row,
     );
   }
 }
@@ -1558,6 +1647,9 @@ class _PgDatabasesNodeState extends State<_PgDatabasesNode> {
             ),
             verticalPadding: 4,
             onTap: () => setState(() => _expanded = !_expanded),
+            connection: widget.connection,
+            onContextRefresh: widget.onRefreshDatabases,
+            onOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
           ),
           if (_expanded)
             for (final db in widget.databases)
@@ -1565,6 +1657,7 @@ class _PgDatabasesNodeState extends State<_PgDatabasesNode> {
                 connection: widget.connection,
                 databaseName: db,
                 onPostgresObjectSelected: widget.onPostgresObjectSelected,
+                onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
               ),
         ],
       ),
@@ -1577,6 +1670,7 @@ class _PgDatabaseNode extends StatefulWidget {
     required this.connection,
     required this.databaseName,
     this.onPostgresObjectSelected,
+    this.onPostgresOpenSqlWorkspace,
   });
 
   final ConnectionRow connection;
@@ -1588,6 +1682,7 @@ class _PgDatabaseNode extends StatefulWidget {
     String name,
     PostgresObjectKind kind,
   )? onPostgresObjectSelected;
+  final void Function(ConnectionRow connection)? onPostgresOpenSqlWorkspace;
 
   @override
   State<_PgDatabaseNode> createState() => _PgDatabaseNodeState();
@@ -1659,6 +1754,9 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
             ),
             verticalPadding: 4,
             onTap: _toggle,
+            connection: widget.connection,
+            onContextRefresh: _loadSchemas,
+            onOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
           ),
           if (_expanded) ...[
             _PgDbToolRow(
@@ -1668,6 +1766,8 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
               icon: material.Icons.extension_rounded,
               kind: PostgresObjectKind.databaseExtensions,
               onPostgresObjectSelected: widget.onPostgresObjectSelected,
+              onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
+              onContextRefresh: _loadSchemas,
             ),
             _PgDbToolRow(
               connection: widget.connection,
@@ -1676,6 +1776,8 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
               icon: material.Icons.public_rounded,
               kind: PostgresObjectKind.databaseForeignData,
               onPostgresObjectSelected: widget.onPostgresObjectSelected,
+              onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
+              onContextRefresh: _loadSchemas,
             ),
             if (_loading)
               material.Padding(
@@ -1700,6 +1802,8 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
                 databaseName: widget.databaseName,
                 schemas: _schemas,
                 onPostgresObjectSelected: widget.onPostgresObjectSelected,
+                onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
+                onRefreshSchemas: _loadSchemas,
               ),
           ],
         ],
@@ -1716,6 +1820,8 @@ class _PgDbToolRow extends material.StatelessWidget {
     required this.icon,
     required this.kind,
     this.onPostgresObjectSelected,
+    this.onPostgresOpenSqlWorkspace,
+    this.onContextRefresh,
   });
 
   final ConnectionRow connection;
@@ -1730,6 +1836,8 @@ class _PgDbToolRow extends material.StatelessWidget {
     String name,
     PostgresObjectKind kind,
   )? onPostgresObjectSelected;
+  final void Function(ConnectionRow connection)? onPostgresOpenSqlWorkspace;
+  final VoidCallback? onContextRefresh;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -1760,6 +1868,9 @@ class _PgDbToolRow extends material.StatelessWidget {
           fontSize: 11,
           color: muted,
         ),
+        connection: connection,
+        onContextRefresh: onContextRefresh,
+        onOpenSqlWorkspace: onPostgresOpenSqlWorkspace,
       ),
     );
   }
@@ -1771,6 +1882,8 @@ class _PgSchemasNode extends StatefulWidget {
     required this.databaseName,
     required this.schemas,
     this.onPostgresObjectSelected,
+    this.onPostgresOpenSqlWorkspace,
+    required this.onRefreshSchemas,
   });
 
   final ConnectionRow connection;
@@ -1783,6 +1896,8 @@ class _PgSchemasNode extends StatefulWidget {
     String name,
     PostgresObjectKind kind,
   )? onPostgresObjectSelected;
+  final void Function(ConnectionRow connection)? onPostgresOpenSqlWorkspace;
+  final VoidCallback onRefreshSchemas;
 
   @override
   State<_PgSchemasNode> createState() => _PgSchemasNodeState();
@@ -1819,6 +1934,9 @@ class _PgSchemasNodeState extends State<_PgSchemasNode> {
               color: theme.colorScheme.mutedForeground,
             ),
             onTap: () => setState(() => _expanded = !_expanded),
+            connection: widget.connection,
+            onContextRefresh: widget.onRefreshSchemas,
+            onOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
           ),
           if (_expanded)
             for (final schema in widget.schemas)
@@ -1827,6 +1945,7 @@ class _PgSchemasNodeState extends State<_PgSchemasNode> {
                 databaseName: widget.databaseName,
                 schemaName: schema,
                 onPostgresObjectSelected: widget.onPostgresObjectSelected,
+                onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
               ),
         ],
       ),
@@ -1840,6 +1959,7 @@ class _PgSchemaNode extends StatefulWidget {
     required this.databaseName,
     required this.schemaName,
     this.onPostgresObjectSelected,
+    this.onPostgresOpenSqlWorkspace,
   });
 
   final ConnectionRow connection;
@@ -1852,6 +1972,7 @@ class _PgSchemaNode extends StatefulWidget {
     String name,
     PostgresObjectKind kind,
   )? onPostgresObjectSelected;
+  final void Function(ConnectionRow connection)? onPostgresOpenSqlWorkspace;
 
   @override
   State<_PgSchemaNode> createState() => _PgSchemaNodeState();
@@ -1943,6 +2064,9 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
               color: theme.colorScheme.foreground,
             ),
             onTap: _toggle,
+            connection: widget.connection,
+            onContextRefresh: _loadObjects,
+            onOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
           ),
           if (_expanded) ...[
             if (_loading)
@@ -1964,6 +2088,9 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
               ),
             if (_loaded) ...[
               _PgObjectGroup(
+                connection: widget.connection,
+                onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
+                onRefresh: _loadObjects,
                 label: 'Tables',
                 icon: material.Icons.table_chart_rounded,
                 items: _tables,
@@ -1978,6 +2105,9 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
                     : null,
               ),
               _PgObjectGroup(
+                connection: widget.connection,
+                onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
+                onRefresh: _loadObjects,
                 label: 'Views',
                 icon: material.Icons.view_agenda_rounded,
                 items: _views,
@@ -1992,6 +2122,9 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
                     : null,
               ),
               _PgObjectGroup(
+                connection: widget.connection,
+                onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
+                onRefresh: _loadObjects,
                 label: 'Materialized views',
                 icon: material.Icons.dynamic_feed_rounded,
                 items: _matviews,
@@ -2006,6 +2139,9 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
                     : null,
               ),
               _PgObjectGroup(
+                connection: widget.connection,
+                onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
+                onRefresh: _loadObjects,
                 label: 'Functions',
                 icon: material.Icons.functions_rounded,
                 items: _functions,
@@ -2020,6 +2156,9 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
                     : null,
               ),
               _PgObjectGroup(
+                connection: widget.connection,
+                onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
+                onRefresh: _loadObjects,
                 label: 'Sequences',
                 icon: material.Icons.format_list_numbered_rounded,
                 items: _sequences,
@@ -2041,6 +2180,8 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
                 icon: material.Icons.table_rows_rounded,
                 kind: PostgresObjectKind.schemaIndexes,
                 onPostgresObjectSelected: widget.onPostgresObjectSelected,
+                onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
+                onContextRefresh: _loadObjects,
               ),
               _PgSchemaToolRow(
                 connection: widget.connection,
@@ -2050,6 +2191,8 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
                 icon: material.Icons.bolt_rounded,
                 kind: PostgresObjectKind.schemaTriggers,
                 onPostgresObjectSelected: widget.onPostgresObjectSelected,
+                onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
+                onContextRefresh: _loadObjects,
               ),
               _PgSchemaToolRow(
                 connection: widget.connection,
@@ -2059,6 +2202,8 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
                 icon: material.Icons.category_rounded,
                 kind: PostgresObjectKind.schemaTypes,
                 onPostgresObjectSelected: widget.onPostgresObjectSelected,
+                onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
+                onContextRefresh: _loadObjects,
               ),
             ],
           ],
@@ -2077,6 +2222,8 @@ class _PgSchemaToolRow extends material.StatelessWidget {
     required this.icon,
     required this.kind,
     this.onPostgresObjectSelected,
+    this.onPostgresOpenSqlWorkspace,
+    this.onContextRefresh,
   });
 
   final ConnectionRow connection;
@@ -2092,6 +2239,8 @@ class _PgSchemaToolRow extends material.StatelessWidget {
     String name,
     PostgresObjectKind kind,
   )? onPostgresObjectSelected;
+  final void Function(ConnectionRow connection)? onPostgresOpenSqlWorkspace;
+  final VoidCallback? onContextRefresh;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -2122,6 +2271,9 @@ class _PgSchemaToolRow extends material.StatelessWidget {
           fontSize: 11,
           color: muted,
         ),
+        connection: connection,
+        onContextRefresh: onContextRefresh,
+        onOpenSqlWorkspace: onPostgresOpenSqlWorkspace,
       ),
     );
   }
@@ -2129,15 +2281,21 @@ class _PgSchemaToolRow extends material.StatelessWidget {
 
 class _PgObjectGroup extends StatefulWidget {
   const _PgObjectGroup({
+    required this.connection,
+    required this.onRefresh,
     required this.label,
     required this.icon,
     required this.items,
+    this.onPostgresOpenSqlWorkspace,
     this.onItemTap,
   });
 
+  final ConnectionRow connection;
+  final VoidCallback onRefresh;
   final String label;
   final material.IconData icon;
   final List<String> items;
+  final void Function(ConnectionRow connection)? onPostgresOpenSqlWorkspace;
   final void Function(String itemName)? onItemTap;
 
   @override
@@ -2175,6 +2333,9 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
               color: theme.colorScheme.mutedForeground,
             ),
             onTap: () => setState(() => _expanded = !_expanded),
+            connection: widget.connection,
+            onContextRefresh: widget.onRefresh,
+            onOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
           ),
           if (_expanded)
             for (final item in widget.items)
@@ -2194,6 +2355,9 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
                   onTap: widget.onItemTap != null
                       ? () => widget.onItemTap!(item)
                       : null,
+                  connection: widget.connection,
+                  onContextRefresh: widget.onRefresh,
+                  onOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
                 ),
               ),
         ],

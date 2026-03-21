@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/postgresql/postgres_sql_workspace.dart';
@@ -9,9 +11,13 @@ class PostgresWorkspaceHome extends material.StatefulWidget {
   const PostgresWorkspaceHome({
     super.key,
     required this.connectionRow,
+    this.sqlTabRequestToken = 0,
   });
 
   final ConnectionRow connectionRow;
+
+  /// Parent increments this to request switching to the SQL tab (e.g. from browser context menu).
+  final int sqlTabRequestToken;
 
   @override
   material.State<PostgresWorkspaceHome> createState() =>
@@ -21,11 +27,30 @@ class PostgresWorkspaceHome extends material.StatefulWidget {
 class _PostgresWorkspaceHomeState extends material.State<PostgresWorkspaceHome> {
   int _tab = 0;
   late final material.ValueNotifier<bool?> _sqlTxNotifier;
+  int _lastAppliedSqlTabToken = 0;
 
   @override
   void initState() {
     super.initState();
     _sqlTxNotifier = material.ValueNotifier<bool?>(null);
+    _lastAppliedSqlTabToken = widget.sqlTabRequestToken;
+  }
+
+  @override
+  void didUpdateWidget(covariant PostgresWorkspaceHome oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.connectionRow.id != widget.connectionRow.id) {
+      _lastAppliedSqlTabToken = widget.sqlTabRequestToken;
+      return;
+    }
+    final t = widget.sqlTabRequestToken;
+    if (t > _lastAppliedSqlTabToken) {
+      _lastAppliedSqlTabToken = t;
+      material.WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        unawaited(_selectTab(1));
+      });
+    }
   }
 
   @override

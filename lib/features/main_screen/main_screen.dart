@@ -40,6 +40,9 @@ class _MainScreenState extends State<MainScreen> {
   ({String database, String schema, String name, PostgresObjectKind kind})?
       _selectedPostgresObject;
 
+  /// Bumped to tell [PostgresWorkspaceHome] to switch to the SQL tab.
+  int _postgresSqlTabRequestToken = 0;
+
   void _onConnectionSelected(ConnectionRow connection) {
     setState(() {
       _activeConnection = connection;
@@ -85,6 +88,16 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
+  void _onPostgresOpenSqlWorkspace(ConnectionRow connection) {
+    setState(() {
+      _activeConnection = connection;
+      _activeRedisDb = null;
+      _activeMongoDB = null;
+      _selectedPostgresObject = null;
+      _postgresSqlTabRequestToken++;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = AppTheme.dark.colorScheme;
@@ -125,6 +138,7 @@ class _MainScreenState extends State<MainScreen> {
                             onRedisDatabaseSelected: _onRedisDatabaseSelected,
                             onMongoDBDatabaseSelected: _onMongoDBDatabaseSelected,
                             onPostgresObjectSelected: _onPostgresObjectSelected,
+                            onPostgresOpenSqlWorkspace: _onPostgresOpenSqlWorkspace,
                           ),
                         ),
                         _VerticalResizeHandle(
@@ -153,6 +167,7 @@ class _MainScreenState extends State<MainScreen> {
                             selectedRedisDb: _activeRedisDb,
                             selectedMongoDb: _activeMongoDB,
                             selectedPostgresObject: _selectedPostgresObject,
+                            postgresSqlTabRequestToken: _postgresSqlTabRequestToken,
                           ),
                         ),
                       ],
