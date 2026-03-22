@@ -457,27 +457,31 @@ class _SqlToolbar extends material.StatelessWidget {
                     items: const [
                       material.DropdownMenuItem<int?>(
                         value: null,
-                        child: Text('Default'),
+                        child: material.Text('No limit'),
+                      ),
+                      material.DropdownMenuItem(
+                        value: 10,
+                        child: material.Text('10 s'),
                       ),
                       material.DropdownMenuItem(
                         value: 30,
-                        child: Text('30 s'),
+                        child: material.Text('30 s'),
                       ),
                       material.DropdownMenuItem(
                         value: 60,
-                        child: Text('60 s'),
+                        child: material.Text('60 s'),
                       ),
                       material.DropdownMenuItem(
                         value: 120,
-                        child: Text('120 s'),
+                        child: material.Text('2 min'),
                       ),
                       material.DropdownMenuItem(
                         value: 300,
-                        child: Text('5 min'),
+                        child: material.Text('5 min'),
                       ),
                       material.DropdownMenuItem(
                         value: 600,
-                        child: Text('10 min'),
+                        child: material.Text('10 min'),
                       ),
                     ],
                   ),

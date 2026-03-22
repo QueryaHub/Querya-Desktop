@@ -7,6 +7,13 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 const _dbName = 'querya.db';
 const _dbVersion = 4;
 
+int? _sqliteInt(Object? v) {
+  if (v == null) return null;
+  if (v is int) return v;
+  if (v is num) return v.toInt();
+  return int.tryParse(v.toString());
+}
+
 /// Local SQLite database for folders and connections.
 /// File: [applicationSupport]/querya_desktop/querya.db
 class LocalDb {
@@ -14,6 +21,7 @@ class LocalDb {
   static final LocalDb instance = LocalDb._();
 
   Database? _db;
+  String? _cachedDbPath;
 
   static Future<void> initFfi() async {
     if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
@@ -24,12 +32,14 @@ class LocalDb {
   Future<Database> _open() async {
     if (_db != null && _db!.isOpen) return _db!;
     await initFfi();
-    final dir = await getApplicationSupportDirectory();
-    final sub = Directory(p.join(dir.path, 'querya_desktop'));
-    if (!await sub.exists()) await sub.create(recursive: true);
-    final path = p.join(sub.path, _dbName);
+    if (_cachedDbPath == null) {
+      final dir = await getApplicationSupportDirectory();
+      final sub = Directory(p.join(dir.path, 'querya_desktop'));
+      if (!await sub.exists()) await sub.create(recursive: true);
+      _cachedDbPath = p.join(sub.path, _dbName);
+    }
     _db = await databaseFactoryFfi.openDatabase(
-      path,
+      _cachedDbPath!,
       options: OpenDatabaseOptions(
         version: _dbVersion,
         onCreate: _onCreate,
@@ -173,7 +183,7 @@ class LocalDb {
     final db = await _open();
     final rows = await db.query('folders', columns: ['id'], where: 'name = ?', whereArgs: [name]);
     if (rows.isEmpty) return null;
-    return rows.first['id'] as int?;
+    return _sqliteInt(rows.first['id']);
   }
 
   Future<List<ConnectionRow>> getConnections() async {
@@ -182,9 +192,10 @@ class LocalDb {
     return rows.map(ConnectionRow.fromMap).toList();
   }
 
-  Future<void> addConnection(ConnectionRow row) async {
+  /// Inserts a row and returns the SQLite row id.
+  Future<int> addConnection(ConnectionRow row) async {
     final db = await _open();
-    await db.insert('connections', row.toMap());
+    return db.insert('connections', row.toMap());
   }
 
   Future<void> removeConnection(int id) async {
@@ -248,19 +259,19 @@ class ConnectionRow {
       };
 
   static ConnectionRow fromMap(Map<String, Object?> m) => ConnectionRow(
-        id: m['id'] as int?,
+        id: _sqliteInt(m['id']),
         type: m['type'] as String,
         name: m['name'] as String,
         host: m['host'] as String?,
-        port: m['port'] as int?,
+        port: _sqliteInt(m['port']),
         username: m['username'] as String?,
         password: m['password'] as String?,
         databaseName: m['database_name'] as String?,
         authSource: m['auth_source'] as String?,
-        useSSL: (m['use_ssl'] as int?) == 1,
+        useSSL: _sqliteInt(m['use_ssl']) == 1,
         connectionString: m['connection_string'] as String?,
-        folderId: m['folder_id'] as int?,
-        sortOrder: m['sort_order'] as int? ?? 0,
+        folderId: _sqliteInt(m['folder_id']),
+        sortOrder: _sqliteInt(m['sort_order']) ?? 0,
         createdAt: m['created_at'] as String,
       );
 }

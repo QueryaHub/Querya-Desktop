@@ -7,7 +7,7 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
-const _pollInterval = Duration(seconds: 3);
+const _defaultAutoRefresh = Duration(seconds: 3);
 const _summaryChipHeight = 72.0;
 const _gridCardHeight = 220.0;
 
@@ -39,6 +39,12 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
   String? _error;
   Timer? _timer;
 
+  /// `null` = auto-refresh off. Default matches previous 3s polling.
+  Duration? _autoRefreshInterval = _defaultAutoRefresh;
+
+  DateTime? _lastFetchedAt;
+  bool _manualRefreshing = false;
+
   @override
   void initState() {
     super.initState();
@@ -62,17 +68,9 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     super.dispose();
   }
 
-  /// Whether this view owns its connection (created it itself).
-  bool _ownsConnection = false;
-
-  /// Safely disconnects and clears the current MongoDB connection.
+  /// Clears the local connection reference (pooled socket stays in [MongoService]).
   void _disconnectCurrent() {
-    final conn = _connection;
     _connection = null;
-    if (conn != null && _ownsConnection) {
-      conn.disconnect(); // fire-and-forget; disconnect handles errors
-    }
-    _ownsConnection = false;
   }
 
   Future<void> _load() async {
@@ -87,17 +85,13 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     try {
       // Re-use the connection supplied by the parent when available.
       final supplied = widget.connection;
-      MongoConnection conn;
+      final MongoConnection conn;
       if (supplied != null && supplied.isConnected) {
         conn = supplied;
-        _ownsConnection = false;
       } else {
-        conn = MongoService.instance.createConnection(widget.connectionRow);
-        await conn.connect();
-        _ownsConnection = true;
+        conn = await MongoService.instance.ensureConnected(widget.connectionRow);
       }
       if (!mounted) {
-        if (_ownsConnection) conn.disconnect();
         return;
       }
       _connection = conn;
@@ -126,27 +120,62 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
       setState(() {
         _serverStatus = status;
         _loading = false;
+        _lastFetchedAt = DateTime.now();
       });
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  /// Fetches [serverStatus] only (no full reconnect). Use from toolbar / pull-to-refresh.
+  Future<void> _refreshNow() async {
+    final c = _connection;
+    if (c == null || !c.isConnected) {
+      await _load();
+      return;
+    }
+    setState(() => _manualRefreshing = true);
+    try {
+      await _fetch();
+    } finally {
+      if (mounted) setState(() => _manualRefreshing = false);
+    }
+  }
+
+  Future<void> _pollTick() async {
+    final c = _connection;
+    if (c == null || !c.isConnected) return;
+    try {
+      final status = await MongoService.instance.executeCommand(
+        c,
+        'admin',
+        {'serverStatus': 1},
+      );
+      if (!mounted) return;
+      setState(() {
+        _serverStatus = status;
+        _lastFetchedAt = DateTime.now();
+      });
+    } catch (_) {
+      // Keep last good snapshot on transient errors during auto-refresh.
     }
   }
 
   void _startTimer() {
     _timer?.cancel();
-    _timer = Timer.periodic(_pollInterval, (_) async {
-      final c = _connection;
-      if (c == null || !c.isConnected) return;
-      try {
-        final status = await MongoService.instance.executeCommand(
-          c,
-          'admin',
-          {'serverStatus': 1},
-        );
-        if (!mounted) return;
-        setState(() => _serverStatus = status);
-      } catch (_) {}
-    });
+    final interval = _autoRefreshInterval;
+    if (interval == null) return;
+    _timer = Timer.periodic(interval, (_) => _pollTick());
+  }
+
+  String _formatClock(DateTime t) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${two(t.hour)}:${two(t.minute)}:${two(t.second)}';
   }
 
   @override
@@ -202,7 +231,7 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     return material.Container(
       color: cs.background,
       child: material.RefreshIndicator(
-        onRefresh: _fetch,
+        onRefresh: _refreshNow,
         child: material.SingleChildScrollView(
           physics: const material.AlwaysScrollableScrollPhysics(),
           padding: const material.EdgeInsets.all(24),
@@ -251,7 +280,11 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
 
   material.Widget _header(material.BuildContext context) {
     final cs = shadcn.Theme.of(context).colorScheme;
-    return material.Row(
+    final last = _lastFetchedAt;
+    return material.Wrap(
+      crossAxisAlignment: material.WrapCrossAlignment.center,
+      spacing: 8,
+      runSpacing: 10,
       children: [
         material.Container(
           padding: const material.EdgeInsets.all(10),
@@ -261,8 +294,8 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
           ),
           child: material.Icon(material.Icons.eco_rounded, size: 28, color: cs.primary),
         ),
-        const Gap(16),
-        material.Expanded(
+        material.ConstrainedBox(
+          constraints: const material.BoxConstraints(minWidth: 160, maxWidth: 400),
           child: material.Column(
             crossAxisAlignment: material.CrossAxisAlignment.start,
             mainAxisSize: material.MainAxisSize.min,
@@ -270,11 +303,16 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
               Text(widget.connectionRow.name).large().semiBold(),
               const Gap(4),
               Text('${widget.connectionRow.host ?? 'localhost'}:${widget.connectionRow.port ?? 27017}')
-                  .muted().small(),
+                  .muted()
+                  .small(),
+              if (last != null) ...[
+                const Gap(4),
+                Text('Last updated ${_formatClock(last)}').muted().xSmall(),
+              ],
             ],
           ),
         ),
-        if (widget.onBack != null) ...[
+        if (widget.onBack != null)
           OutlineButton(
             onPressed: widget.onBack,
             leading: const material.Icon(
@@ -282,13 +320,51 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
                 size: 18),
             child: const Text('Explorer'),
           ),
-          const Gap(8),
-        ],
         OutlineButton(
-          onPressed: _load,
-          leading: const material.Icon(
-              material.Icons.refresh_rounded, size: 18),
-          child: const Text('Refresh'),
+          onPressed: _manualRefreshing ? null : _refreshNow,
+          leading: _manualRefreshing
+              ? const material.SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: material.CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const material.Icon(material.Icons.refresh_rounded, size: 18),
+          child: const Text('Refresh now'),
+        ),
+        material.Padding(
+          padding: const material.EdgeInsets.symmetric(horizontal: 4),
+          child: material.DropdownButton<Duration?>(
+            value: _autoRefreshInterval,
+            underline: const material.SizedBox.shrink(),
+            isDense: true,
+            borderRadius: material.BorderRadius.circular(8),
+            items: const [
+              material.DropdownMenuItem<Duration?>(
+                value: null,
+                child: material.Text('Auto: off'),
+              ),
+              material.DropdownMenuItem<Duration?>(
+                value: Duration(seconds: 3),
+                child: material.Text('Auto: 3 s'),
+              ),
+              material.DropdownMenuItem<Duration?>(
+                value: Duration(seconds: 10),
+                child: material.Text('Auto: 10 s'),
+              ),
+              material.DropdownMenuItem<Duration?>(
+                value: Duration(seconds: 30),
+                child: material.Text('Auto: 30 s'),
+              ),
+              material.DropdownMenuItem<Duration?>(
+                value: Duration(seconds: 60),
+                child: material.Text('Auto: 60 s'),
+              ),
+            ],
+            onChanged: (value) {
+              setState(() => _autoRefreshInterval = value);
+              _startTimer();
+            },
+          ),
         ),
       ],
     );

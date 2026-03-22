@@ -1,3 +1,5 @@
+import 'dart:math' show min;
+
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
@@ -11,21 +13,34 @@ class MongoCollectionsView extends material.StatefulWidget {
     required this.connection,
     required this.database,
     this.onCollectionTap,
+    this.refreshToken = 0,
   });
 
   final MongoConnection connection;
   final String database;
   final ValueChanged<String>? onCollectionTap;
 
+  /// Incremented by the parent when the user requests a refresh (toolbar).
+  final int refreshToken;
+
   @override
   material.State<MongoCollectionsView> createState() =>
       _MongoCollectionsViewState();
 }
 
+/// Parallel [collStats] calls per batch (limits load on large clusters).
+const _statsConcurrency = 6;
+
 class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
   List<_CollectionInfo> _collections = [];
   bool _loading = true;
   String? _error;
+
+  /// Incremented on each full reload so in-flight stats work is ignored after dispose / new load.
+  int _loadGeneration = 0;
+  bool _loadingStats = false;
+  int _statsProgress = 0;
+  int _statsTotal = 0;
 
   final _newCollController = material.TextEditingController();
 
@@ -36,46 +51,89 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
   }
 
   @override
+  void didUpdateWidget(covariant MongoCollectionsView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken) {
+      _load();
+    }
+  }
+
+  @override
   void dispose() {
+    _loadGeneration++;
     _newCollController.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
+    final gen = ++_loadGeneration;
     if (!mounted) return;
     setState(() {
       _loading = true;
       _error = null;
+      _loadingStats = false;
+      _statsProgress = 0;
+      _statsTotal = 0;
     });
     try {
       final names =
           await widget.connection.listCollections(widget.database);
-      final collections = <_CollectionInfo>[];
-      for (final name in names) {
-        int? count;
-        int? size;
-        try {
-          final stats = await MongoService.instance.getCollectionStats(
-            widget.connection,
-            widget.database,
-            name,
-          );
-          count = _toInt(stats['count']);
-          size = _toInt(stats['size']);
-        } catch (_) {}
-        collections.add(
-            _CollectionInfo(name: name, documentCount: count, size: size));
-      }
-      if (!mounted) return;
+      if (!mounted || gen != _loadGeneration) return;
+
       setState(() {
-        _collections = collections;
+        _collections = [
+          for (final n in names)
+            _CollectionInfo(name: n, documentCount: null, size: null),
+        ];
         _loading = false;
+        _loadingStats = names.isNotEmpty;
+        _statsTotal = names.length;
+        _statsProgress = 0;
       });
+
+      if (names.isEmpty) return;
+
+      for (var i = 0; i < names.length; i += _statsConcurrency) {
+        if (!mounted || gen != _loadGeneration) return;
+        final end = min(i + _statsConcurrency, names.length);
+        final chunk = names.sublist(i, end);
+
+        final chunkInfos = await Future.wait(
+          chunk.map((name) async {
+            try {
+              final stats = await MongoService.instance.getCollectionStats(
+                widget.connection,
+                widget.database,
+                name,
+              );
+              return _CollectionInfo(
+                name: name,
+                documentCount: _toInt(stats['count']),
+                size: _toInt(stats['size']),
+              );
+            } catch (_) {
+              return _CollectionInfo(name: name, documentCount: null, size: null);
+            }
+          }),
+        );
+
+        if (!mounted || gen != _loadGeneration) return;
+        setState(() {
+          for (var k = 0; k < chunk.length; k++) {
+            _collections[i + k] = chunkInfos[k];
+          }
+          _statsProgress = end;
+          if (end >= names.length) {
+            _loadingStats = false;
+          }
+        });
+      }
     } catch (e) {
-      if (mounted) {
+      if (mounted && gen == _loadGeneration) {
         setState(() {
           _error = e.toString();
           _loading = false;
+          _loadingStats = false;
         });
       }
     }
@@ -210,9 +268,26 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
                 material.Icon(material.Icons.folder_rounded,
                     size: 18, color: shadcnCs.primary),
                 const Gap(10),
-                Text('${widget.database} — Collections (${_collections.length})')
-                    .semiBold(),
-                const Spacer(),
+                material.Expanded(
+                  child: material.Column(
+                    crossAxisAlignment: material.CrossAxisAlignment.start,
+                    mainAxisSize: material.MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${widget.database} — Collections (${_collections.length})',
+                      ).semiBold(),
+                      if (_loadingStats && _statsTotal > 0)
+                        material.Padding(
+                          padding: const material.EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Loading stats $_statsProgress / $_statsTotal…',
+                          )
+                              .muted()
+                              .xSmall(),
+                        ),
+                    ],
+                  ),
+                ),
                 material.SizedBox(
                   width: 180,
                   child: TextField(
