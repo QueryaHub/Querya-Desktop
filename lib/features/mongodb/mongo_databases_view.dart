@@ -12,6 +12,7 @@ class MongoDatabasesView extends StatefulWidget {
     required this.connectionRow,
     this.connection,
     this.onDatabaseTap,
+    this.refreshToken = 0,
   });
 
   final ConnectionRow connectionRow;
@@ -22,6 +23,9 @@ class MongoDatabasesView extends StatefulWidget {
 
   /// Called when the user taps a database row to browse it.
   final ValueChanged<String>? onDatabaseTap;
+
+  /// Incremented by the parent when the user requests a refresh (toolbar).
+  final int refreshToken;
 
   @override
   State<MongoDatabasesView> createState() => _MongoDatabasesViewState();
@@ -47,6 +51,8 @@ class _MongoDatabasesViewState extends State<MongoDatabasesView> {
     if (oldWidget.connectionRow.id != widget.connectionRow.id ||
         oldWidget.connection != widget.connection) {
       _connectAndLoad();
+    } else if (oldWidget.refreshToken != widget.refreshToken) {
+      _loadDatabases();
     }
   }
 
@@ -66,10 +72,14 @@ class _MongoDatabasesViewState extends State<MongoDatabasesView> {
       // Re-use the connection supplied by the parent (MongoExplorerView) when
       // available so we don't create a second connection that replaces the
       // shared one in MongoService.
-      final conn = widget.connection ??
-          MongoService.instance.createConnection(widget.connectionRow);
-      if (!conn.isConnected) {
-        await conn.connect();
+      final MongoConnection conn;
+      if (widget.connection != null) {
+        conn = widget.connection!;
+        if (!conn.isConnected) {
+          await conn.connect();
+        }
+      } else {
+        conn = await MongoService.instance.ensureConnected(widget.connectionRow);
       }
       if (!mounted) return;
       _connection = conn;

@@ -10,6 +10,34 @@ class MongoService {
 
   final Map<int, MongoConnection> _connections = {};
 
+  /// Returns a connected [MongoConnection] for [row], reusing an existing
+  /// pooled connection when it is already open for the same connection id.
+  ///
+  /// Use this from the sidebar and explorer so they share one socket per saved
+  /// connection instead of opening parallel clients.
+  Future<MongoConnection> ensureConnected(ConnectionRow row) async {
+    if (row.type != 'mongodb') {
+      throw ArgumentError('Connection type must be mongodb');
+    }
+    final id = row.id ?? 0;
+    final existing = _connections[id];
+    if (existing != null && existing.isConnected) {
+      return existing;
+    }
+    final connection = createConnection(row);
+    await connection.connect();
+    return connection;
+  }
+
+  /// Disconnects the pooled connection for [id], if any (e.g. when the user
+  /// removes the connection from the browser).
+  Future<void> disconnectByConnectionId(int id) async {
+    final c = _connections[id];
+    if (c != null) {
+      await disconnect(c);
+    }
+  }
+
   /// Creates (or replaces) a [MongoConnection] for the given [ConnectionRow].
   /// If a connection with the same ID already exists it is disconnected first.
   MongoConnection createConnection(ConnectionRow row) {

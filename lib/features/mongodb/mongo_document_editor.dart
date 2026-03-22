@@ -14,6 +14,7 @@ class MongoDocumentEditor extends material.StatefulWidget {
     required this.database,
     required this.collection,
     required this.document,
+    this.refreshToken = 0,
     this.onBack,
     this.onDocumentUpdated,
     this.onDocumentDeleted,
@@ -23,6 +24,10 @@ class MongoDocumentEditor extends material.StatefulWidget {
   final String database;
   final String collection;
   final Map<String, dynamic> document;
+
+  /// Incremented by the parent when the user requests a refresh (toolbar).
+  final int refreshToken;
+
   final VoidCallback? onBack;
   final VoidCallback? onDocumentUpdated;
   final VoidCallback? onDocumentDeleted;
@@ -47,6 +52,49 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
       text: _prettyJson(widget.document),
     );
     _controller.addListener(_onTextChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant MongoDocumentEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken) {
+      _reloadFromServer();
+    }
+  }
+
+  /// Fetches the latest document from the server (toolbar Refresh).
+  Future<void> _reloadFromServer() async {
+    final id = widget.document['_id'];
+    if (id == null) return;
+    setState(() {
+      _error = null;
+      _success = null;
+    });
+    try {
+      final rows = await MongoService.instance.find(
+        widget.connection,
+        widget.database,
+        widget.collection,
+        filter: <String, dynamic>{'_id': id},
+        limit: 1,
+      );
+      if (!mounted) return;
+      if (rows.isEmpty) {
+        setState(() => _error = 'Document no longer exists');
+        return;
+      }
+      final doc = rows.first;
+      _controller.removeListener(_onTextChanged);
+      _controller.text = _prettyJson(doc);
+      _controller.addListener(_onTextChanged);
+      setState(() {
+        _dirty = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = 'Failed to reload: $e');
+      }
+    }
   }
 
   @override
