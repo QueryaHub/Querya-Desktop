@@ -25,6 +25,11 @@ class ConnectionsPanel extends StatefulWidget {
     this.onMongoDBDatabaseSelected,
     this.onPostgresObjectSelected,
     this.onPostgresOpenSqlWorkspace,
+    /// When true, [initState] does not call [_loadData]. Widget tests that seed
+    /// SQLite in setUp should call [ConnectionsPanelState.reloadConnectionsFromDb]
+    /// inside [WidgetTester.runAsync] so only one load runs (avoids overlapping
+    /// sqflite isolate futures clobbering state under FakeAsync).
+    this.skipInitialDbLoadForTest = false,
   });
 
   /// Called when the user taps a connection tile.
@@ -50,6 +55,8 @@ class ConnectionsPanel extends StatefulWidget {
   /// Opens the PostgreSQL workspace home and switches to the SQL tab (e.g. from tree context menu).
   final void Function(ConnectionRow connection)? onPostgresOpenSqlWorkspace;
 
+  final bool skipInitialDbLoadForTest;
+
   @override
   State<ConnectionsPanel> createState() => ConnectionsPanelState();
 }
@@ -59,11 +66,15 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
   List<ConnectionRow> _connections = [];
   Map<String, int> _folderIdByName = {};
   final Set<String> _expandedFolders = {};
+  /// Ignores stale [setState] when multiple [_loadData] runs overlap (e.g. tests).
+  int _loadDataGeneration = 0;
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    if (!widget.skipInitialDbLoadForTest) {
+      _loadData();
+    }
   }
 
   /// Reloads folders and connections from [LocalDb] / [FoldersStorage].
@@ -74,6 +85,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
   Future<void> reloadConnectionsFromDb() => _loadData();
 
   Future<void> _loadData() async {
+    final gen = ++_loadDataGeneration;
     final folders = await FoldersStorage.instance.load();
     var connections = await LocalDb.instance.getConnections();
     // Remove stub connections (PostgreSQL/MySQL placeholders) from DB and from list
@@ -86,25 +98,26 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
       final id = await LocalDb.instance.getFolderIdByName(name);
       if (id != null) folderIdByName[name] = id;
     }
-    if (mounted) {
-      setState(() {
-        final previousFolders = _folders.toSet();
-        _folders = folders;
-        _connections = connections;
-        _folderIdByName = folderIdByName;
-        for (final name in folders) {
-          if (!previousFolders.contains(name)) {
-            // First load (no folders in state yet): expand all — matches old UX.
-            // Later, new folders stay collapsed so root connections stay visible
-            // and the tree does not look like catalogs moved under the folder.
-            if (previousFolders.isEmpty) {
-              _expandedFolders.add(name);
-            }
+    if (!mounted || gen != _loadDataGeneration) {
+      return;
+    }
+    setState(() {
+      final previousFolders = _folders.toSet();
+      _folders = folders;
+      _connections = connections;
+      _folderIdByName = folderIdByName;
+      for (final name in folders) {
+        if (!previousFolders.contains(name)) {
+          // First load (no folders in state yet): expand all — matches old UX.
+          // Later, new folders stay collapsed so root connections stay visible
+          // and the tree does not look like catalogs moved under the folder.
+          if (previousFolders.isEmpty) {
+            _expandedFolders.add(name);
           }
         }
-        _expandedFolders.removeWhere((n) => !folders.contains(n));
-      });
-    }
+      }
+      _expandedFolders.removeWhere((n) => !folders.contains(n));
+    });
   }
 
   static bool _isStubConnection(ConnectionRow c) {
