@@ -51,10 +51,10 @@ class ConnectionsPanel extends StatefulWidget {
   final void Function(ConnectionRow connection)? onPostgresOpenSqlWorkspace;
 
   @override
-  State<ConnectionsPanel> createState() => _ConnectionsPanelState();
+  State<ConnectionsPanel> createState() => ConnectionsPanelState();
 }
 
-class _ConnectionsPanelState extends State<ConnectionsPanel> {
+class ConnectionsPanelState extends State<ConnectionsPanel> {
   List<String> _folders = [];
   List<ConnectionRow> _connections = [];
   Map<String, int> _folderIdByName = {};
@@ -65,6 +65,13 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
     super.initState();
     _loadData();
   }
+
+  /// Reloads folders and connections from [LocalDb] / [FoldersStorage].
+  ///
+  /// Widget tests should call this inside `WidgetTester.runAsync` so sqflite FFI
+  /// futures complete outside the test's FakeAsync zone (otherwise [initState]'s
+  /// [_loadData] may never reach [setState]).
+  Future<void> reloadConnectionsFromDb() => _loadData();
 
   Future<void> _loadData() async {
     final folders = await FoldersStorage.instance.load();
@@ -548,7 +555,7 @@ class _FolderTile extends StatelessWidget {
                       : _ConnectionTile(
                           connection: conn,
                           icon: iconForType(conn.type),
-                          iconAsset: _ConnectionsPanelState._iconAssetForType(conn.type),
+                          iconAsset: ConnectionsPanelState._iconAssetForType(conn.type),
                           onRemove: () => onRemoveConnection(conn.id!),
                           onTap: () => onConnectionTap?.call(conn),
                         ),
