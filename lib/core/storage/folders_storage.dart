@@ -16,6 +16,7 @@ class FoldersStorage {
 
   List<String> _folders = [];
   bool _loaded = false;
+  bool _migrationChecked = false;
 
   List<String> get folders => List.unmodifiable(_folders);
 
@@ -32,6 +33,8 @@ class FoldersStorage {
   }
 
   Future<void> _migrateFromLegacyIfNeeded() async {
+    if (_migrationChecked) return;
+    _migrationChecked = true;
     try {
       final dir = await getApplicationSupportDirectory();
       final sub = Directory('${dir.path}/querya_desktop');
@@ -74,5 +77,11 @@ class FoldersStorage {
     await load();
     await LocalDb.instance.removeFolder(name);
     _folders = await LocalDb.instance.getFolders();
+  }
+
+  /// Reloads folder names from [LocalDb] (e.g. after external seeding in tests).
+  Future<void> reload() async {
+    _loaded = false;
+    await load();
   }
 }

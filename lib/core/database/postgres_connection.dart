@@ -106,7 +106,15 @@ class PostgresConnection {
     if (_isConnected && _conn != null) return;
     try {
       if (_usesConnectionString) {
-        final parsed = parseConnectionString(connectionString!.trim());
+        // Pool passes target catalog via [database]; URI alone would always open
+        // the DB embedded in the string — every tree branch then queried the
+        // same database (duplicate tables under finance / logistics, etc.).
+        final dbName = database ?? 'postgres';
+        final uriForOpen = replaceDatabaseInConnectionString(
+          connectionString!.trim(),
+          dbName,
+        );
+        final parsed = parseConnectionString(uriForOpen);
         final sslMode =
             parsed.sslMode ?? (useSSL ? SslMode.require : SslMode.disable);
         _conn = await Connection.open(

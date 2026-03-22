@@ -16,12 +16,16 @@ class MongoDocumentsView extends material.StatefulWidget {
     required this.database,
     required this.collection,
     this.onDocumentTap,
+    this.refreshToken = 0,
   });
 
   final MongoConnection connection;
   final String database;
   final String collection;
   final ValueChanged<Map<String, dynamic>>? onDocumentTap;
+
+  /// Incremented by the parent when the user requests a refresh (toolbar).
+  final int refreshToken;
 
   @override
   material.State<MongoDocumentsView> createState() =>
@@ -43,6 +47,14 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant MongoDocumentsView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken) {
+      _load();
+    }
   }
 
   @override

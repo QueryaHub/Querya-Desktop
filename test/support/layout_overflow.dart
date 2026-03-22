@@ -9,6 +9,19 @@ bool isLayoutOverflowError(FlutterErrorDetails details) {
       s.contains('RenderFlex');
 }
 
+/// Bounded frame pumping — avoids [WidgetTester.pumpAndSettle], which never returns
+/// when the tree has a never-ending animation (e.g. [CircularProgressIndicator],
+/// shimmer, or a continuous implicit animation).
+Future<void> pumpFrames(
+  WidgetTester tester, {
+  int count = 120,
+  Duration step = const Duration(milliseconds: 50),
+}) async {
+  for (var i = 0; i < count; i++) {
+    await tester.pump(step);
+  }
+}
+
 /// Pumps [widget] with [tester.binding.setSurfaceSize], restores size in tearDown.
 Future<void> pumpWidgetWithSurfaceSize(
   WidgetTester tester,
@@ -18,7 +31,7 @@ Future<void> pumpWidgetWithSurfaceSize(
   await tester.binding.setSurfaceSize(size);
   addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.pumpWidget(widget);
-  await tester.pumpAndSettle();
+  await pumpFrames(tester);
 }
 
 /// Runs [action], collecting overflow-like [FlutterErrorDetails] while still
