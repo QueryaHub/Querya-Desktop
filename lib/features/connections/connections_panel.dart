@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart' as material show AlertDialog, BoxConstraints, BuildContext, Column, ConstrainedBox, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, DefaultTextStyle, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, AnimatedRotation, Row, BoxFit, Text, TextOverflow, Expanded, CircularProgressIndicator, Material, StatelessWidget, Colors, Tooltip, Color, LayoutBuilder, TextPainter, TextSpan, TextDirection, SelectableText, Padding, Widget, Navigator;
+import 'package:flutter/material.dart' as material show AlertDialog, BoxConstraints, BuildContext, Column, ConstrainedBox, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, DefaultTextStyle, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, AnimatedRotation, Row, BoxFit, Text, TextOverflow, Expanded, CircularProgressIndicator, Material, StatelessWidget, Colors, Tooltip, Color, LayoutBuilder, TextPainter, TextSpan, TextDirection, SelectableText, Padding, Widget, Navigator, ValueKey;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
@@ -86,7 +86,14 @@ class _ConnectionsPanelState extends State<ConnectionsPanel> {
         _connections = connections;
         _folderIdByName = folderIdByName;
         for (final name in folders) {
-          if (!previousFolders.contains(name)) _expandedFolders.add(name);
+          if (!previousFolders.contains(name)) {
+            // First load (no folders in state yet): expand all — matches old UX.
+            // Later, new folders stay collapsed so root connections stay visible
+            // and the tree does not look like catalogs moved under the folder.
+            if (previousFolders.isEmpty) {
+              _expandedFolders.add(name);
+            }
+          }
         }
         _expandedFolders.removeWhere((n) => !folders.contains(n));
       });
@@ -1679,6 +1686,7 @@ class _PgDatabasesNodeState extends State<_PgDatabasesNode> {
           if (_expanded)
             for (final db in widget.databases)
               _PgDatabaseNode(
+                key: material.ValueKey('pg-db-${widget.connection.id ?? 0}-$db'),
                 connection: widget.connection,
                 databaseName: db,
                 onPostgresObjectSelected: widget.onPostgresObjectSelected,
@@ -1692,6 +1700,7 @@ class _PgDatabasesNodeState extends State<_PgDatabasesNode> {
 
 class _PgDatabaseNode extends StatefulWidget {
   const _PgDatabaseNode({
+    super.key,
     required this.connection,
     required this.databaseName,
     this.onPostgresObjectSelected,
@@ -1966,6 +1975,9 @@ class _PgSchemasNodeState extends State<_PgSchemasNode> {
           if (_expanded)
             for (final schema in widget.schemas)
               _PgSchemaNode(
+                key: material.ValueKey(
+                  'pg-schema-${widget.connection.id ?? 0}-${widget.databaseName}-$schema',
+                ),
                 connection: widget.connection,
                 databaseName: widget.databaseName,
                 schemaName: schema,
@@ -1980,6 +1992,7 @@ class _PgSchemasNodeState extends State<_PgSchemasNode> {
 
 class _PgSchemaNode extends StatefulWidget {
   const _PgSchemaNode({
+    super.key,
     required this.connection,
     required this.databaseName,
     required this.schemaName,
