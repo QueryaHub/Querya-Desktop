@@ -157,12 +157,10 @@ void main() {
       );
       await FoldersStorage.instance.reload();
 
-      // Close the DB so _open() creates a FRESH Database object inside
-      // FakeAsync zone (testWidgets). sqflite's internal Lock retains the zone
-      // where the Database was created; if it stays in the real-async zone,
-      // Lock._last Future continuations go to the wrong microtask queue and
-      // _loadData() never completes.
-      await LocalDb.instance.close();
+      // Keep LocalDb open: closing here and reopening during testWidgets (FakeAsync)
+      // often prevents _loadData() from finishing setState — FoldersStorage cache
+      // is correct but the panel stays empty (no PG rows). Cross-zone sqflite
+      // workarounds use runAsync+pump in the test body instead.
     });
 
     tearDown(() async {
@@ -194,17 +192,17 @@ void main() {
           ),
         ),
       );
+      await tester.pump();
 
-      // _loadData() fires from initState and calls sqflite queries. sqflite
-      // internally uses Lock whose _last Future lives in the real-async zone
-      // (because the DB was first opened in setUp). Each cross-zone Future hop
-      // needs one runAsync (to process the real-zone microtask) + pump (to
-      // process the resulting FakeAsync microtask and frame).
-      for (var i = 0; i < 10; i++) {
-        await tester.runAsync(
-            () => Future<void>.delayed(const Duration(milliseconds: 5)));
-        await tester.pump(const Duration(milliseconds: 50));
-      }
+      // Sqflite FFI uses an isolate; async work started from initState may not
+      // finish reliably under FakeAsync. Call [reloadConnectionsFromDb] inside
+      // runAsync (real microtasks/timers) and pump — same idea as seeding DB in
+      // setUp outside FakeAsync. Capture [ConnectionsPanelState] outside runAsync.
+      final panelState = tester.state<ConnectionsPanelState>(
+        find.byType(ConnectionsPanel),
+      );
+      await tester.runAsync(() => panelState.reloadConnectionsFromDb());
+      await tester.pumpAndSettle(const Duration(milliseconds: 100));
 
       _expectMaterialTextCount('LayoutTestFolder', 1);
       _expectMaterialTextCount('PG local', 1);
