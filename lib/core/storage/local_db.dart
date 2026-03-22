@@ -7,6 +7,13 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 const _dbName = 'querya.db';
 const _dbVersion = 4;
 
+int? _sqliteInt(Object? v) {
+  if (v == null) return null;
+  if (v is int) return v;
+  if (v is num) return v.toInt();
+  return int.tryParse(v.toString());
+}
+
 /// Local SQLite database for folders and connections.
 /// File: [applicationSupport]/querya_desktop/querya.db
 class LocalDb {
@@ -176,7 +183,7 @@ class LocalDb {
     final db = await _open();
     final rows = await db.query('folders', columns: ['id'], where: 'name = ?', whereArgs: [name]);
     if (rows.isEmpty) return null;
-    return rows.first['id'] as int?;
+    return _sqliteInt(rows.first['id']);
   }
 
   Future<List<ConnectionRow>> getConnections() async {
@@ -252,19 +259,19 @@ class ConnectionRow {
       };
 
   static ConnectionRow fromMap(Map<String, Object?> m) => ConnectionRow(
-        id: m['id'] as int?,
+        id: _sqliteInt(m['id']),
         type: m['type'] as String,
         name: m['name'] as String,
         host: m['host'] as String?,
-        port: m['port'] as int?,
+        port: _sqliteInt(m['port']),
         username: m['username'] as String?,
         password: m['password'] as String?,
         databaseName: m['database_name'] as String?,
         authSource: m['auth_source'] as String?,
-        useSSL: (m['use_ssl'] as int?) == 1,
+        useSSL: _sqliteInt(m['use_ssl']) == 1,
         connectionString: m['connection_string'] as String?,
-        folderId: m['folder_id'] as int?,
-        sortOrder: m['sort_order'] as int? ?? 0,
+        folderId: _sqliteInt(m['folder_id']),
+        sortOrder: _sqliteInt(m['sort_order']) ?? 0,
         createdAt: m['created_at'] as String,
       );
 }
