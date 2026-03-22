@@ -14,13 +14,14 @@ import '../../support/layout_overflow.dart';
 String _isoNow() => DateTime.now().toUtc().toIso8601String();
 
 /// Avoid [findsOneWidget] here: it polls until a long timeout and can hang the suite.
-/// Match [material.Text] explicitly (same as folder / connection rows in [ConnectionsPanel]).
-void _expectMaterialTextCount(String label, int expected) {
-  final n = find.widgetWithText(material.Text, label).evaluate().length;
+/// Use [find.text] (matches Material [Text] via RichText) — [find.widgetWithText]
+/// with `material.Text` can miss the same widget class across import boundaries.
+void _expectTextCount(String label, int expected) {
+  final n = find.text(label).evaluate().length;
   expect(
     n,
     expected,
-    reason: 'material.Text("$label"): expected $expected, found $n',
+    reason: 'find.text("$label"): expected $expected, found $n',
   );
 }
 
@@ -187,6 +188,7 @@ void main() {
           themeMode: ThemeMode.dark,
           home: material.SizedBox.expand(
             child: ConnectionsPanel(
+              skipInitialDbLoadForTest: true,
               onPostgresOpenSqlWorkspace: (_) {},
             ),
           ),
@@ -194,20 +196,35 @@ void main() {
       );
       await tester.pump();
 
-      // Sqflite FFI uses an isolate; async work started from initState may not
-      // finish reliably under FakeAsync. Call [reloadConnectionsFromDb] inside
-      // runAsync (real microtasks/timers) and pump — same idea as seeding DB in
-      // setUp outside FakeAsync. Capture [ConnectionsPanelState] outside runAsync.
+      // One [_loadData] only: skip initState load + reload inside runAsync (real
+      // async). Two overlapping loads under FakeAsync left the panel empty even
+      // when FoldersStorage had folders (stale sqflite futures + generation guard).
       final panelState = tester.state<ConnectionsPanelState>(
         find.byType(ConnectionsPanel),
       );
-      await tester.runAsync(() => panelState.reloadConnectionsFromDb());
-      await tester.pumpAndSettle(const Duration(milliseconds: 100));
+      Object? reloadError;
+      await tester.runAsync(() async {
+        try {
+          await panelState.reloadConnectionsFromDb();
+        } catch (e) {
+          reloadError = e;
+        }
+        // Let completions scheduled from the isolate chain run before runAsync ends.
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      });
+      expect(
+        reloadError,
+        isNull,
+        reason:
+            'reloadConnectionsFromDb threw (runAsync often swallows async errors): $reloadError',
+      );
+      await tester.pump(const Duration(milliseconds: 16));
+      await tester.pump(const Duration(milliseconds: 16));
 
-      _expectMaterialTextCount('LayoutTestFolder', 1);
-      _expectMaterialTextCount('PG local', 1);
-      _expectMaterialTextCount('Redis local', 1);
-      _expectMaterialTextCount('Mongo local', 1);
+      _expectTextCount('LayoutTestFolder', 1);
+      _expectTextCount('PG local', 1);
+      _expectTextCount('Redis local', 1);
+      _expectTextCount('Mongo local', 1);
     });
   });
 }
