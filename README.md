@@ -7,7 +7,13 @@ A lightweight desktop client for SQL and NoSQL databases. Connect to PostgreSQL,
 - **Cross-platform:** Windows, Linux, macOS (Flutter desktop).
 - **Multi-database:** PostgreSQL, MySQL, Redis, MongoDB (more can be added).
 - **UI:** Custom window (no system title bar), resizable left panel (connection tree) and bottom split (query editor / results), dark theme, [shadcn_flutter](https://pub.dev/packages/shadcn_flutter) components.
-- **Flow:** Right-click “Servers” → “New connection” → pick database type → (future: connection form and query execution).
+- **Flow:** Right-click “Servers” → “New connection” → pick database type → configure and save (stored in local SQLite).
+
+## Database drivers
+
+- **PostgreSQL** — `postgres` (Dart); browser, SQL workspace, table/view browsing, server stats.
+- **MySQL / MariaDB** — `mysql_client` (Dart); browser (databases, tables, views), SQL workspace with configurable statement timeout, paginated table/view data (read-oriented browse SQL).
+- **Redis** / **MongoDB** — see connection panels and workspace.
 
 ## Tech stack
 
