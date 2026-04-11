@@ -7,6 +7,7 @@ import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 import 'package:querya_desktop/features/connections/connections_panel.dart';
+import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
 import 'package:querya_desktop/features/connections/driver_manager_dialog.dart';
 import 'package:querya_desktop/features/connections/new_connection_dialog.dart';
@@ -43,12 +44,19 @@ class _MainScreenState extends State<MainScreen> {
   /// Bumped to tell [PostgresWorkspaceHome] to switch to the SQL tab.
   int _postgresSqlTabRequestToken = 0;
 
+  /// When set, user selected a MySQL table or view in the tree.
+  ({String database, String name, MysqlObjectKind kind})? _selectedMysqlObject;
+
+  /// Bumped to tell [MysqlWorkspaceHome] to switch to the SQL tab.
+  int _mysqlSqlTabRequestToken = 0;
+
   void _onConnectionSelected(ConnectionRow connection) {
     setState(() {
       _activeConnection = connection;
       _activeRedisDb = null;
       _activeMongoDB = null;
       _selectedPostgresObject = null;
+      _selectedMysqlObject = null;
     });
   }
 
@@ -63,9 +71,29 @@ class _MainScreenState extends State<MainScreen> {
       _activeConnection = connection;
       _activeRedisDb = null;
       _activeMongoDB = null;
+      _selectedMysqlObject = null;
       _selectedPostgresObject = (
         database: database,
         schema: schema,
+        name: name,
+        kind: kind,
+      );
+    });
+  }
+
+  void _onMysqlObjectSelected(
+    ConnectionRow connection,
+    String database,
+    String name,
+    MysqlObjectKind kind,
+  ) {
+    setState(() {
+      _activeConnection = connection;
+      _activeRedisDb = null;
+      _activeMongoDB = null;
+      _selectedPostgresObject = null;
+      _selectedMysqlObject = (
+        database: database,
         name: name,
         kind: kind,
       );
@@ -77,6 +105,8 @@ class _MainScreenState extends State<MainScreen> {
       _activeConnection = connection;
       _activeRedisDb = database;
       _activeMongoDB = null;
+      _selectedPostgresObject = null;
+      _selectedMysqlObject = null;
     });
   }
 
@@ -85,6 +115,8 @@ class _MainScreenState extends State<MainScreen> {
       _activeConnection = connection;
       _activeRedisDb = null;
       _activeMongoDB = database;
+      _selectedPostgresObject = null;
+      _selectedMysqlObject = null;
     });
   }
 
@@ -94,7 +126,19 @@ class _MainScreenState extends State<MainScreen> {
       _activeRedisDb = null;
       _activeMongoDB = null;
       _selectedPostgresObject = null;
+      _selectedMysqlObject = null;
       _postgresSqlTabRequestToken++;
+    });
+  }
+
+  void _onMysqlOpenSqlWorkspace(ConnectionRow connection) {
+    setState(() {
+      _activeConnection = connection;
+      _activeRedisDb = null;
+      _activeMongoDB = null;
+      _selectedPostgresObject = null;
+      _selectedMysqlObject = null;
+      _mysqlSqlTabRequestToken++;
     });
   }
 
@@ -139,6 +183,8 @@ class _MainScreenState extends State<MainScreen> {
                             onMongoDBDatabaseSelected: _onMongoDBDatabaseSelected,
                             onPostgresObjectSelected: _onPostgresObjectSelected,
                             onPostgresOpenSqlWorkspace: _onPostgresOpenSqlWorkspace,
+                            onMysqlObjectSelected: _onMysqlObjectSelected,
+                            onMysqlOpenSqlWorkspace: _onMysqlOpenSqlWorkspace,
                           ),
                         ),
                         _VerticalResizeHandle(
@@ -168,6 +214,8 @@ class _MainScreenState extends State<MainScreen> {
                             selectedMongoDb: _activeMongoDB,
                             selectedPostgresObject: _selectedPostgresObject,
                             postgresSqlTabRequestToken: _postgresSqlTabRequestToken,
+                            selectedMysqlObject: _selectedMysqlObject,
+                            mysqlSqlTabRequestToken: _mysqlSqlTabRequestToken,
                           ),
                         ),
                       ],

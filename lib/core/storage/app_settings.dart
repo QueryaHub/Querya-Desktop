@@ -4,6 +4,7 @@ import 'local_db.dart';
 abstract final class AppSettingsKeys {
   static const postgresSqlStmtTimeoutSeconds =
       'postgres_sql_stmt_timeout_seconds';
+  static const mysqlSqlStmtTimeoutSeconds = 'mysql_sql_stmt_timeout_seconds';
 }
 
 /// User preferences backed by [LocalDb] (SQLite).
@@ -28,6 +29,28 @@ class AppSettings {
     } else {
       await LocalDb.instance.setAppSetting(
         AppSettingsKeys.postgresSqlStmtTimeoutSeconds,
+        seconds.toString(),
+      );
+    }
+  }
+
+  /// `null` = use driver default for statement duration.
+  Future<int?> getMysqlSqlStmtTimeoutSeconds() async {
+    final v = await LocalDb.instance.getAppSetting(
+      AppSettingsKeys.mysqlSqlStmtTimeoutSeconds,
+    );
+    if (v == null || v.isEmpty) return null;
+    return int.tryParse(v);
+  }
+
+  Future<void> setMysqlSqlStmtTimeoutSeconds(int? seconds) async {
+    if (seconds == null) {
+      await LocalDb.instance.deleteAppSetting(
+        AppSettingsKeys.mysqlSqlStmtTimeoutSeconds,
+      );
+    } else {
+      await LocalDb.instance.setAppSetting(
+        AppSettingsKeys.mysqlSqlStmtTimeoutSeconds,
         seconds.toString(),
       );
     }
