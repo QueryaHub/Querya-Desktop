@@ -59,6 +59,7 @@ void main() {
 
   tearDown(() async {
     await AppSettings.instance.setPostgresSqlStmtTimeoutSeconds(null);
+    await AppSettings.instance.setMysqlSqlStmtTimeoutSeconds(null);
   });
 
   group('AppSettings', () {
@@ -78,6 +79,24 @@ void main() {
         'not-a-number',
       );
       expect(await AppSettings.instance.getPostgresSqlStmtTimeoutSeconds(), isNull);
+    });
+
+    test('getMysqlSqlStmtTimeoutSeconds roundtrip', () async {
+      expect(await AppSettings.instance.getMysqlSqlStmtTimeoutSeconds(), isNull);
+
+      await AppSettings.instance.setMysqlSqlStmtTimeoutSeconds(60);
+      expect(await AppSettings.instance.getMysqlSqlStmtTimeoutSeconds(), 60);
+
+      await AppSettings.instance.setMysqlSqlStmtTimeoutSeconds(null);
+      expect(await AppSettings.instance.getMysqlSqlStmtTimeoutSeconds(), isNull);
+    });
+
+    test('getMysqlSqlStmtTimeoutSeconds returns null for invalid stored value', () async {
+      await LocalDb.instance.setAppSetting(
+        AppSettingsKeys.mysqlSqlStmtTimeoutSeconds,
+        'not-a-number',
+      );
+      expect(await AppSettings.instance.getMysqlSqlStmtTimeoutSeconds(), isNull);
     });
   });
 }

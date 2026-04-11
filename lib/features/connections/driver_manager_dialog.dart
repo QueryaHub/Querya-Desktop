@@ -21,7 +21,7 @@ typedef _DriverInfo = ({
 
 final _driverInfoList = <_DriverInfo>[
   (type: ConnectionType.postgresql, description: 'PostgreSQL server connection (JDBC driver)', fixedStatus: null, downloadable: DownloadableDriver.postgresql),
-  (type: ConnectionType.mysql, description: 'MySQL / MariaDB server connection', fixedStatus: DriverStatus.comingSoon, downloadable: null),
+  (type: ConnectionType.mysql, description: 'MySQL / MariaDB server connection', fixedStatus: DriverStatus.installed, downloadable: null),
   (type: ConnectionType.redis, description: 'Redis server connection', fixedStatus: DriverStatus.installed, downloadable: null),
   (type: ConnectionType.mongodb, description: 'MongoDB server connection', fixedStatus: DriverStatus.installed, downloadable: null),
 ];
