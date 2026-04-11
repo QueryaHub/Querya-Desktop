@@ -2,6 +2,9 @@ import 'package:flutter/material.dart' as material show Axis, Container, EdgeIns
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
+import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
+import 'package:querya_desktop/features/mysql/mysql_table_view.dart';
+import 'package:querya_desktop/features/mysql/mysql_workspace_home.dart';
 import 'package:querya_desktop/features/mongodb/mongo_explorer_view.dart';
 import 'package:querya_desktop/features/mongodb/mongo_stats_view.dart';
 import 'package:querya_desktop/features/postgresql/postgres_browser_views.dart';
@@ -117,6 +120,8 @@ class WorkspacePanel extends StatefulWidget {
     this.selectedMongoDb,
     this.selectedPostgresObject,
     this.postgresSqlTabRequestToken = 0,
+    this.selectedMysqlObject,
+    this.mysqlSqlTabRequestToken = 0,
   });
 
   /// Currently selected connection from the sidebar.
@@ -137,6 +142,13 @@ class WorkspacePanel extends StatefulWidget {
 
   /// Incremented by [MainScreen] to switch the PostgreSQL home view to the SQL tab.
   final int postgresSqlTabRequestToken;
+
+  /// When set, the user selected a MySQL table or view in the sidebar tree.
+  final ({String database, String name, MysqlObjectKind kind})?
+      selectedMysqlObject;
+
+  /// Incremented by [MainScreen] to switch the MySQL home view to the SQL tab.
+  final int mysqlSqlTabRequestToken;
 
   @override
   State<WorkspacePanel> createState() => _WorkspacePanelState();
@@ -167,6 +179,32 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
               : _pgObjectWorkspace(
                   connection: widget.activeConnection!,
                   pg: pg,
+                ),
+        ),
+      );
+    }
+
+    // MySQL / MariaDB
+    if (widget.activeConnection != null &&
+        widget.activeConnection!.type == 'mysql') {
+      final my = widget.selectedMysqlObject;
+      return material.Container(
+        color: theme.colorScheme.background,
+        child: material.SizedBox.expand(
+          child: my == null
+              ? MysqlWorkspaceHome(
+                  key: ValueKey('mysql_home_${widget.activeConnection!.id}'),
+                  connectionRow: widget.activeConnection!,
+                  sqlTabRequestToken: widget.mysqlSqlTabRequestToken,
+                )
+              : MysqlTableView(
+                  key: ValueKey(
+                    'mysql_${widget.activeConnection!.id}_${my.database}_${my.name}_${my.kind}',
+                  ),
+                  connectionRow: widget.activeConnection!,
+                  database: my.database,
+                  tableName: my.name,
+                  isView: my.kind == MysqlObjectKind.view,
                 ),
         ),
       );
