@@ -1,14 +1,21 @@
-# Сборка релизов и публикация в GitHub Releases.
-# Запуск: создайте и запушьте тег, например v0.1.0:
-#   git tag v0.1.0
-#   git push origin v0.1.0
+# Release: сборка артефактов → единая публикация с git-cliff и SHA256SUMS.
+# Триггер: git tag v0.1.0 && git push origin v0.1.0
+#
+# Рекомендуемые коммиты: Conventional Commits (feat:, fix:, …) — см. cliff.toml
 
 name: Release
 
 on:
   push:
     tags:
-      - 'v*'   # v0.1.0, v1.0.0, etc.
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build-windows:
@@ -36,16 +43,11 @@ jobs:
           $dir = "build\windows\x64\runner\Release"
           Compress-Archive -Path "$dir\*" -DestinationPath "Querya-Desktop-$tag-windows.zip"
 
-      - name: Create Release and upload Windows
-        uses: softprops/action-gh-release@v2
+      - uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          generate_release_notes: true
-          files: Querya-Desktop-${{ github.ref_name }}-windows.zip
-          allow_updates: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: bundle-windows
+          path: Querya-Desktop-${{ github.ref_name }}-windows.zip
+          if-no-files-found: error
 
   build-linux:
     name: Build Linux
@@ -74,15 +76,73 @@ jobs:
       - name: Zip Linux artifact
         run: |
           cd build/linux/x64/release/bundle
-          zip -r ../../../../../../Querya-Desktop-${{ github.ref_name }}-linux.zip .
+          zip -r "${GITHUB_WORKSPACE}/Querya-Desktop-${{ github.ref_name }}-linux.zip" .
 
-      - name: Upload to Release (Linux)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundle-linux
+          path: Querya-Desktop-${{ github.ref_name }}-linux.zip
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff@2.11.0
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: bundle-*
+          merge-multiple: true
+
+      - name: Layout distribution files
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          find artifacts -name '*.zip' -exec mv -t dist/ {} +
+          test "$(find dist -name '*.zip' | wc -l)" -eq 2
+          cd dist
+          sha256sum *.zip | tee SHA256SUMS.txt
+
+      - name: Generate changelog (git-cliff + GitHub API)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          TAG="${{ github.ref_name }}"
+          # Текст страницы релиза: без глобального header из cliff.toml
+          git-cliff --latest \
+            --config cliff.toml \
+            --strip header \
+            --github-token "$GITHUB_TOKEN" \
+            --github-repo "$GITHUB_REPO" \
+            -o release-body.md
+          # Вложение: полный фрагмент с header (удобно архивировать / копировать в docs)
+          git-cliff --latest \
+            --config cliff.toml \
+            --github-token "$GITHUB_TOKEN" \
+            --github-repo "$GITHUB_REPO" \
+            -o "CHANGELOG-${TAG}.md"
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
-          generate_release_notes: true
-          files: Querya-Desktop-${{ github.ref_name }}-linux.zip
-          allow_updates: true
+          body_path: release-body.md
+          fail_on_unmatched_files: true
+          files: |
+            dist/*.zip
+            dist/SHA256SUMS.txt
+            CHANGELOG-${{ github.ref_name }}.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
