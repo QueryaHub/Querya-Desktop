@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/postgres_connection.dart';
+import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/database/postgres_metadata.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -79,8 +80,7 @@ class _PrivilegesDialogBodyState extends material.State<_PrivilegesDialogBody> {
     final radius = Theme.of(context).radiusXxl;
     return material.Dialog(
       backgroundColor: material.Colors.transparent,
-      insetPadding:
-          const material.EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+      insetPadding: WindowLayout.dialogSymmetricInsets(context),
       child: material.Container(
         constraints: const material.BoxConstraints(
           maxWidth: 560,
