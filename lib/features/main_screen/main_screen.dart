@@ -4,9 +4,10 @@ import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart' as material show Scaffold, Container, MainAxisSize, GestureDetector, MouseRegion, SystemMouseCursors, HitTestBehavior, Icons, Icon;
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/app_theme.dart';
-import 'package:querya_desktop/shared/widgets/widgets.dart';
-
+import 'package:querya_desktop/core/theme/querya_colors.dart';
+import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
+import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
 import 'package:querya_desktop/features/connections/driver_manager_dialog.dart';
@@ -21,6 +22,9 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
+  final GlobalKey<ConnectionsPanelState> _connectionsPanelKey =
+      GlobalKey<ConnectionsPanelState>();
+
   static const double _minLeftWidth = 180;
   static const double _maxLeftWidth = 500;
   /// Minimum width reserved for workspace (avoid Row overflow when window is narrow).
@@ -142,6 +146,13 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
+  Future<void> _openNewConnectionFromHero() async {
+    final row = await promptCreateConnection(context);
+    if (!mounted || row == null) return;
+    await LocalDb.instance.addConnection(row);
+    await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = AppTheme.dark.colorScheme;
@@ -150,12 +161,12 @@ class _MainScreenState extends State<MainScreen> {
       body: Theme(
         data: AppTheme.dark,
         child: WindowBorder(
-          color: theme.border.withValues(alpha: 0.6),
+          color: theme.border.withValues(alpha: 0.35),
           width: 1,
           child: Column(
             children: [
               _CustomTitleBar(theme: theme),
-              const Divider(height: 1),
+              Divider(height: 1, color: theme.border.withValues(alpha: 0.22)),
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
@@ -178,6 +189,8 @@ class _MainScreenState extends State<MainScreen> {
                         SizedBox(
                           width: leftW,
                           child: ConnectionsPanel(
+                            key: _connectionsPanelKey,
+                            selectedConnectionId: _activeConnection?.id,
                             onConnectionSelected: _onConnectionSelected,
                             onRedisDatabaseSelected: _onRedisDatabaseSelected,
                             onMongoDBDatabaseSelected: _onMongoDBDatabaseSelected,
@@ -216,6 +229,9 @@ class _MainScreenState extends State<MainScreen> {
                             postgresSqlTabRequestToken: _postgresSqlTabRequestToken,
                             selectedMysqlObject: _selectedMysqlObject,
                             mysqlSqlTabRequestToken: _mysqlSqlTabRequestToken,
+                            onRequestNewConnection: () {
+                              _openNewConnectionFromHero();
+                            },
                           ),
                         ),
                       ],
@@ -292,6 +308,12 @@ class _CustomTitleBarState extends State<_CustomTitleBar> {
                 child: Row(
                   children: [
                     const SizedBox(width: 16),
+                    material.Icon(
+                      material.Icons.search_rounded,
+                      size: 18,
+                      color: QueryaColors.accentCyan,
+                    ),
+                    const Gap(8),
                     const Text('Querya').semiBold().small(),
                     const Gap(24),
                     Menubar(
