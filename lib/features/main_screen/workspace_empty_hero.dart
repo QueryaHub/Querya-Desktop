@@ -38,21 +38,29 @@ class WorkspaceEmptyHero extends StatelessWidget {
                   material.SizedBox(height: compact ? 16 : 20),
                   material.Padding(
                     padding: const material.EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(
+                    child: material.Text(
                       'A lightweight desktop client for every database you ship',
                       textAlign: material.TextAlign.center,
-                    )
-                        .large()
-                        .semiBold(),
+                      style: material.TextStyle(
+                        fontSize: 20,
+                        fontWeight: material.FontWeight.w600,
+                        color: cs.foreground,
+                      ),
+                    ),
                   ),
                   material.SizedBox(height: compact ? 10 : 12),
                   material.Padding(
                     padding: const material.EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(
+                    child: material.Text(
                       'Connect to PostgreSQL, MySQL, Redis and MongoDB from a single '
                       'focused app with a calm dark interface.',
                       textAlign: material.TextAlign.center,
-                    ).muted().small(),
+                      style: material.TextStyle(
+                        fontSize: 14,
+                        height: 1.4,
+                        color: cs.mutedForeground,
+                      ),
+                    ),
                   ),
                   const material.SizedBox(height: 10),
                   Text(
@@ -118,7 +126,7 @@ class _HeroBadge extends StatelessWidget {
         ),
       ),
       child: material.Row(
-        mainAxisSize: material.MainAxisSize.min,
+        mainAxisSize: material.MainAxisSize.max,
         children: [
           material.Icon(
             material.Icons.auto_awesome_rounded,
@@ -126,11 +134,15 @@ class _HeroBadge extends StatelessWidget {
             color: colorScheme.primary,
           ),
           material.SizedBox(width: compact ? 6 : 8),
-          Text(
-            'One app for SQL and NoSQL',
-            style: material.TextStyle(
-              fontSize: compact ? 11 : 12,
-              color: colorScheme.foreground.withValues(alpha: 0.92),
+          material.Expanded(
+            child: material.Text(
+              'One app for SQL and NoSQL',
+              maxLines: 2,
+              overflow: material.TextOverflow.ellipsis,
+              style: material.TextStyle(
+                fontSize: compact ? 11 : 12,
+                color: colorScheme.foreground.withValues(alpha: 0.92),
+              ),
             ),
           ),
         ],

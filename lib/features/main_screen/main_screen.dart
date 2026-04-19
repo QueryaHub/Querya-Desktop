@@ -308,7 +308,7 @@ class _CustomTitleBarState extends State<_CustomTitleBar> {
                 child: Row(
                   children: [
                     const SizedBox(width: 16),
-                    material.Icon(
+                    const material.Icon(
                       material.Icons.search_rounded,
                       size: 18,
                       color: QueryaColors.accentCyan,
