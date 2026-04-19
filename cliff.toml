@@ -1,0 +1,84 @@
+# git-cliff — https://git-cliff.org/docs/configuration
+# Conventional Commits: https://www.conventionalcommits.org/
+#
+# Явный remote: SSH origin (`git@github.com:…`) без этого даёт пустые ссылки в changelog.
+# Форки могут переопределить секцию или задать GITHUB_REPO при генерации.
+
+[remote.github]
+owner = "QueryaHub"
+repo = "Querya-Desktop"
+
+[changelog]
+header = """
+# Changelog
+
+Release history. Commit messages should follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, …) so entries group correctly.
+
+"""
+body = """
+{%- macro commit_url(id) -%}
+https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}/commit/{{ id }}
+{%- endmacro -%}
+
+{% macro print_commit(commit) -%}
+- {% if commit.scope %}**{{ commit.scope }}:** {% endif %}\
+{% if commit.breaking %}[**breaking**] {% endif %}\
+{{ commit.message | upper_first | trim }} — \
+[`{{ commit.id | truncate(length=7, end="") }}`]({{ self::commit_url(id=commit.id) }})
+{%- endmacro %}
+
+{% if version %}
+## [{{ version }}] — {{ timestamp | date(format="%Y-%m-%d") }}
+{% if previous.version %}
+[Compare {{ previous.version }}…{{ version }}](https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}/compare/{{ previous.version }}..{{ version }})
+{% endif %}
+{% else %}
+## [unreleased]
+{% endif %}
+
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group }}
+{% for commit in commits -%}
+{{ self::print_commit(commit=commit) }}
+{% endfor %}
+{% endfor %}
+{%- if github %}
+{%- set newbies = github.contributors | filter(attribute="is_first_time", value=true) %}
+{%- if newbies | length != 0 %}
+
+### New contributors
+{% for c in newbies -%}
+- @{{ c.username }}{% if c.pr_number %} ([#{{ c.pr_number }}](https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}/pull/{{ c.pr_number }})){% endif %}
+{% endfor %}
+{%- endif %}
+{%- endif %}
+"""
+footer = """
+"""
+trim = true
+
+[git]
+conventional_commits = true
+# Включать и неконвенциональные коммиты (попадут в «Прочее»).
+filter_unconventional = false
+split_commits = false
+commit_parsers = [
+  { message = "^feat", group = "Features" },
+  { message = "^fix", group = "Bug Fixes" },
+  { message = "^doc", group = "Documentation" },
+  { message = "^perf", group = "Performance" },
+  { message = "^refactor", group = "Refactor" },
+  { message = "^style", group = "Styling" },
+  { message = "^test", group = "Tests" },
+  { message = "^build", group = "Build" },
+  { message = "^ci", group = "CI" },
+  { message = "^chore", group = "Chore" },
+  { message = "^revert", group = "Revert" },
+  { message = ".*", group = "Other" },
+]
+protect_breaking_commits = true
+filter_commits = false
+tag_pattern = "v[0-9].*"
+skip_tags = "beta|alpha|rc"
+topo_order = false
+sort_commits = "newest"
