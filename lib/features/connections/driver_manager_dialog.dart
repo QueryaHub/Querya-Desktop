@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/drivers/driver_storage.dart';
+import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 import 'new_connection_dialog.dart';
@@ -30,10 +31,10 @@ final _driverInfoList = <_DriverInfo>[
 void showDriverManagerDialog(BuildContext context) {
   showAppDialog<void>(
     context: context,
-    builder: (context) => const material.Dialog(
+    builder: (context) => material.Dialog(
       backgroundColor: material.Colors.transparent,
-      insetPadding: material.EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-      child: _DriverManagerDialogContent(),
+      insetPadding: WindowLayout.dialogSymmetricInsets(context),
+      child: const _DriverManagerDialogContent(),
     ),
   );
 }
