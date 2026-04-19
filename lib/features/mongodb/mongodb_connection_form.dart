@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
+import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -47,7 +48,7 @@ Future<ConnectionRow?> showMongoConnectionForm(
     context: context,
     builder: (context) => material.Dialog(
       backgroundColor: material.Colors.transparent,
-      insetPadding: const material.EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+      insetPadding: WindowLayout.dialogSymmetricInsets(context),
       child: _MongoConnectionFormContent(folderId: folderId),
     ),
   );

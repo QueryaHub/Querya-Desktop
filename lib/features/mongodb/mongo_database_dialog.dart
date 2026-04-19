@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Shows dialog to create a new MongoDB database.
 Future<String?> showCreateMongoDBDialog(material.BuildContext context) async {
   return showAppDialog<String>(
     context: context,
-    builder: (context) => const material.Dialog(
+    builder: (context) => material.Dialog(
       backgroundColor: material.Colors.transparent,
-      insetPadding: material.EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-      child: _CreateMongoDBDialogContent(),
+      insetPadding: WindowLayout.dialogSymmetricInsets(context),
+      child: const _CreateMongoDBDialogContent(),
     ),
   );
 }

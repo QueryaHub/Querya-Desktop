@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Shows a dialog to create a new folder (same style as new connection).
@@ -6,10 +7,10 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 Future<String?> showNewFolderDialog(BuildContext context) {
   return showAppDialog<String>(
     context: context,
-    builder: (context) => const material.Dialog(
+    builder: (context) => material.Dialog(
       backgroundColor: material.Colors.transparent,
-      insetPadding: material.EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-      child: _NewFolderDialogContent(),
+      insetPadding: WindowLayout.dialogSymmetricInsets(context),
+      child: const _NewFolderDialogContent(),
     ),
   );
 }
