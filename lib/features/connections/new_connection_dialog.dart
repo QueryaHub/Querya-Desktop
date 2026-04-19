@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Database type for new connection.
@@ -43,10 +46,10 @@ enum _Category { all, sql, nosql }
 Future<ConnectionType?> showNewConnectionDialog(BuildContext context) {
   return showAppDialog<ConnectionType>(
     context: context,
-    builder: (context) => const material.Dialog(
+    builder: (context) => material.Dialog(
       backgroundColor: material.Colors.transparent,
-      insetPadding: material.EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-      child: _NewConnectionDialogContent(),
+      insetPadding: WindowLayout.dialogSymmetricInsets(context),
+      child: const _NewConnectionDialogContent(),
     ),
   );
 }
@@ -86,25 +89,34 @@ class _NewConnectionDialogContentState extends material.State<_NewConnectionDial
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context).colorScheme;
     final radius = Theme.of(context).radiusXxl;
+    final mq = MediaQuery.sizeOf(context);
+    final dialogMaxW = WindowLayout.newConnectionDialogMaxWidth(mq.width);
+    final dialogH = WindowLayout.newConnectionDialogHeight(mq.height);
+    final sidebarW = WindowLayout.newConnectionSidebarWidth(dialogMaxW);
+    final headerPadH = dialogMaxW < 420 ? 16.0 : 24.0;
+
     return material.Container(
-      constraints: const material.BoxConstraints(maxWidth: 740, minHeight: 380),
+      width: dialogMaxW,
+      constraints: material.BoxConstraints(
+        maxWidth: dialogMaxW,
+        maxHeight: dialogH,
+        minHeight: math.min(320.0, dialogH),
+      ),
       decoration: material.BoxDecoration(
         color: theme.popover,
         borderRadius: material.BorderRadius.circular(radius),
         border: material.Border.all(color: theme.muted),
       ),
-      child: material.ConstrainedBox(
-        constraints: const material.BoxConstraints(maxWidth: 740, minHeight: 380),
-        child: material.ClipRRect(
-          borderRadius: material.BorderRadius.circular(radius),
-          child: material.SizedBox(
-            height: 520,
-            child: material.Column(
+      child: material.ClipRRect(
+        borderRadius: material.BorderRadius.circular(radius),
+        child: material.SizedBox(
+          height: dialogH,
+          child: material.Column(
           mainAxisSize: material.MainAxisSize.min,
           crossAxisAlignment: material.CrossAxisAlignment.stretch,
           children: [
             material.Padding(
-              padding: const material.EdgeInsets.fromLTRB(24, 24, 24, 8),
+              padding: material.EdgeInsets.fromLTRB(headerPadH, 20, headerPadH, 8),
               child: Column(
                 crossAxisAlignment: material.CrossAxisAlignment.stretch,
                 children: [
@@ -147,7 +159,7 @@ class _NewConnectionDialogContentState extends material.State<_NewConnectionDial
                 crossAxisAlignment: material.CrossAxisAlignment.stretch,
                 children: [
                   material.Container(
-                    width: 140,
+                    width: sidebarW,
                     decoration: material.BoxDecoration(
                       border: material.Border(
                         right: material.BorderSide(
@@ -186,16 +198,25 @@ class _NewConnectionDialogContentState extends material.State<_NewConnectionDial
                     child: material.LayoutBuilder(
                       builder: (context, constraints) {
                         const spacing = 12.0;
-                        const crossAxisCount = 4;
-                        final cardWidth = (constraints.maxWidth - spacing * (crossAxisCount - 1)) / crossAxisCount;
-                        const cardHeight = 132.0;
+                        final gridPad = dialogMaxW < 420 ? 12.0 : 16.0;
+                        final innerW = math.max(0.0, constraints.maxWidth - gridPad * 2);
+                        final crossAxisCount =
+                            WindowLayout.dbTypeGridCrossAxisCount(innerW);
+                        final cardHeight =
+                            WindowLayout.dbTypeCardHeight(crossAxisCount);
+                        final cardWidth = crossAxisCount > 0
+                            ? (innerW - spacing * (crossAxisCount - 1)) /
+                                crossAxisCount
+                            : innerW;
+                        final aspect =
+                            cardHeight > 0 ? cardWidth / cardHeight : 1.0;
                         return material.Padding(
-                          padding: const material.EdgeInsets.all(16),
+                          padding: material.EdgeInsets.all(gridPad),
                           child: material.GridView.count(
                             crossAxisCount: crossAxisCount,
                             mainAxisSpacing: spacing,
                             crossAxisSpacing: spacing,
-                            childAspectRatio: cardWidth / cardHeight,
+                            childAspectRatio: aspect.clamp(0.4, 4.0),
                             shrinkWrap: true,
                             physics: const material.ClampingScrollPhysics(),
                             children: [
@@ -216,7 +237,10 @@ class _NewConnectionDialogContentState extends material.State<_NewConnectionDial
               ),
             ),
             material.Container(
-              padding: const material.EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: material.EdgeInsets.symmetric(
+                horizontal: headerPadH,
+                vertical: 14,
+              ),
               decoration: material.BoxDecoration(
                 border: material.Border(
                   top: material.BorderSide(color: theme.border.withValues(alpha: 0.3)),
@@ -241,7 +265,6 @@ class _NewConnectionDialogContentState extends material.State<_NewConnectionDial
             ),
           ],
         ),
-          ),
         ),
       ),
     );
@@ -317,7 +340,7 @@ class _DbTypeCardState extends material.State<_DbTypeCard> {
         child: material.AnimatedContainer(
           duration: const Duration(milliseconds: 120),
           curve: material.Curves.easeOut,
-          padding: const material.EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+          padding: const material.EdgeInsets.symmetric(vertical: 10, horizontal: 8),
           decoration: material.BoxDecoration(
             color: highlighted ? t.muted.withValues(alpha: 0.4) : t.muted.withValues(alpha: 0.12),
             borderRadius: material.BorderRadius.circular(10),
@@ -327,22 +350,52 @@ class _DbTypeCardState extends material.State<_DbTypeCard> {
             ),
           ),
           child: material.Column(
-            mainAxisSize: material.MainAxisSize.min,
-            mainAxisAlignment: material.MainAxisAlignment.center,
+            crossAxisAlignment: material.CrossAxisAlignment.stretch,
             children: [
-              material.SizedBox(
-                width: 56,
-                height: 56,
-                child: widget.type.iconAsset != null
-                    ? material.Image.asset(
-                        widget.type.iconAsset!,
-                        fit: material.BoxFit.contain,
-                        filterQuality: material.FilterQuality.medium,
-                      )
-                    : material.Icon(widget.type.icon, size: 56, color: t.primary),
+              material.Expanded(
+                child: material.Center(
+                  child: material.SizedBox(
+                    width: 52,
+                    height: 52,
+                    child: widget.type.iconAsset != null
+                        ? material.Image.asset(
+                            widget.type.iconAsset!,
+                            fit: material.BoxFit.contain,
+                            filterQuality: material.FilterQuality.medium,
+                          )
+                        : material.Icon(widget.type.icon, size: 52, color: t.primary),
+                  ),
+                ),
               ),
-              const material.SizedBox(height: 10),
-              Text(widget.type.label).semiBold().small(),
+              const material.SizedBox(height: 6),
+              material.LayoutBuilder(
+                builder: (context, lc) {
+                  return material.SizedBox(
+                    height: 38,
+                    child: material.FittedBox(
+                      fit: material.BoxFit.scaleDown,
+                      alignment: material.Alignment.center,
+                      child: material.ConstrainedBox(
+                        constraints: material.BoxConstraints(
+                          maxWidth: math.max(48.0, lc.maxWidth),
+                        ),
+                        child: material.Text(
+                          widget.type.label,
+                          textAlign: material.TextAlign.center,
+                          maxLines: 2,
+                          overflow: material.TextOverflow.ellipsis,
+                          style: material.TextStyle(
+                            fontSize: 13,
+                            fontWeight: material.FontWeight.w600,
+                            height: 1.2,
+                            color: t.foreground,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
             ],
           ),
         ),

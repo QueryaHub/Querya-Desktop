@@ -1,36 +1,71 @@
-import 'package:flutter/material.dart' as material show AlertDialog, BoxConstraints, BuildContext, Column, ConstrainedBox, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, DefaultTextStyle, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, AnimatedRotation, Row, BoxFit, Text, TextOverflow, Expanded, CircularProgressIndicator, Material, StatelessWidget, Colors, Tooltip, Color, LayoutBuilder, TextPainter, TextSpan, TextDirection, SelectableText, Padding, Widget, Navigator, ValueKey;
+import 'package:flutter/material.dart' as material show AlertDialog, BoxConstraints, BuildContext, Column, ConstrainedBox, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, AnimatedRotation, Row, BoxFit, Text, TextOverflow, Expanded, CircularProgressIndicator, Material, StatelessWidget, Colors, Tooltip, Color, LayoutBuilder, TextPainter, TextSpan, TextDirection, SelectableText, Padding, Widget, Navigator, ValueKey, FontWeight, VoidCallback;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:querya_desktop/core/database/mongodb_service.dart';
+import 'package:querya_desktop/core/database/mysql_service.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/database/redis_info.dart';
 import 'package:querya_desktop/core/storage/folders_storage.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
+import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 import 'package:querya_desktop/features/mongodb/mongo_database_dialog.dart';
-import 'package:querya_desktop/features/mongodb/mongodb_connection_form.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
-import 'package:querya_desktop/features/postgresql/postgresql_connection_form.dart';
-import 'package:querya_desktop/features/redis/redis_connection_form.dart';
-import 'new_connection_dialog.dart';
+import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
 import 'new_folder_dialog.dart';
+
+material.Widget _sidebarConnectionShell({
+  required material.BuildContext context,
+  required bool isSelected,
+  required material.VoidCallback? onTap,
+  required material.Widget child,
+}) {
+  final p = Theme.of(context).colorScheme.primary;
+  return material.Material(
+    color: material.Colors.transparent,
+    child: material.InkWell(
+      onTap: onTap,
+      borderRadius: material.BorderRadius.circular(20),
+      mouseCursor: onTap != null
+          ? material.SystemMouseCursors.click
+          : material.SystemMouseCursors.basic,
+      child: material.Container(
+        decoration: material.BoxDecoration(
+          color: isSelected ? p.withValues(alpha: 0.16) : null,
+          borderRadius: material.BorderRadius.circular(20),
+          border: isSelected
+              ? material.Border.all(color: p.withValues(alpha: 0.26))
+              : null,
+        ),
+        child: child,
+      ),
+    ),
+  );
+}
 
 /// Left panel: Browser tree (pgAdmin-style). Uses shadcn layout widgets.
 class ConnectionsPanel extends StatefulWidget {
   const ConnectionsPanel({
     super.key,
+    this.selectedConnectionId,
     this.onConnectionSelected,
     this.onRedisDatabaseSelected,
     this.onMongoDBDatabaseSelected,
     this.onPostgresObjectSelected,
     this.onPostgresOpenSqlWorkspace,
+    this.onMysqlObjectSelected,
+    this.onMysqlOpenSqlWorkspace,
     /// When true, [initState] does not call [_loadData]. Widget tests that seed
     /// SQLite in setUp should call [ConnectionsPanelState.reloadConnectionsFromDb]
     /// inside [WidgetTester.runAsync] so only one load runs (avoids overlapping
     /// sqflite isolate futures clobbering state under FakeAsync).
     this.skipInitialDbLoadForTest = false,
   });
+
+  /// Highlights the active connection row in the sidebar (workspace selection).
+  final int? selectedConnectionId;
 
   /// Called when the user taps a connection tile.
   final void Function(ConnectionRow connection)? onConnectionSelected;
@@ -54,6 +89,17 @@ class ConnectionsPanel extends StatefulWidget {
 
   /// Opens the PostgreSQL workspace home and switches to the SQL tab (e.g. from tree context menu).
   final void Function(ConnectionRow connection)? onPostgresOpenSqlWorkspace;
+
+  /// MySQL table or view selected in the tree.
+  final void Function(
+    ConnectionRow connection,
+    String database,
+    String name,
+    MysqlObjectKind kind,
+  )? onMysqlObjectSelected;
+
+  /// Opens the MySQL workspace home and switches to the SQL tab.
+  final void Function(ConnectionRow connection)? onMysqlOpenSqlWorkspace;
 
   final bool skipInitialDbLoadForTest;
 
@@ -131,19 +177,14 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     if (mounted) setState(() => _folders = FoldersStorage.instance.folders);
   }
 
-  Future<void> _createConnection(ConnectionType type, {int? folderId}) async {
-    ConnectionRow? row;
-
-    if (type == ConnectionType.postgresql) {
-      row = await showPostgresConnectionForm(context, folderId: folderId);
-    } else if (type == ConnectionType.mongodb) {
-      row = await showMongoConnectionForm(context, folderId: folderId);
-    } else if (type == ConnectionType.redis) {
-      row = await showRedisConnectionForm(context, folderId: folderId);
-    } else {
-      row = null;
-    }
-
+  Future<void> _createConnection({
+    int? folderId,
+    material.BuildContext? dialogContext,
+  }) async {
+    final row = await promptCreateConnection(
+      dialogContext ?? context,
+      folderId: folderId,
+    );
     if (row != null && mounted) {
       await LocalDb.instance.addConnection(row);
       await _loadData();
@@ -179,9 +220,12 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
   }
 
   Widget _buildConnectionTile(ConnectionRow conn) {
+    final isSelected =
+        widget.selectedConnectionId != null && widget.selectedConnectionId == conn.id;
     if (conn.type == 'postgresql') {
       return _PostgresConnectionTile(
         connection: conn,
+        isSelected: isSelected,
         icon: _iconForType(conn.type),
         iconAsset: _iconAssetForType(conn.type),
         onRemove: () => _removeConnection(conn.id!),
@@ -189,9 +233,21 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         onPostgresObjectSelected: widget.onPostgresObjectSelected,
         onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
       );
+    } else if (conn.type == 'mysql') {
+      return _MysqlConnectionTile(
+        connection: conn,
+        isSelected: isSelected,
+        icon: _iconForType(conn.type),
+        iconAsset: _iconAssetForType(conn.type),
+        onRemove: () => _removeConnection(conn.id!),
+        onTap: () => widget.onConnectionSelected?.call(conn),
+        onMysqlObjectSelected: widget.onMysqlObjectSelected,
+        onMysqlOpenSqlWorkspace: widget.onMysqlOpenSqlWorkspace,
+      );
     } else if (conn.type == 'redis') {
       return _RedisConnectionTile(
         connection: conn,
+        isSelected: isSelected,
         icon: _iconForType(conn.type),
         iconAsset: _iconAssetForType(conn.type),
         onRemove: () => _removeConnection(conn.id!),
@@ -201,6 +257,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     } else if (conn.type == 'mongodb') {
       return _MongoConnectionTile(
         connection: conn,
+        isSelected: isSelected,
         icon: _iconForType(conn.type),
         iconAsset: _iconAssetForType(conn.type),
         onRemove: () => _removeConnection(conn.id!),
@@ -210,6 +267,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     }
     return _ConnectionTile(
       connection: conn,
+      isSelected: isSelected,
       icon: _iconForType(conn.type),
       iconAsset: _iconAssetForType(conn.type),
       onRemove: () => _removeConnection(conn.id!),
@@ -229,7 +287,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         color: theme.colorScheme.background,
         border: material.Border(
           right: material.BorderSide(
-            color: theme.colorScheme.border.withValues(alpha: 0.4),
+            color: theme.colorScheme.border.withValues(alpha: 0.28),
             width: 1,
           ),
         ),
@@ -239,12 +297,18 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         children: [
           material.Padding(
             padding: const material.EdgeInsets.fromLTRB(20, 24, 16, 16),
-            child: material.DefaultTextStyle(
-              style: material.TextStyle(color: theme.colorScheme.mutedForeground),
-                  child: const Text('Browser').semiBold().small(),
+            child: material.Text(
+              'SERVERS',
+              style: material.TextStyle(
+                fontFamily: QueryaTypography.mono,
+                fontSize: 11,
+                letterSpacing: 0.85,
+                fontWeight: material.FontWeight.w600,
+                color: theme.colorScheme.mutedForeground,
+              ),
             ),
           ),
-          Divider(height: 1, color: theme.colorScheme.border.withValues(alpha: 0.3)),
+          Divider(height: 1, color: theme.colorScheme.border.withValues(alpha: 0.22)),
           Expanded(
             child: material.CustomScrollView(
               slivers: [
@@ -277,10 +341,9 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                               await _loadData();
                             },
                             onNewConnection: (folderName) async {
-                              final type = await showNewConnectionDialog(context);
-                              if (type == null || !mounted) return;
-                              final folderId = await LocalDb.instance.getFolderIdByName(folderName);
-                              await _createConnection(type, folderId: folderId);
+                              final folderId =
+                                  await LocalDb.instance.getFolderIdByName(folderName);
+                              await _createConnection(folderId: folderId);
                             },
                             iconForType: _iconForType,
                             onRemoveConnection: _removeConnection,
@@ -312,11 +375,9 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                           MenuButton(
                             leading: material.Icon(material.Icons.settings_ethernet_rounded, size: 18, color: theme.colorScheme.mutedForeground),
                             onPressed: (menuContext) async {
-                              final type = await showNewConnectionDialog(menuContext);
-                              if (type == null || !mounted) return;
                               await Future.delayed(const Duration(milliseconds: 100));
-                              if (!mounted) return;
-                              await _createConnection(type);
+                              if (!mounted || !menuContext.mounted) return;
+                              await _createConnection(dialogContext: menuContext);
                             },
                             child: const Text('New Connection'),
                           ),
@@ -384,6 +445,7 @@ class _EmptyState extends StatelessWidget {
 class _ConnectionTile extends StatelessWidget {
   const _ConnectionTile({
     required this.connection,
+    this.isSelected = false,
     required this.icon,
     this.iconAsset,
     required this.onRemove,
@@ -391,6 +453,7 @@ class _ConnectionTile extends StatelessWidget {
   });
 
   final ConnectionRow connection;
+  final bool isSelected;
   final material.IconData icon;
   final String? iconAsset;
   final VoidCallback onRemove;
@@ -422,46 +485,45 @@ class _ConnectionTile extends StatelessWidget {
       ],
       child: material.Padding(
         padding: const material.EdgeInsets.only(bottom: 2),
-        child: material.MouseRegion(
-          cursor: material.SystemMouseCursors.click,
-          child: material.InkWell(
-            onTap: onTap,
-            borderRadius: material.BorderRadius.circular(6),
-            child: material.Padding(
-              padding: const material.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              child: material.Row(
-                children: [
-                  iconWidget,
-                  const Gap(8),
-                  material.Expanded(
-                    child: material.Column(
-                      crossAxisAlignment: material.CrossAxisAlignment.start,
-                      mainAxisSize: material.MainAxisSize.min,
-                      children: [
+        child: _sidebarConnectionShell(
+          context: context,
+          isSelected: isSelected,
+          onTap: onTap,
+          child: material.Padding(
+            padding:
+                const material.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            child: material.Row(
+              children: [
+                iconWidget,
+                const Gap(8),
+                material.Expanded(
+                  child: material.Column(
+                    crossAxisAlignment: material.CrossAxisAlignment.start,
+                    mainAxisSize: material.MainAxisSize.min,
+                    children: [
+                      material.Text(
+                        connection.name,
+                        overflow: material.TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: material.TextStyle(
+                          fontSize: 13,
+                          color: theme.colorScheme.foreground,
+                        ),
+                      ),
+                      if (connection.host != null)
                         material.Text(
-                          connection.name,
+                          '${connection.host}:${connection.port ?? ''}',
                           overflow: material.TextOverflow.ellipsis,
                           maxLines: 1,
                           style: material.TextStyle(
-                            fontSize: 13,
-                            color: theme.colorScheme.foreground,
+                            fontSize: 11,
+                            color: theme.colorScheme.mutedForeground,
                           ),
                         ),
-                        if (connection.host != null)
-                          material.Text(
-                            '${connection.host}:${connection.port ?? ''}',
-                            overflow: material.TextOverflow.ellipsis,
-                            maxLines: 1,
-                            style: material.TextStyle(
-                              fontSize: 11,
-                              color: theme.colorScheme.mutedForeground,
-                            ),
-                          ),
-                      ],
-                    ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -585,6 +647,7 @@ class _FolderTile extends StatelessWidget {
 class _RedisConnectionTile extends StatefulWidget {
   const _RedisConnectionTile({
     required this.connection,
+    this.isSelected = false,
     required this.icon,
     this.iconAsset,
     required this.onRemove,
@@ -593,6 +656,7 @@ class _RedisConnectionTile extends StatefulWidget {
   });
 
   final ConnectionRow connection;
+  final bool isSelected;
   final material.IconData icon;
   final String? iconAsset;
   final VoidCallback onRemove;
@@ -738,48 +802,46 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
                 ),
                 // Connection name — clickable for stats
                 material.Expanded(
-                  child: material.MouseRegion(
-                    cursor: material.SystemMouseCursors.click,
-                    child: material.InkWell(
-                      onTap: widget.onTap,
-                      borderRadius: material.BorderRadius.circular(6),
-                      child: material.Padding(
-                        padding: const material.EdgeInsets.symmetric(
-                            horizontal: 4, vertical: 6),
-                        child: material.Row(
-                          children: [
-                            iconWidget,
-                            const Gap(8),
-                            material.Expanded(
-                              child: material.Column(
-                                crossAxisAlignment:
-                                    material.CrossAxisAlignment.start,
-                                mainAxisSize: material.MainAxisSize.min,
-                                children: [
+                  child: _sidebarConnectionShell(
+                    context: context,
+                    isSelected: widget.isSelected,
+                    onTap: widget.onTap,
+                    child: material.Padding(
+                      padding: const material.EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 6),
+                      child: material.Row(
+                        children: [
+                          iconWidget,
+                          const Gap(8),
+                          material.Expanded(
+                            child: material.Column(
+                              crossAxisAlignment:
+                                  material.CrossAxisAlignment.start,
+                              mainAxisSize: material.MainAxisSize.min,
+                              children: [
+                                material.Text(
+                                  widget.connection.name,
+                                  overflow: material.TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                  style: material.TextStyle(
+                                    fontSize: 13,
+                                    color: theme.colorScheme.foreground,
+                                  ),
+                                ),
+                                if (widget.connection.host != null)
                                   material.Text(
-                                    widget.connection.name,
+                                    '${widget.connection.host}:${widget.connection.port ?? ''}',
                                     overflow: material.TextOverflow.ellipsis,
                                     maxLines: 1,
                                     style: material.TextStyle(
-                                      fontSize: 13,
-                                      color: theme.colorScheme.foreground,
+                                      fontSize: 11,
+                                      color: theme.colorScheme.mutedForeground,
                                     ),
                                   ),
-                                  if (widget.connection.host != null)
-                                    material.Text(
-                                      '${widget.connection.host}:${widget.connection.port ?? ''}',
-                                      overflow: material.TextOverflow.ellipsis,
-                                      maxLines: 1,
-                                      style: material.TextStyle(
-                                        fontSize: 11,
-                                        color: theme.colorScheme.mutedForeground,
-                                      ),
-                                    ),
-                                ],
-                              ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -896,6 +958,7 @@ class _RedisDatabaseNode extends StatelessWidget {
 class _MongoConnectionTile extends StatefulWidget {
   const _MongoConnectionTile({
     required this.connection,
+    this.isSelected = false,
     required this.icon,
     this.iconAsset,
     required this.onRemove,
@@ -904,6 +967,7 @@ class _MongoConnectionTile extends StatefulWidget {
   });
 
   final ConnectionRow connection;
+  final bool isSelected;
   final material.IconData icon;
   final String? iconAsset;
   final VoidCallback onRemove;
@@ -1070,48 +1134,46 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
                 ),
                 // Connection name — clickable for stats
                 material.Expanded(
-                  child: material.MouseRegion(
-                    cursor: material.SystemMouseCursors.click,
-                    child: material.InkWell(
-                      onTap: widget.onTap,
-                      borderRadius: material.BorderRadius.circular(6),
-                      child: material.Padding(
-                        padding: const material.EdgeInsets.symmetric(
-                            horizontal: 4, vertical: 6),
-                        child: material.Row(
-                          children: [
-                            iconWidget,
-                            const Gap(8),
-                            material.Expanded(
-                              child: material.Column(
-                                crossAxisAlignment:
-                                    material.CrossAxisAlignment.start,
-                                mainAxisSize: material.MainAxisSize.min,
-                                children: [
+                  child: _sidebarConnectionShell(
+                    context: context,
+                    isSelected: widget.isSelected,
+                    onTap: widget.onTap,
+                    child: material.Padding(
+                      padding: const material.EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 6),
+                      child: material.Row(
+                        children: [
+                          iconWidget,
+                          const Gap(8),
+                          material.Expanded(
+                            child: material.Column(
+                              crossAxisAlignment:
+                                  material.CrossAxisAlignment.start,
+                              mainAxisSize: material.MainAxisSize.min,
+                              children: [
+                                material.Text(
+                                  widget.connection.name,
+                                  overflow: material.TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                  style: material.TextStyle(
+                                    fontSize: 13,
+                                    color: theme.colorScheme.foreground,
+                                  ),
+                                ),
+                                if (widget.connection.host != null)
                                   material.Text(
-                                    widget.connection.name,
+                                    '${widget.connection.host}:${widget.connection.port ?? ''}',
                                     overflow: material.TextOverflow.ellipsis,
                                     maxLines: 1,
                                     style: material.TextStyle(
-                                      fontSize: 13,
-                                      color: theme.colorScheme.foreground,
+                                      fontSize: 11,
+                                      color: theme.colorScheme.mutedForeground,
                                     ),
                                   ),
-                                  if (widget.connection.host != null)
-                                    material.Text(
-                                      '${widget.connection.host}:${widget.connection.port ?? ''}',
-                                      overflow: material.TextOverflow.ellipsis,
-                                      maxLines: 1,
-                                      style: material.TextStyle(
-                                        fontSize: 11,
-                                        color: theme.colorScheme.mutedForeground,
-                                      ),
-                                    ),
-                                ],
-                              ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -1244,6 +1306,7 @@ class _MongoDatabaseNode extends StatelessWidget {
 class _PostgresConnectionTile extends StatefulWidget {
   const _PostgresConnectionTile({
     required this.connection,
+    this.isSelected = false,
     required this.icon,
     this.iconAsset,
     required this.onRemove,
@@ -1253,6 +1316,7 @@ class _PostgresConnectionTile extends StatefulWidget {
   });
 
   final ConnectionRow connection;
+  final bool isSelected;
   final material.IconData icon;
   final String? iconAsset;
   final VoidCallback onRemove;
@@ -1379,48 +1443,46 @@ class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
                   ),
                 ),
                 material.Expanded(
-                  child: material.MouseRegion(
-                    cursor: material.SystemMouseCursors.click,
-                    child: material.InkWell(
-                      onTap: widget.onTap,
-                      borderRadius: material.BorderRadius.circular(6),
-                      child: material.Padding(
-                        padding: const material.EdgeInsets.symmetric(
-                            horizontal: 4, vertical: 6),
-                        child: material.Row(
-                          children: [
-                            iconWidget,
-                            const Gap(8),
-                            material.Expanded(
-                              child: material.Column(
-                                crossAxisAlignment:
-                                    material.CrossAxisAlignment.start,
-                                mainAxisSize: material.MainAxisSize.min,
-                                children: [
+                  child: _sidebarConnectionShell(
+                    context: context,
+                    isSelected: widget.isSelected,
+                    onTap: widget.onTap,
+                    child: material.Padding(
+                      padding: const material.EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 6),
+                      child: material.Row(
+                        children: [
+                          iconWidget,
+                          const Gap(8),
+                          material.Expanded(
+                            child: material.Column(
+                              crossAxisAlignment:
+                                  material.CrossAxisAlignment.start,
+                              mainAxisSize: material.MainAxisSize.min,
+                              children: [
+                                material.Text(
+                                  widget.connection.name,
+                                  overflow: material.TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                  style: material.TextStyle(
+                                    fontSize: 13,
+                                    color: theme.colorScheme.foreground,
+                                  ),
+                                ),
+                                if (widget.connection.host != null)
                                   material.Text(
-                                    widget.connection.name,
+                                    '${widget.connection.host}:${widget.connection.port ?? ''}',
                                     overflow: material.TextOverflow.ellipsis,
                                     maxLines: 1,
                                     style: material.TextStyle(
-                                      fontSize: 13,
-                                      color: theme.colorScheme.foreground,
+                                      fontSize: 11,
+                                      color: theme.colorScheme.mutedForeground,
                                     ),
                                   ),
-                                  if (widget.connection.host != null)
-                                    material.Text(
-                                      '${widget.connection.host}:${widget.connection.port ?? ''}',
-                                      overflow: material.TextOverflow.ellipsis,
-                                      maxLines: 1,
-                                      style: material.TextStyle(
-                                        fontSize: 11,
-                                        color: theme.colorScheme.mutedForeground,
-                                      ),
-                                    ),
-                                ],
-                              ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -1471,6 +1533,524 @@ class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ─── MySQL connection tile (databases → tables) ───────────────────────────────
+
+class _MysqlConnectionTile extends StatefulWidget {
+  const _MysqlConnectionTile({
+    required this.connection,
+    this.isSelected = false,
+    required this.icon,
+    this.iconAsset,
+    required this.onRemove,
+    this.onTap,
+    this.onMysqlObjectSelected,
+    this.onMysqlOpenSqlWorkspace,
+  });
+
+  final ConnectionRow connection;
+  final bool isSelected;
+  final material.IconData icon;
+  final String? iconAsset;
+  final VoidCallback onRemove;
+  final VoidCallback? onTap;
+  final void Function(
+    ConnectionRow connection,
+    String database,
+    String name,
+    MysqlObjectKind kind,
+  )? onMysqlObjectSelected;
+  final void Function(ConnectionRow connection)? onMysqlOpenSqlWorkspace;
+
+  @override
+  State<_MysqlConnectionTile> createState() => _MysqlConnectionTileState();
+}
+
+class _MysqlConnectionTileState extends State<_MysqlConnectionTile> {
+  bool _expanded = false;
+  bool _loading = false;
+  String? _error;
+  List<String> _databases = [];
+
+  void _toggle() {
+    setState(() => _expanded = !_expanded);
+    if (_expanded && _databases.isEmpty && !_loading) {
+      _loadDatabases();
+    }
+  }
+
+  Future<void> _loadDatabases() async {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    MysqlLease? lease;
+    try {
+      final c = widget.connection;
+      lease = await MysqlService.instance.acquire(
+        c,
+        database: c.databaseName ?? '',
+        mode: MysqlSessionMode.readOnly,
+      );
+      final dbs = await lease.connection.listDatabases();
+      if (!mounted) return;
+      setState(() {
+        _databases = dbs;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    } finally {
+      lease?.release();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final iconWidget = widget.iconAsset != null
+        ? material.Image.asset(
+            widget.iconAsset!,
+            width: 16,
+            height: 16,
+            fit: material.BoxFit.contain,
+            errorBuilder: (_, __, ___) => material.Icon(
+              widget.icon,
+              size: 16,
+              color: theme.colorScheme.primary,
+            ),
+          )
+        : material.Icon(widget.icon, size: 16, color: theme.colorScheme.primary);
+
+    return ContextMenu(
+      items: [
+        MenuButton(
+          leading: material.Icon(material.Icons.refresh_rounded,
+              size: 18, color: theme.colorScheme.mutedForeground),
+          onPressed: (_) {
+            _databases = [];
+            _loadDatabases();
+          },
+          child: const Text('Refresh databases'),
+        ),
+        if (widget.onMysqlOpenSqlWorkspace != null)
+          MenuButton(
+            leading: material.Icon(material.Icons.terminal_rounded,
+                size: 18, color: theme.colorScheme.mutedForeground),
+            onPressed: (_) => widget.onMysqlOpenSqlWorkspace!(widget.connection),
+            child: const Text('Open in SQL'),
+          ),
+        MenuButton(
+          leading: material.Icon(material.Icons.delete_outline_rounded,
+              size: 18, color: theme.colorScheme.mutedForeground),
+          onPressed: (_) => widget.onRemove(),
+          child: const Text('Remove connection'),
+        ),
+      ],
+      child: material.Padding(
+        padding: const material.EdgeInsets.only(bottom: 2),
+        child: material.Column(
+          crossAxisAlignment: material.CrossAxisAlignment.start,
+          mainAxisSize: material.MainAxisSize.min,
+          children: [
+            material.Row(
+              children: [
+                material.MouseRegion(
+                  cursor: material.SystemMouseCursors.click,
+                  child: material.InkWell(
+                    onTap: _toggle,
+                    borderRadius: material.BorderRadius.circular(4),
+                    child: material.Padding(
+                      padding: const material.EdgeInsets.all(2),
+                      child: material.AnimatedRotation(
+                        turns: _expanded ? 0.25 : 0,
+                        duration: const Duration(milliseconds: 150),
+                        child: material.Icon(
+                          material.Icons.chevron_right_rounded,
+                          size: 16,
+                          color: theme.colorScheme.mutedForeground,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                material.Expanded(
+                  child: _sidebarConnectionShell(
+                    context: context,
+                    isSelected: widget.isSelected,
+                    onTap: widget.onTap,
+                    child: material.Padding(
+                      padding: const material.EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 6),
+                      child: material.Row(
+                        children: [
+                          iconWidget,
+                          const Gap(8),
+                          material.Expanded(
+                            child: material.Column(
+                              crossAxisAlignment:
+                                  material.CrossAxisAlignment.start,
+                              mainAxisSize: material.MainAxisSize.min,
+                              children: [
+                                material.Text(
+                                  widget.connection.name,
+                                  overflow: material.TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                  style: material.TextStyle(
+                                    fontSize: 13,
+                                    color: theme.colorScheme.foreground,
+                                  ),
+                                ),
+                                if (widget.connection.host != null)
+                                  material.Text(
+                                    '${widget.connection.host}:${widget.connection.port ?? ''}',
+                                    overflow: material.TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                    style: material.TextStyle(
+                                      fontSize: 11,
+                                      color:
+                                          theme.colorScheme.mutedForeground,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (_expanded) ...[
+              if (_loading)
+                material.Padding(
+                  padding:
+                      const material.EdgeInsets.only(left: 28, top: 4, bottom: 4),
+                  child: material.Row(
+                    children: [
+                      const material.SizedBox(
+                        width: 12,
+                        height: 12,
+                        child:
+                            material.CircularProgressIndicator(strokeWidth: 1.5),
+                      ),
+                      const Gap(8),
+                      const Text('Loading...').muted().xSmall(),
+                    ],
+                  ),
+                ),
+              if (_error != null)
+                material.Padding(
+                  padding:
+                      const material.EdgeInsets.only(left: 28, top: 4, bottom: 4),
+                  child: material.Text(
+                    'Error',
+                    overflow: material.TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: material.TextStyle(
+                        fontSize: 11, color: theme.colorScheme.destructive),
+                  ),
+                ),
+              if (_databases.isNotEmpty)
+                _MysqlDatabasesNode(
+                  connection: widget.connection,
+                  databases: _databases,
+                  onRefreshDatabases: () {
+                    setState(() => _databases = []);
+                    _loadDatabases();
+                  },
+                  onMysqlObjectSelected: widget.onMysqlObjectSelected,
+                  onMysqlOpenSqlWorkspace: widget.onMysqlOpenSqlWorkspace,
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MysqlDatabasesNode extends material.StatelessWidget {
+  const _MysqlDatabasesNode({
+    required this.connection,
+    required this.databases,
+    required this.onRefreshDatabases,
+    this.onMysqlObjectSelected,
+    this.onMysqlOpenSqlWorkspace,
+  });
+
+  final ConnectionRow connection;
+  final List<String> databases;
+  final VoidCallback onRefreshDatabases;
+  final void Function(
+    ConnectionRow connection,
+    String database,
+    String name,
+    MysqlObjectKind kind,
+  )? onMysqlObjectSelected;
+  final void Function(ConnectionRow connection)? onMysqlOpenSqlWorkspace;
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    final theme = Theme.of(context);
+    return material.Padding(
+      padding: const material.EdgeInsets.only(left: 20),
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.start,
+        mainAxisSize: material.MainAxisSize.min,
+        children: [
+          _PgTreeRow(
+            label: 'Databases (${databases.length})',
+            icon: material.Icons.dns_rounded,
+            iconSize: 14,
+            iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
+            textStyle: material.TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.foreground,
+            ),
+            verticalPadding: 4,
+            onTap: null,
+            connection: connection,
+            onContextRefresh: onRefreshDatabases,
+            onOpenSqlWorkspace: onMysqlOpenSqlWorkspace,
+          ),
+          for (final db in databases)
+            _MysqlDatabaseNode(
+              key: material.ValueKey('mysql-db-${connection.id ?? 0}-$db'),
+              connection: connection,
+              databaseName: db,
+              onMysqlObjectSelected: onMysqlObjectSelected,
+              onMysqlOpenSqlWorkspace: onMysqlOpenSqlWorkspace,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MysqlDatabaseNode extends StatefulWidget {
+  const _MysqlDatabaseNode({
+    super.key,
+    required this.connection,
+    required this.databaseName,
+    this.onMysqlObjectSelected,
+    this.onMysqlOpenSqlWorkspace,
+  });
+
+  final ConnectionRow connection;
+  final String databaseName;
+  final void Function(
+    ConnectionRow connection,
+    String database,
+    String name,
+    MysqlObjectKind kind,
+  )? onMysqlObjectSelected;
+  final void Function(ConnectionRow connection)? onMysqlOpenSqlWorkspace;
+
+  @override
+  State<_MysqlDatabaseNode> createState() => _MysqlDatabaseNodeState();
+}
+
+class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
+  bool _expanded = false;
+  bool _loading = false;
+  List<String> _tables = [];
+  List<String> _views = [];
+
+  void _toggle() {
+    setState(() => _expanded = !_expanded);
+    if (_expanded && _tables.isEmpty && _views.isEmpty && !_loading) {
+      _loadTables();
+    }
+  }
+
+  Future<void> _loadTables() async {
+    if (!mounted) return;
+    setState(() => _loading = true);
+    MysqlLease? lease;
+    try {
+      final c = widget.connection;
+      lease = await MysqlService.instance.acquire(
+        c,
+        database: widget.databaseName,
+        mode: MysqlSessionMode.readOnly,
+      );
+      final tables =
+          await lease.connection.listTables(schema: widget.databaseName);
+      final views =
+          await lease.connection.listViews(schema: widget.databaseName);
+      if (!mounted) return;
+      setState(() {
+        _tables = tables;
+        _views = views;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    } finally {
+      lease?.release();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return material.Padding(
+      padding: const material.EdgeInsets.only(left: 16),
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.start,
+        mainAxisSize: material.MainAxisSize.min,
+        children: [
+          _PgTreeRow(
+            label: widget.databaseName,
+            leading: material.AnimatedRotation(
+              turns: _expanded ? 0.25 : 0,
+              duration: const Duration(milliseconds: 150),
+              child: material.Icon(
+                material.Icons.chevron_right_rounded,
+                size: 14,
+                color: theme.colorScheme.mutedForeground,
+              ),
+            ),
+            icon: material.Icons.storage_rounded,
+            iconSize: 14,
+            iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
+            textStyle: material.TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.foreground,
+            ),
+            verticalPadding: 4,
+            onTap: _toggle,
+            connection: widget.connection,
+            onContextRefresh: _loadTables,
+            onOpenSqlWorkspace: widget.onMysqlOpenSqlWorkspace,
+          ),
+          if (_expanded) ...[
+            if (_loading)
+              material.Padding(
+                padding:
+                    const material.EdgeInsets.only(left: 24, top: 2, bottom: 2),
+                child: material.Row(
+                  children: [
+                    const material.SizedBox(
+                      width: 10,
+                      height: 10,
+                      child:
+                          material.CircularProgressIndicator(strokeWidth: 1.5),
+                    ),
+                    const Gap(6),
+                    const Text('Loading...').muted().xSmall(),
+                  ],
+                ),
+              ),
+            if (_tables.isNotEmpty || _views.isNotEmpty)
+              material.Padding(
+                padding: const material.EdgeInsets.only(left: 16),
+                child: material.Column(
+                  crossAxisAlignment: material.CrossAxisAlignment.start,
+                  children: [
+                    if (_tables.isNotEmpty) ...[
+                      _PgTreeRow(
+                        label: 'Tables (${_tables.length})',
+                        icon: material.Icons.table_chart_rounded,
+                        iconSize: 13,
+                        iconColor: theme.colorScheme.mutedForeground,
+                        textStyle: material.TextStyle(
+                          fontSize: 11,
+                          color: theme.colorScheme.mutedForeground,
+                        ),
+                        verticalPadding: 3,
+                        onTap: null,
+                        connection: widget.connection,
+                        onContextRefresh: _loadTables,
+                        onOpenSqlWorkspace: null,
+                      ),
+                      for (final t in _tables)
+                        material.Padding(
+                          padding: const material.EdgeInsets.only(left: 12),
+                          child: _PgTreeRow(
+                            label: t,
+                            icon: material.Icons.grid_on_rounded,
+                            iconSize: 12,
+                            iconColor: theme.colorScheme.mutedForeground,
+                            textStyle: material.TextStyle(
+                              fontSize: 11,
+                              color: theme.colorScheme.foreground,
+                            ),
+                            verticalPadding: 2,
+                            onTap: widget.onMysqlObjectSelected == null
+                                ? null
+                                : () => widget.onMysqlObjectSelected!(
+                                      widget.connection,
+                                      widget.databaseName,
+                                      t,
+                                      MysqlObjectKind.table,
+                                    ),
+                            connection: widget.connection,
+                            onContextRefresh: null,
+                            onOpenSqlWorkspace: null,
+                          ),
+                        ),
+                    ],
+                    if (_views.isNotEmpty) ...[
+                      _PgTreeRow(
+                        label: 'Views (${_views.length})',
+                        icon: material.Icons.view_agenda_rounded,
+                        iconSize: 13,
+                        iconColor: theme.colorScheme.mutedForeground,
+                        textStyle: material.TextStyle(
+                          fontSize: 11,
+                          color: theme.colorScheme.mutedForeground,
+                        ),
+                        verticalPadding: 3,
+                        onTap: null,
+                        connection: widget.connection,
+                        onContextRefresh: _loadTables,
+                        onOpenSqlWorkspace: null,
+                      ),
+                      for (final v in _views)
+                        material.Padding(
+                          padding: const material.EdgeInsets.only(left: 12),
+                          child: _PgTreeRow(
+                            label: v,
+                            icon: material.Icons.view_week_rounded,
+                            iconSize: 12,
+                            iconColor: theme.colorScheme.mutedForeground,
+                            textStyle: material.TextStyle(
+                              fontSize: 11,
+                              color: theme.colorScheme.foreground,
+                            ),
+                            verticalPadding: 2,
+                            onTap: widget.onMysqlObjectSelected == null
+                                ? null
+                                : () => widget.onMysqlObjectSelected!(
+                                      widget.connection,
+                                      widget.databaseName,
+                                      v,
+                                      MysqlObjectKind.view,
+                                    ),
+                            connection: widget.connection,
+                            onContextRefresh: null,
+                            onOpenSqlWorkspace: null,
+                          ),
+                        ),
+                    ],
+                  ],
+                ),
+              ),
+          ],
+        ],
       ),
     );
   }

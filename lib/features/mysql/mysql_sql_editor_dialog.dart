@@ -2,38 +2,11 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/main_screen/sql_editor_chrome.dart';
+import 'package:querya_desktop/features/mysql/mysql_table_utils.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
-/// Returns true if [sql] is allowed to run (read-only: SELECT / WITH).
-bool isAllowedPostgresSelectQuery(String sql) {
-  final t = sql.trim();
-  if (t.isEmpty) return false;
-  final lower = t.toLowerCase();
-  const blocked = [
-    'insert ',
-    'update ',
-    'delete ',
-    'drop ',
-    'truncate ',
-    'alter ',
-    'create ',
-    'grant ',
-    'revoke ',
-    'call ',
-    'execute ',
-    'copy ',
-  ];
-  for (final b in blocked) {
-    if (lower.contains(b)) return false;
-  }
-  return lower.startsWith('select') ||
-      lower.startsWith('with') ||
-      lower.startsWith('(');
-}
-
-/// Dialog to view/edit SQL and run it.
-/// [initialSql] — text shown when opening; [browseSql] — "Reset" restores table browse query.
-Future<void> showPostgresSqlEditorDialog({
+/// Dialog to view/edit SQL and run it (read-only SELECT for table browse).
+Future<void> showMysqlSqlEditorDialog({
   required material.BuildContext context,
   required String initialSql,
   required String browseSql,
@@ -41,7 +14,7 @@ Future<void> showPostgresSqlEditorDialog({
 }) {
   return showAppDialog<void>(
     context: context,
-    builder: (ctx) => _PostgresSqlEditorDialog(
+    builder: (ctx) => _MysqlSqlEditorDialog(
       initialSql: initialSql,
       browseSql: browseSql,
       onRun: onRun,
@@ -49,8 +22,8 @@ Future<void> showPostgresSqlEditorDialog({
   );
 }
 
-class _PostgresSqlEditorDialog extends material.StatefulWidget {
-  const _PostgresSqlEditorDialog({
+class _MysqlSqlEditorDialog extends material.StatefulWidget {
+  const _MysqlSqlEditorDialog({
     required this.initialSql,
     required this.browseSql,
     required this.onRun,
@@ -61,11 +34,11 @@ class _PostgresSqlEditorDialog extends material.StatefulWidget {
   final void Function(String sql) onRun;
 
   @override
-  material.State<_PostgresSqlEditorDialog> createState() =>
-      _PostgresSqlEditorDialogState();
+  material.State<_MysqlSqlEditorDialog> createState() =>
+      _MysqlSqlEditorDialogState();
 }
 
-class _PostgresSqlEditorDialogState extends material.State<_PostgresSqlEditorDialog> {
+class _MysqlSqlEditorDialogState extends material.State<_MysqlSqlEditorDialog> {
   late final material.TextEditingController _controller;
   String? _error;
 
@@ -87,9 +60,9 @@ class _PostgresSqlEditorDialogState extends material.State<_PostgresSqlEditorDia
       setState(() => _error = 'Enter a SQL query');
       return;
     }
-    if (!isAllowedPostgresSelectQuery(sql)) {
+    if (!isAllowedMysqlSelectQuery(sql)) {
       setState(() =>
-          _error = 'Only SELECT queries (and WITH … SELECT) are allowed.');
+          _error = 'Only a single SELECT (or WITH …) statement is allowed.');
       return;
     }
     material.Navigator.of(context).pop();
@@ -129,7 +102,7 @@ class _PostgresSqlEditorDialogState extends material.State<_PostgresSqlEditorDia
                     const material.SizedBox(height: 6),
                     const Text(
                       'Table browse uses SELECT with LIMIT/OFFSET. '
-                      'Edit it or write your own SELECT. Reset restores the table browse query.',
+                      'Edit or write your own SELECT. Reset restores the browse query.',
                     ).muted().xSmall(),
                   ],
                 ),

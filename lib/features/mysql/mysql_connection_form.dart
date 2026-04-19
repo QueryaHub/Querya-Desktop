@@ -1,14 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
-import 'package:querya_desktop/core/database/postgres_connection.dart';
+import 'package:querya_desktop/core/database/mysql_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
-/// Shows PostgreSQL connection form dialog.
-/// Returns ConnectionRow if saved, null if cancelled.
-Future<ConnectionRow?> showPostgresConnectionForm(
+/// Shows MySQL / MariaDB connection form dialog.
+/// Returns [ConnectionRow] if saved, null if cancelled.
+Future<ConnectionRow?> showMysqlConnectionForm(
   BuildContext context, {
   int? folderId,
 }) async {
@@ -17,32 +17,32 @@ Future<ConnectionRow?> showPostgresConnectionForm(
     builder: (context) => material.Dialog(
       backgroundColor: material.Colors.transparent,
       insetPadding: WindowLayout.dialogSymmetricInsets(context),
-      child: _PostgresConnectionFormContent(folderId: folderId),
+      child: _MysqlConnectionFormContent(folderId: folderId),
     ),
   );
 }
 
-class _PostgresConnectionFormContent extends material.StatefulWidget {
-  const _PostgresConnectionFormContent({this.folderId});
+class _MysqlConnectionFormContent extends material.StatefulWidget {
+  const _MysqlConnectionFormContent({this.folderId});
 
   final int? folderId;
 
   @override
-  material.State<_PostgresConnectionFormContent> createState() =>
-      _PostgresConnectionFormContentState();
+  material.State<_MysqlConnectionFormContent> createState() =>
+      _MysqlConnectionFormContentState();
 }
 
-class _PostgresConnectionFormContentState
-    extends material.State<_PostgresConnectionFormContent> {
+class _MysqlConnectionFormContentState
+    extends material.State<_MysqlConnectionFormContent> {
   final _nameController = material.TextEditingController();
   final _hostController = material.TextEditingController(text: 'localhost');
-  final _portController = material.TextEditingController(text: '5432');
-  final _databaseController = material.TextEditingController(text: 'postgres');
-  final _usernameController = material.TextEditingController(text: 'postgres');
+  final _portController = material.TextEditingController(text: '3306');
+  final _databaseController = material.TextEditingController();
+  final _usernameController = material.TextEditingController(text: 'root');
   final _passwordController = material.TextEditingController();
   final _connectionStringController = material.TextEditingController();
 
-  bool _useSSL = false;
+  bool _useSSL = true;
   bool _showPassword = false;
   bool _isTesting = false;
   String? _testResult;
@@ -61,19 +61,18 @@ class _PostgresConnectionFormContentState
 
   void _onFieldChanged() => setState(() {});
 
-  bool _looksLikePostgresUri(String s) {
+  bool _looksLikeMysqlUri(String s) {
     final t = s.trim().toLowerCase();
-    return t.startsWith('postgres://') || t.startsWith('postgresql://');
+    return t.startsWith('mysql://') || t.startsWith('mariadb://');
   }
 
   bool get _formValid {
     final uri = _connectionStringController.text.trim();
     if (uri.isNotEmpty) {
-      return _looksLikePostgresUri(uri);
+      return _looksLikeMysqlUri(uri);
     }
     final host = _hostController.text.trim();
-    final db = _databaseController.text.trim();
-    return host.isNotEmpty && db.isNotEmpty;
+    return host.isNotEmpty;
   }
 
   void _showTestResult(String result) {
@@ -103,16 +102,15 @@ class _PostgresConnectionFormContentState
     });
     try {
       final uri = _connectionStringController.text.trim();
-      final conn = PostgresConnection(
+      final dbText = _databaseController.text.trim();
+      final conn = MysqlConnection(
         id: 0,
         name: _nameController.text.trim().isEmpty
             ? 'test'
             : _nameController.text.trim(),
         host: uri.isNotEmpty ? 'localhost' : _hostController.text.trim(),
-        port: int.tryParse(_portController.text.trim()) ?? 5432,
-        database: _databaseController.text.trim().isEmpty
-            ? null
-            : _databaseController.text.trim(),
+        port: int.tryParse(_portController.text.trim()) ?? 3306,
+        database: dbText.isEmpty ? null : dbText,
         username: _usernameController.text.trim().isEmpty
             ? null
             : _usernameController.text.trim(),
@@ -133,16 +131,16 @@ class _PostgresConnectionFormContentState
     if (!_formValid) return;
     final name = _nameController.text.trim();
     final host = _hostController.text.trim();
-    final port = int.tryParse(_portController.text.trim()) ?? 5432;
+    final port = int.tryParse(_portController.text.trim()) ?? 3306;
     final database = _databaseController.text.trim();
     final uri = _connectionStringController.text.trim();
     final displayName = name.isNotEmpty
         ? name
         : (uri.isNotEmpty
-            ? 'PostgreSQL (URI)'
-            : 'PostgreSQL $host:$port/$database');
+            ? 'MySQL (URI)'
+            : 'MySQL $host:$port${database.isNotEmpty ? '/$database' : ''}');
     final row = ConnectionRow(
-      type: 'postgresql',
+      type: 'mysql',
       name: displayName,
       host: uri.isNotEmpty ? null : host,
       port: uri.isNotEmpty ? null : port,
@@ -151,7 +149,9 @@ class _PostgresConnectionFormContentState
           : _usernameController.text.trim(),
       password:
           _passwordController.text.isEmpty ? null : _passwordController.text,
-      databaseName: uri.isNotEmpty ? null : (database.isEmpty ? null : database),
+      databaseName: uri.isNotEmpty
+          ? null
+          : (database.isEmpty ? null : database),
       useSSL: _useSSL,
       connectionString: uri.isEmpty ? null : uri,
       folderId: widget.folderId,
@@ -197,7 +197,6 @@ class _PostgresConnectionFormContentState
         child: material.Column(
           crossAxisAlignment: material.CrossAxisAlignment.stretch,
           children: [
-            // Header
             material.Padding(
               padding: const material.EdgeInsets.fromLTRB(24, 24, 24, 16),
               child: material.Column(
@@ -209,40 +208,38 @@ class _PostgresConnectionFormContentState
                         width: 24,
                         height: 24,
                         child: material.Image.asset(
-                          'assets/images/postgresql_icon.png',
+                          'assets/images/mysql_icon.png',
                           fit: material.BoxFit.contain,
                           errorBuilder: (_, __, ___) => material.Icon(
-                            material.Icons.storage_rounded,
+                            material.Icons.table_chart_rounded,
                             size: 24,
                             color: theme.primary,
                           ),
                         ),
                       ),
                       const Gap(12),
-                      const Text('PostgreSQL Connection').large().semiBold(),
+                      const Text('MySQL Connection').large().semiBold(),
                     ],
                   ),
                   const Gap(8),
-                  const Text('Configure your PostgreSQL connection settings')
+                  const Text('Configure your MySQL or MariaDB connection')
                       .muted()
                       .small(),
                 ],
               ),
             ),
             const material.Divider(height: 1),
-            // Form body
             material.Expanded(
               child: material.SingleChildScrollView(
                 padding: const material.EdgeInsets.all(24),
                 child: material.Column(
                   crossAxisAlignment: material.CrossAxisAlignment.stretch,
                   children: [
-                    // Connection Name
                     const Text('Connection Name').small().semiBold(),
                     const Gap(8),
                     TextField(
                       controller: _nameController,
-                      placeholder: const Text('My PostgreSQL Server'),
+                      placeholder: const Text('My MySQL Server'),
                     ),
                     const Gap(16),
                     const Text('Connection URI (optional)').small().semiBold(),
@@ -252,19 +249,16 @@ class _PostgresConnectionFormContentState
                     ).muted().small(),
                     const Gap(4),
                     const Text(
-                      'Supported query params include sslmode (disable, require, '
-                      'verify-ca, verify-full), connect_timeout and query_timeout '
-                      '(seconds). If sslmode is omitted, Use SSL/TLS below applies.',
+                      'Query params: ssl-mode (disable, require), database.',
                     ).muted().small(),
                     const Gap(8),
                     TextField(
                       controller: _connectionStringController,
                       placeholder: const Text(
-                        'postgresql://user:pass@host:5432/dbname?sslmode=require',
+                        'mysql://user:pass@host:3306/dbname?ssl-mode=disable',
                       ),
                     ),
                     const Gap(16),
-                    // Host + Port
                     material.Row(
                       children: [
                         material.Expanded(
@@ -295,7 +289,7 @@ class _PostgresConnectionFormContentState
                               const Gap(8),
                               TextField(
                                 controller: _portController,
-                                placeholder: const Text('5432'),
+                                placeholder: const Text('3306'),
                               ),
                             ],
                           ),
@@ -303,23 +297,20 @@ class _PostgresConnectionFormContentState
                       ],
                     ),
                     const Gap(16),
-                    // Database
-                    const Text('Database').small().semiBold(),
+                    const Text('Database (optional)').small().semiBold(),
                     const Gap(8),
                     TextField(
                       controller: _databaseController,
-                      placeholder: const Text('postgres'),
+                      placeholder: const Text('Leave empty to browse all'),
                     ),
                     const Gap(16),
-                    // Username
                     const Text('Username').small().semiBold(),
                     const Gap(8),
                     TextField(
                       controller: _usernameController,
-                      placeholder: const Text('postgres'),
+                      placeholder: const Text('root'),
                     ),
                     const Gap(16),
-                    // Password
                     const Text('Password').small().semiBold(),
                     const Gap(8),
                     material.Stack(
@@ -351,13 +342,12 @@ class _PostgresConnectionFormContentState
                       ],
                     ),
                     const Gap(16),
-                    // SSL toggle
                     material.Row(
                       children: [
                         material.Checkbox(
                           value: _useSSL,
                           onChanged: (v) =>
-                              setState(() => _useSSL = v ?? false),
+                              setState(() => _useSSL = v ?? true),
                         ),
                         const Gap(8),
                         const Text('Use SSL/TLS').small(),
@@ -368,7 +358,6 @@ class _PostgresConnectionFormContentState
               ),
             ),
             const material.Divider(height: 1),
-            // Test result banner
             if (_testResult != null)
               material.Padding(
                 padding: const material.EdgeInsets.fromLTRB(24, 8, 16, 8),
@@ -435,7 +424,6 @@ class _PostgresConnectionFormContentState
                   ),
                 ),
               ),
-            // Footer — Wrap avoids overflow on narrow viewports (e.g. in tests)
             material.Container(
               padding: const material.EdgeInsets.symmetric(
                   horizontal: 24, vertical: 16),

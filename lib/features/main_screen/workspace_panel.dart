@@ -1,7 +1,10 @@
-import 'package:flutter/material.dart' as material show Axis, Container, EdgeInsets, BoxDecoration, GestureDetector, Padding, BorderRadius, Center, CrossAxisAlignment, Icon, Icons, MouseRegion, AnimatedContainer, AnimatedScale, Curves, SystemMouseCursors, LayoutBuilder, HitTestBehavior, SizedBox, SingleChildScrollView, Row, MainAxisSize;
+import 'package:flutter/material.dart' as material show Alignment, Axis, Container, EdgeInsets, BoxDecoration, GestureDetector, Padding, BorderRadius, Center, CrossAxisAlignment, Icon, Icons, MouseRegion, AnimatedContainer, AnimatedScale, Curves, SystemMouseCursors, LayoutBuilder, HitTestBehavior, SizedBox, SingleChildScrollView, Row, MainAxisSize;
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
+import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
+import 'package:querya_desktop/features/mysql/mysql_table_view.dart';
+import 'package:querya_desktop/features/mysql/mysql_workspace_home.dart';
 import 'package:querya_desktop/features/mongodb/mongo_explorer_view.dart';
 import 'package:querya_desktop/features/mongodb/mongo_stats_view.dart';
 import 'package:querya_desktop/features/postgresql/postgres_browser_views.dart';
@@ -14,6 +17,7 @@ import 'package:querya_desktop/features/redis/redis_explorer_view.dart';
 import 'package:querya_desktop/features/redis/redis_view.dart';
 import 'query_editor_tab.dart';
 import 'results_tab.dart';
+import 'workspace_empty_hero.dart';
 
 Widget _pgObjectWorkspace({
   required ConnectionRow connection,
@@ -117,6 +121,9 @@ class WorkspacePanel extends StatefulWidget {
     this.selectedMongoDb,
     this.selectedPostgresObject,
     this.postgresSqlTabRequestToken = 0,
+    this.selectedMysqlObject,
+    this.mysqlSqlTabRequestToken = 0,
+    this.onRequestNewConnection,
   });
 
   /// Currently selected connection from the sidebar.
@@ -138,6 +145,16 @@ class WorkspacePanel extends StatefulWidget {
   /// Incremented by [MainScreen] to switch the PostgreSQL home view to the SQL tab.
   final int postgresSqlTabRequestToken;
 
+  /// When set, the user selected a MySQL table or view in the sidebar tree.
+  final ({String database, String name, MysqlObjectKind kind})?
+      selectedMysqlObject;
+
+  /// Incremented by [MainScreen] to switch the MySQL home view to the SQL tab.
+  final int mysqlSqlTabRequestToken;
+
+  /// Empty-state hero: primary CTA to add a connection.
+  final void Function()? onRequestNewConnection;
+
   @override
   State<WorkspacePanel> createState() => _WorkspacePanelState();
 }
@@ -150,6 +167,17 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    if (widget.activeConnection == null) {
+      return material.Container(
+        color: theme.colorScheme.background,
+        alignment: material.Alignment.topCenter,
+        child: WorkspaceEmptyHero(
+          onNewConnection:
+              widget.onRequestNewConnection ?? () {},
+        ),
+      );
+    }
 
     // If a PostgreSQL connection is selected → stats, table/view, function, or sequence
     if (widget.activeConnection != null &&
@@ -167,6 +195,32 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
               : _pgObjectWorkspace(
                   connection: widget.activeConnection!,
                   pg: pg,
+                ),
+        ),
+      );
+    }
+
+    // MySQL / MariaDB
+    if (widget.activeConnection != null &&
+        widget.activeConnection!.type == 'mysql') {
+      final my = widget.selectedMysqlObject;
+      return material.Container(
+        color: theme.colorScheme.background,
+        child: material.SizedBox.expand(
+          child: my == null
+              ? MysqlWorkspaceHome(
+                  key: ValueKey('mysql_home_${widget.activeConnection!.id}'),
+                  connectionRow: widget.activeConnection!,
+                  sqlTabRequestToken: widget.mysqlSqlTabRequestToken,
+                )
+              : MysqlTableView(
+                  key: ValueKey(
+                    'mysql_${widget.activeConnection!.id}_${my.database}_${my.name}_${my.kind}',
+                  ),
+                  connectionRow: widget.activeConnection!,
+                  database: my.database,
+                  tableName: my.name,
+                  isView: my.kind == MysqlObjectKind.view,
                 ),
         ),
       );
