@@ -14,14 +14,15 @@ Future<ConnectionRow?> promptCreateConnection(
 }) async {
   final type = await showNewConnectionDialog(context);
   if (type == null) return null;
-  return switch (type) {
-    ConnectionType.postgresql =>
-      await showPostgresConnectionForm(context, folderId: folderId),
-    ConnectionType.mysql =>
-      await showMysqlConnectionForm(context, folderId: folderId),
-    ConnectionType.mongodb =>
-      await showMongoConnectionForm(context, folderId: folderId),
-    ConnectionType.redis =>
-      await showRedisConnectionForm(context, folderId: folderId),
-  };
+  if (!context.mounted) return null;
+  switch (type) {
+    case ConnectionType.postgresql:
+      return await showPostgresConnectionForm(context, folderId: folderId);
+    case ConnectionType.mysql:
+      return await showMysqlConnectionForm(context, folderId: folderId);
+    case ConnectionType.mongodb:
+      return await showMongoConnectionForm(context, folderId: folderId);
+    case ConnectionType.redis:
+      return await showRedisConnectionForm(context, folderId: folderId);
+  }
 }

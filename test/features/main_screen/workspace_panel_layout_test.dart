@@ -8,12 +8,14 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 import '../../support/layout_overflow.dart';
 
 void main() {
-  const stubRedisConnection = ConnectionRow(
+  /// Type must not be postgresql/mysql/mongodb/redis so [WorkspacePanel] uses the
+  /// default Query/Output split (includes resize handle). Not a real DB driver.
+  const stubSplitWorkspaceConnection = ConnectionRow(
     id: 1,
-    type: 'redis',
+    type: '_layout_test_split',
     name: 'layout-stub',
     host: '127.0.0.1',
-    port: 6379,
+    port: 0,
     createdAt: '0',
   );
 
@@ -56,7 +58,7 @@ void main() {
             darkTheme: AppTheme.dark,
             themeMode: ThemeMode.dark,
             home: const material.SizedBox.expand(
-              child: WorkspacePanel(activeConnection: stubRedisConnection),
+              child: WorkspacePanel(activeConnection: stubSplitWorkspaceConnection),
             ),
           ),
         );

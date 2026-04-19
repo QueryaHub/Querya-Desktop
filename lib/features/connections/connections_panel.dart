@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart' as material show AlertDialog, BoxConstraints, BuildContext, Column, ConstrainedBox, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, DefaultTextStyle, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, AnimatedRotation, Row, BoxFit, Text, TextOverflow, Expanded, CircularProgressIndicator, Material, StatelessWidget, Colors, Tooltip, Color, LayoutBuilder, TextPainter, TextSpan, TextDirection, SelectableText, Padding, Widget, Navigator, ValueKey, FontWeight, VoidCallback;
+import 'package:flutter/material.dart' as material show AlertDialog, BoxConstraints, BuildContext, Column, ConstrainedBox, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, AnimatedRotation, Row, BoxFit, Text, TextOverflow, Expanded, CircularProgressIndicator, Material, StatelessWidget, Colors, Tooltip, Color, LayoutBuilder, TextPainter, TextSpan, TextDirection, SelectableText, Padding, Widget, Navigator, ValueKey, FontWeight, VoidCallback;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
@@ -376,7 +376,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                             leading: material.Icon(material.Icons.settings_ethernet_rounded, size: 18, color: theme.colorScheme.mutedForeground),
                             onPressed: (menuContext) async {
                               await Future.delayed(const Duration(milliseconds: 100));
-                              if (!mounted) return;
+                              if (!mounted || !menuContext.mounted) return;
                               await _createConnection(dialogContext: menuContext);
                             },
                             child: const Text('New Connection'),

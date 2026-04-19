@@ -61,9 +61,11 @@ abstract class WindowLayout {
     };
   }
 
-  /// Empty workspace hero content max width.
+  /// Empty workspace hero content max width (stays within viewport minus padding).
   static double heroContentMaxWidth(double viewportWidth) {
-    return math.min(560, math.max(260.0, viewportWidth * 0.92));
+    final pad = heroHorizontalPadding(viewportWidth) * 2;
+    final inner = math.max(0.0, viewportWidth - pad);
+    return math.min(560, inner);
   }
 
   static double heroHorizontalPadding(double viewportWidth) {
