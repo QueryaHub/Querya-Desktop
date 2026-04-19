@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart' as material
-    show Padding, EdgeInsets, TextStyle, TextEditingController;
+    show EdgeInsets, Padding, TextEditingController, TextStyle;
+import 'package:querya_desktop/core/theme/querya_typography.dart';
+import 'package:querya_desktop/features/main_screen/sql_editor_chrome.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 class QueryEditorTab extends StatelessWidget {
@@ -68,17 +70,18 @@ class _QueryEditorBodyState extends State<_QueryEditorBody> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return material.Padding(
       padding: const material.EdgeInsets.all(12),
-      child: Card(
-        padding: material.EdgeInsets.zero,
+      child: SqlEditorChrome(
         child: TextField(
           controller: _owned,
           maxLines: null,
           expands: true,
-          style: const material.TextStyle(
-            fontFamily: 'monospace',
+          style: material.TextStyle(
+            fontFamily: QueryaTypography.mono,
             fontSize: 13,
+            color: theme.colorScheme.foreground,
           ),
           placeholder: const Text('-- Enter SQL here…\nSELECT 1;'),
         ),
