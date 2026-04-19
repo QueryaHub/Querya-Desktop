@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/features/main_screen/workspace_panel.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -7,6 +8,15 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 import '../../support/layout_overflow.dart';
 
 void main() {
+  const stubRedisConnection = ConnectionRow(
+    id: 1,
+    type: 'redis',
+    name: 'layout-stub',
+    host: '127.0.0.1',
+    port: 6379,
+    createdAt: '0',
+  );
+
   group('WorkspacePanel layout (no connection)', () {
     final sizes = <String, material.Size>{
       'narrow_tall': const material.Size(320, 720),
@@ -46,7 +56,7 @@ void main() {
             darkTheme: AppTheme.dark,
             themeMode: ThemeMode.dark,
             home: const material.SizedBox.expand(
-              child: WorkspacePanel(),
+              child: WorkspacePanel(activeConnection: stubRedisConnection),
             ),
           ),
         );
