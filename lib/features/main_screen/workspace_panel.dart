@@ -470,7 +470,7 @@ class _TabButtonState extends State<_TabButton> {
         child: material.GestureDetector(
           onTap: widget.onTap,
           child: material.AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
+            duration: const Duration(milliseconds: 120),
             curve: material.Curves.easeOut,
             padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: material.BoxDecoration(
@@ -505,7 +505,7 @@ class _RunButtonState extends State<_RunButton> {
       cursor: material.SystemMouseCursors.click,
       child: material.AnimatedScale(
         scale: _hovered ? 1.03 : 1.0,
-        duration: const Duration(milliseconds: 120),
+        duration: const Duration(milliseconds: 100),
         curve: material.Curves.easeOut,
         child: OutlineButton(
           onPressed: () {},

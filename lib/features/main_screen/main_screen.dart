@@ -1,8 +1,23 @@
 import 'dart:math' as math;
 
 import 'package:bitsdojo_window/bitsdojo_window.dart';
+import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:flutter/material.dart' as material
-    show Scaffold, Container, MainAxisSize, GestureDetector, MouseRegion, SystemMouseCursors, HitTestBehavior, Icons, Icon, BuildContext, Widget;
+    show
+        Scaffold,
+        Container,
+        MainAxisSize,
+        GestureDetector,
+        MouseRegion,
+        SystemMouseCursors,
+        HitTestBehavior,
+        Icons,
+        Icon,
+        BuildContext,
+        Widget,
+        RepaintBoundary;
+import 'package:flutter/widgets.dart'
+    show ValueListenableBuilder, VoidCallback;
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/core/theme/querya_colors.dart';
@@ -13,6 +28,7 @@ import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
 import 'package:querya_desktop/features/connections/driver_manager_dialog.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
+import 'main_screen_workspace_state.dart';
 import 'workspace_panel.dart';
 
 class MainScreen extends StatefulWidget {
@@ -26,43 +42,17 @@ class _MainScreenState extends State<MainScreen> {
   final GlobalKey<ConnectionsPanelState> _connectionsPanelKey =
       GlobalKey<ConnectionsPanelState>();
 
-  static const double _minLeftWidth = 180;
-  static const double _maxLeftWidth = 500;
-  /// Minimum width reserved for workspace (avoid Row overflow when window is narrow).
-  static const double _minWorkspaceWidth = 64;
-  static const double _resizeHandleWidth = 6;
-  double _leftPanelWidth = 260;
+  final ValueNotifier<MainScreenWorkspaceState> _workspace =
+      ValueNotifier(MainScreenWorkspaceState.empty);
 
-  /// Currently selected connection (null = no connection selected).
-  ConnectionRow? _activeConnection;
-
-  /// Currently selected Redis database (null = show stats).
-  int? _activeRedisDb;
-
-  /// Currently selected MongoDB database (null = show stats).
-  String? _activeMongoDB;
-
-  /// When set, user selected a PostgreSQL object in the tree.
-  ({String database, String schema, String name, PostgresObjectKind kind})?
-      _selectedPostgresObject;
-
-  /// Bumped to tell [PostgresWorkspaceHome] to switch to the SQL tab.
-  int _postgresSqlTabRequestToken = 0;
-
-  /// When set, user selected a MySQL table or view in the tree.
-  ({String database, String name, MysqlObjectKind kind})? _selectedMysqlObject;
-
-  /// Bumped to tell [MysqlWorkspaceHome] to switch to the SQL tab.
-  int _mysqlSqlTabRequestToken = 0;
+  @override
+  void dispose() {
+    _workspace.dispose();
+    super.dispose();
+  }
 
   void _onConnectionSelected(ConnectionRow connection) {
-    setState(() {
-      _activeConnection = connection;
-      _activeRedisDb = null;
-      _activeMongoDB = null;
-      _selectedPostgresObject = null;
-      _selectedMysqlObject = null;
-    });
+    _workspace.value = _workspace.value.selectConnection(connection);
   }
 
   void _onPostgresObjectSelected(
@@ -72,18 +62,13 @@ class _MainScreenState extends State<MainScreen> {
     String name,
     PostgresObjectKind kind,
   ) {
-    setState(() {
-      _activeConnection = connection;
-      _activeRedisDb = null;
-      _activeMongoDB = null;
-      _selectedMysqlObject = null;
-      _selectedPostgresObject = (
-        database: database,
-        schema: schema,
-        name: name,
-        kind: kind,
-      );
-    });
+    _workspace.value = _workspace.value.selectPostgresObject(
+      connection,
+      database,
+      schema,
+      name,
+      kind,
+    );
   }
 
   void _onMysqlObjectSelected(
@@ -92,59 +77,28 @@ class _MainScreenState extends State<MainScreen> {
     String name,
     MysqlObjectKind kind,
   ) {
-    setState(() {
-      _activeConnection = connection;
-      _activeRedisDb = null;
-      _activeMongoDB = null;
-      _selectedPostgresObject = null;
-      _selectedMysqlObject = (
-        database: database,
-        name: name,
-        kind: kind,
-      );
-    });
+    _workspace.value = _workspace.value.selectMysqlObject(
+      connection,
+      database,
+      name,
+      kind,
+    );
   }
 
   void _onRedisDatabaseSelected(ConnectionRow connection, int database) {
-    setState(() {
-      _activeConnection = connection;
-      _activeRedisDb = database;
-      _activeMongoDB = null;
-      _selectedPostgresObject = null;
-      _selectedMysqlObject = null;
-    });
+    _workspace.value = _workspace.value.selectRedisDb(connection, database);
   }
 
   void _onMongoDBDatabaseSelected(ConnectionRow connection, String database) {
-    setState(() {
-      _activeConnection = connection;
-      _activeRedisDb = null;
-      _activeMongoDB = database;
-      _selectedPostgresObject = null;
-      _selectedMysqlObject = null;
-    });
+    _workspace.value = _workspace.value.selectMongoDb(connection, database);
   }
 
   void _onPostgresOpenSqlWorkspace(ConnectionRow connection) {
-    setState(() {
-      _activeConnection = connection;
-      _activeRedisDb = null;
-      _activeMongoDB = null;
-      _selectedPostgresObject = null;
-      _selectedMysqlObject = null;
-      _postgresSqlTabRequestToken++;
-    });
+    _workspace.value = _workspace.value.openPostgresSqlWorkspace(connection);
   }
 
   void _onMysqlOpenSqlWorkspace(ConnectionRow connection) {
-    setState(() {
-      _activeConnection = connection;
-      _activeRedisDb = null;
-      _activeMongoDB = null;
-      _selectedPostgresObject = null;
-      _selectedMysqlObject = null;
-      _mysqlSqlTabRequestToken++;
-    });
+    _workspace.value = _workspace.value.openMysqlSqlWorkspace(connection);
   }
 
   Future<void> _openNewConnectionFromHero() async {
@@ -154,7 +108,8 @@ class _MainScreenState extends State<MainScreen> {
     await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
   }
 
-  Future<void> _onNewDatabaseConnectionFromMenu(material.BuildContext menuContext) async {
+  Future<void> _onNewDatabaseConnectionFromMenu(
+      material.BuildContext menuContext) async {
     final row = await promptCreateConnection(menuContext, folderId: null);
     if (!mounted || row == null) return;
     await LocalDb.instance.addConnection(row);
@@ -179,81 +134,159 @@ class _MainScreenState extends State<MainScreen> {
               ),
               Divider(height: 1, color: theme.border.withValues(alpha: 0.22)),
               Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final maxLeft = constraints.maxWidth -
-                        _resizeHandleWidth -
-                        _minWorkspaceWidth;
-                    double leftW;
-                    if (maxLeft <= 0) {
-                      leftW = 0;
-                    } else if (maxLeft < _minLeftWidth) {
-                      leftW = maxLeft;
-                    } else {
-                      leftW = _leftPanelWidth.clamp(
-                        _minLeftWidth,
-                        math.min(_maxLeftWidth, maxLeft),
-                      );
-                    }
-                    return Row(
-                      children: [
-                        SizedBox(
-                          width: leftW,
-                          child: ConnectionsPanel(
-                            key: _connectionsPanelKey,
-                            selectedConnectionId: _activeConnection?.id,
-                            onConnectionSelected: _onConnectionSelected,
-                            onRedisDatabaseSelected: _onRedisDatabaseSelected,
-                            onMongoDBDatabaseSelected: _onMongoDBDatabaseSelected,
-                            onPostgresObjectSelected: _onPostgresObjectSelected,
-                            onPostgresOpenSqlWorkspace: _onPostgresOpenSqlWorkspace,
-                            onMysqlObjectSelected: _onMysqlObjectSelected,
-                            onMysqlOpenSqlWorkspace: _onMysqlOpenSqlWorkspace,
-                          ),
-                        ),
-                        _VerticalResizeHandle(
-                          onDrag: (dx) {
-                            setState(() {
-                              final w = MediaQuery.sizeOf(context).width;
-                              final ml = w -
-                                  _resizeHandleWidth -
-                                  _minWorkspaceWidth;
-                              if (ml <= 0) return;
-                              final next = _leftPanelWidth + dx;
-                              if (ml < _minLeftWidth) {
-                                _leftPanelWidth = next.clamp(0, ml);
-                              } else {
-                                _leftPanelWidth = next.clamp(
-                                  _minLeftWidth,
-                                  math.min(_maxLeftWidth, ml),
-                                );
-                              }
-                            });
-                          },
-                        ),
-                        Expanded(
-                          child: WorkspacePanel(
-                            activeConnection: _activeConnection,
-                            selectedRedisDb: _activeRedisDb,
-                            selectedMongoDb: _activeMongoDB,
-                            selectedPostgresObject: _selectedPostgresObject,
-                            postgresSqlTabRequestToken: _postgresSqlTabRequestToken,
-                            selectedMysqlObject: _selectedMysqlObject,
-                            mysqlSqlTabRequestToken: _mysqlSqlTabRequestToken,
-                            onRequestNewConnection: () {
-                              _openNewConnectionFromHero();
-                            },
-                          ),
-                        ),
-                      ],
-                    );
-                  },
+                child: _MainContentSplit(
+                  connectionsPanelKey: _connectionsPanelKey,
+                  workspace: _workspace,
+                  onConnectionSelected: _onConnectionSelected,
+                  onPostgresObjectSelected: _onPostgresObjectSelected,
+                  onMysqlObjectSelected: _onMysqlObjectSelected,
+                  onRedisDatabaseSelected: _onRedisDatabaseSelected,
+                  onMongoDBDatabaseSelected: _onMongoDBDatabaseSelected,
+                  onPostgresOpenSqlWorkspace: _onPostgresOpenSqlWorkspace,
+                  onMysqlOpenSqlWorkspace: _onMysqlOpenSqlWorkspace,
+                  onRequestNewConnection: _openNewConnectionFromHero,
                 ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Owns splitter width so resizing does not rebuild [MainScreen] or title bar.
+class _MainContentSplit extends StatefulWidget {
+  const _MainContentSplit({
+    required this.connectionsPanelKey,
+    required this.workspace,
+    required this.onConnectionSelected,
+    required this.onPostgresObjectSelected,
+    required this.onMysqlObjectSelected,
+    required this.onRedisDatabaseSelected,
+    required this.onMongoDBDatabaseSelected,
+    required this.onPostgresOpenSqlWorkspace,
+    required this.onMysqlOpenSqlWorkspace,
+    required this.onRequestNewConnection,
+  });
+
+  final GlobalKey<ConnectionsPanelState> connectionsPanelKey;
+  final ValueNotifier<MainScreenWorkspaceState> workspace;
+  final void Function(ConnectionRow) onConnectionSelected;
+  final void Function(
+    ConnectionRow,
+    String database,
+    String schema,
+    String name,
+    PostgresObjectKind kind,
+  ) onPostgresObjectSelected;
+  final void Function(
+    ConnectionRow,
+    String database,
+    String name,
+    MysqlObjectKind kind,
+  ) onMysqlObjectSelected;
+  final void Function(ConnectionRow, int) onRedisDatabaseSelected;
+  final void Function(ConnectionRow, String) onMongoDBDatabaseSelected;
+  final void Function(ConnectionRow) onPostgresOpenSqlWorkspace;
+  final void Function(ConnectionRow) onMysqlOpenSqlWorkspace;
+  final VoidCallback onRequestNewConnection;
+
+  @override
+  State<_MainContentSplit> createState() => _MainContentSplitState();
+}
+
+class _MainContentSplitState extends State<_MainContentSplit> {
+  static const double _minLeftWidth = 180;
+  static const double _maxLeftWidth = 500;
+  static const double _minWorkspaceWidth = 64;
+  static const double _resizeHandleWidth = 6;
+  double _leftPanelWidth = 260;
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxLeft =
+            constraints.maxWidth - _resizeHandleWidth - _minWorkspaceWidth;
+        double leftW;
+        if (maxLeft <= 0) {
+          leftW = 0;
+        } else if (maxLeft < _minLeftWidth) {
+          leftW = maxLeft;
+        } else {
+          leftW = _leftPanelWidth.clamp(
+            _minLeftWidth,
+            math.min(_maxLeftWidth, maxLeft),
+          );
+        }
+        return Row(
+          children: [
+            SizedBox(
+              width: leftW,
+              child: material.RepaintBoundary(
+                child: ValueListenableBuilder<MainScreenWorkspaceState>(
+                  valueListenable: widget.workspace,
+                  builder: (context, ws, _) {
+                    return ConnectionsPanel(
+                      key: widget.connectionsPanelKey,
+                      selectedConnectionId: ws.activeConnection?.id,
+                      onConnectionSelected: widget.onConnectionSelected,
+                      onRedisDatabaseSelected: widget.onRedisDatabaseSelected,
+                      onMongoDBDatabaseSelected:
+                          widget.onMongoDBDatabaseSelected,
+                      onPostgresObjectSelected:
+                          widget.onPostgresObjectSelected,
+                      onPostgresOpenSqlWorkspace:
+                          widget.onPostgresOpenSqlWorkspace,
+                      onMysqlObjectSelected: widget.onMysqlObjectSelected,
+                      onMysqlOpenSqlWorkspace: widget.onMysqlOpenSqlWorkspace,
+                    );
+                  },
+                ),
+              ),
+            ),
+            _VerticalResizeHandle(
+              onDrag: (dx) {
+                setState(() {
+                  final w = MediaQuery.sizeOf(context).width;
+                  final ml = w - _resizeHandleWidth - _minWorkspaceWidth;
+                  if (ml <= 0) return;
+                  final next = _leftPanelWidth + dx;
+                  if (ml < _minLeftWidth) {
+                    _leftPanelWidth = next.clamp(0, ml);
+                  } else {
+                    _leftPanelWidth = next.clamp(
+                      _minLeftWidth,
+                      math.min(_maxLeftWidth, ml),
+                    );
+                  }
+                });
+              },
+            ),
+            Expanded(
+              child: material.RepaintBoundary(
+                child: ValueListenableBuilder<MainScreenWorkspaceState>(
+                  valueListenable: widget.workspace,
+                  builder: (context, ws, _) {
+                    return WorkspacePanel(
+                      activeConnection: ws.activeConnection,
+                      selectedRedisDb: ws.activeRedisDb,
+                      selectedMongoDb: ws.activeMongoDB,
+                      selectedPostgresObject: ws.selectedPostgresObject,
+                      postgresSqlTabRequestToken:
+                          ws.postgresSqlTabRequestToken,
+                      selectedMysqlObject: ws.selectedMysqlObject,
+                      mysqlSqlTabRequestToken: ws.mysqlSqlTabRequestToken,
+                      onRequestNewConnection: widget.onRequestNewConnection,
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -287,7 +320,8 @@ class _CustomTitleBar extends StatefulWidget {
   });
 
   final ColorScheme theme;
-  final Future<void> Function(material.BuildContext context) onNewDatabaseConnection;
+  final Future<void> Function(material.BuildContext context)
+      onNewDatabaseConnection;
 
   @override
   State<_CustomTitleBar> createState() => _CustomTitleBarState();
@@ -337,11 +371,16 @@ class _CustomTitleBarState extends State<_CustomTitleBar> {
                       children: [
                         MenuButton(
                           subMenu: [
-                            MenuButton(onPressed: (_) {}, child: const Text('New')),
-                            MenuButton(onPressed: (_) {}, child: const Text('Open...')),
-                            MenuButton(onPressed: (_) {}, child: const Text('Save')),
+                            MenuButton(
+                                onPressed: (_) {}, child: const Text('New')),
+                            MenuButton(
+                                onPressed: (_) {},
+                                child: const Text('Open...')),
+                            MenuButton(
+                                onPressed: (_) {}, child: const Text('Save')),
                             const MenuDivider(),
-                            MenuButton(onPressed: (_) {}, child: const Text('Exit')),
+                            MenuButton(
+                                onPressed: (_) {}, child: const Text('Exit')),
                           ],
                           child: const Text('File'),
                         ),
@@ -361,43 +400,57 @@ class _CustomTitleBarState extends State<_CustomTitleBar> {
                         MenuButton(
                           subMenu: [
                             MenuButton(
-                              leading: const material.Icon(material.Icons.add_link_rounded, size: 18),
-                              trailing: const Text('Shift+Ctrl+N').xSmall().muted(),
-                              onPressed: (ctx) => widget.onNewDatabaseConnection(ctx),
+                              leading: const material.Icon(
+                                  material.Icons.add_link_rounded, size: 18),
+                              trailing:
+                                  const Text('Shift+Ctrl+N').xSmall().muted(),
+                              onPressed: (ctx) =>
+                                  widget.onNewDatabaseConnection(ctx),
                               child: const Text('New Database Connection'),
                             ),
                             MenuButton(
-                              leading: const material.Icon(material.Icons.link_rounded, size: 18),
+                              leading: const material.Icon(
+                                  material.Icons.link_rounded, size: 18),
                               onPressed: (_) {},
                               child: const Text('New Connection from URL'),
                             ),
                             MenuButton(
-                              leading: const material.Icon(material.Icons.settings_rounded, size: 18),
+                              leading: const material.Icon(
+                                  material.Icons.settings_rounded, size: 18),
                               onPressed: (ctx) => showDriverManagerDialog(ctx),
                               child: const Text('Driver Manager'),
                             ),
                             const MenuDivider(),
                             MenuButton(
                               enabled: false,
-                              leading: const material.Icon(material.Icons.power_rounded, size: 18),
+                              leading: const material.Icon(
+                                  material.Icons.power_rounded, size: 18),
                               onPressed: (_) {},
                               child: const Text('Connect'),
                             ),
                             MenuButton(
-                              leading: const material.Icon(material.Icons.refresh_rounded, size: 18),
+                              leading: const material.Icon(
+                                  material.Icons.refresh_rounded, size: 18),
                               onPressed: (_) {},
                               child: const Text('Invalidate/Reconnect'),
                             ),
                             MenuButton(
-                              leading: const material.Icon(material.Icons.power_off_rounded, size: 18),
+                              leading: const material.Icon(
+                                  material.Icons.power_off_rounded, size: 18),
                               onPressed: (_) {},
                               child: const Text('Disconnect'),
                             ),
-                            MenuButton(onPressed: (_) {}, child: const Text('Disconnect All')),
-                            MenuButton(onPressed: (_) {}, child: const Text('Disconnect Others')),
+                            MenuButton(
+                                onPressed: (_) {},
+                                child: const Text('Disconnect All')),
+                            MenuButton(
+                                onPressed: (_) {},
+                                child: const Text('Disconnect Others')),
                             const MenuDivider(),
                             MenuButton(
-                              leading: const material.Icon(material.Icons.lock_outline_rounded, size: 18),
+                              leading: const material.Icon(
+                                  material.Icons.lock_outline_rounded,
+                                  size: 18),
                               onPressed: (_) {},
                               child: const Text('Read-only'),
                             ),
@@ -406,8 +459,11 @@ class _CustomTitleBarState extends State<_CustomTitleBar> {
                         ),
                         MenuButton(
                           subMenu: [
-                            MenuButton(onPressed: (_) {}, child: const Text('About')),
-                            MenuButton(onPressed: (_) {}, child: const Text('Documentation')),
+                            MenuButton(
+                                onPressed: (_) {}, child: const Text('About')),
+                            MenuButton(
+                                onPressed: (_) {},
+                                child: const Text('Documentation')),
                           ],
                           child: const Text('Help'),
                         ),

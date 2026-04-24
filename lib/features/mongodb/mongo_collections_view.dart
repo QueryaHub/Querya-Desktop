@@ -233,7 +233,7 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
       );
     }
 
-    return material.SingleChildScrollView(
+    return material.Padding(
       padding: const material.EdgeInsets.all(24),
       child: _buildCard(cs),
     );
@@ -248,9 +248,9 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
         border: material.Border.all(
             color: cs.border.withValues(alpha: 0.4), width: 1),
       ),
+      clipBehavior: material.Clip.antiAlias,
       child: material.Column(
         crossAxisAlignment: material.CrossAxisAlignment.stretch,
-        mainAxisSize: material.MainAxisSize.min,
         children: [
           // Card header
           material.Container(
@@ -329,27 +329,31 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
               ],
             ),
           ),
-          // Collection rows
-          for (var i = 0; i < _collections.length; i++) ...[
-            if (i > 0)
-              Divider(
-                  height: 1,
-                  color: cs.border.withValues(alpha: 0.15)),
-            _CollectionRow(
-              collection: _collections[i],
-              colorScheme: cs,
-              onView: () =>
-                  widget.onCollectionTap?.call(_collections[i].name),
-              onDrop: () => _dropCollection(_collections[i].name),
-            ),
-          ],
-          if (_collections.isEmpty)
-            material.Padding(
-              padding: const material.EdgeInsets.all(24),
-              child: material.Center(
-                child: const Text('No collections found').muted(),
-              ),
-            ),
+          // Collection rows (virtualized)
+          material.Expanded(
+            child: _collections.isEmpty
+                ? material.Center(
+                    child: const Text('No collections found').muted(),
+                  )
+                : material.ListView.separated(
+                    cacheExtent: 400,
+                    itemCount: _collections.length,
+                    separatorBuilder: (_, __) => Divider(
+                      height: 1,
+                      color: cs.border.withValues(alpha: 0.15),
+                    ),
+                    itemBuilder: (context, i) {
+                      return _CollectionRow(
+                        collection: _collections[i],
+                        colorScheme: cs,
+                        onView: () => widget.onCollectionTap
+                            ?.call(_collections[i].name),
+                        onDrop: () =>
+                            _dropCollection(_collections[i].name),
+                      );
+                    },
+                  ),
+          ),
         ],
       ),
     );

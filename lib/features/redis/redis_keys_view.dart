@@ -165,10 +165,47 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
         const Divider(height: 1),
         if (_error != null) _buildErrorBanner(cs),
         material.Expanded(
-          child: material.SingleChildScrollView(
-            padding: const material.EdgeInsets.all(16),
-            child: _buildKeysList(cs),
-          ),
+          child: _keys.isEmpty
+              ? material.Center(
+                  child: material.Padding(
+                    padding: const material.EdgeInsets.all(48),
+                    child: const Text('No keys found').muted(),
+                  ),
+                )
+              : material.ListView.builder(
+                  padding: const material.EdgeInsets.all(16),
+                  cacheExtent: 400,
+                  itemCount: _keys.length + (_hasMore ? 1 : 0),
+                  itemBuilder: (context, i) {
+                    final shadcnCs = shadcn.Theme.of(context).colorScheme;
+                    if (i >= _keys.length) {
+                      return material.Padding(
+                        padding: const material.EdgeInsets.only(top: 12),
+                        child: material.Center(
+                          child: OutlineButton(
+                            onPressed: _loadingMore ? null : _loadMore,
+                            size: ButtonSize.small,
+                            child: _loadingMore
+                                ? const Text('Loading...')
+                                : Text(
+                                    'Load more (${_keys.length} / $_dbSize)'),
+                          ),
+                        ),
+                      );
+                    }
+                    return material.Padding(
+                      padding: EdgeInsets.only(top: i > 0 ? 4 : 0),
+                      child: _KeyTile(
+                        keyInfo: _keys[i],
+                        colorScheme: cs,
+                        shadcnCs: shadcnCs,
+                        onTap: () => widget.onKeyTap?.call(
+                            _keys[i].name, _keys[i].type),
+                        onDelete: () => _deleteKey(_keys[i]),
+                      ),
+                    );
+                  },
+                ),
         ),
         _buildStatusBar(cs),
       ],
@@ -236,47 +273,6 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildKeysList(ColorScheme cs) {
-    final shadcnCs = shadcn.Theme.of(context).colorScheme;
-    if (_keys.isEmpty) {
-      return material.Center(
-        child: material.Padding(
-          padding: const material.EdgeInsets.all(48),
-          child: const Text('No keys found').muted(),
-        ),
-      );
-    }
-
-    return material.Column(
-      crossAxisAlignment: material.CrossAxisAlignment.stretch,
-      children: [
-        for (var i = 0; i < _keys.length; i++) ...[
-          if (i > 0) const Gap(4),
-          _KeyTile(
-            keyInfo: _keys[i],
-            colorScheme: cs,
-            shadcnCs: shadcnCs,
-            onTap: () =>
-                widget.onKeyTap?.call(_keys[i].name, _keys[i].type),
-            onDelete: () => _deleteKey(_keys[i]),
-          ),
-        ],
-        if (_hasMore) ...[
-          const Gap(12),
-          material.Center(
-            child: OutlineButton(
-              onPressed: _loadingMore ? null : _loadMore,
-              size: ButtonSize.small,
-              child: _loadingMore
-                  ? const Text('Loading...')
-                  : Text('Load more (${_keys.length} / $_dbSize)'),
-            ),
-          ),
-        ],
-      ],
     );
   }
 
