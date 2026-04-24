@@ -4,6 +4,8 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:querya_desktop/core/csv/result_grid_csv.dart';
 import 'package:querya_desktop/core/csv/save_result_grid_csv.dart';
+import 'package:querya_desktop/core/json/result_grid_json.dart';
+import 'package:querya_desktop/core/json/save_result_grid_json.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Query output: grid, loading, error, or placeholder.
@@ -100,6 +102,26 @@ class ResultsTab extends StatelessWidget {
                 OutlineButton(
                   size: ButtonSize.small,
                   onPressed: () {
+                    unawaited(() async {
+                      final outcome = await saveResultGridJsonFile(
+                        columns: columns,
+                        rows: rows,
+                      );
+                      if (!context.mounted) return;
+                      if (outcome == SaveResultGridJsonOutcome.error) {
+                        await _showSaveFileErrorDialog(context);
+                      }
+                    }());
+                  },
+                  leading: const material.Icon(
+                    material.Icons.data_object_rounded,
+                    size: 14,
+                  ),
+                  child: const Text('Save as JSON…'),
+                ),
+                OutlineButton(
+                  size: ButtonSize.small,
+                  onPressed: () {
                     final csv = resultGridAsCsv(columns, rows);
                     Clipboard.setData(ClipboardData(text: csv));
                   },
@@ -108,6 +130,18 @@ class ResultsTab extends StatelessWidget {
                     size: 14,
                   ),
                   child: const Text('Copy as CSV'),
+                ),
+                OutlineButton(
+                  size: ButtonSize.small,
+                  onPressed: () {
+                    final json = resultGridAsJson(columns, rows);
+                    Clipboard.setData(ClipboardData(text: json));
+                  },
+                  leading: const material.Icon(
+                    material.Icons.copy_rounded,
+                    size: 14,
+                  ),
+                  child: const Text('Copy as JSON'),
                 ),
               ],
             ),
