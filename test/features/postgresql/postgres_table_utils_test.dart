@@ -23,6 +23,15 @@ void main() {
     });
   });
 
+  group('postgresBrowseSelectSql', () {
+    test('quotes identifiers and uses default limit', () {
+      expect(
+        postgresBrowseSelectSql(schema: 'public', table: 'stock'),
+        'SELECT * FROM "public"."stock" LIMIT 200 OFFSET 0;\n',
+      );
+    });
+  });
+
   group('convertResultRowsToStrings', () {
     test('converts null to "NULL"', () {
       final result = convertResultRowsToStrings([

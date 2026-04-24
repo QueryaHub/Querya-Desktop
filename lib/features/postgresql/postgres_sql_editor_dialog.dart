@@ -129,7 +129,8 @@ class _PostgresSqlEditorDialogState extends material.State<_PostgresSqlEditorDia
                     const material.SizedBox(height: 6),
                     const Text(
                       'Table browse uses SELECT with LIMIT/OFFSET. '
-                      'Edit it or write your own SELECT. Reset restores the table browse query.',
+                      'Edit it or write your own SELECT. Reset restores the table browse query. '
+                      'Run reloads the grid from the database; if rows are unchanged, the view will look the same.',
                     ).muted().xSmall(),
                   ],
                 ),

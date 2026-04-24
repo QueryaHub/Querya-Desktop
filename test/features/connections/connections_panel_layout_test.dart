@@ -103,7 +103,7 @@ void main() {
               themeMode: ThemeMode.dark,
               home: material.SizedBox.expand(
                 child: ConnectionsPanel(
-                  onPostgresOpenSqlWorkspace: (_) {},
+                  onPostgresOpenSqlWorkspace: (_, {database, schema, name, kind}) {},
                 ),
               ),
             ),
@@ -189,7 +189,7 @@ void main() {
           home: material.SizedBox.expand(
             child: ConnectionsPanel(
               skipInitialDbLoadForTest: true,
-              onPostgresOpenSqlWorkspace: (_) {},
+              onPostgresOpenSqlWorkspace: (_, {database, schema, name, kind}) {},
             ),
           ),
         ),

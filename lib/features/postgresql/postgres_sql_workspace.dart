@@ -7,11 +7,21 @@ import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/postgres_sql.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
+import 'package:querya_desktop/features/postgresql/postgres_table_utils.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
 import 'package:querya_desktop/features/main_screen/query_editor_tab.dart';
 import 'package:querya_desktop/features/main_screen/results_tab.dart';
+import 'package:querya_desktop/features/main_screen/sql_query_history_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
+
+/// Database used for this SQL workspace session (matches [PostgresService.acquire]).
+String _pgSqlSessionDatabase(ConnectionRow row) {
+  final d = row.databaseName?.trim();
+  if (d == null || d.isEmpty) return 'postgres';
+  return d;
+}
 
 /// Ad-hoc SQL editor + results for a PostgreSQL connection (pgAdmin-style).
 class PostgresSqlWorkspace extends material.StatefulWidget {
@@ -19,12 +29,21 @@ class PostgresSqlWorkspace extends material.StatefulWidget {
     super.key,
     required this.connectionRow,
     this.transactionOpenNotifier,
+    this.postgresSqlEditorContext,
+    this.postgresSqlEditorContextToken = 0,
   });
 
   final ConnectionRow connectionRow;
 
   /// Updated when transaction state changes (for tab-switch warnings).
   final material.ValueNotifier<bool?>? transactionOpenNotifier;
+
+  /// Table/view/matview from the tree: sets session DB (if non-empty) and editor template.
+  final ({String database, String schema, String name, PostgresObjectKind kind})?
+      postgresSqlEditorContext;
+
+  /// Increments when [postgresSqlEditorContext] should be re-applied to the editor.
+  final int postgresSqlEditorContextToken;
 
   @override
   material.State<PostgresSqlWorkspace> createState() =>
@@ -36,6 +55,11 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
   double _topFractionState = 0.65;
 
   PgLease? _lease;
+
+  /// Database used for the current lease (for [PostgresService.interrupt]).
+  String? _interruptDatabase;
+
+  int _lastAppliedSqlContextToken = -1;
 
   bool _running = false;
   String? _error;
@@ -52,6 +76,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
   int? _queryTimeoutSeconds;
 
   int _resultMaxRows = kDefaultSqlResultMaxRows;
+  int _historyMaxEntries = kDefaultSqlHistoryMaxEntries;
   double _editorFontSize = kDefaultSqlEditorFontSize;
 
   /// `null` = unknown (older server or error).
@@ -67,18 +92,62 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     };
     AppSettingsRevision.listenable.addListener(_appSettingsListener);
     material.WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncPostgresSqlTreeContext();
       unawaited(_loadWorkspaceSettings());
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant PostgresSqlWorkspace oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.connectionRow.id != widget.connectionRow.id) {
+      _lastAppliedSqlContextToken = -1;
+    }
+    _syncPostgresSqlTreeContext();
+  }
+
+  String _effectiveSessionDatabase() {
+    final ctx = widget.postgresSqlEditorContext;
+    if (ctx != null) {
+      final d = ctx.database.trim();
+      if (d.isNotEmpty) return d;
+    }
+    return _pgSqlSessionDatabase(widget.connectionRow);
+  }
+
+  void _dropLease() {
+    _lease?.release();
+    _lease = null;
+    _interruptDatabase = null;
+  }
+
+  void _syncPostgresSqlTreeContext() {
+    final ctx = widget.postgresSqlEditorContext;
+    final tok = widget.postgresSqlEditorContextToken;
+    if (ctx == null) {
+      _lastAppliedSqlContextToken = tok;
+      return;
+    }
+    if (tok == _lastAppliedSqlContextToken) return;
+    _lastAppliedSqlContextToken = tok;
+    _dropLease();
+    final sql = postgresBrowseSelectSql(schema: ctx.schema, table: ctx.name);
+    _sqlController.value = material.TextEditingValue(
+      text: sql,
+      selection: material.TextSelection.collapsed(offset: sql.length),
+    );
   }
 
   Future<void> _loadWorkspaceSettings() async {
     final t = await AppSettings.instance.getPostgresSqlStmtTimeoutSeconds();
     final rows = await AppSettings.instance.getSqlResultMaxRows();
+    final hist = await AppSettings.instance.getSqlHistoryMaxEntries();
     final font = await AppSettings.instance.getSqlEditorFontSize();
     if (!mounted) return;
     setState(() {
       _queryTimeoutSeconds = t;
       _resultMaxRows = rows;
+      _historyMaxEntries = hist;
       _editorFontSize = font;
     });
   }
@@ -94,11 +163,11 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
 
   Future<void> _ensureLease() async {
     if (_lease != null && _lease!.connection.isConnected) return;
-    _lease?.release();
-    _lease = null;
+    _dropLease();
+    final db = _effectiveSessionDatabase();
     final lease = await PostgresService.instance.acquire(
       widget.connectionRow,
-      database: widget.connectionRow.databaseName ?? 'postgres',
+      database: db,
       mode: PgSessionMode.readWrite,
     );
     if (!mounted) {
@@ -106,6 +175,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       return;
     }
     _lease = lease;
+    _interruptDatabase = db;
   }
 
   Duration? _statementTimeout() =>
@@ -175,18 +245,19 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     if (_running) {
       PostgresService.instance.interrupt(
         widget.connectionRow,
-        database: widget.connectionRow.databaseName ?? 'postgres',
+        database: _interruptDatabase ?? _effectiveSessionDatabase(),
         mode: PgSessionMode.readWrite,
       );
     }
-    _lease?.release();
+    _dropLease();
     _sqlController.dispose();
     super.dispose();
   }
 
   Future<void> _execute() async {
-    var sql = _sqlController.text.trim();
-    if (sql.isEmpty) return;
+    final userSql = _sqlController.text.trim();
+    if (userSql.isEmpty) return;
+    var sql = userSql;
 
     setState(() {
       _running = true;
@@ -255,6 +326,17 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         }
         _running = false;
       });
+      final cid = widget.connectionRow.id;
+      if (cid != null) {
+        unawaited(
+          LocalDb.instance.recordSqlQueryHistory(
+            connectionId: cid,
+            databaseName: _effectiveSessionDatabase(),
+            sqlText: userSql,
+            maxEntries: _historyMaxEntries,
+          ),
+        );
+      }
     } on pg.ServerException catch (e) {
       if (mounted) {
         setState(() {
@@ -305,6 +387,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
                     crossAxisAlignment: material.CrossAxisAlignment.stretch,
                     children: [
                       _SqlToolbar(
+                        sessionDatabase: _effectiveSessionDatabase(),
                         onExecute: _running ? null : _execute,
                         running: _running,
                         autocommit: _autocommit,
@@ -314,6 +397,17 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
                         onQueryTimeoutChanged: _onStmtTimeoutChanged,
                         onOpenPreferences: () =>
                             showPreferencesDialog(context),
+                        onOpenHistory: widget.connectionRow.id != null &&
+                                !_running
+                            ? () {
+                                showSqlQueryHistoryDialog(
+                                  context: context,
+                                  connectionId: widget.connectionRow.id!,
+                                  databaseName: _effectiveSessionDatabase(),
+                                  sqlController: _sqlController,
+                                );
+                              }
+                            : null,
                         txOpen: _txOpen,
                         onBegin: _running
                             ? null
@@ -386,6 +480,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
 
 class _SqlToolbar extends material.StatelessWidget {
   const _SqlToolbar({
+    required this.sessionDatabase,
     required this.onExecute,
     required this.running,
     required this.autocommit,
@@ -393,12 +488,15 @@ class _SqlToolbar extends material.StatelessWidget {
     required this.queryTimeoutSeconds,
     required this.onQueryTimeoutChanged,
     required this.onOpenPreferences,
+    this.onOpenHistory,
     required this.txOpen,
     required this.onBegin,
     required this.onCommit,
     required this.onRollback,
   });
 
+  /// Effective PostgreSQL database for queries in this tab (from the connection profile).
+  final String sessionDatabase;
   final Future<void> Function()? onExecute;
   final bool running;
   final bool autocommit;
@@ -406,6 +504,7 @@ class _SqlToolbar extends material.StatelessWidget {
   final int? queryTimeoutSeconds;
   final void Function(int?) onQueryTimeoutChanged;
   final VoidCallback onOpenPreferences;
+  final VoidCallback? onOpenHistory;
   final bool? txOpen;
   final void Function()? onBegin;
   final void Function()? onCommit;
@@ -432,8 +531,20 @@ class _SqlToolbar extends material.StatelessWidget {
             children: [
               const Text('Query').semiBold().small(),
               const Gap(12),
+              Text('DB: $sessionDatabase').muted().small(),
+              const Gap(12),
               Text(_txLabel()).muted().small(),
               const Spacer(),
+              OutlineButton(
+                size: ButtonSize.small,
+                onPressed: onOpenHistory,
+                leading: const material.Icon(
+                  material.Icons.history_rounded,
+                  size: 16,
+                ),
+                child: const Text('History'),
+              ),
+              const Gap(8),
               OutlineButton(
                 onPressed: onExecute,
                 leading: running
