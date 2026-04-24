@@ -20,6 +20,7 @@ dependencies:
   postgres: ^3.5.6
   fl_chart: ^0.69.0
   mysql_client: ^0.0.27
+  flutter_secure_storage: ^9.2.4
 
 dev_dependencies:
   flutter_test:
