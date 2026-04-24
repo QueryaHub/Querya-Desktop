@@ -12,6 +12,7 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
 import 'package:querya_desktop/features/connections/driver_manager_dialog.dart';
+import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'workspace_panel.dart';
 
 class MainScreen extends StatefulWidget {
@@ -343,6 +344,19 @@ class _CustomTitleBarState extends State<_CustomTitleBar> {
                             MenuButton(onPressed: (_) {}, child: const Text('Exit')),
                           ],
                           child: const Text('File'),
+                        ),
+                        MenuButton(
+                          subMenu: [
+                            MenuButton(
+                              leading: const material.Icon(
+                                material.Icons.tune_rounded,
+                                size: 18,
+                              ),
+                              onPressed: (ctx) => showPreferencesDialog(ctx),
+                              child: const Text('Preferences…'),
+                            ),
+                          ],
+                          child: const Text('Edit'),
                         ),
                         MenuButton(
                           subMenu: [
