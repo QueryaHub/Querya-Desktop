@@ -159,6 +159,25 @@ void main() {
       expect(row.sortOrder, 0); // null sort_order → 0
     });
 
+    test('toPersistenceMap omits secrets for SQLite persistence', () {
+      const row = ConnectionRow(
+        type: 'postgresql',
+        name: 'PG',
+        host: 'localhost',
+        port: 5432,
+        username: 'u',
+        password: 'secret',
+        databaseName: 'db',
+        connectionString: 'postgres://u:p@h/db',
+        createdAt: '2026-01-01T00:00:00Z',
+      );
+      final map = row.toPersistenceMap();
+      expect(map['password'], isNull);
+      expect(map['connection_string'], isNull);
+      expect(map['username'], 'u');
+      expect(map['host'], 'localhost');
+    });
+
     test('toMap does not include id field', () {
       const row = ConnectionRow(
         id: 123,

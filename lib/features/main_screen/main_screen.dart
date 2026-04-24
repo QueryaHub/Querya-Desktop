@@ -1,7 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:bitsdojo_window/bitsdojo_window.dart';
-import 'package:flutter/material.dart' as material show Scaffold, Container, MainAxisSize, GestureDetector, MouseRegion, SystemMouseCursors, HitTestBehavior, Icons, Icon;
+import 'package:flutter/material.dart' as material
+    show Scaffold, Container, MainAxisSize, GestureDetector, MouseRegion, SystemMouseCursors, HitTestBehavior, Icons, Icon, BuildContext, Widget;
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/core/theme/querya_colors.dart';
@@ -11,7 +12,7 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
 import 'package:querya_desktop/features/connections/driver_manager_dialog.dart';
-import 'package:querya_desktop/features/connections/new_connection_dialog.dart';
+import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'workspace_panel.dart';
 
 class MainScreen extends StatefulWidget {
@@ -153,8 +154,15 @@ class _MainScreenState extends State<MainScreen> {
     await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
   }
 
+  Future<void> _onNewDatabaseConnectionFromMenu(material.BuildContext menuContext) async {
+    final row = await promptCreateConnection(menuContext, folderId: null);
+    if (!mounted || row == null) return;
+    await LocalDb.instance.addConnection(row);
+    await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
+  }
+
   @override
-  Widget build(BuildContext context) {
+  material.Widget build(material.BuildContext context) {
     final theme = AppTheme.dark.colorScheme;
     return material.Scaffold(
       backgroundColor: theme.background,
@@ -165,7 +173,10 @@ class _MainScreenState extends State<MainScreen> {
           width: 1,
           child: Column(
             children: [
-              _CustomTitleBar(theme: theme),
+              _CustomTitleBar(
+                theme: theme,
+                onNewDatabaseConnection: _onNewDatabaseConnectionFromMenu,
+              ),
               Divider(height: 1, color: theme.border.withValues(alpha: 0.22)),
               Expanded(
                 child: LayoutBuilder(
@@ -253,7 +264,7 @@ class _VerticalResizeHandle extends StatelessWidget {
   final void Function(double dx) onDrag;
 
   @override
-  Widget build(BuildContext context) {
+  material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context).colorScheme;
     return material.MouseRegion(
       cursor: material.SystemMouseCursors.resizeColumn,
@@ -270,9 +281,13 @@ class _VerticalResizeHandle extends StatelessWidget {
 }
 
 class _CustomTitleBar extends StatefulWidget {
-  const _CustomTitleBar({required this.theme});
+  const _CustomTitleBar({
+    required this.theme,
+    required this.onNewDatabaseConnection,
+  });
 
   final ColorScheme theme;
+  final Future<void> Function(material.BuildContext context) onNewDatabaseConnection;
 
   @override
   State<_CustomTitleBar> createState() => _CustomTitleBarState();
@@ -280,7 +295,7 @@ class _CustomTitleBar extends StatefulWidget {
 
 class _CustomTitleBarState extends State<_CustomTitleBar> {
   @override
-  Widget build(BuildContext context) {
+  material.Widget build(material.BuildContext context) {
     final c = widget.theme;
     final buttonColors = WindowButtonColors(
       iconNormal: c.mutedForeground,
@@ -333,14 +348,22 @@ class _CustomTitleBarState extends State<_CustomTitleBar> {
                         MenuButton(
                           subMenu: [
                             MenuButton(
+                              leading: const material.Icon(
+                                material.Icons.tune_rounded,
+                                size: 18,
+                              ),
+                              onPressed: (ctx) => showPreferencesDialog(ctx),
+                              child: const Text('Preferences…'),
+                            ),
+                          ],
+                          child: const Text('Edit'),
+                        ),
+                        MenuButton(
+                          subMenu: [
+                            MenuButton(
                               leading: const material.Icon(material.Icons.add_link_rounded, size: 18),
                               trailing: const Text('Shift+Ctrl+N').xSmall().muted(),
-                              onPressed: (ctx) async {
-                                final type = await showNewConnectionDialog(ctx);
-                                if (type != null) {
-                                  // TODO: add connection (no folder)
-                                }
-                              },
+                              onPressed: (ctx) => widget.onNewDatabaseConnection(ctx),
                               child: const Text('New Database Connection'),
                             ),
                             MenuButton(

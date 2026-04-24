@@ -2,10 +2,11 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const _dbName = 'querya.db';
-const _dbVersion = 4;
+const _dbVersion = 5;
 
 int? _sqliteInt(Object? v) {
   if (v == null) return null;
@@ -128,6 +129,23 @@ class LocalDb {
         )
       ''');
     }
+    if (oldVersion < 5) {
+      final rows = await db.query('connections');
+      for (final m in rows) {
+        final id = _sqliteInt(m['id']);
+        if (id == null) continue;
+        final pwd = m['password'] as String?;
+        final cs = m['connection_string'] as String?;
+        await ConnectionSecretsStore.writeForConnection(
+          id,
+          password: (pwd != null && pwd.isNotEmpty) ? pwd : null,
+          connectionString: (cs != null && cs.isNotEmpty) ? cs : null,
+        );
+      }
+      await db.execute(
+        'UPDATE connections SET password = NULL, connection_string = NULL',
+      );
+    }
   }
 
   Future<String?> getAppSetting(String key) async {
@@ -189,16 +207,49 @@ class LocalDb {
   Future<List<ConnectionRow>> getConnections() async {
     final db = await _open();
     final rows = await db.query('connections', orderBy: 'sort_order ASC, name ASC');
-    return rows.map(ConnectionRow.fromMap).toList();
+    final out = <ConnectionRow>[];
+    for (final m in rows) {
+      out.add(await _hydrateConnection(ConnectionRow.fromMap(m)));
+    }
+    return out;
+  }
+
+  static Future<ConnectionRow> _hydrateConnection(ConnectionRow row) async {
+    if (row.id == null) return row;
+    final secrets = await ConnectionSecretsStore.readForConnection(row.id!);
+    return ConnectionRow(
+      id: row.id,
+      type: row.type,
+      name: row.name,
+      host: row.host,
+      port: row.port,
+      username: row.username,
+      password: secrets.password ?? row.password,
+      databaseName: row.databaseName,
+      authSource: row.authSource,
+      useSSL: row.useSSL,
+      connectionString: secrets.connectionString ?? row.connectionString,
+      folderId: row.folderId,
+      sortOrder: row.sortOrder,
+      createdAt: row.createdAt,
+    );
   }
 
   /// Inserts a row and returns the SQLite row id.
+  /// Password and connection string are stored in the OS secure store, not in SQLite.
   Future<int> addConnection(ConnectionRow row) async {
     final db = await _open();
-    return db.insert('connections', row.toMap());
+    final id = await db.insert('connections', row.toPersistenceMap());
+    await ConnectionSecretsStore.writeForConnection(
+      id,
+      password: row.password,
+      connectionString: row.connectionString,
+    );
+    return id;
   }
 
   Future<void> removeConnection(int id) async {
+    await ConnectionSecretsStore.deleteForConnection(id);
     final db = await _open();
     await db.delete('connections', where: 'id = ?', whereArgs: [id]);
   }
@@ -253,6 +304,23 @@ class ConnectionRow {
         'auth_source': authSource,
         'use_ssl': useSSL ? 1 : 0,
         'connection_string': connectionString,
+        'folder_id': folderId,
+        'sort_order': sortOrder,
+        'created_at': createdAt,
+      };
+
+  /// SQLite row without secrets ([password], [connectionString]); use the secure store for those.
+  Map<String, Object?> toPersistenceMap() => {
+        'type': type,
+        'name': name,
+        'host': host,
+        'port': port,
+        'username': username,
+        'password': null,
+        'database_name': databaseName,
+        'auth_source': authSource,
+        'use_ssl': useSSL ? 1 : 0,
+        'connection_string': null,
         'folder_id': folderId,
         'sort_order': sortOrder,
         'created_at': createdAt,

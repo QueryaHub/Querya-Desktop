@@ -7,7 +7,7 @@ A lightweight desktop client for SQL and NoSQL databases. Connect to PostgreSQL,
 - **Cross-platform:** Windows, Linux, macOS (Flutter desktop).
 - **Multi-database:** PostgreSQL, MySQL, Redis, MongoDB (more can be added).
 - **UI:** Custom window (no system title bar), resizable left panel (connection tree) and bottom split (query editor / results), dark theme, [shadcn_flutter](https://pub.dev/packages/shadcn_flutter) components.
-- **Flow:** Right-click “Servers” → “New connection” → pick database type → configure and save (stored in local SQLite).
+- **Flow:** Right-click “Servers” → “New connection” (or **Connection → New Database Connection**) → pick database type → configure and save. Metadata is stored in local SQLite; **passwords and connection strings** use the OS secure store (see [docs/security.md](docs/security.md)).
 
 ## Database drivers
 
@@ -27,6 +27,7 @@ A lightweight desktop client for SQL and NoSQL databases. Connect to PostgreSQL,
   ```bash
   flutter config --enable-linux-desktop   # or windows, macos
   ```
+- **Linux builds** also need desktop headers used by Flutter and plugins (GTK, etc.). For `flutter_secure_storage` on Linux you typically need **`libsecret-1-dev`** (Debian/Ubuntu: `sudo apt install libsecret-1-dev`; Fedora: `libsecret-devel`). Match this to your distro’s Flutter desktop docs.
 
 ## Setup
 
@@ -87,4 +88,11 @@ flutter build macos
 
 ## License
 
-See repository license if present.
+[MIT](LICENSE). Third-party components (e.g. vendored UI under `third_party/`) retain their own licenses.
+
+## More documentation
+
+- [Security / local data](docs/security.md)
+- [User guide](docs/user-guide.md)
+- [Releases](docs/tags-and-releases.md)
+- [Release checklist](docs/release-checklist.md)

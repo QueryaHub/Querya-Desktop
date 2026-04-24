@@ -1,5 +1,7 @@
 # План: MySQL / MariaDB по образцу PostgreSQL
 
+> **Статус:** MySQL / MariaDB уже интегрированы в приложение (`lib/features/mysql/`, встроенный драйвер `mysql_client`). Разделы про «coming soon» в Driver Manager и отдельные JDBC-артефакты относятся к **историческому** плану; актуальный список драйверов — только встроенные Dart-пакеты (см. **Connection → Driver Manager**).
+
 Документ описывает текущую реализацию PostgreSQL в Querya Desktop, проверяет каждый пункт плана по MySQL и детализирует рекомендуемые практики, компромиссы и порядок работ.
 
 ---
@@ -71,7 +73,7 @@
 ### 1.7 Заглушки и драйвер-менеджер
 
 - **Stub:** в `connections_panel.dart` удаляются записи с `type == 'mysql' && name == 'MySQL connection'`.
-- **Driver Manager:** `lib/features/connections/driver_manager_dialog.dart` — у MySQL `fixedStatus: DriverStatus.comingSoon`, без `DownloadableDriver`.
+- **Driver Manager:** `lib/features/connections/driver_manager_dialog.dart` — список **встроенных** Dart-драйверов (без загрузки JDBC/JAR); MySQL отображается как поддерживаемый тип.
 
 ---
 
@@ -282,7 +284,7 @@
 
 ## 10. Документация и статус драйвера
 
-- **`driver_manager_dialog.dart`:** заменить `comingSoon` на `installed` или `available`, когда функциональность готова; при необходимости добавить `DownloadableDriver.mysql`, если появится отдельный артефакт (сейчас PG тянется отдельно — следовать той же модели, если она актуальна для MySQL).
+- **`driver_manager_dialog.dart`:** актуальная версия только информирует о встроенных драйверах; отдельные загружаемые артефакты не используются.
 - **`README.md`:** кратко описать поддерживаемые версии MySQL/MariaDB и ограничения драйвера.
 
 ---

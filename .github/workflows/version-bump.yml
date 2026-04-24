@@ -1,0 +1,76 @@
+name: Auto Version Bump
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+
+jobs:
+  bump-version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check if PR was merged
+        id: check
+        run: |
+          if [ "${{ github.event.pull_request.merged }}" = "true" ]; then
+            echo "merged=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "merged=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout main branch
+        if: steps.check.outputs.merged == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get current version
+        if: steps.check.outputs.merged == 'true'
+        id: current_version
+        run: |
+          CURRENT_VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
+          BUILD_NUMBER=$(grep "^version:" pubspec.yaml | sed 's/.*+//')
+          echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+          echo "current_build=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Bump patch version
+        if: steps.check.outputs.merged == 'true'
+        id: bump
+        run: |
+          CURRENT_VERSION="${{ steps.current_version.outputs.current_version }}"
+          CURRENT_BUILD="${{ steps.current_version.outputs.current_build }}"
+          MAJOR=$(echo "$CURRENT_VERSION" | cut -d. -f1)
+          MINOR=$(echo "$CURRENT_VERSION" | cut -d. -f2)
+          PATCH=$(echo "$CURRENT_VERSION" | cut -d. -f3)
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+          if [ -z "$CURRENT_BUILD" ]; then
+            NEW_BUILD=1
+          else
+            NEW_BUILD=$((CURRENT_BUILD + 1))
+          fi
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "new_build=$NEW_BUILD" >> "$GITHUB_OUTPUT"
+
+      - name: Update pubspec.yaml
+        if: steps.check.outputs.merged == 'true'
+        run: |
+          NEW_VERSION="${{ steps.bump.outputs.new_version }}"
+          NEW_BUILD="${{ steps.bump.outputs.new_build }}"
+          sed -i "s/^version: .*/version: ${NEW_VERSION}+${NEW_BUILD}/" pubspec.yaml
+          grep "^version:" pubspec.yaml
+
+      - name: Commit version bump
+        if: steps.check.outputs.merged == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add pubspec.yaml
+          git commit -m "Bump version to ${{ steps.bump.outputs.new_version }}+${{ steps.bump.outputs.new_build }}"
+          git push origin main

@@ -95,6 +95,21 @@ class WorkspaceEmptyHero extends StatelessWidget {
                       ),
                     ],
                   ),
+                  material.SizedBox(height: compact ? 14 : 18),
+                  material.Padding(
+                    padding: const material.EdgeInsets.symmetric(horizontal: 8),
+                    child: material.Text(
+                      'You can also use Connection → New Database Connection. '
+                      'Passwords are kept in your OS secure store (see docs/security.md). '
+                      'Quick start: docs/user-guide.md.',
+                      textAlign: material.TextAlign.center,
+                      style: material.TextStyle(
+                        fontSize: 12,
+                        height: 1.35,
+                        color: cs.mutedForeground.withValues(alpha: 0.9),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
