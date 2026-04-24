@@ -147,9 +147,10 @@ class _SqlQueryHistoryDialogContentState
                 children: [
                   const Text('Query history').large().semiBold(),
                   const material.SizedBox(height: 4),
-                  Text(
+                  const Text(
                     'Successful runs from this workspace (newest first).',
-                  ).muted().small(),
+                  ).muted()
+                      .small(),
                 ],
               ),
             ),
@@ -177,8 +178,9 @@ class _SqlQueryHistoryDialogContentState
                   final items = snap.data ?? [];
                   if (items.isEmpty) {
                     return material.Center(
-                      child: Text('No queries yet. Run SQL to build history.')
-                          .muted()
+                      child: const Text(
+                        'No queries yet. Run SQL to build history.',
+                      ).muted()
                           .small(),
                     );
                   }
