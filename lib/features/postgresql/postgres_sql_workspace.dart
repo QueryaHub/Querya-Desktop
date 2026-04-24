@@ -11,6 +11,7 @@ import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
 import 'package:querya_desktop/features/main_screen/query_editor_tab.dart';
 import 'package:querya_desktop/features/main_screen/results_tab.dart';
+import 'package:querya_desktop/features/main_screen/sql_query_history_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Ad-hoc SQL editor + results for a PostgreSQL connection (pgAdmin-style).
@@ -52,6 +53,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
   int? _queryTimeoutSeconds;
 
   int _resultMaxRows = kDefaultSqlResultMaxRows;
+  int _historyMaxEntries = kDefaultSqlHistoryMaxEntries;
   double _editorFontSize = kDefaultSqlEditorFontSize;
 
   /// `null` = unknown (older server or error).
@@ -74,11 +76,13 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
   Future<void> _loadWorkspaceSettings() async {
     final t = await AppSettings.instance.getPostgresSqlStmtTimeoutSeconds();
     final rows = await AppSettings.instance.getSqlResultMaxRows();
+    final hist = await AppSettings.instance.getSqlHistoryMaxEntries();
     final font = await AppSettings.instance.getSqlEditorFontSize();
     if (!mounted) return;
     setState(() {
       _queryTimeoutSeconds = t;
       _resultMaxRows = rows;
+      _historyMaxEntries = hist;
       _editorFontSize = font;
     });
   }
@@ -185,8 +189,9 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
   }
 
   Future<void> _execute() async {
-    var sql = _sqlController.text.trim();
-    if (sql.isEmpty) return;
+    final userSql = _sqlController.text.trim();
+    if (userSql.isEmpty) return;
+    var sql = userSql;
 
     setState(() {
       _running = true;
@@ -255,6 +260,17 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         }
         _running = false;
       });
+      final cid = widget.connectionRow.id;
+      if (cid != null) {
+        unawaited(
+          LocalDb.instance.recordSqlQueryHistory(
+            connectionId: cid,
+            databaseName: widget.connectionRow.databaseName,
+            sqlText: userSql,
+            maxEntries: _historyMaxEntries,
+          ),
+        );
+      }
     } on pg.ServerException catch (e) {
       if (mounted) {
         setState(() {
@@ -314,6 +330,18 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
                         onQueryTimeoutChanged: _onStmtTimeoutChanged,
                         onOpenPreferences: () =>
                             showPreferencesDialog(context),
+                        onOpenHistory: widget.connectionRow.id != null &&
+                                !_running
+                            ? () {
+                                showSqlQueryHistoryDialog(
+                                  context: context,
+                                  connectionId: widget.connectionRow.id!,
+                                  databaseName:
+                                      widget.connectionRow.databaseName,
+                                  sqlController: _sqlController,
+                                );
+                              }
+                            : null,
                         txOpen: _txOpen,
                         onBegin: _running
                             ? null
@@ -393,6 +421,7 @@ class _SqlToolbar extends material.StatelessWidget {
     required this.queryTimeoutSeconds,
     required this.onQueryTimeoutChanged,
     required this.onOpenPreferences,
+    this.onOpenHistory,
     required this.txOpen,
     required this.onBegin,
     required this.onCommit,
@@ -406,6 +435,7 @@ class _SqlToolbar extends material.StatelessWidget {
   final int? queryTimeoutSeconds;
   final void Function(int?) onQueryTimeoutChanged;
   final VoidCallback onOpenPreferences;
+  final VoidCallback? onOpenHistory;
   final bool? txOpen;
   final void Function()? onBegin;
   final void Function()? onCommit;
@@ -434,6 +464,16 @@ class _SqlToolbar extends material.StatelessWidget {
               const Gap(12),
               Text(_txLabel()).muted().small(),
               const Spacer(),
+              OutlineButton(
+                size: ButtonSize.small,
+                onPressed: onOpenHistory,
+                leading: const material.Icon(
+                  material.Icons.history_rounded,
+                  size: 16,
+                ),
+                child: const Text('History'),
+              ),
+              const Gap(8),
               OutlineButton(
                 onPressed: onExecute,
                 leading: running
