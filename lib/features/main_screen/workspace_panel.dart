@@ -7,110 +7,14 @@ import 'package:querya_desktop/features/mysql/mysql_table_view.dart';
 import 'package:querya_desktop/features/mysql/mysql_workspace_home.dart';
 import 'package:querya_desktop/features/mongodb/mongo_explorer_view.dart';
 import 'package:querya_desktop/features/mongodb/mongo_stats_view.dart';
-import 'package:querya_desktop/features/postgresql/postgres_browser_views.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
-import 'package:querya_desktop/features/postgresql/postgres_routine_view.dart';
-import 'package:querya_desktop/features/postgresql/postgres_sequence_view.dart';
+import 'package:querya_desktop/features/postgresql/postgres_object_workspace.dart';
 import 'package:querya_desktop/features/postgresql/postgres_workspace_home.dart';
-import 'package:querya_desktop/features/postgresql/postgres_table_view.dart';
 import 'package:querya_desktop/features/redis/redis_explorer_view.dart';
 import 'package:querya_desktop/features/redis/redis_view.dart';
 import 'query_editor_tab.dart';
 import 'results_tab.dart';
 import 'workspace_empty_hero.dart';
-
-Widget _pgObjectWorkspace({
-  required ConnectionRow connection,
-  required ({String database, String schema, String name, PostgresObjectKind kind}) pg,
-}) {
-  switch (pg.kind) {
-    case PostgresObjectKind.table:
-      return PostgresTableView(
-        key: ValueKey(
-          'pg_table_${connection.id}_${pg.schema}_${pg.name}_${pg.kind}',
-        ),
-        connectionRow: connection,
-        database: pg.database,
-        schema: pg.schema,
-        tableName: pg.name,
-        isView: false,
-        isMaterializedView: false,
-      );
-    case PostgresObjectKind.view:
-      return PostgresTableView(
-        key: ValueKey(
-          'pg_table_${connection.id}_${pg.schema}_${pg.name}_${pg.kind}',
-        ),
-        connectionRow: connection,
-        database: pg.database,
-        schema: pg.schema,
-        tableName: pg.name,
-        isView: true,
-        isMaterializedView: false,
-      );
-    case PostgresObjectKind.materializedView:
-      return PostgresTableView(
-        key: ValueKey(
-          'pg_mat_${connection.id}_${pg.schema}_${pg.name}_${pg.kind}',
-        ),
-        connectionRow: connection,
-        database: pg.database,
-        schema: pg.schema,
-        tableName: pg.name,
-        isView: false,
-        isMaterializedView: true,
-      );
-    case PostgresObjectKind.function:
-      return PostgresRoutineView(
-        key: ValueKey('pg_fn_${connection.id}_${pg.schema}_${pg.name}'),
-        connectionRow: connection,
-        database: pg.database,
-        schema: pg.schema,
-        routineName: pg.name,
-      );
-    case PostgresObjectKind.sequence:
-      return PostgresSequenceView(
-        key: ValueKey('pg_seq_${connection.id}_${pg.schema}_${pg.name}'),
-        connectionRow: connection,
-        database: pg.database,
-        schema: pg.schema,
-        sequenceName: pg.name,
-      );
-    case PostgresObjectKind.schemaIndexes:
-      return PostgresIndexListView(
-        key: ValueKey('pg_idx_${connection.id}_${pg.schema}'),
-        connectionRow: connection,
-        database: pg.database,
-        schema: pg.schema,
-      );
-    case PostgresObjectKind.schemaTriggers:
-      return PostgresTriggerListView(
-        key: ValueKey('pg_trg_${connection.id}_${pg.schema}'),
-        connectionRow: connection,
-        database: pg.database,
-        schema: pg.schema,
-      );
-    case PostgresObjectKind.schemaTypes:
-      return PostgresTypeListView(
-        key: ValueKey('pg_typ_${connection.id}_${pg.schema}'),
-        connectionRow: connection,
-        database: pg.database,
-        schema: pg.schema,
-      );
-    case PostgresObjectKind.databaseExtensions:
-      return PostgresExtensionListView(
-        key: ValueKey('pg_ext_${connection.id}_${pg.database}'),
-        connectionRow: connection,
-        database: pg.database,
-      );
-    case PostgresObjectKind.databaseForeignData:
-      return PostgresFdwListView(
-        key: ValueKey('pg_fdw_${connection.id}_${pg.database}'),
-        connectionRow: connection,
-        database: pg.database,
-      );
-  }
-}
 
 /// Main workspace: top = Query Editor / Query History, bottom = Data Output / Messages (pgAdmin-style). Uses shadcn layout.
 class WorkspacePanel extends StatefulWidget {
@@ -121,6 +25,8 @@ class WorkspacePanel extends StatefulWidget {
     this.selectedMongoDb,
     this.selectedPostgresObject,
     this.postgresSqlTabRequestToken = 0,
+    this.postgresSqlEditorContext,
+    this.postgresSqlEditorContextToken = 0,
     this.selectedMysqlObject,
     this.mysqlSqlTabRequestToken = 0,
     this.onRequestNewConnection,
@@ -144,6 +50,11 @@ class WorkspacePanel extends StatefulWidget {
 
   /// Incremented by [MainScreen] to switch the PostgreSQL home view to the SQL tab.
   final int postgresSqlTabRequestToken;
+
+  /// Seeds the SQL editor from the last table/view/matview tree selection.
+  final ({String database, String schema, String name, PostgresObjectKind kind})?
+      postgresSqlEditorContext;
+  final int postgresSqlEditorContextToken;
 
   /// When set, the user selected a MySQL table or view in the sidebar tree.
   final ({String database, String name, MysqlObjectKind kind})?
@@ -190,9 +101,12 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
               ? PostgresWorkspaceHome(
                   key: ValueKey('pg_home_${widget.activeConnection!.id}'),
                   connectionRow: widget.activeConnection!,
+                  postgresSqlEditorContext: widget.postgresSqlEditorContext,
+                  postgresSqlEditorContextToken:
+                      widget.postgresSqlEditorContextToken,
                   sqlTabRequestToken: widget.postgresSqlTabRequestToken,
                 )
-              : _pgObjectWorkspace(
+              : buildPostgresObjectWorkspace(
                   connection: widget.activeConnection!,
                   pg: pg,
                 ),
