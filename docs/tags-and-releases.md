@@ -11,7 +11,7 @@
    - либо `v0.1.1` — тоже допустимо, CI сравнивает с pubspec без префикса `v`.
 4. Запушьте тег: `git push origin 0.1.1`
 
-После этого workflow **[Release](../.github/workflows/release.yml)** запустится **автоматически**: соберёт **Windows** и **Linux** (zip), **`SHA256SUMS.txt`**, создаст или обновит **GitHub Release** с этими файлами.
+После этого workflow **[Release](../.github/workflows/release.yml)** запустится **автоматически**: соберёт **Windows**, **Linux** и **macOS** (zip), **`SHA256SUMS.txt`**, создаст или обновит **GitHub Release** с этими файлами.
 
 Если после merge в `main` сработал **автобамп** версии в `pubspec`, а вы поставили тег со **старым** номером (например тег `0.1.1`, а в коммите уже `0.1.2+…`), сборка **всё равно пройдёт**: имена zip возьмутся из **pubspec** (`0.1.2`), а GitHub Release останется на **вашем теге** (`0.1.1`). В логах будет предупреждение; чтобы номер тега и архивов совпадали, ставьте тег на актуальный semver из `pubspec` (например `0.1.2`).
 
@@ -22,7 +22,7 @@
 
 ## Что внутри релиза
 
-- Имена архивов: `Querya-Desktop-X.Y.Z-linux.zip`, `Querya-Desktop-X.Y.Z-windows.zip`.
+- Имена архивов: `Querya-Desktop-X.Y.Z-linux.zip`, `Querya-Desktop-X.Y.Z-windows.zip`, `Querya-Desktop-X.Y.Z-macos.zip` (внутри неподписанный `.app`).
 - Версия для имён и тега — **semver из pubspec**; build `+N` попадает в текст релиза как **полный pubspec version**.
 
 ## Changelog (git-cliff)
@@ -50,5 +50,4 @@
 
 ## Платформы
 
-- **Поставка через CI:** Windows и Linux (см. `release.yml`).
-- **macOS:** локальная сборка возможна (`flutter build macos`); отдельного job подписи/notarize в этом workflow нет.
+- **Поставка через CI:** Windows, Linux и macOS (см. `release.yml`); macOS-сборка **без** подписи и notarize — для установки может понадобиться «Открыть» через контекстное меню при первом запуске.

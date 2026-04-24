@@ -1,4 +1,4 @@
-# Сборка Windows/Linux zip + GitHub Release.
+# Сборка Windows / Linux / macOS zip + GitHub Release.
 #
 # Автоматически: push тега X.Y.Z или vX.Y.Z.
 # Имена zip берутся из semver в pubspec на закоммиченном ref (после merge в main он может
@@ -130,9 +130,47 @@ jobs:
           path: Querya-Desktop-${{ steps.version.outputs.version }}-linux.zip
           if-no-files-found: error
 
+  build-macos:
+    name: Build macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version from pubspec.yaml
+        id: version
+        run: |
+          FULL_VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //')
+          VERSION=$(echo "$FULL_VERSION" | sed 's/+.*//')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.5'
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build macOS (release)
+        run: flutter build macos --release
+
+      - name: Zip macOS .app
+        run: |
+          APP="build/macos/Build/Products/Release/querya_desktop.app"
+          test -d "$APP"
+          ditto -c -k --keepParent "$APP" "Querya-Desktop-${{ steps.version.outputs.version }}-macos.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundle-macos
+          path: Querya-Desktop-${{ steps.version.outputs.version }}-macos.zip
+          if-no-files-found: error
+
   publish:
     name: Publish GitHub Release
-    needs: [build-windows, build-linux]
+    needs: [build-windows, build-linux, build-macos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -150,7 +188,7 @@ jobs:
           set -euo pipefail
           mkdir -p dist
           find artifacts -name '*.zip' -exec mv -t dist/ {} +
-          test "$(find dist -name '*.zip' | wc -l)" -eq 2
+          test "$(find dist -name '*.zip' | wc -l)" -eq 3
           cd dist
           sha256sum *.zip | tee SHA256SUMS.txt
 
@@ -174,6 +212,7 @@ jobs:
             ### Downloads
             - **Linux**: `Querya-Desktop-${{ needs.build-windows.outputs.version }}-linux.zip`
             - **Windows**: `Querya-Desktop-${{ needs.build-windows.outputs.version }}-windows.zip`
+            - **macOS**: `Querya-Desktop-${{ needs.build-windows.outputs.version }}-macos.zip` (unsigned `.app` in zip; right-click → Open on first launch)
 
             Verify checksums: `SHA256SUMS.txt`
 

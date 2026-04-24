@@ -5,6 +5,24 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-04-25
+
+### Added
+
+- **Performance** — narrower workspace rebuilds via `ValueNotifier` / `ValueListenableBuilder` on the main screen; `RepaintBoundary` around connections and workspace; folder expansion uses local state so the whole sidebar does not rebuild on every toggle.
+- **Lists** — virtualized long lists for MongoDB documents/collections, Redis keys, and PostgreSQL browser views (indexes, triggers, types, extensions, foreign data).
+- **Tests** — `MainScreenWorkspaceState`, `showAppDialog`, `RedisKeysView` (with `RedisConnectionTestFake`), and expanded connections panel folder collapse/expand coverage.
+- **Docs** — `docs/perf-baseline.md` (Flutter DevTools checklist for regression comparison).
+
+### Changed
+
+- **Dialogs** — slightly shorter transition and lower blur sigma in `showAppDialog` to reduce GPU load on modest hardware.
+- **Connections tree** — slightly shorter chevron rotation animation.
+
+### Fixed
+
+- **PostgreSQL server dashboard** — removed fixed-height cards and chip layout that caused vertical overflow (yellow/black debug stripes) on the stats view.
+
 ## [0.1.2] - 2026-04-24
 
 ### Changed
@@ -39,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Linux desktop build/install layout no longer targets `/usr/local` when building the app bundle.
 
+[0.1.3]: https://github.com/QueryaHub/Querya-Desktop/compare/0.1.2...0.1.3
 [0.1.2]: https://github.com/QueryaHub/Querya-Desktop/compare/0.1.1...0.1.2
 [0.1.1]: https://github.com/QueryaHub/Querya-Desktop/compare/0.1.0...0.1.1
 [0.1.0]: https://github.com/QueryaHub/Querya-Desktop/compare/0.0.1...0.1.0

@@ -8,8 +8,8 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
 const _pollInterval = Duration(seconds: 5);
-const _summaryChipHeight = 72.0;
-const _gridCardHeight = 220.0;
+const _summaryChipHeight = 88.0;
+const _gridCardMinHeight = 220.0;
 
 class PostgresStatsView extends material.StatefulWidget {
   const PostgresStatsView({
@@ -307,8 +307,10 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
     material.Widget chip(
         String label, String value, material.IconData icon) {
       return material.Expanded(
-        child: material.SizedBox(
-          height: _summaryChipHeight,
+        child: material.ConstrainedBox(
+          constraints: const material.BoxConstraints(
+            minHeight: _summaryChipHeight,
+          ),
           child: material.Container(
             padding: const material.EdgeInsets.symmetric(
                 horizontal: 16, vertical: 12),
@@ -319,8 +321,12 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
                   color: cs.border.withValues(alpha: 0.5)),
             ),
             child: material.Row(
+              crossAxisAlignment: material.CrossAxisAlignment.start,
               children: [
-                material.Icon(icon, size: 20, color: cs.primary),
+                material.Padding(
+                  padding: const material.EdgeInsets.only(top: 2),
+                  child: material.Icon(icon, size: 20, color: cs.primary),
+                ),
                 const Gap(12),
                 material.Expanded(
                   child: material.Column(
@@ -330,7 +336,17 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
                     children: [
                       Text(label).muted().xSmall(),
                       const Gap(2),
-                      Text(value).semiBold().small(),
+                      material.Text(
+                        value,
+                        maxLines: 2,
+                        overflow: material.TextOverflow.ellipsis,
+                        style: material.TextStyle(
+                          fontSize: 13,
+                          fontWeight: material.FontWeight.w600,
+                          color: cs.foreground,
+                          height: 1.25,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -357,11 +373,13 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
 
   material.Widget _card(material.BuildContext context, String title,
       material.Widget body,
-      {double? height}) {
+      {double? minHeight}) {
     final cs = shadcn.Theme.of(context).colorScheme;
     return material.Container(
       width: double.infinity,
-      height: height,
+      constraints: minHeight != null
+          ? material.BoxConstraints(minHeight: minHeight)
+          : const material.BoxConstraints(),
       padding: const material.EdgeInsets.all(20),
       decoration: material.BoxDecoration(
         color: cs.card,
@@ -401,7 +419,7 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
           _row(context, 'Max connections', maxConn),
         ],
       ),
-      height: _gridCardHeight,
+      minHeight: _gridCardMinHeight,
     );
   }
 
@@ -423,7 +441,7 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
           _row(context, 'Timezone', settings['timezone'] ?? '—'),
         ],
       ),
-      height: _gridCardHeight,
+      minHeight: _gridCardMinHeight,
     );
   }
 

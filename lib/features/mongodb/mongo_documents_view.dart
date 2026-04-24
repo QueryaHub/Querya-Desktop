@@ -208,12 +208,33 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
         const Divider(height: 1),
         // Error banner
         if (_error != null) _buildErrorBanner(cs),
-        // Document list
+        // Document list (virtualized)
         material.Expanded(
-          child: material.SingleChildScrollView(
-            padding: const material.EdgeInsets.all(16),
-            child: _buildDocumentCards(cs),
-          ),
+          child: _documents.isEmpty
+              ? material.Center(
+                  child: material.Padding(
+                    padding: const material.EdgeInsets.all(48),
+                    child: const Text('No documents found').muted(),
+                  ),
+                )
+              : material.ListView.separated(
+                  padding: const material.EdgeInsets.all(16),
+                  cacheExtent: 400,
+                  itemCount: _documents.length,
+                  separatorBuilder: (_, __) => const Gap(8),
+                  itemBuilder: (context, i) {
+                    final shadcnCs = shadcn.Theme.of(context).colorScheme;
+                    return _DocumentCard(
+                      document: _documents[i],
+                      index: _skip + i,
+                      colorScheme: cs,
+                      shadcnCs: shadcnCs,
+                      onView: () =>
+                          widget.onDocumentTap?.call(_documents[i]),
+                      onDelete: () => _deleteDocument(_documents[i]),
+                    );
+                  },
+                ),
         ),
         // Pagination bar
         _buildPaginationBar(cs),
@@ -287,36 +308,6 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildDocumentCards(ColorScheme cs) {
-    final shadcnCs = shadcn.Theme.of(context).colorScheme;
-    if (_documents.isEmpty) {
-      return material.Center(
-        child: material.Padding(
-          padding: const material.EdgeInsets.all(48),
-          child: const Text('No documents found').muted(),
-        ),
-      );
-    }
-
-    return material.Column(
-      crossAxisAlignment: material.CrossAxisAlignment.stretch,
-      children: [
-        for (var i = 0; i < _documents.length; i++) ...[
-          if (i > 0) const Gap(8),
-          _DocumentCard(
-            document: _documents[i],
-            index: _skip + i,
-            colorScheme: cs,
-            shadcnCs: shadcnCs,
-            onView: () =>
-                widget.onDocumentTap?.call(_documents[i]),
-            onDelete: () => _deleteDocument(_documents[i]),
-          ),
-        ],
-      ],
     );
   }
 
