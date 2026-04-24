@@ -4,9 +4,9 @@ Living document for planned work. Not a commitment order; adjust as priorities c
 
 ## Query history and favorites
 
-- Persist **recent SQL statements per connection** (or per connection + database) in local SQLite with a configurable cap (e.g. last 50–200 entries).
-- UI: dropdown or side panel in SQL workspace to recall, pin “favorites”, and clear history.
-- Respect existing **security** model: do not log secrets; optional opt-out.
+- **Done:** `sql_query_history` in SQLite + record/list APIs; **History** in PostgreSQL / MySQL toolbars; **Preferences → Query history limit** ([`AppSettings.getSqlHistoryMaxEntries`](lib/core/storage/app_settings.dart)).
+- **Later:** favorites / pins, opt-out toggle.
+- Respect existing **security** model: history stores SQL text only (no passwords); optional opt-out when UI lands.
 
 ## Result export
 
