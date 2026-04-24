@@ -1,6 +1,6 @@
 name: querya_desktop
 description: Lightweight desktop SQL/NoSQL client. Flutter (Dart).
-version: 0.2.0+1
+version: 0.2.1+1
 
 
 environment:
