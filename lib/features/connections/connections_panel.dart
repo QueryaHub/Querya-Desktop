@@ -23,6 +23,16 @@ part 'connections_panel_postgres_connection.dart';
 part 'connections_panel_mysql.dart';
 part 'connections_panel_pg_tree.dart';
 
+/// Opens the PostgreSQL SQL tab; optional tree fields seed the editor for the
+/// row that was right-clicked (left-click is not required).
+typedef OnPostgresOpenSqlWorkspace = void Function(
+  ConnectionRow connection, {
+  String? database,
+  String? schema,
+  String? name,
+  PostgresObjectKind? kind,
+});
+
 /// Left panel: Browser tree (pgAdmin-style). Uses shadcn layout widgets.
 class ConnectionsPanel extends StatefulWidget {
   const ConnectionsPanel({
@@ -66,7 +76,7 @@ class ConnectionsPanel extends StatefulWidget {
   )? onPostgresObjectSelected;
 
   /// Opens the PostgreSQL workspace home and switches to the SQL tab (e.g. from tree context menu).
-  final void Function(ConnectionRow connection)? onPostgresOpenSqlWorkspace;
+  final OnPostgresOpenSqlWorkspace? onPostgresOpenSqlWorkspace;
 
   /// MySQL table or view selected in the tree.
   final void Function(

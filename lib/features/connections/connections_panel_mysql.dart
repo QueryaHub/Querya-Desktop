@@ -284,7 +284,10 @@ class _MysqlDatabasesNode extends material.StatelessWidget {
             onTap: null,
             connection: connection,
             onContextRefresh: onRefreshDatabases,
-            onOpenSqlWorkspace: onMysqlOpenSqlWorkspace,
+            onOpenSqlWorkspace: onMysqlOpenSqlWorkspace == null
+                ? null
+                : (c, {database, schema, name, kind}) =>
+                    onMysqlOpenSqlWorkspace!(c),
           ),
           for (final db in databases)
             _MysqlDatabaseNode(
@@ -396,7 +399,10 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
             onTap: _toggle,
             connection: widget.connection,
             onContextRefresh: _loadTables,
-            onOpenSqlWorkspace: widget.onMysqlOpenSqlWorkspace,
+            onOpenSqlWorkspace: widget.onMysqlOpenSqlWorkspace == null
+                ? null
+                : (c, {database, schema, name, kind}) =>
+                    widget.onMysqlOpenSqlWorkspace!(c),
           ),
           if (_expanded) ...[
             if (_loading)

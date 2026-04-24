@@ -18,7 +18,7 @@ class _PgDatabasesNode extends StatefulWidget {
     String name,
     PostgresObjectKind kind,
   )? onPostgresObjectSelected;
-  final void Function(ConnectionRow connection)? onPostgresOpenSqlWorkspace;
+  final OnPostgresOpenSqlWorkspace? onPostgresOpenSqlWorkspace;
   final VoidCallback onRefreshDatabases;
 
   @override
@@ -78,6 +78,10 @@ class _PgTreeRow extends material.StatelessWidget {
     this.connection,
     this.onContextRefresh,
     this.onOpenSqlWorkspace,
+    this.openSqlDatabase,
+    this.openSqlSchema,
+    this.openSqlName,
+    this.openSqlKind,
     this.onContextDelete,
     this.contextDeleteLabel,
   });
@@ -93,7 +97,11 @@ class _PgTreeRow extends material.StatelessWidget {
   final material.TextStyle textStyle;
   final ConnectionRow? connection;
   final VoidCallback? onContextRefresh;
-  final void Function(ConnectionRow connection)? onOpenSqlWorkspace;
+  final OnPostgresOpenSqlWorkspace? onOpenSqlWorkspace;
+  final String? openSqlDatabase;
+  final String? openSqlSchema;
+  final String? openSqlName;
+  final PostgresObjectKind? openSqlKind;
   final VoidCallback? onContextDelete;
   final String? contextDeleteLabel;
 
@@ -172,7 +180,13 @@ class _PgTreeRow extends material.StatelessWidget {
               size: 18,
               color: theme.colorScheme.mutedForeground,
             ),
-            onPressed: (_) => onOpenSqlWorkspace!(connection!),
+            onPressed: (_) => onOpenSqlWorkspace!(
+                  connection!,
+                  database: openSqlDatabase,
+                  schema: openSqlSchema,
+                  name: openSqlName,
+                  kind: openSqlKind,
+                ),
             child: const Text('Open in SQL'),
           ),
         if (onContextDelete != null)
@@ -260,7 +274,7 @@ class _PgDatabaseNode extends StatefulWidget {
     String name,
     PostgresObjectKind kind,
   )? onPostgresObjectSelected;
-  final void Function(ConnectionRow connection)? onPostgresOpenSqlWorkspace;
+  final OnPostgresOpenSqlWorkspace? onPostgresOpenSqlWorkspace;
 
   @override
   State<_PgDatabaseNode> createState() => _PgDatabaseNodeState();
@@ -414,7 +428,7 @@ class _PgDbToolRow extends material.StatelessWidget {
     String name,
     PostgresObjectKind kind,
   )? onPostgresObjectSelected;
-  final void Function(ConnectionRow connection)? onPostgresOpenSqlWorkspace;
+  final OnPostgresOpenSqlWorkspace? onPostgresOpenSqlWorkspace;
   final VoidCallback? onContextRefresh;
 
   @override
@@ -474,7 +488,7 @@ class _PgSchemasNode extends StatefulWidget {
     String name,
     PostgresObjectKind kind,
   )? onPostgresObjectSelected;
-  final void Function(ConnectionRow connection)? onPostgresOpenSqlWorkspace;
+  final OnPostgresOpenSqlWorkspace? onPostgresOpenSqlWorkspace;
   final VoidCallback onRefreshSchemas;
 
   @override
@@ -554,7 +568,7 @@ class _PgSchemaNode extends StatefulWidget {
     String name,
     PostgresObjectKind kind,
   )? onPostgresObjectSelected;
-  final void Function(ConnectionRow connection)? onPostgresOpenSqlWorkspace;
+  final OnPostgresOpenSqlWorkspace? onPostgresOpenSqlWorkspace;
 
   @override
   State<_PgSchemaNode> createState() => _PgSchemaNodeState();
@@ -671,6 +685,9 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
             if (_loaded) ...[
               _PgObjectGroup(
                 connection: widget.connection,
+                databaseName: widget.databaseName,
+                schemaName: widget.schemaName,
+                objectKind: PostgresObjectKind.table,
                 onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
                 onRefresh: _loadObjects,
                 label: 'Tables',
@@ -688,6 +705,9 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
               ),
               _PgObjectGroup(
                 connection: widget.connection,
+                databaseName: widget.databaseName,
+                schemaName: widget.schemaName,
+                objectKind: PostgresObjectKind.view,
                 onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
                 onRefresh: _loadObjects,
                 label: 'Views',
@@ -705,6 +725,9 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
               ),
               _PgObjectGroup(
                 connection: widget.connection,
+                databaseName: widget.databaseName,
+                schemaName: widget.schemaName,
+                objectKind: PostgresObjectKind.materializedView,
                 onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
                 onRefresh: _loadObjects,
                 label: 'Materialized views',
@@ -722,6 +745,9 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
               ),
               _PgObjectGroup(
                 connection: widget.connection,
+                databaseName: widget.databaseName,
+                schemaName: widget.schemaName,
+                objectKind: PostgresObjectKind.function,
                 onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
                 onRefresh: _loadObjects,
                 label: 'Functions',
@@ -739,6 +765,9 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
               ),
               _PgObjectGroup(
                 connection: widget.connection,
+                databaseName: widget.databaseName,
+                schemaName: widget.schemaName,
+                objectKind: PostgresObjectKind.sequence,
                 onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
                 onRefresh: _loadObjects,
                 label: 'Sequences',
@@ -821,7 +850,7 @@ class _PgSchemaToolRow extends material.StatelessWidget {
     String name,
     PostgresObjectKind kind,
   )? onPostgresObjectSelected;
-  final void Function(ConnectionRow connection)? onPostgresOpenSqlWorkspace;
+  final OnPostgresOpenSqlWorkspace? onPostgresOpenSqlWorkspace;
   final VoidCallback? onContextRefresh;
 
   @override
@@ -864,6 +893,9 @@ class _PgSchemaToolRow extends material.StatelessWidget {
 class _PgObjectGroup extends StatefulWidget {
   const _PgObjectGroup({
     required this.connection,
+    required this.databaseName,
+    required this.schemaName,
+    required this.objectKind,
     required this.onRefresh,
     required this.label,
     required this.icon,
@@ -873,11 +905,14 @@ class _PgObjectGroup extends StatefulWidget {
   });
 
   final ConnectionRow connection;
+  final String databaseName;
+  final String schemaName;
+  final PostgresObjectKind objectKind;
   final VoidCallback onRefresh;
   final String label;
   final material.IconData icon;
   final List<String> items;
-  final void Function(ConnectionRow connection)? onPostgresOpenSqlWorkspace;
+  final OnPostgresOpenSqlWorkspace? onPostgresOpenSqlWorkspace;
   final void Function(String itemName)? onItemTap;
 
   @override
@@ -940,6 +975,10 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
                   connection: widget.connection,
                   onContextRefresh: widget.onRefresh,
                   onOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
+                  openSqlDatabase: widget.databaseName,
+                  openSqlSchema: widget.schemaName,
+                  openSqlName: item,
+                  openSqlKind: widget.objectKind,
                 ),
               ),
         ],
