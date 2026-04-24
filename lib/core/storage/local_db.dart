@@ -6,13 +6,23 @@ import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const _dbName = 'querya.db';
-const _dbVersion = 5;
+const _dbVersion = 6;
+
+/// Fallback when [recordSqlQueryHistory] is called without `maxEntries`.
+/// Keep in sync with [kDefaultSqlHistoryMaxEntries] in `app_settings.dart`.
+const int kDefaultSqlHistoryCap = 100;
 
 int? _sqliteInt(Object? v) {
   if (v == null) return null;
   if (v is int) return v;
   if (v is num) return v.toInt();
   return int.tryParse(v.toString());
+}
+
+String? _normalizeHistoryDatabaseName(String? databaseName) {
+  final t = databaseName?.trim();
+  if (t == null || t.isEmpty) return null;
+  return t;
 }
 
 /// Local SQLite database for folders and connections.
@@ -45,6 +55,9 @@ class LocalDb {
         version: _dbVersion,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
+        onOpen: (db) async {
+          await db.execute('PRAGMA foreign_keys = ON');
+        },
       ),
     );
     return _db!;
@@ -81,6 +94,19 @@ class LocalDb {
         key TEXT PRIMARY KEY NOT NULL,
         value TEXT NOT NULL
       )
+    ''');
+    await db.execute('''
+      CREATE TABLE sql_query_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        connection_id INTEGER NOT NULL REFERENCES connections(id) ON DELETE CASCADE,
+        database_name TEXT,
+        sql_text TEXT NOT NULL,
+        recorded_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE INDEX idx_sql_query_history_lookup
+      ON sql_query_history (connection_id, recorded_at DESC)
     ''');
   }
 
@@ -146,6 +172,21 @@ class LocalDb {
         'UPDATE connections SET password = NULL, connection_string = NULL',
       );
     }
+    if (oldVersion < 6) {
+      await db.execute('''
+        CREATE TABLE sql_query_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          connection_id INTEGER NOT NULL REFERENCES connections(id) ON DELETE CASCADE,
+          database_name TEXT,
+          sql_text TEXT NOT NULL,
+          recorded_at TEXT NOT NULL
+        )
+      ''');
+      await db.execute('''
+        CREATE INDEX idx_sql_query_history_lookup
+        ON sql_query_history (connection_id, recorded_at DESC)
+      ''');
+    }
   }
 
   Future<String?> getAppSetting(String key) async {
@@ -172,6 +213,85 @@ class LocalDb {
   Future<void> deleteAppSetting(String key) async {
     final db = await _open();
     await db.delete('app_settings', where: 'key = ?', whereArgs: [key]);
+  }
+
+  Future<void> recordSqlQueryHistory({
+    required int connectionId,
+    String? databaseName,
+    required String sqlText,
+    int maxEntries = kDefaultSqlHistoryCap,
+  }) async {
+    final sql = sqlText.trim();
+    if (sql.isEmpty) return;
+    if (maxEntries < 1) return;
+    final db = await _open();
+    final dbKey = _normalizeHistoryDatabaseName(databaseName);
+    final now = DateTime.now().toUtc().toIso8601String();
+    await db.insert('sql_query_history', {
+      'connection_id': connectionId,
+      'database_name': dbKey,
+      'sql_text': sql,
+      'recorded_at': now,
+    });
+    await db.rawDelete(
+      '''
+      DELETE FROM sql_query_history WHERE id IN (
+        SELECT id FROM (
+          SELECT id FROM sql_query_history
+          WHERE connection_id = ? AND database_name IS NOT DISTINCT FROM ?
+          ORDER BY recorded_at DESC, id DESC
+          LIMIT -1 OFFSET ?
+        )
+      )
+      ''',
+      [connectionId, dbKey, maxEntries],
+    );
+  }
+
+  Future<List<SqlQueryHistoryEntry>> listSqlQueryHistory({
+    required int connectionId,
+    String? databaseName,
+    int limit = 50,
+  }) async {
+    final db = await _open();
+    final dbKey = _normalizeHistoryDatabaseName(databaseName);
+    final rows = await db.rawQuery(
+      '''
+      SELECT id, connection_id, database_name, sql_text, recorded_at
+      FROM sql_query_history
+      WHERE connection_id = ? AND database_name IS NOT DISTINCT FROM ?
+      ORDER BY recorded_at DESC, id DESC
+      LIMIT ?
+      ''',
+      [connectionId, dbKey, limit],
+    );
+    return rows.map(SqlQueryHistoryEntry.fromMap).toList();
+  }
+
+  /// Removes all history rows for [connectionId] (every database bucket).
+  Future<void> clearSqlQueryHistoryForConnection(int connectionId) async {
+    final db = await _open();
+    await db.delete(
+      'sql_query_history',
+      where: 'connection_id = ?',
+      whereArgs: [connectionId],
+    );
+  }
+
+  /// Removes history for [connectionId] and [databaseName] only (same bucket as [listSqlQueryHistory]).
+  Future<void> clearSqlQueryHistoryBucket({
+    required int connectionId,
+    String? databaseName,
+  }) async {
+    final db = await _open();
+    final dbKey = _normalizeHistoryDatabaseName(databaseName);
+    await db.rawDelete(
+      '''
+      DELETE FROM sql_query_history
+      WHERE connection_id = ? AND database_name IS NOT DISTINCT FROM ?
+      ''',
+      [connectionId, dbKey],
+    );
   }
 
   Future<List<String>> getFolders() async {
@@ -258,6 +378,32 @@ class LocalDb {
     await _db?.close();
     _db = null;
   }
+}
+
+/// One row from [LocalDb.sql_query_history] (recent SQL, no secrets).
+class SqlQueryHistoryEntry {
+  const SqlQueryHistoryEntry({
+    required this.id,
+    required this.connectionId,
+    this.databaseName,
+    required this.sqlText,
+    required this.recordedAt,
+  });
+
+  final int id;
+  final int connectionId;
+  final String? databaseName;
+  final String sqlText;
+  final String recordedAt;
+
+  static SqlQueryHistoryEntry fromMap(Map<String, Object?> m) =>
+      SqlQueryHistoryEntry(
+        id: _sqliteInt(m['id'])!,
+        connectionId: _sqliteInt(m['connection_id'])!,
+        databaseName: m['database_name'] as String?,
+        sqlText: m['sql_text'] as String,
+        recordedAt: m['recorded_at'] as String,
+      );
 }
 
 class ConnectionRow {
