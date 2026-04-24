@@ -4,6 +4,7 @@ on:
   push:
     branches: [ main, dev, '**-connector', '**-connection-pull' ]
     tags:
+      - '*.*.*'
       - 'v*'
   pull_request:
     branches: [ main, dev ]
@@ -52,12 +53,12 @@ jobs:
       - name: Analyze code
         run: flutter analyze
 
-  # Release smoke build: same tag also runs release.yml (artifacts). This job
-  # gates tags on a real linux release compile after tests + analyze.
+  # Release smoke build: runs after tests + analyze only when the workflow was
+  # triggered by a version tag (semver X.Y.Z or legacy v*), not on branch/PR pushes.
   build-linux-release:
     name: Build Linux (release)
     needs: [test, analyze]
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

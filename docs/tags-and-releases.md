@@ -42,7 +42,7 @@ git-cliff --latest --strip header
 | Файл | Назначение |
 |------|------------|
 | [.github/workflows/release.yml](../.github/workflows/release.yml) | Ручной релиз, сборка, GitHub Release |
-| [.github/workflows/ci.yml](../.github/workflows/ci.yml) | Тесты, analyze, smoke-сборка Linux на тегах `v*` |
+| [.github/workflows/ci.yml](../.github/workflows/ci.yml) | Тесты, analyze, smoke-сборка Linux при push тегов `X.Y.Z` или `v*` |
 | [.github/workflows/version-bump.yml](../.github/workflows/version-bump.yml) | Автоподнятие patch/build при merge в `main` |
 | [cliff.toml](../cliff.toml) | Правила changelog (локально) |
 
