@@ -2,11 +2,28 @@
 
 Кратко: как выставить версию и опубликовать бинарники через GitHub Actions.
 
-## Как устроен релиз сейчас
+## Рекомендуемый способ: тег → всё само
 
-- Workflow **[Release](../.github/workflows/release.yml)** запускается **вручную** (**Actions → Release → Run workflow**), а не автоматически при пуше тега.
-- Версия для артефактов и имени тега берётся из поля **`version`** в [pubspec.yaml](../pubspec.yaml) (например `0.9.0+42` → тег `v0.9.0`, build number в метаданных релиза).
-- Собираются артефакты **Windows** и **Linux** (zip), публикуется **`SHA256SUMS.txt`**, создаётся **GitHub Release** с фиксированным телом (описание из workflow, не git-cliff в CI).
+1. В [pubspec.yaml](../pubspec.yaml) выставьте **`version: X.Y.Z+N`** (semver до `+`, build number после).
+2. Закоммитьте и запушьте в **`main`** (или в ветку, откуда мержите в `main`).
+3. Создайте **аннотированный тег** с **той же semver-частью**, что в pubspec (без `+N`):
+   - либо `0.1.1`, если в pubspec `0.1.1+1`;
+   - либо `v0.1.1` — тоже допустимо, CI сравнивает с pubspec без префикса `v`.
+4. Запушьте тег: `git push origin 0.1.1`
+
+После этого workflow **[Release](../.github/workflows/release.yml)** запустится **автоматически**: соберёт **Windows** и **Linux** (zip), **`SHA256SUMS.txt`**, создаст или обновит **GitHub Release** с этими файлами.
+
+Если тег **не совпадает** с semver в pubspec (например, в pubspec `0.1.0`, а тег `0.1.1`), первая job **Version check** упадёт с понятной ошибкой — так и задумано.
+
+## Ручной запуск (как раньше)
+
+- **Actions → Release → Run workflow** на нужном ref (обычно `main`).
+- Workflow возьмёт semver из **pubspec** на этом коммите, соберёт zip и создаст **GitHub Release** с тегом **`X.Y.Z`** (как в pubspec до `+`), если тега ещё нет.
+
+## Что внутри релиза
+
+- Имена архивов: `Querya-Desktop-X.Y.Z-linux.zip`, `Querya-Desktop-X.Y.Z-windows.zip`.
+- Версия для имён и тега — **semver из pubspec**; build `+N` попадает в текст релиза как **полный pubspec version**.
 
 ## Changelog (git-cliff)
 
@@ -18,37 +35,18 @@
 
 - Генерация changelog **не подключена** к `release.yml`; при необходимости вставьте вывод git-cliff в описание релиза вручную на GitHub или расширьте workflow.
 
-## Имя тега
-
-- Workflow создаёт тег вида **`v` + semver из pubspec** (например `v0.9.0`).
-- Чтобы не путаться с другими схемами, придерживайтесь **`v*`** для релизных тегов.
-
-## Перед запуском Release
-
-1. Обновите `version` в `pubspec.yaml`, закоммитьте в ветку по вашему процессу.
-2. Убедитесь, что **CI** (тесты + analyze) зелёные на этом коммите.
-3. Запустите workflow **Release** на нужном коммите (обычно `main`).
-
-## Локальная проверка changelog (опционально)
-
-```bash
-git-cliff --latest --strip header
-```
-
-С токеном GitHub (PR, авторы) см. историческую секцию в предыдущих версиях этого файла или документацию git-cliff.
-
 ## Где смотреть настройки
 
 | Файл | Назначение |
 |------|------------|
-| [.github/workflows/release.yml](../.github/workflows/release.yml) | Ручной релиз, сборка, GitHub Release |
+| [.github/workflows/release.yml](../.github/workflows/release.yml) | Сборка + GitHub Release: **push тегов** `X.Y.Z` / `v*` или **ручной** запуск |
 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) | Тесты, analyze, smoke-сборка Linux при push тегов `X.Y.Z` или `v*` |
-| [.github/workflows/version-bump.yml](../.github/workflows/version-bump.yml) | Автоподнятие patch/build при merge в `main` |
+| [.github/workflows/version-bump.yml](../.github/workflows/version-bump.yml) | Автоподнятие patch/build при merge PR в `main` |
 | [cliff.toml](../cliff.toml) | Правила changelog (локально) |
 
 ## Версия в приложении
 
-Поле **`version`** в `pubspec.yaml` должно соответствовать тому, что вы ожидаете увидеть в имени zip и в GitHub Release. Тег создаётся workflow’ом из этой версии.
+Поле **`version`** в `pubspec.yaml` должно совпадать с ожидаемыми именами zip и тегом (semver до `+`).
 
 ## Платформы
 
