@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-04-24
+
+### Added
+
+- **SQL result export** — from the PostgreSQL / MySQL **Data Output** grid: **Copy as CSV**, **Save as CSV…**, **Copy as JSON**, **Save as JSON…** (native save dialog via **`file_selector`** on Linux, macOS, and Windows).
+- **SQL query history** — successful statements are stored in local **SQLite** (per saved connection and database bucket); **History** in the SQL toolbar opens a recall dialog; **Edit → Preferences** adds **Query history limit** (25–500 entries, oldest trimmed automatically).
+- **Documentation** — contributing notes, product **roadmap**, macOS signing track; README structure refresh.
+- **Tests** — MySQL SQL workspace home, driver manager, and preferences dialog widget coverage; storage tests for query history and export encoding.
+
+### Changed
+
+- **Connections sidebar** — `connections_panel` split into **part libraries** for easier maintenance (behavior preserved).
+- **CI / release** — Flutter toolchain pinned to **3.41.6** for analyze, tests, and release builds.
+
 ## [0.1.3] - 2026-04-25
 
 ### Added
@@ -57,6 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Linux desktop build/install layout no longer targets `/usr/local` when building the app bundle.
 
+[0.2.0]: https://github.com/QueryaHub/Querya-Desktop/compare/0.1.3...0.2.0
 [0.1.3]: https://github.com/QueryaHub/Querya-Desktop/compare/0.1.2...0.1.3
 [0.1.2]: https://github.com/QueryaHub/Querya-Desktop/compare/0.1.1...0.1.2
 [0.1.1]: https://github.com/QueryaHub/Querya-Desktop/compare/0.1.0...0.1.1
