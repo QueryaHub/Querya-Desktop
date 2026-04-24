@@ -12,6 +12,16 @@
 - **Connection list and settings**: local SQLite (`querya.db` under the app support directory).
 - **Passwords / connection strings**: OS secure store (see [security.md](security.md)).
 
+## Preferences
+
+Open **Edit → Preferences…** to change options that apply across the app:
+
+- **SQL statement timeouts** (PostgreSQL and MySQL) — **global** defaults for every connection of that type, not per-server. You can still change the timeout from the SQL workspace toolbar; both places stay in sync.
+- **Max rows in results** — how many rows are loaded into the grid after running a query (large results may be truncated with a status message).
+- **SQL editor font size** — monospace size in the query editor.
+
+Preferences (except secrets) live in the same local SQLite file as connection metadata. A **settings** icon next to the statement timeout in the PostgreSQL/MySQL SQL toolbar opens the same dialog.
+
 ## Driver manager
 
 **Connection → Driver Manager** lists **built-in** Dart drivers. You do **not** need to download a JDBC JAR to connect.
