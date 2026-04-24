@@ -2,6 +2,7 @@ import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
 import 'package:querya_desktop/features/postgresql/postgres_sql_workspace.dart';
 import 'package:querya_desktop/features/postgresql/postgres_stats_view.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -11,10 +12,19 @@ class PostgresWorkspaceHome extends material.StatefulWidget {
   const PostgresWorkspaceHome({
     super.key,
     required this.connectionRow,
+    this.postgresSqlEditorContext,
+    this.postgresSqlEditorContextToken = 0,
     this.sqlTabRequestToken = 0,
   });
 
   final ConnectionRow connectionRow;
+
+  /// Set when opening SQL from the tree (e.g. "Open in SQL") to seed session DB + template.
+  final ({String database, String schema, String name, PostgresObjectKind kind})?
+      postgresSqlEditorContext;
+
+  /// Bumps when [postgresSqlEditorContext] should be applied to the editor.
+  final int postgresSqlEditorContextToken;
 
   /// Parent increments this to request switching to the SQL tab (e.g. from browser context menu).
   final int sqlTabRequestToken;
@@ -151,6 +161,9 @@ class _PostgresWorkspaceHomeState extends material.State<PostgresWorkspaceHome> 
                 key: ValueKey('pg_sql_${widget.connectionRow.id}'),
                 connectionRow: widget.connectionRow,
                 transactionOpenNotifier: _sqlTxNotifier,
+                postgresSqlEditorContext: widget.postgresSqlEditorContext,
+                postgresSqlEditorContextToken:
+                    widget.postgresSqlEditorContextToken,
               ),
             ],
           ),
