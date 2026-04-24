@@ -10,8 +10,8 @@ Living document for planned work. Not a commitment order; adjust as priorities c
 
 ## Result export
 
-- From results grids (PostgreSQL / MySQL / others): **Export visible page or full result** to CSV and optionally JSON, with a safe row cap aligned with `AppSettings` max rows.
-- File picker for save location; desktop-friendly default filename (connection, timestamp).
+- **Done (small steps):** CSV and JSON from the Data Output grid — copy to clipboard and **Save…** (system dialog): [`ResultsTab`](lib/features/main_screen/results_tab.dart), [`lib/core/csv/`](lib/core/csv/), [`lib/core/json/`](lib/core/json/).
+- **Later:** alignment with `AppSettings` max rows for very large grids (warn or truncate before export).
 
 ## SSH and advanced networking
 
