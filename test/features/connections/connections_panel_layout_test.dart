@@ -225,6 +225,22 @@ void main() {
       _expectTextCount('PG local', 1);
       _expectTextCount('Redis local', 1);
       _expectTextCount('Mongo local', 1);
+
+      // First-load folders start expanded; collapsing hides nested connections
+      // without a full-panel setState (local _FolderTile state).
+      await tester.tap(find.text('LayoutTestFolder'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 120));
+      _expectTextCount('PG local', 0);
+      _expectTextCount('Redis local', 0);
+      _expectTextCount('Mongo local', 0);
+
+      await tester.tap(find.text('LayoutTestFolder'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 120));
+      _expectTextCount('PG local', 1);
+      _expectTextCount('Redis local', 1);
+      _expectTextCount('Mongo local', 1);
     });
   });
 }

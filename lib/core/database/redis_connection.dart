@@ -302,6 +302,74 @@ class RedisConnection {
   }
 }
 
+/// In-memory stub for widget tests (no socket). Handles SELECT, DBSIZE, SCAN,
+/// TYPE, TTL used by [RedisKeysView].
+class RedisConnectionTestFake extends RedisConnection {
+  RedisConnectionTestFake({
+    this.firstScanKeys = const ['alpha', 'beta'],
+    this.secondScanKeys = const <String>[],
+    this.dbSizeResult = 2,
+  }) : super(id: -1, name: 'test-fake', host: 'localhost', port: 6379);
+
+  final List<String> firstScanKeys;
+  final List<String> secondScanKeys;
+  final int dbSizeResult;
+
+  bool _firstScanDone = false;
+
+  @override
+  bool get isConnected => _isConnected;
+
+  @override
+  Future<void> connect() async {
+    _isConnected = true;
+    _conn = null;
+    _command = null;
+  }
+
+  @override
+  Future<void> disconnect() async {
+    _isConnected = false;
+    final c = _conn;
+    _conn = null;
+    _command = null;
+    try {
+      await c?.close();
+    } catch (_) {}
+  }
+
+  @override
+  Future<dynamic> sendCommand(List<dynamic> args) async {
+    if (!_isConnected) {
+      throw StateError('Not connected to Redis');
+    }
+    final op = args.first.toString().toUpperCase();
+    switch (op) {
+      case 'SELECT':
+        return 'OK';
+      case 'DBSIZE':
+        return dbSizeResult;
+      case 'SCAN':
+        final cursor = int.tryParse(args[1].toString()) ?? 0;
+        if (cursor == 0 && !_firstScanDone) {
+          _firstScanDone = true;
+          final next = secondScanKeys.isNotEmpty ? 1 : 0;
+          return [next, firstScanKeys];
+        }
+        if (cursor == 1 && secondScanKeys.isNotEmpty) {
+          return [0, secondScanKeys];
+        }
+        return [0, <String>[]];
+      case 'TYPE':
+        return 'string';
+      case 'TTL':
+        return -1;
+      default:
+        return null;
+    }
+  }
+}
+
 class RedisConnectionException implements Exception {
   RedisConnectionException(this.message);
   final String message;

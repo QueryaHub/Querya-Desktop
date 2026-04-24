@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart' as material show AlertDialog, BoxConstraints, BuildContext, Column, ConstrainedBox, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, AnimatedRotation, Row, BoxFit, Text, TextOverflow, Expanded, CircularProgressIndicator, Material, StatelessWidget, Colors, Tooltip, Color, LayoutBuilder, TextPainter, TextSpan, TextDirection, SelectableText, Padding, Widget, Navigator, ValueKey, FontWeight, VoidCallback;
+import 'package:flutter/material.dart' as material show AlertDialog, BoxConstraints, BuildContext, Column, ConstrainedBox, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, AnimatedRotation, Row, BoxFit, Text, TextOverflow, Expanded, CircularProgressIndicator, Material, StatelessWidget, Colors, Tooltip, Color, LayoutBuilder, TextPainter, TextSpan, TextDirection, SelectableText, Padding, Widget, Navigator, ValueKey, FontWeight, VoidCallback, RepaintBoundary;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
@@ -309,8 +309,9 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
           ),
           Divider(height: 1, color: theme.colorScheme.border.withValues(alpha: 0.22)),
           Expanded(
-            child: material.CustomScrollView(
-              slivers: [
+            child: material.RepaintBoundary(
+              child: material.CustomScrollView(
+                slivers: [
                 material.SliverPadding(
                   padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   sliver: material.SliverToBoxAdapter(
@@ -322,15 +323,13 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                         for (final name in _folders)
                           _FolderTile(
                             name: name,
-                            isExpanded: _expandedFolders.contains(name),
-                            onToggle: () {
-                              setState(() {
-                                if (_expandedFolders.contains(name)) {
-                                  _expandedFolders.remove(name);
-                                } else {
-                                  _expandedFolders.add(name);
-                                }
-                              });
+                            initiallyExpanded: _expandedFolders.contains(name),
+                            onExpansionCommitted: (folderName, expanded) {
+                              if (expanded) {
+                                _expandedFolders.add(folderName);
+                              } else {
+                                _expandedFolders.remove(folderName);
+                              }
                             },
                             connections: _connections
                                 .where((c) => c.folderId == _folderIdByName[name])
@@ -396,6 +395,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                   ),
                 ),
               ],
+              ),
             ),
           ),
         ],
@@ -531,11 +531,11 @@ class _ConnectionTile extends StatelessWidget {
   }
 }
 
-class _FolderTile extends StatelessWidget {
+class _FolderTile extends StatefulWidget {
   const _FolderTile({
     required this.name,
-    required this.isExpanded,
-    required this.onToggle,
+    required this.initiallyExpanded,
+    required this.onExpansionCommitted,
     required this.connections,
     required this.onRemove,
     required this.onNewConnection,
@@ -548,8 +548,8 @@ class _FolderTile extends StatelessWidget {
   });
 
   final String name;
-  final bool isExpanded;
-  final VoidCallback onToggle;
+  final bool initiallyExpanded;
+  final void Function(String folderName, bool expanded) onExpansionCommitted;
   final List<ConnectionRow> connections;
   final VoidCallback onRemove;
   final void Function(String folderName) onNewConnection;
@@ -561,18 +561,45 @@ class _FolderTile extends StatelessWidget {
   final Widget Function(ConnectionRow conn)? buildConnectionTile;
 
   @override
+  State<_FolderTile> createState() => _FolderTileState();
+}
+
+class _FolderTileState extends State<_FolderTile> {
+  late bool _expanded;
+
+  @override
+  void initState() {
+    super.initState();
+    _expanded = widget.initiallyExpanded;
+  }
+
+  @override
+  void didUpdateWidget(_FolderTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.name != oldWidget.name ||
+        widget.initiallyExpanded != oldWidget.initiallyExpanded) {
+      _expanded = widget.initiallyExpanded;
+    }
+  }
+
+  void _toggle() {
+    setState(() => _expanded = !_expanded);
+    widget.onExpansionCommitted(widget.name, _expanded);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return ContextMenu(
       items: [
         MenuButton(
           leading: material.Icon(material.Icons.settings_ethernet_rounded, size: 18, color: theme.colorScheme.mutedForeground),
-          onPressed: (menuContext) => onNewConnection(name),
+          onPressed: (menuContext) => widget.onNewConnection(widget.name),
           child: const Text('New connection'),
         ),
         MenuButton(
           leading: material.Icon(material.Icons.delete_outline_rounded, size: 18, color: theme.colorScheme.mutedForeground),
-          onPressed: (_) => onRemove(),
+          onPressed: (_) => widget.onRemove(),
           child: const Text('Remove folder'),
         ),
       ],
@@ -585,15 +612,15 @@ class _FolderTile extends StatelessWidget {
             material.MouseRegion(
               cursor: material.SystemMouseCursors.click,
               child: material.InkWell(
-                onTap: onToggle,
+                onTap: _toggle,
                 borderRadius: material.BorderRadius.circular(6),
                 child: material.Padding(
                   padding: const material.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                   child: material.Row(
                     children: [
                       material.AnimatedRotation(
-                        turns: isExpanded ? 0.25 : 0,
-                        duration: const Duration(milliseconds: 150),
+                        turns: _expanded ? 0.25 : 0,
+                        duration: const Duration(milliseconds: 100),
                         child: material.Icon(
                           material.Icons.chevron_right_rounded,
                           size: 18,
@@ -605,7 +632,7 @@ class _FolderTile extends StatelessWidget {
                       const Gap(8),
                       material.Expanded(
                         child: material.Text(
-                          name,
+                          widget.name,
                           overflow: material.TextOverflow.ellipsis,
                           maxLines: 1,
                           style: material.TextStyle(
@@ -619,19 +646,18 @@ class _FolderTile extends StatelessWidget {
                 ),
               ),
             ),
-            // Show connections inside this folder when expanded
-            if (isExpanded)
-              for (final conn in connections)
+            if (_expanded)
+              for (final conn in widget.connections)
                 material.Padding(
                   padding: const material.EdgeInsets.only(left: 24),
-                  child: buildConnectionTile != null
-                      ? buildConnectionTile!(conn)
+                  child: widget.buildConnectionTile != null
+                      ? widget.buildConnectionTile!(conn)
                       : _ConnectionTile(
                           connection: conn,
-                          icon: iconForType(conn.type),
+                          icon: widget.iconForType(conn.type),
                           iconAsset: ConnectionsPanelState._iconAssetForType(conn.type),
-                          onRemove: () => onRemoveConnection(conn.id!),
-                          onTap: () => onConnectionTap?.call(conn),
+                          onRemove: () => widget.onRemoveConnection(conn.id!),
+                          onTap: () => widget.onConnectionTap?.call(conn),
                         ),
                 ),
           ],
@@ -789,7 +815,7 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
                       padding: const material.EdgeInsets.all(2),
                       child: material.AnimatedRotation(
                         turns: _expanded ? 0.25 : 0,
-                        duration: const Duration(milliseconds: 150),
+                        duration: const Duration(milliseconds: 100),
                         child: material.Icon(
                           material.Icons.chevron_right_rounded,
                           size: 16,
@@ -1121,7 +1147,7 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
                       padding: const material.EdgeInsets.all(2),
                       child: material.AnimatedRotation(
                         turns: _expanded ? 0.25 : 0,
-                        duration: const Duration(milliseconds: 150),
+                        duration: const Duration(milliseconds: 100),
                         child: material.Icon(
                           material.Icons.chevron_right_rounded,
                           size: 16,
@@ -1431,7 +1457,7 @@ class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
                       padding: const material.EdgeInsets.all(2),
                       child: material.AnimatedRotation(
                         turns: _expanded ? 0.25 : 0,
-                        duration: const Duration(milliseconds: 150),
+                        duration: const Duration(milliseconds: 100),
                         child: material.Icon(
                           material.Icons.chevron_right_rounded,
                           size: 16,
@@ -1672,7 +1698,7 @@ class _MysqlConnectionTileState extends State<_MysqlConnectionTile> {
                       padding: const material.EdgeInsets.all(2),
                       child: material.AnimatedRotation(
                         turns: _expanded ? 0.25 : 0,
-                        duration: const Duration(milliseconds: 150),
+                        duration: const Duration(milliseconds: 100),
                         child: material.Icon(
                           material.Icons.chevron_right_rounded,
                           size: 16,
@@ -1915,7 +1941,7 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
             label: widget.databaseName,
             leading: material.AnimatedRotation(
               turns: _expanded ? 0.25 : 0,
-              duration: const Duration(milliseconds: 150),
+              duration: const Duration(milliseconds: 100),
               child: material.Icon(
                 material.Icons.chevron_right_rounded,
                 size: 14,
@@ -2262,7 +2288,7 @@ class _PgDatabasesNodeState extends State<_PgDatabasesNode> {
             label: 'Databases (${widget.databases.length})',
             leading: material.AnimatedRotation(
               turns: _expanded ? 0.25 : 0,
-              duration: const Duration(milliseconds: 150),
+              duration: const Duration(milliseconds: 100),
               child: material.Icon(
                 material.Icons.chevron_right_rounded,
                 size: 14,
@@ -2371,7 +2397,7 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
             label: widget.databaseName,
             leading: material.AnimatedRotation(
               turns: _expanded ? 0.25 : 0,
-              duration: const Duration(milliseconds: 150),
+              duration: const Duration(milliseconds: 100),
               child: material.Icon(
                 material.Icons.chevron_right_rounded,
                 size: 14,
@@ -2552,7 +2578,7 @@ class _PgSchemasNodeState extends State<_PgSchemasNode> {
             label: 'Schemas (${widget.schemas.length})',
             leading: material.AnimatedRotation(
               turns: _expanded ? 0.25 : 0,
-              duration: const Duration(milliseconds: 150),
+              duration: const Duration(milliseconds: 100),
               child: material.Icon(
                 material.Icons.chevron_right_rounded,
                 size: 14,
@@ -2686,7 +2712,7 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
             label: widget.schemaName,
             leading: material.AnimatedRotation(
               turns: _expanded ? 0.25 : 0,
-              duration: const Duration(milliseconds: 150),
+              duration: const Duration(milliseconds: 100),
               child: material.Icon(
                 material.Icons.chevron_right_rounded,
                 size: 14,
@@ -2955,7 +2981,7 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
             label: '${widget.label} (${widget.items.length})',
             leading: material.AnimatedRotation(
               turns: _expanded ? 0.25 : 0,
-              duration: const Duration(milliseconds: 150),
+              duration: const Duration(milliseconds: 100),
               child: material.Icon(
                 material.Icons.chevron_right_rounded,
                 size: 13,
