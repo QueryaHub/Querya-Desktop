@@ -9,8 +9,6 @@ import 'package:querya_desktop/features/postgresql/postgres_table_toolbar.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_utils.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
-const _defaultLimit = 200;
-
 class PostgresTableView extends material.StatefulWidget {
   const PostgresTableView({
     super.key,
@@ -20,7 +18,7 @@ class PostgresTableView extends material.StatefulWidget {
     required this.tableName,
     this.isView = false,
     this.isMaterializedView = false,
-    this.limit = _defaultLimit,
+    this.limit = kPostgresBrowseDefaultRowLimit,
   });
 
   final ConnectionRow connectionRow;
@@ -268,7 +266,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     final trimmed = sql.trim();
     if (!isAllowedPostgresSelectQuery(trimmed)) return;
     final browse = _browseDataSql().trim();
-    if (trimmed == browse) {
+    if (_browseSqlCompareKey(trimmed) == _browseSqlCompareKey(browse)) {
       setState(() {
         _customSqlActive = false;
         _customSql = null;
@@ -572,6 +570,15 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         ],
       ),
     );
+  }
+
+  /// Ignores trailing semicolons and whitespace so Run matches the browse query.
+  static String _browseSqlCompareKey(String sql) {
+    var s = sql.trim();
+    while (s.endsWith(';')) {
+      s = s.substring(0, s.length - 1).trimRight();
+    }
+    return s.replaceAll(RegExp(r'\s+'), ' ');
   }
 
   double _calcTableWidth(int colCount, double availableWidth) {
