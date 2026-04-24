@@ -5,6 +5,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-04-25
+
+### Added
+
+- **PostgreSQL** — `postgres_object_workspace.dart` builds object views from the sidebar tree (logic moved out of `workspace_panel` for clarity).
+
+### Changed
+
+- **PostgreSQL — workspace** — a selected table, view, or other object opens **full width** again; **Server** / **SQL** tabs show only when no object is selected for that connection. The SQL tab still receives a browse template when you use **Open in SQL**; the toolbar **DB:** line follows the catalog from the tree when a seed is applied.
+- **PostgreSQL** — shared browse query helper (`postgresBrowseSelectSql`) and default page size (`kPostgresBrowseDefaultRowLimit`) align the data grid with the SQL editor template.
+- **MySQL** — comparing the table browse query to the mini-editor SQL ignores trailing semicolons and normalizes whitespace; hint text clarifies that **Run** reloads from the server even when rows look unchanged.
+
+### Fixed
+
+- **PostgreSQL — Open in SQL** — the context menu seeds the editor from the **row you right-clicked** (database, schema, table/view/matview name). Previously the app used only the last **left-click** selection, so the query could target the wrong table.
+
 ## [0.2.0] - 2026-04-24
 
 ### Added
@@ -71,6 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Linux desktop build/install layout no longer targets `/usr/local` when building the app bundle.
 
+[0.2.1]: https://github.com/QueryaHub/Querya-Desktop/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/QueryaHub/Querya-Desktop/compare/0.1.3...0.2.0
 [0.1.3]: https://github.com/QueryaHub/Querya-Desktop/compare/0.1.2...0.1.3
 [0.1.2]: https://github.com/QueryaHub/Querya-Desktop/compare/0.1.1...0.1.2
