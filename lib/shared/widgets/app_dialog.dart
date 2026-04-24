@@ -15,7 +15,7 @@ Future<T?> showAppDialog<T>({
     barrierDismissible: false,
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
     barrierColor: Colors.transparent,
-    transitionDuration: const Duration(milliseconds: 240),
+    transitionDuration: const Duration(milliseconds: 200),
     pageBuilder: (ctx, animation, secondaryAnimation) {
       return _BlurredDialogScaffold(
         barrierDismissible: barrierDismissible,
@@ -67,7 +67,7 @@ class _BlurredDialogScaffold extends StatelessWidget {
                   final t = curved.value;
                   return ClipRect(
                     child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 10.0 * t, sigmaY: 10.0 * t),
+                      filter: ImageFilter.blur(sigmaX: 8.0 * t, sigmaY: 8.0 * t),
                       child: Container(
                         color: Colors.black.withValues(alpha: 0.32 * t),
                       ),

@@ -125,58 +125,62 @@ class _PostgresIndexListViewState extends material.State<PostgresIndexListView> 
             child: material.Scrollbar(
               controller: _scroll,
               thumbVisibility: true,
-              child: material.SingleChildScrollView(
+              child: material.ListView.builder(
                 controller: _scroll,
                 padding: const material.EdgeInsets.all(16),
-                child: material.Column(
-                  crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                  children: [
-                    for (final r in _rows) ...[
-                      material.Container(
-                        margin: const material.EdgeInsets.only(bottom: 12),
-                        padding: const material.EdgeInsets.all(12),
-                        decoration: material.BoxDecoration(
-                          color: cs.muted.withValues(alpha: 0.12),
-                          borderRadius: material.BorderRadius.circular(8),
-                          border: material.Border.all(
-                              color: cs.border.withValues(alpha: 0.35)),
-                        ),
-                        child: material.Column(
-                          crossAxisAlignment: material.CrossAxisAlignment.start,
-                          children: [
-                            material.Text(
-                              '${r.tableName} · ${r.indexName}',
-                              style: material.TextStyle(
-                                fontWeight: material.FontWeight.w600,
-                                fontSize: 12,
-                                color: cs.foreground,
-                              ),
-                            ),
-                            material.Text(
-                              'Size: ${_formatBytes(r.sizeBytes)}',
-                              style: material.TextStyle(
-                                fontSize: 11,
-                                color: cs.mutedForeground,
-                              ),
-                            ),
-                            const Gap(8),
-                            material.SelectableText(
-                              r.indexDef,
-                              style: material.TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 11,
-                                height: 1.4,
-                                color: cs.foreground,
-                              ),
-                            ),
-                          ],
-                        ),
+                cacheExtent: 400,
+                itemCount: _rows.isEmpty ? 1 : _rows.length,
+                itemBuilder: (context, i) {
+                  if (_rows.isEmpty) {
+                    return const Text('No indexes in this schema.')
+                        .muted()
+                        .small();
+                  }
+                  final r = _rows[i];
+                  return material.Padding(
+                    padding: material.EdgeInsets.only(
+                        bottom: i < _rows.length - 1 ? 12 : 0),
+                    child: material.Container(
+                      padding: const material.EdgeInsets.all(12),
+                      decoration: material.BoxDecoration(
+                        color: cs.muted.withValues(alpha: 0.12),
+                        borderRadius: material.BorderRadius.circular(8),
+                        border: material.Border.all(
+                            color: cs.border.withValues(alpha: 0.35)),
                       ),
-                    ],
-                    if (_rows.isEmpty)
-                      const Text('No indexes in this schema.').muted().small(),
-                  ],
-                ),
+                      child: material.Column(
+                        crossAxisAlignment: material.CrossAxisAlignment.start,
+                        children: [
+                          material.Text(
+                            '${r.tableName} · ${r.indexName}',
+                            style: material.TextStyle(
+                              fontWeight: material.FontWeight.w600,
+                              fontSize: 12,
+                              color: cs.foreground,
+                            ),
+                          ),
+                          material.Text(
+                            'Size: ${_formatBytes(r.sizeBytes)}',
+                            style: material.TextStyle(
+                              fontSize: 11,
+                              color: cs.mutedForeground,
+                            ),
+                          ),
+                          const Gap(8),
+                          material.SelectableText(
+                            r.indexDef,
+                            style: material.TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 11,
+                              height: 1.4,
+                              color: cs.foreground,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -300,51 +304,55 @@ class _PostgresTriggerListViewState extends material.State<PostgresTriggerListVi
             child: material.Scrollbar(
               controller: _scroll,
               thumbVisibility: true,
-              child: material.SingleChildScrollView(
+              child: material.ListView.builder(
                 controller: _scroll,
                 padding: const material.EdgeInsets.all(16),
-                child: material.Column(
-                  crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                  children: [
-                    for (final r in _rows) ...[
-                      material.Container(
-                        margin: const material.EdgeInsets.only(bottom: 12),
-                        padding: const material.EdgeInsets.all(12),
-                        decoration: material.BoxDecoration(
-                          color: cs.muted.withValues(alpha: 0.12),
-                          borderRadius: material.BorderRadius.circular(8),
-                          border: material.Border.all(
-                              color: cs.border.withValues(alpha: 0.35)),
-                        ),
-                        child: material.Column(
-                          crossAxisAlignment: material.CrossAxisAlignment.start,
-                          children: [
-                            material.Text(
-                              '${r.tableName} · ${r.triggerName}',
-                              style: material.TextStyle(
-                                fontWeight: material.FontWeight.w600,
-                                fontSize: 12,
-                                color: cs.foreground,
-                              ),
-                            ),
-                            const Gap(8),
-                            material.SelectableText(
-                              r.definition,
-                              style: material.TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 11,
-                                height: 1.4,
-                                color: cs.foreground,
-                              ),
-                            ),
-                          ],
-                        ),
+                cacheExtent: 400,
+                itemCount: _rows.isEmpty ? 1 : _rows.length,
+                itemBuilder: (context, i) {
+                  if (_rows.isEmpty) {
+                    return const Text('No triggers in this schema.')
+                        .muted()
+                        .small();
+                  }
+                  final r = _rows[i];
+                  return material.Padding(
+                    padding: material.EdgeInsets.only(
+                        bottom: i < _rows.length - 1 ? 12 : 0),
+                    child: material.Container(
+                      padding: const material.EdgeInsets.all(12),
+                      decoration: material.BoxDecoration(
+                        color: cs.muted.withValues(alpha: 0.12),
+                        borderRadius: material.BorderRadius.circular(8),
+                        border: material.Border.all(
+                            color: cs.border.withValues(alpha: 0.35)),
                       ),
-                    ],
-                    if (_rows.isEmpty)
-                      const Text('No triggers in this schema.').muted().small(),
-                  ],
-                ),
+                      child: material.Column(
+                        crossAxisAlignment: material.CrossAxisAlignment.start,
+                        children: [
+                          material.Text(
+                            '${r.tableName} · ${r.triggerName}',
+                            style: material.TextStyle(
+                              fontWeight: material.FontWeight.w600,
+                              fontSize: 12,
+                              color: cs.foreground,
+                            ),
+                          ),
+                          const Gap(8),
+                          material.SelectableText(
+                            r.definition,
+                            style: material.TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 11,
+                              height: 1.4,
+                              color: cs.foreground,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -460,43 +468,45 @@ class _PostgresTypeListViewState extends material.State<PostgresTypeListView> {
           child: material.Scrollbar(
             controller: _scroll,
             thumbVisibility: true,
-            child: material.SingleChildScrollView(
+            child: material.ListView.builder(
               controller: _scroll,
               padding: const material.EdgeInsets.all(16),
-              child: material.Column(
-                crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                children: [
-                  for (final r in _rows)
-                    material.Padding(
-                      padding: const material.EdgeInsets.symmetric(vertical: 4),
-                      child: material.Row(
-                        children: [
-                          material.Expanded(
-                            child: material.Text(
-                              r.name,
-                              style: material.TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 12,
-                                color: cs.foreground,
-                              ),
-                            ),
+              cacheExtent: 400,
+              itemCount: _rows.isEmpty ? 1 : _rows.length,
+              itemBuilder: (context, i) {
+                if (_rows.isEmpty) {
+                  return const Text('No user types in this schema.')
+                      .muted()
+                      .small();
+                }
+                final r = _rows[i];
+                return material.Padding(
+                  padding: const material.EdgeInsets.symmetric(vertical: 4),
+                  child: material.Row(
+                    children: [
+                      material.Expanded(
+                        child: material.Text(
+                          r.name,
+                          style: material.TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            color: cs.foreground,
                           ),
-                          material.Container(
-                            padding: const material.EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
-                            decoration: material.BoxDecoration(
-                              color: cs.muted.withValues(alpha: 0.35),
-                              borderRadius: material.BorderRadius.circular(4),
-                            ),
-                            child: Text(r.kind).xSmall().muted(),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
-                  if (_rows.isEmpty)
-                    const Text('No user types in this schema.').muted().small(),
-                ],
-              ),
+                      material.Container(
+                        padding: const material.EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: material.BoxDecoration(
+                          color: cs.muted.withValues(alpha: 0.35),
+                          borderRadius: material.BorderRadius.circular(4),
+                        ),
+                        child: Text(r.kind).xSmall().muted(),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
         ),
@@ -610,39 +620,39 @@ class _PostgresExtensionListViewState
           child: material.Scrollbar(
             controller: _scroll,
             thumbVisibility: true,
-            child: material.SingleChildScrollView(
+            child: material.ListView.builder(
               controller: _scroll,
               padding: const material.EdgeInsets.all(16),
-              child: material.Column(
-                crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                children: [
-                  for (final r in _rows)
-                    material.Padding(
-                      padding: const material.EdgeInsets.symmetric(vertical: 6),
-                      child: material.Row(
-                        children: [
-                          material.Icon(material.Icons.extension_rounded,
-                              size: 16, color: cs.primary),
-                          const Gap(8),
-                          material.Expanded(
-                            child: material.Text(
-                              r.name,
-                              style: material.TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 12,
-                                fontWeight: material.FontWeight.w600,
-                                color: cs.foreground,
-                              ),
-                            ),
+              cacheExtent: 400,
+              itemCount: _rows.isEmpty ? 1 : _rows.length,
+              itemBuilder: (context, i) {
+                if (_rows.isEmpty) {
+                  return const Text('No extensions installed.').muted().small();
+                }
+                final r = _rows[i];
+                return material.Padding(
+                  padding: const material.EdgeInsets.symmetric(vertical: 6),
+                  child: material.Row(
+                    children: [
+                      material.Icon(material.Icons.extension_rounded,
+                          size: 16, color: cs.primary),
+                      const Gap(8),
+                      material.Expanded(
+                        child: material.Text(
+                          r.name,
+                          style: material.TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            fontWeight: material.FontWeight.w600,
+                            color: cs.foreground,
                           ),
-                          Text('v${r.version}').muted().xSmall(),
-                        ],
+                        ),
                       ),
-                    ),
-                  if (_rows.isEmpty)
-                    const Text('No extensions installed.').muted().small(),
-                ],
-              ),
+                      Text('v${r.version}').muted().xSmall(),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
         ),
@@ -747,6 +757,13 @@ class _PostgresFdwListViewState extends material.State<PostgresFdwListView> {
             style: material.TextStyle(color: cs.destructive)),
       );
     }
+    final fdwBody = _fdws.isEmpty ? 1 : _fdws.length;
+    const fdwHeaderCount = 1;
+    final fdwEnd = fdwHeaderCount + fdwBody;
+    const srvHeaderCount = 1;
+    final srvBody = _servers.isEmpty ? 1 : _servers.length;
+    final totalItems = fdwEnd + srvHeaderCount + srvBody;
+
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
@@ -759,47 +776,68 @@ class _PostgresFdwListViewState extends material.State<PostgresFdwListView> {
           child: material.Scrollbar(
             controller: _scroll,
             thumbVisibility: true,
-            child: material.SingleChildScrollView(
+            child: material.ListView.builder(
               controller: _scroll,
               padding: const material.EdgeInsets.all(16),
-              child: material.Column(
-                crossAxisAlignment: material.CrossAxisAlignment.start,
-                children: [
-                  const Text('Foreign-data wrappers').small().semiBold(),
-                  const Gap(8),
-                  for (final r in _fdws)
-                    material.Padding(
-                      padding: const material.EdgeInsets.only(bottom: 8),
-                      child: material.Text(
-                        '${r.name}${r.handler != null ? ' · ${r.handler}' : ''}',
-                        style: material.TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 12,
-                          color: cs.foreground,
-                        ),
+              cacheExtent: 400,
+              itemCount: totalItems,
+              itemBuilder: (context, i) {
+                if (i == 0) {
+                  return material.Column(
+                    crossAxisAlignment: material.CrossAxisAlignment.start,
+                    mainAxisSize: material.MainAxisSize.min,
+                    children: [
+                      const Text('Foreign-data wrappers').small().semiBold(),
+                      const Gap(8),
+                    ],
+                  );
+                }
+                if (i < fdwEnd) {
+                  if (_fdws.isEmpty) {
+                    return const Text('No foreign-data wrappers.')
+                        .muted()
+                        .xSmall();
+                  }
+                  final r = _fdws[i - fdwHeaderCount];
+                  return material.Padding(
+                    padding: const material.EdgeInsets.only(bottom: 8),
+                    child: material.Text(
+                      '${r.name}${r.handler != null ? ' · ${r.handler}' : ''}',
+                      style: material.TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        color: cs.foreground,
                       ),
                     ),
-                  if (_fdws.isEmpty)
-                    const Text('No foreign-data wrappers.').muted().xSmall(),
-                  const Gap(24),
-                  const Text('Foreign servers').small().semiBold(),
-                  const Gap(8),
-                  for (final r in _servers)
-                    material.Padding(
-                      padding: const material.EdgeInsets.only(bottom: 8),
-                      child: material.Text(
-                        '${r.serverName} → ${r.fdwName}',
-                        style: material.TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 12,
-                          color: cs.foreground,
-                        ),
-                      ),
+                  );
+                }
+                if (i == fdwEnd) {
+                  return material.Column(
+                    crossAxisAlignment: material.CrossAxisAlignment.start,
+                    mainAxisSize: material.MainAxisSize.min,
+                    children: [
+                      const Gap(24),
+                      const Text('Foreign servers').small().semiBold(),
+                      const Gap(8),
+                    ],
+                  );
+                }
+                if (_servers.isEmpty) {
+                  return const Text('No foreign servers.').muted().xSmall();
+                }
+                final r = _servers[i - fdwEnd - srvHeaderCount];
+                return material.Padding(
+                  padding: const material.EdgeInsets.only(bottom: 8),
+                  child: material.Text(
+                    '${r.serverName} → ${r.fdwName}',
+                    style: material.TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      color: cs.foreground,
                     ),
-                  if (_servers.isEmpty)
-                    const Text('No foreign servers.').muted().xSmall(),
-                ],
-              ),
+                  ),
+                );
+              },
             ),
           ),
         ),
