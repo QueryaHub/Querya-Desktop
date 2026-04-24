@@ -248,7 +248,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
     final trimmed = sql.trim();
     if (!isAllowedMysqlSelectQuery(trimmed)) return;
     final browse = _browseDataSql().trim();
-    if (trimmed == browse) {
+    if (_browseSqlCompareKey(trimmed) == _browseSqlCompareKey(browse)) {
       setState(() {
         _customSqlActive = false;
         _customSql = null;
@@ -575,6 +575,14 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
         ],
       ),
     );
+  }
+
+  static String _browseSqlCompareKey(String sql) {
+    var s = sql.trim();
+    while (s.endsWith(';')) {
+      s = s.substring(0, s.length - 1).trimRight();
+    }
+    return s.replaceAll(RegExp(r'\s+'), ' ');
   }
 
   double _calcTableWidth(int colCount, double availableWidth) {

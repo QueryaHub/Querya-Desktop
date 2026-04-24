@@ -102,7 +102,8 @@ class _MysqlSqlEditorDialogState extends material.State<_MysqlSqlEditorDialog> {
                     const material.SizedBox(height: 6),
                     const Text(
                       'Table browse uses SELECT with LIMIT/OFFSET. '
-                      'Edit or write your own SELECT. Reset restores the browse query.',
+                      'Edit or write your own SELECT. Reset restores the browse query. '
+                      'Run reloads the grid; unchanged data looks the same.',
                     ).muted().xSmall(),
                   ],
                 ),
