@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:bitsdojo_window/bitsdojo_window.dart';
-import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:flutter/material.dart' as material
     show
         Scaffold,
@@ -16,8 +15,6 @@ import 'package:flutter/material.dart' as material
         BuildContext,
         Widget,
         RepaintBoundary;
-import 'package:flutter/widgets.dart'
-    show ValueListenableBuilder, VoidCallback;
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/core/theme/querya_colors.dart';
