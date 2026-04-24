@@ -1,14 +1,10 @@
-# Release: сборка артефактов → единая публикация с git-cliff и SHA256SUMS.
-# Триггер: git tag v0.1.0 && git push origin v0.1.0
-#
-# Рекомендуемые коммиты: Conventional Commits (feat:, fix:, …) — см. cliff.toml
+# Release: ручной запуск сборки артефактов и публикация релиза с тегом v<version>.
+# Триггер: Actions -> Release -> Run workflow
 
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -21,8 +17,23 @@ jobs:
   build-windows:
     name: Build Windows
     runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      full_version: ${{ steps.version.outputs.full_version }}
+      build_number: ${{ steps.version.outputs.build_number }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Get version from pubspec.yaml
+        id: version
+        shell: bash
+        run: |
+          FULL_VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //')
+          VERSION=$(echo "$FULL_VERSION" | sed 's/+.*//')
+          BUILD_NUMBER=$(echo "$FULL_VERSION" | sed 's/.*+//')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "full_version=$FULL_VERSION" >> "$GITHUB_OUTPUT"
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -39,26 +50,35 @@ jobs:
 
       - name: Zip Windows artifact
         run: |
-          $tag = "${{ github.ref_name }}"
+          $tag = "v${{ steps.version.outputs.version }}"
           $dir = "build\windows\x64\runner\Release"
           Compress-Archive -Path "$dir\*" -DestinationPath "Querya-Desktop-$tag-windows.zip"
 
       - uses: actions/upload-artifact@v4
         with:
           name: bundle-windows
-          path: Querya-Desktop-${{ github.ref_name }}-windows.zip
+          path: Querya-Desktop-v${{ steps.version.outputs.version }}-windows.zip
           if-no-files-found: error
 
   build-linux:
     name: Build Linux
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Get version from pubspec.yaml
+        id: version
+        run: |
+          FULL_VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //')
+          VERSION=$(echo "$FULL_VERSION" | sed 's/+.*//')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -76,12 +96,12 @@ jobs:
       - name: Zip Linux artifact
         run: |
           cd build/linux/x64/release/bundle
-          zip -r "${GITHUB_WORKSPACE}/Querya-Desktop-${{ github.ref_name }}-linux.zip" .
+          zip -r "${GITHUB_WORKSPACE}/Querya-Desktop-v${{ steps.version.outputs.version }}-linux.zip" .
 
       - uses: actions/upload-artifact@v4
         with:
           name: bundle-linux
-          path: Querya-Desktop-${{ github.ref_name }}-linux.zip
+          path: Querya-Desktop-v${{ steps.version.outputs.version }}-linux.zip
           if-no-files-found: error
 
   publish:
@@ -92,10 +112,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: git-cliff@2.11.0
 
       - uses: actions/download-artifact@v4
         with:
@@ -112,37 +128,25 @@ jobs:
           cd dist
           sha256sum *.zip | tee SHA256SUMS.txt
 
-      - name: Generate changelog (git-cliff + GitHub API)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          TAG="${{ github.ref_name }}"
-          # Текст страницы релиза: без глобального header из cliff.toml
-          git-cliff --latest \
-            --config cliff.toml \
-            --strip header \
-            --github-token "$GITHUB_TOKEN" \
-            --github-repo "$GITHUB_REPO" \
-            -o release-body.md
-          # Вложение: полный фрагмент с header (удобно архивировать / копировать в docs)
-          git-cliff --latest \
-            --config cliff.toml \
-            --github-token "$GITHUB_TOKEN" \
-            --github-repo "$GITHUB_REPO" \
-            -o "CHANGELOG-${TAG}.md"
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          body_path: release-body.md
+          tag_name: v${{ needs.build-windows.outputs.version }}
+          name: Release v${{ needs.build-windows.outputs.version }}
+          body: |
+            ## Querya Desktop v${{ needs.build-windows.outputs.version }}
+
+            ### Downloads
+            - **Linux**: Querya-Desktop-v${{ needs.build-windows.outputs.version }}-linux.zip
+            - **Windows**: Querya-Desktop-v${{ needs.build-windows.outputs.version }}-windows.zip
+
+            ### Build Info
+            - Version: ${{ needs.build-windows.outputs.full_version }}
+            - Build Number: ${{ needs.build-windows.outputs.build_number }}
+            - Commit: ${{ github.sha }}
           fail_on_unmatched_files: true
           files: |
             dist/*.zip
             dist/SHA256SUMS.txt
-            CHANGELOG-${{ github.ref_name }}.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

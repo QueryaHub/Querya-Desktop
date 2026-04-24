@@ -179,10 +179,9 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
 
   Future<void> _createConnection({
     int? folderId,
-    material.BuildContext? dialogContext,
   }) async {
     final row = await promptCreateConnection(
-      dialogContext ?? context,
+      context,
       folderId: folderId,
     );
     if (row != null && mounted) {
@@ -376,8 +375,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                             leading: material.Icon(material.Icons.settings_ethernet_rounded, size: 18, color: theme.colorScheme.mutedForeground),
                             onPressed: (menuContext) async {
                               await Future.delayed(const Duration(milliseconds: 100));
-                              if (!mounted || !menuContext.mounted) return;
-                              await _createConnection(dialogContext: menuContext);
+                              if (!mounted) return;
+                              await _createConnection();
                             },
                             child: const Text('New Connection'),
                           ),
