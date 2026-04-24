@@ -30,6 +30,7 @@ class _PreferencesDialogContentState extends material.State<_PreferencesDialogCo
   int? _pgTimeout;
   int? _mysqlTimeout;
   int _maxRows = kDefaultSqlResultMaxRows;
+  int _historyMax = kDefaultSqlHistoryMaxEntries;
   double _fontSize = kDefaultSqlEditorFontSize;
 
   @override
@@ -42,12 +43,14 @@ class _PreferencesDialogContentState extends material.State<_PreferencesDialogCo
     final pg = await AppSettings.instance.getPostgresSqlStmtTimeoutSeconds();
     final my = await AppSettings.instance.getMysqlSqlStmtTimeoutSeconds();
     final rows = await AppSettings.instance.getSqlResultMaxRows();
+    final hist = await AppSettings.instance.getSqlHistoryMaxEntries();
     final font = await AppSettings.instance.getSqlEditorFontSize();
     if (!mounted) return;
     setState(() {
       _pgTimeout = pg;
       _mysqlTimeout = my;
       _maxRows = rows;
+      _historyMax = hist;
       _fontSize = font;
       _loading = false;
     });
@@ -71,6 +74,11 @@ class _PreferencesDialogContentState extends material.State<_PreferencesDialogCo
   Future<void> _setFont(double v) async {
     setState(() => _fontSize = v);
     await AppSettings.instance.setSqlEditorFontSize(v);
+  }
+
+  Future<void> _setHistoryMax(int v) async {
+    setState(() => _historyMax = v);
+    await AppSettings.instance.setSqlHistoryMaxEntries(v);
   }
 
   @override
@@ -163,6 +171,39 @@ class _PreferencesDialogContentState extends material.State<_PreferencesDialogCo
                                       value: n,
                                       child: material.Text('$n'),
                                     ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          const material.SizedBox(height: 12),
+                          material.Row(
+                            crossAxisAlignment: material.CrossAxisAlignment.start,
+                            children: [
+                              material.Padding(
+                                padding: const material.EdgeInsets.only(top: 8),
+                                child: const Text('Query history limit').small(),
+                              ),
+                              const material.SizedBox(width: 12),
+                              material.Column(
+                                crossAxisAlignment: material.CrossAxisAlignment.start,
+                                children: [
+                                  material.DropdownButton<int>(
+                                    value: _historyMax,
+                                    onChanged: (v) {
+                                      if (v != null) unawaited(_setHistoryMax(v));
+                                    },
+                                    items: [
+                                      for (final n in kSqlHistoryMaxEntriesPresets)
+                                        material.DropdownMenuItem(
+                                          value: n,
+                                          child: material.Text('$n entries'),
+                                        ),
+                                    ],
+                                  ),
+                                  const material.SizedBox(height: 4),
+                                  Text(
+                                    'Per connection and database; oldest queries are dropped.',
+                                  ).muted().xSmall(),
                                 ],
                               ),
                             ],
