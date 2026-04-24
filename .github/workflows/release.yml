@@ -1,6 +1,8 @@
 # Сборка Windows/Linux zip + GitHub Release.
 #
-# Автоматически: push тега X.Y.Z или vX.Y.Z (совпадает с semver в pubspec без +build).
+# Автоматически: push тега X.Y.Z или vX.Y.Z.
+# Имена zip берутся из semver в pubspec на закоммиченном ref (после merge в main он может
+# быть новее номера тега из‑за version-bump — это не блокирует сборку, см. job version-hint).
 # Вручную: Actions → Release → Run workflow (создаёт тег из pubspec, если его ещё нет).
 
 name: Release
@@ -20,27 +22,26 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release-gate:
-    name: Version check
+  version-hint:
+    name: Version vs tag (hint only)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify tag matches pubspec (tag push only)
+      - name: Warn when git tag and pubspec semver differ
         if: startsWith(github.ref, 'refs/tags/')
         run: |
-          set -euo pipefail
           VER=$(grep '^version:' pubspec.yaml | sed 's/^version: //' | sed 's/+.*//')
           RAW="${{ github.ref_name }}"
           TAG="${RAW#v}"
           if [ "$VER" != "$TAG" ]; then
-            echo "::error::pubspec has version $VER but tag is $RAW — align pubspec and tag (e.g. 0.1.2+1 and tag 0.1.2 or v0.1.2)."
-            exit 1
+            echo "::warning::Git tag is $RAW but pubspec semver is $VER (часто так бывает после auto version-bump на main). Артефакты будут с именем **$VER** из pubspec; GitHub Release останется на теге **$RAW**. Чтобы всё совпадало, поставьте тег на semver из pubspec (например $VER)."
+          else
+            echo "Tag $RAW matches pubspec semver $VER."
           fi
 
   build-windows:
     name: Build Windows
-    needs: [release-gate]
     runs-on: windows-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -87,7 +88,6 @@ jobs:
 
   build-linux:
     name: Build Linux
-    needs: [release-gate]
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
