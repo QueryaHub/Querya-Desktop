@@ -184,27 +184,34 @@ class _PreferencesDialogContentState extends material.State<_PreferencesDialogCo
                                 child: const Text('Query history limit').small(),
                               ),
                               const material.SizedBox(width: 12),
-                              material.Column(
-                                crossAxisAlignment: material.CrossAxisAlignment.start,
-                                children: [
-                                  material.DropdownButton<int>(
-                                    value: _historyMax,
-                                    onChanged: (v) {
-                                      if (v != null) unawaited(_setHistoryMax(v));
-                                    },
-                                    items: [
-                                      for (final n in kSqlHistoryMaxEntriesPresets)
-                                        material.DropdownMenuItem(
-                                          value: n,
-                                          child: material.Text('$n entries'),
-                                        ),
-                                    ],
-                                  ),
-                                  const material.SizedBox(height: 4),
-                                  Text(
-                                    'Per connection and database; oldest queries are dropped.',
-                                  ).muted().xSmall(),
-                                ],
+                              material.Expanded(
+                                child: material.Column(
+                                  crossAxisAlignment:
+                                      material.CrossAxisAlignment.start,
+                                  children: [
+                                    material.DropdownButton<int>(
+                                      value: _historyMax,
+                                      isExpanded: true,
+                                      onChanged: (v) {
+                                        if (v != null) {
+                                          unawaited(_setHistoryMax(v));
+                                        }
+                                      },
+                                      items: [
+                                        for (final n
+                                            in kSqlHistoryMaxEntriesPresets)
+                                          material.DropdownMenuItem(
+                                            value: n,
+                                            child: material.Text('$n entries'),
+                                          ),
+                                      ],
+                                    ),
+                                    const material.SizedBox(height: 4),
+                                    const Text(
+                                      'Per connection and database; oldest queries are dropped.',
+                                    ).muted().xSmall(),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
