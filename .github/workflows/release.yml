@@ -1,10 +1,16 @@
-# Release: ручной запуск сборки артефактов и публикация релиза с тегом v<version>.
-# Триггер: Actions -> Release -> Run workflow
+# Сборка Windows/Linux zip + GitHub Release.
+#
+# Автоматически: push тега X.Y.Z или vX.Y.Z (совпадает с semver в pubspec без +build).
+# Вручную: Actions → Release → Run workflow (создаёт тег из pubspec, если его ещё нет).
 
 name: Release
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - '*.*.*'
+      - 'v*'
 
 permissions:
   contents: write
@@ -14,8 +20,27 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  release-gate:
+    name: Version check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify tag matches pubspec (tag push only)
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+          VER=$(grep '^version:' pubspec.yaml | sed 's/^version: //' | sed 's/+.*//')
+          RAW="${{ github.ref_name }}"
+          TAG="${RAW#v}"
+          if [ "$VER" != "$TAG" ]; then
+            echo "::error::pubspec has version $VER but tag is $RAW — align pubspec and tag (e.g. 0.1.2+1 and tag 0.1.2 or v0.1.2)."
+            exit 1
+          fi
+
   build-windows:
     name: Build Windows
+    needs: [release-gate]
     runs-on: windows-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -50,18 +75,19 @@ jobs:
 
       - name: Zip Windows artifact
         run: |
-          $tag = "v${{ steps.version.outputs.version }}"
+          $v = "${{ steps.version.outputs.version }}"
           $dir = "build\windows\x64\runner\Release"
-          Compress-Archive -Path "$dir\*" -DestinationPath "Querya-Desktop-$tag-windows.zip"
+          Compress-Archive -Path "$dir\*" -DestinationPath "Querya-Desktop-$v-windows.zip"
 
       - uses: actions/upload-artifact@v4
         with:
           name: bundle-windows
-          path: Querya-Desktop-v${{ steps.version.outputs.version }}-windows.zip
+          path: Querya-Desktop-${{ steps.version.outputs.version }}-windows.zip
           if-no-files-found: error
 
   build-linux:
     name: Build Linux
+    needs: [release-gate]
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -96,12 +122,12 @@ jobs:
       - name: Zip Linux artifact
         run: |
           cd build/linux/x64/release/bundle
-          zip -r "${GITHUB_WORKSPACE}/Querya-Desktop-v${{ steps.version.outputs.version }}-linux.zip" .
+          zip -r "${GITHUB_WORKSPACE}/Querya-Desktop-${{ steps.version.outputs.version }}-linux.zip" .
 
       - uses: actions/upload-artifact@v4
         with:
           name: bundle-linux
-          path: Querya-Desktop-v${{ steps.version.outputs.version }}-linux.zip
+          path: Querya-Desktop-${{ steps.version.outputs.version }}-linux.zip
           if-no-files-found: error
 
   publish:
@@ -128,22 +154,32 @@ jobs:
           cd dist
           sha256sum *.zip | tee SHA256SUMS.txt
 
+      - name: Release tag name
+        id: rel
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ needs.build-windows.outputs.version }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.build-windows.outputs.version }}
-          name: Release v${{ needs.build-windows.outputs.version }}
+          tag_name: ${{ steps.rel.outputs.tag }}
+          name: Querya Desktop ${{ needs.build-windows.outputs.version }}
           body: |
-            ## Querya Desktop v${{ needs.build-windows.outputs.version }}
+            ## Querya Desktop ${{ needs.build-windows.outputs.version }}
 
             ### Downloads
-            - **Linux**: Querya-Desktop-v${{ needs.build-windows.outputs.version }}-linux.zip
-            - **Windows**: Querya-Desktop-v${{ needs.build-windows.outputs.version }}-windows.zip
+            - **Linux**: `Querya-Desktop-${{ needs.build-windows.outputs.version }}-linux.zip`
+            - **Windows**: `Querya-Desktop-${{ needs.build-windows.outputs.version }}-windows.zip`
 
-            ### Build Info
-            - Version: ${{ needs.build-windows.outputs.full_version }}
-            - Build Number: ${{ needs.build-windows.outputs.build_number }}
-            - Commit: ${{ github.sha }}
+            Verify checksums: `SHA256SUMS.txt`
+
+            ### Build info
+            - **pubspec**: ${{ needs.build-windows.outputs.full_version }}
+            - **Commit**: ${{ github.sha }}
           fail_on_unmatched_files: true
           files: |
             dist/*.zip
