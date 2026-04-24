@@ -9,6 +9,7 @@ import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
 import 'package:querya_desktop/features/main_screen/query_editor_tab.dart';
 import 'package:querya_desktop/features/main_screen/results_tab.dart';
+import 'package:querya_desktop/features/main_screen/sql_query_history_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Ad-hoc SQL editor + results for MySQL / MariaDB.
@@ -41,6 +42,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
   int? _queryTimeoutSeconds;
 
   int _resultMaxRows = kDefaultSqlResultMaxRows;
+  int _historyMaxEntries = kDefaultSqlHistoryMaxEntries;
   double _editorFontSize = kDefaultSqlEditorFontSize;
 
   late final VoidCallback _appSettingsListener;
@@ -60,11 +62,13 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
   Future<void> _loadWorkspaceSettings() async {
     final t = await AppSettings.instance.getMysqlSqlStmtTimeoutSeconds();
     final rows = await AppSettings.instance.getSqlResultMaxRows();
+    final hist = await AppSettings.instance.getSqlHistoryMaxEntries();
     final font = await AppSettings.instance.getSqlEditorFontSize();
     if (!mounted) return;
     setState(() {
       _queryTimeoutSeconds = t;
       _resultMaxRows = rows;
+      _historyMaxEntries = hist;
       _editorFontSize = font;
     });
   }
@@ -111,8 +115,8 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
   }
 
   Future<void> _execute() async {
-    final sql = _sqlController.text.trim();
-    if (sql.isEmpty) return;
+    final userSql = _sqlController.text.trim();
+    if (userSql.isEmpty) return;
 
     setState(() {
       _running = true;
@@ -137,7 +141,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       }
 
       final to = _statementTimeout();
-      final rs = await conn.executeWithTimeout(sql, timeout: to);
+      final rs = await conn.executeWithTimeout(userSql, timeout: to);
 
       if (!mounted) return;
 
@@ -182,6 +186,17 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
         }
         _running = false;
       });
+      final cid = widget.connectionRow.id;
+      if (cid != null) {
+        unawaited(
+          LocalDb.instance.recordSqlQueryHistory(
+            connectionId: cid,
+            databaseName: widget.connectionRow.databaseName,
+            sqlText: userSql,
+            maxEntries: _historyMaxEntries,
+          ),
+        );
+      }
     } on TimeoutException catch (e) {
       if (mounted) {
         setState(() {
@@ -238,6 +253,18 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
                         onQueryTimeoutChanged: _onStmtTimeoutChanged,
                         onOpenPreferences: () =>
                             showPreferencesDialog(context),
+                        onOpenHistory: widget.connectionRow.id != null &&
+                                !_running
+                            ? () {
+                                showSqlQueryHistoryDialog(
+                                  context: context,
+                                  connectionId: widget.connectionRow.id!,
+                                  databaseName:
+                                      widget.connectionRow.databaseName,
+                                  sqlController: _sqlController,
+                                );
+                              }
+                            : null,
                       ),
                       const Divider(height: 1),
                       Expanded(
@@ -305,6 +332,7 @@ class _MysqlSqlToolbar extends material.StatelessWidget {
     required this.queryTimeoutSeconds,
     required this.onQueryTimeoutChanged,
     required this.onOpenPreferences,
+    this.onOpenHistory,
   });
 
   final Future<void> Function()? onExecute;
@@ -312,6 +340,7 @@ class _MysqlSqlToolbar extends material.StatelessWidget {
   final int? queryTimeoutSeconds;
   final void Function(int?) onQueryTimeoutChanged;
   final VoidCallback onOpenPreferences;
+  final VoidCallback? onOpenHistory;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -329,6 +358,16 @@ class _MysqlSqlToolbar extends material.StatelessWidget {
             children: [
               const Text('Query').semiBold().small(),
               const Spacer(),
+              OutlineButton(
+                size: ButtonSize.small,
+                onPressed: onOpenHistory,
+                leading: const material.Icon(
+                  material.Icons.history_rounded,
+                  size: 16,
+                ),
+                child: const Text('History'),
+              ),
+              const Gap(8),
               OutlineButton(
                 onPressed: onExecute,
                 leading: running
