@@ -12,12 +12,14 @@ Use this before tagging or running the **Release** workflow.
 
 ## Automated
 
-- [ ] `flutter analyze` — clean.
+- [ ] `flutter analyze` — clean (on Linux, if the analyzer crashes with **Too many open files**, try `ulimit -n 8192`; see [CONTRIBUTING.md](../CONTRIBUTING.md)).
 - [ ] `flutter test` — all green.
+- [ ] CI **Flutter version** in `.github/workflows/*.yml` matches the toolchain you validated (bump intentionally when upgrading stable).
 
 ## Versioning and release
 
 - [ ] `pubspec.yaml` `version` matches the release you intend to ship.
+- [ ] **Tag** is placed on the **commit that includes all fixes** you want in binaries (a tag does not auto-include later commits; see [CONTRIBUTING.md](../CONTRIBUTING.md)).
 - [ ] Run the **Release** workflow from GitHub Actions (see [tags-and-releases.md](tags-and-releases.md)).
 - [ ] Verify **Linux** and **Windows** zip artifacts and `SHA256SUMS.txt` on the GitHub Release.
 
@@ -25,3 +27,4 @@ Use this before tagging or running the **Release** workflow.
 
 - [ ] [security.md](security.md) still matches behavior if storage changed.
 - [ ] [README.md](../README.md) prerequisites (e.g. Linux deps) still accurate.
+- [ ] [roadmap.md](roadmap.md) updated if you are communicating upcoming themes externally.
