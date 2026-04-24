@@ -90,8 +90,20 @@ class _MainScreenState extends State<MainScreen> {
     _workspace.value = _workspace.value.selectMongoDb(connection, database);
   }
 
-  void _onPostgresOpenSqlWorkspace(ConnectionRow connection) {
-    _workspace.value = _workspace.value.openPostgresSqlWorkspace(connection);
+  void _onPostgresOpenSqlWorkspace(
+    ConnectionRow connection, {
+    String? database,
+    String? schema,
+    String? name,
+    PostgresObjectKind? kind,
+  }) {
+    _workspace.value = _workspace.value.openPostgresSqlWorkspace(
+      connection,
+      seedDatabase: database,
+      seedSchema: schema,
+      seedName: name,
+      seedKind: kind,
+    );
   }
 
   void _onMysqlOpenSqlWorkspace(ConnectionRow connection) {
@@ -185,7 +197,7 @@ class _MainContentSplit extends StatefulWidget {
   ) onMysqlObjectSelected;
   final void Function(ConnectionRow, int) onRedisDatabaseSelected;
   final void Function(ConnectionRow, String) onMongoDBDatabaseSelected;
-  final void Function(ConnectionRow) onPostgresOpenSqlWorkspace;
+  final OnPostgresOpenSqlWorkspace onPostgresOpenSqlWorkspace;
   final void Function(ConnectionRow) onMysqlOpenSqlWorkspace;
   final VoidCallback onRequestNewConnection;
 
@@ -273,6 +285,9 @@ class _MainContentSplitState extends State<_MainContentSplit> {
                       selectedPostgresObject: ws.selectedPostgresObject,
                       postgresSqlTabRequestToken:
                           ws.postgresSqlTabRequestToken,
+                      postgresSqlEditorContext: ws.postgresSqlEditorContext,
+                      postgresSqlEditorContextToken:
+                          ws.postgresSqlEditorContextToken,
                       selectedMysqlObject: ws.selectedMysqlObject,
                       mysqlSqlTabRequestToken: ws.mysqlSqlTabRequestToken,
                       onRequestNewConnection: widget.onRequestNewConnection,

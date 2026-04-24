@@ -80,9 +80,11 @@ flutter build macos
 |------|-------------|
 | `lib/main.dart` | App entry, window setup (bitsdojo_window) |
 | `lib/app/` | App shell and theme |
-| `lib/features/main_screen/` | Main layout, connections panel, new connection dialog, query/results tabs |
-| `lib/shared/widgets/` | Shared UI (shadcn re-exports) |
-| `lib/core/theme/` | Dark theme and colors |
+| `lib/features/main_screen/` | Main layout, workspace panel, query/results tabs |
+| `lib/features/connections/` | Connection tree, new connection / folder flows, driver manager |
+| `lib/features/postgresql/`, `mysql/`, `redis/`, `mongodb/` | Per-engine workspace and browser UI |
+| `lib/shared/widgets/` | Shared UI (shadcn re-exports, app dialog) |
+| `lib/core/` | Database clients, local storage, theme, editor helpers |
 | `assets/images/` | Database type icons (PostgreSQL, MySQL, Redis, MongoDB) |
 | `linux/`, `windows/`, `macos/` | Native runners (custom frame on Linux/Windows) |
 
@@ -96,3 +98,5 @@ flutter build macos
 - [User guide](docs/user-guide.md)
 - [Releases](docs/tags-and-releases.md)
 - [Release checklist](docs/release-checklist.md)
+- [Contributing](CONTRIBUTING.md) (Flutter pin, tags, local analyze)
+- [Roadmap](docs/roadmap.md)

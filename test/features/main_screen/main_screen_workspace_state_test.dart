@@ -41,6 +41,8 @@ void main() {
       final next = withPg.selectConnection(mysqlConn);
       expect(next.activeConnection?.id, 11);
       expect(next.selectedPostgresObject, isNull);
+      expect(next.postgresSqlEditorContext, isNull);
+      expect(next.postgresSqlEditorContextToken, 0);
       expect(next.activeRedisDb, isNull);
       expect(next.activeMongoDB, isNull);
     });
@@ -56,6 +58,8 @@ void main() {
       expect(s.activeConnection?.id, 10);
       expect(s.selectedPostgresObject?.name, 'users');
       expect(s.selectedPostgresObject?.kind, PostgresObjectKind.table);
+      expect(s.postgresSqlEditorContext, isNull);
+      expect(s.postgresSqlEditorContextToken, 0);
     });
 
     test('openPostgresSqlWorkspace bumps token and clears selection', () {
@@ -69,6 +73,66 @@ void main() {
       final sql = withObj.openPostgresSqlWorkspace(pgConn);
       expect(sql.postgresSqlTabRequestToken, 1);
       expect(sql.selectedPostgresObject, isNull);
+      expect(sql.postgresSqlEditorContext, isNull);
+      expect(sql.postgresSqlEditorContextToken, 0);
+    });
+
+    test('openPostgresSqlWorkspace seeds editor from selected table/view', () {
+      final withTable = MainScreenWorkspaceState.empty.selectPostgresObject(
+        pgConn,
+        'warehouse',
+        'public',
+        'stock',
+        PostgresObjectKind.table,
+      );
+      final sql = withTable.openPostgresSqlWorkspace(pgConn);
+      expect(sql.postgresSqlTabRequestToken, 1);
+      expect(sql.selectedPostgresObject, isNull);
+      expect(sql.postgresSqlEditorContext?.database, 'warehouse');
+      expect(sql.postgresSqlEditorContext?.name, 'stock');
+      expect(sql.postgresSqlEditorContextToken, 1);
+    });
+
+    test('openPostgresSqlWorkspace explicit seed overrides workspace selection',
+        () {
+      final withBatches = MainScreenWorkspaceState.empty.selectPostgresObject(
+        pgConn,
+        'postgres',
+        'public',
+        'batches',
+        PostgresObjectKind.table,
+      );
+      final sql = withBatches.openPostgresSqlWorkspace(
+        pgConn,
+        seedDatabase: 'postgres',
+        seedSchema: 'public',
+        seedName: 'stock',
+        seedKind: PostgresObjectKind.table,
+      );
+      expect(sql.postgresSqlEditorContext?.name, 'stock');
+      expect(sql.postgresSqlTabRequestToken, 1);
+    });
+
+    test('openPostgresSqlWorkspace does not seed for another connection id',
+        () {
+      final otherPg = ConnectionRow(
+        type: 'postgresql',
+        name: 'pg2',
+        host: '127.0.0.1',
+        port: 5432,
+        createdAt: createdAt,
+        id: 99,
+      );
+      final withTable = MainScreenWorkspaceState.empty.selectPostgresObject(
+        pgConn,
+        'warehouse',
+        'public',
+        'stock',
+        PostgresObjectKind.table,
+      );
+      final sql = withTable.openPostgresSqlWorkspace(otherPg);
+      expect(sql.postgresSqlEditorContext, isNull);
+      expect(sql.postgresSqlEditorContextToken, 0);
     });
 
     test('selectRedisDb and selectMongoDb are mutually exclusive fields', () {

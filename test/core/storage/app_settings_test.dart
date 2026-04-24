@@ -62,6 +62,7 @@ void main() {
     await AppSettings.instance.setMysqlSqlStmtTimeoutSeconds(null);
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.sqlResultMaxRows);
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.sqlEditorFontSizePoints);
+    await LocalDb.instance.deleteAppSetting(AppSettingsKeys.sqlHistoryMaxEntries);
   });
 
   group('AppSettings', () {
@@ -141,6 +142,39 @@ void main() {
 
       await AppSettings.instance.setSqlEditorFontSize(30);
       expect(await AppSettings.instance.getSqlEditorFontSize(), 24);
+    });
+
+    test('getSqlHistoryMaxEntries defaults and normalizes', () async {
+      expect(
+        await AppSettings.instance.getSqlHistoryMaxEntries(),
+        kDefaultSqlHistoryMaxEntries,
+      );
+
+      await AppSettings.instance.setSqlHistoryMaxEntries(200);
+      expect(await AppSettings.instance.getSqlHistoryMaxEntries(), 200);
+
+      await LocalDb.instance.setAppSetting(
+        AppSettingsKeys.sqlHistoryMaxEntries,
+        '40',
+      );
+      expect(await AppSettings.instance.getSqlHistoryMaxEntries(), 50);
+
+      await LocalDb.instance.setAppSetting(
+        AppSettingsKeys.sqlHistoryMaxEntries,
+        'not-int',
+      );
+      expect(
+        await AppSettings.instance.getSqlHistoryMaxEntries(),
+        kDefaultSqlHistoryMaxEntries,
+      );
+    });
+
+    test('setSqlHistoryMaxEntries snaps non-preset to nearest', () async {
+      await AppSettings.instance.setSqlHistoryMaxEntries(30);
+      expect(await AppSettings.instance.getSqlHistoryMaxEntries(), 25);
+
+      await AppSettings.instance.setSqlHistoryMaxEntries(180);
+      expect(await AppSettings.instance.getSqlHistoryMaxEntries(), 200);
     });
   });
 
