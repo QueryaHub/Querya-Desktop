@@ -27,7 +27,7 @@ class _PostgresConnectionTile extends StatefulWidget {
     String name,
     PostgresObjectKind kind,
   )? onPostgresObjectSelected;
-  final void Function(ConnectionRow connection)? onPostgresOpenSqlWorkspace;
+  final OnPostgresOpenSqlWorkspace? onPostgresOpenSqlWorkspace;
 
   @override
   State<_PostgresConnectionTile> createState() =>
