@@ -5,11 +5,11 @@ import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:querya_desktop/core/database/mysql_service.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/settings/preferences_dialog.dart';
+import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
 import 'package:querya_desktop/features/main_screen/query_editor_tab.dart';
 import 'package:querya_desktop/features/main_screen/results_tab.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-
-const _maxDisplayRows = 5000;
 
 /// Ad-hoc SQL editor + results for MySQL / MariaDB.
 class MysqlSqlWorkspace extends material.StatefulWidget {
@@ -40,18 +40,33 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
 
   int? _queryTimeoutSeconds;
 
+  int _resultMaxRows = kDefaultSqlResultMaxRows;
+  double _editorFontSize = kDefaultSqlEditorFontSize;
+
+  late final VoidCallback _appSettingsListener;
+
   @override
   void initState() {
     super.initState();
+    _appSettingsListener = () {
+      unawaited(_loadWorkspaceSettings());
+    };
+    AppSettingsRevision.listenable.addListener(_appSettingsListener);
     material.WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(_loadStmtTimeoutSetting());
+      unawaited(_loadWorkspaceSettings());
     });
   }
 
-  Future<void> _loadStmtTimeoutSetting() async {
+  Future<void> _loadWorkspaceSettings() async {
     final t = await AppSettings.instance.getMysqlSqlStmtTimeoutSeconds();
+    final rows = await AppSettings.instance.getSqlResultMaxRows();
+    final font = await AppSettings.instance.getSqlEditorFontSize();
     if (!mounted) return;
-    setState(() => _queryTimeoutSeconds = t);
+    setState(() {
+      _queryTimeoutSeconds = t;
+      _resultMaxRows = rows;
+      _editorFontSize = font;
+    });
   }
 
   void _onStmtTimeoutChanged(int? v) {
@@ -82,6 +97,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
 
   @override
   void dispose() {
+    AppSettingsRevision.listenable.removeListener(_appSettingsListener);
     if (_running) {
       MysqlService.instance.interrupt(
         widget.connectionRow,
@@ -132,8 +148,9 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
 
       final outRows = <List<String>>[];
       var n = 0;
+      final cap = _resultMaxRows;
       for (final row in rs.rows) {
-        if (n >= _maxDisplayRows) break;
+        if (n >= cap) break;
         outRows.add(
           List.generate(
             row.numOfColumns,
@@ -158,9 +175,9 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
               : 'Command completed.';
         } else {
           final total = rs.numOfRows;
-          final truncated = total > _maxDisplayRows;
+          final truncated = total > cap;
           _statusLine = truncated
-              ? 'Showing first $_maxDisplayRows of $total row(s).'
+              ? 'Showing first $cap of $total row(s).'
               : '$total row(s).';
         }
         _running = false;
@@ -219,10 +236,15 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
                         running: _running,
                         queryTimeoutSeconds: _queryTimeoutSeconds,
                         onQueryTimeoutChanged: _onStmtTimeoutChanged,
+                        onOpenPreferences: () =>
+                            showPreferencesDialog(context),
                       ),
                       const Divider(height: 1),
                       Expanded(
-                        child: QueryEditorTab(controller: _sqlController),
+                        child: QueryEditorTab(
+                          controller: _sqlController,
+                          fontSize: _editorFontSize,
+                        ),
                       ),
                     ],
                   ),
@@ -282,12 +304,14 @@ class _MysqlSqlToolbar extends material.StatelessWidget {
     required this.running,
     required this.queryTimeoutSeconds,
     required this.onQueryTimeoutChanged,
+    required this.onOpenPreferences,
   });
 
   final Future<void> Function()? onExecute;
   final bool running;
   final int? queryTimeoutSeconds;
   final void Function(int?) onQueryTimeoutChanged;
+  final VoidCallback onOpenPreferences;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -335,39 +359,18 @@ class _MysqlSqlToolbar extends material.StatelessWidget {
                 children: [
                   const Text('Stmt timeout').small(),
                   const Gap(6),
-                  material.DropdownButton<int?>(
+                  SqlStatementTimeoutDropdown(
                     value: queryTimeoutSeconds,
-                    onChanged: running ? null : onQueryTimeoutChanged,
-                    items: const [
-                      material.DropdownMenuItem<int?>(
-                        value: null,
-                        child: material.Text('No limit'),
-                      ),
-                      material.DropdownMenuItem(
-                        value: 10,
-                        child: material.Text('10 s'),
-                      ),
-                      material.DropdownMenuItem(
-                        value: 30,
-                        child: material.Text('30 s'),
-                      ),
-                      material.DropdownMenuItem(
-                        value: 60,
-                        child: material.Text('60 s'),
-                      ),
-                      material.DropdownMenuItem(
-                        value: 120,
-                        child: material.Text('2 min'),
-                      ),
-                      material.DropdownMenuItem(
-                        value: 300,
-                        child: material.Text('5 min'),
-                      ),
-                      material.DropdownMenuItem(
-                        value: 600,
-                        child: material.Text('10 min'),
-                      ),
-                    ],
+                    onChanged: onQueryTimeoutChanged,
+                    enabled: !running,
+                  ),
+                  const Gap(4),
+                  IconButton.ghost(
+                    onPressed: running ? null : onOpenPreferences,
+                    icon: const material.Icon(
+                      material.Icons.settings_rounded,
+                      size: 20,
+                    ),
                   ),
                 ],
               ),

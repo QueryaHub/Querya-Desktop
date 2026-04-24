@@ -7,11 +7,11 @@ import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/postgres_sql.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/settings/preferences_dialog.dart';
+import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
 import 'package:querya_desktop/features/main_screen/query_editor_tab.dart';
 import 'package:querya_desktop/features/main_screen/results_tab.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-
-const _maxDisplayRows = 5000;
 
 /// Ad-hoc SQL editor + results for a PostgreSQL connection (pgAdmin-style).
 class PostgresSqlWorkspace extends material.StatefulWidget {
@@ -51,21 +51,36 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
   /// `null` = use connection / URI [query_timeout] default from driver.
   int? _queryTimeoutSeconds;
 
+  int _resultMaxRows = kDefaultSqlResultMaxRows;
+  double _editorFontSize = kDefaultSqlEditorFontSize;
+
   /// `null` = unknown (older server or error).
   bool? _txOpen;
+
+  late final VoidCallback _appSettingsListener;
 
   @override
   void initState() {
     super.initState();
+    _appSettingsListener = () {
+      unawaited(_loadWorkspaceSettings());
+    };
+    AppSettingsRevision.listenable.addListener(_appSettingsListener);
     material.WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(_loadStmtTimeoutSetting());
+      unawaited(_loadWorkspaceSettings());
     });
   }
 
-  Future<void> _loadStmtTimeoutSetting() async {
+  Future<void> _loadWorkspaceSettings() async {
     final t = await AppSettings.instance.getPostgresSqlStmtTimeoutSeconds();
+    final rows = await AppSettings.instance.getSqlResultMaxRows();
+    final font = await AppSettings.instance.getSqlEditorFontSize();
     if (!mounted) return;
-    setState(() => _queryTimeoutSeconds = t);
+    setState(() {
+      _queryTimeoutSeconds = t;
+      _resultMaxRows = rows;
+      _editorFontSize = font;
+    });
   }
 
   void _onStmtTimeoutChanged(int? v) {
@@ -156,6 +171,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
 
   @override
   void dispose() {
+    AppSettingsRevision.listenable.removeListener(_appSettingsListener);
     if (_running) {
       PostgresService.instance.interrupt(
         widget.connectionRow,
@@ -217,8 +233,9 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
 
       final outRows = <List<String>>[];
       var n = 0;
+      final cap = _resultMaxRows;
       for (final row in result) {
-        if (n >= _maxDisplayRows) break;
+        if (n >= cap) break;
         outRows.add(row.map(_cellText).toList());
         n++;
       }
@@ -231,9 +248,9 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
           _statusLine =
               'Command completed. Rows affected: ${result.affectedRows}.';
         } else {
-          final truncated = result.length > _maxDisplayRows;
+          final truncated = result.length > cap;
           _statusLine = truncated
-              ? 'Showing first $_maxDisplayRows of ${result.length} row(s).'
+              ? 'Showing first $cap of ${result.length} row(s).'
               : '${result.length} row(s).';
         }
         _running = false;
@@ -295,6 +312,8 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
                             setState(() => _autocommit = v),
                         queryTimeoutSeconds: _queryTimeoutSeconds,
                         onQueryTimeoutChanged: _onStmtTimeoutChanged,
+                        onOpenPreferences: () =>
+                            showPreferencesDialog(context),
                         txOpen: _txOpen,
                         onBegin: _running
                             ? null
@@ -308,7 +327,10 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
                       ),
                       const Divider(height: 1),
                       Expanded(
-                        child: QueryEditorTab(controller: _sqlController),
+                        child: QueryEditorTab(
+                          controller: _sqlController,
+                          fontSize: _editorFontSize,
+                        ),
                       ),
                     ],
                   ),
@@ -370,6 +392,7 @@ class _SqlToolbar extends material.StatelessWidget {
     required this.onAutocommitChanged,
     required this.queryTimeoutSeconds,
     required this.onQueryTimeoutChanged,
+    required this.onOpenPreferences,
     required this.txOpen,
     required this.onBegin,
     required this.onCommit,
@@ -382,6 +405,7 @@ class _SqlToolbar extends material.StatelessWidget {
   final void Function(bool) onAutocommitChanged;
   final int? queryTimeoutSeconds;
   final void Function(int?) onQueryTimeoutChanged;
+  final VoidCallback onOpenPreferences;
   final bool? txOpen;
   final void Function()? onBegin;
   final void Function()? onCommit;
@@ -451,39 +475,18 @@ class _SqlToolbar extends material.StatelessWidget {
                 children: [
                   const Text('Stmt timeout').small(),
                   const Gap(6),
-                  material.DropdownButton<int?>(
+                  SqlStatementTimeoutDropdown(
                     value: queryTimeoutSeconds,
-                    onChanged: running ? null : onQueryTimeoutChanged,
-                    items: const [
-                      material.DropdownMenuItem<int?>(
-                        value: null,
-                        child: material.Text('No limit'),
-                      ),
-                      material.DropdownMenuItem(
-                        value: 10,
-                        child: material.Text('10 s'),
-                      ),
-                      material.DropdownMenuItem(
-                        value: 30,
-                        child: material.Text('30 s'),
-                      ),
-                      material.DropdownMenuItem(
-                        value: 60,
-                        child: material.Text('60 s'),
-                      ),
-                      material.DropdownMenuItem(
-                        value: 120,
-                        child: material.Text('2 min'),
-                      ),
-                      material.DropdownMenuItem(
-                        value: 300,
-                        child: material.Text('5 min'),
-                      ),
-                      material.DropdownMenuItem(
-                        value: 600,
-                        child: material.Text('10 min'),
-                      ),
-                    ],
+                    onChanged: onQueryTimeoutChanged,
+                    enabled: !running,
+                  ),
+                  const Gap(4),
+                  IconButton.ghost(
+                    onPressed: running ? null : onOpenPreferences,
+                    icon: const material.Icon(
+                      material.Icons.settings_rounded,
+                      size: 20,
+                    ),
                   ),
                 ],
               ),
