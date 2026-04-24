@@ -1,4 +1,5 @@
 /// RFC 4180–style CSV for a result grid (header + rows).
+library;
 
 String escapeCsvField(String s) {
   final needsQuotes = s.contains(',') ||

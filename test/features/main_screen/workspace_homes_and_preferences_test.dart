@@ -46,7 +46,7 @@ class _FakePathProvider extends PathProviderPlatform {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  final myConn = ConnectionRow(
+  const myConn = ConnectionRow(
     id: 2,
     type: 'mysql',
     name: 'Test MySQL',
@@ -62,7 +62,7 @@ void main() {
           theme: AppTheme.dark,
           darkTheme: AppTheme.dark,
           themeMode: ThemeMode.dark,
-          home: material.Scaffold(
+          home: const material.Scaffold(
             body: material.SizedBox(
               width: 700,
               height: 500,
