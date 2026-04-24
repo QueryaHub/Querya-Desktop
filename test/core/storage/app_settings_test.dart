@@ -60,6 +60,8 @@ void main() {
   tearDown(() async {
     await AppSettings.instance.setPostgresSqlStmtTimeoutSeconds(null);
     await AppSettings.instance.setMysqlSqlStmtTimeoutSeconds(null);
+    await LocalDb.instance.deleteAppSetting(AppSettingsKeys.sqlResultMaxRows);
+    await LocalDb.instance.deleteAppSetting(AppSettingsKeys.sqlEditorFontSizePoints);
   });
 
   group('AppSettings', () {
@@ -97,6 +99,68 @@ void main() {
         'not-a-number',
       );
       expect(await AppSettings.instance.getMysqlSqlStmtTimeoutSeconds(), isNull);
+    });
+
+    test('getSqlResultMaxRows defaults and normalizes to preset', () async {
+      expect(await AppSettings.instance.getSqlResultMaxRows(), kDefaultSqlResultMaxRows);
+
+      await AppSettings.instance.setSqlResultMaxRows(10000);
+      expect(await AppSettings.instance.getSqlResultMaxRows(), 10000);
+
+      await LocalDb.instance.setAppSetting(AppSettingsKeys.sqlResultMaxRows, '7777');
+      expect(await AppSettings.instance.getSqlResultMaxRows(), 10000);
+
+      await LocalDb.instance.setAppSetting(AppSettingsKeys.sqlResultMaxRows, 'not-int');
+      expect(await AppSettings.instance.getSqlResultMaxRows(), kDefaultSqlResultMaxRows);
+    });
+
+    test('getSqlEditorFontSize roundtrip and invalid stored', () async {
+      expect(await AppSettings.instance.getSqlEditorFontSize(), kDefaultSqlEditorFontSize);
+
+      await AppSettings.instance.setSqlEditorFontSize(16);
+      expect(await AppSettings.instance.getSqlEditorFontSize(), 16);
+
+      await LocalDb.instance.setAppSetting(AppSettingsKeys.sqlEditorFontSizePoints, '99');
+      expect(await AppSettings.instance.getSqlEditorFontSize(), 24);
+
+      await LocalDb.instance.setAppSetting(AppSettingsKeys.sqlEditorFontSizePoints, 'x');
+      expect(await AppSettings.instance.getSqlEditorFontSize(), kDefaultSqlEditorFontSize);
+    });
+
+    test('setSqlResultMaxRows snaps non-preset to nearest', () async {
+      await AppSettings.instance.setSqlResultMaxRows(3333);
+      expect(await AppSettings.instance.getSqlResultMaxRows(), 2500);
+
+      await AppSettings.instance.setSqlResultMaxRows(8000);
+      expect(await AppSettings.instance.getSqlResultMaxRows(), 10000);
+    });
+
+    test('setSqlEditorFontSize clamps to 10–24', () async {
+      await AppSettings.instance.setSqlEditorFontSize(8);
+      expect(await AppSettings.instance.getSqlEditorFontSize(), 10);
+
+      await AppSettings.instance.setSqlEditorFontSize(30);
+      expect(await AppSettings.instance.getSqlEditorFontSize(), 24);
+    });
+  });
+
+  group('AppSettingsRevision', () {
+    test('bump increments listenable value', () {
+      final start = AppSettingsRevision.listenable.value;
+      AppSettingsRevision.bump();
+      expect(AppSettingsRevision.listenable.value, start + 1);
+    });
+
+    test('mutating AppSettings notifies listenable', () async {
+      var calls = 0;
+      void listener() => calls++;
+
+      AppSettingsRevision.listenable.addListener(listener);
+      final before = AppSettingsRevision.listenable.value;
+      await AppSettings.instance.setPostgresSqlStmtTimeoutSeconds(45);
+      expect(AppSettingsRevision.listenable.value, greaterThan(before));
+      expect(calls, greaterThan(0));
+      AppSettingsRevision.listenable.removeListener(listener);
     });
   });
 }
