@@ -1,0 +1,14 @@
+{
+  "name": "Fixture Dark Subset",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#1e1e1e",
+    "editor.foreground": "#d4d4d4",
+    "sideBar.background": "#252526",
+    "sideBar.foreground": "#cccccc",
+    "statusBar.background": "#007acc",
+    "focusBorder": "#007fd4",
+    "gitDecoration.modifiedResourceForeground": "#e2c08d",
+    "gitDecoration.untrackedResourceForeground": "#73c991"
+  }
+}

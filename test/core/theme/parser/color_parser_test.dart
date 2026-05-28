@@ -10,7 +10,8 @@ void main() {
     });
 
     test('8-digit RRGGBBAA', () {
-      expect(parseVsCodeColor('#11223344').alpha, 0x44);
+      final c = parseVsCodeColor('#11223344');
+      expect((c.a * 255).round(), 0x44);
     });
 
     test('3-digit shorthand', () {
