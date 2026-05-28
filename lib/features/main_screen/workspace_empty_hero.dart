@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/window_layout.dart';
+import 'package:querya_desktop/core/theme/querya_editor_theme.dart';
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
+import 'package:querya_desktop/core/theme/querya_workbench_theme.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Marketing-style empty workspace: badge, copy, mock window, primary CTA.
@@ -14,8 +17,9 @@ class WorkspaceEmptyHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+    final cs = Theme.of(context).colorScheme;
+    final workbench = context.workbench;
+    final editorTheme = context.editorTheme;
     return material.LayoutBuilder(
       builder: (context, c) {
         final vw = c.maxWidth;
@@ -75,6 +79,8 @@ class WorkspaceEmptyHero extends StatelessWidget {
                   material.SizedBox(height: compact ? 20 : 28),
                   _MockAppWindow(
                     colorScheme: cs,
+                    workbench: workbench,
+                    editorTheme: editorTheme,
                     height: mockH,
                     compact: compact,
                   ),
@@ -168,11 +174,15 @@ class _HeroBadge extends StatelessWidget {
 class _MockAppWindow extends StatelessWidget {
   const _MockAppWindow({
     required this.colorScheme,
+    required this.workbench,
+    required this.editorTheme,
     required this.height,
     this.compact = false,
   });
 
   final ColorScheme colorScheme;
+  final QueryaWorkbenchTheme workbench;
+  final QueryaEditorTheme editorTheme;
   final double height;
   final bool compact;
 
@@ -197,7 +207,7 @@ class _MockAppWindow extends StatelessWidget {
       child: material.Container(
         height: height,
         decoration: material.BoxDecoration(
-          color: const Color(0xFF141414),
+          color: workbench.surface,
           borderRadius: material.BorderRadius.circular(radius),
           border: material.Border.all(
             color: colorScheme.border.withValues(alpha: 0.5),
@@ -221,11 +231,11 @@ class _MockAppWindow extends StatelessWidget {
               ),
               child: material.Row(
                 children: [
-                  _trafficDot(const Color(0xFFFF5F57)),
+                  _trafficDot(workbench.destructive),
                   const material.SizedBox(width: 6),
-                  _trafficDot(const Color(0xFFFEBC2E)),
+                  _trafficDot(workbench.warning),
                   const material.SizedBox(width: 6),
-                  _trafficDot(const Color(0xFF28C840)),
+                  _trafficDot(workbench.success),
                 ],
               ),
             ),
@@ -241,7 +251,7 @@ class _MockAppWindow extends StatelessWidget {
                       compact ? 6 : 8,
                       compact ? 8 : 10,
                     ),
-                    color: const Color(0xFF0F0F0F),
+                    color: workbench.sidebarBackground,
                     child: material.Column(
                       crossAxisAlignment: material.CrossAxisAlignment.start,
                       children: [
@@ -283,7 +293,7 @@ class _MockAppWindow extends StatelessWidget {
                       margin: material.EdgeInsets.all(compact ? 8 : 10),
                       padding: material.EdgeInsets.all(compact ? 8 : 10),
                       decoration: material.BoxDecoration(
-                        color: const Color(0xFF0A0A0A),
+                        color: workbench.editorBackground,
                         borderRadius: material.BorderRadius.circular(8),
                         border: material.Border.all(
                           color: colorScheme.border.withValues(alpha: 0.25),
@@ -307,7 +317,7 @@ class _MockAppWindow extends StatelessWidget {
                               fontFamily: QueryaTypography.mono,
                               fontSize: compact ? 9 : 11,
                               height: 1.45,
-                              color: const Color(0xFFFBBF24),
+                              color: editorTheme.string,
                             ),
                           ),
                         ],
