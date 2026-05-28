@@ -3,6 +3,7 @@ import 'dart:async' show unawaited;
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
+import 'package:querya_desktop/features/settings/preferences_appearance_section.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -89,7 +90,7 @@ class _PreferencesDialogContentState extends material.State<_PreferencesDialogCo
       constraints: const material.BoxConstraints(
         maxWidth: 480,
         minWidth: 360,
-        maxHeight: 560,
+        maxHeight: 640,
       ),
       decoration: material.BoxDecoration(
         color: theme.popover,
@@ -128,6 +129,8 @@ class _PreferencesDialogContentState extends material.State<_PreferencesDialogCo
                     : material.Column(
                         crossAxisAlignment: material.CrossAxisAlignment.start,
                         children: [
+                          const PreferencesAppearanceSection(),
+                          const material.SizedBox(height: 24),
                           const Text('SQL — PostgreSQL').semiBold().small(),
                           const material.SizedBox(height: 8),
                           material.Row(
