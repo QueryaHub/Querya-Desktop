@@ -5,7 +5,7 @@ Living document for planned work. Not a commitment order; adjust as priorities c
 ## Theme system
 
 - **Done:** runtime themes, VS Code `colors` import, `tokenColors` syntax highlighting — see [theme.md](theme.md).
-- **Later:** advanced editor (LSP / `code_forge` spike). Theme transitions: Preferences → **Animate theme changes** (off by default).
+- **Later:** `re_editor` if perf gap; LSP epic only per [code-forge-evaluation.md](code-forge-evaluation.md) (**NO-GO** on `code_forge` for 0.3). Theme animation: Preferences → **Animate theme changes** (off by default).
 
 ## Query history and favorites
 
