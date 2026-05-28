@@ -4,7 +4,7 @@ import 'dart:ui';
 Color parseVsCodeColor(String input) {
   var s = input.trim();
   if (s.isEmpty) {
-    throw FormatException('Empty color string');
+    throw const FormatException('Empty color string');
   }
   if (s.startsWith('#')) {
     s = s.substring(1);
