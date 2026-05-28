@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/window_layout.dart';
-import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
+import 'package:querya_desktop/core/editor/querya_code_editor.dart';
+import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/features/main_screen/sql_editor_chrome.dart';
 import 'package:querya_desktop/features/mysql/mysql_table_utils.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -116,21 +117,14 @@ class _MysqlSqlEditorDialogState extends material.State<_MysqlSqlEditorDialog> {
                     decoration: SqlEditorChrome.inlineFieldDecorationFromContext(
                       context,
                     ),
-                    child: material.TextField(
+                    child: QueryaCodeEditor(
                       controller: _controller,
-                      maxLines: null,
-                      expands: true,
+                      language: QueryaCodeLanguage.sql,
+                      fontSize: 12,
+                      variant: QueryaCodeEditorVariant.material,
                       textAlignVertical: material.TextAlignVertical.top,
-                      style: material.TextStyle(
-                        fontFamily: context.editorTheme.fontFamily,
-                        fontSize: 12,
-                        color: context.editorTheme.foreground,
-                      ),
-                      decoration: const material.InputDecoration(
-                        border: material.InputBorder.none,
-                        contentPadding: material.EdgeInsets.all(12),
-                        hintText: 'SELECT …',
-                      ),
+                      hintText: 'SELECT …',
+                      contentPadding: const material.EdgeInsets.all(12),
                     ),
                   ),
                 ),

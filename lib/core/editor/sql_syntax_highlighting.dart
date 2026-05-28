@@ -1,7 +1,4 @@
-/// Future work: editable SQL with syntax highlighting (see plan: syntax-highlight-epic).
-///
-/// Candidates: custom [EditableText] + [TextPainter], or a dedicated code-editor package.
-/// Plain [TextField] remains the source of truth until an editor is chosen.
-abstract class SqlSyntaxHighlighting {
-  const SqlSyntaxHighlighting._();
-}
+// Future: syntax highlighting backend for [QueryaCodeEditor] (#49, #50).
+//
+// MVP uses plain TextField via [QueryaCodeEditor]. Candidates: syntax_highlight,
+// re_editor, code_forge (see issue #48).
