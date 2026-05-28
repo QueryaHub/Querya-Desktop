@@ -200,6 +200,19 @@ void main() {
       await AppSettings.instance.clearThemeSettings();
       expect(await AppSettings.instance.getThemeMode(), ThemeMode.dark);
     });
+
+    test('theme color overrides json roundtrip', () async {
+      await AppSettings.instance.setThemeColorOverrides({
+        'sideBar.background': '#ff0000',
+        'editor.background': '#1e1e1e',
+      });
+      expect(await AppSettings.instance.getThemeColorOverrides(), {
+        'sideBar.background': '#ff0000',
+        'editor.background': '#1e1e1e',
+      });
+      await AppSettings.instance.clearThemeColorOverrides();
+      expect(await AppSettings.instance.getThemeColorOverrides(), isEmpty);
+    });
   });
 
   group('AppSettingsRevision', () {
