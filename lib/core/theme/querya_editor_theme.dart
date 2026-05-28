@@ -10,6 +10,8 @@ class QueryaEditorTheme {
     required this.foreground,
     required this.lineHighlight,
     required this.selection,
+    required this.lineNumber,
+    required this.bracketMatch,
     required this.comment,
     required this.keyword,
     required this.string,
@@ -17,6 +19,7 @@ class QueryaEditorTheme {
     required this.operator,
     required this.function,
     required this.type,
+    this.widgetBorder,
     this.fontFamily = QueryaTypography.mono,
     this.fontSize = 13,
   });
@@ -25,6 +28,11 @@ class QueryaEditorTheme {
   final Color foreground;
   final Color lineHighlight;
   final Color selection;
+  final Color lineNumber;
+  final Color bracketMatch;
+
+  /// Chrome border around editor widgets; falls back to workbench [borderSubtle].
+  final Color? widgetBorder;
   final Color comment;
   final Color keyword;
   final Color string;
@@ -41,6 +49,8 @@ class QueryaEditorTheme {
     foreground: Color(0xFFF8FAFC),
     lineHighlight: Color(0xFF18181B),
     selection: Color(0xFF264F78),
+    lineNumber: Color(0xFF858585),
+    bracketMatch: Color(0x33006400),
     comment: Color(0xFF6A9955),
     keyword: Color(0xFF569CD6),
     string: Color(0xFFCE9178),
@@ -55,6 +65,8 @@ class QueryaEditorTheme {
     foreground: Color(0xFF1E293B),
     lineHighlight: Color(0xFFF1F5F9),
     selection: Color(0xFFADD6FF),
+    lineNumber: Color(0xFF237893),
+    bracketMatch: Color(0x33006400),
     comment: Color(0xFF008000),
     keyword: Color(0xFF0000FF),
     string: Color(0xFFA31515),
@@ -69,6 +81,10 @@ class QueryaEditorTheme {
     Color? foreground,
     Color? lineHighlight,
     Color? selection,
+    Color? lineNumber,
+    Color? bracketMatch,
+    Color? widgetBorder,
+    bool clearWidgetBorder = false,
     Color? comment,
     Color? keyword,
     Color? string,
@@ -84,6 +100,10 @@ class QueryaEditorTheme {
       foreground: foreground ?? this.foreground,
       lineHighlight: lineHighlight ?? this.lineHighlight,
       selection: selection ?? this.selection,
+      lineNumber: lineNumber ?? this.lineNumber,
+      bracketMatch: bracketMatch ?? this.bracketMatch,
+      widgetBorder:
+          clearWidgetBorder ? null : (widgetBorder ?? this.widgetBorder),
       comment: comment ?? this.comment,
       keyword: keyword ?? this.keyword,
       string: string ?? this.string,
@@ -107,6 +127,9 @@ class QueryaEditorTheme {
       foreground: c(a.foreground, b.foreground),
       lineHighlight: c(a.lineHighlight, b.lineHighlight),
       selection: c(a.selection, b.selection),
+      lineNumber: c(a.lineNumber, b.lineNumber),
+      bracketMatch: c(a.bracketMatch, b.bracketMatch),
+      widgetBorder: t < 0.5 ? a.widgetBorder : b.widgetBorder,
       comment: c(a.comment, b.comment),
       keyword: c(a.keyword, b.keyword),
       string: c(a.string, b.string),
@@ -127,6 +150,9 @@ class QueryaEditorTheme {
           foreground == other.foreground &&
           lineHighlight == other.lineHighlight &&
           selection == other.selection &&
+          lineNumber == other.lineNumber &&
+          bracketMatch == other.bracketMatch &&
+          widgetBorder == other.widgetBorder &&
           comment == other.comment &&
           keyword == other.keyword &&
           string == other.string &&
@@ -143,6 +169,9 @@ class QueryaEditorTheme {
         foreground,
         lineHighlight,
         selection,
+        lineNumber,
+        bracketMatch,
+        widgetBorder,
         comment,
         keyword,
         string,

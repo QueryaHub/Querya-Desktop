@@ -18,6 +18,10 @@ enum VsCodeWorkbenchField {
 enum VsCodeEditorField {
   background,
   foreground,
+  selection,
+  lineNumber,
+  bracketMatch,
+  widgetBorder,
 }
 
 /// Optional direct [ColorScheme] fields (shadcn) beyond workbench derivation.
@@ -57,6 +61,18 @@ const Map<String, VsCodeColorTarget> kVsCodeColorMap = {
     VsCodeWorkbenchField.editorBackground,
   ),
   'editor.foreground': VsCodeColorTarget.editor(VsCodeEditorField.foreground),
+  'editor.selectionBackground': VsCodeColorTarget.editor(
+    VsCodeEditorField.selection,
+  ),
+  'editorLineNumber.foreground': VsCodeColorTarget.editor(
+    VsCodeEditorField.lineNumber,
+  ),
+  'editorBracketMatch.background': VsCodeColorTarget.editor(
+    VsCodeEditorField.bracketMatch,
+  ),
+  'editorWidget.border': VsCodeColorTarget.editor(
+    VsCodeEditorField.widgetBorder,
+  ),
   'sideBar.background': VsCodeColorTarget.workbench(
     VsCodeWorkbenchField.sidebarBackground,
   ),
@@ -92,6 +108,10 @@ const Map<String, VsCodeColorTarget> kVsCodeColorMap = {
 const List<String> kSupportedVsCodeColorKeys = [
   'editor.background',
   'editor.foreground',
+  'editor.selectionBackground',
+  'editorLineNumber.foreground',
+  'editorBracketMatch.background',
+  'editorWidget.border',
   'sideBar.background',
   'sideBar.foreground',
   'activityBar.background',

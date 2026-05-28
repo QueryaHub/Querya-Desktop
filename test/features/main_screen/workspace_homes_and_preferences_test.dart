@@ -10,6 +10,8 @@ import 'package:querya_desktop/features/mysql/mysql_workspace_home.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
+import '../../support/querya_theme_test_shell.dart';
+
 class _FakePathProvider extends PathProviderPlatform {
   _FakePathProvider(this._root);
   final String _root;
@@ -58,11 +60,8 @@ void main() {
   group('MysqlWorkspaceHome', () {
     testWidgets('shows tabs and SQL tab exposes Execute control', (tester) async {
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
-          darkTheme: AppTheme.dark,
-          themeMode: ThemeMode.dark,
-          home: const material.Scaffold(
+        queryaThemeTestShell(
+          child: const material.Scaffold(
             body: material.SizedBox(
               width: 700,
               height: 500,

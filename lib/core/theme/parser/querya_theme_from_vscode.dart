@@ -185,6 +185,14 @@ QueryaEditorTheme _applyEditorField(
       return e.copyWith(background: color);
     case VsCodeEditorField.foreground:
       return e.copyWith(foreground: color);
+    case VsCodeEditorField.selection:
+      return e.copyWith(selection: color);
+    case VsCodeEditorField.lineNumber:
+      return e.copyWith(lineNumber: color);
+    case VsCodeEditorField.bracketMatch:
+      return e.copyWith(bracketMatch: color);
+    case VsCodeEditorField.widgetBorder:
+      return e.copyWith(widgetBorder: color);
   }
 }
 
