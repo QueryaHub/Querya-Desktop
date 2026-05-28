@@ -168,10 +168,11 @@ Manual QA (with animation enabled):
 | SQL/JSON syntax highlighting | Done |
 | `tokenColors` → highlighter | Done |
 | Theme transition animation | Preferences → **Animate theme changes** (default off) |
-| `code_forge` / LSP editor | [#52](https://github.com/QueryaHub/Querya-Desktop/issues/52) |
+| `code_forge` / LSP editor | **NO-GO** for 0.3 — [code-forge-evaluation.md](code-forge-evaluation.md) |
 
 ## Related docs
 
 - [theme-import.md](theme-import.md) — supported `colors` keys and merge behavior
 - [research_theme.md](research_theme.md) — background research (RU)
-- [editor-spike-report.md](editor-spike-report.md) — code editor package evaluation
+- [editor-spike-report.md](editor-spike-report.md) — code editor package evaluation (#48)
+- [code-forge-evaluation.md](code-forge-evaluation.md) — `code_forge` + LSP go/no-go (#52)
