@@ -201,6 +201,20 @@ void main() {
       expect(await AppSettings.instance.getThemeMode(), ThemeMode.dark);
     });
 
+    test('theme animation defaults off and roundtrip', () async {
+      expect(await AppSettings.instance.getThemeAnimationEnabled(), isFalse);
+
+      await AppSettings.instance.setThemeAnimationEnabled(true);
+      expect(await AppSettings.instance.getThemeAnimationEnabled(), isTrue);
+
+      await AppSettings.instance.setThemeAnimationEnabled(false);
+      expect(await AppSettings.instance.getThemeAnimationEnabled(), isFalse);
+
+      await AppSettings.instance.setThemeAnimationEnabled(true);
+      await AppSettings.instance.clearThemeSettings();
+      expect(await AppSettings.instance.getThemeAnimationEnabled(), isFalse);
+    });
+
     test('theme color overrides json roundtrip', () async {
       await AppSettings.instance.setThemeColorOverrides({
         'sideBar.background': '#ff0000',

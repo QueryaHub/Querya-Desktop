@@ -22,7 +22,7 @@ class QueryaApp extends StatelessWidget {
           darkTheme: themeController.darkShadcnTheme,
           themeMode: themeController.themeMode,
           debugShowCheckedModeBanner: false,
-          enableThemeAnimation: false,
+          enableThemeAnimation: themeController.themeAnimationEnabled,
           enableScrollInterception: false,
           home: QueryaThemeScope(
             data: queryaTheme,

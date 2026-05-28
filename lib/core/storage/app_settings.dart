@@ -56,6 +56,7 @@ abstract final class AppSettingsKeys {
   static const themeImportPath = 'theme_import_path';
   static const themeImportName = 'theme_import_name';
   static const themeImportedColorsJson = 'theme_imported_colors_json';
+  static const themeAnimationEnabled = 'theme_animation_enabled';
 }
 
 /// Bumps [listenable] when any preference is persisted so open screens can reload.
@@ -349,10 +350,34 @@ class AppSettings {
     AppSettingsRevision.bump();
   }
 
+  /// Smooth color transitions when switching theme (off by default).
+  Future<bool> getThemeAnimationEnabled() async {
+    final v = await LocalDb.instance.getAppSetting(
+      AppSettingsKeys.themeAnimationEnabled,
+    );
+    if (v == null || v.isEmpty) return false;
+    return v == 'true' || v == '1';
+  }
+
+  Future<void> setThemeAnimationEnabled(bool enabled) async {
+    if (!enabled) {
+      await LocalDb.instance.deleteAppSetting(
+        AppSettingsKeys.themeAnimationEnabled,
+      );
+    } else {
+      await LocalDb.instance.setAppSetting(
+        AppSettingsKeys.themeAnimationEnabled,
+        'true',
+      );
+    }
+    AppSettingsRevision.bump();
+  }
+
   Future<void> clearThemeSettings() async {
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeMode);
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themePreset);
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeOverridesJson);
+    await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeAnimationEnabled);
     await deleteThemeImportKeys();
     AppSettingsRevision.bump();
   }

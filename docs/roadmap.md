@@ -5,7 +5,7 @@ Living document for planned work. Not a commitment order; adjust as priorities c
 ## Theme system
 
 - **Done:** runtime themes, VS Code `colors` import, `tokenColors` syntax highlighting — see [theme.md](theme.md).
-- **Later:** animated theme transitions ([#57](https://github.com/QueryaHub/Querya-Desktop/issues/57)), advanced editor (LSP / `code_forge` spike).
+- **Later:** advanced editor (LSP / `code_forge` spike). Theme transitions: Preferences → **Animate theme changes** (off by default).
 
 ## Query history and favorites
 
