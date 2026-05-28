@@ -2,12 +2,14 @@ import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart';
 
 import 'app/app.dart';
+import 'core/editor/syntax_highlight_service.dart';
 import 'core/storage/local_db.dart';
 import 'core/theme/theme_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await LocalDb.initFfi();
+  await SyntaxHighlightService.ensureInitialized();
   await ThemeController.instance.load();
   runApp(const QueryaApp());
   doWhenWindowReady(() {
