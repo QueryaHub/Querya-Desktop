@@ -53,6 +53,9 @@ abstract final class AppSettingsKeys {
   static const themeMode = 'theme_mode';
   static const themePreset = 'theme_preset';
   static const themeOverridesJson = 'theme_overrides_json';
+  static const themeImportPath = 'theme_import_path';
+  static const themeImportName = 'theme_import_name';
+  static const themeImportedColorsJson = 'theme_imported_colors_json';
 }
 
 /// Bumps [listenable] when any preference is persisted so open screens can reload.
@@ -201,6 +204,7 @@ class AppSettings {
     final v = await LocalDb.instance.getAppSetting(AppSettingsKeys.themePreset);
     return switch (v) {
       'querya_light' => QueryaThemePreset.queryaLight,
+      'imported' => QueryaThemePreset.imported,
       _ => QueryaThemePreset.queryaDark,
     };
   }
@@ -208,10 +212,100 @@ class AppSettings {
   Future<void> setThemePreset(QueryaThemePreset preset) async {
     final stored = switch (preset) {
       QueryaThemePreset.queryaLight => 'querya_light',
+      QueryaThemePreset.imported => 'imported',
       QueryaThemePreset.queryaDark => 'querya_dark',
     };
     await LocalDb.instance.setAppSetting(AppSettingsKeys.themePreset, stored);
     AppSettingsRevision.bump();
+  }
+
+  Future<String?> getThemeImportName() async {
+    return LocalDb.instance.getAppSetting(AppSettingsKeys.themeImportName);
+  }
+
+  Future<void> setThemeImportName(String? name) async {
+    if (name == null || name.isEmpty) {
+      await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeImportName);
+    } else {
+      await LocalDb.instance.setAppSetting(
+        AppSettingsKeys.themeImportName,
+        name,
+      );
+    }
+    AppSettingsRevision.bump();
+  }
+
+  Future<String?> getThemeImportPath() async {
+    return LocalDb.instance.getAppSetting(AppSettingsKeys.themeImportPath);
+  }
+
+  Future<void> setThemeImportPath(String? path) async {
+    if (path == null || path.isEmpty) {
+      await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeImportPath);
+    } else {
+      await LocalDb.instance.setAppSetting(
+        AppSettingsKeys.themeImportPath,
+        path,
+      );
+    }
+    AppSettingsRevision.bump();
+  }
+
+  Future<Map<String, String>> getThemeImportedColors() async {
+    final v = await LocalDb.instance.getAppSetting(
+      AppSettingsKeys.themeImportedColorsJson,
+    );
+    if (v == null || v.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(v);
+      if (decoded is! Map) return {};
+      final out = <String, String>{};
+      for (final entry in decoded.entries) {
+        final key = entry.key?.toString();
+        final value = entry.value?.toString();
+        if (key != null &&
+            key.isNotEmpty &&
+            value != null &&
+            value.isNotEmpty) {
+          out[key] = value;
+        }
+      }
+      return out;
+    } on FormatException {
+      return {};
+    }
+  }
+
+  Future<void> setThemeImportedColors(Map<String, String> colors) async {
+    if (colors.isEmpty) {
+      await LocalDb.instance.deleteAppSetting(
+        AppSettingsKeys.themeImportedColorsJson,
+      );
+    } else {
+      await LocalDb.instance.setAppSetting(
+        AppSettingsKeys.themeImportedColorsJson,
+        jsonEncode(colors),
+      );
+    }
+    AppSettingsRevision.bump();
+  }
+
+  Future<void> clearThemeImport() async {
+    await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeImportPath);
+    await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeImportName);
+    await LocalDb.instance.deleteAppSetting(
+      AppSettingsKeys.themeImportedColorsJson,
+    );
+    AppSettingsRevision.bump();
+  }
+
+  /// Clears import metadata without bumping (for batched clears).
+  Future<void> deleteThemeImportKeys() async {
+    await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeImportPath);
+    await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeImportName);
+    await LocalDb.instance.deleteAppSetting(
+      AppSettingsKeys.themeImportedColorsJson,
+    );
   }
 
   Future<Map<String, String>> getThemeColorOverrides() async {
@@ -259,6 +353,7 @@ class AppSettings {
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeMode);
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themePreset);
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeOverridesJson);
+    await deleteThemeImportKeys();
     AppSettingsRevision.bump();
   }
 }
