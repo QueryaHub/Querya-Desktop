@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import '../theme/querya_theme_preset.dart';
@@ -50,6 +52,7 @@ abstract final class AppSettingsKeys {
   static const sqlHistoryMaxEntries = 'sql_history_max_entries';
   static const themeMode = 'theme_mode';
   static const themePreset = 'theme_preset';
+  static const themeOverridesJson = 'theme_overrides_json';
 }
 
 /// Bumps [listenable] when any preference is persisted so open screens can reload.
@@ -211,9 +214,51 @@ class AppSettings {
     AppSettingsRevision.bump();
   }
 
+  Future<Map<String, String>> getThemeColorOverrides() async {
+    final v =
+        await LocalDb.instance.getAppSetting(AppSettingsKeys.themeOverridesJson);
+    if (v == null || v.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(v);
+      if (decoded is! Map) return {};
+      final out = <String, String>{};
+      for (final entry in decoded.entries) {
+        final key = entry.key?.toString();
+        final value = entry.value?.toString();
+        if (key != null &&
+            key.isNotEmpty &&
+            value != null &&
+            value.isNotEmpty) {
+          out[key] = value;
+        }
+      }
+      return out;
+    } on FormatException {
+      return {};
+    }
+  }
+
+  Future<void> setThemeColorOverrides(Map<String, String> overrides) async {
+    if (overrides.isEmpty) {
+      await clearThemeColorOverrides();
+      return;
+    }
+    await LocalDb.instance.setAppSetting(
+      AppSettingsKeys.themeOverridesJson,
+      jsonEncode(overrides),
+    );
+    AppSettingsRevision.bump();
+  }
+
+  Future<void> clearThemeColorOverrides() async {
+    await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeOverridesJson);
+    AppSettingsRevision.bump();
+  }
+
   Future<void> clearThemeSettings() async {
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeMode);
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themePreset);
+    await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeOverridesJson);
     AppSettingsRevision.bump();
   }
 }

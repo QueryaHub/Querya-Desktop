@@ -1,7 +1,8 @@
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:querya_desktop/core/theme/parser/color_parser.dart';
+import 'package:querya_desktop/core/theme/parser/color_parser.dart'
+    show formatVsCodeColor, parseVsCodeColor;
 
 void main() {
   group('parseVsCodeColor', () {
@@ -25,6 +26,12 @@ void main() {
 
     test('invalid throws', () {
       expect(() => parseVsCodeColor('nope'), throwsFormatException);
+    });
+
+    test('formatVsCodeColor roundtrip', () {
+      const c = Color(0xFF1E1E1E);
+      expect(formatVsCodeColor(c), '#1e1e1e');
+      expect(parseVsCodeColor(formatVsCodeColor(c)), c);
     });
   });
 }

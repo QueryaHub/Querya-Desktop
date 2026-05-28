@@ -43,6 +43,20 @@ Hex strings as in VS Code: `#RRGGBB`, `#RRGGBBAA`, `#RGB`, `#RGBA` (see
 
 Comments and trailing commas are stripped before parse (`stripJsonc`).
 
+## User overrides (#45)
+
+User customizations are stored as VS Code keys → hex strings in
+`theme_overrides_json` (`AppSettings`). Merge order:
+
+```
+effectiveColors = merge(importedTheme.colors, userOverrides)
+```
+
+Built-in preset defaults apply for keys not present in the merged map.
+
+API: `ThemeController.setWorkbenchColor(key, color?)`,
+`ThemeController.clearColorOverrides()` (user layer only).
+
 ## Fixtures (tests)
 
 - `test/fixtures/themes/dark_subset.json`

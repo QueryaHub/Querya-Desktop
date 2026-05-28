@@ -187,3 +187,21 @@ QueryaEditorTheme _applyEditorField(
       return e.copyWith(foreground: color);
   }
 }
+
+/// Builds [QueryaTheme] from merged VS Code `colors` on top of [fallback].
+QueryaTheme buildQueryaThemeFromVsCodeColors({
+  required Brightness brightness,
+  required Map<String, String> colors,
+  QueryaTheme? fallback,
+}) {
+  final base = fallback ??
+      (brightness == Brightness.light
+          ? QueryaTheme.lightDefault
+          : QueryaTheme.darkDefault);
+  if (colors.isEmpty) return base;
+  final manifest = VsCodeThemeManifest(
+    type: brightness == Brightness.light ? 'light' : 'dark',
+    colors: colors,
+  );
+  return buildQueryaThemeFromVsCodeManifest(manifest, fallback: base);
+}
