@@ -63,6 +63,7 @@ class _QueryaCodeEditorState extends State<QueryaCodeEditor> {
   bool _syncing = false;
   QueryaEditorTheme? _highlightEditorTheme;
   QueryaCodeLanguage? _highlightLanguage;
+  int _highlightTokenColorsHash = 0;
 
   material.TextEditingController get _activeController =>
       _highlightController ?? _plainController!;
@@ -133,15 +134,18 @@ class _QueryaCodeEditorState extends State<QueryaCodeEditor> {
     _highlightController = null;
     _highlightEditorTheme = null;
     _highlightLanguage = null;
+    _highlightTokenColorsHash = 0;
   }
 
   void _ensureHighlightController(QueryaTheme queryaTheme) {
     if (!_useHighlighting) return;
 
     final editor = queryaTheme.editor;
+    final tokenHash = Object.hashAll(queryaTheme.tokenColors);
     if (_highlightController != null &&
         _highlightEditorTheme == editor &&
-        _highlightLanguage == widget.language) {
+        _highlightLanguage == widget.language &&
+        _highlightTokenColorsHash == tokenHash) {
       return;
     }
 
@@ -157,12 +161,18 @@ class _QueryaCodeEditorState extends State<QueryaCodeEditor> {
 
     _highlightController = QueryaHighlightController(
       text: text,
+      language: widget.language,
       lightHighlighter: pair.light,
       darkHighlighter: pair.dark,
+      lightThemeConfig: pair.lightThemeConfig,
+      darkThemeConfig: pair.darkThemeConfig,
+      grammarJson: pair.grammarJson,
+      wrapperColor: editor.foreground,
     );
     _ownsHighlightController = external == null;
     _highlightEditorTheme = editor;
     _highlightLanguage = widget.language;
+    _highlightTokenColorsHash = tokenHash;
 
     _highlightController!.addListener(_onTextChanged);
     if (external != null) {
@@ -235,6 +245,7 @@ class _QueryaCodeEditorState extends State<QueryaCodeEditor> {
         oldWidget.enableHighlighting != widget.enableHighlighting) {
       _highlightEditorTheme = null;
       _highlightLanguage = null;
+      _highlightTokenColorsHash = 0;
       if (_useHighlighting) {
         _ensureHighlightController(context.queryaTheme);
       } else {

@@ -15,12 +15,14 @@ class ThemeImportSuccess extends ThemeImportResult {
     required this.name,
     required this.isDark,
     required this.colors,
+    required this.tokenColors,
     required this.storedPath,
   });
 
   final String name;
   final bool isDark;
   final Map<String, String> colors;
+  final List<TokenColorRule> tokenColors;
   final String storedPath;
 }
 
@@ -60,6 +62,7 @@ abstract final class ThemeImportService {
         name: name,
         isDark: manifest.isDark || !manifest.isLight,
         colors: Map.unmodifiable(manifest.colors),
+        tokenColors: List.unmodifiable(manifest.tokenColors),
         storedPath: storedFile.path,
       );
     } on VsCodeThemeParseException catch (e) {
@@ -75,13 +78,23 @@ abstract final class ThemeImportService {
 
   /// Reloads colors from the persisted import file, if present.
   static Future<Map<String, String>?> loadPersistedColors() async {
+    final manifest = await loadPersistedManifest();
+    if (manifest == null || manifest.colors.isEmpty) return null;
+    return manifest.colors;
+  }
+
+  /// Reloads `tokenColors` from the persisted import file, if present.
+  static Future<List<TokenColorRule>> loadPersistedTokenColors() async {
+    final manifest = await loadPersistedManifest();
+    return manifest?.tokenColors ?? const [];
+  }
+
+  /// Full parsed manifest from the persisted import copy.
+  static Future<VsCodeThemeManifest?> loadPersistedManifest() async {
     final file = await _storedThemeFile();
     if (!await file.exists()) return null;
     try {
-      final manifest =
-          VsCodeThemeManifest.fromJsonString(await file.readAsString());
-      if (manifest.colors.isEmpty) return null;
-      return manifest.colors;
+      return VsCodeThemeManifest.fromJsonString(await file.readAsString());
     } on Object {
       return null;
     }
