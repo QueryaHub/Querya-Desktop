@@ -43,6 +43,17 @@ Hex strings as in VS Code: `#RRGGBB`, `#RRGGBBAA`, `#RGB`, `#RGBA` (see
 
 Comments and trailing commas are stripped before parse (`stripJsonc`).
 
+## Preferences UI (#43)
+
+In **Preferences → Appearance**:
+
+- **Theme mode** — Dark / Light / System
+- **Color preset** — Querya Dark, Querya Light, or imported theme name
+- **Import theme…** — pick `.json` / `.jsonc` (VS Code format)
+- **Reset appearance** — clears import, overrides, returns to Querya Dark
+
+Imported files are copied to app data (`themes/imported.json`) and survive restarts.
+
 ## User overrides (#45)
 
 User customizations are stored as VS Code keys → hex strings in
