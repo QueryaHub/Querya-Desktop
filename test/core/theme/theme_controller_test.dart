@@ -117,6 +117,20 @@ void main() {
     expect(c.preset, QueryaThemePreset.queryaDark);
   });
 
+  test('setThemeAnimationEnabled persists and reset clears', () async {
+    final c = ThemeController.instance;
+    await c.load();
+    expect(c.themeAnimationEnabled, isFalse);
+
+    await c.setThemeAnimationEnabled(true);
+    expect(c.themeAnimationEnabled, isTrue);
+    expect(await AppSettings.instance.getThemeAnimationEnabled(), isTrue);
+
+    await c.resetToDefaults();
+    expect(c.themeAnimationEnabled, isFalse);
+    expect(await AppSettings.instance.getThemeAnimationEnabled(), isFalse);
+  });
+
   test('clearColorOverrides does not reset theme mode', () async {
     final c = ThemeController.instance;
     await c.setThemeMode(ThemeMode.light);

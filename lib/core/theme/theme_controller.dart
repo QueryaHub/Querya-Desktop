@@ -23,8 +23,12 @@ class ThemeController extends ChangeNotifier {
   Map<String, String> _userOverrides = const {};
   String? _importedThemeName;
   bool _loaded = false;
+  bool _themeAnimationEnabled = false;
 
   ThemeMode get themeMode => _themeMode;
+
+  /// When true, [QueryaApp] enables ShadcnAnimatedTheme transitions.
+  bool get themeAnimationEnabled => _themeAnimationEnabled;
 
   QueryaThemePreset get preset => _preset;
 
@@ -99,7 +103,15 @@ class ThemeController extends ChangeNotifier {
     _preset = preset;
     _userOverrides = Map.unmodifiable(overrides);
     _importedColors = Map.unmodifiable(imported);
+    _themeAnimationEnabled =
+        await AppSettings.instance.getThemeAnimationEnabled();
     _loaded = true;
+    notifyListeners();
+  }
+
+  Future<void> setThemeAnimationEnabled(bool enabled) async {
+    _themeAnimationEnabled = enabled;
+    await AppSettings.instance.setThemeAnimationEnabled(enabled);
     notifyListeners();
   }
 
@@ -205,6 +217,7 @@ class ThemeController extends ChangeNotifier {
     _importedTokenColors = const [];
     _userOverrides = const {};
     _importedThemeName = null;
+    _themeAnimationEnabled = false;
     notifyListeners();
   }
 
