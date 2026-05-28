@@ -88,5 +88,18 @@ void main() {
       expect(td.brightness, Brightness.dark);
       expect(td.colorScheme.primary, QueryaColors.accentCyan);
     });
+
+    test('ThemeData.lerp at 0.5 matches QueryaTheme.lerp colorScheme', () {
+      const a = QueryaTheme.darkDefault;
+      const b = QueryaTheme.lightDefault;
+      final qaMid = QueryaTheme.lerp(a, b, 0.5);
+      final tdMid = ThemeData.lerp(
+        a.toShadcnThemeData(),
+        b.toShadcnThemeData(),
+        0.5,
+      );
+      expect(tdMid.colorScheme.primary, qaMid.colorScheme.primary);
+      expect(tdMid.colorScheme.background, qaMid.colorScheme.background);
+    });
   });
 }

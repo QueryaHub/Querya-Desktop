@@ -146,6 +146,19 @@ See also: [theme-import.md](theme-import.md).
 
 Run: `flutter test test/core/theme/`
 
+## Theme transition animation
+
+Off by default. Enable in **Preferences → Appearance → Animate theme changes** to
+turn on `ShadcnApp.enableThemeAnimation`.
+
+Manual QA (with animation enabled):
+
+- [ ] Toggle dark / light / system — no stuck overlay or wrong brightness on dialogs
+- [ ] Switch preset (Querya Dark ↔ Light, imported) — sidebars and editor chrome animate smoothly
+- [ ] Open connection dialog, settings sheet, SQL history — backgrounds readable during transition
+- [ ] Resize main window while toggling theme — no layout jump or transparent holes
+- [ ] Import theme while animation on — editor and workbench settle to final colors
+
 ## Roadmap (Phase 2+)
 
 | Topic | Status |
@@ -154,7 +167,7 @@ Run: `flutter test test/core/theme/`
 | Preferences UI | Done |
 | SQL/JSON syntax highlighting | Done |
 | `tokenColors` → highlighter | Done |
-| Theme transition animation | [#57](https://github.com/QueryaHub/Querya-Desktop/issues/57) |
+| Theme transition animation | Preferences → **Animate theme changes** (default off) |
 | `code_forge` / LSP editor | [#52](https://github.com/QueryaHub/Querya-Desktop/issues/52) |
 
 ## Related docs
