@@ -1,0 +1,15 @@
+{
+  // One Dark–like fixture with JSONC trailing comma
+  "name": "JSONC Trailing Comma",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#282c34",
+    "sideBar.background": "#21252b",
+  },
+  "tokenColors": [
+    {
+      "scope": "comment",
+      "settings": { "foreground": "#5c6370" },
+    },
+  ],
+}
