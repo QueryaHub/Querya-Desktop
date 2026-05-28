@@ -2,12 +2,17 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/editor/querya_code_editor.dart';
 import 'package:querya_desktop/core/editor/querya_code_language.dart';
+import 'package:querya_desktop/core/editor/syntax_highlight_service.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import '../../support/querya_theme_test_shell.dart';
 
 void main() {
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    await SyntaxHighlightService.ensureInitialized();
+  });
   testWidgets('QueryaCodeEditor shadcn applies fontSize from props', (tester) async {
     await tester.pumpWidget(
       queryaThemeTestShell(
@@ -52,6 +57,32 @@ void main() {
 
     final field = tester.widget<material.TextField>(find.byType(material.TextField));
     expect(field.style?.color, const Color(0xFFABCDEF));
+  });
+
+  testWidgets('SQL highlighting keeps external controller in sync', (tester) async {
+    final external = material.TextEditingController();
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.SizedBox(
+          width: 400,
+          height: 200,
+          child: QueryaCodeEditor(
+            controller: external,
+            language: QueryaCodeLanguage.sql,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(material.EditableText), 'SELECT 1');
+    await tester.pump();
+    expect(external.text, 'SELECT 1');
+    external.text = 'UPDATE x';
+    await tester.pump();
+    expect(
+      tester.widget<material.EditableText>(find.byType(material.EditableText)).controller.text,
+      'UPDATE x',
+    );
   });
 
   testWidgets('onChanged fires when text updates', (tester) async {
