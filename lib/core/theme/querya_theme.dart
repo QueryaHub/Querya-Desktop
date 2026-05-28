@@ -1,5 +1,6 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
+import 'querya_colors.dart';
 import 'querya_editor_theme.dart';
 import 'querya_workbench_theme.dart';
 
@@ -17,41 +18,42 @@ class QueryaTheme {
   final Brightness brightness;
   final ColorScheme colorScheme;
 
-  static final QueryaTheme darkDefault = QueryaTheme(
+  static const QueryaTheme darkDefault = QueryaTheme(
     workbench: QueryaWorkbenchTheme.darkDefault,
     editor: QueryaEditorTheme.darkDefault,
     brightness: Brightness.dark,
     colorScheme: _darkColorScheme,
   );
 
-  static final QueryaTheme lightDefault = QueryaTheme(
+  static const QueryaTheme lightDefault = QueryaTheme(
     workbench: QueryaWorkbenchTheme.lightDefault,
     editor: QueryaEditorTheme.lightDefault,
     brightness: Brightness.light,
     colorScheme: _lightColorScheme,
   );
 
-  static final ColorScheme _darkColorScheme = ColorScheme(
+  /// Matches [QueryaWorkbenchTheme.darkDefault] / legacy [QueryaColorScheme].
+  static const ColorScheme _darkColorScheme = ColorScheme(
     brightness: Brightness.dark,
-    background: QueryaWorkbenchTheme.darkDefault.canvas,
+    background: QueryaColors.canvas,
     foreground: Color(0xFFF8FAFC),
-    card: QueryaWorkbenchTheme.darkDefault.surface,
+    card: QueryaColors.surface,
     cardForeground: Color(0xFFF8FAFC),
-    popover: QueryaWorkbenchTheme.darkDefault.surface,
+    popover: QueryaColors.surface,
     popoverForeground: Color(0xFFF8FAFC),
-    primary: QueryaWorkbenchTheme.darkDefault.accent,
-    primaryForeground: QueryaWorkbenchTheme.darkDefault.onAccent,
+    primary: QueryaColors.accentCyan,
+    primaryForeground: QueryaColors.onAccent,
     secondary: Color(0xFF18181B),
     secondaryForeground: Color(0xFFF8FAFC),
     muted: Color(0xFF18181B),
-    mutedForeground: QueryaWorkbenchTheme.darkDefault.mutedForeground,
+    mutedForeground: QueryaColors.mutedLabel,
     accent: Color(0xFF27272A),
     accentForeground: Color(0xFFF8FAFC),
-    destructive: QueryaWorkbenchTheme.darkDefault.destructive,
+    destructive: Color(0xFFEF4444),
     destructiveForeground: Color(0xFFF8FAFC),
-    border: QueryaWorkbenchTheme.darkDefault.borderSubtle,
-    input: QueryaWorkbenchTheme.darkDefault.borderSubtle,
-    ring: QueryaWorkbenchTheme.darkDefault.accent,
+    border: QueryaColors.borderSubtle,
+    input: QueryaColors.borderSubtle,
+    ring: QueryaColors.accentCyan,
     chart1: Color(0xFF2662D9),
     chart2: Color(0xFF2EB88A),
     chart3: Color(0xFFE88C30),
@@ -59,27 +61,28 @@ class QueryaTheme {
     chart5: Color(0xFFE23670),
   );
 
-  static final ColorScheme _lightColorScheme = ColorScheme(
+  /// Matches [QueryaWorkbenchTheme.lightDefault].
+  static const ColorScheme _lightColorScheme = ColorScheme(
     brightness: Brightness.light,
-    background: QueryaWorkbenchTheme.lightDefault.canvas,
+    background: Color(0xFFFAFAFA),
     foreground: Color(0xFF0F172A),
-    card: QueryaWorkbenchTheme.lightDefault.surface,
+    card: Color(0xFFFFFFFF),
     cardForeground: Color(0xFF0F172A),
-    popover: QueryaWorkbenchTheme.lightDefault.surface,
+    popover: Color(0xFFFFFFFF),
     popoverForeground: Color(0xFF0F172A),
-    primary: QueryaWorkbenchTheme.lightDefault.accent,
-    primaryForeground: QueryaWorkbenchTheme.lightDefault.onAccent,
+    primary: QueryaColors.accentCyan,
+    primaryForeground: QueryaColors.onAccent,
     secondary: Color(0xFFF4F4F5),
     secondaryForeground: Color(0xFF0F172A),
     muted: Color(0xFFF4F4F5),
-    mutedForeground: QueryaWorkbenchTheme.lightDefault.mutedForeground,
+    mutedForeground: Color(0xFF64748B),
     accent: Color(0xFFE4E4E7),
     accentForeground: Color(0xFF0F172A),
-    destructive: QueryaWorkbenchTheme.lightDefault.destructive,
+    destructive: Color(0xFFDC2626),
     destructiveForeground: Color(0xFFF8FAFC),
-    border: QueryaWorkbenchTheme.lightDefault.borderSubtle,
-    input: QueryaWorkbenchTheme.lightDefault.borderSubtle,
-    ring: QueryaWorkbenchTheme.lightDefault.accent,
+    border: Color(0xFFE4E4E7),
+    input: Color(0xFFE4E4E7),
+    ring: QueryaColors.accentCyan,
     chart1: Color(0xFF2662D9),
     chart2: Color(0xFF2EB88A),
     chart3: Color(0xFFE88C30),
@@ -154,7 +157,7 @@ class QueryaTheme {
     double scaling = 1,
     Typography? typography,
   }) {
-    final typo = typography ?? Typography.geist();
+    final typo = typography ?? const Typography.geist();
     final base = brightness == Brightness.dark
         ? ThemeData.dark(colorScheme: colorScheme)
         : ThemeData(colorScheme: colorScheme);
