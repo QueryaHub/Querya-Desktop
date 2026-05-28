@@ -1,0 +1,24 @@
+{
+  "name": "One Dark Fixture",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#282c34",
+    "editor.foreground": "#abb2bf",
+    "sideBar.background": "#21252b",
+    "activityBar.background": "#21252b"
+  },
+  "tokenColors": [
+    {
+      "scope": "comment",
+      "settings": { "foreground": "#5c6370" }
+    },
+    {
+      "scope": "keyword",
+      "settings": { "foreground": "#c678dd" }
+    },
+    {
+      "scope": "string",
+      "settings": { "foreground": "#98c379" }
+    }
+  ]
+}
