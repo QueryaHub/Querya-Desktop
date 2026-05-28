@@ -95,6 +95,7 @@ flutter build macos
 ## More documentation
 
 - [Security / local data](docs/security.md)
+- [Theme system](docs/theme.md)
 - [User guide](docs/user-guide.md)
 - [Releases](docs/tags-and-releases.md)
 - [Release checklist](docs/release-checklist.md)
