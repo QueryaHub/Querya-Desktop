@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/theme/parser/jsonc_preprocessor.dart';
 
@@ -30,6 +32,15 @@ void main() {
     test('removes trailing comma', () {
       const input = '{"a": 1,}';
       expect(stripJsonc(input), '{"a": 1}');
+    });
+
+    test('parses invalid-trailing-comma.jsonc fixture via manifest', () {
+      final raw = File('test/fixtures/themes/invalid-trailing-comma.jsonc')
+          .readAsStringSync();
+      final cleaned = stripJsonc(raw);
+      expect(cleaned.contains('//'), isFalse);
+      expect(cleaned.contains(',}'), isFalse);
+      expect(cleaned, contains('"editor.background"'));
     });
   });
 }
