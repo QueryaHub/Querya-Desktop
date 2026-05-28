@@ -17,7 +17,7 @@ import 'package:flutter/material.dart' as material
         RepaintBoundary;
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/app_theme.dart';
-import 'package:querya_desktop/core/theme/querya_colors.dart';
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -369,10 +369,10 @@ class _CustomTitleBarState extends State<_CustomTitleBar> {
                 child: Row(
                   children: [
                     const SizedBox(width: 16),
-                    const material.Icon(
+                    material.Icon(
                       material.Icons.search_rounded,
                       size: 18,
-                      color: QueryaColors.accentCyan,
+                      color: context.workbench.accent,
                     ),
                     const Gap(8),
                     const Text('Querya').semiBold().small(),
