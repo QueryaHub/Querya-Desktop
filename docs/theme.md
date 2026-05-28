@@ -5,7 +5,7 @@ editor syntax tokens, and optional import of community `.json` / `.jsonc` themes
 
 ## Milestone status
 
-**Theme system epic ([#37](https://github.com/QueryaHub/Querya-Desktop/issues/37)) — complete on `dev` (2026-05-28).**
+**Theme system epic ([#37](https://github.com/QueryaHub/Querya-Desktop/issues/37)) — shipped in **0.4.0** (2026-05-28).**
 
 Delivered: models (#38), JSONC parser (#39), `ThemeController` (#40–41), Preferences +
 import (#43–45), `tokenColors` → syntax highlight (#46–47, #49–50), P0 workbench tokens
