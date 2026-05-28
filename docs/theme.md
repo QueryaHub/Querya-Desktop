@@ -3,6 +3,18 @@
 Querya Desktop uses a VS Code–inspired theme pipeline: workbench chrome colors,
 editor syntax tokens, and optional import of community `.json` / `.jsonc` themes.
 
+## Milestone status
+
+**Theme system epic ([#37](https://github.com/QueryaHub/Querya-Desktop/issues/37)) — complete on `dev` (2026-05-28).**
+
+Delivered: models (#38), JSONC parser (#39), `ThemeController` (#40–41), Preferences +
+import (#43–45), `tokenColors` → syntax highlight (#46–47, #49–50), P0 workbench tokens
+(#42, #59–60), tests (#58), `docs/theme.md` (#55), Querya Light (#51), optional theme
+animation (#57), editor package spikes (#48, #52).
+
+**Follow-up (not blocking):** P2 surfaces (Mongo/Redis explorer semantic hues), `re_editor`
+if large-buffer benchmarks fail — see [code-forge-evaluation.md](code-forge-evaluation.md).
+
 ## Architecture
 
 ```mermaid
