@@ -1,13 +1,10 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
-import 'querya_color_scheme.dart';
+import 'querya_theme.dart';
 
-/// App theme: dark only. Used for both theme and darkTheme so the app is always dark.
+/// App theme presets built from [QueryaTheme].
 abstract class AppTheme {
-  static ThemeData get dark => const ThemeData.dark(
-        colorScheme: QueryaColorScheme.dark,
-        radius: 0.58,
-        scaling: 1,
-        typography: Typography.geist(),
-      );
+  static ThemeData get dark => QueryaTheme.darkDefault.toShadcnThemeData();
+
+  static ThemeData get light => QueryaTheme.lightDefault.toShadcnThemeData();
 }
