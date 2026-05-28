@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/window_layout.dart';
-import 'package:querya_desktop/core/theme/querya_colors.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -137,7 +136,7 @@ class _HeroBadge extends StatelessWidget {
         color: colorScheme.background,
         borderRadius: material.BorderRadius.circular(999),
         border: material.Border.all(
-          color: QueryaColors.accentCyan.withValues(alpha: 0.45),
+          color: colorScheme.primary.withValues(alpha: 0.45),
         ),
       ),
       child: material.Row(
@@ -179,7 +178,7 @@ class _MockAppWindow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final glow = QueryaColors.accentCyan.withValues(alpha: 0.14);
+    final glow = colorScheme.primary.withValues(alpha: 0.14);
     final sidebarW = compact ? 58.0 : 72.0;
     final blur = compact ? 28.0 : 40.0;
     final radius = compact ? 12.0 : 16.0;
