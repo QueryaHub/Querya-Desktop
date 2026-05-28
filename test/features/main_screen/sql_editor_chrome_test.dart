@@ -1,8 +1,13 @@
+import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/theme/parser/querya_theme_from_vscode.dart';
 import 'package:querya_desktop/core/theme/querya_editor_theme.dart';
+import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/core/theme/querya_workbench_theme.dart';
 import 'package:querya_desktop/features/main_screen/sql_editor_chrome.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+
+import '../../support/querya_theme_test_shell.dart';
 
 void main() {
   group('SqlEditorChrome.inlineFieldDecoration', () {
@@ -66,9 +71,69 @@ void main() {
       final deco = SqlEditorChrome.inlineFieldDecoration(
         editor,
         QueryaWorkbenchTheme.lightDefault,
+        brightness: Brightness.light,
       );
       final border = deco.border as Border;
       expect(border.top.color, const Color(0xFFFF0000).withValues(alpha: 0.45));
+      expect(
+        deco.boxShadow!.single.color,
+        QueryaWorkbenchTheme.lightDefault.accent.withValues(alpha: 0.05),
+      );
+    });
+  });
+
+  group('SqlEditorChrome widget', () {
+    testWidgets('applies imported editor background and border', (tester) async {
+      final queryaTheme = buildQueryaThemeFromVsCodeColors(
+        brightness: Brightness.dark,
+        colors: const {
+          'editor.background': '#aabbcc',
+          'editorWidget.border': '#112233',
+          'focusBorder': '#00ffee',
+        },
+        fallback: QueryaTheme.darkDefault,
+      );
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          data: queryaTheme,
+          child: const material.SizedBox(
+            width: 320,
+            height: 200,
+            child: SqlEditorChrome(
+              child: material.SizedBox.expand(),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final containers = tester.widgetList<material.Container>(
+        find.descendant(
+          of: find.byType(SqlEditorChrome),
+          matching: find.byType(material.Container),
+        ),
+      );
+
+      final inner = containers.firstWhere((c) {
+        final d = c.decoration;
+        return d is material.BoxDecoration &&
+            d.color == const Color(0xFFAABBCC);
+      });
+      final border = (inner.decoration! as material.BoxDecoration).border as Border;
+      expect(
+        border.top.color,
+        const Color(0xFF112233).withValues(alpha: 0.5),
+      );
+
+      final outerGlow = containers
+          .map((c) => c.decoration)
+          .whereType<material.BoxDecoration>()
+          .expand((d) => d.boxShadow ?? const <material.BoxShadow>[])
+          .map((s) => s.color)
+          .whereType<Color>()
+          .firstWhere((c) => c == const Color(0xFF00FFEE).withValues(alpha: 0.1));
+      expect(outerGlow, const Color(0xFF00FFEE).withValues(alpha: 0.1));
     });
   });
 }

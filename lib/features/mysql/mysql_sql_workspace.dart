@@ -10,6 +10,7 @@ import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
 import 'package:querya_desktop/features/main_screen/query_editor_tab.dart';
 import 'package:querya_desktop/features/main_screen/results_tab.dart';
+import 'package:querya_desktop/features/main_screen/sql_editor_chrome.dart';
 import 'package:querya_desktop/features/main_screen/sql_query_history_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -345,13 +346,10 @@ class _MysqlSqlToolbar extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context);
     final accent = context.workbench.accent;
     return material.Container(
       padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: material.BoxDecoration(
-        color: theme.colorScheme.muted.withValues(alpha: 0.6),
-      ),
+      decoration: SqlEditorChrome.sqlToolbarDecoration(context),
       child: material.Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: material.MainAxisSize.min,
