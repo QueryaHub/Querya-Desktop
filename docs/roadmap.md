@@ -2,6 +2,11 @@
 
 Living document for planned work. Not a commitment order; adjust as priorities change.
 
+## Theme system
+
+- **Done:** runtime themes, VS Code `colors` import, `tokenColors` syntax highlighting — see [theme.md](theme.md).
+- **Later:** animated theme transitions ([#57](https://github.com/QueryaHub/Querya-Desktop/issues/57)), advanced editor (LSP / `code_forge` spike).
+
 ## Query history and favorites
 
 - **Done:** `sql_query_history` in SQLite + record/list APIs; **History** in PostgreSQL / MySQL toolbars; **Preferences → Query history limit** ([`AppSettings.getSqlHistoryMaxEntries`](lib/core/storage/app_settings.dart)).
