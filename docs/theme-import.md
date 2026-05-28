@@ -73,6 +73,11 @@ Built-in preset defaults apply for keys not present in the merged map.
 API: `ThemeController.setWorkbenchColor(key, color?)`,
 `ThemeController.clearColorOverrides()` (user layer only).
 
+## Sample themes (manual import)
+
+- `themes/samples/cyberpunk-neon.json` — cyberpunk dark preset for UI + SQL/JSON tokens
+- `themes/samples/cyberpunk-neon.jsonc` — same, JSONC variant
+
 ## Fixtures (tests)
 
 - `test/fixtures/themes/dark_subset.json`
