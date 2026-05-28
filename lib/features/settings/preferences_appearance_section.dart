@@ -84,6 +84,10 @@ class _PreferencesAppearanceSectionState
     if (mounted) setState(() => _importError = null);
   }
 
+  Future<void> _setThemeAnimation(bool enabled) async {
+    await _controller.setThemeAnimationEnabled(enabled);
+  }
+
   @override
   material.Widget build(material.BuildContext context) {
     final c = _controller;
@@ -157,6 +161,21 @@ class _PreferencesAppearanceSectionState
             ),
           ],
         ),
+        const material.SizedBox(height: 12),
+        material.Row(
+          children: [
+            const Text('Animate theme changes').small(),
+            const material.SizedBox(width: 12),
+            material.Switch(
+              value: c.themeAnimationEnabled,
+              onChanged: (v) => unawaited(_setThemeAnimation(v)),
+            ),
+          ],
+        ),
+        const material.SizedBox(height: 4),
+        const Text(
+          'Smooth transitions when switching dark/light or presets. Off by default for stability.',
+        ).muted().xSmall(),
         const material.SizedBox(height: 12),
         material.Wrap(
           spacing: 8,
