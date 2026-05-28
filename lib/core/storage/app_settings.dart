@@ -1,5 +1,6 @@
-import 'package:flutter/foundation.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart';
 
+import '../theme/querya_theme_preset.dart';
 import 'local_db.dart';
 
 /// Default cap on rows shown in SQL workspace result grids (full result may be larger).
@@ -47,6 +48,8 @@ abstract final class AppSettingsKeys {
   static const sqlResultMaxRows = 'sql_result_max_rows';
   static const sqlEditorFontSizePoints = 'sql_editor_font_size_points';
   static const sqlHistoryMaxEntries = 'sql_history_max_entries';
+  static const themeMode = 'theme_mode';
+  static const themePreset = 'theme_preset';
 }
 
 /// Bumps [listenable] when any preference is persisted so open screens can reload.
@@ -168,6 +171,49 @@ class AppSettings {
       AppSettingsKeys.sqlHistoryMaxEntries,
       preset.toString(),
     );
+    AppSettingsRevision.bump();
+  }
+
+  /// UI theme mode (dark / light / system).
+  Future<ThemeMode> getThemeMode() async {
+    final v = await LocalDb.instance.getAppSetting(AppSettingsKeys.themeMode);
+    return switch (v) {
+      'light' => ThemeMode.light,
+      'system' => ThemeMode.system,
+      _ => ThemeMode.dark,
+    };
+  }
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    final stored = switch (mode) {
+      ThemeMode.light => 'light',
+      ThemeMode.system => 'system',
+      ThemeMode.dark => 'dark',
+    };
+    await LocalDb.instance.setAppSetting(AppSettingsKeys.themeMode, stored);
+    AppSettingsRevision.bump();
+  }
+
+  Future<QueryaThemePreset> getThemePreset() async {
+    final v = await LocalDb.instance.getAppSetting(AppSettingsKeys.themePreset);
+    return switch (v) {
+      'querya_light' => QueryaThemePreset.queryaLight,
+      _ => QueryaThemePreset.queryaDark,
+    };
+  }
+
+  Future<void> setThemePreset(QueryaThemePreset preset) async {
+    final stored = switch (preset) {
+      QueryaThemePreset.queryaLight => 'querya_light',
+      QueryaThemePreset.queryaDark => 'querya_dark',
+    };
+    await LocalDb.instance.setAppSetting(AppSettingsKeys.themePreset, stored);
+    AppSettingsRevision.bump();
+  }
+
+  Future<void> clearThemeSettings() async {
+    await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeMode);
+    await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themePreset);
     AppSettingsRevision.bump();
   }
 }
