@@ -11,6 +11,10 @@ Syntax highlighting (`tokenColors`) is tracked separately (issue #46).
 |-------------|---------------|
 | `editor.background` | `workbench.editorBackground`, `editor.background` |
 | `editor.foreground` | `editor.foreground`, `ColorScheme.foreground` |
+| `editor.selectionBackground` | `editor.selection` |
+| `editorLineNumber.foreground` | `editor.lineNumber` |
+| `editorBracketMatch.background` | `editor.bracketMatch` |
+| `editorWidget.border` | `editor.widgetBorder` (chrome border) |
 | `sideBar.background` | `workbench.sidebarBackground` |
 | `sideBar.foreground` | `workbench.mutedForeground` |
 | `activityBar.background` | `workbench.canvas` |
