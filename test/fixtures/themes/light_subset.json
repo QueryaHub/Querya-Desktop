@@ -1,0 +1,10 @@
+{
+  "name": "Fixture Light Subset",
+  "type": "light",
+  "colors": {
+    "editor.background": "#ffffff",
+    "sideBar.background": "#f3f3f3",
+    "panel.background": "#f8f8f8",
+    "input.background": "#ffffff"
+  }
+}

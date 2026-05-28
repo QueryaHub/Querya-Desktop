@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/features/settings/preferences_controls.dart';
 
 /// Shared dropdown values for SQL statement timeouts (PostgreSQL / MySQL).
-const List<material.DropdownMenuItem<int?>> kSqlStatementTimeoutMenuItems = [
-  material.DropdownMenuItem<int?>(
+const List<material.DropdownMenuEntry<int?>> kSqlStatementTimeoutMenuEntries = [
+  material.DropdownMenuEntry<int?>(
     value: null,
-    child: material.Text('No limit'),
+    label: 'No limit',
   ),
-  material.DropdownMenuItem(value: 10, child: material.Text('10 s')),
-  material.DropdownMenuItem(value: 30, child: material.Text('30 s')),
-  material.DropdownMenuItem(value: 60, child: material.Text('60 s')),
-  material.DropdownMenuItem(value: 120, child: material.Text('2 min')),
-  material.DropdownMenuItem(value: 300, child: material.Text('5 min')),
-  material.DropdownMenuItem(value: 600, child: material.Text('10 min')),
+  material.DropdownMenuEntry(value: 10, label: '10 s'),
+  material.DropdownMenuEntry(value: 30, label: '30 s'),
+  material.DropdownMenuEntry(value: 60, label: '60 s'),
+  material.DropdownMenuEntry(value: 120, label: '2 min'),
+  material.DropdownMenuEntry(value: 300, label: '5 min'),
+  material.DropdownMenuEntry(value: 600, label: '10 min'),
 ];
 
 /// Statement timeout selector used in SQL toolbars and Preferences.
@@ -29,10 +30,11 @@ class SqlStatementTimeoutDropdown extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    return material.DropdownButton<int?>(
+    return PreferencesDropdownMenu<int?>(
       value: value,
-      onChanged: enabled ? onChanged : null,
-      items: kSqlStatementTimeoutMenuItems,
+      enabled: enabled,
+      onSelected: onChanged,
+      entries: kSqlStatementTimeoutMenuEntries,
     );
   }
 }

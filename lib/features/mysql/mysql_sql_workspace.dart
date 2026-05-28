@@ -5,10 +5,12 @@ import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:querya_desktop/core/database/mysql_service.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
 import 'package:querya_desktop/features/main_screen/query_editor_tab.dart';
 import 'package:querya_desktop/features/main_screen/results_tab.dart';
+import 'package:querya_desktop/features/main_screen/sql_editor_chrome.dart';
 import 'package:querya_desktop/features/main_screen/sql_query_history_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -344,12 +346,10 @@ class _MysqlSqlToolbar extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context);
+    final accent = context.workbench.accent;
     return material.Container(
       padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: material.BoxDecoration(
-        color: theme.colorScheme.muted.withValues(alpha: 0.6),
-      ),
+      decoration: SqlEditorChrome.sqlToolbarDecoration(context),
       child: material.Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: material.MainAxisSize.min,
@@ -361,9 +361,10 @@ class _MysqlSqlToolbar extends material.StatelessWidget {
               OutlineButton(
                 size: ButtonSize.small,
                 onPressed: onOpenHistory,
-                leading: const material.Icon(
+                leading: material.Icon(
                   material.Icons.history_rounded,
                   size: 16,
+                  color: accent,
                 ),
                 child: const Text('History'),
               ),
@@ -376,12 +377,13 @@ class _MysqlSqlToolbar extends material.StatelessWidget {
                         height: 16,
                         child: material.CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: theme.colorScheme.primary,
+                          color: accent,
                         ),
                       )
-                    : const material.Icon(
+                    : material.Icon(
                         material.Icons.play_arrow_rounded,
                         size: 18,
+                        color: accent,
                       ),
                 child: const Text('Execute (F5)'),
               ),
@@ -406,9 +408,10 @@ class _MysqlSqlToolbar extends material.StatelessWidget {
                   const Gap(4),
                   IconButton.ghost(
                     onPressed: running ? null : onOpenPreferences,
-                    icon: const material.Icon(
+                    icon: material.Icon(
                       material.Icons.settings_rounded,
                       size: 20,
+                      color: accent,
                     ),
                   ),
                 ],

@@ -1,0 +1,9 @@
+{
+  "name": "Fixture Unknown Keys",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#2d2d30",
+    "workbench.colorCustomizations.unsupported": "#ff00ff",
+    "titleBar.activeBackground": "#3c3c3c"
+  }
+}

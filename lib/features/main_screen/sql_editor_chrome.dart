@@ -1,24 +1,58 @@
 import 'package:flutter/material.dart' as material;
-import 'package:querya_desktop/core/theme/querya_colors.dart';
+import 'package:querya_desktop/core/theme/querya_editor_theme.dart';
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
+import 'package:querya_desktop/core/theme/querya_workbench_theme.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
-/// Outer chrome for SQL editors: subtle border, surface fill, soft cyan glow.
+/// Outer chrome for SQL editors: border, surface, brand accent glow.
 class SqlEditorChrome extends StatelessWidget {
   const SqlEditorChrome({super.key, required this.child});
 
   final Widget child;
 
-  static material.BoxDecoration inlineFieldDecoration(ThemeData theme) {
-    final cs = theme.colorScheme;
+  static const double outerRadius = 14;
+  static const double innerRadius = 10;
+
+  /// Accent glow strength; slightly softer on light themes.
+  static double chromeGlowAlpha(Brightness brightness) =>
+      brightness == Brightness.light ? 0.08 : 0.1;
+
+  static double inlineGlowAlpha(Brightness brightness) =>
+      brightness == Brightness.light ? 0.05 : 0.07;
+
+  /// Toolbar strip above SQL editor (Postgres/MySQL workspaces).
+  static material.BoxDecoration sqlToolbarDecoration(
+    BuildContext context,
+  ) {
+    final workbench = context.workbench;
     return material.BoxDecoration(
-      color: cs.card,
-      borderRadius: material.BorderRadius.circular(10),
+      color: workbench.surface.withValues(alpha: 0.85),
+      border: material.Border(
+        bottom: material.BorderSide(
+          color: workbench.borderSubtle.withValues(alpha: 0.35),
+        ),
+      ),
+    );
+  }
+
+  /// Decoration for compact SQL fields (dialogs) from theme tokens.
+  static material.BoxDecoration inlineFieldDecoration(
+    QueryaEditorTheme editor,
+    QueryaWorkbenchTheme workbench, {
+    Brightness brightness = Brightness.dark,
+  }) {
+    final border = editor.widgetBorder ?? workbench.borderSubtle;
+    return material.BoxDecoration(
+      color: editor.background,
+      borderRadius: material.BorderRadius.circular(innerRadius),
       border: material.Border.all(
-        color: cs.border.withValues(alpha: 0.45),
+        color: border.withValues(alpha: 0.45),
       ),
       boxShadow: [
         material.BoxShadow(
-          color: QueryaColors.accentCyan.withValues(alpha: 0.07),
+          color: workbench.accent.withValues(
+            alpha: inlineGlowAlpha(brightness),
+          ),
           blurRadius: 18,
           offset: const material.Offset(0, 6),
         ),
@@ -26,14 +60,29 @@ class SqlEditorChrome extends StatelessWidget {
     );
   }
 
+  static material.BoxDecoration inlineFieldDecorationFromContext(
+    BuildContext context,
+  ) {
+    return inlineFieldDecoration(
+      context.editorTheme,
+      context.workbench,
+      brightness: Theme.of(context).brightness,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final glow = QueryaColors.accentCyan.withValues(alpha: 0.1);
+    final editor = context.editorTheme;
+    final workbench = context.workbench;
+    final brightness = Theme.of(context).brightness;
+    final border = editor.widgetBorder ?? workbench.borderSubtle;
+    final glow = workbench.accent.withValues(
+      alpha: chromeGlowAlpha(brightness),
+    );
+
     return material.Container(
       decoration: material.BoxDecoration(
-        borderRadius: material.BorderRadius.circular(14),
+        borderRadius: material.BorderRadius.circular(outerRadius),
         boxShadow: [
           material.BoxShadow(
             color: glow,
@@ -45,10 +94,10 @@ class SqlEditorChrome extends StatelessWidget {
       ),
       child: material.Container(
         decoration: material.BoxDecoration(
-          color: cs.card,
-          borderRadius: material.BorderRadius.circular(14),
+          color: editor.background,
+          borderRadius: material.BorderRadius.circular(outerRadius),
           border: material.Border.all(
-            color: cs.border.withValues(alpha: 0.5),
+            color: border.withValues(alpha: 0.5),
           ),
         ),
         clipBehavior: material.Clip.antiAlias,

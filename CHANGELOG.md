@@ -5,6 +5,29 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-05-28
+
+### Added
+
+- **Theme system** — runtime dark/light/system modes, **Querya Light** preset, optional **Animate theme changes** in Preferences.
+- **VS Code themes** — import `.json` / `.jsonc` (`colors` + `tokenColors`); user color overrides; persisted imported theme.
+- **Syntax highlighting** — SQL and JSON in `QueryaCodeEditor` via `syntax_highlight`; `tokenColors` mapped to TextMate scopes; isolate highlight for large buffers.
+- **Editor** — `QueryaCodeEditor` abstraction, `SqlEditorChrome` from theme tokens, `QueryaThemeScope` for workbench/editor tokens.
+- **Samples** — `themes/samples/cyberpunk-neon.json` (+ JSONC) for manual import testing.
+- **Docs** — [docs/theme.md](docs/theme.md), [docs/theme-import.md](docs/theme-import.md), [docs/editor-spike-report.md](docs/editor-spike-report.md), [docs/code-forge-evaluation.md](docs/code-forge-evaluation.md).
+
+### Changed
+
+- **Workbench UI** — P0 surfaces (sidebar, SQL chrome, empty hero, main shell) use design tokens instead of hardcoded `QueryaColors`.
+- **Preferences** — Appearance section (theme mode, preset, import, animation); Material `DropdownMenu` for stable menus in scrollable dialogs.
+- **Imported themes** — `mutedForeground` clamped for readable helper text when VS Code sidebar colors are low-contrast.
+
+### Fixed
+
+- **Preferences (dark / imported themes)** — readable labels and dropdown text via `materialTheme` + `popoverForeground` hints.
+- **Preferences dropdown** — Color preset menu no longer stretches full screen (`expandedInsets` instead of `width: infinity`).
+- **Dialogs / SQL editor** — `QueryaThemeScope` on `ShadcnApp.builder` so overlays (Preferences, SQL editor) resolve theme tokens.
+
 ## [0.2.0] - 2026-04-24
 
 ### Added

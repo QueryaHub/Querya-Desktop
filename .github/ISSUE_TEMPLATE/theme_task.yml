@@ -1,0 +1,47 @@
+name: Theme system task
+description: Task under epic #37 (theming / editor)
+title: "Theme: "
+labels:
+  - theme
+  - enhancement
+projects: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Epic: [#37 — Theme system](https://github.com/QueryaHub/Querya-Desktop/issues/37)  
+        Milestone: **Theme system**
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One paragraph — what and why
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Checkbox list
+      value: |
+        - [ ] 
+    validations:
+      required: true
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Phase
+      options:
+        - "0 — Foundation"
+        - "1 — App & UI"
+        - "2 — Editor MVP"
+        - "3 — Advanced"
+    validations:
+      required: true
+  - type: checkboxes
+    id: labels_extra
+    attributes:
+      label: Extra labels
+      options:
+        - label: editor
+        - label: documentation
