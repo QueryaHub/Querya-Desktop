@@ -1,0 +1,26 @@
+{
+  "name": "Dracula Fixture",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#282a36",
+    "editor.foreground": "#f8f8f2"
+  },
+  "tokenColors": [
+    {
+      "scope": ["comment", "comment.line", "comment.block"],
+      "settings": { "foreground": "#6272a4" }
+    },
+    {
+      "scope": ["keyword", "keyword.control", "storage.type"],
+      "settings": { "foreground": "#ff79c6" }
+    },
+    {
+      "scope": ["string", "string.quoted.double"],
+      "settings": { "foreground": "#f1fa8c" }
+    },
+    {
+      "scope": ["constant.numeric"],
+      "settings": { "foreground": "#bd93f9" }
+    }
+  ]
+}

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../querya_editor_theme.dart';
 import '../querya_theme.dart';
 import '../querya_workbench_theme.dart';
+import 'apply_token_colors_to_editor.dart';
 import 'color_parser.dart';
 import 'vscode_color_map.dart';
 import 'vscode_theme_manifest.dart';
@@ -128,11 +129,16 @@ QueryaTheme buildQueryaThemeFromVsCodeManifest(
     colorScheme = colorScheme.copyWith(accent: () => schemeAccent!);
   }
 
+  if (manifest.tokenColors.isNotEmpty) {
+    editor = applyTokenColorsToEditor(editor, manifest.tokenColors);
+  }
+
   return QueryaTheme(
     workbench: workbench,
     editor: editor,
     brightness: brightness,
     colorScheme: colorScheme,
+    tokenColors: manifest.tokenColors,
   );
 }
 
