@@ -76,8 +76,8 @@ void main() {
     });
 
     test('lerp interpolates editor and workbench', () {
-      final a = QueryaTheme.darkDefault;
-      final b = QueryaTheme.lightDefault;
+      const a = QueryaTheme.darkDefault;
+      const b = QueryaTheme.lightDefault;
       final mid = QueryaTheme.lerp(a, b, 0.5);
       expect(mid.workbench, isNot(equals(a.workbench)));
       expect(mid.editor.foreground, isNot(equals(a.editor.foreground)));
