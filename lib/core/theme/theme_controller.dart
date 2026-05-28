@@ -6,6 +6,7 @@ import 'parser/querya_theme_from_vscode.dart';
 import 'parser/vscode_colors_merge.dart';
 import 'querya_theme.dart';
 import 'querya_theme_preset.dart';
+import 'theme_import_service.dart';
 
 /// Active theme state: preset, optional imported colors, user overrides.
 class ThemeController extends ChangeNotifier {
@@ -17,6 +18,7 @@ class ThemeController extends ChangeNotifier {
   QueryaThemePreset _preset = QueryaThemePreset.queryaDark;
   Map<String, String> _importedColors = const {};
   Map<String, String> _userOverrides = const {};
+  String? _importedThemeName;
   bool _loaded = false;
 
   ThemeMode get themeMode => _themeMode;
@@ -25,18 +27,27 @@ class ThemeController extends ChangeNotifier {
 
   bool get isLoaded => _loaded;
 
+  bool get hasImportedTheme => _importedColors.isNotEmpty;
+
+  String? get importedThemeName => _importedThemeName;
+
   /// User `workbench.colorCustomizations` layer (VS Code keys → hex).
   Map<String, String> get userColorOverrides =>
       Map.unmodifiable(_userOverrides);
 
-  /// Imported theme `colors` layer (from file import; empty until wired).
+  /// Imported theme `colors` layer (from file import).
   Map<String, String> get importedColors => Map.unmodifiable(_importedColors);
 
-  /// Merged VS Code color keys: imported → user overrides.
-  Map<String, String> get effectiveVsCodeColors => mergeVsCodeColorLayers([
+  /// Merged VS Code color keys for the active preset.
+  Map<String, String> get effectiveVsCodeColors {
+    if (_preset == QueryaThemePreset.imported) {
+      return mergeVsCodeColorLayers([
         _importedColors,
         _userOverrides,
       ]);
+    }
+    return mergeVsCodeColorLayers([_userOverrides]);
+  }
 
   /// Parsed effective colors for supported VS Code keys only.
   Map<String, Color> get effectiveWorkbenchColors {
@@ -62,33 +73,80 @@ class ThemeController extends ChangeNotifier {
 
   Future<void> load() async {
     final mode = await AppSettings.instance.getThemeMode();
-    final preset = await AppSettings.instance.getThemePreset();
+    var preset = await AppSettings.instance.getThemePreset();
     final overrides = await AppSettings.instance.getThemeColorOverrides();
+    var imported = await AppSettings.instance.getThemeImportedColors();
+    _importedThemeName = await AppSettings.instance.getThemeImportName();
+
+    if (imported.isEmpty) {
+      final fromDisk = await ThemeImportService.loadPersistedColors();
+      if (fromDisk != null && fromDisk.isNotEmpty) {
+        imported = fromDisk;
+        await AppSettings.instance.setThemeImportedColors(imported);
+      }
+    }
+
+    if (preset == QueryaThemePreset.imported && imported.isEmpty) {
+      preset = QueryaThemePreset.queryaDark;
+      await AppSettings.instance.setThemePreset(preset);
+    }
+
     _themeMode = mode;
     _preset = preset;
     _userOverrides = Map.unmodifiable(overrides);
+    _importedColors = Map.unmodifiable(imported);
     _loaded = true;
     notifyListeners();
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
     _themeMode = mode;
-    _preset = mode == ThemeMode.light
-        ? QueryaThemePreset.queryaLight
-        : QueryaThemePreset.queryaDark;
+    if (_preset != QueryaThemePreset.imported) {
+      _preset = mode == ThemeMode.light
+          ? QueryaThemePreset.queryaLight
+          : QueryaThemePreset.queryaDark;
+      await AppSettings.instance.setThemePreset(_preset);
+    }
     await AppSettings.instance.setThemeMode(mode);
-    await AppSettings.instance.setThemePreset(_preset);
     notifyListeners();
   }
 
   Future<void> setPreset(QueryaThemePreset preset) async {
+    if (preset == QueryaThemePreset.imported && !hasImportedTheme) {
+      return;
+    }
     _preset = preset;
-    _themeMode = preset == QueryaThemePreset.queryaLight
-        ? ThemeMode.light
-        : ThemeMode.dark;
-    await AppSettings.instance.setThemePreset(preset);
-    await AppSettings.instance.setThemeMode(_themeMode);
+    if (preset == QueryaThemePreset.imported) {
+      await AppSettings.instance.setThemePreset(preset);
+    } else {
+      _themeMode = preset == QueryaThemePreset.queryaLight
+          ? ThemeMode.light
+          : ThemeMode.dark;
+      await AppSettings.instance.setThemePreset(preset);
+      await AppSettings.instance.setThemeMode(_themeMode);
+    }
     notifyListeners();
+  }
+
+  /// Parses a VS Code theme file, persists it, and activates the imported preset.
+  Future<ThemeImportResult> importThemeFromFile(String path) async {
+    final result = await ThemeImportService.importFromPath(path);
+    switch (result) {
+      case ThemeImportSuccess(:final name, :final isDark, :final colors, :final storedPath):
+        _importedColors = Map.unmodifiable(colors);
+        _importedThemeName = name;
+        _preset = QueryaThemePreset.imported;
+        _themeMode = isDark ? ThemeMode.dark : ThemeMode.light;
+        await AppSettings.instance.setThemeImportedColors(colors);
+        await AppSettings.instance.setThemeImportName(name);
+        await AppSettings.instance.setThemeImportPath(storedPath);
+        await AppSettings.instance.setThemePreset(QueryaThemePreset.imported);
+        await AppSettings.instance.setThemeMode(_themeMode);
+        notifyListeners();
+        return result;
+      case ThemeImportFailure():
+        return result;
+    }
   }
 
   /// Sets or clears a user override for a VS Code `colors` key.
@@ -111,12 +169,29 @@ class ThemeController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Clears imported theme file and settings; falls back to Querya Dark.
+  Future<void> clearImportedTheme() async {
+    await ThemeImportService.deletePersistedImport();
+    await AppSettings.instance.clearThemeImport();
+    _importedColors = const {};
+    _importedThemeName = null;
+    if (_preset == QueryaThemePreset.imported) {
+      _preset = QueryaThemePreset.queryaDark;
+      _themeMode = ThemeMode.dark;
+      await AppSettings.instance.setThemePreset(_preset);
+      await AppSettings.instance.setThemeMode(_themeMode);
+    }
+    notifyListeners();
+  }
+
   Future<void> resetToDefaults() async {
+    await ThemeImportService.deletePersistedImport();
     await AppSettings.instance.clearThemeSettings();
     _themeMode = ThemeMode.dark;
     _preset = QueryaThemePreset.queryaDark;
     _importedColors = const {};
     _userOverrides = const {};
+    _importedThemeName = null;
     notifyListeners();
   }
 
