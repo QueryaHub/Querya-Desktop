@@ -41,8 +41,26 @@ HighlighterTheme highlighterThemeFromQueryaEditor(QueryaEditorTheme editor) {
         'settings': {'foreground': _hex(editor.string)},
       },
       {
-        'scope': ['constant.numeric', 'number'],
+        'scope': [
+          'constant.numeric',
+          'constant.numeric.json',
+          'number',
+        ],
         'settings': {'foreground': _hex(editor.number)},
+      },
+      {
+        'scope': [
+          'support.type.property-name',
+          'support.type.property-name.json',
+        ],
+        'settings': {'foreground': _hex(editor.type)},
+      },
+      {
+        'scope': [
+          'constant.language',
+          'constant.language.json',
+        ],
+        'settings': {'foreground': _hex(editor.keyword)},
       },
       {
         'scope': ['entity.name.function', 'support.function'],
