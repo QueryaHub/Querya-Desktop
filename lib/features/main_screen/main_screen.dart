@@ -343,6 +343,7 @@ class _CustomTitleBarState extends State<_CustomTitleBar> {
   @override
   material.Widget build(material.BuildContext context) {
     final c = widget.theme;
+    final onDestructive = context.workbench.onAccent;
     final buttonColors = WindowButtonColors(
       iconNormal: c.mutedForeground,
       mouseOver: c.muted.withValues(alpha: 0.5),
@@ -352,10 +353,10 @@ class _CustomTitleBarState extends State<_CustomTitleBar> {
     );
     final closeButtonColors = WindowButtonColors(
       iconNormal: c.mutedForeground,
-      mouseOver: const Color(0xFFE53935),
-      mouseDown: const Color(0xFFB71C1C),
-      iconMouseOver: const Color(0xFFFFFFFF),
-      iconMouseDown: const Color(0xFFFFFFFF),
+      mouseOver: c.destructive,
+      mouseDown: c.destructive.withValues(alpha: 0.85),
+      iconMouseOver: onDestructive,
+      iconMouseDown: onDestructive,
     );
 
     return material.Container(
