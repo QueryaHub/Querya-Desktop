@@ -113,6 +113,8 @@ Plan: spike branch with `re_editor` only for `QueryEditorTab`, keep dialogs on M
 
 Track for a dedicated epic (LSP, diagnostics, multi-language). Not blocking Querya 0.3 theme milestone.
 
+**Update (#52):** See [code-forge-evaluation.md](code-forge-evaluation.md) — **NO-GO** for 0.3.x; **re_editor** before `code_forge`; conditional LSP epic ~6–10 weeks if product triggers fire.
+
 ### Defer — **flutter_code_editor**
 
 No advantage over syntax_highlight for VS Code theme fidelity.
