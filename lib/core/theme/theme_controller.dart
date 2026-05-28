@@ -1,9 +1,11 @@
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
+import 'parser/apply_token_colors_to_editor.dart';
 import 'parser/color_parser.dart';
 import 'parser/querya_theme_from_vscode.dart';
 import 'parser/vscode_colors_merge.dart';
+import 'parser/vscode_theme_manifest.dart';
 import 'querya_theme.dart';
 import 'querya_theme_preset.dart';
 import 'theme_import_service.dart';
@@ -17,6 +19,7 @@ class ThemeController extends ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.dark;
   QueryaThemePreset _preset = QueryaThemePreset.queryaDark;
   Map<String, String> _importedColors = const {};
+  List<TokenColorRule> _importedTokenColors = const [];
   Map<String, String> _userOverrides = const {};
   String? _importedThemeName;
   bool _loaded = false;
@@ -85,6 +88,7 @@ class ThemeController extends ChangeNotifier {
         await AppSettings.instance.setThemeImportedColors(imported);
       }
     }
+    _importedTokenColors = await ThemeImportService.loadPersistedTokenColors();
 
     if (preset == QueryaThemePreset.imported && imported.isEmpty) {
       preset = QueryaThemePreset.queryaDark;
@@ -132,8 +136,15 @@ class ThemeController extends ChangeNotifier {
   Future<ThemeImportResult> importThemeFromFile(String path) async {
     final result = await ThemeImportService.importFromPath(path);
     switch (result) {
-      case ThemeImportSuccess(:final name, :final isDark, :final colors, :final storedPath):
+      case ThemeImportSuccess(
+          :final name,
+          :final isDark,
+          :final colors,
+          :final tokenColors,
+          :final storedPath,
+        ):
         _importedColors = Map.unmodifiable(colors);
+        _importedTokenColors = List.unmodifiable(tokenColors);
         _importedThemeName = name;
         _preset = QueryaThemePreset.imported;
         _themeMode = isDark ? ThemeMode.dark : ThemeMode.light;
@@ -174,6 +185,7 @@ class ThemeController extends ChangeNotifier {
     await ThemeImportService.deletePersistedImport();
     await AppSettings.instance.clearThemeImport();
     _importedColors = const {};
+    _importedTokenColors = const [];
     _importedThemeName = null;
     if (_preset == QueryaThemePreset.imported) {
       _preset = QueryaThemePreset.queryaDark;
@@ -190,6 +202,7 @@ class ThemeController extends ChangeNotifier {
     _themeMode = ThemeMode.dark;
     _preset = QueryaThemePreset.queryaDark;
     _importedColors = const {};
+    _importedTokenColors = const [];
     _userOverrides = const {};
     _importedThemeName = null;
     notifyListeners();
@@ -208,11 +221,22 @@ class ThemeController extends ChangeNotifier {
         ? QueryaTheme.lightDefault
         : QueryaTheme.darkDefault;
     final merged = effectiveVsCodeColors;
-    if (merged.isEmpty) return fallback;
-    return buildQueryaThemeFromVsCodeColors(
-      brightness: brightness,
-      colors: merged,
-      fallback: fallback,
-    );
+    if (merged.isEmpty && _importedTokenColors.isEmpty) return fallback;
+
+    var theme = merged.isEmpty
+        ? fallback
+        : buildQueryaThemeFromVsCodeColors(
+            brightness: brightness,
+            colors: merged,
+            fallback: fallback,
+          );
+
+    if (_importedTokenColors.isNotEmpty) {
+      theme = theme.copyWith(
+        tokenColors: _importedTokenColors,
+        editor: applyTokenColorsToEditor(theme.editor, _importedTokenColors),
+      );
+    }
+    return theme;
   }
 }

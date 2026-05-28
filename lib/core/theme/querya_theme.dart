@@ -1,5 +1,6 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
+import 'parser/vscode_theme_manifest.dart';
 import 'querya_colors.dart';
 import 'querya_editor_theme.dart';
 import 'querya_workbench_theme.dart';
@@ -11,12 +12,16 @@ class QueryaTheme {
     required this.editor,
     required this.brightness,
     required this.colorScheme,
+    this.tokenColors = const [],
   });
 
   final QueryaWorkbenchTheme workbench;
   final QueryaEditorTheme editor;
   final Brightness brightness;
   final ColorScheme colorScheme;
+
+  /// VS Code `tokenColors` for syntax highlighting (imported themes).
+  final List<TokenColorRule> tokenColors;
 
   static const QueryaTheme darkDefault = QueryaTheme(
     workbench: QueryaWorkbenchTheme.darkDefault,
@@ -131,12 +136,14 @@ class QueryaTheme {
     QueryaEditorTheme? editor,
     Brightness? brightness,
     ColorScheme? colorScheme,
+    List<TokenColorRule>? tokenColors,
   }) {
     return QueryaTheme(
       workbench: workbench ?? this.workbench,
       editor: editor ?? this.editor,
       brightness: brightness ?? this.brightness,
       colorScheme: colorScheme ?? this.colorScheme,
+      tokenColors: tokenColors ?? this.tokenColors,
     );
   }
 
@@ -149,6 +156,7 @@ class QueryaTheme {
       editor: e,
       brightness: brightness,
       colorScheme: ColorScheme.lerp(a.colorScheme, b.colorScheme, t),
+      tokenColors: t < 0.5 ? a.tokenColors : b.tokenColors,
     );
   }
 
@@ -175,9 +183,18 @@ class QueryaTheme {
           workbench == other.workbench &&
           editor == other.editor &&
           brightness == other.brightness &&
-          colorScheme == other.colorScheme;
+          colorScheme == other.colorScheme &&
+          _listEquals(tokenColors, other.tokenColors);
 
   @override
   int get hashCode =>
-      Object.hash(workbench, editor, brightness, colorScheme);
+      Object.hash(workbench, editor, brightness, colorScheme, tokenColors);
+
+  static bool _listEquals<T>(List<T> a, List<T> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
 }

@@ -84,6 +84,32 @@ class TokenColorRule {
   final String? background;
   final String? fontStyle;
 
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TokenColorRule &&
+          scopes.length == other.scopes.length &&
+          _listEquals(scopes, other.scopes) &&
+          foreground == other.foreground &&
+          background == other.background &&
+          fontStyle == other.fontStyle;
+
+  @override
+  int get hashCode => Object.hash(
+        Object.hashAll(scopes),
+        foreground,
+        background,
+        fontStyle,
+      );
+
+  static bool _listEquals(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
   static TokenColorRule? tryParse(Map<String, dynamic> json) {
     final scopeRaw = json['scope'];
     final scopes = <String>[];
