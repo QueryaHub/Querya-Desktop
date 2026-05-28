@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
+import 'package:querya_desktop/core/editor/querya_code_editor.dart';
+import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
@@ -326,20 +328,12 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
         material.Expanded(
           child: material.Container(
             color: cs.card,
-            child: material.TextField(
+            child: QueryaCodeEditor(
               controller: _controller,
-              maxLines: null,
-              expands: true,
-              style: material.TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 13,
-                color: shadcnCs.foreground,
-                height: 1.5,
-              ),
-              decoration: const material.InputDecoration(
-                border: material.InputBorder.none,
-                contentPadding: material.EdgeInsets.all(16),
-              ),
+              language: QueryaCodeLanguage.json,
+              fontSize: 13,
+              variant: QueryaCodeEditorVariant.material,
+              contentPadding: const material.EdgeInsets.all(16),
             ),
           ),
         ),
