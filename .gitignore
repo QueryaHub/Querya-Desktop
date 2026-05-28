@@ -4,21 +4,41 @@
 build/
 *.iml
 pubspec.lock
+.flutter-plugins
+.flutter-plugins-dependencies
 
-# IDE
+# Generated (platform)
+**/flutter/ephemeral/
+**/Flutter/ephemeral/
+**/GeneratedPluginRegistrant.*
+linux/flutter/generated_*
+windows/flutter/generated_*
+macos/Flutter/ephemeral/
+
+# IDE — track Cursor rules, ignore the rest
 .idea/
-.cursor/
-*.iml
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Old C++/Qt (if still present)
+# Logs & coverage
+*.log
+flutter_*.log
+coverage/
+
+# Secrets / local env (never commit)
+.env
+.env.*
+!.env.example
+
+# Old C++/Qt / design mockups (local only)
 *.o
 *.a
 *.so
 *.dll
 *.exe
-flutter_*.log
-design-front
+design-front/
