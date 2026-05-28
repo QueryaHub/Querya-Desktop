@@ -51,7 +51,7 @@ class QueryaWorkbenchTheme {
     gitUntracked: Color(0xFF2EB88A),
   );
 
-  /// Placeholder light preset (#51 will refine).
+  /// Built-in light preset (slate-like canvas, cyan brand accent).
   static const QueryaWorkbenchTheme lightDefault = QueryaWorkbenchTheme(
     canvas: Color(0xFFFAFAFA),
     surface: Color(0xFFFFFFFF),

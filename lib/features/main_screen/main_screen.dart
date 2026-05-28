@@ -16,8 +16,8 @@ import 'package:flutter/material.dart' as material
         Widget,
         RepaintBoundary;
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -127,37 +127,34 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = AppTheme.dark.colorScheme;
+    final scheme = Theme.of(context).colorScheme;
     return material.Scaffold(
-      backgroundColor: theme.background,
-      body: Theme(
-        data: AppTheme.dark,
-        child: WindowBorder(
-          color: theme.border.withValues(alpha: 0.35),
-          width: 1,
-          child: Column(
-            children: [
-              _CustomTitleBar(
-                theme: theme,
-                onNewDatabaseConnection: _onNewDatabaseConnectionFromMenu,
+      backgroundColor: scheme.background,
+      body: WindowBorder(
+        color: scheme.border.withValues(alpha: 0.35),
+        width: 1,
+        child: Column(
+          children: [
+            _CustomTitleBar(
+              theme: scheme,
+              onNewDatabaseConnection: _onNewDatabaseConnectionFromMenu,
+            ),
+            Divider(height: 1, color: scheme.border.withValues(alpha: 0.22)),
+            Expanded(
+              child: _MainContentSplit(
+                connectionsPanelKey: _connectionsPanelKey,
+                workspace: _workspace,
+                onConnectionSelected: _onConnectionSelected,
+                onPostgresObjectSelected: _onPostgresObjectSelected,
+                onMysqlObjectSelected: _onMysqlObjectSelected,
+                onRedisDatabaseSelected: _onRedisDatabaseSelected,
+                onMongoDBDatabaseSelected: _onMongoDBDatabaseSelected,
+                onPostgresOpenSqlWorkspace: _onPostgresOpenSqlWorkspace,
+                onMysqlOpenSqlWorkspace: _onMysqlOpenSqlWorkspace,
+                onRequestNewConnection: _openNewConnectionFromHero,
               ),
-              Divider(height: 1, color: theme.border.withValues(alpha: 0.22)),
-              Expanded(
-                child: _MainContentSplit(
-                  connectionsPanelKey: _connectionsPanelKey,
-                  workspace: _workspace,
-                  onConnectionSelected: _onConnectionSelected,
-                  onPostgresObjectSelected: _onPostgresObjectSelected,
-                  onMysqlObjectSelected: _onMysqlObjectSelected,
-                  onRedisDatabaseSelected: _onRedisDatabaseSelected,
-                  onMongoDBDatabaseSelected: _onMongoDBDatabaseSelected,
-                  onPostgresOpenSqlWorkspace: _onPostgresOpenSqlWorkspace,
-                  onMysqlOpenSqlWorkspace: _onMysqlOpenSqlWorkspace,
-                  onRequestNewConnection: _openNewConnectionFromHero,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
