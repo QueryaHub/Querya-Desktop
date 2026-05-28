@@ -55,7 +55,7 @@ flowchart TB
 ## Built-in presets
 
 - **Querya Dark** — default (`QueryaThemePreset.queryaDark`)
-- **Querya Light** — light UI (`QueryaThemePreset.queryaLight`)
+- **Querya Light** — built-in light UI (`QueryaThemePreset.queryaLight`); slate canvas, cyan accent, WCAG AA body text
 - **Imported** — after a VS Code file is imported (`QueryaThemePreset.imported`)
 
 Access tokens in widgets:
