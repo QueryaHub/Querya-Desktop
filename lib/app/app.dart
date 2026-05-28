@@ -1,3 +1,4 @@
+import 'package:querya_desktop/core/theme/querya_material_theme.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -16,19 +17,23 @@ class QueryaApp extends StatelessWidget {
       listenable: themeController,
       builder: (context, _) {
         final queryaTheme = themeController.activeTheme;
+        final colorScheme = queryaTheme.colorScheme;
         return ShadcnApp(
           title: 'Querya',
           theme: themeController.lightShadcnTheme,
           darkTheme: themeController.darkShadcnTheme,
           themeMode: themeController.themeMode,
+          materialTheme: materialThemeFromQuerya(colorScheme),
           debugShowCheckedModeBanner: false,
           enableThemeAnimation: themeController.themeAnimationEnabled,
           enableScrollInterception: false,
-          home: QueryaThemeScope(
+          // Above navigator so dialogs/overlays (SQL editor, Preferences) see tokens.
+          builder: (context, child) => QueryaThemeScope(
             data: queryaTheme,
-            child: const AppLifecycleCleanup(
-              child: MainScreen(),
-            ),
+            child: child ?? const SizedBox.shrink(),
+          ),
+          home: const AppLifecycleCleanup(
+            child: MainScreen(),
           ),
         );
       },

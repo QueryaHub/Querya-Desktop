@@ -5,6 +5,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/theme/querya_theme_preset.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:querya_desktop/core/theme/theme_import_service.dart';
+import 'package:querya_desktop/features/settings/preferences_controls.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
@@ -98,29 +99,29 @@ class _PreferencesAppearanceSectionState
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.start,
       children: [
-        const Text('Appearance').semiBold().small(),
+        const Text('Appearance').semiBold().small().foreground(),
         const material.SizedBox(height: 8),
         material.Row(
           children: [
-            const Text('Theme mode').small(),
+            const Text('Theme mode').small().foreground(),
             const material.SizedBox(width: 12),
-            material.DropdownButton<ThemeMode>(
+            PreferencesDropdownMenu<ThemeMode>(
               value: c.themeMode,
-              onChanged: (v) {
+              onSelected: (v) {
                 if (v != null) unawaited(_setThemeMode(v));
               },
-              items: const [
-                material.DropdownMenuItem(
+              entries: const [
+                material.DropdownMenuEntry(
                   value: ThemeMode.dark,
-                  child: material.Text('Dark'),
+                  label: 'Dark',
                 ),
-                material.DropdownMenuItem(
+                material.DropdownMenuEntry(
                   value: ThemeMode.light,
-                  child: material.Text('Light'),
+                  label: 'Light',
                 ),
-                material.DropdownMenuItem(
+                material.DropdownMenuEntry(
                   value: ThemeMode.system,
-                  child: material.Text('System'),
+                  label: 'System',
                 ),
               ],
             ),
@@ -131,30 +132,30 @@ class _PreferencesAppearanceSectionState
           crossAxisAlignment: material.CrossAxisAlignment.start,
           children: [
             material.Padding(
-              padding: const material.EdgeInsets.only(top: 8),
-              child: const Text('Color preset').small(),
+              padding: const material.EdgeInsets.only(top: 10),
+              child: const Text('Color preset').small().foreground(),
             ),
             const material.SizedBox(width: 12),
             material.Expanded(
-              child: material.DropdownButton<QueryaThemePreset>(
+              child: PreferencesDropdownMenu<QueryaThemePreset>(
                 value: c.preset,
-                isExpanded: true,
-                onChanged: (v) {
+                expandToParent: true,
+                onSelected: (v) {
                   if (v != null) unawaited(_setPreset(v));
                 },
-                items: [
-                  const material.DropdownMenuItem(
+                entries: [
+                  const material.DropdownMenuEntry(
                     value: QueryaThemePreset.queryaDark,
-                    child: material.Text('Querya Dark'),
+                    label: 'Querya Dark',
                   ),
-                  const material.DropdownMenuItem(
+                  const material.DropdownMenuEntry(
                     value: QueryaThemePreset.queryaLight,
-                    child: material.Text('Querya Light'),
+                    label: 'Querya Light',
                   ),
-                  material.DropdownMenuItem(
+                  material.DropdownMenuEntry(
                     value: QueryaThemePreset.imported,
                     enabled: c.hasImportedTheme,
-                    child: material.Text(importedLabel),
+                    label: importedLabel,
                   ),
                 ],
               ),
@@ -164,7 +165,7 @@ class _PreferencesAppearanceSectionState
         const material.SizedBox(height: 12),
         material.Row(
           children: [
-            const Text('Animate theme changes').small(),
+            const Text('Animate theme changes').small().foreground(),
             const material.SizedBox(width: 12),
             material.Switch(
               value: c.themeAnimationEnabled,
@@ -173,16 +174,17 @@ class _PreferencesAppearanceSectionState
           ],
         ),
         const material.SizedBox(height: 4),
-        const Text(
+        const PreferencesHint(
           'Smooth transitions when switching dark/light or presets. Off by default for stability.',
-        ).muted().xSmall(),
+        ),
         const material.SizedBox(height: 12),
         material.Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
             OutlineButton(
-              onPressed: _importing ? null : () => unawaited(_pickAndImportTheme()),
+              onPressed:
+                  _importing ? null : () => unawaited(_pickAndImportTheme()),
               child: material.Text(_importing ? 'Importing…' : 'Import theme…'),
             ),
             OutlineButton(
@@ -202,9 +204,9 @@ class _PreferencesAppearanceSectionState
           ),
         ],
         const material.SizedBox(height: 4),
-        const Text(
+        const PreferencesHint(
           'Import VS Code theme JSON/JSONC (.colors subset). Changes apply immediately.',
-        ).muted().xSmall(),
+        ),
       ],
     );
   }
