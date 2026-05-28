@@ -1,0 +1,50 @@
+# New issues with label `theme` → milestone Theme system
+name: Issue theme milestone
+
+on:
+  issues:
+    types: [opened, labeled]
+
+permissions:
+  issues: write
+
+jobs:
+  assign-milestone:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set Theme system milestone on theme issues
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            if (!issue?.labels) return;
+
+            const hasTheme = issue.labels.some(
+              (l) => (typeof l === 'string' ? l : l.name) === 'theme'
+            );
+            if (!hasTheme) return;
+
+            if (issue.milestone?.title === 'Theme system') {
+              core.info('Milestone already set.');
+              return;
+            }
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const milestones = await github.paginate(
+              github.rest.issues.listMilestones,
+              { owner, repo, state: 'open', per_page: 100 }
+            );
+            const milestone = milestones.find((m) => m.title === 'Theme system');
+            if (!milestone) {
+              core.setFailed('Milestone "Theme system" not found');
+              return;
+            }
+
+            await github.rest.issues.update({
+              owner,
+              repo,
+              issue_number: issue.number,
+              milestone: milestone.number,
+            });
+            core.info(`Milestone Theme system set on #${issue.number}`);
