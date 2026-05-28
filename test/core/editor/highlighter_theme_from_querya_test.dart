@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/editor/highlighter_theme_from_querya.dart';
 import 'package:querya_desktop/core/editor/syntax_highlight_service.dart';
