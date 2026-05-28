@@ -1,5 +1,6 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
+import 'color_contrast.dart';
 import 'parser/vscode_theme_manifest.dart';
 import 'querya_colors.dart';
 import 'querya_editor_theme.dart';
@@ -115,7 +116,11 @@ class QueryaTheme {
       secondary: isDark ? const Color(0xFF18181B) : const Color(0xFFF4F4F5),
       secondaryForeground: fg,
       muted: isDark ? const Color(0xFF18181B) : const Color(0xFFF4F4F5),
-      mutedForeground: w.mutedForeground,
+      mutedForeground: legibleSecondaryLabel(
+        candidate: w.mutedForeground,
+        background: w.surface,
+        fallback: fg,
+      ),
       accent: isDark ? const Color(0xFF27272A) : const Color(0xFFE4E4E7),
       accentForeground: fg,
       destructive: w.destructive,

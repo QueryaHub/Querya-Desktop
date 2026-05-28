@@ -13,9 +13,10 @@ Widget queryaThemeTestShell({
     theme: td,
     darkTheme: td,
     themeMode: ThemeMode.dark,
-    home: QueryaThemeScope(
+    builder: (context, appChild) => QueryaThemeScope(
       data: data,
-      child: child,
+      child: appChild ?? const SizedBox.shrink(),
     ),
+    home: child,
   );
 }
