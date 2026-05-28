@@ -17,4 +17,13 @@ void main() {
     expect(span.children, isNotNull);
     expect(span.children!.length, greaterThan(1));
   });
+
+  test('highlighterThemeFromQueryaEditor produces JSON spans', () {
+    final theme = highlighterThemeFromQueryaEditor(QueryaTheme.darkDefault.editor);
+    final highlighter = Highlighter(language: 'json', theme: theme);
+    const sample = '{"name": "x", "count": 1, "ok": true, "nil": null}';
+    final span = highlighter.highlight(sample);
+    expect(span.children, isNotNull);
+    expect(span.children!.length, greaterThan(3));
+  });
 }

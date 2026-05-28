@@ -5,6 +5,7 @@ import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/editor/querya_code_editor.dart';
 import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
@@ -215,6 +216,9 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
   material.Widget build(material.BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final shadcnCs = shadcn.Theme.of(context).colorScheme;
+    final workbench = context.workbench;
+    final editorTheme = context.editorTheme;
+    final success = workbench.success;
     final idStr = widget.document['_id']?.toString() ?? 'New Document';
 
     return material.Column(
@@ -310,16 +314,16 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
           material.Container(
             padding: const material.EdgeInsets.symmetric(
                 horizontal: 16, vertical: 8),
-            color: const Color(0xFF4CAF50).withValues(alpha: 0.1),
+            color: success.withValues(alpha: 0.1),
             child: Row(
               children: [
-                const material.Icon(material.Icons.check_circle_rounded,
-                    size: 14, color: Color(0xFF4CAF50)),
+                material.Icon(material.Icons.check_circle_rounded,
+                    size: 14, color: success),
                 const Gap(8),
                 material.Expanded(
                   child: Text(_success!,
-                      style: const material.TextStyle(
-                          color: Color(0xFF4CAF50), fontSize: 12)),
+                      style: material.TextStyle(
+                          color: success, fontSize: 12)),
                 ),
               ],
             ),
@@ -327,7 +331,7 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
         // Editor
         material.Expanded(
           child: material.Container(
-            color: cs.card,
+            color: editorTheme.background,
             child: QueryaCodeEditor(
               controller: _controller,
               language: QueryaCodeLanguage.json,
