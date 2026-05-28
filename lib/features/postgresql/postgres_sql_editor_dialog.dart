@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/window_layout.dart';
-import 'package:querya_desktop/core/theme/querya_typography.dart';
+import 'package:querya_desktop/core/editor/querya_code_editor.dart';
+import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/features/main_screen/sql_editor_chrome.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -140,24 +141,17 @@ class _PostgresSqlEditorDialogState extends material.State<_PostgresSqlEditorDia
                 child: material.SizedBox(
                   height: 280,
                   child: material.Container(
-                    decoration: SqlEditorChrome.inlineFieldDecoration(
-                      Theme.of(context),
+                    decoration: SqlEditorChrome.inlineFieldDecorationFromContext(
+                      context,
                     ),
-                    child: material.TextField(
+                    child: QueryaCodeEditor(
                       controller: _controller,
-                      maxLines: null,
-                      expands: true,
+                      language: QueryaCodeLanguage.sql,
+                      fontSize: 12,
+                      variant: QueryaCodeEditorVariant.material,
                       textAlignVertical: material.TextAlignVertical.top,
-                      style: material.TextStyle(
-                        fontFamily: QueryaTypography.mono,
-                        fontSize: 12,
-                        color: theme.foreground,
-                      ),
-                      decoration: const material.InputDecoration(
-                        border: material.InputBorder.none,
-                        contentPadding: material.EdgeInsets.all(12),
-                        hintText: 'SELECT …',
-                      ),
+                      hintText: 'SELECT …',
+                      contentPadding: const material.EdgeInsets.all(12),
                     ),
                   ),
                 ),

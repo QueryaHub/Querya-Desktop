@@ -1,0 +1,46 @@
+// JSONC variant — tests comment stripping on import
+{
+  "name": "Querya Cyberpunk Neon (JSONC)",
+  "type": "dark",
+  "colors": {
+    "activityBar.background": "#050508",
+    "statusBar.background": "#050508",
+    "sideBar.background": "#0c0820",
+    "sideBar.foreground": "#8b7cf8",
+    "tab.activeBackground": "#14102a",
+    "panel.background": "#14102a",
+    "input.background": "#14102a",
+    "editor.background": "#0a0a14",
+    "editor.foreground": "#e8f4ff",
+    "editor.selectionBackground": "#ff2a6d44",
+    "editorLineNumber.foreground": "#4a3f7a",
+    "editorBracketMatch.background": "#00f5ff33",
+    "editorWidget.border": "#00f5ff66",
+    "focusBorder": "#00f5ff", // neon cyan ring
+    "list.hoverBackground": "#ff2a6d22",
+    "gitDecoration.modifiedResourceForeground": "#fcee09",
+    "gitDecoration.untrackedResourceForeground": "#39ff14",
+  },
+  "tokenColors": [
+    {
+      "scope": ["comment", "comment.line"],
+      "settings": { "foreground": "#5c4d8a", "fontStyle": "italic" },
+    },
+    {
+      "scope": ["keyword", "keyword.control", "storage.type"],
+      "settings": { "foreground": "#ff2a6d" },
+    },
+    {
+      "scope": ["string"],
+      "settings": { "foreground": "#fcee09" },
+    },
+    {
+      "scope": ["constant.numeric"],
+      "settings": { "foreground": "#bd00ff" },
+    },
+    {
+      "scope": ["entity.name.function", "support.function"],
+      "settings": { "foreground": "#00f5ff" },
+    },
+  ],
+}

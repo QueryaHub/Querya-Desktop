@@ -72,16 +72,47 @@ git checkout -b issue/38-querya-workbench-theme-models
 
 ## GitHub labels & milestones
 
-На **issues** и **PRs** через `gh`:
+### Milestone: **Theme system**
+
+Epic [#37](https://github.com/QueryaHub/Querya-Desktop/issues/37) и дочерние issues **#38–#60** (кроме закрытого #56) — milestone [Theme system](https://github.com/QueryaHub/Querya-Desktop/milestone/1).
+
+Новые theme-issues: label `theme` → workflow [issue-theme-milestone.yml](.github/workflows/issue-theme-milestone.yml) проставит milestone автоматически. Шаблон: [.github/ISSUE_TEMPLATE/theme_task.yml](.github/ISSUE_TEMPLATE/theme_task.yml).
+
+### PR: labels + milestone (автоматика)
+
+1. Ветка **`issue/<number>-<slug>`** (рекомендуется), например `issue/38-workbench-theme-models`.
+2. В PR body: **`Closes #38`** (или Fixes/Resolves).
+3. В title опционально: `feat(theme): … (#38)`.
+
+Workflow [pr-linked-issue-metadata.yml](.github/workflows/pr-linked-issue-metadata.yml) копирует **все labels** и **milestone** с linked issue на PR при open/edit/sync.
+
+Шаблон PR: [.github/pull_request_template.md](.github/pull_request_template.md).
+
+### Ручное создание PR (если автоматика не сработала)
 
 ```bash
-gh issue edit 38 --add-label "theme,enhancement"
-gh pr create --base dev --label "theme,enhancement" \
-  --body "Closes #38" --title "feat(theme): QueryaWorkbenchTheme models (#38)"
+gh pr create --base dev \
+  --milestone "Theme system" \
+  --label "theme,enhancement" \
+  --title "feat(theme): QueryaWorkbenchTheme models (#38)" \
+  --body "$(cat <<'EOF'
+## Summary
+…
+
+Closes #38
+EOF
+)"
 ```
 
-Актуальные labels в репо: `bug`, `enhancement`, `documentation`, `theme`, `editor`, `epic`, …  
-Для темизации: `theme`, `editor`, `epic` (см. epic [#37](https://github.com/QueryaHub/Querya-Desktop/issues/37)).
+Для editor-задач добавь label `editor`: `--label "theme,editor,enhancement"`.
+
+### Issues
+
+```bash
+gh issue edit 38 --milestone "Theme system" --add-label "theme,enhancement"
+```
+
+Labels: `bug`, `enhancement`, `documentation`, `theme`, `editor`, `epic`.
 
 После merge: issue `CLOSED`; `git fetch` + `git pull --ff-only` на `dev`.
 

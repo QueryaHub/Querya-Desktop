@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/theme/querya_theme_preset.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// path_provider has no implementation in plain `flutter test`; LocalDb needs a path.
 class _FakePathProvider extends PathProviderPlatform {
@@ -63,6 +65,7 @@ void main() {
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.sqlResultMaxRows);
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.sqlEditorFontSizePoints);
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.sqlHistoryMaxEntries);
+    await AppSettings.instance.clearThemeSettings();
   });
 
   group('AppSettings', () {
@@ -175,6 +178,54 @@ void main() {
 
       await AppSettings.instance.setSqlHistoryMaxEntries(180);
       expect(await AppSettings.instance.getSqlHistoryMaxEntries(), 200);
+    });
+  });
+
+  group('theme settings', () {
+    test('theme mode and preset roundtrip', () async {
+      expect(await AppSettings.instance.getThemeMode(), ThemeMode.dark);
+      expect(
+        await AppSettings.instance.getThemePreset(),
+        QueryaThemePreset.queryaDark,
+      );
+
+      await AppSettings.instance.setThemeMode(ThemeMode.light);
+      await AppSettings.instance.setThemePreset(QueryaThemePreset.queryaLight);
+      expect(await AppSettings.instance.getThemeMode(), ThemeMode.light);
+      expect(
+        await AppSettings.instance.getThemePreset(),
+        QueryaThemePreset.queryaLight,
+      );
+
+      await AppSettings.instance.clearThemeSettings();
+      expect(await AppSettings.instance.getThemeMode(), ThemeMode.dark);
+    });
+
+    test('theme animation defaults off and roundtrip', () async {
+      expect(await AppSettings.instance.getThemeAnimationEnabled(), isFalse);
+
+      await AppSettings.instance.setThemeAnimationEnabled(true);
+      expect(await AppSettings.instance.getThemeAnimationEnabled(), isTrue);
+
+      await AppSettings.instance.setThemeAnimationEnabled(false);
+      expect(await AppSettings.instance.getThemeAnimationEnabled(), isFalse);
+
+      await AppSettings.instance.setThemeAnimationEnabled(true);
+      await AppSettings.instance.clearThemeSettings();
+      expect(await AppSettings.instance.getThemeAnimationEnabled(), isFalse);
+    });
+
+    test('theme color overrides json roundtrip', () async {
+      await AppSettings.instance.setThemeColorOverrides({
+        'sideBar.background': '#ff0000',
+        'editor.background': '#1e1e1e',
+      });
+      expect(await AppSettings.instance.getThemeColorOverrides(), {
+        'sideBar.background': '#ff0000',
+        'editor.background': '#1e1e1e',
+      });
+      await AppSettings.instance.clearThemeColorOverrides();
+      expect(await AppSettings.instance.getThemeColorOverrides(), isEmpty);
     });
   });
 

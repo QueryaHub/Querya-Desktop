@@ -16,8 +16,8 @@ import 'package:flutter/material.dart' as material
         Widget,
         RepaintBoundary;
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/core/theme/app_theme.dart';
-import 'package:querya_desktop/core/theme/querya_colors.dart';
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -127,37 +127,34 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = AppTheme.dark.colorScheme;
+    final scheme = Theme.of(context).colorScheme;
     return material.Scaffold(
-      backgroundColor: theme.background,
-      body: Theme(
-        data: AppTheme.dark,
-        child: WindowBorder(
-          color: theme.border.withValues(alpha: 0.35),
-          width: 1,
-          child: Column(
-            children: [
-              _CustomTitleBar(
-                theme: theme,
-                onNewDatabaseConnection: _onNewDatabaseConnectionFromMenu,
+      backgroundColor: scheme.background,
+      body: WindowBorder(
+        color: scheme.border.withValues(alpha: 0.35),
+        width: 1,
+        child: Column(
+          children: [
+            _CustomTitleBar(
+              theme: scheme,
+              onNewDatabaseConnection: _onNewDatabaseConnectionFromMenu,
+            ),
+            Divider(height: 1, color: scheme.border.withValues(alpha: 0.22)),
+            Expanded(
+              child: _MainContentSplit(
+                connectionsPanelKey: _connectionsPanelKey,
+                workspace: _workspace,
+                onConnectionSelected: _onConnectionSelected,
+                onPostgresObjectSelected: _onPostgresObjectSelected,
+                onMysqlObjectSelected: _onMysqlObjectSelected,
+                onRedisDatabaseSelected: _onRedisDatabaseSelected,
+                onMongoDBDatabaseSelected: _onMongoDBDatabaseSelected,
+                onPostgresOpenSqlWorkspace: _onPostgresOpenSqlWorkspace,
+                onMysqlOpenSqlWorkspace: _onMysqlOpenSqlWorkspace,
+                onRequestNewConnection: _openNewConnectionFromHero,
               ),
-              Divider(height: 1, color: theme.border.withValues(alpha: 0.22)),
-              Expanded(
-                child: _MainContentSplit(
-                  connectionsPanelKey: _connectionsPanelKey,
-                  workspace: _workspace,
-                  onConnectionSelected: _onConnectionSelected,
-                  onPostgresObjectSelected: _onPostgresObjectSelected,
-                  onMysqlObjectSelected: _onMysqlObjectSelected,
-                  onRedisDatabaseSelected: _onRedisDatabaseSelected,
-                  onMongoDBDatabaseSelected: _onMongoDBDatabaseSelected,
-                  onPostgresOpenSqlWorkspace: _onPostgresOpenSqlWorkspace,
-                  onMysqlOpenSqlWorkspace: _onMysqlOpenSqlWorkspace,
-                  onRequestNewConnection: _openNewConnectionFromHero,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -343,6 +340,7 @@ class _CustomTitleBarState extends State<_CustomTitleBar> {
   @override
   material.Widget build(material.BuildContext context) {
     final c = widget.theme;
+    final onDestructive = context.workbench.onAccent;
     final buttonColors = WindowButtonColors(
       iconNormal: c.mutedForeground,
       mouseOver: c.muted.withValues(alpha: 0.5),
@@ -352,10 +350,10 @@ class _CustomTitleBarState extends State<_CustomTitleBar> {
     );
     final closeButtonColors = WindowButtonColors(
       iconNormal: c.mutedForeground,
-      mouseOver: const Color(0xFFE53935),
-      mouseDown: const Color(0xFFB71C1C),
-      iconMouseOver: const Color(0xFFFFFFFF),
-      iconMouseDown: const Color(0xFFFFFFFF),
+      mouseOver: c.destructive,
+      mouseDown: c.destructive.withValues(alpha: 0.85),
+      iconMouseOver: onDestructive,
+      iconMouseDown: onDestructive,
     );
 
     return material.Container(
@@ -369,10 +367,10 @@ class _CustomTitleBarState extends State<_CustomTitleBar> {
                 child: Row(
                   children: [
                     const SizedBox(width: 16),
-                    const material.Icon(
+                    material.Icon(
                       material.Icons.search_rounded,
                       size: 18,
-                      color: QueryaColors.accentCyan,
+                      color: context.workbench.accent,
                     ),
                     const Gap(8),
                     const Text('Querya').semiBold().small(),

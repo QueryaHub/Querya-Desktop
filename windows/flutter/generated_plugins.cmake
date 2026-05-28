@@ -6,6 +6,8 @@ list(APPEND FLUTTER_PLUGIN_LIST
   bitsdojo_window_windows
   file_selector_windows
   flutter_secure_storage_windows
+  irondash_engine_context
+  super_native_extensions
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

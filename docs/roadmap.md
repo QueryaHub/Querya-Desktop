@@ -2,6 +2,14 @@
 
 Living document for planned work. Not a commitment order; adjust as priorities change.
 
+## Theme system
+
+- **Shipped in 0.3.0 (epic #37):** runtime themes, VS Code `colors` + `tokenColors` import, SQL/JSON
+  highlighting, P0 workbench migration, Preferences, tests, docs — [theme.md](theme.md).
+- **Optional:** Preferences → **Animate theme changes** (off by default).
+- **Later:** P2 Mongo/Redis token colors; `re_editor` if perf gap; LSP epic per
+  [code-forge-evaluation.md](code-forge-evaluation.md) (**NO-GO** on `code_forge` for 0.3).
+
 ## Query history and favorites
 
 - **Done:** `sql_query_history` in SQLite + record/list APIs; **History** in PostgreSQL / MySQL toolbars; **Preferences → Query history limit** ([`AppSettings.getSqlHistoryMaxEntries`](lib/core/storage/app_settings.dart)).
