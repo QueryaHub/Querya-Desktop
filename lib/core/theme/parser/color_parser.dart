@@ -33,6 +33,20 @@ Color parseVsCodeColor(String input) {
   throw FormatException('Unsupported color format: $input');
 }
 
+/// Encodes a [Color] as a VS Code hex string (`#RRGGBB` or `#RRGGBBAA`).
+String formatVsCodeColor(Color color) {
+  String channel(double component) =>
+      (component * 255.0).round().clamp(0, 255).toRadixString(16).padLeft(2, '0');
+  final rr = channel(color.r);
+  final gg = channel(color.g);
+  final bb = channel(color.b);
+  if (color.a < 1.0) {
+    final aa = channel(color.a);
+    return '#$rr$gg$bb$aa';
+  }
+  return '#$rr$gg$bb';
+}
+
 Color _fromRgbaHex(String eight) {
   final rr = eight.substring(0, 2);
   final gg = eight.substring(2, 4);

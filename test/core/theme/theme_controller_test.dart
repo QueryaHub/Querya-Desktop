@@ -75,4 +75,37 @@ void main() {
     expect(c.themeMode, ThemeMode.dark);
     expect(c.activeTheme, QueryaTheme.darkDefault);
   });
+
+  test('setWorkbenchColor overrides sidebar and persists', () async {
+    final c = ThemeController.instance;
+    await c.load();
+    await c.setWorkbenchColor(
+      'sideBar.background',
+      const Color(0xFFFF0000),
+    );
+    expect(
+      c.activeTheme.workbench.sidebarBackground,
+      const Color(0xFFFF0000),
+    );
+    expect(
+      (await AppSettings.instance.getThemeColorOverrides())['sideBar.background'],
+      '#ff0000',
+    );
+
+    await c.clearColorOverrides();
+    expect(c.userColorOverrides, isEmpty);
+    expect(
+      c.activeTheme.workbench.sidebarBackground,
+      QueryaTheme.darkDefault.workbench.sidebarBackground,
+    );
+  });
+
+  test('clearColorOverrides does not reset theme mode', () async {
+    final c = ThemeController.instance;
+    await c.setThemeMode(ThemeMode.light);
+    await c.setWorkbenchColor('editor.background', const Color(0xFF111111));
+    await c.clearColorOverrides();
+    expect(c.themeMode, ThemeMode.light);
+    expect(c.activeTheme, QueryaTheme.lightDefault);
+  });
 }
