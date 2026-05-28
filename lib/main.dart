@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 
 import 'app/app.dart';
 import 'core/storage/local_db.dart';
+import 'core/theme/theme_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await LocalDb.initFfi();
+  await ThemeController.instance.load();
   runApp(const QueryaApp());
   doWhenWindowReady(() {
     final win = appWindow;
