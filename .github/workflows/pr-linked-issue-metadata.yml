@@ -1,0 +1,103 @@
+# Copy milestone + labels from linked issues onto the PR.
+# Triggers: branch issue/<n>-*, PR title/body "Closes #n", etc.
+name: PR linked issue metadata
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: write
+  issues: read
+
+jobs:
+  apply-from-linked-issues:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply milestone and labels from linked issues
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const issueIds = new Set();
+
+            // issue/38-short-slug
+            const branchMatch = pr.head.ref.match(/^issue\/(\d+)(?:-|$)/i);
+            if (branchMatch) issueIds.add(Number(branchMatch[1]));
+
+            const body = pr.body || '';
+            const title = pr.title || '';
+
+            for (const m of body.matchAll(
+              /(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s+#(\d+)/gi
+            )) {
+              issueIds.add(Number(m[1]));
+            }
+
+            // feat(theme): short description (#38)
+            const titleTail = title.match(/\(#(\d+)\)\s*$/);
+            if (titleTail) issueIds.add(Number(titleTail[1]));
+
+            if (issueIds.size === 0) {
+              core.info('No linked issue numbers found; skipping.');
+              return;
+            }
+
+            const labelNames = new Set();
+            let milestoneTitle = null;
+
+            for (const num of issueIds) {
+              let issue;
+              try {
+                const res = await github.rest.issues.get({
+                  owner,
+                  repo,
+                  issue_number: num,
+                });
+                issue = res.data;
+              } catch (e) {
+                core.warning(`Issue #${num} not found: ${e.message}`);
+                continue;
+              }
+
+              for (const l of issue.labels) {
+                if (typeof l === 'string') labelNames.add(l);
+                else if (l.name) labelNames.add(l.name);
+              }
+
+              if (issue.milestone?.title) {
+                milestoneTitle = issue.milestone.title;
+              }
+            }
+
+            if (labelNames.size > 0) {
+              await github.rest.issues.setLabels({
+                owner,
+                repo,
+                issue_number: pr.number,
+                labels: [...labelNames],
+              });
+              core.info(`Labels set: ${[...labelNames].join(', ')}`);
+            }
+
+            if (milestoneTitle) {
+              const milestones = await github.paginate(
+                github.rest.issues.listMilestones,
+                { owner, repo, state: 'open', per_page: 100 }
+              );
+              const milestone = milestones.find((m) => m.title === milestoneTitle);
+              if (milestone) {
+                await github.rest.issues.update({
+                  owner,
+                  repo,
+                  issue_number: pr.number,
+                  milestone: milestone.number,
+                });
+                core.info(`Milestone set: ${milestoneTitle}`);
+              } else {
+                core.warning(`Milestone not found: ${milestoneTitle}`);
+              }
+            }
