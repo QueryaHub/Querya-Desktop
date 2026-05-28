@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/features/main_screen/query_editor_tab.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+
+import '../../support/querya_theme_test_shell.dart';
 
 void main() {
   testWidgets('QueryEditorTab applies fontSize to EditableText', (tester) async {
     await tester.pumpWidget(
-      ShadcnApp(
-        theme: AppTheme.dark,
-        home: const material.Scaffold(
+      queryaThemeTestShell(
+        child: const material.Scaffold(
           body: SizedBox(
             width: 600,
             height: 400,
@@ -29,9 +29,8 @@ void main() {
 
   testWidgets('QueryEditorTab default fontSize is 13', (tester) async {
     await tester.pumpWidget(
-      ShadcnApp(
-        theme: AppTheme.dark,
-        home: const material.Scaffold(
+      queryaThemeTestShell(
+        child: const material.Scaffold(
           body: SizedBox(
             width: 600,
             height: 400,

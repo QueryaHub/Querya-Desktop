@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/features/main_screen/workspace_panel.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import '../../support/layout_overflow.dart';
+import '../../support/querya_theme_test_shell.dart';
 
 void main() {
   /// Type must not be postgresql/mysql/mongodb/redis so [WorkspacePanel] uses the
@@ -35,11 +35,8 @@ void main() {
           await pumpWidgetWithSurfaceSize(
             tester,
             entry.value,
-            ShadcnApp(
-              theme: AppTheme.dark,
-              darkTheme: AppTheme.dark,
-              themeMode: ThemeMode.dark,
-              home: const material.SizedBox.expand(
+            queryaThemeTestShell(
+              child: const material.SizedBox.expand(
                 child: WorkspacePanel(),
               ),
             ),
@@ -53,11 +50,8 @@ void main() {
         await pumpWidgetWithSurfaceSize(
           tester,
           const material.Size(800, 600),
-          ShadcnApp(
-            theme: AppTheme.dark,
-            darkTheme: AppTheme.dark,
-            themeMode: ThemeMode.dark,
-            home: const material.SizedBox.expand(
+          queryaThemeTestShell(
+            child: const material.SizedBox.expand(
               child: WorkspacePanel(activeConnection: stubSplitWorkspaceConnection),
             ),
           ),

@@ -37,6 +37,21 @@ void main() {
       expect(theme.workbench.gitModified, const Color(0xFFE2C08D));
       expect(theme.workbench.gitUntracked, const Color(0xFF73C991));
       expect(theme.colorScheme.foreground, const Color(0xFFD4D4D4));
+      expect(theme.editor.background, const Color(0xFF1E1E1E));
+    });
+
+    test('editor.selectionBackground maps to editor.selection', () async {
+      const src = '''
+{
+  "type": "dark",
+  "colors": {
+    "editor.selectionBackground": "#123456"
+  }
+}
+''';
+      final manifest = VsCodeThemeManifest.fromJsonString(src);
+      final theme = buildQueryaThemeFromVsCodeManifest(manifest);
+      expect(theme.editor.selection, const Color(0xFF123456));
     });
 
     test('light_subset fixture uses light brightness', () async {
