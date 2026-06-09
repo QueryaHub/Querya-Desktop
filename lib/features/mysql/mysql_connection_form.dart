@@ -186,7 +186,11 @@ class _MysqlConnectionFormContentState
 
     return material.Container(
       constraints:
-          const material.BoxConstraints(maxWidth: 600, maxHeight: 640),
+          WindowLayout.dialogConstraints(
+            context,
+            maxWidth: 600,
+            maxHeight: 640,
+          ),
       decoration: material.BoxDecoration(
         color: theme.popover,
         borderRadius: material.BorderRadius.circular(radius),
