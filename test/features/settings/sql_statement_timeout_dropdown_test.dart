@@ -4,17 +4,16 @@ import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.
 import '../../support/querya_theme_test_shell.dart';
 
 void main() {
-  group('kSqlStatementTimeoutMenuEntries', () {
+  group('kSqlStatementTimeoutMenuItems', () {
     test('has seven entries with expected values', () {
-      expect(kSqlStatementTimeoutMenuEntries.length, 7);
-      final values =
-          kSqlStatementTimeoutMenuEntries.map((e) => e.value).toList();
+      expect(kSqlStatementTimeoutMenuItems.length, 7);
+      final values = kSqlStatementTimeoutMenuItems.map((e) => e.value).toList();
       expect(values, [null, 10, 30, 60, 120, 300, 600]);
     });
   });
 
   group('SqlStatementTimeoutDropdown', () {
-    testWidgets('builds DropdownMenu with current value', (tester) async {
+    testWidgets('builds MenuAnchor with current value', (tester) async {
       await tester.pumpWidget(
         queryaThemeTestShell(
           child: material.Scaffold(
@@ -27,15 +26,11 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.byType(material.DropdownMenu<int?>), findsOneWidget);
-      final menu = tester.widget<material.DropdownMenu<int?>>(
-        find.byType(material.DropdownMenu<int?>),
-      );
-      expect(menu.initialSelection, 60);
-      expect(menu.onSelected, isNotNull);
+      expect(find.byType(material.MenuAnchor), findsOneWidget);
+      expect(find.text('60 s'), findsOneWidget);
     });
 
-    testWidgets('disables changes when enabled is false', (tester) async {
+    testWidgets('disables menu when enabled is false', (tester) async {
       await tester.pumpWidget(
         queryaThemeTestShell(
           child: material.Scaffold(
@@ -49,10 +44,10 @@ void main() {
       );
       await tester.pump();
 
-      final menu = tester.widget<material.DropdownMenu<int?>>(
-        find.byType(material.DropdownMenu<int?>),
-      );
-      expect(menu.enabled, isFalse);
+      await tester.tap(find.text('30 s'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('10 s'), findsNothing);
     });
   });
 }

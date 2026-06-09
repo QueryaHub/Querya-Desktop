@@ -9,4 +9,5 @@
 library;
 
 export 'app_dialog.dart';
+export 'querya_dropdown.dart';
 export 'package:shadcn_flutter/shadcn_flutter.dart';

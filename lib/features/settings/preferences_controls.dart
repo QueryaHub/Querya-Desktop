@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/shared/widgets/querya_dropdown.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// Helper / hint copy in Preferences — readable on imported themes.
@@ -21,7 +22,7 @@ class PreferencesHint extends StatelessWidget {
   }
 }
 
-/// Material 3 dropdown anchored to the field (stable inside scroll views).
+/// Preferences dropdown backed by [QueryaDropdown] ([MenuAnchor]).
 class PreferencesDropdownMenu<T> extends StatelessWidget {
   const PreferencesDropdownMenu({
     super.key,
@@ -35,7 +36,7 @@ class PreferencesDropdownMenu<T> extends StatelessWidget {
 
   final T value;
   final List<material.DropdownMenuEntry<T>> entries;
-  final ValueChanged<T?> onSelected;
+  final material.ValueChanged<T?> onSelected;
 
   /// Fixed width for field + menu. Do not pass [double.infinity] — menu glitches.
   final double? width;
@@ -46,46 +47,22 @@ class PreferencesDropdownMenu<T> extends StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final mTheme = material.Theme.of(context);
-    final textStyle = material.TextStyle(
-      color: cs.popoverForeground,
-      fontSize: 14,
-    );
+    final items = [
+      for (final entry in entries)
+        QueryaDropdownItem<T>(
+          value: entry.value,
+          label: entry.label,
+          enabled: entry.enabled,
+        ),
+    ];
 
-    return material.Theme(
-      data: mTheme.copyWith(
-        canvasColor: cs.popover,
-        colorScheme: mTheme.colorScheme.copyWith(
-          surface: cs.popover,
-          onSurface: cs.popoverForeground,
-        ),
-      ),
-      child: material.DropdownMenu<T>(
-        enabled: enabled,
-        width: width,
-        expandedInsets:
-            expandToParent ? material.EdgeInsets.zero : null,
-        initialSelection: value,
-        onSelected: enabled ? onSelected : null,
-        dropdownMenuEntries: entries,
-        textStyle: textStyle,
-        inputDecorationTheme: material.InputDecorationTheme(
-          isDense: true,
-          contentPadding: const material.EdgeInsets.symmetric(vertical: 6),
-          enabledBorder: material.UnderlineInputBorder(
-            borderSide: material.BorderSide(color: cs.border),
-          ),
-          focusedBorder: material.UnderlineInputBorder(
-            borderSide: material.BorderSide(color: cs.ring, width: 2),
-          ),
-        ),
-        menuStyle: material.MenuStyle(
-          backgroundColor: material.WidgetStatePropertyAll(cs.popover),
-          surfaceTintColor: material.WidgetStatePropertyAll(cs.popover),
-          elevation: const material.WidgetStatePropertyAll(8),
-        ),
-      ),
+    return QueryaDropdown<T>(
+      value: value,
+      items: items,
+      enabled: enabled,
+      width: width,
+      expandToParent: expandToParent,
+      onSelected: onSelected,
     );
   }
 }
