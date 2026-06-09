@@ -94,7 +94,8 @@ class _PreferencesDialogContentState
       child: material.IconTheme(
         data: material.IconThemeData(color: onPopover),
         child: material.Container(
-          constraints: const material.BoxConstraints(
+          constraints: WindowLayout.dialogConstraints(
+            context,
             maxWidth: 480,
             minWidth: 360,
             maxHeight: 640,
