@@ -30,17 +30,20 @@ class SqlStatementTimeoutDropdown extends material.StatelessWidget {
     required this.value,
     required this.onChanged,
     this.enabled = true,
+    this.expandToParent = false,
   });
 
   final int? value;
   final void Function(int?) onChanged;
   final bool enabled;
+  final bool expandToParent;
 
   @override
   material.Widget build(material.BuildContext context) {
     return QueryaDropdown<int?>(
       value: value,
       enabled: enabled,
+      expandToParent: expandToParent,
       onSelected: onChanged,
       items: kSqlStatementTimeoutMenuItems,
     );

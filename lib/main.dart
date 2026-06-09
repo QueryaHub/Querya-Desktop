@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'app/app.dart';
 import 'core/editor/syntax_highlight_service.dart';
+import 'core/layout/ui_scale_controller.dart';
 import 'core/storage/local_db.dart';
 import 'core/theme/theme_controller.dart';
 
@@ -11,6 +12,7 @@ void main() async {
   await LocalDb.initFfi();
   await SyntaxHighlightService.ensureInitialized();
   await ThemeController.instance.load();
+  await UiScaleController.instance.load();
   runApp(const QueryaApp());
   doWhenWindowReady(() {
     final win = appWindow;

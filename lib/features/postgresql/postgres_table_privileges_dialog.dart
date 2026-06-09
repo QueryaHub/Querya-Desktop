@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
@@ -81,10 +79,23 @@ class _PrivilegesDialogBodyState extends material.State<_PrivilegesDialogBody> {
     final theme = Theme.of(context).colorScheme;
     final radius = Theme.of(context).radiusXxl;
     final mq = material.MediaQuery.sizeOf(context);
-    final dialogHeight =
-        math.min(480.0, math.max(260.0, mq.height * 0.72)).toDouble();
-    final dialogWidth =
-        math.min(560.0, math.max(300.0, mq.width - 48)).toDouble();
+    final hInset = WindowLayout.dialogVerticalInset(mq.height) * 2;
+    final wInset = WindowLayout.dialogHorizontalInset(mq.width) * 2;
+    final dialogHeight = WindowLayout.scaledDialogExtent(
+      context,
+      screenExtent: mq.height,
+      insetTotal: hInset,
+      baseMax: 480,
+      baseMin: 260,
+      viewportFactor: 0.72,
+    );
+    final dialogWidth = WindowLayout.scaledDialogExtent(
+      context,
+      screenExtent: mq.width,
+      insetTotal: wInset,
+      baseMax: 560,
+      baseMin: 300,
+    );
 
     return material.Dialog(
       backgroundColor: material.Colors.transparent,

@@ -94,7 +94,8 @@ class _PreferencesDialogContentState
       child: material.IconTheme(
         data: material.IconThemeData(color: onPopover),
         child: material.Container(
-          constraints: const material.BoxConstraints(
+          constraints: WindowLayout.dialogConstraints(
+            context,
             maxWidth: 480,
             minWidth: 360,
             maxHeight: 640,
@@ -144,17 +145,13 @@ class _PreferencesDialogContentState
                                   .small()
                                   .foreground(),
                               const material.SizedBox(height: 8),
-                              material.Row(
-                                children: [
-                                  const Text('Statement timeout')
-                                      .small()
-                                      .foreground(),
-                                  const material.SizedBox(width: 12),
-                                  SqlStatementTimeoutDropdown(
-                                    value: _pgTimeout,
-                                    onChanged: (v) => unawaited(_setPg(v)),
-                                  ),
-                                ],
+                              PreferencesFieldRow(
+                                label: 'Statement timeout',
+                                control: SqlStatementTimeoutDropdown(
+                                  value: _pgTimeout,
+                                  expandToParent: true,
+                                  onChanged: (v) => unawaited(_setPg(v)),
+                                ),
                               ),
                               const material.SizedBox(height: 24),
                               const Text('SQL — MySQL / MariaDB')
@@ -162,17 +159,13 @@ class _PreferencesDialogContentState
                                   .small()
                                   .foreground(),
                               const material.SizedBox(height: 8),
-                              material.Row(
-                                children: [
-                                  const Text('Statement timeout')
-                                      .small()
-                                      .foreground(),
-                                  const material.SizedBox(width: 12),
-                                  SqlStatementTimeoutDropdown(
-                                    value: _mysqlTimeout,
-                                    onChanged: (v) => unawaited(_setMysql(v)),
-                                  ),
-                                ],
+                              PreferencesFieldRow(
+                                label: 'Statement timeout',
+                                control: SqlStatementTimeoutDropdown(
+                                  value: _mysqlTimeout,
+                                  expandToParent: true,
+                                  onChanged: (v) => unawaited(_setMysql(v)),
+                                ),
                               ),
                               const material.SizedBox(height: 24),
                               const Text('SQL editor')
@@ -180,109 +173,78 @@ class _PreferencesDialogContentState
                                   .small()
                                   .foreground(),
                               const material.SizedBox(height: 8),
-                              material.Row(
-                                children: [
-                                  const Text('Max rows in results')
-                                      .small()
-                                      .foreground(),
-                                  const material.SizedBox(width: 12),
-                                  PreferencesDropdownMenu<int>(
-                                    value: _maxRows,
-                                    onSelected: (v) {
-                                      if (v != null) unawaited(_setMaxRows(v));
-                                    },
-                                    entries: [
-                                      for (final n in kSqlResultMaxRowsPresets)
-                                        material.DropdownMenuEntry(
-                                          value: n,
-                                          label: '$n',
-                                        ),
-                                    ],
-                                  ),
-                                ],
+                              PreferencesFieldRow(
+                                label: 'Max rows in results',
+                                control: PreferencesDropdownMenu<int>(
+                                  value: _maxRows,
+                                  onSelected: (v) {
+                                    if (v != null) unawaited(_setMaxRows(v));
+                                  },
+                                  entries: [
+                                    for (final n in kSqlResultMaxRowsPresets)
+                                      material.DropdownMenuEntry(
+                                        value: n,
+                                        label: '$n',
+                                      ),
+                                  ],
+                                ),
                               ),
                               const material.SizedBox(height: 12),
-                              material.Row(
-                                crossAxisAlignment:
-                                    material.CrossAxisAlignment.start,
-                                children: [
-                                  material.Padding(
-                                    padding:
-                                        const material.EdgeInsets.only(top: 8),
-                                    child: const Text('Query history limit')
-                                        .small()
-                                        .foreground(),
-                                  ),
-                                  const material.SizedBox(width: 12),
-                                  material.Expanded(
-                                    child: material.Column(
-                                      crossAxisAlignment:
-                                          material.CrossAxisAlignment.start,
-                                      children: [
-                                        PreferencesDropdownMenu<int>(
-                                          value: _historyMax,
-                                          expandToParent: true,
-                                          onSelected: (v) {
-                                            if (v != null) {
-                                              unawaited(_setHistoryMax(v));
-                                            }
-                                          },
-                                          entries: [
-                                            for (final n
-                                                in kSqlHistoryMaxEntriesPresets)
-                                              material.DropdownMenuEntry(
-                                                value: n,
-                                                label: '$n entries',
-                                              ),
-                                          ],
-                                        ),
-                                        const material.SizedBox(height: 4),
-                                        const PreferencesHint(
-                                          'Per connection and database; oldest queries are dropped.',
-                                        ),
-                                      ],
+                              PreferencesFieldRow(
+                                label: 'Query history limit',
+                                hint:
+                                    'Per connection and database; oldest queries are dropped.',
+                                control: PreferencesDropdownMenu<int>(
+                                  value: _historyMax,
+                                  onSelected: (v) {
+                                    if (v != null) {
+                                      unawaited(_setHistoryMax(v));
+                                    }
+                                  },
+                                  entries: [
+                                    for (final n in kSqlHistoryMaxEntriesPresets)
+                                      material.DropdownMenuEntry(
+                                        value: n,
+                                        label: '$n entries',
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              const material.SizedBox(height: 12),
+                              PreferencesFieldRow(
+                                label: 'Font size',
+                                control: PreferencesDropdownMenu<double>(
+                                  value: _fontSize,
+                                  onSelected: (v) {
+                                    if (v != null) unawaited(_setFont(v));
+                                  },
+                                  entries: const [
+                                    material.DropdownMenuEntry(
+                                      value: 11.0,
+                                      label: '11 pt',
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const material.SizedBox(height: 12),
-                              material.Row(
-                                children: [
-                                  const Text('Font size').small().foreground(),
-                                  const material.SizedBox(width: 12),
-                                  PreferencesDropdownMenu<double>(
-                                    value: _fontSize,
-                                    onSelected: (v) {
-                                      if (v != null) unawaited(_setFont(v));
-                                    },
-                                    entries: const [
-                                      material.DropdownMenuEntry(
-                                        value: 11.0,
-                                        label: '11 pt',
-                                      ),
-                                      material.DropdownMenuEntry(
-                                        value: 12.0,
-                                        label: '12 pt',
-                                      ),
-                                      material.DropdownMenuEntry(
-                                        value: 13.0,
-                                        label: '13 pt',
-                                      ),
-                                      material.DropdownMenuEntry(
-                                        value: 14.0,
-                                        label: '14 pt',
-                                      ),
-                                      material.DropdownMenuEntry(
-                                        value: 16.0,
-                                        label: '16 pt',
-                                      ),
-                                      material.DropdownMenuEntry(
-                                        value: 18.0,
-                                        label: '18 pt',
-                                      ),
-                                    ],
-                                  ),
-                                ],
+                                    material.DropdownMenuEntry(
+                                      value: 12.0,
+                                      label: '12 pt',
+                                    ),
+                                    material.DropdownMenuEntry(
+                                      value: 13.0,
+                                      label: '13 pt',
+                                    ),
+                                    material.DropdownMenuEntry(
+                                      value: 14.0,
+                                      label: '14 pt',
+                                    ),
+                                    material.DropdownMenuEntry(
+                                      value: 16.0,
+                                      label: '16 pt',
+                                    ),
+                                    material.DropdownMenuEntry(
+                                      value: 18.0,
+                                      label: '18 pt',
+                                    ),
+                                  ],
+                                ),
                               ),
                               const material.SizedBox(height: 16),
                               const PreferencesHint(
