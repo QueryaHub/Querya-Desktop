@@ -14,9 +14,26 @@ class UiScaleController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setScale(double value) async {
+  /// Live preview while dragging the scale slider (not persisted).
+  void setScalePreview(double value) {
+    final next = _normalizeUiScale(value);
+    if (next == _scale) return;
+    _scale = next;
+    notifyListeners();
+  }
+
+  /// Persist scale to SQLite (called on slider release).
+  Future<void> commitScale(double value) async {
     await AppSettings.instance.setUiScale(value);
     _scale = await AppSettings.instance.getUiScale();
     notifyListeners();
+  }
+
+  Future<void> setScale(double value) => commitScale(value);
+
+  double _normalizeUiScale(double value) {
+    final clamped = value.clamp(kMinUiScale, kMaxUiScale);
+    final steps = ((clamped - kMinUiScale) / kUiScaleStep).round();
+    return (kMinUiScale + steps * kUiScaleStep).clamp(kMinUiScale, kMaxUiScale);
   }
 }

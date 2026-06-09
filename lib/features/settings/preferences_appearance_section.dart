@@ -3,17 +3,11 @@ import 'dart:async' show unawaited;
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/ui_scale_controller.dart';
-import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/theme/querya_theme_preset.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:querya_desktop/core/theme/theme_import_service.dart';
 import 'package:querya_desktop/features/settings/preferences_controls.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-
-String _uiScaleLabel(double scale) {
-  final pct = (scale * 100).round();
-  return '$pct%';
-}
 
 /// Appearance / theme controls for [PreferencesDialog].
 class PreferencesAppearanceSection extends material.StatefulWidget {
@@ -55,10 +49,6 @@ class _PreferencesAppearanceSectionState
 
   Future<void> _setPreset(QueryaThemePreset preset) async {
     await _controller.setPreset(preset);
-  }
-
-  Future<void> _setUiScale(double scale) async {
-    await _uiScale.setScale(scale);
   }
 
   Future<void> _pickAndImportTheme() async {
@@ -165,20 +155,9 @@ class _PreferencesAppearanceSectionState
         const material.SizedBox(height: 12),
         PreferencesFieldRow(
           label: 'Interface scale',
-          hint: 'Scales labels, menus, and compact controls across the app.',
-          control: PreferencesDropdownMenu<double>(
-            value: _uiScale.scale,
-            onSelected: (v) {
-              if (v != null) unawaited(_setUiScale(v));
-            },
-            entries: [
-              for (final scale in kUiScalePresets)
-                material.DropdownMenuEntry(
-                  value: scale,
-                  label: _uiScaleLabel(scale),
-                ),
-            ],
-          ),
+          hint:
+              'Drag to resize the UI (75–200%). Changes apply live; release to save.',
+          control: InterfaceScaleSlider(scale: _uiScale.scale),
         ),
         const material.SizedBox(height: 12),
         PreferencesFieldRow(

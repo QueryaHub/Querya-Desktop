@@ -32,8 +32,6 @@ abstract final class QueryaDropdownTokens {
   static const material.EdgeInsets menuItemPadding =
       material.EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0);
 
-  static const double menuItemMinWidth = 180.0;
-
   static const double fontSize = 14.0;
 
   static const double lineHeight = 1.25;

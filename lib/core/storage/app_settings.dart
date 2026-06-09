@@ -25,14 +25,19 @@ const double kDefaultSqlEditorFontSize = 13;
 /// Default interface scale (1.0 = 100%).
 const double kDefaultUiScale = 1.0;
 
-/// Allowed UI scale presets (nearest is used when persisting).
-const List<double> kUiScalePresets = [0.85, 0.9, 1.0, 1.1, 1.25, 1.5];
+/// Minimum interface scale (Telegram Desktop supports 75%).
+const double kMinUiScale = 0.75;
+
+/// Maximum interface scale (Telegram goes to 300%; 200% is enough for Querya).
+const double kMaxUiScale = 2.0;
+
+/// Slider step — 1% increments, like Telegram's interface scale control.
+const double kUiScaleStep = 0.01;
 
 double _normalizeUiScale(double value) {
-  final clamped = value.clamp(0.85, 1.5);
-  return kUiScalePresets.reduce(
-    (a, b) => (clamped - a).abs() <= (clamped - b).abs() ? a : b,
-  );
+  final clamped = value.clamp(kMinUiScale, kMaxUiScale);
+  final steps = ((clamped - kMinUiScale) / kUiScaleStep).round();
+  return (kMinUiScale + steps * kUiScaleStep).clamp(kMinUiScale, kMaxUiScale);
 }
 
 /// Default cap on stored SQL history entries per connection + database.
@@ -183,12 +188,10 @@ class AppSettings {
   }
 
   Future<void> setUiScale(double scale) async {
-    final preset = kUiScalePresets.contains(scale)
-        ? scale
-        : _normalizeUiScale(scale);
+    final normalized = _normalizeUiScale(scale);
     await LocalDb.instance.setAppSetting(
       AppSettingsKeys.uiScale,
-      preset.toString(),
+      normalized.toStringAsFixed(2),
     );
     AppSettingsRevision.bump();
   }

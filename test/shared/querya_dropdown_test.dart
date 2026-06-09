@@ -68,6 +68,33 @@ void main() {
       expect(picked, 2);
     });
 
+    testWidgets('menu anchor constrains width to trigger', (tester) async {
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: material.SizedBox(
+              width: 240,
+              child: QueryaDropdown<String>(
+                value: 'a',
+                expandToParent: true,
+                items: const [
+                  QueryaDropdownItem(value: 'a', label: 'Alpha'),
+                  QueryaDropdownItem(value: 'b', label: 'Beta'),
+                ],
+                onSelected: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final anchor = tester.widget<material.MenuAnchor>(
+        find.byType(material.MenuAnchor),
+      );
+      expect(anchor.crossAxisUnconstrained, isFalse);
+    });
+
     testWidgets('shows check on selected menu item', (tester) async {
       await tester.pumpWidget(
         queryaThemeTestShell(
