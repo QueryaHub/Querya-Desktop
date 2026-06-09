@@ -9,5 +9,5 @@
 library;
 
 export 'app_dialog.dart';
-export 'querya_dropdown.dart';
+export 'querya_dropdown.dart' show QueryaDropdown, QueryaDropdownItem, QueryaDropdownTokens;
 export 'package:shadcn_flutter/shadcn_flutter.dart';
