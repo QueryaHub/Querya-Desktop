@@ -208,6 +208,7 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
 
     final anchor = material.MenuAnchor(
       controller: _controller,
+      crossAxisUnconstrained: false,
       alignmentOffset: material.Offset(
         widget.alignmentOffset.dx,
         context.scaled(widget.alignmentOffset.dy),
@@ -306,7 +307,6 @@ class _QueryaDropdownMenuItemState<T> extends material.State<_QueryaDropdownMenu
             ? cs.muted.withValues(alpha: 0.32)
             : material.Colors.transparent;
     final itemHeight = QueryaDropdownTokens.scaledMenuItemHeight(context);
-    final minWidth = context.scaled(QueryaDropdownTokens.menuItemMinWidth);
     final radius = context.scaled(QueryaDropdownTokens.menuBorderRadius);
     final slot = context.scaled(QueryaDropdownTokens.selectedCheckSlotWidth);
 
@@ -318,7 +318,7 @@ class _QueryaDropdownMenuItemState<T> extends material.State<_QueryaDropdownMenu
       onExit: widget.enabled ? (_) => setState(() => _hovered = false) : null,
       child: material.MenuItemButton(
         style: material.MenuItemButton.styleFrom(
-          minimumSize: material.Size(minWidth, itemHeight),
+          minimumSize: material.Size(double.infinity, itemHeight),
           padding: material.EdgeInsets.zero,
           foregroundColor: cs.popoverForeground,
           disabledForegroundColor: cs.mutedForeground.withValues(alpha: 0.5),

@@ -230,14 +230,17 @@ void main() {
   });
 
   group('ui scale', () {
-    test('defaults to 1.0 and snaps to presets', () async {
+    test('defaults to 1.0 and stores continuous 1% steps', () async {
       expect(await AppSettings.instance.getUiScale(), kDefaultUiScale);
 
       await AppSettings.instance.setUiScale(1.12);
-      expect(await AppSettings.instance.getUiScale(), 1.1);
+      expect(await AppSettings.instance.getUiScale(), closeTo(1.12, 0.001));
 
-      await AppSettings.instance.setUiScale(1.5);
-      expect(await AppSettings.instance.getUiScale(), 1.5);
+      await AppSettings.instance.setUiScale(0.75);
+      expect(await AppSettings.instance.getUiScale(), kMinUiScale);
+
+      await AppSettings.instance.setUiScale(2.5);
+      expect(await AppSettings.instance.getUiScale(), kMaxUiScale);
 
       await LocalDb.instance.deleteAppSetting(AppSettingsKeys.uiScale);
     });
