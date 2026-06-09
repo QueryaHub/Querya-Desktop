@@ -333,34 +333,17 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
         ),
         material.Padding(
           padding: const material.EdgeInsets.symmetric(horizontal: 4),
-          child: material.DropdownButton<Duration?>(
+          child: QueryaDropdown<Duration?>(
+            width: 132,
             value: _autoRefreshInterval,
-            underline: const material.SizedBox.shrink(),
-            isDense: true,
-            borderRadius: material.BorderRadius.circular(8),
             items: const [
-              material.DropdownMenuItem<Duration?>(
-                value: null,
-                child: material.Text('Auto: off'),
-              ),
-              material.DropdownMenuItem<Duration?>(
-                value: Duration(seconds: 3),
-                child: material.Text('Auto: 3 s'),
-              ),
-              material.DropdownMenuItem<Duration?>(
-                value: Duration(seconds: 10),
-                child: material.Text('Auto: 10 s'),
-              ),
-              material.DropdownMenuItem<Duration?>(
-                value: Duration(seconds: 30),
-                child: material.Text('Auto: 30 s'),
-              ),
-              material.DropdownMenuItem<Duration?>(
-                value: Duration(seconds: 60),
-                child: material.Text('Auto: 60 s'),
-              ),
+              QueryaDropdownItem<Duration?>(value: null, label: 'Auto: off'),
+              QueryaDropdownItem(value: Duration(seconds: 3), label: 'Auto: 3 s'),
+              QueryaDropdownItem(value: Duration(seconds: 10), label: 'Auto: 10 s'),
+              QueryaDropdownItem(value: Duration(seconds: 30), label: 'Auto: 30 s'),
+              QueryaDropdownItem(value: Duration(seconds: 60), label: 'Auto: 60 s'),
             ],
-            onChanged: (value) {
+            onSelected: (value) {
               setState(() => _autoRefreshInterval = value);
               _startTimer();
             },
