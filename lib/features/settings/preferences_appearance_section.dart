@@ -156,7 +156,7 @@ class _PreferencesAppearanceSectionState
         PreferencesFieldRow(
           label: 'Interface scale',
           hint:
-              'Drag to resize the UI (75–200%). Changes apply live; release to save.',
+              'Snap to presets (75%, 85%, 90%, 100% …). Hold Shift for 1% fine control.',
           control: InterfaceScaleSlider(scale: _uiScale.scale),
         ),
         const material.SizedBox(height: 12),
