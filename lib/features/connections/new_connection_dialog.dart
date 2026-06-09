@@ -195,7 +195,7 @@ class _NewConnectionDialogContentState extends material.State<_NewConnectionDial
                     padding: material.EdgeInsets.all(gridPad),
                     child: _filteredTypes.isEmpty
                         ? material.Center(
-                            child: Text('No databases match your search.')
+                            child: const Text('No databases match your search.')
                                 .muted()
                                 .small(),
                           )
