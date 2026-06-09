@@ -15,25 +15,29 @@ class UiScaleController extends ChangeNotifier {
   }
 
   /// Live preview while dragging the scale slider (not persisted).
-  void setScalePreview(double value) {
-    final next = _normalizeUiScale(value);
+  void setScalePreview(double value, {bool fine = false}) {
+    final next = _normalize(value, fine: fine);
     if (next == _scale) return;
     _scale = next;
     notifyListeners();
   }
 
   /// Persist scale to SQLite (called on slider release).
-  Future<void> commitScale(double value) async {
-    await AppSettings.instance.setUiScale(value);
+  Future<void> commitScale(double value, {bool fine = false}) async {
+    await AppSettings.instance.setUiScale(value, fine: fine);
     _scale = await AppSettings.instance.getUiScale();
     notifyListeners();
   }
 
-  Future<void> setScale(double value) => commitScale(value);
+  Future<void> setScale(double value, {bool fine = false}) =>
+      commitScale(value, fine: fine);
 
-  double _normalizeUiScale(double value) {
+  double _normalize(double value, {required bool fine}) {
     final clamped = value.clamp(kMinUiScale, kMaxUiScale);
-    final steps = ((clamped - kMinUiScale) / kUiScaleStep).round();
-    return (kMinUiScale + steps * kUiScaleStep).clamp(kMinUiScale, kMaxUiScale);
+    if (fine) {
+      final steps = ((clamped - kMinUiScale) / kUiScaleStep).round();
+      return (kMinUiScale + steps * kUiScaleStep).clamp(kMinUiScale, kMaxUiScale);
+    }
+    return snapUiScaleToPreset(clamped);
   }
 }

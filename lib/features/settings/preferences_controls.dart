@@ -1,6 +1,7 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/layout/ui_scale_controller.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/shared/widgets/querya_dropdown.dart';
@@ -75,52 +76,106 @@ class PreferencesFieldRow extends StatelessWidget {
   }
 }
 
-/// Telegram-style interface scale slider (75–200%, 1% steps, live preview).
-class InterfaceScaleSlider extends StatelessWidget {
+/// Interface scale slider: fixed presets by default; hold Shift for 1% fine steps.
+class InterfaceScaleSlider extends material.StatefulWidget {
   const InterfaceScaleSlider({super.key, required this.scale});
 
   final double scale;
 
-  static int get _divisions =>
+  @override
+  material.State<InterfaceScaleSlider> createState() =>
+      _InterfaceScaleSliderState();
+}
+
+class _InterfaceScaleSliderState extends material.State<InterfaceScaleSlider> {
+  bool _fineControl = false;
+
+  static int get _fineDivisions =>
       ((kMaxUiScale - kMinUiScale) / kUiScaleStep).round();
+
+  bool get _shiftHeld => HardwareKeyboard.instance.isShiftPressed;
+
+  void _syncModifierKeys() {
+    final fine = _shiftHeld;
+    if (fine != _fineControl) {
+      setState(() => _fineControl = fine);
+    }
+  }
+
+  double _sliderPosition(double scale, {required bool fine}) {
+    if (fine) return scale;
+    return nearestUiScalePresetIndex(scale).toDouble();
+  }
+
+  double _scaleFromSlider(double position, {required bool fine}) {
+    if (fine) return position;
+    final index = position.round().clamp(0, kUiScalePresets.length - 1);
+    return kUiScalePresets[index];
+  }
 
   @override
   material.Widget build(material.BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final pct = (scale * 100).round();
+    final pct = (widget.scale * 100).round();
+    final fine = _fineControl;
 
-    return material.Row(
-      children: [
-        material.Expanded(
-          child: Slider(
-            value: SliderValue.single(scale),
-            min: kMinUiScale,
-            max: kMaxUiScale,
-            divisions: _divisions,
-            hintValue: const SliderValue.single(kDefaultUiScale),
-            onChanged: (value) {
-              UiScaleController.instance.setScalePreview(value.value);
-            },
-            onChangeEnd: (value) {
-              unawaited(UiScaleController.instance.commitScale(value.value));
-            },
-          ),
-        ),
-        const material.SizedBox(width: 8),
-        material.SizedBox(
-          width: 44,
-          child: material.Text(
-            '$pct%',
-            textAlign: material.TextAlign.right,
-            style: material.TextStyle(
-              fontSize: 13,
-              fontWeight: material.FontWeight.w600,
-              color: cs.popoverForeground,
+    return material.Listener(
+        onPointerDown: (_) => _syncModifierKeys(),
+        onPointerMove: (_) => _syncModifierKeys(),
+        child: material.Row(
+          children: [
+            material.Expanded(
+              child: Slider(
+                value: SliderValue.single(
+                  _sliderPosition(widget.scale, fine: fine),
+                ),
+                min: fine ? kMinUiScale : 0,
+                max: fine
+                    ? kMaxUiScale
+                    : (kUiScalePresets.length - 1).toDouble(),
+                divisions: fine ? _fineDivisions : kUiScalePresets.length - 1,
+                hintValue: const SliderValue.single(kDefaultUiScale),
+                onChanged: (value) {
+                  _syncModifierKeys();
+                  final next = _scaleFromSlider(
+                    value.value,
+                    fine: _shiftHeld,
+                  );
+                  UiScaleController.instance.setScalePreview(
+                    next,
+                    fine: _shiftHeld,
+                  );
+                },
+                onChangeEnd: (value) {
+                  final next = _scaleFromSlider(
+                    value.value,
+                    fine: _shiftHeld,
+                  );
+                  unawaited(
+                    UiScaleController.instance.commitScale(
+                      next,
+                      fine: _shiftHeld,
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
+            const material.SizedBox(width: 8),
+            material.SizedBox(
+              width: 44,
+              child: material.Text(
+                '$pct%',
+                textAlign: material.TextAlign.right,
+                style: material.TextStyle(
+                  fontSize: 13,
+                  fontWeight: material.FontWeight.w600,
+                  color: cs.popoverForeground,
+                ),
+              ),
+            ),
+          ],
         ),
-      ],
-    );
+      );
   }
 }
 

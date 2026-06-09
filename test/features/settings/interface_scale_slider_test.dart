@@ -23,12 +23,14 @@ void main() {
       expect(find.byType(Slider), findsOneWidget);
     });
 
-    test('preview updates controller without persisting', () {
+    test('preview snaps to presets unless fine mode', () {
       final controller = UiScaleController.instance;
       final before = controller.scale;
       controller.setScalePreview(1.15);
+      expect(controller.scale, 1.1);
+      controller.setScalePreview(1.15, fine: true);
       expect(controller.scale, closeTo(1.15, 0.001));
-      controller.setScalePreview(before);
+      controller.setScalePreview(before, fine: true);
     });
   });
 
@@ -37,6 +39,23 @@ void main() {
       expect(kMinUiScale, 0.75);
       expect(kMaxUiScale, 2.0);
       expect(kUiScaleStep, 0.01);
+    });
+
+    test('presets snap to fixed ticks', () {
+      expect(kUiScalePresets, [
+        0.75,
+        0.85,
+        0.9,
+        1.0,
+        1.1,
+        1.25,
+        1.5,
+        1.75,
+        2.0,
+      ]);
+      expect(snapUiScaleToPreset(1.12), 1.1);
+      expect(snapUiScaleToPreset(0.88), 0.9);
+      expect(nearestUiScalePresetIndex(1.0), 3);
     });
   });
 }
