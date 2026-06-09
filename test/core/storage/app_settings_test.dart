@@ -229,6 +229,26 @@ void main() {
     });
   });
 
+  group('ui scale', () {
+    test('defaults to 1.0 and stores continuous 1% steps', () async {
+      expect(await AppSettings.instance.getUiScale(), kDefaultUiScale);
+
+      await AppSettings.instance.setUiScale(1.12, fine: true);
+      expect(await AppSettings.instance.getUiScale(), closeTo(1.12, 0.001));
+
+      await AppSettings.instance.setUiScale(0.75);
+      expect(await AppSettings.instance.getUiScale(), kMinUiScale);
+
+      await AppSettings.instance.setUiScale(2.5);
+      expect(await AppSettings.instance.getUiScale(), kMaxUiScale);
+
+      await AppSettings.instance.setUiScale(1.12, fine: false);
+      expect(await AppSettings.instance.getUiScale(), 1.1);
+
+      await LocalDb.instance.deleteAppSetting(AppSettingsKeys.uiScale);
+    });
+  });
+
   group('AppSettingsRevision', () {
     test('bump increments listenable value', () {
       final start = AppSettingsRevision.listenable.value;

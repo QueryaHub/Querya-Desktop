@@ -52,7 +52,7 @@ class _CreateMongoDBDialogContentState extends material.State<_CreateMongoDBDial
     final radius = Theme.of(context).radiusXxl;
 
     return material.Container(
-      constraints: const material.BoxConstraints(maxWidth: 500),
+      constraints: WindowLayout.dialogConstraints(context, maxWidth: 500),
       decoration: material.BoxDecoration(
         color: theme.popover,
         borderRadius: material.BorderRadius.circular(radius),

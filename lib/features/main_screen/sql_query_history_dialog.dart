@@ -125,7 +125,8 @@ class _SqlQueryHistoryDialogContentState
     final scheme = Theme.of(context).colorScheme;
     final radius = Theme.of(context).radiusXxl;
     return material.Container(
-      constraints: const material.BoxConstraints(
+      constraints: WindowLayout.dialogConstraints(
+        context,
         maxWidth: 520,
         minWidth: 320,
         maxHeight: 440,

@@ -89,9 +89,8 @@ class _NewConnectionDialogContentState extends material.State<_NewConnectionDial
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context).colorScheme;
     final radius = Theme.of(context).radiusXxl;
-    final mq = MediaQuery.sizeOf(context);
-    final dialogMaxW = WindowLayout.newConnectionDialogMaxWidth(mq.width);
-    final dialogH = WindowLayout.newConnectionDialogHeight(mq.height);
+    final dialogMaxW = WindowLayout.newConnectionDialogMaxWidth(context);
+    final dialogH = WindowLayout.newConnectionDialogHeight(context);
     final headerPadH = dialogMaxW < 420 ? 16.0 : 24.0;
     final stackFilters = dialogMaxW < 520;
 
@@ -185,8 +184,8 @@ class _NewConnectionDialogContentState extends material.State<_NewConnectionDial
                   final innerW = math.max(0.0, constraints.maxWidth - gridPad * 2);
                   final crossAxisCount =
                       WindowLayout.dbTypeGridCrossAxisCount(innerW);
-                  final cardHeight =
-                      WindowLayout.dbTypeCardHeight(crossAxisCount);
+                    final cardHeight =
+                        WindowLayout.dbTypeCardHeight(context, crossAxisCount);
                   final cardWidth = crossAxisCount > 0
                       ? (innerW - spacing * (crossAxisCount - 1)) / crossAxisCount
                       : innerW;

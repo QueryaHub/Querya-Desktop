@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
+import 'package:querya_desktop/core/layout/ui_scale.dart';
 
 /// Breakpoints and sizes derived from window / overlay size (desktop adaptive UI).
 abstract class WindowLayout {
@@ -18,6 +19,36 @@ abstract class WindowLayout {
     return (screenHeight * 0.04).clamp(12.0, 40.0);
   }
 
+  /// Scaled [BoxConstraints] for modal dialogs (respects [QueryaUiScaleScope]).
+  static BoxConstraints dialogConstraints(
+    BuildContext context, {
+    double? maxWidth,
+    double? minWidth,
+    double? maxHeight,
+    double? minHeight,
+  }) {
+    return BoxConstraints(
+      maxWidth: maxWidth != null ? context.scaled(maxWidth) : double.infinity,
+      minWidth: minWidth != null ? context.scaled(minWidth) : 0,
+      maxHeight: maxHeight != null ? context.scaled(maxHeight) : double.infinity,
+      minHeight: minHeight != null ? context.scaled(minHeight) : 0,
+    );
+  }
+
+  /// Fits a base dialog dimension into the viewport, then applies UI scale.
+  static double scaledDialogExtent(
+    BuildContext context, {
+    required double screenExtent,
+    required double insetTotal,
+    required double baseMax,
+    required double baseMin,
+    double viewportFactor = 1.0,
+  }) {
+    final available = math.max(0.0, screenExtent - insetTotal);
+    final base = math.min(baseMax, math.max(baseMin, available * viewportFactor));
+    return math.min(context.scaled(base), available);
+  }
+
   /// Use for [Dialog.insetPadding] / modal margins on small windows.
   static EdgeInsets dialogSymmetricInsets(BuildContext context) {
     final mq = MediaQuery.sizeOf(context);
@@ -28,15 +59,30 @@ abstract class WindowLayout {
   }
 
   /// "Select database" and similar pickers.
-  static double newConnectionDialogMaxWidth(double screenWidth) {
-    final inset = dialogHorizontalInset(screenWidth) * 2;
-    return math.min(740, math.max(280.0, screenWidth - inset));
+  static double newConnectionDialogMaxWidth(BuildContext context) {
+    final mq = MediaQuery.sizeOf(context);
+    final inset = dialogHorizontalInset(mq.width) * 2;
+    return scaledDialogExtent(
+      context,
+      screenExtent: mq.width,
+      insetTotal: inset,
+      baseMax: 740,
+      baseMin: 280,
+      viewportFactor: 1.0,
+    );
   }
 
-  static double newConnectionDialogHeight(double screenHeight) {
-    final inset = dialogVerticalInset(screenHeight) * 2;
-    final h = screenHeight - inset;
-    return math.min(580, math.max(320.0, h * 0.78));
+  static double newConnectionDialogHeight(BuildContext context) {
+    final mq = MediaQuery.sizeOf(context);
+    final inset = dialogVerticalInset(mq.height) * 2;
+    return scaledDialogExtent(
+      context,
+      screenExtent: mq.height,
+      insetTotal: inset,
+      baseMax: 580,
+      baseMin: 320,
+      viewportFactor: 0.78,
+    );
   }
 
   static double newConnectionSidebarWidth(double dialogWidth) {
@@ -53,12 +99,13 @@ abstract class WindowLayout {
     return 1;
   }
 
-  static double dbTypeCardHeight(int crossAxisCount) {
-    return switch (crossAxisCount) {
-      4 => 144,
-      2 => 138,
-      _ => 132,
+  static double dbTypeCardHeight(BuildContext context, int crossAxisCount) {
+    final base = switch (crossAxisCount) {
+      4 => 144.0,
+      2 => 138.0,
+      _ => 132.0,
     };
+    return context.scaled(base);
   }
 
   /// Empty workspace hero content max width (stays within viewport minus padding).
