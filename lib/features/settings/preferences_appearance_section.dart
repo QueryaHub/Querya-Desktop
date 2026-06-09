@@ -2,12 +2,18 @@ import 'dart:async' show unawaited;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/layout/ui_scale_controller.dart';
+import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/theme/querya_theme_preset.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:querya_desktop/core/theme/theme_import_service.dart';
 import 'package:querya_desktop/features/settings/preferences_controls.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+
+String _uiScaleLabel(double scale) {
+  final pct = (scale * 100).round();
+  return '$pct%';
+}
 
 /// Appearance / theme controls for [PreferencesDialog].
 class PreferencesAppearanceSection extends material.StatefulWidget {
@@ -21,6 +27,7 @@ class PreferencesAppearanceSection extends material.StatefulWidget {
 class _PreferencesAppearanceSectionState
     extends material.State<PreferencesAppearanceSection> {
   final _controller = ThemeController.instance;
+  final _uiScale = UiScaleController.instance;
   String? _importError;
   bool _importing = false;
 
@@ -28,11 +35,13 @@ class _PreferencesAppearanceSectionState
   void initState() {
     super.initState();
     _controller.addListener(_onThemeChanged);
+    _uiScale.addListener(_onThemeChanged);
   }
 
   @override
   void dispose() {
     _controller.removeListener(_onThemeChanged);
+    _uiScale.removeListener(_onThemeChanged);
     super.dispose();
   }
 
@@ -46,6 +55,10 @@ class _PreferencesAppearanceSectionState
 
   Future<void> _setPreset(QueryaThemePreset preset) async {
     await _controller.setPreset(preset);
+  }
+
+  Future<void> _setUiScale(double scale) async {
+    await _uiScale.setScale(scale);
   }
 
   Future<void> _pickAndImportTheme() async {
@@ -101,77 +114,90 @@ class _PreferencesAppearanceSectionState
       children: [
         const Text('Appearance').semiBold().small().foreground(),
         const material.SizedBox(height: 8),
-        material.Row(
-          children: [
-            const Text('Theme mode').small().foreground(),
-            const material.SizedBox(width: 12),
-            PreferencesDropdownMenu<ThemeMode>(
-              value: c.themeMode,
-              onSelected: (v) {
-                if (v != null) unawaited(_setThemeMode(v));
-              },
-              entries: const [
-                material.DropdownMenuEntry(
-                  value: ThemeMode.dark,
-                  label: 'Dark',
-                ),
-                material.DropdownMenuEntry(
-                  value: ThemeMode.light,
-                  label: 'Light',
-                ),
-                material.DropdownMenuEntry(
-                  value: ThemeMode.system,
-                  label: 'System',
-                ),
-              ],
-            ),
-          ],
-        ),
-        const material.SizedBox(height: 12),
-        material.Row(
-          crossAxisAlignment: material.CrossAxisAlignment.start,
-          children: [
-            material.Padding(
-              padding: const material.EdgeInsets.only(top: 10),
-              child: const Text('Color preset').small().foreground(),
-            ),
-            const material.SizedBox(width: 12),
-            material.Expanded(
-              child: PreferencesDropdownMenu<QueryaThemePreset>(
-                value: c.preset,
-                expandToParent: true,
-                onSelected: (v) {
-                  if (v != null) unawaited(_setPreset(v));
-                },
-                entries: [
-                  const material.DropdownMenuEntry(
-                    value: QueryaThemePreset.queryaDark,
-                    label: 'Querya Dark',
-                  ),
-                  const material.DropdownMenuEntry(
-                    value: QueryaThemePreset.queryaLight,
-                    label: 'Querya Light',
-                  ),
-                  material.DropdownMenuEntry(
-                    value: QueryaThemePreset.imported,
-                    enabled: c.hasImportedTheme,
-                    label: importedLabel,
-                  ),
-                ],
+        PreferencesFieldRow(
+          label: 'Theme mode',
+          control: PreferencesDropdownMenu<ThemeMode>(
+            value: c.themeMode,
+            onSelected: (v) {
+              if (v != null) unawaited(_setThemeMode(v));
+            },
+            entries: const [
+              material.DropdownMenuEntry(
+                value: ThemeMode.dark,
+                label: 'Dark',
               ),
-            ),
-          ],
+              material.DropdownMenuEntry(
+                value: ThemeMode.light,
+                label: 'Light',
+              ),
+              material.DropdownMenuEntry(
+                value: ThemeMode.system,
+                label: 'System',
+              ),
+            ],
+          ),
         ),
         const material.SizedBox(height: 12),
-        material.Row(
-          children: [
-            const Text('Animate theme changes').small().foreground(),
-            const material.SizedBox(width: 12),
-            material.Switch(
-              value: c.themeAnimationEnabled,
-              onChanged: (v) => unawaited(_setThemeAnimation(v)),
-            ),
-          ],
+        PreferencesFieldRow(
+          label: 'Color preset',
+          control: PreferencesDropdownMenu<QueryaThemePreset>(
+            value: c.preset,
+            onSelected: (v) {
+              if (v != null) unawaited(_setPreset(v));
+            },
+            entries: [
+              const material.DropdownMenuEntry(
+                value: QueryaThemePreset.queryaDark,
+                label: 'Querya Dark',
+              ),
+              const material.DropdownMenuEntry(
+                value: QueryaThemePreset.queryaLight,
+                label: 'Querya Light',
+              ),
+              material.DropdownMenuEntry(
+                value: QueryaThemePreset.imported,
+                enabled: c.hasImportedTheme,
+                label: importedLabel,
+              ),
+            ],
+          ),
+        ),
+        const material.SizedBox(height: 12),
+        PreferencesFieldRow(
+          label: 'Interface scale',
+          hint: 'Scales labels, menus, and compact controls across the app.',
+          control: PreferencesDropdownMenu<double>(
+            value: _uiScale.scale,
+            onSelected: (v) {
+              if (v != null) unawaited(_setUiScale(v));
+            },
+            entries: [
+              for (final scale in kUiScalePresets)
+                material.DropdownMenuEntry(
+                  value: scale,
+                  label: _uiScaleLabel(scale),
+                ),
+            ],
+          ),
+        ),
+        const material.SizedBox(height: 12),
+        PreferencesFieldRow(
+          label: 'Animate theme changes',
+          control: material.Builder(
+            builder: (context) {
+              final h = QueryaDropdownTokens.scaledTriggerHeight(context);
+              return material.SizedBox(
+                height: h,
+                child: material.Align(
+                  alignment: material.Alignment.centerLeft,
+                  child: material.Switch(
+                    value: c.themeAnimationEnabled,
+                    onChanged: (v) => unawaited(_setThemeAnimation(v)),
+                  ),
+                ),
+              );
+            },
+          ),
         ),
         const material.SizedBox(height: 4),
         const PreferencesHint(

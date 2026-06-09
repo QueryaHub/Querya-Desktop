@@ -22,6 +22,55 @@ class PreferencesHint extends StatelessWidget {
   }
 }
 
+/// Label + full-width control row for Preferences (uniform dropdown width).
+class PreferencesFieldRow extends StatelessWidget {
+  const PreferencesFieldRow({
+    super.key,
+    required this.label,
+    required this.control,
+    this.hint,
+    this.labelWidth = kPreferencesLabelWidth,
+  });
+
+  final String label;
+  final material.Widget control;
+  final String? hint;
+  final double labelWidth;
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    final triggerHeight = QueryaDropdownTokens.scaledTriggerHeight(context);
+
+    return material.Column(
+      crossAxisAlignment: material.CrossAxisAlignment.stretch,
+      children: [
+        material.Row(
+          crossAxisAlignment: material.CrossAxisAlignment.start,
+          children: [
+            material.SizedBox(
+              width: labelWidth,
+              height: triggerHeight,
+              child: material.Align(
+                alignment: material.Alignment.centerLeft,
+                child: Text(label).small().foreground(),
+              ),
+            ),
+            const material.SizedBox(width: 12),
+            material.Expanded(child: control),
+          ],
+        ),
+        if (hint != null) ...[
+          const material.SizedBox(height: 4),
+          material.Padding(
+            padding: material.EdgeInsets.only(left: labelWidth + 12),
+            child: PreferencesHint(hint!),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 /// Preferences dropdown backed by [QueryaDropdown] ([MenuAnchor]).
 class PreferencesDropdownMenu<T> extends StatelessWidget {
   const PreferencesDropdownMenu({
@@ -30,7 +79,7 @@ class PreferencesDropdownMenu<T> extends StatelessWidget {
     required this.entries,
     required this.onSelected,
     this.width,
-    this.expandToParent = false,
+    this.expandToParent = true,
     this.enabled = true,
   });
 
@@ -38,10 +87,10 @@ class PreferencesDropdownMenu<T> extends StatelessWidget {
   final List<material.DropdownMenuEntry<T>> entries;
   final material.ValueChanged<T?> onSelected;
 
-  /// Fixed width for field + menu. Do not pass [double.infinity] — menu glitches.
+  /// Fixed width when [expandToParent] is false.
   final double? width;
 
-  /// Fill [Expanded] parent width without stretching the popup to screen width.
+  /// Fill parent — use inside [PreferencesFieldRow].
   final bool expandToParent;
   final bool enabled;
 

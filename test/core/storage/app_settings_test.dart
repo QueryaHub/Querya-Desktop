@@ -229,6 +229,20 @@ void main() {
     });
   });
 
+  group('ui scale', () {
+    test('defaults to 1.0 and snaps to presets', () async {
+      expect(await AppSettings.instance.getUiScale(), kDefaultUiScale);
+
+      await AppSettings.instance.setUiScale(1.12);
+      expect(await AppSettings.instance.getUiScale(), 1.1);
+
+      await AppSettings.instance.setUiScale(1.5);
+      expect(await AppSettings.instance.getUiScale(), 1.5);
+
+      await LocalDb.instance.deleteAppSetting(AppSettingsKeys.uiScale);
+    });
+  });
+
   group('AppSettingsRevision', () {
     test('bump increments listenable value', () {
       final start = AppSettingsRevision.listenable.value;

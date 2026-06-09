@@ -7,11 +7,11 @@ import '../support/querya_theme_test_shell.dart';
 void main() {
   group('QueryaDropdownTokens', () {
     test('uses design-system defaults from issue #89', () {
-      expect(QueryaDropdownTokens.triggerHeight, 32.0);
+      expect(QueryaDropdownTokens.triggerHeight, 36.0);
       expect(QueryaDropdownTokens.menuAlignmentOffset, const material.Offset(0, 4));
       expect(QueryaDropdownTokens.menuMaxHeight, 300.0);
       expect(QueryaDropdownTokens.menuBorderRadius, 6.0);
-      expect(QueryaDropdownTokens.fontSize, 13.0);
+      expect(QueryaDropdownTokens.fontSize, 14.0);
     });
   });
 
