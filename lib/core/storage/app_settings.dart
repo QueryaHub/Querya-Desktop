@@ -22,6 +22,19 @@ const List<int> kSqlResultMaxRowsPresets = [
 /// Default monospace size in the SQL editor (logical pixels).
 const double kDefaultSqlEditorFontSize = 13;
 
+/// Default interface scale (1.0 = 100%).
+const double kDefaultUiScale = 1.0;
+
+/// Allowed UI scale presets (nearest is used when persisting).
+const List<double> kUiScalePresets = [0.85, 0.9, 1.0, 1.1, 1.25, 1.5];
+
+double _normalizeUiScale(double value) {
+  final clamped = value.clamp(0.85, 1.5);
+  return kUiScalePresets.reduce(
+    (a, b) => (clamped - a).abs() <= (clamped - b).abs() ? a : b,
+  );
+}
+
 /// Default cap on stored SQL history entries per connection + database.
 const int kDefaultSqlHistoryMaxEntries = 100;
 
@@ -57,6 +70,7 @@ abstract final class AppSettingsKeys {
   static const themeImportName = 'theme_import_name';
   static const themeImportedColorsJson = 'theme_imported_colors_json';
   static const themeAnimationEnabled = 'theme_animation_enabled';
+  static const uiScale = 'ui_scale';
 }
 
 /// Bumps [listenable] when any preference is persisted so open screens can reload.
@@ -155,6 +169,26 @@ class AppSettings {
     await LocalDb.instance.setAppSetting(
       AppSettingsKeys.sqlEditorFontSizePoints,
       clamped.toString(),
+    );
+    AppSettingsRevision.bump();
+  }
+
+  /// Global interface scale for typography and compact controls.
+  Future<double> getUiScale() async {
+    final v = await LocalDb.instance.getAppSetting(AppSettingsKeys.uiScale);
+    if (v == null || v.isEmpty) return kDefaultUiScale;
+    final n = double.tryParse(v);
+    if (n == null) return kDefaultUiScale;
+    return _normalizeUiScale(n);
+  }
+
+  Future<void> setUiScale(double scale) async {
+    final preset = kUiScalePresets.contains(scale)
+        ? scale
+        : _normalizeUiScale(scale);
+    await LocalDb.instance.setAppSetting(
+      AppSettingsKeys.uiScale,
+      preset.toString(),
     );
     AppSettingsRevision.bump();
   }
