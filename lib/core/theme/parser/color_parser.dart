@@ -33,6 +33,41 @@ Color parseVsCodeColor(String input) {
   throw FormatException('Unsupported color format: $input');
 }
 
+/// Parses Querya custom theme hex strings into Flutter [Color].
+///
+/// Accepts `#RRGGBB`, `RRGGBB`, `#AARRGGBB`, and `AARRGGBB`. Shorthand `#RGB` /
+/// `#RGBA` and 6-digit values delegate to [parseVsCodeColor]. Eight-digit values
+/// use alpha-first `AARRGGBB` (Querya custom), not VS Code `RRGGBBAA`.
+Color parseQueryaThemeColor(String raw) {
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty) {
+    throw FormatException('Invalid Querya theme color: $raw');
+  }
+
+  var s = trimmed;
+  if (s.startsWith('#')) {
+    s = s.substring(1);
+  }
+
+  if (s.length == 8) {
+    try {
+      final aa = int.parse(s.substring(0, 2), radix: 16);
+      final rr = int.parse(s.substring(2, 4), radix: 16);
+      final gg = int.parse(s.substring(4, 6), radix: 16);
+      final bb = int.parse(s.substring(6, 8), radix: 16);
+      return Color.fromARGB(aa, rr, gg, bb);
+    } on FormatException {
+      throw FormatException('Invalid Querya theme color: $raw');
+    }
+  }
+
+  try {
+    return parseVsCodeColor(trimmed.startsWith('#') ? trimmed : '#$s');
+  } on FormatException {
+    throw FormatException('Invalid Querya theme color: $raw');
+  }
+}
+
 /// Encodes a [Color] as a VS Code hex string (`#RRGGBB` or `#RRGGBBAA`).
 String formatVsCodeColor(Color color) {
   String channel(double component) =>
