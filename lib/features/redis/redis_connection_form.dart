@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/shared/widgets/form_validity_notifier.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Shows Redis connection form dialog. Returns ConnectionRow if saved, null if cancelled.
@@ -41,20 +42,22 @@ class _RedisConnectionFormContentState extends material.State<_RedisConnectionFo
   bool _isTesting = false;
   String? _testResult;
   Timer? _dismissTimer;
+  late final FormValidityNotifier _formValidNotifier;
 
   @override
   void initState() {
     super.initState();
-    _nameController.addListener(_onFieldChanged);
-    _hostController.addListener(_onFieldChanged);
-    _portController.addListener(_onFieldChanged);
+    _formValidNotifier = FormValidityNotifier(_computeFormValid);
+    for (final c in [_nameController, _hostController, _portController]) {
+      _formValidNotifier.listenTo(c);
+    }
+    _formValidNotifier.seed();
   }
 
-  void _onFieldChanged() => setState(() {});
-
-  bool get _formValid {
+  bool _computeFormValid() {
     final host = _hostController.text.trim();
-    return host.isNotEmpty && (_nameController.text.trim().isNotEmpty || host.isNotEmpty);
+    return host.isNotEmpty &&
+        (_nameController.text.trim().isNotEmpty || host.isNotEmpty);
   }
 
   void _showTestResult(String result) {
@@ -75,7 +78,7 @@ class _RedisConnectionFormContentState extends material.State<_RedisConnectionFo
   }
 
   Future<void> _testConnection() async {
-    if (!_formValid) return;
+    if (!_formValidNotifier.value) return;
     _dismissTimer?.cancel();
     _dismissTimer = null;
     setState(() {
@@ -99,7 +102,7 @@ class _RedisConnectionFormContentState extends material.State<_RedisConnectionFo
   }
 
   void _save() {
-    if (!_formValid) return;
+    if (!_formValidNotifier.value) return;
     final name = _nameController.text.trim();
     final host = _hostController.text.trim();
     final port = int.tryParse(_portController.text.trim()) ?? 6379;
@@ -120,9 +123,10 @@ class _RedisConnectionFormContentState extends material.State<_RedisConnectionFo
   @override
   void dispose() {
     _dismissTimer?.cancel();
-    _nameController.removeListener(_onFieldChanged);
-    _hostController.removeListener(_onFieldChanged);
-    _portController.removeListener(_onFieldChanged);
+    for (final c in [_nameController, _hostController, _portController]) {
+      _formValidNotifier.unlistenFrom(c);
+    }
+    _formValidNotifier.dispose();
     _nameController.dispose();
     _hostController.dispose();
     _portController.dispose();
@@ -327,43 +331,53 @@ class _RedisConnectionFormContentState extends material.State<_RedisConnectionFo
               ),
             material.Container(
               padding: const material.EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              child: material.Row(
-                children: [
-                  OutlineButton(
-                    onPressed: _formValid && !_isTesting ? _testConnection : null,
-                    leading: _isTesting
-                        ? material.SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: material.CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: theme.primary,
-                            ),
-                          )
-                        : material.Icon(
-                            material.Icons.link_rounded,
-                            size: 18,
-                            color: _formValid ? theme.primary : theme.mutedForeground,
+              child: ValueListenableBuilder<bool>(
+                valueListenable: _formValidNotifier.listenable,
+                builder: (context, formValid, _) {
+                  return material.Row(
+                    children: [
+                      OutlineButton(
+                        onPressed:
+                            formValid && !_isTesting ? _testConnection : null,
+                        leading: _isTesting
+                            ? material.SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: material.CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: theme.primary,
+                                ),
+                              )
+                            : material.Icon(
+                                material.Icons.link_rounded,
+                                size: 18,
+                                color: formValid
+                                    ? theme.primary
+                                    : theme.mutedForeground,
+                              ),
+                        child: Text(
+                          'Test Connection',
+                          style: material.TextStyle(
+                            fontWeight: material.FontWeight.w500,
+                            color: formValid
+                                ? theme.primary
+                                : theme.mutedForeground,
                           ),
-                    child: Text(
-                      'Test Connection',
-                      style: material.TextStyle(
-                        fontWeight: material.FontWeight.w500,
-                        color: _formValid ? theme.primary : theme.mutedForeground,
+                        ),
                       ),
-                    ),
-                  ),
-                  const material.Spacer(),
-                  GhostButton(
-                    onPressed: () => material.Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
-                  ),
-                  const Gap(12),
-                  PrimaryButton(
-                    onPressed: _formValid ? _save : null,
-                    child: const Text('Save'),
-                  ),
-                ],
+                      const material.Spacer(),
+                      GhostButton(
+                        onPressed: () => material.Navigator.of(context).pop(),
+                        child: const Text('Cancel'),
+                      ),
+                      const Gap(12),
+                      PrimaryButton(
+                        onPressed: formValid ? _save : null,
+                        child: const Text('Save'),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ],

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:postgres/postgres.dart' as pg;
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/postgres_sql.dart';
+import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
@@ -54,7 +55,7 @@ class PostgresSqlWorkspace extends material.StatefulWidget {
 
 class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
   final _sqlController = material.TextEditingController();
-  double _topFractionState = 0.65;
+  final ValueNotifier<double> _topFraction = ValueNotifier(0.65);
 
   PgLease? _lease;
 
@@ -92,7 +93,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     _appSettingsListener = () {
       unawaited(_loadWorkspaceSettings());
     };
-    AppSettingsRevision.listenable.addListener(_appSettingsListener);
+    SqlWorkspaceSettingsRevision.listenable.addListener(_appSettingsListener);
     material.WidgetsBinding.instance.addPostFrameCallback((_) {
       _syncPostgresSqlTreeContext();
       unawaited(_loadWorkspaceSettings());
@@ -243,7 +244,8 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
 
   @override
   void dispose() {
-    AppSettingsRevision.listenable.removeListener(_appSettingsListener);
+    SqlWorkspaceSettingsRevision.listenable.removeListener(_appSettingsListener);
+    _topFraction.dispose();
     if (_running) {
       PostgresService.instance.interrupt(
         widget.connectionRow,
@@ -366,12 +368,9 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
   @override
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context);
-    final topFlex = (_topFractionState * 100).round().clamp(20, 80);
-    final bottomFlex = 100 - topFlex;
 
     return material.LayoutBuilder(
       builder: (context, constraints) {
-        final totalHeight = constraints.maxHeight;
         return material.CallbackShortcuts(
           bindings: {
             const material.SingleActivator(LogicalKeyboardKey.f5): () {
@@ -380,98 +379,76 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
           },
           child: material.Focus(
             autofocus: true,
-            child: Column(
-              crossAxisAlignment: material.CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  flex: topFlex,
-                  child: Column(
-                    crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                    children: [
-                      _SqlToolbar(
-                        sessionDatabase: _effectiveSessionDatabase(),
-                        onExecute: _running ? null : _execute,
-                        running: _running,
-                        autocommit: _autocommit,
-                        onAutocommitChanged: (v) =>
-                            setState(() => _autocommit = v),
-                        queryTimeoutSeconds: _queryTimeoutSeconds,
-                        onQueryTimeoutChanged: _onStmtTimeoutChanged,
-                        onOpenPreferences: () =>
-                            showPreferencesDialog(context),
-                        onOpenHistory: widget.connectionRow.id != null &&
-                                !_running
-                            ? () {
-                                showSqlQueryHistoryDialog(
-                                  context: context,
-                                  connectionId: widget.connectionRow.id!,
-                                  databaseName: _effectiveSessionDatabase(),
-                                  sqlController: _sqlController,
-                                );
-                              }
-                            : null,
-                        txOpen: _txOpen,
-                        onBegin: _running
-                            ? null
-                            : () => _runTxCommand('BEGIN'),
-                        onCommit: _running
-                            ? null
-                            : () => _runTxCommand('COMMIT'),
-                        onRollback: _running
-                            ? null
-                            : () => _runTxCommand('ROLLBACK'),
-                      ),
-                      const Divider(height: 1),
-                      Expanded(
-                        child: QueryEditorTab(
-                          controller: _sqlController,
-                          fontSize: _editorFontSize,
-                        ),
-                      ),
-                    ],
+            child: VerticalSplitPane(
+              fraction: _topFraction,
+              maxFraction: 0.85,
+              top: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _SqlToolbar(
+                    sessionDatabase: _effectiveSessionDatabase(),
+                    onExecute: _running ? null : _execute,
+                    running: _running,
+                    autocommit: _autocommit,
+                    onAutocommitChanged: (v) =>
+                        setState(() => _autocommit = v),
+                    queryTimeoutSeconds: _queryTimeoutSeconds,
+                    onQueryTimeoutChanged: _onStmtTimeoutChanged,
+                    onOpenPreferences: () => showPreferencesDialog(context),
+                    onOpenHistory: widget.connectionRow.id != null && !_running
+                        ? () {
+                            showSqlQueryHistoryDialog(
+                              context: context,
+                              connectionId: widget.connectionRow.id!,
+                              databaseName: _effectiveSessionDatabase(),
+                              sqlController: _sqlController,
+                            );
+                          }
+                        : null,
+                    txOpen: _txOpen,
+                    onBegin:
+                        _running ? null : () => _runTxCommand('BEGIN'),
+                    onCommit:
+                        _running ? null : () => _runTxCommand('COMMIT'),
+                    onRollback:
+                        _running ? null : () => _runTxCommand('ROLLBACK'),
                   ),
-                ),
-                _HorizontalResizeHandle(
-                  totalHeight: totalHeight,
-                  onDrag: (dy) {
-                    if (totalHeight <= 0) return;
-                    setState(() {
-                      _topFractionState = (_topFractionState + dy / totalHeight)
-                          .clamp(0.2, 0.85);
-                    });
-                  },
-                ),
-                Expanded(
-                  flex: bottomFlex,
-                  child: Column(
-                    crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                    children: [
-                      material.Container(
-                        height: 44,
-                        padding: const material.EdgeInsets.symmetric(
-                          horizontal: 12,
-                        ),
-                        decoration: material.BoxDecoration(
-                          color: theme.colorScheme.muted.withValues(alpha: 0.6),
-                        ),
-                        alignment: material.Alignment.centerLeft,
-                        child: const Text('Data Output').semiBold().small(),
-                      ),
-                      const Divider(height: 1),
-                      Expanded(
-                        child: ResultsTab(
-                          columns: _columns,
-                          rows: _rows,
-                          errorMessage: _error,
-                          isLoading: _running,
-                          affectedRows: _affectedRows,
-                          statusLine: _statusLine,
-                        ),
-                      ),
-                    ],
+                  const Divider(height: 1),
+                  Expanded(
+                    child: QueryEditorTab(
+                      controller: _sqlController,
+                      fontSize: _editorFontSize,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
+              bottom: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  material.Container(
+                    height: 44,
+                    padding: const material.EdgeInsets.symmetric(
+                      horizontal: 12,
+                    ),
+                    decoration: material.BoxDecoration(
+                      color: theme.colorScheme.muted.withValues(alpha: 0.6),
+                    ),
+                    alignment: material.Alignment.centerLeft,
+                    child: const Text('Data Output').semiBold().small(),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: ResultsTab(
+                      columns: _columns,
+                      rows: _rows,
+                      errorMessage: _error,
+                      isLoading: _running,
+                      affectedRows: _affectedRows,
+                      statusLine: _statusLine,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -619,32 +596,6 @@ class _SqlToolbar extends material.StatelessWidget {
             ],
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _HorizontalResizeHandle extends material.StatelessWidget {
-  const _HorizontalResizeHandle({
-    required this.totalHeight,
-    required this.onDrag,
-  });
-
-  final double totalHeight;
-  final void Function(double dy) onDrag;
-
-  @override
-  material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context).colorScheme;
-    return material.MouseRegion(
-      cursor: material.SystemMouseCursors.resizeRow,
-      child: material.GestureDetector(
-        behavior: material.HitTestBehavior.opaque,
-        onVerticalDragUpdate: (e) => onDrag(e.delta.dy),
-        child: material.Container(
-          height: 6,
-          color: theme.border.withValues(alpha: 0.15),
-        ),
       ),
     );
   }

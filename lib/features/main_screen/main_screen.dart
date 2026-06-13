@@ -209,67 +209,57 @@ class _MainContentSplitState extends State<_MainContentSplit> {
   static const double _maxLeftWidth = 500;
   static const double _minWorkspaceWidth = 64;
   static const double _resizeHandleWidth = 6;
-  double _leftPanelWidth = 260;
+  final ValueNotifier<double> _leftPanelWidth = ValueNotifier(260);
+
+  @override
+  void dispose() {
+    _leftPanelWidth.dispose();
+    super.dispose();
+  }
+
+  double _clampLeftWidth(double raw, double maxWidth) {
+    final maxLeft = maxWidth - _resizeHandleWidth - _minWorkspaceWidth;
+    if (maxLeft <= 0) return 0;
+    if (maxLeft < _minLeftWidth) return raw.clamp(0, maxLeft);
+    return raw.clamp(_minLeftWidth, math.min(_maxLeftWidth, maxLeft));
+  }
 
   @override
   material.Widget build(material.BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final maxLeft =
-            constraints.maxWidth - _resizeHandleWidth - _minWorkspaceWidth;
-        double leftW;
-        if (maxLeft <= 0) {
-          leftW = 0;
-        } else if (maxLeft < _minLeftWidth) {
-          leftW = maxLeft;
-        } else {
-          leftW = _leftPanelWidth.clamp(
-            _minLeftWidth,
-            math.min(_maxLeftWidth, maxLeft),
-          );
-        }
         return Row(
           children: [
-            SizedBox(
-              width: leftW,
+            ValueListenableBuilder<double>(
+              valueListenable: _leftPanelWidth,
+              builder: (context, rawWidth, connectionsPanel) {
+                final leftW = _clampLeftWidth(rawWidth, constraints.maxWidth);
+                return SizedBox(width: leftW, child: connectionsPanel);
+              },
               child: material.RepaintBoundary(
-                child: ValueListenableBuilder<MainScreenWorkspaceState>(
-                  valueListenable: widget.workspace,
-                  builder: (context, ws, _) {
-                    return ConnectionsPanel(
-                      key: widget.connectionsPanelKey,
-                      selectedConnectionId: ws.activeConnection?.id,
-                      onConnectionSelected: widget.onConnectionSelected,
-                      onRedisDatabaseSelected: widget.onRedisDatabaseSelected,
-                      onMongoDBDatabaseSelected:
-                          widget.onMongoDBDatabaseSelected,
-                      onPostgresObjectSelected:
-                          widget.onPostgresObjectSelected,
-                      onPostgresOpenSqlWorkspace:
-                          widget.onPostgresOpenSqlWorkspace,
-                      onMysqlObjectSelected: widget.onMysqlObjectSelected,
-                      onMysqlOpenSqlWorkspace: widget.onMysqlOpenSqlWorkspace,
-                    );
-                  },
+                child: _ConnectionsPanelSlot(
+                  connectionsPanelKey: widget.connectionsPanelKey,
+                  workspace: widget.workspace,
+                  onConnectionSelected: widget.onConnectionSelected,
+                  onRedisDatabaseSelected: widget.onRedisDatabaseSelected,
+                  onMongoDBDatabaseSelected: widget.onMongoDBDatabaseSelected,
+                  onPostgresObjectSelected: widget.onPostgresObjectSelected,
+                  onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
+                  onMysqlObjectSelected: widget.onMysqlObjectSelected,
+                  onMysqlOpenSqlWorkspace: widget.onMysqlOpenSqlWorkspace,
                 ),
               ),
             ),
             _VerticalResizeHandle(
               onDrag: (dx) {
-                setState(() {
-                  final w = MediaQuery.sizeOf(context).width;
-                  final ml = w - _resizeHandleWidth - _minWorkspaceWidth;
-                  if (ml <= 0) return;
-                  final next = _leftPanelWidth + dx;
-                  if (ml < _minLeftWidth) {
-                    _leftPanelWidth = next.clamp(0, ml);
-                  } else {
-                    _leftPanelWidth = next.clamp(
-                      _minLeftWidth,
-                      math.min(_maxLeftWidth, ml),
-                    );
-                  }
-                });
+                final ml = constraints.maxWidth -
+                    _resizeHandleWidth -
+                    _minWorkspaceWidth;
+                if (ml <= 0) return;
+                _leftPanelWidth.value = _clampLeftWidth(
+                  _leftPanelWidth.value + dx,
+                  constraints.maxWidth,
+                );
               },
             ),
             Expanded(
@@ -298,6 +288,84 @@ class _MainContentSplitState extends State<_MainContentSplit> {
           ],
         );
       },
+    );
+  }
+}
+
+/// Rebuilds [ConnectionsPanel] only when the selected connection id changes.
+class _ConnectionsPanelSlot extends StatefulWidget {
+  const _ConnectionsPanelSlot({
+    required this.connectionsPanelKey,
+    required this.workspace,
+    required this.onConnectionSelected,
+    required this.onPostgresObjectSelected,
+    required this.onMysqlObjectSelected,
+    required this.onRedisDatabaseSelected,
+    required this.onMongoDBDatabaseSelected,
+    required this.onPostgresOpenSqlWorkspace,
+    required this.onMysqlOpenSqlWorkspace,
+  });
+
+  final GlobalKey<ConnectionsPanelState> connectionsPanelKey;
+  final ValueNotifier<MainScreenWorkspaceState> workspace;
+  final void Function(ConnectionRow) onConnectionSelected;
+  final void Function(
+    ConnectionRow,
+    String database,
+    String schema,
+    String name,
+    PostgresObjectKind kind,
+  ) onPostgresObjectSelected;
+  final void Function(
+    ConnectionRow,
+    String database,
+    String name,
+    MysqlObjectKind kind,
+  ) onMysqlObjectSelected;
+  final void Function(ConnectionRow, int) onRedisDatabaseSelected;
+  final void Function(ConnectionRow, String) onMongoDBDatabaseSelected;
+  final OnPostgresOpenSqlWorkspace onPostgresOpenSqlWorkspace;
+  final void Function(ConnectionRow) onMysqlOpenSqlWorkspace;
+
+  @override
+  State<_ConnectionsPanelSlot> createState() => _ConnectionsPanelSlotState();
+}
+
+class _ConnectionsPanelSlotState extends State<_ConnectionsPanelSlot> {
+  int? _selectedConnectionId;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedConnectionId = widget.workspace.value.activeConnection?.id;
+    widget.workspace.addListener(_onWorkspaceChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.workspace.removeListener(_onWorkspaceChanged);
+    super.dispose();
+  }
+
+  void _onWorkspaceChanged() {
+    final next = widget.workspace.value.activeConnection?.id;
+    if (next != _selectedConnectionId) {
+      setState(() => _selectedConnectionId = next);
+    }
+  }
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    return ConnectionsPanel(
+      key: widget.connectionsPanelKey,
+      selectedConnectionId: _selectedConnectionId,
+      onConnectionSelected: widget.onConnectionSelected,
+      onRedisDatabaseSelected: widget.onRedisDatabaseSelected,
+      onMongoDBDatabaseSelected: widget.onMongoDBDatabaseSelected,
+      onPostgresObjectSelected: widget.onPostgresObjectSelected,
+      onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
+      onMysqlObjectSelected: widget.onMysqlObjectSelected,
+      onMysqlOpenSqlWorkspace: widget.onMysqlOpenSqlWorkspace,
     );
   }
 }
