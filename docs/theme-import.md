@@ -3,6 +3,10 @@
 Querya can apply a **subset** of VS Code theme JSON / JSONC `colors` to
 `QueryaWorkbenchTheme`, `QueryaEditorTheme`, and the shadcn `ColorScheme`.
 
+For the native Querya custom format (`querya.theme.v1`), see
+**[theme-custom-json.md](theme-custom-json.md)**. Both formats will coexist; VS Code
+import remains supported.
+
 Imported `tokenColors` are persisted with the theme file and applied to SQL/JSON
 syntax highlighting via `TokenStyleResolver` → `HighlighterTheme` (issue #46).
 
