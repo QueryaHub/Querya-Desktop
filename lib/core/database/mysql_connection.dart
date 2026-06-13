@@ -330,4 +330,76 @@ class MysqlConnection {
     final rs = await execute('SELECT VERSION()');
     return rs.rows.first.colAt(0) ?? '';
   }
+
+  /// Key metrics for the MySQL stats dashboard (`SHOW GLOBAL STATUS` / `VARIABLES`).
+  Future<Map<String, dynamic>> serverStats() async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to MySQL');
+    }
+    final stats = <String, dynamic>{};
+
+    stats['version'] = await serverVersion();
+
+    final status = await _showKeyValueRows(
+      "SHOW GLOBAL STATUS WHERE Variable_name IN ("
+      "'Uptime','Threads_connected','Threads_running','Max_used_connections',"
+      "'Questions','Slow_queries','Bytes_received','Bytes_sent','Connections',"
+      "'Open_tables','Opened_tables','Aborted_connects'"
+      ')',
+    );
+    stats['status'] = status;
+    stats['uptime_seconds'] = int.tryParse(status['Uptime'] ?? '') ?? 0;
+
+    stats['variables'] = await _showKeyValueRows(
+      "SHOW GLOBAL VARIABLES WHERE Variable_name IN ("
+      "'max_connections','port','datadir','character_set_server',"
+      "'collation_server','innodb_buffer_pool_size','version'"
+      ')',
+    );
+
+    const systemSchemas = {
+      'information_schema',
+      'mysql',
+      'performance_schema',
+      'sys',
+    };
+    final dbRs = await execute(
+      'SELECT table_schema, '
+      'COALESCE(SUM(data_length + index_length), 0) AS size_bytes, '
+      'COUNT(*) AS table_count '
+      'FROM information_schema.tables '
+      "WHERE table_schema NOT IN ('information_schema','mysql',"
+      "'performance_schema','sys') "
+      'GROUP BY table_schema '
+      'ORDER BY table_schema',
+    );
+    final databases = <Map<String, dynamic>>[];
+    for (final row in dbRs.rows) {
+      final name = row.colAt(0);
+      if (name == null || systemSchemas.contains(name.toLowerCase())) {
+        continue;
+      }
+      databases.add({
+        'name': name,
+        'size': int.tryParse(row.colAt(1) ?? '') ?? 0,
+        'tables': int.tryParse(row.colAt(2) ?? '') ?? 0,
+      });
+    }
+    stats['databases'] = databases;
+
+    return stats;
+  }
+
+  Future<Map<String, String>> _showKeyValueRows(String sql) async {
+    final rs = await execute(sql);
+    final out = <String, String>{};
+    for (final row in rs.rows) {
+      final key = row.colAt(0);
+      final value = row.colAt(1);
+      if (key != null && value != null) {
+        out[key] = value;
+      }
+    }
+    return out;
+  }
 }
