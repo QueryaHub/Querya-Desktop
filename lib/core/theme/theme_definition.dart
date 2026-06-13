@@ -39,4 +39,29 @@ class ThemeDefinition {
 
   String get stableCacheKey =>
       '${source.name}:$id:${contentHash ?? path ?? name}';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ThemeDefinition &&
+          id == other.id &&
+          name == other.name &&
+          source == other.source &&
+          format == other.format &&
+          isDark == other.isDark &&
+          path == other.path &&
+          lastModified == other.lastModified &&
+          contentHash == other.contentHash;
+
+  @override
+  int get hashCode => Object.hash(
+        id,
+        name,
+        source,
+        format,
+        isDark,
+        path,
+        lastModified,
+        contentHash,
+      );
 }
