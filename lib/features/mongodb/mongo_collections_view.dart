@@ -362,7 +362,7 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
 
 // ─── Row widget ──────────────────────────────────────────────────────────────
 
-class _CollectionRow extends StatefulWidget {
+class _CollectionRow extends StatelessWidget {
   const _CollectionRow({
     required this.collection,
     required this.colorScheme,
@@ -376,40 +376,30 @@ class _CollectionRow extends StatefulWidget {
   final VoidCallback onDrop;
 
   @override
-  State<_CollectionRow> createState() => _CollectionRowState();
-}
-
-class _CollectionRowState extends State<_CollectionRow> {
-  bool _hovered = false;
-
-  @override
   Widget build(BuildContext context) {
-    final cs = widget.colorScheme;
-    return material.MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: material.AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        curve: material.Curves.easeOut,
-        color: _hovered
-            ? cs.muted.withValues(alpha: 0.15)
-            : Colors.transparent,
-        padding: const material.EdgeInsets.symmetric(
-            horizontal: 20, vertical: 10),
-        child: Row(
-          children: [
-            _ActionButton(
-              label: 'View',
-              icon: material.Icons.visibility_rounded,
-              color: const Color(0xFF4CAF50),
-              onTap: widget.onView,
-            ),
-            const Gap(16),
-            material.Expanded(
-              child: material.InkWell(
-                onTap: widget.onView,
+    final cs = colorScheme;
+    return material.Material(
+      color: Colors.transparent,
+      child: material.InkWell(
+        onTap: onView,
+        hoverColor: cs.muted.withValues(alpha: 0.15),
+        child: material.Padding(
+          padding: const material.EdgeInsets.symmetric(
+              horizontal: 20, vertical: 10),
+          child: Row(
+            children: [
+              _ActionButton(
+                label: 'View',
+                icon: material.Icons.visibility_rounded,
+                color: const Color(0xFF4CAF50),
+                onTap: onView,
+              ),
+              const Gap(16),
+              Expanded(
                 child: Text(
-                  widget.collection.name,
+                  collection.name,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                   style: material.TextStyle(
                     color: cs.primary,
                     fontSize: 14,
@@ -417,26 +407,24 @@ class _CollectionRowState extends State<_CollectionRow> {
                   ),
                 ),
               ),
-            ),
-            material.SizedBox(
-              width: 100,
-              child: Text(widget.collection.documentCount?.toString() ?? '—')
-                  .muted()
-                  .small(),
-            ),
-            material.SizedBox(
-              width: 100,
-              child: Text(_formatSize(widget.collection.size))
-                  .muted()
-                  .small(),
-            ),
-            _ActionButton(
-              label: 'Del',
-              icon: material.Icons.delete_rounded,
-              color: const Color(0xFFEF5350),
-              onTap: widget.onDrop,
-            ),
-          ],
+              SizedBox(
+                width: 100,
+                child: Text(collection.documentCount?.toString() ?? '—')
+                    .muted()
+                    .small(),
+              ),
+              SizedBox(
+                width: 100,
+                child: Text(_formatSize(collection.size)).muted().small(),
+              ),
+              _ActionButton(
+                label: 'Del',
+                icon: material.Icons.delete_rounded,
+                color: const Color(0xFFEF5350),
+                onTap: onDrop,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -455,7 +443,7 @@ class _CollectionRowState extends State<_CollectionRow> {
   }
 }
 
-class _ActionButton extends StatefulWidget {
+class _ActionButton extends StatelessWidget {
   const _ActionButton({
     required this.label,
     required this.icon,
@@ -469,42 +457,28 @@ class _ActionButton extends StatefulWidget {
   final VoidCallback onTap;
 
   @override
-  State<_ActionButton> createState() => _ActionButtonState();
-}
-
-class _ActionButtonState extends State<_ActionButton> {
-  bool _hovered = false;
-
-  @override
   Widget build(BuildContext context) {
-    return material.MouseRegion(
-      cursor: material.SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
+    return material.Material(
+      color: Colors.transparent,
       child: material.InkWell(
-        onTap: widget.onTap,
+        onTap: onTap,
         borderRadius: material.BorderRadius.circular(6),
-        child: material.AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          curve: material.Curves.easeOut,
+        child: material.Container(
           padding: const material.EdgeInsets.symmetric(
               horizontal: 12, vertical: 6),
           decoration: material.BoxDecoration(
-            color: _hovered
-                ? widget.color.withValues(alpha: 0.9)
-                : widget.color.withValues(alpha: 0.75),
+            color: color.withValues(alpha: 0.8),
             borderRadius: material.BorderRadius.circular(6),
           ),
           child: Row(
             mainAxisSize: material.MainAxisSize.min,
             children: [
-              material.Icon(widget.icon,
-                  size: 14, color: material.Colors.white),
+              material.Icon(icon, size: 14, color: Colors.white),
               const Gap(5),
               Text(
-                widget.label,
+                label,
                 style: const material.TextStyle(
-                  color: material.Colors.white,
+                  color: Colors.white,
                   fontSize: 12,
                   fontWeight: material.FontWeight.w500,
                 ),
