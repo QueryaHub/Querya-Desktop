@@ -289,14 +289,20 @@ class _MysqlDatabasesNode extends material.StatelessWidget {
                 : (c, {database, schema, name, kind}) =>
                     onMysqlOpenSqlWorkspace!(c),
           ),
-          for (final db in databases)
-            _MysqlDatabaseNode(
-              key: material.ValueKey('mysql-db-${connection.id ?? 0}-$db'),
-              connection: connection,
-              databaseName: db,
-              onMysqlObjectSelected: onMysqlObjectSelected,
-              onMysqlOpenSqlWorkspace: onMysqlOpenSqlWorkspace,
-            ),
+          lazyConnectionTreeList(
+            context: context,
+            itemCount: databases.length,
+            itemBuilder: (context, index) {
+              final db = databases[index];
+              return _MysqlDatabaseNode(
+                key: material.ValueKey('mysql-db-${connection.id ?? 0}-$db'),
+                connection: connection,
+                databaseName: db,
+                onMysqlObjectSelected: onMysqlObjectSelected,
+                onMysqlOpenSqlWorkspace: onMysqlOpenSqlWorkspace,
+              );
+            },
+          ),
         ],
       ),
     );
@@ -444,10 +450,17 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
                         onContextRefresh: _loadTables,
                         onOpenSqlWorkspace: null,
                       ),
-                      for (final t in _tables)
-                        material.Padding(
-                          padding: const material.EdgeInsets.only(left: 12),
-                          child: _PgTreeRow(
+                      lazyConnectionTreeList(
+                        context: context,
+                        itemCount: _tables.length,
+                        itemExtent: kConnectionTreeRowExtent,
+                        padding: const material.EdgeInsets.only(left: 12),
+                        itemBuilder: (context, index) {
+                          final t = _tables[index];
+                          return _PgTreeRow(
+                            key: material.ValueKey(
+                              'mysql-table-${widget.connection.id ?? 0}-${widget.databaseName}-$t',
+                            ),
                             label: t,
                             icon: material.Icons.grid_on_rounded,
                             iconSize: 12,
@@ -468,8 +481,9 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
                             connection: widget.connection,
                             onContextRefresh: null,
                             onOpenSqlWorkspace: null,
-                          ),
-                        ),
+                          );
+                        },
+                      ),
                     ],
                     if (_views.isNotEmpty) ...[
                       _PgTreeRow(
@@ -487,10 +501,17 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
                         onContextRefresh: _loadTables,
                         onOpenSqlWorkspace: null,
                       ),
-                      for (final v in _views)
-                        material.Padding(
-                          padding: const material.EdgeInsets.only(left: 12),
-                          child: _PgTreeRow(
+                      lazyConnectionTreeList(
+                        context: context,
+                        itemCount: _views.length,
+                        itemExtent: kConnectionTreeRowExtent,
+                        padding: const material.EdgeInsets.only(left: 12),
+                        itemBuilder: (context, index) {
+                          final v = _views[index];
+                          return _PgTreeRow(
+                            key: material.ValueKey(
+                              'mysql-view-${widget.connection.id ?? 0}-${widget.databaseName}-$v',
+                            ),
                             label: v,
                             icon: material.Icons.view_week_rounded,
                             iconSize: 12,
@@ -511,8 +532,9 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
                             connection: widget.connection,
                             onContextRefresh: null,
                             onOpenSqlWorkspace: null,
-                          ),
-                        ),
+                          );
+                        },
+                      ),
                     ],
                   ],
                 ),

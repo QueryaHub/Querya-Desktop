@@ -67,6 +67,7 @@ class _EmptyState extends StatelessWidget {
 /// Tile for a single connection in the sidebar.
 class _ConnectionTile extends StatelessWidget {
   const _ConnectionTile({
+    super.key,
     required this.connection,
     this.isSelected = false,
     required this.icon,
@@ -271,19 +272,28 @@ class _FolderTileState extends State<_FolderTile> {
               ),
             ),
             if (_expanded)
-              for (final conn in widget.connections)
-                material.Padding(
-                  padding: const material.EdgeInsets.only(left: 24),
-                  child: widget.buildConnectionTile != null
-                      ? widget.buildConnectionTile!(conn)
-                      : _ConnectionTile(
-                          connection: conn,
-                          icon: widget.iconForType(conn.type),
-                          iconAsset: ConnectionsPanelState._iconAssetForType(conn.type),
-                          onRemove: () => widget.onRemoveConnection(conn.id!),
-                          onTap: () => widget.onConnectionTap?.call(conn),
-                        ),
+              material.Padding(
+                padding: const material.EdgeInsets.only(left: 24),
+                child: lazyConnectionTreeList(
+                  context: context,
+                  itemCount: widget.connections.length,
+                  itemBuilder: (context, index) {
+                    final conn = widget.connections[index];
+                    return widget.buildConnectionTile != null
+                        ? widget.buildConnectionTile!(conn)
+                        : _ConnectionTile(
+                            key: material.ValueKey('folder-conn-${conn.id}'),
+                            connection: conn,
+                            icon: widget.iconForType(conn.type),
+                            iconAsset: ConnectionsPanelState._iconAssetForType(
+                              conn.type,
+                            ),
+                            onRemove: () => widget.onRemoveConnection(conn.id!),
+                            onTap: () => widget.onConnectionTap?.call(conn),
+                          );
+                  },
                 ),
+              ),
           ],
         ),
       ),
