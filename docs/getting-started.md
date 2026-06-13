@@ -73,3 +73,16 @@ flutter build macos
 
 See the [User guide](user-guide.md) for preferences, the driver manager, and
 day-to-day usage, and [Security](security.md) for how credentials are stored.
+
+## Local dev databases (optional)
+
+The repo includes a Docker Compose stack under [`docker/`](../docker/) with
+PostgreSQL, MySQL, MongoDB, and Redis plus seed data:
+
+```bash
+cp docker/.env.example docker/.env   # optional overrides
+cd docker && docker compose up -d
+```
+
+Default credentials: user/password **`querya`**, database **`querya`**
+(MongoDB auth source: **`admin`**). Stop with `docker compose down`.
