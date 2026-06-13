@@ -105,7 +105,8 @@ class _PostgresSqlEditorDialogState extends material.State<_PostgresSqlEditorDia
       backgroundColor: material.Colors.transparent,
       insetPadding: WindowLayout.dialogSymmetricInsets(context),
       child: material.Container(
-        constraints: const material.BoxConstraints(
+        constraints: WindowLayout.dialogConstraints(
+          context,
           maxWidth: 720,
           minWidth: 480,
           maxHeight: 520,

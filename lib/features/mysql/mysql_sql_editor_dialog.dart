@@ -78,7 +78,8 @@ class _MysqlSqlEditorDialogState extends material.State<_MysqlSqlEditorDialog> {
       backgroundColor: material.Colors.transparent,
       insetPadding: WindowLayout.dialogSymmetricInsets(context),
       child: material.Container(
-        constraints: const material.BoxConstraints(
+        constraints: WindowLayout.dialogConstraints(
+          context,
           maxWidth: 720,
           minWidth: 480,
           maxHeight: 520,

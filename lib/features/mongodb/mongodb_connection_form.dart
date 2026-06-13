@@ -207,7 +207,11 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
     final radius = Theme.of(context).radiusXxl;
 
     return material.Container(
-      constraints: const material.BoxConstraints(maxWidth: 600, maxHeight: 700),
+      constraints: WindowLayout.dialogConstraints(
+        context,
+        maxWidth: 600,
+        maxHeight: 700,
+      ),
       decoration: material.BoxDecoration(
         color: theme.popover,
         borderRadius: material.BorderRadius.circular(radius),
