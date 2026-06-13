@@ -6,6 +6,7 @@ import 'package:querya_desktop/core/editor/syntax_highlight_service.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
+import '../../support/pump_syntax_highlight.dart';
 import '../../support/querya_theme_test_shell.dart';
 
 void main() {
@@ -74,11 +75,14 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await pumpSyntaxHighlightDebounce(tester);
     await tester.enterText(find.byType(material.EditableText), 'SELECT 1');
     await tester.pump();
+    await pumpSyntaxHighlightDebounce(tester);
     expect(external.text, 'SELECT 1');
     external.text = 'UPDATE x';
     await tester.pump();
+    await pumpSyntaxHighlightDebounce(tester);
     expect(
       tester.widget<material.EditableText>(find.byType(material.EditableText)).controller.text,
       'UPDATE x',

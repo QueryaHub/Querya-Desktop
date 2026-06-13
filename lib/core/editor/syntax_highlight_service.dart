@@ -60,6 +60,29 @@ abstract final class SyntaxHighlightService {
     required QueryaCodeLanguage language,
     required QueryaTheme queryaTheme,
   }) {
+    final cacheKey = Object.hash(
+      language,
+      queryaTheme.editor,
+      Object.hashAll(queryaTheme.tokenColors),
+    );
+    final cached = _pairCache[cacheKey];
+    if (cached != null) return cached;
+
+    final pair = _buildPair(language: language, queryaTheme: queryaTheme);
+    if (_pairCache.length >= _maxPairCacheEntries) {
+      _pairCache.remove(_pairCache.keys.first);
+    }
+    _pairCache[cacheKey] = pair;
+    return pair;
+  }
+
+  static const _maxPairCacheEntries = 12;
+  static final Map<int, HighlighterPair> _pairCache = {};
+
+  static HighlighterPair _buildPair({
+    required QueryaCodeLanguage language,
+    required QueryaTheme queryaTheme,
+  }) {
     final tokenColors = queryaTheme.tokenColors;
     return HighlighterPair(
       language: language,

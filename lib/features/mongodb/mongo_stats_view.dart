@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/util/deep_collection_equals.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -8,8 +9,8 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
 const _defaultAutoRefresh = Duration(seconds: 3);
-const _summaryChipHeight = 72.0;
-const _gridCardHeight = 220.0;
+const _summaryChipHeight = 88.0;
+const _gridCardMinHeight = 220.0;
 
 class MongoStatsView extends material.StatefulWidget {
   const MongoStatsView({
@@ -117,10 +118,12 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
         {'serverStatus': 1},
       );
       if (!mounted) return;
+      final changed =
+          replaceIfChanged(_serverStatus, status, (v) => _serverStatus = v);
+      if (!changed && !_loading) return;
       setState(() {
-        _serverStatus = status;
         _loading = false;
-        _lastFetchedAt = DateTime.now();
+        if (changed) _lastFetchedAt = DateTime.now();
       });
     } catch (e) {
       if (mounted) {
@@ -157,10 +160,10 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
         {'serverStatus': 1},
       );
       if (!mounted) return;
-      setState(() {
-        _serverStatus = status;
-        _lastFetchedAt = DateTime.now();
-      });
+      if (!replaceIfChanged(_serverStatus, status, (v) => _serverStatus = v)) {
+        return;
+      }
+      setState(() => _lastFetchedAt = DateTime.now());
     } catch (_) {
       // Keep last good snapshot on transient errors during auto-refresh.
     }
@@ -245,29 +248,47 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
                 const Gap(24),
                 _summaryChips(context, status),
                 const Gap(24),
-                material.Row(
-                  crossAxisAlignment: material.CrossAxisAlignment.start,
-                  children: [
-                    material.Expanded(child: _memoryCard(context, status)),
-                    const Gap(16),
-                    material.Expanded(child: _operationsCard(context, status)),
-                  ],
+                _gridRow(
+                  _memoryCard(context, status),
+                  _operationsCard(context, status),
                 ),
                 const Gap(16),
-                material.Row(
-                  crossAxisAlignment: material.CrossAxisAlignment.start,
-                  children: [
-                    material.Expanded(child: _connectionsCard(context, status)),
-                    const Gap(16),
-                    material.Expanded(child: _networkCard(context, status)),
-                  ],
+                _gridRow(
+                  _connectionsCard(context, status),
+                  _networkCard(context, status),
                 ),
                 const Gap(24),
                 _sectionCard(context, 'Server', _extractServerInfo(status)),
                 const Gap(12),
-                _sectionCard(context, 'Storage', _extractStorageInfo(status)),
-                const Gap(12),
-                _sectionCard(context, 'Replication', _extractReplicationInfo(status)),
+                material.LayoutBuilder(
+                  builder: (context, constraints) {
+                    final wide = constraints.maxWidth >= 900;
+                    final storage = _extractStorageInfo(status);
+                    final replication = _extractReplicationInfo(status);
+                    if (!wide) {
+                      return material.Column(
+                        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                        children: [
+                          _sectionCard(context, 'Storage', storage),
+                          const Gap(12),
+                          _sectionCard(context, 'Replication', replication),
+                        ],
+                      );
+                    }
+                    return material.Row(
+                      crossAxisAlignment: material.CrossAxisAlignment.start,
+                      children: [
+                        material.Expanded(
+                          child: _sectionCard(context, 'Storage', storage),
+                        ),
+                        const Gap(16),
+                        material.Expanded(
+                          child: _sectionCard(context, 'Replication', replication),
+                        ),
+                      ],
+                    );
+                  },
+                ),
                 const Gap(12),
                 _sectionCard(context, 'WiredTiger', _extractWiredTigerInfo(status)),
               ],
@@ -281,90 +302,124 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
   material.Widget _header(material.BuildContext context) {
     final cs = shadcn.Theme.of(context).colorScheme;
     final last = _lastFetchedAt;
-    return material.Wrap(
-      crossAxisAlignment: material.WrapCrossAlignment.center,
-      spacing: 8,
-      runSpacing: 10,
+    return material.Column(
+      crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
-        material.Container(
-          padding: const material.EdgeInsets.all(10),
-          decoration: material.BoxDecoration(
-            color: cs.primary.withValues(alpha: 0.12),
-            borderRadius: material.BorderRadius.circular(12),
-          ),
-          child: material.Icon(material.Icons.eco_rounded, size: 28, color: cs.primary),
+        material.Row(
+          crossAxisAlignment: material.CrossAxisAlignment.start,
+          children: [
+            material.Container(
+              padding: const material.EdgeInsets.all(10),
+              decoration: material.BoxDecoration(
+                color: cs.primary.withValues(alpha: 0.12),
+                borderRadius: material.BorderRadius.circular(12),
+              ),
+              child: material.Icon(material.Icons.eco_rounded, size: 28, color: cs.primary),
+            ),
+            const Gap(16),
+            material.Expanded(
+              child: material.Column(
+                crossAxisAlignment: material.CrossAxisAlignment.start,
+                mainAxisSize: material.MainAxisSize.min,
+                children: [
+                  Text(widget.connectionRow.name).large().semiBold(),
+                  const Gap(4),
+                  Text('${widget.connectionRow.host ?? 'localhost'}:${widget.connectionRow.port ?? 27017}')
+                      .muted()
+                      .small(),
+                  if (last != null) ...[
+                    const Gap(4),
+                    Text('Last updated ${_formatClock(last)}').muted().xSmall(),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ),
-        material.ConstrainedBox(
-          constraints: const material.BoxConstraints(minWidth: 160, maxWidth: 400),
-          child: material.Column(
-            crossAxisAlignment: material.CrossAxisAlignment.start,
-            mainAxisSize: material.MainAxisSize.min,
-            children: [
-              Text(widget.connectionRow.name).large().semiBold(),
-              const Gap(4),
-              Text('${widget.connectionRow.host ?? 'localhost'}:${widget.connectionRow.port ?? 27017}')
-                  .muted()
-                  .small(),
-              if (last != null) ...[
-                const Gap(4),
-                Text('Last updated ${_formatClock(last)}').muted().xSmall(),
-              ],
-            ],
-          ),
-        ),
-        if (widget.onBack != null)
-          OutlineButton(
-            onPressed: widget.onBack,
-            leading: const material.Icon(
-                material.Icons.grid_view_rounded,
-                size: 18),
-            child: const Text('Explorer'),
-          ),
-        OutlineButton(
-          onPressed: _manualRefreshing ? null : _refreshNow,
-          leading: _manualRefreshing
-              ? const material.SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: material.CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const material.Icon(material.Icons.refresh_rounded, size: 18),
-          child: const Text('Refresh now'),
-        ),
-        material.Padding(
-          padding: const material.EdgeInsets.symmetric(horizontal: 4),
-          child: QueryaDropdown<Duration?>(
-            width: 132,
-            value: _autoRefreshInterval,
-            items: const [
-              QueryaDropdownItem<Duration?>(value: null, label: 'Auto: off'),
-              QueryaDropdownItem(value: Duration(seconds: 3), label: 'Auto: 3 s'),
-              QueryaDropdownItem(value: Duration(seconds: 10), label: 'Auto: 10 s'),
-              QueryaDropdownItem(value: Duration(seconds: 30), label: 'Auto: 30 s'),
-              QueryaDropdownItem(value: Duration(seconds: 60), label: 'Auto: 60 s'),
-            ],
-            onSelected: (value) {
-              setState(() => _autoRefreshInterval = value);
-              _startTimer();
-            },
-          ),
+        const Gap(12),
+        material.Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          alignment: material.WrapAlignment.end,
+          crossAxisAlignment: material.WrapCrossAlignment.center,
+          children: [
+            if (widget.onBack != null)
+              OutlineButton(
+                onPressed: widget.onBack,
+                leading: const material.Icon(
+                    material.Icons.grid_view_rounded,
+                    size: 18),
+                child: const Text('Explorer'),
+              ),
+            OutlineButton(
+              onPressed: _manualRefreshing ? null : _refreshNow,
+              leading: _manualRefreshing
+                  ? const material.SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: material.CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const material.Icon(material.Icons.refresh_rounded, size: 18),
+              child: const Text('Refresh now'),
+            ),
+            material.SizedBox(
+              width: 132,
+              child: QueryaDropdown<Duration?>(
+                expandToParent: true,
+                value: _autoRefreshInterval,
+                items: const [
+                  QueryaDropdownItem<Duration?>(value: null, label: 'Auto: off'),
+                  QueryaDropdownItem(value: Duration(seconds: 3), label: 'Auto: 3 s'),
+                  QueryaDropdownItem(value: Duration(seconds: 10), label: 'Auto: 10 s'),
+                  QueryaDropdownItem(value: Duration(seconds: 30), label: 'Auto: 30 s'),
+                  QueryaDropdownItem(value: Duration(seconds: 60), label: 'Auto: 60 s'),
+                ],
+                onSelected: (value) {
+                  setState(() => _autoRefreshInterval = value);
+                  _startTimer();
+                },
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
 
+  material.Widget _gridRow(material.Widget left, material.Widget right) {
+    return material.IntrinsicHeight(
+      child: material.Row(
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
+          material.Expanded(child: left),
+          const Gap(16),
+          material.Expanded(child: right),
+        ],
+      ),
+    );
+  }
+
+  String _formatUptime(int seconds) {
+    if (seconds <= 0) return '0m';
+    final days = seconds ~/ 86400;
+    final hours = (seconds % 86400) ~/ 3600;
+    final minutes = (seconds % 3600) ~/ 60;
+    if (days > 0) return '${days}d ${hours}h';
+    if (hours > 0) return '${hours}h ${minutes}m';
+    return '${minutes}m';
+  }
+
   material.Widget _summaryChips(material.BuildContext context, Map<String, dynamic> status) {
     final cs = shadcn.Theme.of(context).colorScheme;
     final version = _getString(status, 'version') ?? '—';
-    final uptime = _getInt(status, 'uptime') ?? 0;
-    final uptimeDays = (uptime / 86400).toStringAsFixed(1);
+    final uptime = _formatUptime(_getInt(status, 'uptime') ?? 0);
     final connections = _getNestedInt(status, 'connections', 'current') ?? 0;
-    final maxConnections = _getNestedInt(status, 'connections', 'available') ?? 0;
+    final available = _getNestedInt(status, 'connections', 'available') ?? 0;
     final ops = _getNestedInt(status, 'opcounters', 'query') ?? 0;
     material.Widget chip(String label, String value, material.IconData icon) {
       return material.Expanded(
-        child: material.SizedBox(
-          height: _summaryChipHeight,
+        child: material.ConstrainedBox(
+          constraints: const material.BoxConstraints(minHeight: _summaryChipHeight),
           child: material.Container(
             padding: const material.EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: material.BoxDecoration(
@@ -373,8 +428,12 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
               border: material.Border.all(color: cs.border.withValues(alpha: 0.5)),
             ),
             child: material.Row(
+              crossAxisAlignment: material.CrossAxisAlignment.start,
               children: [
-                material.Icon(icon, size: 20, color: cs.primary),
+                material.Padding(
+                  padding: const material.EdgeInsets.only(top: 2),
+                  child: material.Icon(icon, size: 20, color: cs.primary),
+                ),
                 const Gap(12),
                 material.Expanded(
                   child: material.Column(
@@ -384,7 +443,17 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
                     children: [
                       Text(label).muted().xSmall(),
                       const Gap(2),
-                      Text(value).semiBold().small(),
+                      material.Text(
+                        value,
+                        maxLines: 2,
+                        overflow: material.TextOverflow.ellipsis,
+                        style: material.TextStyle(
+                          fontSize: 13,
+                          fontWeight: material.FontWeight.w600,
+                          color: cs.foreground,
+                          height: 1.25,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -395,23 +464,32 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
       );
     }
     return material.Row(
+      crossAxisAlignment: material.CrossAxisAlignment.start,
       children: [
         chip('Version', version, material.Icons.tag_rounded),
         const Gap(12),
-        chip('Uptime', '$uptimeDays days', material.Icons.schedule_rounded),
+        chip('Uptime', uptime, material.Icons.schedule_rounded),
         const Gap(12),
-        chip('Connections', '$connections / $maxConnections', material.Icons.people_outline_rounded),
+        chip('Connections', '$connections / $available', material.Icons.people_outline_rounded),
         const Gap(12),
         chip('Queries', '$ops', material.Icons.speed_rounded),
       ],
     );
   }
 
-  material.Widget _card(material.BuildContext context, String title, material.Widget body, {double? height}) {
+  material.Widget _card(
+    material.BuildContext context,
+    String title,
+    material.Widget body, {
+    double? minHeight,
+    bool stretchBody = false,
+  }) {
     final cs = shadcn.Theme.of(context).colorScheme;
     return material.Container(
       width: double.infinity,
-      height: height,
+      constraints: minHeight != null
+          ? material.BoxConstraints(minHeight: minHeight)
+          : const material.BoxConstraints(),
       padding: const material.EdgeInsets.all(20),
       decoration: material.BoxDecoration(
         color: cs.card,
@@ -419,14 +497,32 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
         border: material.Border.all(color: cs.border.withValues(alpha: 0.4)),
       ),
       child: material.Column(
-        mainAxisSize: material.MainAxisSize.min,
-        crossAxisAlignment: material.CrossAxisAlignment.start,
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
         children: [
           Text(title).semiBold(),
           const Gap(12),
-          body,
+          if (stretchBody) material.Expanded(child: body) else body,
         ],
       ),
+    );
+  }
+
+  material.Widget _metricList(
+    material.BuildContext context,
+    List<material.Widget> rows, {
+    bool stretch = false,
+  }) {
+    final column = material.Column(
+      crossAxisAlignment: material.CrossAxisAlignment.stretch,
+      children: rows,
+    );
+    if (!stretch) return column;
+    return material.Column(
+      crossAxisAlignment: material.CrossAxisAlignment.stretch,
+      children: [
+        column,
+        const material.Spacer(),
+      ],
     );
   }
 
@@ -439,17 +535,18 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     return _card(
       context,
       'Memory',
-      material.Column(
-        mainAxisSize: material.MainAxisSize.min,
-        crossAxisAlignment: material.CrossAxisAlignment.stretch,
-        children: [
-          _row(context, 'Resident', _formatBytes(resident)),
-          _row(context, 'Virtual', _formatBytes(virtual)),
-          _row(context, 'Mapped', _formatBytes(mapped)),
-          _row(context, 'Mapped + Journal', _formatBytes(mappedWithJournal)),
+      _metricList(
+        context,
+        [
+          _metricRow(context, 'Resident', _formatBytes(resident)),
+          _metricRow(context, 'Virtual', _formatBytes(virtual)),
+          _metricRow(context, 'Mapped', _formatBytes(mapped)),
+          _metricRow(context, 'Mapped + Journal', _formatBytes(mappedWithJournal)),
         ],
+        stretch: true,
       ),
-      height: _gridCardHeight,
+      minHeight: _gridCardMinHeight,
+      stretchBody: true,
     );
   }
 
@@ -462,17 +559,18 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     return _card(
       context,
       'Operations',
-      material.Column(
-        mainAxisSize: material.MainAxisSize.min,
-        crossAxisAlignment: material.CrossAxisAlignment.stretch,
-        children: [
-          _row(context, 'Inserts', '$inserts'),
-          _row(context, 'Queries', '$queries'),
-          _row(context, 'Updates', '$updates'),
-          _row(context, 'Deletes', '$deletes'),
+      _metricList(
+        context,
+        [
+          _metricRow(context, 'Inserts', '$inserts'),
+          _metricRow(context, 'Queries', '$queries'),
+          _metricRow(context, 'Updates', '$updates'),
+          _metricRow(context, 'Deletes', '$deletes'),
         ],
+        stretch: true,
       ),
-      height: _gridCardHeight,
+      minHeight: _gridCardMinHeight,
+      stretchBody: true,
     );
   }
 
@@ -484,16 +582,17 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     return _card(
       context,
       'Connections',
-      material.Column(
-        mainAxisSize: material.MainAxisSize.min,
-        crossAxisAlignment: material.CrossAxisAlignment.stretch,
-        children: [
-          _row(context, 'Current', '$current'),
-          _row(context, 'Available', '$available'),
-          _row(context, 'Active clients', '$active'),
+      _metricList(
+        context,
+        [
+          _metricRow(context, 'Current', '$current'),
+          _metricRow(context, 'Available', '$available'),
+          _metricRow(context, 'Active clients', '$active'),
         ],
+        stretch: true,
       ),
-      height: _gridCardHeight,
+      minHeight: _gridCardMinHeight,
+      stretchBody: true,
     );
   }
 
@@ -505,16 +604,17 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     return _card(
       context,
       'Network',
-      material.Column(
-        mainAxisSize: material.MainAxisSize.min,
-        crossAxisAlignment: material.CrossAxisAlignment.stretch,
-        children: [
-          _row(context, 'Bytes in', _formatBytes(bytesIn)),
-          _row(context, 'Bytes out', _formatBytes(bytesOut)),
-          _row(context, 'Requests', '$numRequests'),
+      _metricList(
+        context,
+        [
+          _metricRow(context, 'Bytes in', _formatBytes(bytesIn)),
+          _metricRow(context, 'Bytes out', _formatBytes(bytesOut)),
+          _metricRow(context, 'Requests', '$numRequests'),
         ],
+        stretch: true,
       ),
-      height: _gridCardHeight,
+      minHeight: _gridCardMinHeight,
+      stretchBody: true,
     );
   }
 
@@ -523,23 +623,76 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     return _card(
       context,
       title,
-      material.Column(
-        mainAxisSize: material.MainAxisSize.min,
-        crossAxisAlignment: material.CrossAxisAlignment.stretch,
-        children: [for (final e in data.entries) _row(context, e.key, e.value)],
+      _twoColumnMetrics(
+        context,
+        data.entries.map((e) => MapEntry(e.key, e.value)).toList(),
       ),
     );
   }
 
-  material.Widget _row(material.BuildContext context, String key, String value) {
+  material.Widget _twoColumnMetrics(
+    material.BuildContext context,
+    List<MapEntry<String, String>> entries,
+  ) {
+    if (entries.length <= 4) {
+      return material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [for (final e in entries) _metricRow(context, e.key, e.value)],
+      );
+    }
+    final mid = (entries.length / 2).ceil();
+    final left = entries.sublist(0, mid);
+    final right = entries.sublist(mid);
+    return material.Row(
+      crossAxisAlignment: material.CrossAxisAlignment.start,
+      children: [
+        material.Expanded(
+          child: material.Column(
+            crossAxisAlignment: material.CrossAxisAlignment.stretch,
+            children: [for (final e in left) _metricRow(context, e.key, e.value)],
+          ),
+        ),
+        const Gap(24),
+        material.Expanded(
+          child: material.Column(
+            crossAxisAlignment: material.CrossAxisAlignment.stretch,
+            children: [for (final e in right) _metricRow(context, e.key, e.value)],
+          ),
+        ),
+      ],
+    );
+  }
+
+  material.Widget _metricRow(material.BuildContext context, String label, String value) {
     final cs = shadcn.Theme.of(context).colorScheme;
     return material.Padding(
-      padding: const material.EdgeInsets.symmetric(vertical: 4),
+      padding: const material.EdgeInsets.symmetric(vertical: 6),
       child: material.Row(
         crossAxisAlignment: material.CrossAxisAlignment.start,
         children: [
-          material.SizedBox(width: 160, child: Text(key).muted().small()),
-          material.Expanded(child: material.SelectableText(value, style: material.TextStyle(fontSize: 13, color: cs.foreground))),
+          material.Expanded(
+            flex: 3,
+            child: Text(
+              label,
+              maxLines: 2,
+              overflow: material.TextOverflow.ellipsis,
+            ).muted().small(),
+          ),
+          const Gap(12),
+          material.Flexible(
+            flex: 2,
+            child: material.SelectableText(
+              value,
+              textAlign: material.TextAlign.right,
+              maxLines: 2,
+              style: material.TextStyle(
+                fontSize: 13,
+                fontWeight: material.FontWeight.w600,
+                color: cs.foreground,
+                height: 1.25,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -582,8 +735,7 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     if (status['process'] != null) result['Process'] = status['process'].toString();
     final uptime = _getInt(status, 'uptime');
     if (uptime != null) {
-      final days = (uptime / 86400).toStringAsFixed(1);
-      result['Uptime'] = '$days days ($uptime seconds)';
+      result['Uptime'] = '${_formatUptime(uptime)} ($uptime s)';
     }
     return result;
   }

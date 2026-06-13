@@ -419,7 +419,7 @@ class _BreadcrumbBar extends StatelessWidget {
   }
 }
 
-class _CrumbChip extends StatefulWidget {
+class _CrumbChip extends material.StatelessWidget {
   const _CrumbChip({
     required this.label,
     required this.isLast,
@@ -428,44 +428,37 @@ class _CrumbChip extends StatefulWidget {
 
   final String label;
   final bool isLast;
-  final VoidCallback? onTap;
-
-  @override
-  material.State<_CrumbChip> createState() => _CrumbChipState();
-}
-
-class _CrumbChipState extends material.State<_CrumbChip> {
-  bool _hovered = false;
+  final material.VoidCallback? onTap;
 
   @override
   material.Widget build(material.BuildContext context) {
     final cs = shadcn.Theme.of(context).colorScheme;
-    return material.MouseRegion(
-      cursor: widget.onTap != null
-          ? material.SystemMouseCursors.click
-          : material.SystemMouseCursors.basic,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: material.GestureDetector(
-        onTap: widget.onTap,
-        child: material.AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
+    final child = isLast
+        ? Text(label).semiBold().small()
+        : Text(label,
+                style: material.TextStyle(
+                    color: cs.primary,
+                    fontSize: 13,
+                    fontWeight: material.FontWeight.w500))
+            .small();
+
+    if (onTap == null) {
+      return material.Padding(
+        padding: const material.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: child,
+      );
+    }
+
+    return material.Material(
+      color: material.Colors.transparent,
+      child: material.InkWell(
+        onTap: onTap,
+        hoverColor: cs.primary.withValues(alpha: 0.1),
+        borderRadius: material.BorderRadius.circular(4),
+        child: material.Padding(
           padding:
               const material.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: material.BoxDecoration(
-            color: _hovered && widget.onTap != null
-                ? cs.primary.withValues(alpha: 0.1)
-                : material.Colors.transparent,
-            borderRadius: material.BorderRadius.circular(4),
-          ),
-          child: widget.isLast
-              ? Text(widget.label).semiBold().small()
-              : Text(widget.label,
-                      style: material.TextStyle(
-                          color: cs.primary,
-                          fontSize: 13,
-                          fontWeight: material.FontWeight.w500))
-                  .small(),
+          child: child,
         ),
       ),
     );

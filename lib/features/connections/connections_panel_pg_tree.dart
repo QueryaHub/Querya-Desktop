@@ -25,7 +25,7 @@ class _PgDatabasesNode extends StatefulWidget {
   State<_PgDatabasesNode> createState() => _PgDatabasesNodeState();
 }
 
-/// Ellipsis label; tooltip only when text overflows (intrinsic width > slot).
+/// Ellipsis label; tooltip when the name is long enough to likely truncate.
 class _PgTreeRowLabel extends material.StatelessWidget {
   const _PgTreeRowLabel({
     required this.label,
@@ -35,30 +35,21 @@ class _PgTreeRowLabel extends material.StatelessWidget {
   final String label;
   final material.TextStyle textStyle;
 
+  static const int _tooltipMinLength = 28;
+
   @override
   material.Widget build(material.BuildContext context) {
-    return material.LayoutBuilder(
-      builder: (context, constraints) {
-        final tp = material.TextPainter(
-          text: material.TextSpan(text: label, style: textStyle),
-          maxLines: 1,
-          textDirection: material.TextDirection.ltr,
-        );
-        tp.layout(maxWidth: double.infinity);
-        final overflow = tp.width > constraints.maxWidth + 0.5;
-        final text = material.Text(
-          label,
-          overflow: material.TextOverflow.ellipsis,
-          maxLines: 1,
-          style: textStyle,
-        );
-        if (!overflow) return text;
-        return material.Tooltip(
-          message: label,
-          waitDuration: const Duration(milliseconds: 450),
-          child: text,
-        );
-      },
+    final text = material.Text(
+      label,
+      overflow: material.TextOverflow.ellipsis,
+      maxLines: 1,
+      style: textStyle,
+    );
+    if (label.length < _tooltipMinLength) return text;
+    return material.Tooltip(
+      message: label,
+      waitDuration: const Duration(milliseconds: 450),
+      child: text,
     );
   }
 }
@@ -66,6 +57,7 @@ class _PgTreeRowLabel extends material.StatelessWidget {
 /// Shared tree row: consistent ink hover, optional context menu, tooltips when truncated.
 class _PgTreeRow extends material.StatelessWidget {
   const _PgTreeRow({
+    super.key,
     required this.label,
     this.leading,
     this.icon,
@@ -242,14 +234,20 @@ class _PgDatabasesNodeState extends State<_PgDatabasesNode> {
             onOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
           ),
           if (_expanded)
-            for (final db in widget.databases)
-              _PgDatabaseNode(
-                key: material.ValueKey('pg-db-${widget.connection.id ?? 0}-$db'),
-                connection: widget.connection,
-                databaseName: db,
-                onPostgresObjectSelected: widget.onPostgresObjectSelected,
-                onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
-              ),
+            lazyConnectionTreeList(
+              context: context,
+              itemCount: widget.databases.length,
+              itemBuilder: (context, index) {
+                final db = widget.databases[index];
+                return _PgDatabaseNode(
+                  key: material.ValueKey('pg-db-${widget.connection.id ?? 0}-$db'),
+                  connection: widget.connection,
+                  databaseName: db,
+                  onPostgresObjectSelected: widget.onPostgresObjectSelected,
+                  onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
+                );
+              },
+            ),
         ],
       ),
     );
@@ -531,17 +529,23 @@ class _PgSchemasNodeState extends State<_PgSchemasNode> {
             onOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
           ),
           if (_expanded)
-            for (final schema in widget.schemas)
-              _PgSchemaNode(
-                key: material.ValueKey(
-                  'pg-schema-${widget.connection.id ?? 0}-${widget.databaseName}-$schema',
-                ),
-                connection: widget.connection,
-                databaseName: widget.databaseName,
-                schemaName: schema,
-                onPostgresObjectSelected: widget.onPostgresObjectSelected,
-                onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
-              ),
+            lazyConnectionTreeList(
+              context: context,
+              itemCount: widget.schemas.length,
+              itemBuilder: (context, index) {
+                final schema = widget.schemas[index];
+                return _PgSchemaNode(
+                  key: material.ValueKey(
+                    'pg-schema-${widget.connection.id ?? 0}-${widget.databaseName}-$schema',
+                  ),
+                  connection: widget.connection,
+                  databaseName: widget.databaseName,
+                  schemaName: schema,
+                  onPostgresObjectSelected: widget.onPostgresObjectSelected,
+                  onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
+                );
+              },
+            ),
         ],
       ),
     );
@@ -955,10 +959,17 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
             onOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
           ),
           if (_expanded)
-            for (final item in widget.items)
-              material.Padding(
-                padding: const material.EdgeInsets.only(left: 22),
-                child: _PgTreeRow(
+            lazyConnectionTreeList(
+              context: context,
+              itemCount: widget.items.length,
+              itemExtent: kConnectionTreeRowExtent,
+              padding: const material.EdgeInsets.only(left: 22),
+              itemBuilder: (context, index) {
+                final item = widget.items[index];
+                return _PgTreeRow(
+                  key: material.ValueKey(
+                    'pg-${widget.objectKind.name}-${widget.databaseName}-${widget.schemaName}-$item',
+                  ),
                   label: item,
                   icon: widget.icon,
                   iconSize: 12,
@@ -979,8 +990,9 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
                   openSqlSchema: widget.schemaName,
                   openSqlName: item,
                   openSqlKind: widget.objectKind,
-                ),
-              ),
+                );
+              },
+            ),
         ],
       ),
     );

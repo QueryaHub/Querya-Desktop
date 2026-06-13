@@ -23,14 +23,10 @@ void main() {
       expect(find.byType(Slider), findsOneWidget);
     });
 
-    test('preview snaps to presets unless fine mode', () {
-      final controller = UiScaleController.instance;
-      final before = controller.scale;
-      controller.setScalePreview(1.15);
-      expect(controller.scale, 1.1);
-      controller.setScalePreview(1.15, fine: true);
-      expect(controller.scale, closeTo(1.15, 0.001));
-      controller.setScalePreview(before, fine: true);
+    test('UiScaleController.normalize snaps to presets unless fine mode', () {
+      expect(UiScaleController.normalize(1.15), 1.1);
+      expect(UiScaleController.normalize(1.15, fine: true), closeTo(1.15, 0.001));
+      expect(UiScaleController.normalize(0.88), 0.9);
     });
   });
 
