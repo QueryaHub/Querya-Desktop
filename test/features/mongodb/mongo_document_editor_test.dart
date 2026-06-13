@@ -6,6 +6,7 @@ import 'package:querya_desktop/core/editor/syntax_highlight_service.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/features/mongodb/mongo_document_editor.dart';
 
+import '../../support/pump_syntax_highlight.dart';
 import '../../support/querya_theme_test_shell.dart';
 
 void main() {
@@ -37,6 +38,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await pumpSyntaxHighlightDebounce(tester);
   }
 
   testWidgets('Format pretty-prints valid JSON', (tester) async {
@@ -48,6 +50,7 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('Format'));
     await tester.pump();
+    await pumpSyntaxHighlightDebounce(tester);
 
     final editable = tester.widget<material.EditableText>(
       find.byType(material.EditableText),
@@ -63,6 +66,7 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('Format'));
     await tester.pump();
+    await pumpSyntaxHighlightDebounce(tester);
 
     expect(find.textContaining('Invalid JSON'), findsOneWidget);
     expect(find.byType(material.EditableText), findsOneWidget);

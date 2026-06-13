@@ -119,12 +119,9 @@ TextStyle? _styleFromSegment(HighlightSegment s, TextStyle? base) {
   );
 }
 
-/// Runs [syntaxHighlightInIsolate] off the UI thread when [code] is large.
+/// Runs [syntaxHighlightInIsolate] off the UI thread.
 Future<List<HighlightSegment>> highlightOffMainThread(
   SyntaxHighlightJob job,
 ) {
-  if (job.code.length < kSyntaxHighlightIsolateThreshold) {
-    return Future.value(syntaxHighlightInIsolate(job));
-  }
   return compute(syntaxHighlightInIsolate, job);
 }
