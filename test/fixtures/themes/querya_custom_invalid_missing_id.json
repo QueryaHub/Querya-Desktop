@@ -1,0 +1,7 @@
+{
+  "schema": "querya.theme.v1",
+  "name": "Missing Id Fixture",
+  "type": "dark",
+  "shadcn_colors": {},
+  "editor_colors": {}
+}
