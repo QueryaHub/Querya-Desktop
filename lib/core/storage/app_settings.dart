@@ -225,7 +225,6 @@ class AppSettings {
       AppSettingsKeys.uiScale,
       normalized.toStringAsFixed(2),
     );
-    AppSettingsRevision.bump();
   }
 
   /// Max SQL history rows kept per connection + database (oldest trimmed).

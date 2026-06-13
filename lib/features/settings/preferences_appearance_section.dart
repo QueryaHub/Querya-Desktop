@@ -2,7 +2,6 @@ import 'dart:async' show unawaited;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart' as material;
-import 'package:querya_desktop/core/layout/ui_scale_controller.dart';
 import 'package:querya_desktop/core/theme/querya_theme_preset.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:querya_desktop/core/theme/theme_import_service.dart';
@@ -21,7 +20,6 @@ class PreferencesAppearanceSection extends material.StatefulWidget {
 class _PreferencesAppearanceSectionState
     extends material.State<PreferencesAppearanceSection> {
   final _controller = ThemeController.instance;
-  final _uiScale = UiScaleController.instance;
   String? _importError;
   bool _importing = false;
 
@@ -29,13 +27,11 @@ class _PreferencesAppearanceSectionState
   void initState() {
     super.initState();
     _controller.addListener(_onThemeChanged);
-    _uiScale.addListener(_onThemeChanged);
   }
 
   @override
   void dispose() {
     _controller.removeListener(_onThemeChanged);
-    _uiScale.removeListener(_onThemeChanged);
     super.dispose();
   }
 
@@ -153,11 +149,11 @@ class _PreferencesAppearanceSectionState
           ),
         ),
         const material.SizedBox(height: 12),
-        PreferencesFieldRow(
+        const PreferencesFieldRow(
           label: 'Interface scale',
           hint:
               'Snap to presets (75%, 85%, 90%, 100% …). Hold Shift for 1% fine control.',
-          control: InterfaceScaleSlider(scale: _uiScale.scale),
+          control: InterfaceScaleSlider(),
         ),
         const material.SizedBox(height: 12),
         PreferencesFieldRow(
