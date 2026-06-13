@@ -49,7 +49,7 @@ void main() {
           .readAsStringSync();
       final manifest = QueryaThemeManifest.fromJsonString(raw);
       final theme = queryaThemeFromManifest(manifest);
-      final fallback = QueryaTheme.darkDefault;
+      const fallback = QueryaTheme.darkDefault;
 
       expect(theme.brightness, Brightness.dark);
       expect(theme.colorScheme.primary, parseQueryaThemeColor('#FF00AA'));
