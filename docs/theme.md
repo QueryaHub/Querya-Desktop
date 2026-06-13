@@ -13,7 +13,7 @@ import (#43–45), `tokenColors` → syntax highlight (#46–47, #49–50), P0 w
 animation (#57), editor package spikes (#48, #52).
 
 **Follow-up (not blocking):** P2 surfaces (Mongo/Redis explorer semantic hues), `re_editor`
-if large-buffer benchmarks fail — see [code-forge-evaluation.md](code-forge-evaluation.md).
+if large-buffer benchmarks fail — see [archive/code-forge-evaluation.md](archive/code-forge-evaluation.md).
 
 ## Architecture
 
@@ -180,11 +180,11 @@ Manual QA (with animation enabled):
 | SQL/JSON syntax highlighting | Done |
 | `tokenColors` → highlighter | Done |
 | Theme transition animation | Preferences → **Animate theme changes** (default off) |
-| `code_forge` / LSP editor | **NO-GO** for 0.3 — [code-forge-evaluation.md](code-forge-evaluation.md) |
+| `code_forge` / LSP editor | **NO-GO** for 0.3 — [archive/code-forge-evaluation.md](archive/code-forge-evaluation.md) |
 
 ## Related docs
 
 - [theme-import.md](theme-import.md) — supported `colors` keys and merge behavior
-- [research_theme.md](research_theme.md) — background research (RU)
-- [editor-spike-report.md](editor-spike-report.md) — code editor package evaluation (#48)
-- [code-forge-evaluation.md](code-forge-evaluation.md) — `code_forge` + LSP go/no-go (#52)
+- [archive/research_theme.md](archive/research_theme.md) — background research (RU)
+- [archive/editor-spike-report.md](archive/editor-spike-report.md) — code editor package evaluation (#48)
+- [archive/code-forge-evaluation.md](archive/code-forge-evaluation.md) — `code_forge` + LSP go/no-go (#52)
