@@ -89,11 +89,10 @@ class _NewConnectionDialogContentState extends material.State<_NewConnectionDial
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context).colorScheme;
     final radius = Theme.of(context).radiusXxl;
-    final mq = MediaQuery.sizeOf(context);
-    final dialogMaxW = WindowLayout.newConnectionDialogMaxWidth(mq.width);
-    final dialogH = WindowLayout.newConnectionDialogHeight(mq.height);
-    final sidebarW = WindowLayout.newConnectionSidebarWidth(dialogMaxW);
+    final dialogMaxW = WindowLayout.newConnectionDialogMaxWidth(context);
+    final dialogH = WindowLayout.newConnectionDialogHeight(context);
     final headerPadH = dialogMaxW < 420 ? 16.0 : 24.0;
+    final stackFilters = dialogMaxW < 520;
 
     return material.Container(
       width: dialogMaxW,
@@ -145,74 +144,61 @@ class _NewConnectionDialogContentState extends material.State<_NewConnectionDial
                           child: TextField(
                             controller: _searchController,
                             placeholder: const Text('Search...'),
-                            onChanged: (v) => setState(() => _searchQuery = v),
+                            onChanged: (v) => setState(() {
+                              _searchQuery = v;
+                              if (_selectedType != null &&
+                                  !_filteredTypes.contains(_selectedType)) {
+                                _selectedType = null;
+                              }
+                            }),
                           ),
                         ),
                       ],
                     ),
                   ),
+                  const material.SizedBox(height: 12),
+                  _FilterDropdowns(
+                    stackVertically: stackFilters,
+                    category: _category,
+                    selectedType: _selectedType,
+                    filteredTypes: _filteredTypes,
+                    onCategoryChanged: (category) {
+                      setState(() {
+                        _category = category;
+                        if (_selectedType != null &&
+                            !_categoryTypes.contains(_selectedType)) {
+                          _selectedType = null;
+                        }
+                      });
+                    },
+                    onTypeChanged: (type) => setState(() => _selectedType = type),
+                  ),
                 ],
               ),
             ),
             material.Expanded(
-              child: material.Row(
-                crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                children: [
-                  material.Container(
-                    width: sidebarW,
-                    decoration: material.BoxDecoration(
-                      border: material.Border(
-                        right: material.BorderSide(
-                          color: theme.border.withValues(alpha: 0.4),
-                        ),
-                      ),
-                    ),
-                    child: material.ListView(
-                      padding: const material.EdgeInsets.symmetric(vertical: 8),
-                      children: [
-                        _CategoryTile(
-                          label: 'All',
-                          icon: material.Icons.dns_rounded,
-                          selected: _category == _Category.all,
-                          onTap: () => setState(() => _category = _Category.all),
-                          theme: theme,
-                        ),
-                        _CategoryTile(
-                          label: 'SQL',
-                          icon: material.Icons.table_chart_rounded,
-                          selected: _category == _Category.sql,
-                          onTap: () => setState(() => _category = _Category.sql),
-                          theme: theme,
-                        ),
-                        _CategoryTile(
-                          label: 'NoSQL',
-                          icon: material.Icons.memory_rounded,
-                          selected: _category == _Category.nosql,
-                          onTap: () => setState(() => _category = _Category.nosql),
-                          theme: theme,
-                        ),
-                      ],
-                    ),
-                  ),
-                  material.Expanded(
-                    child: material.LayoutBuilder(
-                      builder: (context, constraints) {
-                        const spacing = 12.0;
-                        final gridPad = dialogMaxW < 420 ? 12.0 : 16.0;
-                        final innerW = math.max(0.0, constraints.maxWidth - gridPad * 2);
-                        final crossAxisCount =
-                            WindowLayout.dbTypeGridCrossAxisCount(innerW);
-                        final cardHeight =
-                            WindowLayout.dbTypeCardHeight(crossAxisCount);
-                        final cardWidth = crossAxisCount > 0
-                            ? (innerW - spacing * (crossAxisCount - 1)) /
-                                crossAxisCount
-                            : innerW;
-                        final aspect =
-                            cardHeight > 0 ? cardWidth / cardHeight : 1.0;
-                        return material.Padding(
-                          padding: material.EdgeInsets.all(gridPad),
-                          child: material.GridView.count(
+              child: material.LayoutBuilder(
+                builder: (context, constraints) {
+                  const spacing = 12.0;
+                  final gridPad = dialogMaxW < 420 ? 12.0 : 16.0;
+                  final innerW = math.max(0.0, constraints.maxWidth - gridPad * 2);
+                  final crossAxisCount =
+                      WindowLayout.dbTypeGridCrossAxisCount(innerW);
+                    final cardHeight =
+                        WindowLayout.dbTypeCardHeight(context, crossAxisCount);
+                  final cardWidth = crossAxisCount > 0
+                      ? (innerW - spacing * (crossAxisCount - 1)) / crossAxisCount
+                      : innerW;
+                  final aspect = cardHeight > 0 ? cardWidth / cardHeight : 1.0;
+                  return material.Padding(
+                    padding: material.EdgeInsets.all(gridPad),
+                    child: _filteredTypes.isEmpty
+                        ? material.Center(
+                            child: const Text('No databases match your search.')
+                                .muted()
+                                .small(),
+                          )
+                        : material.GridView.count(
                             crossAxisCount: crossAxisCount,
                             mainAxisSpacing: spacing,
                             crossAxisSpacing: spacing,
@@ -229,11 +215,8 @@ class _NewConnectionDialogContentState extends material.State<_NewConnectionDial
                                 ),
                             ],
                           ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
+                  );
+                },
               ),
             ),
             material.Container(
@@ -271,38 +254,100 @@ class _NewConnectionDialogContentState extends material.State<_NewConnectionDial
   }
 }
 
-class _CategoryTile extends StatelessWidget {
-  const _CategoryTile({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-    required this.theme,
+class _FilterDropdowns extends StatelessWidget {
+  const _FilterDropdowns({
+    required this.stackVertically,
+    required this.category,
+    required this.selectedType,
+    required this.filteredTypes,
+    required this.onCategoryChanged,
+    required this.onTypeChanged,
   });
 
-  final String label;
-  final material.IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-  final ColorScheme theme;
+  final bool stackVertically;
+  final _Category category;
+  final ConnectionType? selectedType;
+  final List<ConnectionType> filteredTypes;
+  final void Function(_Category category) onCategoryChanged;
+  final void Function(ConnectionType? type) onTypeChanged;
+
+  static const _categoryItems = [
+    QueryaDropdownItem(
+      value: _Category.all,
+      label: 'All databases',
+      leading: material.Icon(material.Icons.dns_rounded, size: 18),
+    ),
+    QueryaDropdownItem(
+      value: _Category.sql,
+      label: 'SQL',
+      leading: material.Icon(material.Icons.table_chart_rounded, size: 18),
+    ),
+    QueryaDropdownItem(
+      value: _Category.nosql,
+      label: 'NoSQL',
+      leading: material.Icon(material.Icons.memory_rounded, size: 18),
+    ),
+  ];
 
   @override
   material.Widget build(material.BuildContext context) {
-    return material.Material(
-      color: selected ? theme.muted.withValues(alpha: 0.35) : material.Colors.transparent,
-      child: material.InkWell(
-        onTap: onTap,
-        child: material.Padding(
-          padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: material.Row(
-            children: [
-              material.Icon(icon, size: 20, color: theme.mutedForeground),
-              const material.SizedBox(width: 14),
-              selected ? Text(label).semiBold().small() : Text(label).small(),
-            ],
-          ),
+    final categoryField = material.Column(
+      crossAxisAlignment: material.CrossAxisAlignment.stretch,
+      children: [
+        const Text('Category').small().muted(),
+        const material.SizedBox(height: 4),
+        QueryaDropdown<_Category>(
+          value: category,
+          expandToParent: true,
+          items: _categoryItems,
+          onSelected: (value) {
+            if (value != null) onCategoryChanged(value);
+          },
         ),
-      ),
+      ],
+    );
+
+    final typeField = material.Column(
+      crossAxisAlignment: material.CrossAxisAlignment.stretch,
+      children: [
+        const Text('Database type').small().muted(),
+        const material.SizedBox(height: 4),
+        QueryaDropdown<ConnectionType?>(
+          value: selectedType,
+          hint: filteredTypes.isEmpty ? 'No matches' : 'Select database…',
+          enabled: filteredTypes.isNotEmpty,
+          expandToParent: true,
+          items: [
+            for (final type in filteredTypes)
+              QueryaDropdownItem<ConnectionType?>(
+                value: type,
+                label: type.label,
+                leading: material.Icon(type.icon, size: 18),
+              ),
+          ],
+          onSelected: onTypeChanged,
+        ),
+      ],
+    );
+
+    if (stackVertically) {
+      return material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
+          categoryField,
+          const material.SizedBox(height: 10),
+          typeField,
+        ],
+      );
+    }
+
+    return material.Row(
+      crossAxisAlignment: material.CrossAxisAlignment.start,
+      children: [
+        material.Expanded(child: categoryField),
+        const material.SizedBox(width: 12),
+        material.Expanded(child: typeField),
+      ],
     );
   }
 }

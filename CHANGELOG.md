@@ -5,6 +5,39 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-06-13
+
+Performance and UX release ([#93](https://github.com/QueryaHub/Querya-Desktop/issues/93)). Git tag **`0.4.1`**.
+
+### Added
+
+- **MySQL server stats** — full dashboard (connections, queries, network, databases table) via `SHOW GLOBAL STATUS` / `information_schema`.
+- **Virtual SQL result grid** — `VirtualResultGrid` with fixed column widths, cell copy, and `RepaintBoundary` instead of a materialized `Table`.
+- **Lazy connection tree** — `lazyConnectionTreeList` / `ListView.builder` for large PostgreSQL and MySQL object lists; `ValueKey` on leaf rows.
+- **Vertical split pane** — `ValueNotifier`-driven splitter drag without rebuilding entire workspace panels.
+- **Docker dev stack** — `docker/` compose with PostgreSQL, MySQL, MongoDB, Redis and seed data for local testing.
+- **`deep_collection_equals`** — shared snapshot diff helper for stats polling.
+
+### Changed
+
+- **UI scale preview** — decoupled from app-wide theme rebuilds; scale commits only on slider release.
+- **Syntax highlighting** — debounced updates, worker isolate for all buffer sizes, highlighter pair cache by theme key.
+- **Stats dashboards** — Redis, MongoDB, and PostgreSQL skip `setState` when polled data is unchanged; Redis/Mongo layouts redesigned; MySQL replaces version-only stub.
+- **Connection forms** — `FormValidityNotifier` narrows rebuild scope to action buttons.
+- **SQL workspace settings** — `SqlWorkspaceSettingsRevision` so theme/scale changes do not reload SQL tabs.
+- **Connections panel** — rebuilds only when selected connection id changes.
+- **MySQL results** — row string conversion moved to a worker isolate (`mysql_result_utils`).
+- **Redis key editor** — virtualized hash/list/set/zset member lists.
+- **Mongo documents** — lazy pretty-JSON cache; document cards without hover `setState`.
+- **Explorer list rows** — Redis/Mongo database/key/collection rows use `InkWell` hover instead of hover `setState`.
+- **QueryaDropdown** — caches menu children; ellipsizes trigger label in fixed-width layouts.
+
+### Fixed
+
+- **Connection menu** — new connection form opens after picking type from the menu ([#93](https://github.com/QueryaHub/Querya-Desktop/issues/93) follow-up).
+- **Stats UI overflow** — Redis, MongoDB, and PostgreSQL stats cards no longer overflow in debug/profile layouts.
+- **Redis TTL dialog** — disposes `TextEditingController` on close.
+
 ## [0.4.0] - 2026-05-28
 
 Theme system milestone (epic #37). Git tag **`0.4.0`** — use this release for binaries; earlier tag `0.3.0` was a pre-PR snapshot.
@@ -16,7 +49,7 @@ Theme system milestone (epic #37). Git tag **`0.4.0`** — use this release for 
 - **Syntax highlighting** — SQL and JSON in `QueryaCodeEditor` via `syntax_highlight`; `tokenColors` mapped to TextMate scopes; isolate highlight for large buffers.
 - **Editor** — `QueryaCodeEditor` abstraction, `SqlEditorChrome` from theme tokens, `QueryaThemeScope` for workbench/editor tokens.
 - **Samples** — `themes/samples/cyberpunk-neon.json` (+ JSONC) for manual import testing.
-- **Docs** — [docs/theme.md](docs/theme.md), [docs/theme-import.md](docs/theme-import.md), [docs/editor-spike-report.md](docs/editor-spike-report.md), [docs/code-forge-evaluation.md](docs/code-forge-evaluation.md).
+- **Docs** — [docs/theme.md](docs/theme.md), [docs/theme-import.md](docs/theme-import.md), [docs/archive/editor-spike-report.md](docs/archive/editor-spike-report.md), [docs/archive/code-forge-evaluation.md](docs/archive/code-forge-evaluation.md).
 
 ### Changed
 

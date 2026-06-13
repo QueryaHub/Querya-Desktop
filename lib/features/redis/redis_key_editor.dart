@@ -312,9 +312,13 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
         const Divider(height: 1),
         // Content
         material.Expanded(
-          child: material.SingleChildScrollView(
+          child: material.Padding(
             padding: const material.EdgeInsets.all(16),
-            child: _buildContent(cs, shadcnCs),
+            child: widget.keyType == 'string'
+                ? material.SingleChildScrollView(
+                    child: _buildContent(cs, shadcnCs),
+                  )
+                : _buildContent(cs, shadcnCs),
           ),
         ),
       ],
@@ -499,7 +503,6 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       children: [
         Text('Hash fields (${entries.length})').semiBold(),
         const Gap(8),
-        // Add field row
         material.Row(
           children: [
             material.Expanded(
@@ -531,16 +534,24 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
           ],
         ),
         const Gap(12),
-        for (final entry in entries) ...[
-          _FieldRow(
-            field: entry.key,
-            value: entry.value,
-            onDelete: () => _hashDel(entry.key),
-            colorScheme: cs,
-            shadcnCs: scs,
-          ),
-          const Gap(4),
-        ],
+        material.Expanded(
+          child: entries.isEmpty
+              ? material.Center(child: const Text('No fields').muted())
+              : material.ListView.separated(
+                  itemCount: entries.length,
+                  separatorBuilder: (_, __) => const Gap(4),
+                  itemBuilder: (context, index) {
+                    final entry = entries[index];
+                    return _FieldRow(
+                      field: entry.key,
+                      value: entry.value,
+                      onDelete: () => _hashDel(entry.key),
+                      colorScheme: cs,
+                      shadcnCs: scs,
+                    );
+                  },
+                ),
+        ),
       ],
     );
   }
@@ -576,15 +587,20 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
           ],
         ),
         const Gap(12),
-        for (var i = 0; i < _listValue.length; i++) ...[
-          _IndexedValueRow(
-            index: i,
-            value: _listValue[i],
-            colorScheme: cs,
-            shadcnCs: scs,
-          ),
-          const Gap(4),
-        ],
+        material.Expanded(
+          child: _listValue.isEmpty
+              ? material.Center(child: const Text('No items').muted())
+              : material.ListView.separated(
+                  itemCount: _listValue.length,
+                  separatorBuilder: (_, __) => const Gap(4),
+                  itemBuilder: (context, i) => _IndexedValueRow(
+                    index: i,
+                    value: _listValue[i],
+                    colorScheme: cs,
+                    shadcnCs: scs,
+                  ),
+                ),
+        ),
       ],
     );
   }
@@ -620,15 +636,20 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
           ],
         ),
         const Gap(12),
-        for (final member in _setValue) ...[
-          _MemberRow(
-            member: member,
-            onDelete: () => _setRemove(member),
-            colorScheme: cs,
-            shadcnCs: scs,
-          ),
-          const Gap(4),
-        ],
+        material.Expanded(
+          child: _setValue.isEmpty
+              ? material.Center(child: const Text('No members').muted())
+              : material.ListView.separated(
+                  itemCount: _setValue.length,
+                  separatorBuilder: (_, __) => const Gap(4),
+                  itemBuilder: (context, index) => _MemberRow(
+                    member: _setValue[index],
+                    onDelete: () => _setRemove(_setValue[index]),
+                    colorScheme: cs,
+                    shadcnCs: scs,
+                  ),
+                ),
+        ),
       ],
     );
   }
@@ -675,16 +696,24 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
           ],
         ),
         const Gap(12),
-        for (final (member, score) in _zsetValue) ...[
-          _ScoredMemberRow(
-            member: member,
-            score: score,
-            onDelete: () => _zsetRemove(member),
-            colorScheme: cs,
-            shadcnCs: scs,
-          ),
-          const Gap(4),
-        ],
+        material.Expanded(
+          child: _zsetValue.isEmpty
+              ? material.Center(child: const Text('No members').muted())
+              : material.ListView.separated(
+                  itemCount: _zsetValue.length,
+                  separatorBuilder: (_, __) => const Gap(4),
+                  itemBuilder: (context, index) {
+                    final (member, score) = _zsetValue[index];
+                    return _ScoredMemberRow(
+                      member: member,
+                      score: score,
+                      onDelete: () => _zsetRemove(member),
+                      colorScheme: cs,
+                      shadcnCs: scs,
+                    );
+                  },
+                ),
+        ),
       ],
     );
   }
@@ -692,43 +721,12 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   // ─── TTL dialog ─────────────────────────────────────────────────────────
 
   void _showTtlDialog() {
-    final controller =
-        material.TextEditingController(text: _ttl > 0 ? '$_ttl' : '');
-    showAppDialog(
+    showAppDialog<void>(
       context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          title: const Text('Set TTL'),
-          content: material.Column(
-            mainAxisSize: material.MainAxisSize.min,
-            crossAxisAlignment: material.CrossAxisAlignment.stretch,
-            children: [
-              const Text('Enter TTL in seconds (0 to remove)').muted().small(),
-              const Gap(8),
-              TextField(
-                controller: controller,
-                placeholder: const Text('Seconds'),
-              ),
-            ],
-          ),
-          actions: [
-            GhostButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel'),
-            ),
-            PrimaryButton(
-              onPressed: () {
-                final val = int.tryParse(controller.text.trim());
-                if (val != null) {
-                  _setTtl(val);
-                }
-                Navigator.of(ctx).pop();
-              },
-              child: const Text('Apply'),
-            ),
-          ],
-        );
-      },
+      builder: (ctx) => _RedisTtlDialogContent(
+        initialTtl: _ttl,
+        onApply: _setTtl,
+      ),
     );
   }
 
@@ -766,6 +764,73 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       default:
         return material.Icons.help_outline_rounded;
     }
+  }
+}
+
+class _RedisTtlDialogContent extends material.StatefulWidget {
+  const _RedisTtlDialogContent({
+    required this.initialTtl,
+    required this.onApply,
+  });
+
+  final int initialTtl;
+  final Future<void> Function(int seconds) onApply;
+
+  @override
+  material.State<_RedisTtlDialogContent> createState() =>
+      _RedisTtlDialogContentState();
+}
+
+class _RedisTtlDialogContentState extends material.State<_RedisTtlDialogContent> {
+  late final material.TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = material.TextEditingController(
+      text: widget.initialTtl > 0 ? '${widget.initialTtl}' : '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    return AlertDialog(
+      title: const Text('Set TTL'),
+      content: material.Column(
+        mainAxisSize: material.MainAxisSize.min,
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
+          const Text('Enter TTL in seconds (0 to remove)').muted().small(),
+          const Gap(8),
+          TextField(
+            controller: _controller,
+            placeholder: const Text('Seconds'),
+          ),
+        ],
+      ),
+      actions: [
+        GhostButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        PrimaryButton(
+          onPressed: () {
+            final val = int.tryParse(_controller.text.trim());
+            if (val != null) {
+              widget.onApply(val);
+            }
+            Navigator.of(context).pop();
+          },
+          child: const Text('Apply'),
+        ),
+      ],
+    );
   }
 }
 

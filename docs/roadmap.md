@@ -6,9 +6,10 @@ Living document for planned work. Not a commitment order; adjust as priorities c
 
 - **Shipped in 0.4.0 (epic #37):** runtime themes, VS Code `colors` + `tokenColors` import, SQL/JSON
   highlighting, P0 workbench migration, Preferences, tests, docs — [theme.md](theme.md).
+- **Shipped in 0.4.1 ([#93](https://github.com/QueryaHub/Querya-Desktop/issues/93)):** UI performance — virtual result grid, lazy connection tree, decoupled scale preview, stats polling, MySQL stats dashboard, local `docker/` dev stack — [perf-baseline.md](perf-baseline.md).
 - **Optional:** Preferences → **Animate theme changes** (off by default).
 - **Later:** P2 Mongo/Redis token colors; `re_editor` if perf gap; LSP epic per
-  [code-forge-evaluation.md](code-forge-evaluation.md) (**NO-GO** on `code_forge` for 0.3).
+  [archive/code-forge-evaluation.md](archive/code-forge-evaluation.md) (**NO-GO** on `code_forge` for 0.3).
 
 ## Query history and favorites
 

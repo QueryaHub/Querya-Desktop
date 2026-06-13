@@ -37,7 +37,11 @@ class _NewFolderDialogContentState extends material.State<_NewFolderDialogConten
     final theme = Theme.of(context).colorScheme;
     final radius = Theme.of(context).radiusXxl;
     return material.Container(
-      constraints: const material.BoxConstraints(maxWidth: 440, minWidth: 360),
+      constraints: WindowLayout.dialogConstraints(
+        context,
+        maxWidth: 440,
+        minWidth: 360,
+      ),
       decoration: material.BoxDecoration(
         color: theme.popover,
         borderRadius: material.BorderRadius.circular(radius),

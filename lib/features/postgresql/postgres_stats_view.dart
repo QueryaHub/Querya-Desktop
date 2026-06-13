@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/util/deep_collection_equals.dart';
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -10,6 +11,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 const _pollInterval = Duration(seconds: 5);
 const _summaryChipHeight = 88.0;
 const _gridCardMinHeight = 220.0;
+final _pgVersionPattern = RegExp(r'PostgreSQL\s+([\d.]+)');
 
 class PostgresStatsView extends material.StatefulWidget {
   const PostgresStatsView({
@@ -105,8 +107,8 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
     try {
       final stats = await c.serverStats();
       if (!mounted) return;
+      if (!replaceIfChanged(_stats, stats, (v) => _stats = v)) return;
       setState(() {
-        _stats = stats;
         _loading = false;
       });
     } catch (e) {
@@ -127,7 +129,8 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
       try {
         final stats = await c.serverStats();
         if (!mounted) return;
-        setState(() => _stats = stats);
+        if (!replaceIfChanged(_stats, stats, (v) => _stats = v)) return;
+        setState(() {});
       } catch (_) {}
     });
   }
@@ -553,7 +556,7 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
   }
 
   String _extractPgVersion(String full) {
-    final match = RegExp(r'PostgreSQL\s+([\d.]+)').firstMatch(full);
+    final match = _pgVersionPattern.firstMatch(full);
     return match?.group(1) ?? full;
   }
 

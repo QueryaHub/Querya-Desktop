@@ -1,4 +1,6 @@
+import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/storage/app_settings.dart';
+import 'package:querya_desktop/core/theme/querya_material_theme.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import 'parser/apply_token_colors_to_editor.dart';
@@ -24,6 +26,14 @@ class ThemeController extends ChangeNotifier {
   String? _importedThemeName;
   bool _loaded = false;
   bool _themeAnimationEnabled = false;
+
+  QueryaTheme? _cachedLightTheme;
+  QueryaTheme? _cachedDarkTheme;
+  QueryaTheme? _cachedActiveTheme;
+  ThemeData? _cachedLightShadcnTheme;
+  ThemeData? _cachedDarkShadcnTheme;
+  material.ThemeData? _cachedMaterialTheme;
+  ColorScheme? _cachedMaterialThemeScheme;
 
   ThemeMode get themeMode => _themeMode;
 
@@ -70,13 +80,41 @@ class ThemeController extends ChangeNotifier {
   }
 
   /// Workbench + editor tokens for the current preset/mode and overrides.
-  QueryaTheme get activeTheme => _themeForBrightness(_effectiveBrightness());
+  QueryaTheme get activeTheme =>
+      _cachedActiveTheme ??= _themeForBrightness(_effectiveBrightness());
 
-  ThemeData get lightShadcnTheme =>
-      _themeForBrightness(Brightness.light).toShadcnThemeData();
+  ThemeData get lightShadcnTheme => _cachedLightShadcnTheme ??=
+      (_cachedLightTheme ??= _themeForBrightness(Brightness.light))
+          .toShadcnThemeData();
 
-  ThemeData get darkShadcnTheme =>
-      _themeForBrightness(Brightness.dark).toShadcnThemeData();
+  ThemeData get darkShadcnTheme => _cachedDarkShadcnTheme ??=
+      (_cachedDarkTheme ??= _themeForBrightness(Brightness.dark))
+          .toShadcnThemeData();
+
+  /// Cached Material theme for dialogs/dropdowns (avoids rebuild churn).
+  material.ThemeData materialThemeFor(ColorScheme scheme) {
+    if (_cachedMaterialTheme != null &&
+        _cachedMaterialThemeScheme == scheme) {
+      return _cachedMaterialTheme!;
+    }
+    _cachedMaterialThemeScheme = scheme;
+    return _cachedMaterialTheme = materialThemeFromQuerya(scheme);
+  }
+
+  void _invalidateThemeCache() {
+    _cachedLightTheme = null;
+    _cachedDarkTheme = null;
+    _cachedActiveTheme = null;
+    _cachedLightShadcnTheme = null;
+    _cachedDarkShadcnTheme = null;
+    _cachedMaterialTheme = null;
+    _cachedMaterialThemeScheme = null;
+  }
+
+  void _notifyThemeChanged() {
+    _invalidateThemeCache();
+    notifyListeners();
+  }
 
   Future<void> load() async {
     final mode = await AppSettings.instance.getThemeMode();
@@ -106,13 +144,13 @@ class ThemeController extends ChangeNotifier {
     _themeAnimationEnabled =
         await AppSettings.instance.getThemeAnimationEnabled();
     _loaded = true;
-    notifyListeners();
+    _notifyThemeChanged();
   }
 
   Future<void> setThemeAnimationEnabled(bool enabled) async {
     _themeAnimationEnabled = enabled;
     await AppSettings.instance.setThemeAnimationEnabled(enabled);
-    notifyListeners();
+    _notifyThemeChanged();
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
@@ -124,7 +162,7 @@ class ThemeController extends ChangeNotifier {
       await AppSettings.instance.setThemePreset(_preset);
     }
     await AppSettings.instance.setThemeMode(mode);
-    notifyListeners();
+    _notifyThemeChanged();
   }
 
   Future<void> setPreset(QueryaThemePreset preset) async {
@@ -141,7 +179,7 @@ class ThemeController extends ChangeNotifier {
       await AppSettings.instance.setThemePreset(preset);
       await AppSettings.instance.setThemeMode(_themeMode);
     }
-    notifyListeners();
+    _notifyThemeChanged();
   }
 
   /// Parses a VS Code theme file, persists it, and activates the imported preset.
@@ -165,7 +203,7 @@ class ThemeController extends ChangeNotifier {
         await AppSettings.instance.setThemeImportPath(storedPath);
         await AppSettings.instance.setThemePreset(QueryaThemePreset.imported);
         await AppSettings.instance.setThemeMode(_themeMode);
-        notifyListeners();
+        _notifyThemeChanged();
         return result;
       case ThemeImportFailure():
         return result;
@@ -182,14 +220,14 @@ class ThemeController extends ChangeNotifier {
     }
     _userOverrides = Map.unmodifiable(next);
     await AppSettings.instance.setThemeColorOverrides(next);
-    notifyListeners();
+    _notifyThemeChanged();
   }
 
   /// Removes only the user override layer (keeps preset/imported theme).
   Future<void> clearColorOverrides() async {
     _userOverrides = const {};
     await AppSettings.instance.clearThemeColorOverrides();
-    notifyListeners();
+    _notifyThemeChanged();
   }
 
   /// Clears imported theme file and settings; falls back to Querya Dark.
@@ -205,7 +243,7 @@ class ThemeController extends ChangeNotifier {
       await AppSettings.instance.setThemePreset(_preset);
       await AppSettings.instance.setThemeMode(_themeMode);
     }
-    notifyListeners();
+    _notifyThemeChanged();
   }
 
   Future<void> resetToDefaults() async {
@@ -218,7 +256,7 @@ class ThemeController extends ChangeNotifier {
     _userOverrides = const {};
     _importedThemeName = null;
     _themeAnimationEnabled = false;
-    notifyListeners();
+    _notifyThemeChanged();
   }
 
   Brightness _effectiveBrightness() {
