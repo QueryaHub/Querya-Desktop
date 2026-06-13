@@ -14,6 +14,7 @@ Index of Querya Desktop documentation, grouped by audience.
 - [Architecture](architecture.md) — `lib/` layout and module responsibilities.
 - [Theme system](theme.md) — runtime theming and VS Code theme tokens.
 - [Theme import](theme-import.md) — supported `colors` keys and merge behavior.
+- [Custom theme JSON](theme-custom-json.md) — `querya.theme.v1` schema and fallback rules.
 - [Performance baseline](perf-baseline.md) — per-milestone DevTools checklist.
 
 ## For release managers
