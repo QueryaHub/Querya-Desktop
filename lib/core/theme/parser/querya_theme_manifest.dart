@@ -50,7 +50,9 @@ class QueryaThemeManifest {
       );
     }
     if (decoded is! Map<String, dynamic>) {
-      throw QueryaThemeManifestParseException('Theme root must be a JSON object');
+      throw const QueryaThemeManifestParseException(
+        'Theme root must be a JSON object',
+      );
     }
     return QueryaThemeManifest.fromJson(decoded);
   }
