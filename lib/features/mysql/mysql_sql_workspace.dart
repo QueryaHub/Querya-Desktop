@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:querya_desktop/core/database/mysql_service.dart';
+import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
@@ -30,7 +31,7 @@ class MysqlSqlWorkspace extends material.StatefulWidget {
 
 class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
   final _sqlController = material.TextEditingController();
-  double _topFractionState = 0.65;
+  final ValueNotifier<double> _topFraction = ValueNotifier(0.65);
 
   MysqlLease? _lease;
 
@@ -55,7 +56,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
     _appSettingsListener = () {
       unawaited(_loadWorkspaceSettings());
     };
-    AppSettingsRevision.listenable.addListener(_appSettingsListener);
+    SqlWorkspaceSettingsRevision.listenable.addListener(_appSettingsListener);
     material.WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_loadWorkspaceSettings());
     });
@@ -103,7 +104,8 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
 
   @override
   void dispose() {
-    AppSettingsRevision.listenable.removeListener(_appSettingsListener);
+    SqlWorkspaceSettingsRevision.listenable.removeListener(_appSettingsListener);
+    _topFraction.dispose();
     if (_running) {
       MysqlService.instance.interrupt(
         widget.connectionRow,
@@ -224,12 +226,9 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
   @override
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context);
-    final topFlex = (_topFractionState * 100).round().clamp(20, 80);
-    final bottomFlex = 100 - topFlex;
 
     return material.LayoutBuilder(
       builder: (context, constraints) {
-        final totalHeight = constraints.maxHeight;
         return material.CallbackShortcuts(
           bindings: {
             const material.SingleActivator(LogicalKeyboardKey.f5): () {
@@ -240,85 +239,65 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
           },
           child: material.Focus(
             autofocus: true,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  flex: topFlex,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _MysqlSqlToolbar(
-                        onExecute: _running ? null : _execute,
-                        running: _running,
-                        queryTimeoutSeconds: _queryTimeoutSeconds,
-                        onQueryTimeoutChanged: _onStmtTimeoutChanged,
-                        onOpenPreferences: () =>
-                            showPreferencesDialog(context),
-                        onOpenHistory: widget.connectionRow.id != null &&
-                                !_running
-                            ? () {
-                                showSqlQueryHistoryDialog(
-                                  context: context,
-                                  connectionId: widget.connectionRow.id!,
-                                  databaseName:
-                                      widget.connectionRow.databaseName,
-                                  sqlController: _sqlController,
-                                );
-                              }
-                            : null,
-                      ),
-                      const Divider(height: 1),
-                      Expanded(
-                        child: QueryEditorTab(
-                          controller: _sqlController,
-                          fontSize: _editorFontSize,
-                        ),
-                      ),
-                    ],
+            child: VerticalSplitPane(
+              fraction: _topFraction,
+              maxFraction: 0.85,
+              top: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _MysqlSqlToolbar(
+                    onExecute: _running ? null : _execute,
+                    running: _running,
+                    queryTimeoutSeconds: _queryTimeoutSeconds,
+                    onQueryTimeoutChanged: _onStmtTimeoutChanged,
+                    onOpenPreferences: () => showPreferencesDialog(context),
+                    onOpenHistory: widget.connectionRow.id != null && !_running
+                        ? () {
+                            showSqlQueryHistoryDialog(
+                              context: context,
+                              connectionId: widget.connectionRow.id!,
+                              databaseName: widget.connectionRow.databaseName,
+                              sqlController: _sqlController,
+                            );
+                          }
+                        : null,
                   ),
-                ),
-                _HorizontalResizeHandle(
-                  totalHeight: totalHeight,
-                  onDrag: (dy) {
-                    if (totalHeight <= 0) return;
-                    setState(() {
-                      _topFractionState = (_topFractionState + dy / totalHeight)
-                          .clamp(0.2, 0.85);
-                    });
-                  },
-                ),
-                Expanded(
-                  flex: bottomFlex,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      material.Container(
-                        height: 44,
-                        padding: const material.EdgeInsets.symmetric(
-                          horizontal: 12,
-                        ),
-                        decoration: material.BoxDecoration(
-                          color: theme.colorScheme.muted.withValues(alpha: 0.6),
-                        ),
-                        alignment: material.Alignment.centerLeft,
-                        child: const Text('Data Output').semiBold().small(),
-                      ),
-                      const Divider(height: 1),
-                      Expanded(
-                        child: ResultsTab(
-                          columns: _columns,
-                          rows: _rows,
-                          errorMessage: _error,
-                          isLoading: _running,
-                          affectedRows: _affectedRows,
-                          statusLine: _statusLine,
-                        ),
-                      ),
-                    ],
+                  const Divider(height: 1),
+                  Expanded(
+                    child: QueryEditorTab(
+                      controller: _sqlController,
+                      fontSize: _editorFontSize,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
+              bottom: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  material.Container(
+                    height: 44,
+                    padding: const material.EdgeInsets.symmetric(
+                      horizontal: 12,
+                    ),
+                    decoration: material.BoxDecoration(
+                      color: theme.colorScheme.muted.withValues(alpha: 0.6),
+                    ),
+                    alignment: material.Alignment.centerLeft,
+                    child: const Text('Data Output').semiBold().small(),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: ResultsTab(
+                      columns: _columns,
+                      rows: _rows,
+                      errorMessage: _error,
+                      isLoading: _running,
+                      affectedRows: _affectedRows,
+                      statusLine: _statusLine,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -419,32 +398,6 @@ class _MysqlSqlToolbar extends material.StatelessWidget {
             ],
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _HorizontalResizeHandle extends material.StatelessWidget {
-  const _HorizontalResizeHandle({
-    required this.totalHeight,
-    required this.onDrag,
-  });
-
-  final double totalHeight;
-  final void Function(double dy) onDrag;
-
-  @override
-  material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context).colorScheme;
-    return material.MouseRegion(
-      cursor: material.SystemMouseCursors.resizeRow,
-      child: material.GestureDetector(
-        behavior: material.HitTestBehavior.opaque,
-        onVerticalDragUpdate: (e) => onDrag(e.delta.dy),
-        child: material.Container(
-          height: 6,
-          color: theme.border.withValues(alpha: 0.15),
-        ),
       ),
     );
   }

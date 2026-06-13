@@ -110,8 +110,15 @@ abstract final class AppSettingsKeys {
   static const uiScale = 'ui_scale';
 }
 
-/// Bumps [listenable] when any preference is persisted so open screens can reload.
+/// Bumps [listenable] when any preference is persisted (theme, legacy listeners).
 abstract final class AppSettingsRevision {
+  static final ValueNotifier<int> listenable = ValueNotifier(0);
+
+  static void bump() => listenable.value++;
+}
+
+/// Bumps when SQL workspace preferences change (timeouts, grid, editor font, history).
+abstract final class SqlWorkspaceSettingsRevision {
   static final ValueNotifier<int> listenable = ValueNotifier(0);
 
   static void bump() => listenable.value++;
@@ -142,7 +149,7 @@ class AppSettings {
         seconds.toString(),
       );
     }
-    AppSettingsRevision.bump();
+    SqlWorkspaceSettingsRevision.bump();
   }
 
   /// `null` = use driver default for statement duration.
@@ -165,7 +172,7 @@ class AppSettings {
         seconds.toString(),
       );
     }
-    AppSettingsRevision.bump();
+    SqlWorkspaceSettingsRevision.bump();
   }
 
   /// Max rows loaded into the result grid for PostgreSQL / MySQL workspaces.
@@ -187,7 +194,7 @@ class AppSettings {
       AppSettingsKeys.sqlResultMaxRows,
       preset.toString(),
     );
-    AppSettingsRevision.bump();
+    SqlWorkspaceSettingsRevision.bump();
   }
 
   /// Editor font size in logical pixels.
@@ -207,7 +214,7 @@ class AppSettings {
       AppSettingsKeys.sqlEditorFontSizePoints,
       clamped.toString(),
     );
-    AppSettingsRevision.bump();
+    SqlWorkspaceSettingsRevision.bump();
   }
 
   /// Global interface scale for typography and compact controls.
@@ -246,7 +253,7 @@ class AppSettings {
       AppSettingsKeys.sqlHistoryMaxEntries,
       preset.toString(),
     );
-    AppSettingsRevision.bump();
+    SqlWorkspaceSettingsRevision.bump();
   }
 
   /// UI theme mode (dark / light / system).
