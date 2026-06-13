@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:querya_desktop/core/database/mysql_service.dart';
@@ -13,6 +14,7 @@ import 'package:querya_desktop/features/main_screen/query_editor_tab.dart';
 import 'package:querya_desktop/features/main_screen/results_tab.dart';
 import 'package:querya_desktop/features/main_screen/sql_editor_chrome.dart';
 import 'package:querya_desktop/features/main_screen/sql_query_history_dialog.dart';
+import 'package:querya_desktop/features/mysql/mysql_result_utils.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Ad-hoc SQL editor + results for MySQL / MariaDB.
@@ -154,19 +156,21 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
         cols.add(c.name.isNotEmpty ? c.name : 'col_${cols.length}');
       }
 
-      final outRows = <List<String>>[];
+      final rawRows = <List<Object?>>[];
       var n = 0;
       final cap = _resultMaxRows;
       for (final row in rs.rows) {
         if (n >= cap) break;
-        outRows.add(
-          List.generate(
-            row.numOfColumns,
-            (i) => row.colAt(i) ?? 'NULL',
-          ),
+        rawRows.add(
+          List.generate(row.numOfColumns, (i) => row.colAt(i)),
         );
         n++;
       }
+
+      final outRows = await compute(
+        convertMysqlResultRowsToStrings,
+        MysqlResultConvertJob(rowValues: rawRows),
+      );
 
       int? affected;
       if (cols.isEmpty && outRows.isEmpty) {
