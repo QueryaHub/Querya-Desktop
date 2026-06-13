@@ -22,6 +22,56 @@ const List<int> kSqlResultMaxRowsPresets = [
 /// Default monospace size in the SQL editor (logical pixels).
 const double kDefaultSqlEditorFontSize = 13;
 
+/// Default interface scale (1.0 = 100%).
+const double kDefaultUiScale = 1.0;
+
+/// Minimum interface scale (Telegram Desktop supports 75%).
+const double kMinUiScale = 0.75;
+
+/// Maximum interface scale (Telegram goes to 300%; 200% is enough for Querya).
+const double kMaxUiScale = 2.0;
+
+/// Slider step — 1% increments when Shift is held (fine control).
+const double kUiScaleStep = 0.01;
+
+/// Fixed tick marks on the interface scale slider (75% … 200%).
+const List<double> kUiScalePresets = [
+  0.75,
+  0.85,
+  0.9,
+  1.0,
+  1.1,
+  1.25,
+  1.5,
+  1.75,
+  2.0,
+];
+
+int nearestUiScalePresetIndex(double scale) {
+  var best = 0;
+  var bestDist = double.infinity;
+  for (var i = 0; i < kUiScalePresets.length; i++) {
+    final dist = (kUiScalePresets[i] - scale).abs();
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = i;
+    }
+  }
+  return best;
+}
+
+double snapUiScaleToPreset(double scale) =>
+    kUiScalePresets[nearestUiScalePresetIndex(scale)];
+
+double _normalizeUiScaleContinuous(double value) {
+  final clamped = value.clamp(kMinUiScale, kMaxUiScale);
+  final steps = ((clamped - kMinUiScale) / kUiScaleStep).round();
+  return (kMinUiScale + steps * kUiScaleStep).clamp(kMinUiScale, kMaxUiScale);
+}
+
+double _normalizeUiScale(double value, {bool fine = false}) =>
+    fine ? _normalizeUiScaleContinuous(value) : snapUiScaleToPreset(value);
+
 /// Default cap on stored SQL history entries per connection + database.
 const int kDefaultSqlHistoryMaxEntries = 100;
 
@@ -57,6 +107,7 @@ abstract final class AppSettingsKeys {
   static const themeImportName = 'theme_import_name';
   static const themeImportedColorsJson = 'theme_imported_colors_json';
   static const themeAnimationEnabled = 'theme_animation_enabled';
+  static const uiScale = 'ui_scale';
 }
 
 /// Bumps [listenable] when any preference is persisted so open screens can reload.
@@ -155,6 +206,24 @@ class AppSettings {
     await LocalDb.instance.setAppSetting(
       AppSettingsKeys.sqlEditorFontSizePoints,
       clamped.toString(),
+    );
+    AppSettingsRevision.bump();
+  }
+
+  /// Global interface scale for typography and compact controls.
+  Future<double> getUiScale() async {
+    final v = await LocalDb.instance.getAppSetting(AppSettingsKeys.uiScale);
+    if (v == null || v.isEmpty) return kDefaultUiScale;
+    final n = double.tryParse(v);
+    if (n == null) return kDefaultUiScale;
+    return _normalizeUiScaleContinuous(n);
+  }
+
+  Future<void> setUiScale(double scale, {bool fine = false}) async {
+    final normalized = _normalizeUiScale(scale, fine: fine);
+    await LocalDb.instance.setAppSetting(
+      AppSettingsKeys.uiScale,
+      normalized.toStringAsFixed(2),
     );
     AppSettingsRevision.bump();
   }

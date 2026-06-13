@@ -137,7 +137,11 @@ class _RedisConnectionFormContentState extends material.State<_RedisConnectionFo
     final radius = Theme.of(context).radiusXxl;
 
     return material.Container(
-      constraints: const material.BoxConstraints(maxWidth: 600, maxHeight: 560),
+      constraints: WindowLayout.dialogConstraints(
+        context,
+        maxWidth: 600,
+        maxHeight: 560,
+      ),
       decoration: material.BoxDecoration(
         color: theme.popover,
         borderRadius: material.BorderRadius.circular(radius),

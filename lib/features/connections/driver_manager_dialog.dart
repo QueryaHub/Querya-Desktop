@@ -51,7 +51,11 @@ class _DriverManagerDialogContent extends material.StatelessWidget {
     final theme = Theme.of(context).colorScheme;
     final radius = Theme.of(context).radiusXxl;
     return material.Container(
-      constraints: const material.BoxConstraints(maxWidth: 520, minWidth: 400),
+      constraints: WindowLayout.dialogConstraints(
+        context,
+        maxWidth: 520,
+        minWidth: 400,
+      ),
       decoration: material.BoxDecoration(
         color: theme.popover,
         borderRadius: material.BorderRadius.circular(radius),
