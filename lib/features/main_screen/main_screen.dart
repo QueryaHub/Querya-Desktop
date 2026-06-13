@@ -117,9 +117,11 @@ class _MainScreenState extends State<MainScreen> {
     await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
   }
 
-  Future<void> _onNewDatabaseConnectionFromMenu(
-      material.BuildContext menuContext) async {
-    final row = await promptCreateConnection(menuContext, folderId: null);
+  Future<void> _onNewDatabaseConnectionFromMenu() async {
+    // Menu overlay context is torn down before the connection form opens.
+    await Future.delayed(const Duration(milliseconds: 100));
+    if (!mounted) return;
+    final row = await promptCreateConnection(context, folderId: null);
     if (!mounted || row == null) return;
     await LocalDb.instance.addConnection(row);
     await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
@@ -329,8 +331,7 @@ class _CustomTitleBar extends StatefulWidget {
   });
 
   final ColorScheme theme;
-  final Future<void> Function(material.BuildContext context)
-      onNewDatabaseConnection;
+  final Future<void> Function() onNewDatabaseConnection;
 
   @override
   State<_CustomTitleBar> createState() => _CustomTitleBarState();
@@ -414,8 +415,8 @@ class _CustomTitleBarState extends State<_CustomTitleBar> {
                                   material.Icons.add_link_rounded, size: 18),
                               trailing:
                                   const Text('Shift+Ctrl+N').xSmall().muted(),
-                              onPressed: (ctx) =>
-                                  widget.onNewDatabaseConnection(ctx),
+                              onPressed: (_) =>
+                                  widget.onNewDatabaseConnection(),
                               child: const Text('New Database Connection'),
                             ),
                             MenuButton(
