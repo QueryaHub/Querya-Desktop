@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/mysql_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/shared/widgets/form_validity_notifier.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Shows MySQL / MariaDB connection form dialog.
@@ -47,26 +48,31 @@ class _MysqlConnectionFormContentState
   bool _isTesting = false;
   String? _testResult;
   Timer? _dismissTimer;
+  late final FormValidityNotifier _formValidNotifier;
 
   @override
   void initState() {
     super.initState();
-    _nameController.addListener(_onFieldChanged);
-    _hostController.addListener(_onFieldChanged);
-    _portController.addListener(_onFieldChanged);
-    _databaseController.addListener(_onFieldChanged);
-    _usernameController.addListener(_onFieldChanged);
-    _connectionStringController.addListener(_onFieldChanged);
+    _formValidNotifier = FormValidityNotifier(_computeFormValid);
+    for (final c in [
+      _nameController,
+      _hostController,
+      _portController,
+      _databaseController,
+      _usernameController,
+      _connectionStringController,
+    ]) {
+      _formValidNotifier.listenTo(c);
+    }
+    _formValidNotifier.seed();
   }
-
-  void _onFieldChanged() => setState(() {});
 
   bool _looksLikeMysqlUri(String s) {
     final t = s.trim().toLowerCase();
     return t.startsWith('mysql://') || t.startsWith('mariadb://');
   }
 
-  bool get _formValid {
+  bool _computeFormValid() {
     final uri = _connectionStringController.text.trim();
     if (uri.isNotEmpty) {
       return _looksLikeMysqlUri(uri);
@@ -93,7 +99,7 @@ class _MysqlConnectionFormContentState
   }
 
   Future<void> _testConnection() async {
-    if (!_formValid) return;
+    if (!_formValidNotifier.value) return;
     _dismissTimer?.cancel();
     _dismissTimer = null;
     setState(() {
@@ -128,7 +134,7 @@ class _MysqlConnectionFormContentState
   }
 
   void _save() {
-    if (!_formValid) return;
+    if (!_formValidNotifier.value) return;
     final name = _nameController.text.trim();
     final host = _hostController.text.trim();
     final port = int.tryParse(_portController.text.trim()) ?? 3306;
@@ -163,12 +169,17 @@ class _MysqlConnectionFormContentState
   @override
   void dispose() {
     _dismissTimer?.cancel();
-    _nameController.removeListener(_onFieldChanged);
-    _hostController.removeListener(_onFieldChanged);
-    _portController.removeListener(_onFieldChanged);
-    _databaseController.removeListener(_onFieldChanged);
-    _usernameController.removeListener(_onFieldChanged);
-    _connectionStringController.removeListener(_onFieldChanged);
+    for (final c in [
+      _nameController,
+      _hostController,
+      _portController,
+      _databaseController,
+      _usernameController,
+      _connectionStringController,
+    ]) {
+      _formValidNotifier.unlistenFrom(c);
+    }
+    _formValidNotifier.dispose();
     _nameController.dispose();
     _hostController.dispose();
     _portController.dispose();
@@ -186,7 +197,11 @@ class _MysqlConnectionFormContentState
 
     return material.Container(
       constraints:
-          const material.BoxConstraints(maxWidth: 600, maxHeight: 640),
+          WindowLayout.dialogConstraints(
+            context,
+            maxWidth: 600,
+            maxHeight: 640,
+          ),
       decoration: material.BoxDecoration(
         color: theme.popover,
         borderRadius: material.BorderRadius.circular(radius),
@@ -427,54 +442,61 @@ class _MysqlConnectionFormContentState
             material.Container(
               padding: const material.EdgeInsets.symmetric(
                   horizontal: 24, vertical: 16),
-              child: material.Wrap(
-                spacing: 12,
-                runSpacing: 8,
-                alignment: material.WrapAlignment.spaceBetween,
-                children: [
-                  OutlineButton(
-                    onPressed:
-                        _formValid && !_isTesting ? _testConnection : null,
-                    leading: _isTesting
-                        ? material.SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: material.CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: theme.primary,
-                            ),
-                          )
-                        : material.Icon(
-                            material.Icons.link_rounded,
-                            size: 18,
-                            color: _formValid
+              child: ValueListenableBuilder<bool>(
+                valueListenable: _formValidNotifier.listenable,
+                builder: (context, formValid, _) {
+                  return material.Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    alignment: material.WrapAlignment.spaceBetween,
+                    children: [
+                      OutlineButton(
+                        onPressed:
+                            formValid && !_isTesting ? _testConnection : null,
+                        leading: _isTesting
+                            ? material.SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: material.CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: theme.primary,
+                                ),
+                              )
+                            : material.Icon(
+                                material.Icons.link_rounded,
+                                size: 18,
+                                color: formValid
+                                    ? theme.primary
+                                    : theme.mutedForeground,
+                              ),
+                        child: Text(
+                          'Test Connection',
+                          style: material.TextStyle(
+                            fontWeight: material.FontWeight.w500,
+                            color: formValid
                                 ? theme.primary
                                 : theme.mutedForeground,
                           ),
-                    child: Text(
-                      'Test Connection',
-                      style: material.TextStyle(
-                        fontWeight: material.FontWeight.w500,
-                        color:
-                            _formValid ? theme.primary : theme.mutedForeground,
+                        ),
                       ),
-                    ),
-                  ),
-                  material.Row(
-                    mainAxisSize: material.MainAxisSize.min,
-                    children: [
-                      GhostButton(
-                        onPressed: () => material.Navigator.of(context).pop(),
-                        child: const Text('Cancel'),
-                      ),
-                      const Gap(12),
-                      PrimaryButton(
-                        onPressed: _formValid ? _save : null,
-                        child: const Text('Save'),
+                      material.Row(
+                        mainAxisSize: material.MainAxisSize.min,
+                        children: [
+                          GhostButton(
+                            onPressed: () =>
+                                material.Navigator.of(context).pop(),
+                            child: const Text('Cancel'),
+                          ),
+                          const Gap(12),
+                          PrimaryButton(
+                            onPressed: formValid ? _save : null,
+                            child: const Text('Save'),
+                          ),
+                        ],
                       ),
                     ],
-                  ),
-                ],
+                  );
+                },
               ),
             ),
           ],

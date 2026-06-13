@@ -69,8 +69,10 @@ class _SqlQueryHistoryDialogContentState
     });
   }
 
+  static final _whitespacePattern = RegExp(r'\s+');
+
   static String _previewOneLine(String sql) {
-    final collapsed = sql.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final collapsed = sql.replaceAll(_whitespacePattern, ' ').trim();
     if (collapsed.length <= 96) return collapsed;
     return '${collapsed.substring(0, 93)}…';
   }
@@ -125,7 +127,8 @@ class _SqlQueryHistoryDialogContentState
     final scheme = Theme.of(context).colorScheme;
     final radius = Theme.of(context).radiusXxl;
     return material.Container(
-      constraints: const material.BoxConstraints(
+      constraints: WindowLayout.dialogConstraints(
+        context,
         maxWidth: 520,
         minWidth: 320,
         maxHeight: 440,
