@@ -16,7 +16,7 @@ Theme system milestone (epic #37). Git tag **`0.4.0`** — use this release for 
 - **Syntax highlighting** — SQL and JSON in `QueryaCodeEditor` via `syntax_highlight`; `tokenColors` mapped to TextMate scopes; isolate highlight for large buffers.
 - **Editor** — `QueryaCodeEditor` abstraction, `SqlEditorChrome` from theme tokens, `QueryaThemeScope` for workbench/editor tokens.
 - **Samples** — `themes/samples/cyberpunk-neon.json` (+ JSONC) for manual import testing.
-- **Docs** — [docs/theme.md](docs/theme.md), [docs/theme-import.md](docs/theme-import.md), [docs/editor-spike-report.md](docs/editor-spike-report.md), [docs/code-forge-evaluation.md](docs/code-forge-evaluation.md).
+- **Docs** — [docs/theme.md](docs/theme.md), [docs/theme-import.md](docs/theme-import.md), [docs/archive/editor-spike-report.md](docs/archive/editor-spike-report.md), [docs/archive/code-forge-evaluation.md](docs/archive/code-forge-evaluation.md).
 
 ### Changed
 
