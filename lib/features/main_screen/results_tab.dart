@@ -6,6 +6,7 @@ import 'package:querya_desktop/core/csv/result_grid_csv.dart';
 import 'package:querya_desktop/core/csv/save_result_grid_csv.dart';
 import 'package:querya_desktop/core/json/result_grid_json.dart';
 import 'package:querya_desktop/core/json/save_result_grid_json.dart';
+import 'package:querya_desktop/features/main_screen/result_grid_view.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Query output: grid, loading, error, or placeholder.
@@ -148,58 +149,7 @@ class ResultsTab extends StatelessWidget {
           ),
         ),
         material.Expanded(
-          child: material.Scrollbar(
-            child: material.SingleChildScrollView(
-              scrollDirection: material.Axis.horizontal,
-              child: material.SingleChildScrollView(
-                child: material.Table(
-                  border: material.TableBorder.all(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .border
-                        .withValues(alpha: 0.35),
-                  ),
-                  defaultColumnWidth: const material.IntrinsicColumnWidth(),
-                  children: [
-                    material.TableRow(
-                      decoration: material.BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .muted
-                            .withValues(alpha: 0.35),
-                      ),
-                      children: columns
-                          .map(
-                            (c) => material.Padding(
-                              padding: const material.EdgeInsets.all(8),
-                              child: Text(c).semiBold().small(),
-                            ),
-                          )
-                          .toList(),
-                    ),
-                    ...rows.map(
-                      (r) => material.TableRow(
-                        children: r
-                            .map(
-                              (cell) => material.Padding(
-                                padding: const material.EdgeInsets.all(8),
-                                child: material.SelectableText(
-                                  cell,
-                                  style: const material.TextStyle(
-                                    fontFamily: 'monospace',
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+          child: VirtualResultGrid(columns: columns, rows: rows),
         ),
       ],
     );
