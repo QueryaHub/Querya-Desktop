@@ -1,0 +1,22 @@
+{
+  // JSONC fixture: comments and trailing commas are stripped before parse.
+  "schema": "querya.theme.v1",
+  "id": "fixture-custom-jsonc",
+  "name": "Fixture Custom JSONC",
+  "type": "light",
+  "shadcn_colors": {
+    "background": "#FAFAFA",
+    "primary": "#0EA5E9",
+  },
+  "editor_colors": {
+    "background": "#FFFFFF",
+    "foreground": "#111827",
+  },
+  "tokenColors": [
+    {
+      "name": "Comments",
+      "scope": ["comment"],
+      "settings": { "foreground": "#6B7280" },
+    },
+  ],
+}

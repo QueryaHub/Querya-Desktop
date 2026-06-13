@@ -1,0 +1,81 @@
+{
+  "schema": "querya.theme.v1",
+  "id": "fixture-custom-light",
+  "name": "Fixture Custom Light",
+  "type": "light",
+  "description": "Full light custom theme fixture for parser tests.",
+  "author": "QueryaHub",
+  "version": "1.0.0",
+  "shadcn_colors": {
+    "background": "#F8FAFC",
+    "foreground": "#0F172A",
+    "card": "#FFFFFF",
+    "cardForeground": "#0F172A",
+    "popover": "#FFFFFF",
+    "popoverForeground": "#0F172A",
+    "primary": "#0284C7",
+    "primaryForeground": "#F8FAFC",
+    "secondary": "#E2E8F0",
+    "secondaryForeground": "#0F172A",
+    "muted": "#E2E8F0",
+    "mutedForeground": "#64748B",
+    "accent": "#CBD5E1",
+    "accentForeground": "#0F172A",
+    "destructive": "#DC2626",
+    "destructiveForeground": "#F8FAFC",
+    "border": "#CBD5E1",
+    "input": "#CBD5E1",
+    "ring": "#0284C7",
+    "chart1": "#0284C7",
+    "chart2": "#0891B2",
+    "chart3": "#EA580C",
+    "chart4": "#7C3AED",
+    "chart5": "#DB2777"
+  },
+  "editor_colors": {
+    "background": "#FFFFFF",
+    "foreground": "#1E293B",
+    "lineHighlight": "#F1F5F9",
+    "selection": "#ADD6FF",
+    "lineNumber": "#64748B",
+    "bracketMatch": "#0284C733",
+    "widgetBorder": "#0284C766",
+    "comment": "#008000",
+    "keyword": "#0000FF",
+    "string": "#A31515",
+    "number": "#098658",
+    "operator": "#1E293B",
+    "function": "#795E26",
+    "type": "#267F99",
+    "canvas": "#F8FAFC",
+    "surface": "#FFFFFF",
+    "sidebarBackground": "#F1F5F9",
+    "editorBackground": "#FFFFFF",
+    "mutedForeground": "#64748B",
+    "accent": "#0284C7",
+    "onAccent": "#F8FAFC",
+    "borderSubtle": "#CBD5E1",
+    "destructive": "#DC2626",
+    "success": "#16A34A",
+    "warning": "#D97706",
+    "gitModified": "#D97706",
+    "gitUntracked": "#16A34A"
+  },
+  "tokenColors": [
+    {
+      "name": "Comments",
+      "scope": ["comment", "comment.line"],
+      "settings": { "foreground": "#008000", "fontStyle": "italic" }
+    },
+    {
+      "name": "Keywords",
+      "scope": ["keyword", "keyword.control"],
+      "settings": { "foreground": "#0000FF", "fontStyle": "bold" }
+    },
+    {
+      "name": "Strings",
+      "scope": ["string"],
+      "settings": { "foreground": "#A31515" }
+    }
+  ]
+}

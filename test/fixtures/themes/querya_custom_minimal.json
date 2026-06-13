@@ -1,0 +1,12 @@
+{
+  "schema": "querya.theme.v1",
+  "id": "fixture-custom-minimal",
+  "name": "Fixture Custom Minimal",
+  "type": "dark",
+  "shadcn_colors": {
+    "primary": "#FF00AA"
+  },
+  "editor_colors": {
+    "background": "#010203"
+  }
+}
