@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:syntax_highlight/syntax_highlight.dart';
 
 import 'syntax_highlight_isolate.dart';
+
+/// Debounce delay before scheduling syntax highlight work.
+const Duration kSyntaxHighlightDebounce = Duration(milliseconds: 100);
 
 /// [TextEditingController] that applies [Highlighter] in [buildTextSpan].
 class QueryaHighlightController extends TextEditingController {
@@ -29,6 +34,7 @@ class QueryaHighlightController extends TextEditingController {
   String? _cachedText;
   Brightness? _cachedBrightness;
   int _highlightGeneration = 0;
+  Timer? _debounceTimer;
 
   @override
   TextSpan buildTextSpan({
@@ -37,19 +43,9 @@ class QueryaHighlightController extends TextEditingController {
     required bool withComposing,
   }) {
     final brightness = Theme.of(context).brightness;
-    final highlighter = brightness == Brightness.light
-        ? lightHighlighter
-        : darkHighlighter;
     final themeConfig = brightness == Brightness.light
         ? lightThemeConfig
         : darkThemeConfig;
-
-    if (text.length < kSyntaxHighlightIsolateThreshold) {
-      return TextSpan(
-        style: style,
-        children: [highlighter.highlight(text)],
-      );
-    }
 
     if (_cachedText == text &&
         _cachedBrightness == brightness &&
@@ -64,7 +60,9 @@ class QueryaHighlightController extends TextEditingController {
       style: style,
     );
 
-    if (_cachedSpan != null && _cachedText == text) {
+    if (_cachedSpan != null &&
+        _cachedText == text &&
+        _cachedBrightness == brightness) {
       return TextSpan(style: style, children: [_cachedSpan!]);
     }
 
@@ -72,6 +70,23 @@ class QueryaHighlightController extends TextEditingController {
   }
 
   void _scheduleIsolateHighlight({
+    required String text,
+    required Brightness brightness,
+    required String themeConfig,
+    required TextStyle? style,
+  }) {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(kSyntaxHighlightDebounce, () {
+      _runIsolateHighlight(
+        text: text,
+        brightness: brightness,
+        themeConfig: themeConfig,
+        style: style,
+      );
+    });
+  }
+
+  void _runIsolateHighlight({
     required String text,
     required Brightness brightness,
     required String themeConfig,
@@ -103,6 +118,7 @@ class QueryaHighlightController extends TextEditingController {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _highlightGeneration++;
     super.dispose();
   }
