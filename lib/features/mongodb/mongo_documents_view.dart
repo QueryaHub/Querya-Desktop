@@ -7,6 +7,7 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
 const _defaultLimit = 25;
+const _prettyJsonEncoder = JsonEncoder.withIndent('  ');
 
 /// Paginated document browser for a MongoDB collection.
 class MongoDocumentsView extends material.StatefulWidget {
@@ -393,92 +394,111 @@ class _DocumentCard extends StatefulWidget {
 }
 
 class _DocumentCardState extends State<_DocumentCard> {
-  bool _hovered = false;
   bool _expanded = false;
+  late String _keysPreviewText;
+  String? _prettyJsonCache;
+
+  @override
+  void initState() {
+    super.initState();
+    _keysPreviewText = _computeKeysPreview(widget.document);
+  }
+
+  @override
+  void didUpdateWidget(covariant _DocumentCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.document, widget.document)) {
+      _keysPreviewText = _computeKeysPreview(widget.document);
+      _prettyJsonCache = null;
+    }
+  }
+
+  void _toggleExpanded() {
+    setState(() {
+      _expanded = !_expanded;
+      if (_expanded && _prettyJsonCache == null) {
+        _prettyJsonCache = _encodePrettyJson(widget.document);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = widget.colorScheme;
     final scs = widget.shadcnCs;
     final idStr = widget.document['_id']?.toString() ?? '—';
-    final keysPreview = _keysPreview(widget.document);
 
-    return material.MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: material.AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        decoration: material.BoxDecoration(
-          color: _hovered
-              ? scs.muted.withValues(alpha: 0.15)
-              : cs.card,
-          borderRadius: material.BorderRadius.circular(8),
-          border: material.Border.all(
-              color: cs.border.withValues(alpha: 0.3), width: 1),
-        ),
+    return material.Container(
+      decoration: material.BoxDecoration(
+        borderRadius: material.BorderRadius.circular(8),
+        border: material.Border.all(
+            color: cs.border.withValues(alpha: 0.3), width: 1),
+      ),
+      clipBehavior: material.Clip.antiAlias,
+      child: material.Material(
+        color: cs.card,
         child: material.Column(
           crossAxisAlignment: material.CrossAxisAlignment.stretch,
           mainAxisSize: material.MainAxisSize.min,
           children: [
-            // Header row
-            material.InkWell(
-              onTap: widget.onView,
-              borderRadius: material.BorderRadius.circular(8),
-              child: material.Padding(
-                padding: const material.EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 10),
-                child: Row(
-                  children: [
-                    material.Icon(material.Icons.description_rounded,
-                        size: 16, color: scs.mutedForeground),
-                    const Gap(8),
-                    Text(
-                      idStr,
-                      style: material.TextStyle(
-                          color: cs.primary,
-                          fontSize: 13,
-                          fontWeight: material.FontWeight.w500),
-                    ),
-                    const Spacer(),
-                    // Expand toggle
-                    material.InkWell(
-                      onTap: () => setState(() => _expanded = !_expanded),
-                      child: material.Padding(
-                        padding: const material.EdgeInsets.all(4),
-                        child: material.Icon(
-                          _expanded
-                              ? material.Icons.expand_less_rounded
-                              : material.Icons.expand_more_rounded,
-                          size: 18,
-                          color: scs.mutedForeground,
+            material.Material(
+              color: material.Colors.transparent,
+              child: material.InkWell(
+                onTap: widget.onView,
+                hoverColor: scs.muted.withValues(alpha: 0.15),
+                child: material.Padding(
+                  padding: const material.EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 10),
+                  child: Row(
+                    children: [
+                      material.Icon(material.Icons.description_rounded,
+                          size: 16, color: scs.mutedForeground),
+                      const Gap(8),
+                      Text(
+                        idStr,
+                        style: material.TextStyle(
+                            color: cs.primary,
+                            fontSize: 13,
+                            fontWeight: material.FontWeight.w500),
+                      ),
+                      const Spacer(),
+                      material.InkWell(
+                        onTap: _toggleExpanded,
+                        borderRadius: material.BorderRadius.circular(4),
+                        child: material.Padding(
+                          padding: const material.EdgeInsets.all(4),
+                          child: material.Icon(
+                            _expanded
+                                ? material.Icons.expand_less_rounded
+                                : material.Icons.expand_more_rounded,
+                            size: 18,
+                            color: scs.mutedForeground,
+                          ),
                         ),
                       ),
-                    ),
-                    const Gap(8),
-                    // View
-                    _SmallActionButton(
-                      icon: material.Icons.edit_rounded,
-                      color: const Color(0xFF42A5F5),
-                      onTap: widget.onView,
-                    ),
-                    const Gap(4),
-                    // Delete
-                    _SmallActionButton(
-                      icon: material.Icons.delete_rounded,
-                      color: const Color(0xFFEF5350),
-                      onTap: widget.onDelete,
-                    ),
-                  ],
+                      const Gap(8),
+                      _SmallActionButton(
+                        icon: material.Icons.edit_rounded,
+                        color: const Color(0xFF42A5F5),
+                        onTap: widget.onView,
+                      ),
+                      const Gap(4),
+                      _SmallActionButton(
+                        icon: material.Icons.delete_rounded,
+                        color: const Color(0xFFEF5350),
+                        onTap: widget.onDelete,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-            // Preview / expanded JSON
             material.Padding(
               padding: const material.EdgeInsets.only(
                   left: 16, right: 16, bottom: 10),
               child: _expanded
                   ? material.SelectableText(
-                      _prettyJson(widget.document),
+                      _prettyJsonCache ?? '',
                       style: material.TextStyle(
                         fontSize: 12,
                         fontFamily: 'monospace',
@@ -486,7 +506,7 @@ class _DocumentCardState extends State<_DocumentCard> {
                       ),
                     )
                   : Text(
-                      keysPreview,
+                      _keysPreviewText,
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
                       style: material.TextStyle(
@@ -502,16 +522,15 @@ class _DocumentCardState extends State<_DocumentCard> {
     );
   }
 
-  /// Returns a compact list of top-level keys (excluding _id).
-  String _keysPreview(Map<String, dynamic> doc) {
+  static String _computeKeysPreview(Map<String, dynamic> doc) {
     final keys = doc.keys.where((k) => k != '_id').toList();
     if (keys.isEmpty) return '{ }';
     return keys.join(', ');
   }
 
-  String _prettyJson(Map<String, dynamic> doc) {
+  static String _encodePrettyJson(Map<String, dynamic> doc) {
     try {
-      return const JsonEncoder.withIndent('  ').convert(doc);
+      return _prettyJsonEncoder.convert(doc);
     } catch (_) {
       return doc.toString();
     }
@@ -520,7 +539,7 @@ class _DocumentCardState extends State<_DocumentCard> {
 
 // ─── Small icon-only action button ──────────────────────────────────────────
 
-class _SmallActionButton extends StatefulWidget {
+class _SmallActionButton extends StatelessWidget {
   const _SmallActionButton({
     required this.icon,
     required this.color,
@@ -532,33 +551,13 @@ class _SmallActionButton extends StatefulWidget {
   final VoidCallback onTap;
 
   @override
-  State<_SmallActionButton> createState() => _SmallActionButtonState();
-}
-
-class _SmallActionButtonState extends State<_SmallActionButton> {
-  bool _hovered = false;
-
-  @override
   Widget build(BuildContext context) {
-    return material.MouseRegion(
-      cursor: material.SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: material.InkWell(
-        onTap: widget.onTap,
-        borderRadius: material.BorderRadius.circular(4),
-        child: material.AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding: const material.EdgeInsets.all(5),
-          decoration: material.BoxDecoration(
-            color: _hovered
-                ? widget.color.withValues(alpha: 0.15)
-                : material.Colors.transparent,
-            borderRadius: material.BorderRadius.circular(4),
-          ),
-          child: material.Icon(widget.icon, size: 15, color: widget.color),
-        ),
-      ),
+    return material.IconButton(
+      onPressed: onTap,
+      icon: material.Icon(icon, size: 15, color: color),
+      padding: const material.EdgeInsets.all(5),
+      constraints: const material.BoxConstraints(minWidth: 28, minHeight: 28),
+      splashRadius: 18,
     );
   }
 }
