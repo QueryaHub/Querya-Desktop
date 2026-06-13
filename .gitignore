@@ -15,11 +15,9 @@ linux/flutter/generated_*
 windows/flutter/generated_*
 macos/Flutter/ephemeral/
 
-# IDE — track Cursor rules, ignore the rest
+# IDE
 .idea/
-.cursor/*
-!.cursor/rules/
-!.cursor/rules/**
+.cursor/
 
 # OS
 .DS_Store
