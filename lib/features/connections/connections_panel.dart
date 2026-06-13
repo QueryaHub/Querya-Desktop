@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart' as material show AlertDialog, BoxConstraints, BuildContext, Column, ConstrainedBox, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, TextStyle, CustomScrollView, SliverToBoxAdapter, SliverFillRemaining, SliverPadding, GestureDetector, HitTestBehavior, SizedBox, AnimatedRotation, Row, BoxFit, Text, TextOverflow, Expanded, CircularProgressIndicator, Material, StatelessWidget, Colors, Tooltip, Color, LayoutBuilder, TextPainter, TextSpan, TextDirection, SelectableText, Padding, Widget, Navigator, ValueKey, FontWeight, VoidCallback, RepaintBoundary;
+import 'package:flutter/material.dart' as material show AlertDialog, BoxConstraints, BuildContext, Column, ConstrainedBox, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, EdgeInsetsGeometry, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, TextStyle, CustomScrollView, SliverFillRemaining, SliverPadding, SliverList, SliverChildBuilderDelegate, GestureDetector, HitTestBehavior, SizedBox, AnimatedRotation, Row, BoxFit, Text, TextOverflow, Expanded, CircularProgressIndicator, Material, StatelessWidget, Colors, Tooltip, Color, SelectableText, Padding, Widget, Navigator, ValueKey, FontWeight, VoidCallback, RepaintBoundary, ListView, ClampingScrollPhysics;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
@@ -32,6 +32,54 @@ typedef OnPostgresOpenSqlWorkspace = void Function(
   String? name,
   PostgresObjectKind? kind,
 });
+
+/// Typical height of a compact tree row (object leaf / table name).
+const double kConnectionTreeRowExtent = 28;
+
+/// Build all rows inline when the list is short.
+const int kConnectionTreeEagerThreshold = 24;
+
+/// Max rows visible before nested list scrolls (virtualized via [ListView.builder]).
+const int kConnectionTreeMaxVisibleRows = 14;
+
+/// Builds a short [Column] or a height-capped [ListView.builder] for large lists.
+material.Widget lazyConnectionTreeList({
+  required material.BuildContext context,
+  required int itemCount,
+  required material.Widget Function(material.BuildContext context, int index)
+      itemBuilder,
+  double? itemExtent,
+  int eagerThreshold = kConnectionTreeEagerThreshold,
+  int maxVisibleRows = kConnectionTreeMaxVisibleRows,
+  material.EdgeInsetsGeometry? padding,
+}) {
+  if (itemCount == 0) {
+    return const material.SizedBox.shrink();
+  }
+  if (itemCount <= eagerThreshold) {
+    return material.Column(
+      mainAxisSize: material.MainAxisSize.min,
+      crossAxisAlignment: material.CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < itemCount; i++) itemBuilder(context, i),
+      ],
+    );
+  }
+  final rowExtent = itemExtent ?? kConnectionTreeRowExtent;
+  return material.ConstrainedBox(
+    constraints: material.BoxConstraints(
+      maxHeight: maxVisibleRows * rowExtent,
+    ),
+    child: material.ListView.builder(
+      padding: padding ?? material.EdgeInsets.zero,
+      shrinkWrap: true,
+      physics: const material.ClampingScrollPhysics(),
+      itemCount: itemCount,
+      itemExtent: itemExtent,
+      itemBuilder: itemBuilder,
+    ),
+  );
+}
 
 /// Left panel: Browser tree (pgAdmin-style). Uses shadcn layout widgets.
 class ConnectionsPanel extends StatefulWidget {
@@ -268,6 +316,9 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
 
     // Connections without a folder
     final rootConnections = _connections.where((c) => c.folderId == null).toList();
+    final showEmptyState = _connections.isEmpty && _folders.isEmpty;
+    final topLevelCount =
+        _folders.length + rootConnections.length + (showEmptyState ? 1 : 0);
 
     return material.Container(
       decoration: material.BoxDecoration(
@@ -302,14 +353,20 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                 slivers: [
                 material.SliverPadding(
                   padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                  sliver: material.SliverToBoxAdapter(
-                    child: material.Column(
-                      crossAxisAlignment: material.CrossAxisAlignment.start,
-                      mainAxisSize: material.MainAxisSize.min,
-                      children: [
-                        // Folders
-                        for (final name in _folders)
-                          _FolderTile(
+                  sliver: material.SliverList(
+                    delegate: material.SliverChildBuilderDelegate(
+                      (context, index) {
+                        if (showEmptyState && index == 0) {
+                          return const material.Padding(
+                            padding: material.EdgeInsets.only(top: 8),
+                            child: _EmptyState(message: 'No connections yet'),
+                          );
+                        }
+                        final folderOffset = showEmptyState ? 1 : 0;
+                        final folderIndex = index - folderOffset;
+                        if (folderIndex < _folders.length) {
+                          final name = _folders[folderIndex];
+                          return _FolderTile(
                             name: name,
                             initiallyExpanded: _expandedFolders.contains(name),
                             onExpansionCommitted: (folderName, expanded) {
@@ -337,17 +394,12 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                             onRedisDatabaseTap: widget.onRedisDatabaseSelected,
                             onMongoDBDatabaseTap: widget.onMongoDBDatabaseSelected,
                             buildConnectionTile: _buildConnectionTile,
-                          ),
-                        // Root connections (no folder)
-                        for (final conn in rootConnections)
-                          _buildConnectionTile(conn),
-                        // Empty state
-                        if (_connections.isEmpty && _folders.isEmpty)
-                          const material.Padding(
-                            padding: material.EdgeInsets.only(top: 8),
-                            child: _EmptyState(message: 'No connections yet'),
-                          ),
-                      ],
+                          );
+                        }
+                        final connIndex = folderIndex - _folders.length;
+                        return _buildConnectionTile(rootConnections[connIndex]);
+                      },
+                      childCount: topLevelCount,
                     ),
                   ),
                 ),
