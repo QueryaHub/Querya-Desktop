@@ -62,6 +62,12 @@ ColorScheme colorSchemeFromQueryaThemeColors({
     }
   }
 
+  final destructive = pick('destructive', base.destructive);
+  // querya.theme.v1 still maps this key; shadcn marks the ColorScheme field legacy.
+  // ignore: deprecated_member_use
+  final destructiveForeground =
+      pick('destructiveForeground', base.destructiveForeground);
+
   return ColorScheme(
     brightness: base.brightness,
     background: pick('background', base.background),
@@ -78,9 +84,9 @@ ColorScheme colorSchemeFromQueryaThemeColors({
     mutedForeground: pick('mutedForeground', base.mutedForeground),
     accent: pick('accent', base.accent),
     accentForeground: pick('accentForeground', base.accentForeground),
-    destructive: pick('destructive', base.destructive),
-    destructiveForeground:
-        pick('destructiveForeground', base.destructiveForeground),
+    destructive: destructive,
+    // ignore: deprecated_member_use
+    destructiveForeground: destructiveForeground,
     border: pick('border', base.border),
     input: pick('input', base.input),
     ring: pick('ring', base.ring),
