@@ -320,7 +320,7 @@ class _KeyInfo {
 
 // ─── Key tile widget ────────────────────────────────────────────────────────
 
-class _KeyTile extends StatefulWidget {
+class _KeyTile extends material.StatelessWidget {
   const _KeyTile({
     required this.keyInfo,
     required this.colorScheme,
@@ -332,34 +332,27 @@ class _KeyTile extends StatefulWidget {
   final _KeyInfo keyInfo;
   final ColorScheme colorScheme;
   final shadcn.ColorScheme shadcnCs;
-  final VoidCallback onTap;
-  final VoidCallback onDelete;
+  final material.VoidCallback onTap;
+  final material.VoidCallback onDelete;
 
-  @override
-  material.State<_KeyTile> createState() => _KeyTileState();
-}
-
-class _KeyTileState extends material.State<_KeyTile> {
-  bool _hovered = false;
-
-  Color _typeColor(String type) {
+  static Color _typeColor(String type, shadcn.ColorScheme scs) {
     switch (type) {
       case 'string':
-        return const Color(0xFF42A5F5);
+        return const material.Color(0xFF42A5F5);
       case 'hash':
-        return const Color(0xFFAB47BC);
+        return const material.Color(0xFFAB47BC);
       case 'list':
-        return const Color(0xFF66BB6A);
+        return const material.Color(0xFF66BB6A);
       case 'set':
-        return const Color(0xFFFFA726);
+        return const material.Color(0xFFFFA726);
       case 'zset':
-        return const Color(0xFFEF5350);
+        return const material.Color(0xFFEF5350);
       default:
-        return widget.shadcnCs.mutedForeground;
+        return scs.mutedForeground;
     }
   }
 
-  material.IconData _typeIcon(String type) {
+  static material.IconData _typeIcon(String type) {
     switch (type) {
       case 'string':
         return material.Icons.text_fields_rounded;
@@ -376,7 +369,7 @@ class _KeyTileState extends material.State<_KeyTile> {
     }
   }
 
-  String _formatTtl(int ttl) {
+  static String _formatTtl(int ttl) {
     if (ttl == -1) return 'No TTL';
     if (ttl == -2) return 'Missing';
     if (ttl < 60) return '${ttl}s';
@@ -387,35 +380,25 @@ class _KeyTileState extends material.State<_KeyTile> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = widget.colorScheme;
-    final scs = widget.shadcnCs;
-    final ki = widget.keyInfo;
-    final typeCol = _typeColor(ki.type);
+    final cs = colorScheme;
+    final ki = keyInfo;
+    final typeCol = _typeColor(ki.type, shadcnCs);
 
-    return material.MouseRegion(
-      cursor: material.SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
+    return material.Material(
+      color: cs.card,
+      borderRadius: material.BorderRadius.circular(8),
+      clipBehavior: material.Clip.antiAlias,
       child: material.InkWell(
-        onTap: widget.onTap,
+        onTap: onTap,
+        hoverColor: shadcnCs.muted.withValues(alpha: 0.15),
         borderRadius: material.BorderRadius.circular(8),
-        child: material.AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
+        child: material.Padding(
           padding: const material.EdgeInsets.symmetric(
               horizontal: 16, vertical: 10),
-          decoration: material.BoxDecoration(
-            color: _hovered
-                ? scs.muted.withValues(alpha: 0.15)
-                : cs.card,
-            borderRadius: material.BorderRadius.circular(8),
-            border: material.Border.all(
-                color: cs.border.withValues(alpha: 0.3), width: 1),
-          ),
           child: material.Row(
             children: [
               material.Icon(_typeIcon(ki.type), size: 16, color: typeCol),
               const Gap(10),
-              // Type badge
               material.Container(
                 padding: const material.EdgeInsets.symmetric(
                     horizontal: 6, vertical: 2),
@@ -423,7 +406,7 @@ class _KeyTileState extends material.State<_KeyTile> {
                   color: typeCol.withValues(alpha: 0.12),
                   borderRadius: material.BorderRadius.circular(4),
                 ),
-                child: Text(
+                child: material.Text(
                   ki.type.toUpperCase(),
                   style: material.TextStyle(
                     fontSize: 10,
@@ -434,7 +417,6 @@ class _KeyTileState extends material.State<_KeyTile> {
                 ),
               ),
               const Gap(10),
-              // Key name
               material.Expanded(
                 child: material.Text(
                   ki.name,
@@ -448,40 +430,35 @@ class _KeyTileState extends material.State<_KeyTile> {
                 ),
               ),
               const Gap(8),
-              // TTL
               if (ki.ttl >= 0)
                 material.Container(
                   padding: const material.EdgeInsets.symmetric(
                       horizontal: 6, vertical: 2),
                   decoration: material.BoxDecoration(
-                    color: scs.muted.withValues(alpha: 0.3),
+                    color: shadcnCs.muted.withValues(alpha: 0.3),
                     borderRadius: material.BorderRadius.circular(4),
                   ),
-                  child: Text(
+                  child: material.Text(
                     'TTL ${_formatTtl(ki.ttl)}',
                     style: material.TextStyle(
                       fontSize: 10,
-                      color: scs.mutedForeground,
+                      color: shadcnCs.mutedForeground,
                     ),
                   ),
                 ),
-              const Gap(8),
-              // Delete button (only on hover)
-              material.AnimatedOpacity(
-                opacity: _hovered ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 120),
-                child: material.InkWell(
-                  onTap: widget.onDelete,
-                  borderRadius: material.BorderRadius.circular(4),
-                  child: const material.Padding(
-                    padding: material.EdgeInsets.all(4),
-                    child: material.Icon(material.Icons.delete_rounded,
-                        size: 15, color: Color(0xFFEF5350)),
-                  ),
-                ),
+              const Gap(4),
+              material.IconButton(
+                onPressed: onDelete,
+                icon: const material.Icon(material.Icons.delete_rounded,
+                    size: 15, color: material.Color(0xFFEF5350)),
+                padding: const material.EdgeInsets.all(4),
+                constraints:
+                    const material.BoxConstraints(minWidth: 28, minHeight: 28),
+                splashRadius: 18,
+                tooltip: 'Delete key',
               ),
               material.Icon(material.Icons.chevron_right_rounded,
-                  size: 18, color: scs.mutedForeground),
+                  size: 18, color: shadcnCs.mutedForeground),
             ],
           ),
         ),
