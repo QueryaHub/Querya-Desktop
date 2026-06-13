@@ -40,7 +40,7 @@ void main() {
       final long = computeResultGridColumnWidths(
         columns: const ['payload'],
         rows: [
-          ['${'x' * 80}'],
+          ['x' * 80],
         ],
       ).single;
       expect(long, greaterThan(short));
