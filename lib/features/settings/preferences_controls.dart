@@ -77,10 +77,14 @@ class PreferencesFieldRow extends StatelessWidget {
 }
 
 /// Interface scale slider: fixed presets by default; hold Shift for 1% fine steps.
+///
+/// Drag updates the label locally; [UiScaleController.commitScale] runs on release
+/// so the rest of the app rebuilds once, not on every slider tick.
 class InterfaceScaleSlider extends material.StatefulWidget {
-  const InterfaceScaleSlider({super.key, required this.scale});
+  const InterfaceScaleSlider({super.key, this.scale});
 
-  final double scale;
+  /// When set (e.g. in tests), overrides [UiScaleController.instance.scale].
+  final double? scale;
 
   @override
   material.State<InterfaceScaleSlider> createState() =>
@@ -89,17 +93,55 @@ class InterfaceScaleSlider extends material.StatefulWidget {
 
 class _InterfaceScaleSliderState extends material.State<InterfaceScaleSlider> {
   bool _fineControl = false;
+  double? _dragScale;
 
   static int get _fineDivisions =>
       ((kMaxUiScale - kMinUiScale) / kUiScaleStep).round();
 
   bool get _shiftHeld => HardwareKeyboard.instance.isShiftPressed;
 
-  void _syncModifierKeys() {
+  double get _committedScale =>
+      widget.scale ?? UiScaleController.instance.scale;
+
+  double get _displayScale => _dragScale ?? _committedScale;
+
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_onKeyEvent);
+    if (widget.scale == null) {
+      UiScaleController.instance.addListener(_onCommittedScaleChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onKeyEvent);
+    if (widget.scale == null) {
+      UiScaleController.instance.removeListener(_onCommittedScaleChanged);
+    }
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(InterfaceScaleSlider oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.scale != widget.scale) {
+      _dragScale = null;
+    }
+  }
+
+  void _onCommittedScaleChanged() {
+    if (_dragScale != null || !mounted) return;
+    setState(() {});
+  }
+
+  bool _onKeyEvent(KeyEvent event) {
     final fine = _shiftHeld;
     if (fine != _fineControl) {
       setState(() => _fineControl = fine);
     }
+    return false;
   }
 
   double _sliderPosition(double scale, {required bool fine}) {
@@ -116,18 +158,16 @@ class _InterfaceScaleSliderState extends material.State<InterfaceScaleSlider> {
   @override
   material.Widget build(material.BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final pct = (widget.scale * 100).round();
+    final displayScale = _displayScale;
+    final pct = (displayScale * 100).round();
     final fine = _fineControl;
 
-    return material.Listener(
-        onPointerDown: (_) => _syncModifierKeys(),
-        onPointerMove: (_) => _syncModifierKeys(),
-        child: material.Row(
+    return material.Row(
           children: [
             material.Expanded(
               child: Slider(
                 value: SliderValue.single(
-                  _sliderPosition(widget.scale, fine: fine),
+                  _sliderPosition(displayScale, fine: fine),
                 ),
                 min: fine ? kMinUiScale : 0,
                 max: fine
@@ -136,21 +176,18 @@ class _InterfaceScaleSliderState extends material.State<InterfaceScaleSlider> {
                 divisions: fine ? _fineDivisions : kUiScalePresets.length - 1,
                 hintValue: const SliderValue.single(kDefaultUiScale),
                 onChanged: (value) {
-                  _syncModifierKeys();
                   final next = _scaleFromSlider(
                     value.value,
                     fine: _shiftHeld,
                   );
-                  UiScaleController.instance.setScalePreview(
-                    next,
-                    fine: _shiftHeld,
-                  );
+                  setState(() => _dragScale = next);
                 },
                 onChangeEnd: (value) {
                   final next = _scaleFromSlider(
                     value.value,
                     fine: _shiftHeld,
                   );
+                  setState(() => _dragScale = null);
                   unawaited(
                     UiScaleController.instance.commitScale(
                       next,
@@ -174,8 +211,7 @@ class _InterfaceScaleSliderState extends material.State<InterfaceScaleSlider> {
               ),
             ),
           ],
-        ),
-      );
+        );
   }
 }
 

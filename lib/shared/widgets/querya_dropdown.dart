@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/shared/widgets/querya_dropdown_tokens.dart';
@@ -56,6 +57,9 @@ class QueryaDropdown<T> extends material.StatefulWidget {
 class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
   late material.MenuController _controller;
   bool _triggerHovered = false;
+  List<material.Widget>? _cachedMenuChildren;
+  List<QueryaDropdownItem<T>>? _cachedMenuItems;
+  T? _cachedMenuValue;
 
   @override
   void initState() {
@@ -69,6 +73,23 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
     if (widget.controller != oldWidget.controller) {
       _controller = widget.controller ?? material.MenuController();
     }
+    if (!listEquals(oldWidget.items, widget.items) ||
+        oldWidget.value != widget.value) {
+      _cachedMenuChildren = null;
+    }
+  }
+
+  List<material.Widget> _menuChildren(ColorScheme cs) {
+    if (_cachedMenuChildren != null &&
+        listEquals(_cachedMenuItems, widget.items) &&
+        _cachedMenuValue == widget.value) {
+      return _cachedMenuChildren!;
+    }
+    _cachedMenuItems = List<QueryaDropdownItem<T>>.from(widget.items);
+    _cachedMenuValue = widget.value;
+    _cachedMenuChildren =
+        widget.items.map((item) => _menuItem(item, cs)).toList();
+    return _cachedMenuChildren!;
   }
 
   material.Widget _triggerLabelText({
@@ -148,7 +169,7 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
         ),
         child: material.Row(
           mainAxisAlignment: material.MainAxisAlignment.spaceBetween,
-          mainAxisSize: widget.expandToParent
+          mainAxisSize: (widget.expandToParent || fieldWidth != null)
               ? material.MainAxisSize.max
               : material.MainAxisSize.min,
           children: [
@@ -156,7 +177,7 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
               context: context,
               label: label,
               cs: cs,
-              expand: widget.expandToParent,
+              expand: widget.expandToParent || fieldWidth != null,
             ),
             material.SizedBox(width: chevronGap),
             material.Icon(
@@ -198,7 +219,7 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
     final fieldWidth = widget.expandToParent
         ? null
         : (widget.width != null ? context.scaled(widget.width!) : null);
-    final menuChildren = widget.items.map((item) => _menuItem(item, cs)).toList();
+    final menuChildren = _menuChildren(cs);
     final scaledMaxHeight = context.scaled(widget.menuMaxHeight);
     final effectiveMaxHeight =
         widget.items.length > QueryaDropdownTokens.menuScrollItemThreshold

@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart' as material show Alignment, Axis, Container, EdgeInsets, BoxDecoration, GestureDetector, Padding, BorderRadius, Center, CrossAxisAlignment, Icon, Icons, MouseRegion, AnimatedContainer, AnimatedScale, Curves, SystemMouseCursors, LayoutBuilder, HitTestBehavior, SizedBox, SingleChildScrollView, Row, MainAxisSize;
+import 'package:flutter/material.dart' as material show Alignment, Axis, Container, EdgeInsets, BoxDecoration, GestureDetector, Padding, BorderRadius, Center, Icon, Icons, MouseRegion, AnimatedContainer, AnimatedScale, Curves, SystemMouseCursors, SizedBox, SingleChildScrollView, Row, MainAxisSize;
+import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -73,7 +74,13 @@ class WorkspacePanel extends StatefulWidget {
 class _WorkspacePanelState extends State<WorkspacePanel> {
   int _editorTabIndex = 0;
   int _outputTabIndex = 0;
-  double _topFraction = 0.7;
+  final ValueNotifier<double> _topFraction = ValueNotifier(0.7);
+
+  @override
+  void dispose() {
+    _topFraction.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -186,104 +193,54 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
       );
     }
 
-    final topFlex = (_topFraction * 100).round().clamp(20, 80);
-    final bottomFlex = 100 - topFlex;
-
     return material.Container(
       color: theme.colorScheme.background,
-      child: material.LayoutBuilder(
-        builder: (context, constraints) {
-          final totalHeight = constraints.maxHeight;
-          return Column(
-            children: [
-              Expanded(
-                flex: topFlex,
-                child: Column(
-                  crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                  children: [
-                    _SectionBar(
-                      title: 'Query',
-                      tabs: const ['Query Editor', 'Query History'],
-                      index: _editorTabIndex,
-                      onTabChanged: (v) => setState(() => _editorTabIndex = v),
-                      trailing: const _RunButton(),
-                    ),
-                    const Divider(height: 1),
-                    Expanded(
-                      child: IndexedStack(
-                        index: _editorTabIndex,
-                        children: const [
-                          QueryEditorTab(),
-                          _PlaceholderTab(message: 'Query history'),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+      child: VerticalSplitPane(
+        fraction: _topFraction,
+        handleKey: const Key('workspace_panel_resize_handle'),
+        top: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _SectionBar(
+              title: 'Query',
+              tabs: const ['Query Editor', 'Query History'],
+              index: _editorTabIndex,
+              onTabChanged: (v) => setState(() => _editorTabIndex = v),
+              trailing: const _RunButton(),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: IndexedStack(
+                index: _editorTabIndex,
+                children: const [
+                  QueryEditorTab(),
+                  _PlaceholderTab(message: 'Query history'),
+                ],
               ),
-              _HorizontalResizeHandle(
-                totalHeight: totalHeight,
-                onDrag: (dy) {
-                  if (totalHeight <= 0) return;
-                  setState(() {
-                    _topFraction = (_topFraction + dy / totalHeight).clamp(0.2, 0.8);
-                  });
-                },
+            ),
+          ],
+        ),
+        bottom: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _SectionBar(
+              title: 'Output',
+              tabs: const ['Data Output', 'Messages', 'Notifications'],
+              index: _outputTabIndex,
+              onTabChanged: (v) => setState(() => _outputTabIndex = v),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: IndexedStack(
+                index: _outputTabIndex,
+                children: const [
+                  ResultsTab(),
+                  _PlaceholderTab(message: 'Messages'),
+                  _PlaceholderTab(message: 'Notifications'),
+                ],
               ),
-              Expanded(
-                flex: bottomFlex,
-                child: Column(
-                  crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                  children: [
-                    _SectionBar(
-                      title: 'Output',
-                      tabs: const ['Data Output', 'Messages', 'Notifications'],
-                      index: _outputTabIndex,
-                      onTabChanged: (v) => setState(() => _outputTabIndex = v),
-                    ),
-                    const Divider(height: 1),
-                    Expanded(
-                      child: IndexedStack(
-                        index: _outputTabIndex,
-                        children: const [
-                          ResultsTab(),
-                          _PlaceholderTab(message: 'Messages'),
-                          _PlaceholderTab(message: 'Notifications'),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _HorizontalResizeHandle extends StatelessWidget {
-  const _HorizontalResizeHandle({
-    required this.totalHeight,
-    required this.onDrag,
-  });
-
-  final double totalHeight;
-  final void Function(double dy) onDrag;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context).colorScheme;
-    return material.MouseRegion(
-      cursor: material.SystemMouseCursors.resizeRow,
-      child: material.GestureDetector(
-        key: const Key('workspace_panel_resize_handle'),
-        behavior: material.HitTestBehavior.opaque,
-        onVerticalDragUpdate: (e) => onDrag(e.delta.dy),
-        child: material.Container(
-          height: 6,
-          color: theme.border.withValues(alpha: 0.15),
+            ),
+          ],
         ),
       ),
     );

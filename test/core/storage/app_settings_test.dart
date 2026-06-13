@@ -256,16 +256,30 @@ void main() {
       expect(AppSettingsRevision.listenable.value, start + 1);
     });
 
-    test('mutating AppSettings notifies listenable', () async {
+    test('mutating SQL workspace settings notifies SqlWorkspaceSettingsRevision',
+        () async {
       var calls = 0;
       void listener() => calls++;
 
-      AppSettingsRevision.listenable.addListener(listener);
-      final before = AppSettingsRevision.listenable.value;
+      SqlWorkspaceSettingsRevision.listenable.addListener(listener);
+      final before = SqlWorkspaceSettingsRevision.listenable.value;
       await AppSettings.instance.setPostgresSqlStmtTimeoutSeconds(45);
-      expect(AppSettingsRevision.listenable.value, greaterThan(before));
+      expect(SqlWorkspaceSettingsRevision.listenable.value, greaterThan(before));
       expect(calls, greaterThan(0));
-      AppSettingsRevision.listenable.removeListener(listener);
+      SqlWorkspaceSettingsRevision.listenable.removeListener(listener);
+    });
+
+    test('mutating theme settings does not notify SqlWorkspaceSettingsRevision',
+        () async {
+      var sqlCalls = 0;
+      void listener() => sqlCalls++;
+
+      SqlWorkspaceSettingsRevision.listenable.addListener(listener);
+      final before = SqlWorkspaceSettingsRevision.listenable.value;
+      await AppSettings.instance.setThemeMode(ThemeMode.light);
+      expect(SqlWorkspaceSettingsRevision.listenable.value, before);
+      expect(sqlCalls, 0);
+      SqlWorkspaceSettingsRevision.listenable.removeListener(listener);
     });
   });
 }
