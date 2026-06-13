@@ -237,7 +237,7 @@ class _DbInfo {
 
 // ─── Tile widget ────────────────────────────────────────────────────────────
 
-class _DatabaseTile extends StatefulWidget {
+class _DatabaseTile extends material.StatelessWidget {
   const _DatabaseTile({
     required this.db,
     required this.colorScheme,
@@ -248,34 +248,21 @@ class _DatabaseTile extends StatefulWidget {
   final _DbInfo db;
   final ColorScheme colorScheme;
   final shadcn.ColorScheme shadcnCs;
-  final VoidCallback onTap;
-
-  @override
-  material.State<_DatabaseTile> createState() => _DatabaseTileState();
-}
-
-class _DatabaseTileState extends material.State<_DatabaseTile> {
-  bool _hovered = false;
+  final material.VoidCallback onTap;
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = widget.colorScheme;
-    final scs = widget.shadcnCs;
-    final db = widget.db;
+    final cs = colorScheme;
+    final db = this.db;
 
-    return material.MouseRegion(
-      cursor: material.SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
+    return material.Material(
+      color: material.Colors.transparent,
       child: material.InkWell(
-        onTap: widget.onTap,
-        child: material.AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
+        onTap: onTap,
+        hoverColor: shadcnCs.primary.withValues(alpha: 0.06),
+        child: material.Padding(
           padding: const material.EdgeInsets.symmetric(
               horizontal: 20, vertical: 10),
-          color: _hovered
-              ? scs.primary.withValues(alpha: 0.06)
-              : material.Colors.transparent,
           child: material.Row(
             children: [
               material.Icon(
@@ -283,7 +270,7 @@ class _DatabaseTileState extends material.State<_DatabaseTile> {
                     ? material.Icons.dns_rounded
                     : material.Icons.dns_outlined,
                 size: 18,
-                color: db.hasData ? scs.primary : scs.mutedForeground,
+                color: db.hasData ? shadcnCs.primary : shadcnCs.mutedForeground,
               ),
               const Gap(12),
               material.Expanded(
@@ -302,7 +289,7 @@ class _DatabaseTileState extends material.State<_DatabaseTile> {
                         '${db.keys} keys • ${db.expires} with TTL',
                         style: material.TextStyle(
                           fontSize: 12,
-                          color: scs.mutedForeground,
+                          color: shadcnCs.mutedForeground,
                         ),
                       ),
                   ],
@@ -313,7 +300,7 @@ class _DatabaseTileState extends material.State<_DatabaseTile> {
                   padding: const material.EdgeInsets.symmetric(
                       horizontal: 8, vertical: 3),
                   decoration: material.BoxDecoration(
-                    color: scs.primary.withValues(alpha: 0.12),
+                    color: shadcnCs.primary.withValues(alpha: 0.12),
                     borderRadius: material.BorderRadius.circular(10),
                   ),
                   child: Text(
@@ -321,13 +308,13 @@ class _DatabaseTileState extends material.State<_DatabaseTile> {
                     style: material.TextStyle(
                       fontSize: 11,
                       fontWeight: material.FontWeight.w600,
-                      color: scs.primary,
+                      color: shadcnCs.primary,
                     ),
                   ),
                 ),
               const Gap(8),
               material.Icon(material.Icons.chevron_right_rounded,
-                  size: 18, color: scs.mutedForeground),
+                  size: 18, color: shadcnCs.mutedForeground),
             ],
           ),
         ),
