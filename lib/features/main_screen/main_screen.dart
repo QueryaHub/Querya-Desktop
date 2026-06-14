@@ -6,12 +6,9 @@ import 'package:flutter/material.dart' as material
         Scaffold,
         Container,
         MainAxisSize,
-        GestureDetector,
         MouseRegion,
         SystemMouseCursors,
         HitTestBehavior,
-        Icons,
-        Icon,
         BuildContext,
         Widget,
         RepaintBoundary;
@@ -20,11 +17,10 @@ import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
+import 'package:querya_desktop/features/main_screen/querya_window_title_bar.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
-import 'package:querya_desktop/features/connections/driver_manager_dialog.dart';
-import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'main_screen_workspace_state.dart';
 import 'workspace_panel.dart';
 
@@ -129,19 +125,18 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final wb = context.workbench;
     return material.Scaffold(
-      backgroundColor: scheme.background,
+      backgroundColor: wb.canvas,
       body: WindowBorder(
-        color: scheme.border.withValues(alpha: 0.35),
+        color: wb.borderSubtle.withValues(alpha: 0.35),
         width: 1,
         child: Column(
           children: [
-            _CustomTitleBar(
-              theme: scheme,
+            QueryaWindowTitleBar(
               onNewDatabaseConnection: _onNewDatabaseConnectionFromMenu,
             ),
-            Divider(height: 1, color: scheme.border.withValues(alpha: 0.22)),
+            Divider(height: 1, color: wb.borderSubtle.withValues(alpha: 0.22)),
             Expanded(
               child: _MainContentSplit(
                 connectionsPanelKey: _connectionsPanelKey,
@@ -386,181 +381,6 @@ class _VerticalResizeHandle extends StatelessWidget {
         child: material.Container(
           width: 6,
           color: theme.border.withValues(alpha: 0.15),
-        ),
-      ),
-    );
-  }
-}
-
-class _CustomTitleBar extends StatefulWidget {
-  const _CustomTitleBar({
-    required this.theme,
-    required this.onNewDatabaseConnection,
-  });
-
-  final ColorScheme theme;
-  final Future<void> Function() onNewDatabaseConnection;
-
-  @override
-  State<_CustomTitleBar> createState() => _CustomTitleBarState();
-}
-
-class _CustomTitleBarState extends State<_CustomTitleBar> {
-  @override
-  material.Widget build(material.BuildContext context) {
-    final c = widget.theme;
-    final onDestructive = context.workbench.onAccent;
-    final buttonColors = WindowButtonColors(
-      iconNormal: c.mutedForeground,
-      mouseOver: c.muted.withValues(alpha: 0.5),
-      mouseDown: c.muted.withValues(alpha: 0.7),
-      iconMouseOver: c.foreground,
-      iconMouseDown: c.foreground,
-    );
-    final closeButtonColors = WindowButtonColors(
-      iconNormal: c.mutedForeground,
-      mouseOver: c.destructive,
-      mouseDown: c.destructive.withValues(alpha: 0.85),
-      iconMouseOver: onDestructive,
-      iconMouseDown: onDestructive,
-    );
-
-    return material.Container(
-      height: 40,
-      color: c.background,
-      child: WindowTitleBarBox(
-        child: Row(
-          children: [
-            Expanded(
-              child: MoveWindow(
-                child: Row(
-                  children: [
-                    const SizedBox(width: 16),
-                    material.Icon(
-                      material.Icons.search_rounded,
-                      size: 18,
-                      color: context.workbench.accent,
-                    ),
-                    const Gap(8),
-                    const Text('Querya').semiBold().small(),
-                    const Gap(24),
-                    Menubar(
-                      border: false,
-                      popoverOffset: const Offset(0, 8),
-                      children: [
-                        MenuButton(
-                          subMenu: [
-                            MenuButton(
-                                onPressed: (_) {}, child: const Text('New')),
-                            MenuButton(
-                                onPressed: (_) {},
-                                child: const Text('Open...')),
-                            MenuButton(
-                                onPressed: (_) {}, child: const Text('Save')),
-                            const MenuDivider(),
-                            MenuButton(
-                                onPressed: (_) {}, child: const Text('Exit')),
-                          ],
-                          child: const Text('File'),
-                        ),
-                        MenuButton(
-                          subMenu: [
-                            MenuButton(
-                              leading: const material.Icon(
-                                material.Icons.tune_rounded,
-                                size: 18,
-                              ),
-                              onPressed: (ctx) => showPreferencesDialog(ctx),
-                              child: const Text('Preferences…'),
-                            ),
-                          ],
-                          child: const Text('Edit'),
-                        ),
-                        MenuButton(
-                          subMenu: [
-                            MenuButton(
-                              leading: const material.Icon(
-                                  material.Icons.add_link_rounded, size: 18),
-                              trailing:
-                                  const Text('Shift+Ctrl+N').xSmall().muted(),
-                              onPressed: (_) =>
-                                  widget.onNewDatabaseConnection(),
-                              child: const Text('New Database Connection'),
-                            ),
-                            MenuButton(
-                              leading: const material.Icon(
-                                  material.Icons.link_rounded, size: 18),
-                              onPressed: (_) {},
-                              child: const Text('New Connection from URL'),
-                            ),
-                            MenuButton(
-                              leading: const material.Icon(
-                                  material.Icons.settings_rounded, size: 18),
-                              onPressed: (ctx) => showDriverManagerDialog(ctx),
-                              child: const Text('Driver Manager'),
-                            ),
-                            const MenuDivider(),
-                            MenuButton(
-                              enabled: false,
-                              leading: const material.Icon(
-                                  material.Icons.power_rounded, size: 18),
-                              onPressed: (_) {},
-                              child: const Text('Connect'),
-                            ),
-                            MenuButton(
-                              leading: const material.Icon(
-                                  material.Icons.refresh_rounded, size: 18),
-                              onPressed: (_) {},
-                              child: const Text('Invalidate/Reconnect'),
-                            ),
-                            MenuButton(
-                              leading: const material.Icon(
-                                  material.Icons.power_off_rounded, size: 18),
-                              onPressed: (_) {},
-                              child: const Text('Disconnect'),
-                            ),
-                            MenuButton(
-                                onPressed: (_) {},
-                                child: const Text('Disconnect All')),
-                            MenuButton(
-                                onPressed: (_) {},
-                                child: const Text('Disconnect Others')),
-                            const MenuDivider(),
-                            MenuButton(
-                              leading: const material.Icon(
-                                  material.Icons.lock_outline_rounded,
-                                  size: 18),
-                              onPressed: (_) {},
-                              child: const Text('Read-only'),
-                            ),
-                          ],
-                          child: const Text('Connection'),
-                        ),
-                        MenuButton(
-                          subMenu: [
-                            MenuButton(
-                                onPressed: (_) {}, child: const Text('About')),
-                            MenuButton(
-                                onPressed: (_) {},
-                                child: const Text('Documentation')),
-                          ],
-                          child: const Text('Help'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Row(
-              mainAxisSize: material.MainAxisSize.min,
-              children: [
-                MinimizeWindowButton(colors: buttonColors),
-                MaximizeWindowButton(colors: buttonColors),
-                CloseWindowButton(colors: closeButtonColors),
-              ],
-            )
-          ],
         ),
       ),
     );
