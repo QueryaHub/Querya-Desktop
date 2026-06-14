@@ -19,6 +19,31 @@ List<ThemeDefinition> _fakeThemes(int count) {
 }
 
 void main() {
+  group('filterThemeDefinitions', () {
+    final themes = _fakeThemes(10);
+
+    test('filters by theme name', () {
+      final filtered = filterThemeDefinitions(themes, 'theme 03');
+      expect(filtered, hasLength(1));
+      expect(filtered.single.id, 'theme-3');
+    });
+
+    test('filters by theme id', () {
+      final filtered = filterThemeDefinitions(themes, 'theme-7');
+      expect(filtered, hasLength(1));
+      expect(filtered.single.name, 'Theme 07');
+    });
+
+    test('filters by source label', () {
+      final filtered = filterThemeDefinitions(themes, 'file');
+      expect(filtered, isNotEmpty);
+      expect(
+        filtered.every((theme) => theme.source == ThemeSource.filesystem),
+        isTrue,
+      );
+    });
+  });
+
   group('ThemePickerButton', () {
     testWidgets('builds MenuAnchor trigger for many themes', (tester) async {
       final themes = _fakeThemes(60);
@@ -155,6 +180,115 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(material.ListView), findsNothing);
+    });
+  });
+
+  group('ThemePickerButton search', () {
+    Future<void> openMenu(WidgetTester tester) async {
+      await tester.tap(find.text('Theme 00'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('filters visible rows by theme name', (tester) async {
+      final themes = _fakeThemes(60);
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: ThemePickerButton(
+              themes: themes,
+              selectedThemeId: 'theme-0',
+              onSelected: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await openMenu(tester);
+
+      await tester.enterText(find.byType(material.TextField), 'Theme 05');
+      await tester.pump();
+
+      expect(find.text('Theme 01'), findsNothing);
+      expect(find.text('Theme 59'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(material.ListView),
+          matching: find.text('Theme 05'),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('shows empty message when filter has no results', (tester) async {
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: ThemePickerButton(
+              themes: _fakeThemes(20),
+              selectedThemeId: 'theme-0',
+              onSelected: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await openMenu(tester);
+
+      await tester.enterText(find.byType(material.TextField), 'zzzz-no-match');
+      await tester.pump();
+
+      expect(find.text('No themes match your search.'), findsOneWidget);
+      expect(find.byType(material.ListView), findsNothing);
+    });
+
+    testWidgets('clearing search restores full list', (tester) async {
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: ThemePickerButton(
+              themes: _fakeThemes(20),
+              selectedThemeId: 'theme-0',
+              onSelected: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await openMenu(tester);
+
+      await tester.enterText(find.byType(material.TextField), 'Theme 05');
+      await tester.pump();
+      expect(find.text('Theme 01'), findsNothing);
+
+      await tester.enterText(find.byType(material.TextField), '');
+      await tester.pump();
+
+      expect(find.text('Theme 01'), findsOneWidget);
+      expect(find.text('No themes match your search.'), findsNothing);
+    });
+
+    testWidgets('typing in search does not call onSelected', (tester) async {
+      var selectionCount = 0;
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: ThemePickerButton(
+              themes: _fakeThemes(20),
+              selectedThemeId: 'theme-0',
+              onSelected: (_) => selectionCount++,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await openMenu(tester);
+
+      await tester.enterText(find.byType(material.TextField), 'Theme 03');
+      await tester.pumpAndSettle();
+
+      expect(selectionCount, 0);
     });
   });
 }
