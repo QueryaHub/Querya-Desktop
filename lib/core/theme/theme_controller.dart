@@ -249,6 +249,11 @@ class ThemeController extends ChangeNotifier {
       path: _selectedThemePath,
     );
     if (stillAvailable == null) {
+      if (_registryTheme != null) {
+        // Keep the in-memory active theme; only the on-disk scan lost the file.
+        _selectedThemeLoadError = selectedThemeStartupFallbackMessage;
+        return;
+      }
       _markRegistrySelectionFailed();
       return;
     }
