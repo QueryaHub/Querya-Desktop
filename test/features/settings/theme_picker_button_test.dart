@@ -1,7 +1,10 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/core/theme/theme_definition.dart';
 import 'package:querya_desktop/features/settings/theme_picker_button.dart';
+import 'package:querya_desktop/features/settings/theme_preview_card.dart';
 
 import '../../support/querya_theme_test_shell.dart';
 
@@ -289,6 +292,128 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(selectionCount, 0);
+    });
+  });
+
+  group('ThemePickerButton preview', () {
+    Future<void> openMenu(WidgetTester tester) async {
+      await tester.tap(find.text('Theme 00'));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> hoverRow(WidgetTester tester, String rowLabel) async {
+      final gesture = await tester.createGesture(
+        kind: PointerDeviceKind.mouse,
+      );
+      await gesture.addPointer();
+      await gesture.moveTo(tester.getCenter(find.text(rowLabel)));
+      await tester.pump();
+    }
+
+    testWidgets('hover does not call onSelected', (tester) async {
+      var selectionCount = 0;
+      var previewCount = 0;
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: ThemePickerButton(
+              themes: _fakeThemes(20),
+              selectedThemeId: 'theme-0',
+              onSelected: (_) => selectionCount++,
+              onPreviewTheme: (_) async {
+                previewCount++;
+                return const ThemePreviewResult.theme(QueryaTheme.darkDefault);
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await openMenu(tester);
+
+      await hoverRow(tester, 'Theme 01');
+      await tester.pump(themePreviewDebounce);
+      await tester.pump();
+
+      expect(selectionCount, 0);
+      expect(previewCount, 1);
+      expect(find.text('Sample text'), findsOneWidget);
+    });
+
+    testWidgets('preview future resolves and card updates after debounce',
+        (tester) async {
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: ThemePickerButton(
+              themes: _fakeThemes(20),
+              selectedThemeId: 'theme-0',
+              onSelected: (_) {},
+              onPreviewTheme: (_) async {
+                await Future<void>.delayed(const Duration(milliseconds: 20));
+                return const ThemePreviewResult.theme(QueryaTheme.lightDefault);
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await openMenu(tester);
+
+      await hoverRow(tester, 'Theme 02');
+      await tester.pump(themePreviewDebounce);
+      expect(find.text('Loading preview…'), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 30));
+      expect(find.text('Theme 02'), findsWidgets);
+      expect(find.text('Sample text'), findsOneWidget);
+      expect(find.text('Loading preview…'), findsNothing);
+    });
+
+    testWidgets('broken preview shows fallback error in card', (tester) async {
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: ThemePickerButton(
+              themes: _fakeThemes(20),
+              selectedThemeId: 'theme-0',
+              onSelected: (_) {},
+              onPreviewTheme: (_) async {
+                return const ThemePreviewResult.error('Could not parse theme');
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await openMenu(tester);
+
+      await hoverRow(tester, 'Theme 03');
+      await tester.pump(themePreviewDebounce);
+      await tester.pump();
+
+      expect(find.text('Could not parse theme'), findsOneWidget);
+      expect(find.text('Sample text'), findsNothing);
+    });
+
+    testWidgets('shows preview card only when onPreviewTheme is provided',
+        (tester) async {
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: ThemePickerButton(
+              themes: _fakeThemes(5),
+              selectedThemeId: 'theme-0',
+              onSelected: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await openMenu(tester);
+
+      expect(find.byType(ThemePreviewCard), findsNothing);
     });
   });
 }

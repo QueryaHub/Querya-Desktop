@@ -1,8 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/ui_scale.dart';
+import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/core/theme/theme_definition.dart';
+import 'package:querya_desktop/features/settings/theme_preview_card.dart';
 import 'package:querya_desktop/shared/widgets/querya_dropdown_tokens.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+
+/// Debounce delay before requesting a hover preview load.
+const Duration themePreviewDebounce = Duration(milliseconds: 120);
 
 /// Dedicated theme picker for large registry lists (50+ themes).
 class ThemePickerButton extends material.StatefulWidget {
@@ -11,6 +18,7 @@ class ThemePickerButton extends material.StatefulWidget {
     required this.themes,
     required this.selectedThemeId,
     required this.onSelected,
+    this.onPreviewTheme,
     this.isLoading = false,
     this.expandToParent = false,
     this.width,
@@ -19,6 +27,10 @@ class ThemePickerButton extends material.StatefulWidget {
   final List<ThemeDefinition> themes;
   final String? selectedThemeId;
   final material.ValueChanged<String> onSelected;
+
+  /// Loads preview data for [themeId] on hover. Must not apply the theme.
+  final Future<ThemePreviewResult> Function(String themeId)? onPreviewTheme;
+
   final bool isLoading;
   final bool expandToParent;
   final double? width;
@@ -54,6 +66,13 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
   final material.TextEditingController _searchController =
       material.TextEditingController();
   bool _triggerHovered = false;
+  String? _previewThemeId;
+  String? _previewThemeLabel;
+  QueryaTheme? _previewTheme;
+  String? _previewError;
+  bool _previewLoading = false;
+  Timer? _previewDebounce;
+  int _previewRequestSerial = 0;
 
   @override
   void initState() {
@@ -63,10 +82,65 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
 
   @override
   void dispose() {
+    _previewDebounce?.cancel();
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _resetPreviewState() {
+    _previewDebounce?.cancel();
+    _previewRequestSerial++;
+    _previewThemeId = null;
+    _previewThemeLabel = null;
+    _previewTheme = null;
+    _previewError = null;
+    _previewLoading = false;
+  }
+
+  void _schedulePreview(ThemeDefinition definition) {
+    if (widget.onPreviewTheme == null) return;
+
+    _previewDebounce?.cancel();
+    final targetId = definition.id;
+    setState(() {
+      _previewThemeId = targetId;
+      _previewThemeLabel = definition.name;
+    });
+
+    _previewDebounce = Timer(themePreviewDebounce, () {
+      if (!mounted || _previewThemeId != targetId) return;
+      setState(() {
+        _previewLoading = true;
+        _previewTheme = null;
+        _previewError = null;
+      });
+      unawaited(_loadPreview(targetId));
+    });
+  }
+
+  Future<void> _loadPreview(String themeId) async {
+    final loader = widget.onPreviewTheme;
+    if (loader == null || !mounted || _previewThemeId != themeId) return;
+
+    final requestId = ++_previewRequestSerial;
+    final result = await loader(themeId);
+    if (!mounted || requestId != _previewRequestSerial) return;
+
+    setState(() {
+      _previewLoading = false;
+      switch (result) {
+        case ThemePreviewSuccess(:final theme):
+          _previewTheme = theme;
+          _previewError = null;
+        case ThemePreviewFailure(:final message):
+          _previewTheme = null;
+          _previewError = message;
+        case ThemePreviewLoading():
+          _previewLoading = true;
+      }
+    });
   }
 
   void _onSearchChanged() {
@@ -216,6 +290,21 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
             ),
           ),
         ),
+        if (widget.onPreviewTheme != null)
+          material.Padding(
+            padding: material.EdgeInsets.fromLTRB(
+              context.scaled(8),
+              context.scaled(4),
+              context.scaled(8),
+              context.scaled(4),
+            ),
+            child: ThemePreviewCard(
+              theme: _previewTheme,
+              errorMessage: _previewError,
+              isLoading: _previewLoading,
+              label: _previewThemeLabel,
+            ),
+          ),
         material.Expanded(
           child: filteredThemes.isEmpty
               ? material.Center(
@@ -245,9 +334,13 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
                         definition: theme,
                         selected: theme.id == widget.selectedThemeId,
                         colorScheme: cs,
+                        onHover: widget.onPreviewTheme == null
+                            ? null
+                            : () => _schedulePreview(theme),
                         onSelected: () {
                           widget.onSelected(theme.id);
                           _clearSearch();
+                          _resetPreviewState();
                           _controller.close();
                         },
                       );
@@ -332,6 +425,7 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
                   controller.close();
                 } else {
                   _clearSearch();
+                  _resetPreviewState();
                   controller.open();
                 }
               }
@@ -349,12 +443,14 @@ class _ThemePickerRow extends material.StatefulWidget {
     required this.selected,
     required this.colorScheme,
     required this.onSelected,
+    this.onHover,
   });
 
   final ThemeDefinition definition;
   final bool selected;
   final ColorScheme colorScheme;
   final material.VoidCallback onSelected;
+  final material.VoidCallback? onHover;
 
   @override
   material.State<_ThemePickerRow> createState() => _ThemePickerRowState();
@@ -377,7 +473,10 @@ class _ThemePickerRowState extends material.State<_ThemePickerRow> {
 
     return material.MouseRegion(
       cursor: material.SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
+      onEnter: (_) {
+        setState(() => _hovered = true);
+        widget.onHover?.call();
+      },
       onExit: (_) => setState(() => _hovered = false),
       child: material.Material(
         type: material.MaterialType.transparency,
