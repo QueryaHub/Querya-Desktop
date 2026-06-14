@@ -74,12 +74,12 @@ class _PreferencesAppearanceSectionState
       if (file == null) return;
       final path = file.path;
       if (path.isEmpty) return;
-      final result = await _controller.importThemeFromFile(path);
+      final result = await _controller.importRegistryThemeFile(path);
       if (!mounted) return;
       switch (result) {
-        case ThemeImportSuccess():
+        case ThemeDefinitionImportSuccess():
           setState(() => _importError = null);
-        case ThemeImportFailure(:final message):
+        case ThemeDefinitionImportFailure(:final message):
           setState(() => _importError = message);
       }
     } finally {

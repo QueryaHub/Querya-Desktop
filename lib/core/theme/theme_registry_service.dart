@@ -75,6 +75,92 @@ class ThemeRegistryService {
     return List.unmodifiable(definitions);
   }
 
+  /// Validates [sourcePath], copies into the user themes directory, and returns
+  /// the scanned [ThemeDefinition].
+  Future<ThemeDefinitionImportResult> importThemeFile(String sourcePath) async {
+    try {
+      final source = File(sourcePath);
+      if (!await source.exists()) {
+        return const ThemeDefinitionImportFailure('Theme file not found.');
+      }
+
+      final raw = await source.readAsString();
+      final hash = _contentHash(raw);
+      final json = _decodeRoot(raw);
+      if (json == null) {
+        return const ThemeDefinitionImportFailure('Invalid JSON.');
+      }
+
+      final themesDir = await _userThemesDirectory();
+      if (!await themesDir.exists()) {
+        await themesDir.create(recursive: true);
+      }
+
+      final schema = json['schema']?.toString();
+      late final String logicalId;
+      late final String preferredBaseName;
+      late String contentToWrite;
+
+      if (schema == queryaThemeSchemaV1) {
+        final manifest = QueryaThemeManifest.fromJsonString(raw);
+        logicalId = manifest.id;
+        preferredBaseName = ThemeImportService.safeThemeFileBase(manifest.id);
+        contentToWrite = raw;
+      } else {
+        final manifest = VsCodeThemeManifest.fromJsonString(raw);
+        if (manifest.colors.isEmpty) {
+          return const ThemeDefinitionImportFailure(
+            'Theme file has no "colors" section to import.',
+          );
+        }
+        final displayName = manifest.name?.trim().isNotEmpty == true
+            ? manifest.name!.trim()
+            : p.basenameWithoutExtension(sourcePath);
+        preferredBaseName = ThemeImportService.slugifyThemeName(displayName);
+        logicalId = preferredBaseName;
+        contentToWrite = raw;
+      }
+
+      var resolved = await _resolveImportDestination(
+        themesDir: themesDir,
+        hash: hash,
+        logicalId: logicalId,
+        preferredBaseName: preferredBaseName,
+      );
+
+      if (!resolved.reused &&
+          schema == queryaThemeSchemaV1 &&
+          resolved.renamedId != null) {
+        contentToWrite = _rewriteCustomThemeId(raw, resolved.renamedId!);
+      }
+
+      if (!resolved.reused) {
+        await resolved.file.writeAsString(contentToWrite);
+      }
+
+      final definition =
+          await _definitionFromFile(resolved.file, ThemeSource.filesystem);
+      if (definition == null) {
+        return const ThemeDefinitionImportFailure(
+          'Failed to index imported theme.',
+        );
+      }
+
+      return ThemeDefinitionImportSuccess(
+        definition: definition,
+        reusedExisting: resolved.reused,
+      );
+    } on QueryaThemeManifestParseException catch (e) {
+      return ThemeDefinitionImportFailure(e.message);
+    } on VsCodeThemeParseException catch (e) {
+      return ThemeDefinitionImportFailure(e.message);
+    } on IOException catch (e) {
+      return ThemeDefinitionImportFailure(e.toString());
+    } on Object catch (e) {
+      return ThemeDefinitionImportFailure(e.toString());
+    }
+  }
+
   /// Parses a scanned [definition] into a runtime [QueryaTheme].
   Future<ThemeLoadResult> loadTheme(ThemeDefinition definition) async {
     final path = definition.path;
@@ -361,11 +447,128 @@ class ThemeRegistryService {
     return hash.toRadixString(16).padLeft(8, '0');
   }
 
+  Future<_ResolvedImportDestination> _resolveImportDestination({
+    required Directory themesDir,
+    required String hash,
+    required String logicalId,
+    required String preferredBaseName,
+  }) async {
+    File? sameIdFile;
+
+    await for (final entity in themesDir.list(followLinks: false)) {
+      if (entity is Directory) continue;
+      if (entity is! File) continue;
+
+      final name = p.basename(entity.path);
+      if (name == ThemeImportService.storedFileName) continue;
+
+      final ext = p.extension(entity.path).toLowerCase();
+      if (ext != '.json' && ext != '.jsonc') continue;
+
+      late final String existingRaw;
+      try {
+        existingRaw = await entity.readAsString();
+      } on IOException {
+        continue;
+      }
+
+      if (_contentHash(existingRaw) == hash) {
+        return _ResolvedImportDestination(file: entity, reused: true);
+      }
+
+      final definition =
+          await _definitionFromFile(entity, ThemeSource.filesystem);
+      if (definition?.id == logicalId) {
+        sameIdFile = entity;
+      }
+    }
+
+    if (sameIdFile != null) {
+      final renamedId = await _nextRenamedThemeId(themesDir, logicalId);
+      final baseName = ThemeImportService.safeThemeFileBase(renamedId);
+      final primary = File(p.join(themesDir.path, '$baseName.json'));
+      final file = await primary.exists()
+          ? await _nextAvailableThemeFile(themesDir, baseName, startSuffix: 2)
+          : primary;
+      return _ResolvedImportDestination(
+        file: file,
+        reused: false,
+        renamedId: renamedId,
+      );
+    }
+
+    final primary = File(p.join(themesDir.path, '$preferredBaseName.json'));
+    if (!await primary.exists()) {
+      return _ResolvedImportDestination(file: primary, reused: false);
+    }
+
+    final file = await _nextAvailableThemeFile(
+      themesDir,
+      preferredBaseName,
+      startSuffix: 2,
+    );
+    return _ResolvedImportDestination(file: file, reused: false);
+  }
+
+  Future<String> _nextRenamedThemeId(Directory themesDir, String baseId) async {
+    for (var suffix = 2; suffix < 1000; suffix++) {
+      final candidate = '$baseId-$suffix';
+      final taken = await _themeIdExists(themesDir, candidate);
+      if (!taken) return candidate;
+    }
+    return '$baseId-${_contentHash(baseId)}';
+  }
+
+  Future<bool> _themeIdExists(Directory themesDir, String id) async {
+    await for (final entity in themesDir.list(followLinks: false)) {
+      if (entity is! File) continue;
+      final ext = p.extension(entity.path).toLowerCase();
+      if (ext != '.json' && ext != '.jsonc') continue;
+      final definition =
+          await _definitionFromFile(entity, ThemeSource.filesystem);
+      if (definition?.id == id) return true;
+    }
+    return false;
+  }
+
+  Future<File> _nextAvailableThemeFile(
+    Directory themesDir,
+    String baseName, {
+    int startSuffix = 2,
+  }) async {
+    for (var suffix = startSuffix; suffix < 1000; suffix++) {
+      final candidate = File(p.join(themesDir.path, '$baseName-$suffix.json'));
+      if (!await candidate.exists()) return candidate;
+    }
+    return File(
+      p.join(themesDir.path, '$baseName-${DateTime.now().millisecondsSinceEpoch}.json'),
+    );
+  }
+
+  String _rewriteCustomThemeId(String raw, String newId) {
+    final decoded = jsonDecode(stripJsonc(raw));
+    if (decoded is! Map<String, dynamic>) return raw;
+    decoded['id'] = newId;
+    return const JsonEncoder.withIndent('  ').convert(decoded);
+  }
+
   void _logScanError(String path, Object error) {
     if (kDebugMode) {
       debugPrint('ThemeRegistryService: skipped $path ($error)');
     }
   }
+}
+
+class _ResolvedImportDestination {
+  const _ResolvedImportDestination({
+    required this.file,
+    required this.reused,
+    this.renamedId,
+  });
+
+  final File file;
+  final bool reused;
+  final String? renamedId;
 }
 
 class _ThemeLruCache {
