@@ -84,7 +84,7 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
         minimumSize: material.WidgetStatePropertyAll(
           material.Size(menuWidth, 0),
         ),
-        padding: material.WidgetStatePropertyAll(material.EdgeInsets.zero),
+        padding: const material.WidgetStatePropertyAll(material.EdgeInsets.zero),
         shape: material.WidgetStatePropertyAll(
           material.RoundedRectangleBorder(
             borderRadius: material.BorderRadius.circular(radius),
