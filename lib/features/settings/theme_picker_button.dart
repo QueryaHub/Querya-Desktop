@@ -29,16 +29,60 @@ class ThemePickerButton extends material.StatefulWidget {
   material.State<ThemePickerButton> createState() => _ThemePickerButtonState();
 }
 
+/// Filters [themes] by lowercase [query] against name, id, and source labels.
+List<ThemeDefinition> filterThemeDefinitions(
+  List<ThemeDefinition> themes,
+  String query,
+) {
+  final normalized = query.trim().toLowerCase();
+  if (normalized.isEmpty) return themes;
+
+  return themes
+      .where(
+        (theme) =>
+            theme.name.toLowerCase().contains(normalized) ||
+            theme.id.toLowerCase().contains(normalized) ||
+            theme.source.name.toLowerCase().contains(normalized) ||
+            _sourceBadgeLabel(theme.source).toLowerCase().contains(normalized),
+      )
+      .toList(growable: false);
+}
+
 class _ThemePickerButtonState extends material.State<ThemePickerButton> {
   final material.MenuController _controller = material.MenuController();
   final material.ScrollController _scrollController = material.ScrollController();
+  final material.TextEditingController _searchController =
+      material.TextEditingController();
   bool _triggerHovered = false;
 
   @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  @override
   void dispose() {
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
+
+  void _onSearchChanged() {
+    setState(() {});
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
+  }
+
+  void _clearSearch() {
+    if (_searchController.text.isEmpty) return;
+    _searchController.clear();
+  }
+
+  List<ThemeDefinition> get _filteredThemes =>
+      filterThemeDefinitions(widget.themes, _searchController.text);
 
   bool get _enabled => !widget.isLoading;
 
@@ -96,28 +140,7 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
         material.SizedBox(
           width: menuWidth,
           height: menuHeight,
-          child: material.Scrollbar(
-            controller: _scrollController,
-            thumbVisibility: widget.themes.length > 8,
-            child: material.ListView.builder(
-              controller: _scrollController,
-              primary: false,
-              padding: QueryaDropdownTokens.menuPadding,
-              itemCount: widget.themes.length,
-              itemBuilder: (context, index) {
-                final theme = widget.themes[index];
-                return _ThemePickerRow(
-                  definition: theme,
-                  selected: theme.id == widget.selectedThemeId,
-                  colorScheme: cs,
-                  onSelected: () {
-                    widget.onSelected(theme.id);
-                    _controller.close();
-                  },
-                );
-              },
-            ),
-          ),
+          child: _buildMenuPanel(context, cs),
         ),
       ],
       builder: (context, controller, child) {
@@ -138,6 +161,102 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
     );
 
     return anchor;
+  }
+
+  material.Widget _buildMenuPanel(material.BuildContext context, ColorScheme cs) {
+    final filteredThemes = _filteredThemes;
+    final radius = context.scaled(QueryaDropdownTokens.menuBorderRadius);
+
+    return material.Column(
+      children: [
+        material.Padding(
+          padding: material.EdgeInsets.fromLTRB(
+            context.scaled(8),
+            context.scaled(8),
+            context.scaled(8),
+            context.scaled(4),
+          ),
+          child: material.TextField(
+            controller: _searchController,
+            style: material.TextStyle(
+              fontSize: context.scaled(QueryaDropdownTokens.fontSize),
+              color: cs.popoverForeground,
+            ),
+            decoration: material.InputDecoration(
+              isDense: true,
+              hintText: 'Search themes…',
+              hintStyle: material.TextStyle(color: cs.mutedForeground),
+              prefixIcon: material.Icon(
+                material.Icons.search,
+                size: context.scaled(18),
+                color: cs.mutedForeground,
+              ),
+              prefixIconConstraints: material.BoxConstraints(
+                minWidth: context.scaled(36),
+                minHeight: context.scaled(32),
+              ),
+              contentPadding: material.EdgeInsets.symmetric(
+                horizontal: context.scaled(8),
+                vertical: context.scaled(8),
+              ),
+              filled: true,
+              fillColor: cs.muted.withValues(alpha: 0.18),
+              border: material.OutlineInputBorder(
+                borderRadius: material.BorderRadius.circular(radius),
+                borderSide: material.BorderSide(color: cs.border),
+              ),
+              enabledBorder: material.OutlineInputBorder(
+                borderRadius: material.BorderRadius.circular(radius),
+                borderSide: material.BorderSide(color: cs.border),
+              ),
+              focusedBorder: material.OutlineInputBorder(
+                borderRadius: material.BorderRadius.circular(radius),
+                borderSide: material.BorderSide(color: cs.ring),
+              ),
+            ),
+          ),
+        ),
+        material.Expanded(
+          child: filteredThemes.isEmpty
+              ? material.Center(
+                  child: material.Padding(
+                    padding: material.EdgeInsets.all(context.scaled(12)),
+                    child: material.Text(
+                      'No themes match your search.',
+                      textAlign: material.TextAlign.center,
+                      style: material.TextStyle(
+                        fontSize: context.scaled(12),
+                        color: cs.mutedForeground,
+                      ),
+                    ),
+                  ),
+                )
+              : material.Scrollbar(
+                  controller: _scrollController,
+                  thumbVisibility: filteredThemes.length > 8,
+                  child: material.ListView.builder(
+                    controller: _scrollController,
+                    primary: false,
+                    padding: QueryaDropdownTokens.menuPadding,
+                    itemCount: filteredThemes.length,
+                    itemBuilder: (context, index) {
+                      final theme = filteredThemes[index];
+                      return _ThemePickerRow(
+                        definition: theme,
+                        selected: theme.id == widget.selectedThemeId,
+                        colorScheme: cs,
+                        onSelected: () {
+                          widget.onSelected(theme.id);
+                          _clearSearch();
+                          _controller.close();
+                        },
+                      );
+                    },
+                  ),
+                ),
+        ),
+      ],
+    );
   }
 
   material.Widget _buildTrigger({
@@ -212,6 +331,7 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
                 if (controller.isOpen) {
                   controller.close();
                 } else {
+                  _clearSearch();
                   controller.open();
                 }
               }
