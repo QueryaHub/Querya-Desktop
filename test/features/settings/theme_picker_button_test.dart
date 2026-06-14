@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
+import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:querya_desktop/core/theme/theme_definition.dart';
 import 'package:querya_desktop/features/settings/theme_picker_button.dart';
 import 'package:querya_desktop/features/settings/theme_preview_card.dart';
@@ -414,6 +415,49 @@ void main() {
       await openMenu(tester);
 
       expect(find.byType(ThemePreviewCard), findsNothing);
+    });
+
+    testWidgets('tap row still selects when onPreviewTheme is provided',
+        (tester) async {
+      String? picked;
+      const themes = [
+        ThemeDefinition(
+          id: ThemeController.builtinQueryaDarkId,
+          name: 'Querya Dark',
+          source: ThemeSource.builtin,
+          format: ThemeFormat.queryaCustom,
+          isDark: true,
+        ),
+        ThemeDefinition(
+          id: ThemeController.builtinQueryaLightId,
+          name: 'Querya Light',
+          source: ThemeSource.builtin,
+          format: ThemeFormat.queryaCustom,
+          isDark: false,
+        ),
+      ];
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: ThemePickerButton(
+              themes: themes,
+              selectedThemeId: ThemeController.builtinQueryaDarkId,
+              expandToParent: true,
+              onSelected: (id) => picked = id,
+              onPreviewTheme: (_) async =>
+                  const ThemePreviewResult.theme(QueryaTheme.darkDefault),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.text('Querya Dark'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Querya Light'));
+      await tester.pumpAndSettle();
+
+      expect(picked, ThemeController.builtinQueryaLightId);
     });
   });
 }

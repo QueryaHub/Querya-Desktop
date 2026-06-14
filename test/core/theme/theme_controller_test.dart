@@ -83,6 +83,11 @@ void main() {
     expect(c.preset, QueryaThemePreset.queryaDark);
     expect(c.activeTheme, QueryaTheme.darkDefault);
     expect(c.isLoaded, isTrue);
+    expect(c.availableThemes.map((theme) => theme.id), containsAll([
+      ThemeController.builtinQueryaDarkId,
+      ThemeController.builtinQueryaLightId,
+    ]));
+    expect(c.effectiveSelectedThemeId, ThemeController.builtinQueryaDarkId);
   });
 
   test('setThemeMode light persists and updates activeTheme', () async {
@@ -239,6 +244,43 @@ void main() {
       expect(c.selectedThemeId, isNull);
       expect(c.activeTheme, QueryaTheme.lightDefault);
       expect(await AppSettings.instance.getSelectedThemeId(), isNull);
+    });
+
+    test('setThemeById applies built-in Querya Light preset', () async {
+      final c = ThemeController.instance;
+      await c.load();
+
+      await c.setThemeById(ThemeController.builtinQueryaLightId);
+
+      expect(c.preset, QueryaThemePreset.queryaLight);
+      expect(c.selectedThemeId, isNull);
+      expect(c.effectiveSelectedThemeId, ThemeController.builtinQueryaLightId);
+      expect(c.activeTheme, QueryaTheme.lightDefault);
+      expect(await AppSettings.instance.getSelectedThemeId(), isNull);
+    });
+
+    test('previewThemeById returns built-in theme without registry file',
+        () async {
+      final c = ThemeController.instance;
+      await c.load();
+
+      final result = await c.previewThemeById(ThemeController.builtinQueryaDarkId);
+
+      expect(result, isA<ThemeLoadSuccess>());
+      expect((result as ThemeLoadSuccess).theme, QueryaTheme.darkDefault);
+    });
+
+    test('resetToDefaults keeps built-in themes in picker list', () async {
+      final c = ThemeController.instance;
+      await c.load();
+      await c.setThemeMode(ThemeMode.light);
+      await c.resetToDefaults();
+
+      expect(c.availableThemes.map((theme) => theme.id), containsAll([
+        ThemeController.builtinQueryaDarkId,
+        ThemeController.builtinQueryaLightId,
+      ]));
+      expect(c.effectiveSelectedThemeId, ThemeController.builtinQueryaDarkId);
     });
   });
 }
