@@ -19,13 +19,29 @@ class ThemeRegistryService {
   ThemeRegistryService({
     Future<Directory> Function()? userThemesDirectory,
     Future<Directory> Function()? importedThemesDirectory,
+    int maxCacheEntries = 16,
   })  : _userThemesDirectory =
             userThemesDirectory ?? ThemePaths.userThemesDirectory,
         _importedThemesDirectory =
-            importedThemesDirectory ?? ThemePaths.importedThemesDirectory;
+            importedThemesDirectory ?? ThemePaths.importedThemesDirectory,
+        _themeCache = _ThemeLruCache(maxEntries: maxCacheEntries);
+
+  static const defaultMaxCacheEntries = 16;
 
   final Future<Directory> Function() _userThemesDirectory;
   final Future<Directory> Function() _importedThemesDirectory;
+  final _ThemeLruCache _themeCache;
+  int _themeParseCount = 0;
+
+  /// Number of cache misses that performed a full theme parse.
+  @visibleForTesting
+  int get themeParseCount => _themeParseCount;
+
+  /// Clears parsed theme cache and parse counter.
+  void clearCache() {
+    _themeCache.clear();
+    _themeParseCount = 0;
+  }
 
   Future<List<ThemeDefinition>> loadThemeDefinitions() async {
     final definitions = <ThemeDefinition>[];
@@ -65,12 +81,20 @@ class ThemeRegistryService {
       );
     }
 
+    final cacheKey = definition.stableCacheKey;
+    final cachedTheme = _themeCache.get(cacheKey);
+    if (cachedTheme != null) {
+      return ThemeLoadSuccess(definition: definition, theme: cachedTheme);
+    }
+
     try {
       final raw = await file.readAsString();
       final theme = switch (definition.format) {
         ThemeFormat.queryaCustom => _loadCustomTheme(raw),
         ThemeFormat.vscode => _loadVsCodeTheme(raw),
       };
+      _themeCache.put(cacheKey, theme);
+      _themeParseCount++;
       return ThemeLoadSuccess(definition: definition, theme: theme);
     } on QueryaThemeManifestParseException catch (e) {
       return ThemeLoadFailure(
@@ -257,4 +281,29 @@ class ThemeRegistryService {
       debugPrint('ThemeRegistryService: skipped $path ($error)');
     }
   }
+}
+
+class _ThemeLruCache {
+  _ThemeLruCache({required this.maxEntries});
+
+  final int maxEntries;
+  final _entries = <String, QueryaTheme>{};
+
+  QueryaTheme? get(String key) {
+    final value = _entries.remove(key);
+    if (value == null) return null;
+    _entries[key] = value;
+    return value;
+  }
+
+  void put(String key, QueryaTheme theme) {
+    _entries.remove(key);
+    _entries[key] = theme;
+    while (_entries.length > maxEntries) {
+      final oldest = _entries.keys.first;
+      _entries.remove(oldest);
+    }
+  }
+
+  void clear() => _entries.clear();
 }
