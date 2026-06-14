@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +12,7 @@ import 'package:querya_desktop/core/theme/querya_theme_preset.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:querya_desktop/core/theme/theme_import_service.dart';
 import 'package:querya_desktop/core/theme/theme_load_result.dart';
+import 'package:querya_desktop/core/theme/theme_definition.dart';
 import 'package:querya_desktop/core/theme/theme_registry_service.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
@@ -31,6 +33,21 @@ class _FakePathProvider extends PathProviderPlatform {
 Future<void> _copyFixture(String fixtureName, File destination) async {
   final source = File(p.join('test/fixtures/themes', fixtureName));
   await destination.writeAsString(await source.readAsString());
+}
+
+class _GatedRegistryService extends ThemeRegistryService {
+  _GatedRegistryService({
+    required super.userThemesDirectory,
+    required super.importedThemesDirectory,
+  });
+
+  final gate = Completer<void>();
+
+  @override
+  Future<List<ThemeDefinition>> loadThemeDefinitions() async {
+    await gate.future;
+    return super.loadThemeDefinitions();
+  }
 }
 
 void main() {
@@ -281,6 +298,66 @@ void main() {
         ThemeController.builtinQueryaLightId,
       ]));
       expect(c.effectiveSelectedThemeId, ThemeController.builtinQueryaDarkId);
+    });
+  });
+
+  group('loadAvailableThemes', () {
+    test('picks up newly added filesystem theme', () async {
+      final c = ThemeController.instance;
+      await c.load();
+      final beforeCount = c.availableThemes.length;
+
+      await _copyFixture(
+        'querya_custom_dark.json',
+        File(p.join(themesDir.path, 'querya_custom_dark.json')),
+      );
+      await c.loadAvailableThemes();
+
+      expect(c.availableThemes.length, greaterThan(beforeCount));
+      expect(
+        c.availableThemes.map((theme) => theme.id),
+        contains('fixture-custom-dark'),
+      );
+      expect(c.isLoadingAvailableThemes, isFalse);
+    });
+
+    test('preserves active registry theme without reloading from disk',
+        () async {
+      final c = ThemeController.instance;
+      await _copyFixture(
+        'querya_custom_dark.json',
+        File(p.join(themesDir.path, 'querya_custom_dark.json')),
+      );
+      await c.load();
+      await c.setThemeById('fixture-custom-dark');
+      final before = c.activeTheme;
+
+      await File(p.join(themesDir.path, 'querya_custom_dark.json'))
+          .writeAsString('not valid theme json');
+
+      await c.loadAvailableThemes();
+
+      expect(c.activeTheme, same(before));
+      expect(c.selectedThemeId, 'fixture-custom-dark');
+    });
+
+    test('sets isLoadingAvailableThemes while refresh is in progress', () async {
+      final c = ThemeController.instance;
+      await c.load();
+
+      final gated = _GatedRegistryService(
+        userThemesDirectory: () async => themesDir,
+        importedThemesDirectory: () async => importedDir,
+      );
+      c.setRegistryServiceForTest(gated);
+
+      final refresh = c.loadAvailableThemes();
+      expect(c.isLoadingAvailableThemes, isTrue);
+
+      gated.gate.complete();
+      await refresh;
+
+      expect(c.isLoadingAvailableThemes, isFalse);
     });
   });
 }
