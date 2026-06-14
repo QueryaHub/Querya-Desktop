@@ -2,9 +2,11 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:path/path.dart' as p;
 
 import '../storage/app_settings.dart';
+import 'builtin_theme_assets.dart';
 import 'parser/jsonc_preprocessor.dart';
 import 'parser/querya_theme_from_manifest.dart';
 import 'parser/querya_theme_from_vscode.dart';
@@ -21,17 +23,24 @@ class ThemeRegistryService {
   ThemeRegistryService({
     Future<Directory> Function()? userThemesDirectory,
     Future<Directory> Function()? importedThemesDirectory,
+    Future<String> Function(String assetPath)? assetLoader,
+    List<String>? bundledThemeAssetFiles,
     int maxCacheEntries = 16,
   })  : _userThemesDirectory =
             userThemesDirectory ?? ThemePaths.userThemesDirectory,
         _importedThemesDirectory =
             importedThemesDirectory ?? ThemePaths.importedThemesDirectory,
+        _assetLoader = assetLoader ?? ((path) => rootBundle.loadString(path)),
+        _bundledThemeAssetFiles =
+            bundledThemeAssetFiles ?? BuiltinThemeAssets.bundledFiles,
         _themeCache = _ThemeLruCache(maxEntries: maxCacheEntries);
 
   static const defaultMaxCacheEntries = 16;
 
   final Future<Directory> Function() _userThemesDirectory;
   final Future<Directory> Function() _importedThemesDirectory;
+  final Future<String> Function(String assetPath) _assetLoader;
+  final List<String> _bundledThemeAssetFiles;
   final _ThemeLruCache _themeCache;
   int _themeParseCount = 0;
 
@@ -47,6 +56,8 @@ class ThemeRegistryService {
 
   Future<List<ThemeDefinition>> loadThemeDefinitions() async {
     final definitions = <ThemeDefinition>[];
+
+    await _loadBuiltinAssetDefinitions(definitions);
 
     await _scanDirectory(
       await _userThemesDirectory(),
@@ -171,14 +182,6 @@ class ThemeRegistryService {
       );
     }
 
-    final file = File(path);
-    if (!await file.exists()) {
-      return ThemeLoadFailure(
-        definition: definition,
-        message: 'Theme file not found.',
-      );
-    }
-
     final cacheKey = definition.stableCacheKey;
     final cachedTheme = _themeCache.get(cacheKey);
     if (cachedTheme != null) {
@@ -186,7 +189,14 @@ class ThemeRegistryService {
     }
 
     try {
-      final raw = await file.readAsString();
+      final raw = await _readThemeRaw(definition);
+      if (raw == null) {
+        return ThemeLoadFailure(
+          definition: definition,
+          message: 'Theme file not found.',
+        );
+      }
+
       final theme = switch (definition.format) {
         ThemeFormat.queryaCustom => _loadCustomTheme(raw),
         ThemeFormat.vscode => _loadVsCodeTheme(raw),
@@ -305,6 +315,56 @@ class ThemeRegistryService {
     return null;
   }
 
+  Future<void> _loadBuiltinAssetDefinitions(List<ThemeDefinition> out) async {
+    for (final fileName in _bundledThemeAssetFiles) {
+      final assetPath = BuiltinThemeAssets.assetPath(fileName);
+      try {
+        final raw = await _readAssetString(assetPath);
+        final hash = _contentHash(raw);
+        final json = _decodeRoot(raw);
+        if (json == null) {
+          _logScanError(assetPath, 'Invalid JSON');
+          continue;
+        }
+
+        final definition = _definitionFromRaw(
+          json: json,
+          path: assetPath,
+          fileBaseName: p.basenameWithoutExtension(fileName),
+          source: ThemeSource.builtin,
+          contentHash: hash,
+        );
+        if (definition != null) {
+          out.add(definition);
+        }
+      } on Object catch (e) {
+        _logScanError(assetPath, e);
+      }
+    }
+  }
+
+  Future<String?> _readThemeRaw(ThemeDefinition definition) async {
+    final path = definition.path;
+    if (path == null || path.isEmpty) return null;
+
+    if (definition.source == ThemeSource.builtin && _isAssetPath(path)) {
+      try {
+        return await _readAssetString(path);
+      } on Object {
+        return null;
+      }
+    }
+
+    final file = File(path);
+    if (!await file.exists()) return null;
+    return file.readAsString();
+  }
+
+  Future<String> _readAssetString(String assetPath) =>
+      _assetLoader(assetPath);
+
+  static bool _isAssetPath(String path) => path.startsWith('assets/');
+
   Future<void> _scanDirectory(
     Directory directory,
     ThemeSource source,
@@ -349,21 +409,23 @@ class ThemeRegistryService {
 
       final schema = json['schema']?.toString();
       if (schema == queryaThemeSchemaV1) {
-        return _customDefinition(
+        return _definitionFromRaw(
           json: json,
-          file: file,
+          path: file.path,
+          fileBaseName: p.basenameWithoutExtension(file.path),
           source: source,
-          lastModified: stat.modified,
           contentHash: hash,
+          lastModified: stat.modified,
         );
       }
 
-      return _vscodeDefinition(
+      return _definitionFromRaw(
         json: json,
-        file: file,
+        path: file.path,
+        fileBaseName: p.basenameWithoutExtension(file.path),
         source: source,
-        lastModified: stat.modified,
         contentHash: hash,
+        lastModified: stat.modified,
       );
     } on Object catch (e) {
       _logScanError(file.path, e);
@@ -371,23 +433,52 @@ class ThemeRegistryService {
     }
   }
 
+  ThemeDefinition? _definitionFromRaw({
+    required Map<String, dynamic> json,
+    required String path,
+    required String fileBaseName,
+    required ThemeSource source,
+    required String contentHash,
+    DateTime? lastModified,
+  }) {
+    final schema = json['schema']?.toString();
+    if (schema == queryaThemeSchemaV1) {
+      return _customDefinition(
+        json: json,
+        source: source,
+        contentHash: contentHash,
+        path: path,
+        lastModified: lastModified,
+      );
+    }
+
+    return _vscodeDefinition(
+      json: json,
+      source: source,
+      contentHash: contentHash,
+      fileBaseName: fileBaseName,
+      path: path,
+      lastModified: lastModified,
+    );
+  }
+
   ThemeDefinition? _customDefinition({
     required Map<String, dynamic> json,
-    required File file,
     required ThemeSource source,
-    required DateTime lastModified,
     required String contentHash,
+    required String path,
+    DateTime? lastModified,
   }) {
     final id = json['id']?.toString().trim();
     final name = json['name']?.toString().trim();
     final type = json['type']?.toString().trim().toLowerCase();
 
     if (id == null || id.isEmpty || name == null || name.isEmpty) {
-      _logScanError(file.path, 'Missing required custom theme fields');
+      _logScanError(path, 'Missing required custom theme fields');
       return null;
     }
     if (type != 'dark' && type != 'light') {
-      _logScanError(file.path, 'Invalid custom theme type "$type"');
+      _logScanError(path, 'Invalid custom theme type "$type"');
       return null;
     }
 
@@ -397,7 +488,7 @@ class ThemeRegistryService {
       source: source,
       format: ThemeFormat.queryaCustom,
       isDark: type == 'dark',
-      path: file.path,
+      path: path,
       lastModified: lastModified,
       contentHash: contentHash,
     );
@@ -405,23 +496,23 @@ class ThemeRegistryService {
 
   ThemeDefinition? _vscodeDefinition({
     required Map<String, dynamic> json,
-    required File file,
     required ThemeSource source,
-    required DateTime lastModified,
     required String contentHash,
+    required String fileBaseName,
+    required String path,
+    DateTime? lastModified,
   }) {
-    final fileId = p.basenameWithoutExtension(file.path);
     final rawName = json['name']?.toString().trim();
-    final name = rawName != null && rawName.isNotEmpty ? rawName : fileId;
+    final name = rawName != null && rawName.isNotEmpty ? rawName : fileBaseName;
     final type = json['type']?.toString().trim().toLowerCase();
 
     return ThemeDefinition(
-      id: fileId,
+      id: fileBaseName,
       name: name,
       source: source,
       format: ThemeFormat.vscode,
       isDark: type == 'dark',
-      path: file.path,
+      path: path,
       lastModified: lastModified,
       contentHash: contentHash,
     );
