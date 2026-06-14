@@ -33,7 +33,11 @@ class ThemeImportFailure extends ThemeImportResult {
 
 /// Parses and persists an imported VS Code theme under app support.
 abstract final class ThemeImportService {
-  static const String _storedFileName = 'imported.json';
+  static const String legacyImportedThemeId = 'imported';
+  static const String storedFileName = 'imported.json';
+
+  /// Path to the persisted legacy import copy under app support.
+  static Future<File> persistedImportFile() => _storedThemeFile();
 
   /// Reads [sourcePath], parses JSON/JSONC, copies to app data, returns colors.
   static Future<ThemeImportResult> importFromPath(String sourcePath) async {
@@ -109,6 +113,6 @@ abstract final class ThemeImportService {
 
   static Future<File> _storedThemeFile() async {
     final support = await getApplicationSupportDirectory();
-    return File(p.join(support.path, 'themes', _storedFileName));
+    return File(p.join(support.path, 'themes', storedFileName));
   }
 }
