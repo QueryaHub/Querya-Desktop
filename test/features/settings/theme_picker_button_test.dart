@@ -95,7 +95,7 @@ void main() {
 
     testWidgets('shows source badge and brightness label in open menu',
         (tester) async {
-      final themes = const [
+      const themes = [
         ThemeDefinition(
           id: 'builtin-dark',
           name: 'Querya Dark',
