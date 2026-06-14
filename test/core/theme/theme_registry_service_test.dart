@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:querya_desktop/core/theme/parser/color_parser.dart';
 import 'package:querya_desktop/core/theme/theme_definition.dart';
+import 'package:querya_desktop/core/theme/theme_import_service.dart';
 import 'package:querya_desktop/core/theme/theme_load_result.dart';
 import 'package:querya_desktop/core/theme/theme_registry_service.dart';
 
@@ -222,6 +223,84 @@ void main() {
 
       expect(result, isA<ThemeLoadFailure>());
       expect((result as ThemeLoadFailure).message, contains('id'));
+    });
+  });
+
+  group('ThemeRegistryService.importThemeFile', () {
+    test('imports custom theme into user themes directory', () async {
+      final source = File(p.join('test/fixtures/themes', 'querya_custom_dark.json'));
+      final result = await registry.importThemeFile(source.path);
+
+      expect(result, isA<ThemeDefinitionImportSuccess>());
+      final success = result as ThemeDefinitionImportSuccess;
+      expect(success.reusedExisting, isFalse);
+      expect(success.definition.id, 'fixture-custom-dark');
+      expect(success.definition.source, ThemeSource.filesystem);
+      expect(
+        await File(p.join(themesDir.path, 'fixture-custom-dark.json')).exists(),
+        isTrue,
+      );
+
+      final definitions = await registry.loadThemeDefinitions();
+      expect(
+        definitions.map((d) => d.id),
+        contains('fixture-custom-dark'),
+      );
+    });
+
+    test('imports VS Code theme with slugified filename', () async {
+      final source = File(p.join('test/fixtures/themes', 'dark_subset.json'));
+      final result = await registry.importThemeFile(source.path);
+
+      expect(result, isA<ThemeDefinitionImportSuccess>());
+      final success = result as ThemeDefinitionImportSuccess;
+      expect(success.definition.format, ThemeFormat.vscode);
+      expect(
+        p.basename(success.definition.path!),
+        'fixture-dark-subset.json',
+      );
+    });
+
+    test('reuses existing file when content hash matches', () async {
+      final source = File(p.join('test/fixtures/themes', 'querya_custom_minimal.json'));
+      final first = await registry.importThemeFile(source.path);
+      expect(first, isA<ThemeDefinitionImportSuccess>());
+      final firstSuccess = first as ThemeDefinitionImportSuccess;
+
+      final second = await registry.importThemeFile(source.path);
+      expect(second, isA<ThemeDefinitionImportSuccess>());
+      final secondSuccess = second as ThemeDefinitionImportSuccess;
+      expect(secondSuccess.reusedExisting, isTrue);
+      expect(secondSuccess.definition.path, firstSuccess.definition.path);
+
+      final themeFiles = themesDir
+          .listSync()
+          .whereType<File>()
+          .where((f) => p.extension(f.path) == '.json')
+          .length;
+      expect(themeFiles, 1);
+    });
+
+    test('suffixes custom theme id when same id has different content', () async {
+      final source = File(p.join('test/fixtures/themes', 'querya_custom_minimal.json'));
+      final first = await registry.importThemeFile(source.path);
+      expect(first, isA<ThemeDefinitionImportSuccess>());
+
+      final modified = File(p.join(tempDir.path, 'modified-custom.json'));
+      final raw = await source.readAsString();
+      await modified.writeAsString(raw.replaceFirst('#FF00AA', '#00FFAA'));
+
+      final second = await registry.importThemeFile(modified.path);
+      expect(second, isA<ThemeDefinitionImportSuccess>());
+      final secondSuccess = second as ThemeDefinitionImportSuccess;
+      expect(secondSuccess.reusedExisting, isFalse);
+      expect(secondSuccess.definition.id, 'fixture-custom-minimal-2');
+
+      final definitions = await registry.loadThemeDefinitions();
+      expect(
+        definitions.map((d) => d.id),
+        containsAll(['fixture-custom-minimal', 'fixture-custom-minimal-2']),
+      );
     });
   });
 }

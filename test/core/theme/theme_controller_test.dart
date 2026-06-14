@@ -11,6 +11,7 @@ import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/core/theme/querya_theme_preset.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:querya_desktop/core/theme/theme_import_service.dart';
+import 'package:querya_desktop/core/theme/theme_import_service.dart';
 import 'package:querya_desktop/core/theme/theme_load_result.dart';
 import 'package:querya_desktop/core/theme/theme_definition.dart';
 import 'package:querya_desktop/core/theme/theme_registry_service.dart';
@@ -358,6 +359,22 @@ void main() {
       await refresh;
 
       expect(c.isLoadingAvailableThemes, isFalse);
+    });
+
+    test('importRegistryThemeFile adds theme to registry and selects it', () async {
+      final c = ThemeController.instance;
+      await c.load();
+      final source = File(p.join('test/fixtures/themes', 'querya_custom_dark.json'));
+
+      final result = await c.importRegistryThemeFile(source.path);
+
+      expect(result, isA<ThemeDefinitionImportSuccess>());
+      expect(c.selectedThemeId, 'fixture-custom-dark');
+      expect(
+        c.availableThemes.map((theme) => theme.id),
+        contains('fixture-custom-dark'),
+      );
+      expect(c.activeTheme.colorScheme.primary, parseQueryaThemeColor('#38BDF8'));
     });
   });
 }
