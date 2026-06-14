@@ -17,6 +17,30 @@ import 'theme_registry_service.dart';
 
 /// Active theme state: preset, optional imported colors, user overrides.
 class ThemeController extends ChangeNotifier {
+  static const String builtinQueryaDarkId = 'querya-dark';
+  static const String builtinQueryaLightId = 'querya-light';
+
+  static const ThemeDefinition builtinQueryaDarkDefinition = ThemeDefinition(
+    id: builtinQueryaDarkId,
+    name: 'Querya Dark',
+    source: ThemeSource.builtin,
+    format: ThemeFormat.queryaCustom,
+    isDark: true,
+  );
+
+  static const ThemeDefinition builtinQueryaLightDefinition = ThemeDefinition(
+    id: builtinQueryaLightId,
+    name: 'Querya Light',
+    source: ThemeSource.builtin,
+    format: ThemeFormat.queryaCustom,
+    isDark: false,
+  );
+
+  static const List<ThemeDefinition> _builtinThemeDefinitions = [
+    builtinQueryaDarkDefinition,
+    builtinQueryaLightDefinition,
+  ];
+
   ThemeRegistryService _registryService;
 
   ThemeController._({ThemeRegistryService? registryService})
@@ -68,6 +92,16 @@ class ThemeController extends ChangeNotifier {
   String? get selectedThemePath => _selectedThemePath;
 
   String? get selectedThemeLoadError => _selectedThemeLoadError;
+
+  /// Theme id for registry-backed selection, or built-in/legacy preset ids.
+  String get effectiveSelectedThemeId {
+    if (_selectedThemeId != null) return _selectedThemeId!;
+    return switch (_preset) {
+      QueryaThemePreset.queryaLight => builtinQueryaLightId,
+      QueryaThemePreset.imported => ThemeImportService.legacyImportedThemeId,
+      _ => builtinQueryaDarkId,
+    };
+  }
 
   /// User `workbench.colorCustomizations` layer (VS Code keys → hex).
   Map<String, String> get userColorOverrides =>
@@ -171,7 +205,9 @@ class ThemeController extends ChangeNotifier {
     _themeAnimationEnabled =
         await AppSettings.instance.getThemeAnimationEnabled();
 
-    _availableThemes = await _registryService.loadThemeDefinitions();
+    _availableThemes = _mergeBuiltinThemes(
+      await _registryService.loadThemeDefinitions(),
+    );
     await _restoreSelectedRegistryTheme();
 
     _loaded = true;
@@ -179,11 +215,22 @@ class ThemeController extends ChangeNotifier {
   }
 
   Future<void> loadAvailableThemes() async {
-    _availableThemes = await _registryService.loadThemeDefinitions();
+    _availableThemes = _mergeBuiltinThemes(
+      await _registryService.loadThemeDefinitions(),
+    );
     notifyListeners();
   }
 
   Future<void> setThemeById(String id) async {
+    if (id == builtinQueryaDarkId) {
+      await _applyBuiltinPreset(QueryaThemePreset.queryaDark);
+      return;
+    }
+    if (id == builtinQueryaLightId) {
+      await _applyBuiltinPreset(QueryaThemePreset.queryaLight);
+      return;
+    }
+
     final definition = _definitionById(id);
     if (definition == null) {
       _selectedThemeLoadError = 'Theme "$id" not found.';
@@ -214,6 +261,19 @@ class ThemeController extends ChangeNotifier {
   }
 
   Future<ThemeLoadResult> previewThemeById(String id) async {
+    if (id == builtinQueryaDarkId) {
+      return const ThemeLoadSuccess(
+        definition: builtinQueryaDarkDefinition,
+        theme: QueryaTheme.darkDefault,
+      );
+    }
+    if (id == builtinQueryaLightId) {
+      return const ThemeLoadSuccess(
+        definition: builtinQueryaLightDefinition,
+        theme: QueryaTheme.lightDefault,
+      );
+    }
+
     final definition = _definitionById(id);
     if (definition == null) {
       return ThemeLoadFailure(
@@ -288,7 +348,9 @@ class ThemeController extends ChangeNotifier {
         await AppSettings.instance.setThemeImportPath(storedPath);
         await AppSettings.instance.setThemePreset(QueryaThemePreset.imported);
         await AppSettings.instance.setThemeMode(_themeMode);
-        _availableThemes = await _registryService.loadThemeDefinitions();
+        _availableThemes = _mergeBuiltinThemes(
+          await _registryService.loadThemeDefinitions(),
+        );
         _notifyThemeChanged();
         return result;
       case ThemeImportFailure():
@@ -330,7 +392,9 @@ class ThemeController extends ChangeNotifier {
       await AppSettings.instance.setThemePreset(_preset);
       await AppSettings.instance.setThemeMode(_themeMode);
     }
-    _availableThemes = await _registryService.loadThemeDefinitions();
+    _availableThemes = _mergeBuiltinThemes(
+      await _registryService.loadThemeDefinitions(),
+    );
     _notifyThemeChanged();
   }
 
@@ -344,7 +408,7 @@ class ThemeController extends ChangeNotifier {
     _userOverrides = const {};
     _importedThemeName = null;
     _themeAnimationEnabled = false;
-    _availableThemes = const [];
+    _availableThemes = List.unmodifiable(_builtinThemeDefinitions);
     _selectedThemeId = null;
     _selectedThemePath = null;
     _selectedThemeLoadError = null;
@@ -397,6 +461,30 @@ class ThemeController extends ChangeNotifier {
     _selectedThemePath = null;
     _selectedThemeLoadError = null;
     await AppSettings.instance.clearSelectedThemeRegistry();
+  }
+
+  Future<void> _applyBuiltinPreset(QueryaThemePreset preset) async {
+    await _clearRegistrySelection();
+    _preset = preset;
+    _themeMode = preset == QueryaThemePreset.queryaLight
+        ? ThemeMode.light
+        : ThemeMode.dark;
+    await AppSettings.instance.setThemePreset(preset);
+    await AppSettings.instance.setThemeMode(_themeMode);
+    _notifyThemeChanged();
+  }
+
+  List<ThemeDefinition> _mergeBuiltinThemes(List<ThemeDefinition> scanned) {
+    final merged = <ThemeDefinition>[..._builtinThemeDefinitions];
+    for (final definition in scanned) {
+      if (!_builtinThemeDefinitions.any((builtin) => builtin.id == definition.id)) {
+        merged.add(definition);
+      }
+    }
+    merged.sort(
+      (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+    );
+    return List.unmodifiable(merged);
   }
 
   ThemeDefinition? _definitionById(
