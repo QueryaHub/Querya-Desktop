@@ -579,13 +579,13 @@ flutter:
 
 ## Acceptance checklist
 
-- [ ] Querya custom JSON импортируется и применяется.
-- [ ] VS Code JSON/JSONC import продолжает работать.
-- [ ] 50+ тем в Preferences не вызывают overflow и заметные лаги.
-- [ ] Hover в списке не перестраивает весь app.
-- [ ] Повторное переключение на уже открытую тему мгновенное.
-- [ ] Сломанная выбранная тема не ломает запуск приложения.
-- [ ] Выбранная тема сохраняется после рестарта.
-- [ ] Window title bar синхронизирован с background/canvas темы.
-- [ ] `flutter analyze` clean.
-- [ ] `flutter test` green.
+- [x] Querya custom JSON импортируется и применяется.
+- [x] VS Code JSON/JSONC import продолжает работать.
+- [x] 50+ тем в Preferences не вызывают overflow и заметные лаги.
+- [x] Hover в списке не перестраивает весь app.
+- [x] Повторное переключение на уже открытую тему мгновенное.
+- [x] Сломанная выбранная тема не ломает запуск приложения.
+- [x] Выбранная тема сохраняется после рестарта.
+- [x] Window title bar синхронизирован с background/canvas темы.
+- [x] `flutter analyze` clean.
+- [x] `flutter test` green.

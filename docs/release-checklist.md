@@ -1,6 +1,7 @@
-# Pre-release checklist (toward 1.0)
+# Pre-release checklist (release **0.4.2**)
 
-Use this before tagging or running the **Release** workflow.
+Use this before tagging **`0.4.2`** or running the **Release** workflow.
+See [tags-and-releases.md](tags-and-releases.md) and [CHANGELOG.md](../CHANGELOG.md).
 
 ## Product smoke (manual)
 
@@ -32,7 +33,7 @@ Use **Preferences → Appearance** unless noted. Fixtures for copy/import tests 
 
 ## Versioning and release
 
-- [ ] `pubspec.yaml` `version` matches the release you intend to ship.
+- [ ] `pubspec.yaml` `version` is **`0.4.2+…`** (semver matches intended tag **`0.4.2`**).
 - [ ] **Tag** is placed on the **commit that includes all fixes** you want in binaries (a tag does not auto-include later commits; see [CONTRIBUTING.md](../CONTRIBUTING.md)).
 - [ ] Run the **Release** workflow from GitHub Actions (see [tags-and-releases.md](tags-and-releases.md)).
 - [ ] Verify **Linux** and **Windows** zip artifacts and `SHA256SUMS.txt` on the GitHub Release.
