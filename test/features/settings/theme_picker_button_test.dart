@@ -187,6 +187,124 @@ void main() {
     });
   });
 
+  group('ThemePickerButton large list', () {
+    Future<void> openMenu(WidgetTester tester) async {
+      await tester.tap(find.text('Theme 00'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('uses ListView.builder for 60 themes without overflow',
+        (tester) async {
+      final themes = _fakeThemes(60);
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: ThemePickerButton(
+              themes: themes,
+              selectedThemeId: 'theme-0',
+              onSelected: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await openMenu(tester);
+
+      expect(tester.takeException(), isNull);
+      final listView = tester.widget<material.ListView>(
+        find.byType(material.ListView),
+      );
+      final delegate = listView.childrenDelegate;
+      expect(delegate, isA<material.SliverChildBuilderDelegate>());
+      expect(
+        (delegate as material.SliverChildBuilderDelegate).childCount,
+        60,
+      );
+    });
+
+    testWidgets('builds only a visible subset of 60 theme rows', (tester) async {
+      final themes = _fakeThemes(60);
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: ThemePickerButton(
+              themes: themes,
+              selectedThemeId: 'theme-0',
+              onSelected: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await openMenu(tester);
+
+      var visibleCount = 0;
+      for (var index = 0; index < 60; index++) {
+        final label = 'Theme ${index.toString().padLeft(2, '0')}';
+        final row = find.descendant(
+          of: find.byType(material.ListView),
+          matching: find.text(label),
+        );
+        if (row.evaluate().isNotEmpty) visibleCount++;
+      }
+
+      expect(visibleCount, greaterThan(3));
+      expect(visibleCount, lessThan(60));
+      expect(
+        find.descendant(
+          of: find.byType(material.ListView),
+          matching: find.text('Theme 59'),
+        ),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('selects last theme from large list', (tester) async {
+      final themes = _fakeThemes(60);
+      String? picked;
+      var selectedId = 'theme-0';
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: material.StatefulBuilder(
+              builder: (context, setState) {
+                return ThemePickerButton(
+                  themes: themes,
+                  selectedThemeId: selectedId,
+                  onSelected: (id) {
+                    picked = id;
+                    setState(() => selectedId = id);
+                  },
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await openMenu(tester);
+
+      await tester.enterText(find.byType(material.TextField), 'Theme 59');
+      await tester.pump();
+
+      await tester.tap(
+        find.descendant(
+          of: find.byType(material.ListView),
+          matching: find.text('Theme 59'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(picked, 'theme-59');
+      expect(find.text('Theme 59'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
   group('ThemePickerButton search', () {
     Future<void> openMenu(WidgetTester tester) async {
       await tester.tap(find.text('Theme 00'));
