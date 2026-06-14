@@ -40,6 +40,7 @@ void main() {
     registry = ThemeRegistryService(
       userThemesDirectory: () async => themesDir,
       importedThemesDirectory: () async => importedDir,
+      bundledThemeAssetFiles: const [],
     );
   });
 
@@ -95,6 +96,7 @@ void main() {
         maxCacheEntries: 2,
         userThemesDirectory: () async => themesDir,
         importedThemesDirectory: () async => importedDir,
+        bundledThemeAssetFiles: const [],
       );
 
       await _copyFixture(
