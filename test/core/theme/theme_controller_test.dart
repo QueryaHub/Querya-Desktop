@@ -244,12 +244,71 @@ void main() {
       await c.load();
 
       expect(c.activeTheme, QueryaTheme.darkDefault);
-      expect(c.selectedThemeLoadError, isNotNull);
+      expect(
+        c.selectedThemeLoadError,
+        ThemeController.selectedThemeStartupFallbackMessage,
+      );
       expect(await AppSettings.instance.getSelectedThemeId(), 'missing-theme');
       expect(
         await AppSettings.instance.getThemePreset(),
         QueryaThemePreset.queryaLight,
       );
+    });
+
+    test('missing theme file on startup falls back to Querya Dark', () async {
+      final c = ThemeController.instance;
+      final themeFile = File(p.join(themesDir.path, 'querya_custom_dark.json'));
+      await _copyFixture('querya_custom_dark.json', themeFile);
+      await c.load();
+      await c.setThemeById('fixture-custom-dark');
+      await themeFile.delete();
+
+      await c.load();
+
+      expect(c.activeTheme, QueryaTheme.darkDefault);
+      expect(
+        c.selectedThemeLoadError,
+        ThemeController.selectedThemeStartupFallbackMessage,
+      );
+      expect(c.selectedThemeId, 'fixture-custom-dark');
+      expect(await AppSettings.instance.getSelectedThemeId(), 'fixture-custom-dark');
+    });
+
+    test('invalid theme file skipped on startup falls back to Querya Dark',
+        () async {
+      final c = ThemeController.instance;
+      final themeFile = File(p.join(themesDir.path, 'broken-theme.json'));
+      await _copyFixture('querya_custom_invalid_missing_id.json', themeFile);
+      await AppSettings.instance.setSelectedThemeId('broken-theme');
+      await AppSettings.instance.setSelectedThemeSource('filesystem');
+      await AppSettings.instance.setSelectedThemePath(themeFile.path);
+
+      await c.load();
+
+      expect(c.activeTheme, QueryaTheme.darkDefault);
+      expect(
+        c.selectedThemeLoadError,
+        ThemeController.selectedThemeStartupFallbackMessage,
+      );
+      expect(await AppSettings.instance.getSelectedThemeId(), 'broken-theme');
+    });
+
+    test('valid theme selection after startup failure clears error', () async {
+      final c = ThemeController.instance;
+      await AppSettings.instance.setSelectedThemeId('missing-theme');
+      await AppSettings.instance.setSelectedThemeSource('filesystem');
+      await c.load();
+      expect(c.selectedThemeLoadError, isNotNull);
+
+      await _copyFixture(
+        'querya_custom_dark.json',
+        File(p.join(themesDir.path, 'querya_custom_dark.json')),
+      );
+      await c.loadAvailableThemes();
+      await c.setThemeById('fixture-custom-dark');
+
+      expect(c.selectedThemeLoadError, isNull);
+      expect(c.activeTheme.colorScheme.primary, parseQueryaThemeColor('#38BDF8'));
     });
 
     test('setPreset clears registry selection', () async {
