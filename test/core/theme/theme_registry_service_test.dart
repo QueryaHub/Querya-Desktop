@@ -1,9 +1,12 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:querya_desktop/core/theme/parser/color_parser.dart';
 import 'package:querya_desktop/core/theme/theme_definition.dart';
+import 'package:querya_desktop/core/theme/theme_load_result.dart';
 import 'package:querya_desktop/core/theme/theme_registry_service.dart';
 
 class _FakePathProvider extends PathProviderPlatform {
@@ -153,6 +156,72 @@ void main() {
       final definitions = await registry.loadThemeDefinitions();
 
       expect(definitions, hasLength(1));
+    });
+  });
+
+  group('ThemeRegistryService.loadTheme', () {
+    test('loads custom theme successfully', () async {
+      await _copyFixture(
+        'querya_custom_dark.json',
+        File(p.join(themesDir.path, 'querya_custom_dark.json')),
+      );
+
+      final definition = (await registry.loadThemeDefinitions()).single;
+      final result = await registry.loadTheme(definition);
+
+      expect(result, isA<ThemeLoadSuccess>());
+      final success = result as ThemeLoadSuccess;
+      expect(success.definition, definition);
+      expect(success.theme.brightness, Brightness.dark);
+      expect(success.theme.colorScheme.primary, parseQueryaThemeColor('#38BDF8'));
+    });
+
+    test('loads VS Code theme successfully', () async {
+      await _copyFixture(
+        'dark_subset.json',
+        File(p.join(themesDir.path, 'dark_subset.json')),
+      );
+
+      final definition = (await registry.loadThemeDefinitions()).single;
+      final result = await registry.loadTheme(definition);
+
+      expect(result, isA<ThemeLoadSuccess>());
+      final success = result as ThemeLoadSuccess;
+      expect(success.theme.editor.background, parseQueryaThemeColor('#1e1e1e'));
+    });
+
+    test('returns failure for deleted file', () async {
+      const definition = ThemeDefinition(
+        id: 'missing-theme',
+        name: 'Missing Theme',
+        source: ThemeSource.filesystem,
+        format: ThemeFormat.queryaCustom,
+        isDark: true,
+        path: '/no/such/theme.json',
+      );
+
+      final result = await registry.loadTheme(definition);
+
+      expect(result, isA<ThemeLoadFailure>());
+      expect((result as ThemeLoadFailure).message, 'Theme file not found.');
+    });
+
+    test('returns failure for invalid custom file', () async {
+      final file = File(p.join(themesDir.path, 'broken.json'));
+      await _copyFixture('querya_custom_invalid_missing_id.json', file);
+      final definition = ThemeDefinition(
+        id: 'broken',
+        name: 'Broken',
+        source: ThemeSource.filesystem,
+        format: ThemeFormat.queryaCustom,
+        isDark: true,
+        path: file.path,
+      );
+
+      final result = await registry.loadTheme(definition);
+
+      expect(result, isA<ThemeLoadFailure>());
+      expect((result as ThemeLoadFailure).message, contains('id'));
     });
   });
 }
