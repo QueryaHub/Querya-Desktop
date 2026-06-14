@@ -4,7 +4,7 @@ Querya supports two theme file formats:
 
 | Format | Root marker | Import | Docs |
 |--------|-------------|--------|------|
-| **Querya custom** | `"schema": "querya.theme.v1"` | Planned (theme registry) | this document |
+| **Querya custom** | `"schema": "querya.theme.v1"` | **Supported** — registry / themes folder | this document |
 | **VS Code** | `"colors"` object (no `schema`) | **Supported today** | [theme-import.md](theme-import.md) |
 
 VS Code JSON/JSONC import remains fully supported. The custom format is a first-class
@@ -261,12 +261,27 @@ Only required fields; all colors come from Querya Dark defaults:
 | Detection | No `schema`; has `colors` | `"schema": "querya.theme.v1"` |
 | UI colors | VS Code keys (`editor.background`, `sideBar.background`, …) | `shadcn_colors` + `editor_colors` Querya keys |
 | Stable id | File name only | Required `id` field |
-| Import today | **Yes** — Preferences → Import theme | Planned via theme registry |
+| Import today | **Yes** — themes folder or Preferences → Import theme | **Yes** — themes folder or Preferences → Import theme |
 | Syntax tokens | `tokenColors` | `tokenColors` (same) |
 
 To convert a VS Code theme manually, map keys using
 [theme-import.md](theme-import.md) and place workbench values into `editor_colors`;
 derive shadcn tokens from your palette or leave `{}` to use preset defaults.
+
+## Installing custom themes
+
+1. Create a `.json` file with `"schema": "querya.theme.v1"` (see examples above).
+2. Copy it into the app support **themes folder** (`{appSupport}/themes/`). See
+   [theme-import.md](theme-import.md) for platform-specific paths and the
+   **Open themes folder** button in Preferences.
+3. In **Preferences → Appearance**, click **Refresh themes** and select your theme.
+
+The registry scans `.json` and `.jsonc` files on refresh; there is no live folder watcher.
+Invalid files are skipped (logged in debug builds). Required fields: `schema`, `id`,
+`name`, `type`, `shadcn_colors`, `editor_colors` (the color maps may be empty `{}`).
+
+Built-in bundled themes (under `assets/themes/`) ship with the app and do not require
+manual installation.
 
 ## Related docs
 

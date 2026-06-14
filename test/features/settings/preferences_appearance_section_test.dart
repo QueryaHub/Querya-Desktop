@@ -120,7 +120,20 @@ void main() {
 
       expect(find.text('Import theme…'), findsOneWidget);
       expect(find.text('Refresh themes'), findsOneWidget);
+      expect(find.text('Open themes folder'), findsOneWidget);
       expect(find.text('Reset appearance'), findsOneWidget);
+    });
+
+    testWidgets('shows themes folder hint without live reload promise',
+        (tester) async {
+      await pumpSection(tester);
+
+      expect(
+        find.textContaining('Themes are loaded from the app support themes folder'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('not watched automatically'), findsOneWidget);
+      expect(find.textContaining('live reload'), findsNothing);
     });
   });
 }
