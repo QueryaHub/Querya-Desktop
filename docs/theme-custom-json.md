@@ -283,6 +283,17 @@ Invalid files are skipped (logged in debug builds). Required fields: `schema`, `
 Built-in bundled themes (under `assets/themes/`) ship with the app and do not require
 manual installation.
 
+## Troubleshooting
+
+| Symptom | Likely cause | What to do |
+|---------|----------------|------------|
+| Theme file not in picker | Invalid JSON, missing required fields, or wrong extension | Fix `schema`, `id`, `name`, `type`, `shadcn_colors`, `editor_colors`; use `.json` or `.jsonc`; click **Refresh themes**. In debug builds, skipped files log to the console. |
+| Import dialog reports an error | Parse failure or empty VS Code `colors` | Open the file in an editor; validate JSON/JSONC; for VS Code format ensure a non-empty `colors` object. |
+| *Selected theme failed to load. Using Querya Dark.* | Persisted theme id points to a missing or broken file | Restore the file under `themes/`, or pick another theme in Preferences. Settings are kept so you can fix the file and **Refresh themes**. |
+| Colors look wrong or default | Invalid hex for a key | Invalid optional colors are **skipped** (preset fallback used). Check `#RRGGBB` / `#RRGGBBAA` formats in [Color string formats](#color-string-formats). |
+| Duplicate theme names in picker | Same `id` with different content imported twice | Registry suffixes ids (`my-theme-2`). Rename files or ids to avoid confusion. |
+| Dropped file not visible | No folder watcher | Use **Refresh themes** after copying into `themes/` (restart not required). |
+
 ## Related docs
 
 - [Theme import (VS Code)](theme-import.md)
