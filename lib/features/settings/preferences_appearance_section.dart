@@ -94,6 +94,10 @@ class _PreferencesAppearanceSectionState
     if (mounted) setState(() => _importError = null);
   }
 
+  Future<void> _refreshThemes() async {
+    await _controller.loadAvailableThemes();
+  }
+
   Future<void> _setThemeAnimation(bool enabled) async {
     await _controller.setThemeAnimationEnabled(enabled);
   }
@@ -102,6 +106,7 @@ class _PreferencesAppearanceSectionState
   material.Widget build(material.BuildContext context) {
     final c = _controller;
     final themes = c.availableThemes;
+    final refreshingThemes = c.isLoadingAvailableThemes;
 
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.start,
@@ -138,6 +143,7 @@ class _PreferencesAppearanceSectionState
             themes: themes,
             selectedThemeId: c.effectiveSelectedThemeId,
             expandToParent: true,
+            isLoading: refreshingThemes,
             onSelected: (id) => unawaited(_setThemeById(id)),
             onPreviewTheme: _previewThemeById,
           ),
@@ -195,6 +201,14 @@ class _PreferencesAppearanceSectionState
               onPressed:
                   _importing ? null : () => unawaited(_pickAndImportTheme()),
               child: material.Text(_importing ? 'Importing…' : 'Import theme…'),
+            ),
+            OutlineButton(
+              onPressed: (_importing || refreshingThemes)
+                  ? null
+                  : () => unawaited(_refreshThemes()),
+              child: material.Text(
+                refreshingThemes ? 'Refreshing…' : 'Refresh themes',
+              ),
             ),
             OutlineButton(
               onPressed: () => unawaited(_resetAppearance()),

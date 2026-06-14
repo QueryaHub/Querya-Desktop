@@ -63,6 +63,7 @@ class ThemeController extends ChangeNotifier {
   String? _selectedThemeLoadError;
   QueryaTheme? _registryTheme;
   bool _registrySelectionFailed = false;
+  bool _isLoadingAvailableThemes = false;
 
   QueryaTheme? _cachedLightTheme;
   QueryaTheme? _cachedDarkTheme;
@@ -86,6 +87,9 @@ class ThemeController extends ChangeNotifier {
   String? get importedThemeName => _importedThemeName;
 
   List<ThemeDefinition> get availableThemes => List.unmodifiable(_availableThemes);
+
+  /// True while [loadAvailableThemes] is scanning the registry.
+  bool get isLoadingAvailableThemes => _isLoadingAvailableThemes;
 
   String? get selectedThemeId => _selectedThemeId;
 
@@ -215,10 +219,40 @@ class ThemeController extends ChangeNotifier {
   }
 
   Future<void> loadAvailableThemes() async {
-    _availableThemes = _mergeBuiltinThemes(
-      await _registryService.loadThemeDefinitions(),
-    );
+    if (_isLoadingAvailableThemes) return;
+
+    _isLoadingAvailableThemes = true;
     notifyListeners();
+
+    try {
+      final scanned = await _registryService.loadThemeDefinitions();
+      _availableThemes = _mergeBuiltinThemes(scanned);
+      _syncSelectedThemeAfterRefresh();
+    } on Object {
+      // Registry scan skips broken files per entry; keep the prior list on failure.
+    } finally {
+      _isLoadingAvailableThemes = false;
+      notifyListeners();
+    }
+  }
+
+  void _syncSelectedThemeAfterRefresh() {
+    final selectedId = _selectedThemeId;
+    if (selectedId == null) return;
+
+    final stillAvailable = _definitionById(
+      selectedId,
+      path: _selectedThemePath,
+    );
+    if (stillAvailable == null) {
+      _selectedThemeLoadError =
+          'Selected theme "$selectedId" is not available.';
+      return;
+    }
+
+    if (_registryTheme != null) {
+      _selectedThemeLoadError = null;
+    }
   }
 
   Future<void> setThemeById(String id) async {
