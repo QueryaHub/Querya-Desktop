@@ -96,6 +96,18 @@ duplicate ids get a numeric suffix). Themes picked up from disk use the file bas
 Legacy single-file import (`themes/imported.json` under older builds) is still migrated
 into the registry on load when present.
 
+## Troubleshooting
+
+| Symptom | Likely cause | What to do |
+|---------|----------------|------------|
+| Theme missing from picker after copy | Scan not run or file skipped as invalid | Click **Refresh themes**; verify `.json`/`.jsonc` and valid root object. Debug builds log skipped paths. |
+| Import fails immediately | Unsupported file or empty `colors` (VS Code) | Use VS Code theme JSON with a `colors` section, or Querya custom JSON per [theme-custom-json.md](theme-custom-json.md). |
+| JSONC import fails | Trailing commas/comments in strict JSON tool | Querya strips JSONC on import; ensure the file still has a single root object after stripping. |
+| *Selected theme failed to load. Using Querya Dark.* on startup | Selected file deleted or corrupted | Replace or remove the file; select a working theme. See [theme-custom-json.md](theme-custom-json.md#troubleshooting). |
+| Picker slow with many themes | Large registry list | Expected: picker uses `ListView.builder` and search; report regressions if opening Preferences lags with 50+ themes. |
+| SQL colors unchanged | Theme has no `tokenColors` | Add VS Code-style `tokenColors` to the file; only imported/registry themes with rules affect syntax highlighting. |
+| Title bar wrong color | Window chrome not synced | Switch theme again; file an issue if title bar stays on preset colors with a custom registry theme active. |
+
 ## User overrides (#45)
 
 User customizations are stored as VS Code keys → hex strings in
