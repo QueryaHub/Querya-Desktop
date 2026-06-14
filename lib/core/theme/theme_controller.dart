@@ -459,7 +459,9 @@ class ThemeController extends ChangeNotifier {
     _userOverrides = const {};
     _importedThemeName = null;
     _themeAnimationEnabled = false;
-    _availableThemes = List.unmodifiable(_builtinThemeDefinitions);
+    _availableThemes = _mergeBuiltinThemes(
+      await _registryService.loadThemeDefinitions(),
+    );
     _selectedThemeId = null;
     _selectedThemePath = null;
     _selectedThemeLoadError = null;

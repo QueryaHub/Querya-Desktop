@@ -44,6 +44,7 @@ void main() {
     registry = ThemeRegistryService(
       userThemesDirectory: () async => themesDir,
       importedThemesDirectory: () async => importedDir,
+      bundledThemeAssetFiles: const [],
     );
   });
 

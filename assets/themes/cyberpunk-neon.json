@@ -1,0 +1,96 @@
+{
+  "name": "Querya Cyberpunk Neon",
+  "type": "dark",
+  "colors": {
+    "activityBar.background": "#050508",
+    "statusBar.background": "#050508",
+    "sideBar.background": "#0c0820",
+    "sideBar.foreground": "#8b7cf8",
+    "tab.activeBackground": "#14102a",
+    "panel.background": "#14102a",
+    "input.background": "#14102a",
+    "editor.background": "#0a0a14",
+    "editor.foreground": "#e8f4ff",
+    "editor.selectionBackground": "#ff2a6d44",
+    "editorLineNumber.foreground": "#4a3f7a",
+    "editorBracketMatch.background": "#00f5ff33",
+    "editorWidget.border": "#00f5ff66",
+    "focusBorder": "#00f5ff",
+    "list.hoverBackground": "#ff2a6d22",
+    "gitDecoration.modifiedResourceForeground": "#fcee09",
+    "gitDecoration.untrackedResourceForeground": "#39ff14"
+  },
+  "tokenColors": [
+    {
+      "name": "Comments",
+      "scope": ["comment", "comment.line", "comment.block", "punctuation.definition.comment"],
+      "settings": {
+        "foreground": "#5c4d8a",
+        "fontStyle": "italic"
+      }
+    },
+    {
+      "name": "Keywords",
+      "scope": [
+        "keyword",
+        "keyword.control",
+        "keyword.operator.logical",
+        "storage.type",
+        "storage.modifier"
+      ],
+      "settings": {
+        "foreground": "#ff2a6d",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Strings",
+      "scope": ["string", "string.quoted.single", "string.quoted.double"],
+      "settings": {
+        "foreground": "#fcee09"
+      }
+    },
+    {
+      "name": "Numbers",
+      "scope": ["constant.numeric", "constant.language"],
+      "settings": {
+        "foreground": "#bd00ff"
+      }
+    },
+    {
+      "name": "Functions",
+      "scope": ["entity.name.function", "support.function"],
+      "settings": {
+        "foreground": "#00f5ff"
+      }
+    },
+    {
+      "name": "Types / classes",
+      "scope": ["entity.name.type", "support.type"],
+      "settings": {
+        "foreground": "#8b7cf8"
+      }
+    },
+    {
+      "name": "Variables",
+      "scope": ["variable", "variable.other"],
+      "settings": {
+        "foreground": "#e8f4ff"
+      }
+    },
+    {
+      "name": "JSON keys",
+      "scope": ["support.type.property-name.json"],
+      "settings": {
+        "foreground": "#00f5ff"
+      }
+    },
+    {
+      "name": "JSON strings",
+      "scope": ["string.quoted.double.json"],
+      "settings": {
+        "foreground": "#39ff14"
+      }
+    }
+  ]
+}
