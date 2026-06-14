@@ -14,6 +14,11 @@ import 'package:querya_desktop/features/settings/theme_picker_button.dart';
 
 import '../../support/querya_theme_test_shell.dart';
 
+Future<String> _fixtureAssetLoader(String assetPath) async {
+  final fileName = p.basename(assetPath);
+  return File(p.join('test/fixtures/themes', fileName)).readAsString();
+}
+
 class _FakePathProvider extends PathProviderPlatform {
   _FakePathProvider(this._root);
   final String _root;
@@ -50,6 +55,7 @@ void main() {
     registry = ThemeRegistryService(
       userThemesDirectory: () async => themesDir,
       importedThemesDirectory: () async => importedDir,
+      assetLoader: _fixtureAssetLoader,
     );
     ThemeController.instance.setRegistryServiceForTest(registry);
     await ThemeController.instance.load();
@@ -67,6 +73,7 @@ void main() {
       ThemeRegistryService(
         userThemesDirectory: () async => themesDir,
         importedThemesDirectory: () async => importedDir,
+        assetLoader: _fixtureAssetLoader,
       ),
     );
     await AppSettings.instance.clearThemeSettings();

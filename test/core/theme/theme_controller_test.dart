@@ -50,6 +50,11 @@ class _GatedRegistryService extends ThemeRegistryService {
   }
 }
 
+Future<String> _fixtureAssetLoader(String assetPath) async {
+  final fileName = p.basename(assetPath);
+  return File(p.join('test/fixtures/themes', fileName)).readAsString();
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -72,6 +77,7 @@ void main() {
     registry = ThemeRegistryService(
       userThemesDirectory: () async => themesDir,
       importedThemesDirectory: () async => importedDir,
+      assetLoader: _fixtureAssetLoader,
     );
     ThemeController.instance.setRegistryServiceForTest(registry);
   });
@@ -263,6 +269,20 @@ void main() {
       expect(await AppSettings.instance.getSelectedThemeId(), isNull);
     });
 
+    test('setThemeById applies built-in asset theme from registry', () async {
+      final c = ThemeController.instance;
+      await c.load();
+
+      await c.setThemeById('cyberpunk-neon');
+
+      expect(c.selectedThemeId, 'cyberpunk-neon');
+      expect(c.selectedThemeLoadError, isNull);
+      expect(c.activeTheme.brightness, Brightness.dark);
+      expect(c.activeTheme.editor.background, parseQueryaThemeColor('#0a0a14'));
+      expect(await AppSettings.instance.getSelectedThemeId(), 'cyberpunk-neon');
+      expect(await AppSettings.instance.getSelectedThemeSource(), 'builtin');
+    });
+
     test('setThemeById applies built-in Querya Light preset', () async {
       final c = ThemeController.instance;
       await c.load();
@@ -296,6 +316,7 @@ void main() {
       expect(c.availableThemes.map((theme) => theme.id), containsAll([
         ThemeController.builtinQueryaDarkId,
         ThemeController.builtinQueryaLightId,
+        'cyberpunk-neon',
       ]));
       expect(c.effectiveSelectedThemeId, ThemeController.builtinQueryaDarkId);
     });
