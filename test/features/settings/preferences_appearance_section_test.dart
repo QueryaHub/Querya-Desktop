@@ -63,12 +63,17 @@ void main() {
   });
 
   tearDown(() async {
+    ThemeController.instance.setRegistryServiceForTest(
+      ThemeRegistryService(
+        userThemesDirectory: () async => themesDir,
+        importedThemesDirectory: () async => importedDir,
+      ),
+    );
     await AppSettings.instance.clearThemeSettings();
     await ThemeImportService.deletePersistedImport();
     if (await themesDir.exists()) {
       await themesDir.delete(recursive: true);
     }
-    ThemeController.instance.setRegistryServiceForTest(ThemeRegistryService());
     await ThemeController.instance.load();
   });
 
@@ -107,6 +112,7 @@ void main() {
       await pumpSection(tester);
 
       expect(find.text('Import theme…'), findsOneWidget);
+      expect(find.text('Refresh themes'), findsOneWidget);
       expect(find.text('Reset appearance'), findsOneWidget);
     });
   });
