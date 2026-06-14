@@ -69,4 +69,12 @@ void main() {
         await ThemeImportService.importFromPath('/no/such/theme.json');
     expect(result, isA<ThemeImportFailure>());
   });
+
+  test('slugifyThemeName produces filesystem-safe slug', () {
+    expect(
+      ThemeImportService.slugifyThemeName('Fixture Dark Subset'),
+      'fixture-dark-subset',
+    );
+    expect(ThemeImportService.safeThemeFileBase('My Theme!'), 'my-theme');
+  });
 }
