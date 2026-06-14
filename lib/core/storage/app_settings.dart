@@ -106,6 +106,9 @@ abstract final class AppSettingsKeys {
   static const themeImportPath = 'theme_import_path';
   static const themeImportName = 'theme_import_name';
   static const themeImportedColorsJson = 'theme_imported_colors_json';
+  static const themeSelectedId = 'theme_selected_id';
+  static const themeSelectedSource = 'theme_selected_source';
+  static const themeSelectedPath = 'theme_selected_path';
   static const themeAnimationEnabled = 'theme_animation_enabled';
   static const uiScale = 'ui_scale';
 }
@@ -327,6 +330,68 @@ class AppSettings {
     AppSettingsRevision.bump();
   }
 
+  Future<String?> getSelectedThemeId() async {
+    final v = await LocalDb.instance.getAppSetting(AppSettingsKeys.themeSelectedId);
+    if (v == null || v.isEmpty) return null;
+    return v;
+  }
+
+  Future<void> setSelectedThemeId(String? id) async {
+    if (id == null || id.isEmpty) {
+      await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeSelectedId);
+    } else {
+      await LocalDb.instance.setAppSetting(AppSettingsKeys.themeSelectedId, id);
+    }
+    AppSettingsRevision.bump();
+  }
+
+  Future<String?> getSelectedThemeSource() async {
+    final v =
+        await LocalDb.instance.getAppSetting(AppSettingsKeys.themeSelectedSource);
+    if (v == null || v.isEmpty) return null;
+    return v;
+  }
+
+  Future<void> setSelectedThemeSource(String? source) async {
+    if (source == null || source.isEmpty) {
+      await LocalDb.instance.deleteAppSetting(
+        AppSettingsKeys.themeSelectedSource,
+      );
+    } else {
+      await LocalDb.instance.setAppSetting(
+        AppSettingsKeys.themeSelectedSource,
+        source,
+      );
+    }
+    AppSettingsRevision.bump();
+  }
+
+  Future<String?> getSelectedThemePath() async {
+    final v =
+        await LocalDb.instance.getAppSetting(AppSettingsKeys.themeSelectedPath);
+    if (v == null || v.isEmpty) return null;
+    return v;
+  }
+
+  Future<void> setSelectedThemePath(String? path) async {
+    if (path == null || path.isEmpty) {
+      await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeSelectedPath);
+    } else {
+      await LocalDb.instance.setAppSetting(
+        AppSettingsKeys.themeSelectedPath,
+        path,
+      );
+    }
+    AppSettingsRevision.bump();
+  }
+
+  Future<void> clearSelectedThemeRegistry() async {
+    await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeSelectedId);
+    await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeSelectedSource);
+    await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeSelectedPath);
+    AppSettingsRevision.bump();
+  }
+
   Future<Map<String, String>> getThemeImportedColors() async {
     final v = await LocalDb.instance.getAppSetting(
       AppSettingsKeys.themeImportedColorsJson,
@@ -453,6 +518,9 @@ class AppSettings {
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themePreset);
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeOverridesJson);
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeAnimationEnabled);
+    await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeSelectedId);
+    await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeSelectedSource);
+    await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeSelectedPath);
     await deleteThemeImportKeys();
     AppSettingsRevision.bump();
   }
