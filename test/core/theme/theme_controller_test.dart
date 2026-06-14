@@ -359,5 +359,21 @@ void main() {
 
       expect(c.isLoadingAvailableThemes, isFalse);
     });
+
+    test('importRegistryThemeFile adds theme to registry and selects it', () async {
+      final c = ThemeController.instance;
+      await c.load();
+      final source = File(p.join('test/fixtures/themes', 'querya_custom_dark.json'));
+
+      final result = await c.importRegistryThemeFile(source.path);
+
+      expect(result, isA<ThemeDefinitionImportSuccess>());
+      expect(c.selectedThemeId, 'fixture-custom-dark');
+      expect(
+        c.availableThemes.map((theme) => theme.id),
+        contains('fixture-custom-dark'),
+      );
+      expect(c.activeTheme.colorScheme.primary, parseQueryaThemeColor('#38BDF8'));
+    });
   });
 }
