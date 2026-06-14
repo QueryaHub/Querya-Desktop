@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
+import '../storage/app_settings.dart';
 import 'parser/jsonc_preprocessor.dart';
 import 'parser/querya_theme_from_manifest.dart';
 import 'parser/querya_theme_from_vscode.dart';
@@ -11,6 +12,7 @@ import 'parser/querya_theme_manifest.dart';
 import 'parser/vscode_theme_manifest.dart';
 import 'querya_theme.dart';
 import 'theme_definition.dart';
+import 'theme_import_service.dart';
 import 'theme_load_result.dart';
 import 'theme_paths.dart';
 
@@ -56,6 +58,16 @@ class ThemeRegistryService {
       ThemeSource.imported,
       definitions,
     );
+
+    final legacy = await _legacyImportedDefinition();
+    if (legacy != null) {
+      definitions.removeWhere(
+        (definition) =>
+            definition.path == legacy.path &&
+            definition.source != ThemeSource.legacyImported,
+      );
+      definitions.add(legacy);
+    }
 
     definitions.sort(
       (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
@@ -138,6 +150,75 @@ class ThemeRegistryService {
     return buildQueryaThemeFromVsCodeManifest(manifest);
   }
 
+  Future<ThemeDefinition?> _legacyImportedDefinition() async {
+    try {
+      final settings = AppSettings.instance;
+      final importedColors = await settings.getThemeImportedColors();
+      final importName = await settings.getThemeImportName();
+      final importPath = await settings.getThemeImportPath();
+      final storedFile = await ThemeImportService.persistedImportFile();
+      final hasStoredFile = await storedFile.exists();
+
+      final hasLegacyData = importedColors.isNotEmpty ||
+          (importName != null && importName.isNotEmpty) ||
+          (importPath != null && importPath.isNotEmpty) ||
+          hasStoredFile;
+      if (!hasLegacyData) return null;
+
+      final path = _firstNonEmpty([
+        importPath,
+        if (hasStoredFile) storedFile.path,
+        storedFile.path,
+      ]);
+      if (path == null) return null;
+
+      final name = (importName != null && importName.isNotEmpty)
+          ? importName
+          : 'Imported theme';
+
+      var isDark = true;
+      DateTime? lastModified;
+      String? contentHash;
+
+      final file = File(path);
+      if (await file.exists()) {
+        try {
+          final stat = await file.stat();
+          lastModified = stat.modified;
+          final raw = await file.readAsString();
+          contentHash = _contentHash(raw);
+          final manifest = VsCodeThemeManifest.fromJsonString(raw);
+          isDark = manifest.isDark || !manifest.isLight;
+        } on Object catch (e) {
+          _logScanError(path, e);
+        }
+      }
+
+      return ThemeDefinition(
+        id: ThemeImportService.legacyImportedThemeId,
+        name: name,
+        source: ThemeSource.legacyImported,
+        format: ThemeFormat.vscode,
+        isDark: isDark,
+        path: path,
+        lastModified: lastModified,
+        contentHash: contentHash,
+      );
+    } on Object catch (e) {
+      if (kDebugMode) {
+        debugPrint('ThemeRegistryService: legacy import skipped ($e)');
+      }
+      return null;
+    }
+  }
+
+  String? _firstNonEmpty(List<String?> values) {
+    for (final value in values) {
+      if (value != null && value.isNotEmpty) return value;
+    }
+    return null;
+  }
+
   Future<void> _scanDirectory(
     Directory directory,
     ThemeSource source,
@@ -151,6 +232,10 @@ class ThemeRegistryService {
         continue;
       }
       if (entity is! File) continue;
+
+      if (p.basename(entity.path) == ThemeImportService.storedFileName) {
+        continue;
+      }
 
       final ext = p.extension(entity.path).toLowerCase();
       if (ext != '.json' && ext != '.jsonc') continue;
