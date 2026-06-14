@@ -5,7 +5,7 @@ import 'package:flutter/material.dart' as material
     show
         Scaffold,
         Container,
-        MainAxisSize,
+        GestureDetector,
         MouseRegion,
         SystemMouseCursors,
         HitTestBehavior,

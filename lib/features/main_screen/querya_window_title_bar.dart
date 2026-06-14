@@ -1,7 +1,4 @@
-import 'dart:ui' show Color;
-
 import 'package:bitsdojo_window/bitsdojo_window.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' as material
     show
         BuildContext,
