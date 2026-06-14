@@ -360,6 +360,23 @@ class ThemeController extends ChangeNotifier {
     _notifyThemeChanged();
   }
 
+  /// Copies a theme into the user themes directory and activates it.
+  Future<ThemeDefinitionImportResult> importRegistryThemeFile(
+    String path,
+  ) async {
+    final result = await _registryService.importThemeFile(path);
+    switch (result) {
+      case ThemeDefinitionImportSuccess(:final definition):
+        _availableThemes = _mergeBuiltinThemes(
+          await _registryService.loadThemeDefinitions(),
+        );
+        await setThemeById(definition.id);
+      case ThemeDefinitionImportFailure():
+        notifyListeners();
+    }
+    return result;
+  }
+
   /// Parses a VS Code theme file, persists it, and activates the imported preset.
   Future<ThemeImportResult> importThemeFromFile(String path) async {
     final result = await ThemeImportService.importFromPath(path);
