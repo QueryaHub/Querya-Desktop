@@ -20,6 +20,10 @@ class ThemeController extends ChangeNotifier {
   static const String builtinQueryaDarkId = 'querya-dark';
   static const String builtinQueryaLightId = 'querya-light';
 
+  /// Shown in Preferences when persisted registry selection cannot be restored.
+  static const String selectedThemeStartupFallbackMessage =
+      'Selected theme failed to load. Using Querya Dark.';
+
   static const ThemeDefinition builtinQueryaDarkDefinition = ThemeDefinition(
     id: builtinQueryaDarkId,
     name: 'Querya Dark',
@@ -245,14 +249,20 @@ class ThemeController extends ChangeNotifier {
       path: _selectedThemePath,
     );
     if (stillAvailable == null) {
-      _selectedThemeLoadError =
-          'Selected theme "$selectedId" is not available.';
+      _markRegistrySelectionFailed();
       return;
     }
 
     if (_registryTheme != null) {
       _selectedThemeLoadError = null;
+      _registrySelectionFailed = false;
     }
+  }
+
+  void _markRegistrySelectionFailed() {
+    _registryTheme = null;
+    _registrySelectionFailed = true;
+    _selectedThemeLoadError = selectedThemeStartupFallbackMessage;
   }
 
   Future<void> setThemeById(String id) async {
@@ -486,9 +496,7 @@ class ThemeController extends ChangeNotifier {
       path: _selectedThemePath,
     );
     if (definition == null) {
-      _registrySelectionFailed = true;
-      _selectedThemeLoadError =
-          'Selected theme "${_selectedThemeId!}" is not available.';
+      _markRegistrySelectionFailed();
       return;
     }
 
@@ -498,12 +506,13 @@ class ThemeController extends ChangeNotifier {
         _registryTheme = theme;
         _selectedThemeId = definition.id;
         _selectedThemePath = definition.path;
+        _registrySelectionFailed = false;
+        _selectedThemeLoadError = null;
         _themeMode = theme.brightness == Brightness.light
             ? ThemeMode.light
             : ThemeMode.dark;
-      case ThemeLoadFailure(:final message):
-        _registrySelectionFailed = true;
-        _selectedThemeLoadError = message;
+      case ThemeLoadFailure():
+        _markRegistrySelectionFailed();
     }
   }
 
