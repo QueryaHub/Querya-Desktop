@@ -2,9 +2,11 @@ import 'dart:async' show unawaited;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/platform/open_directory.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:querya_desktop/core/theme/theme_import_service.dart';
 import 'package:querya_desktop/core/theme/theme_load_result.dart';
+import 'package:querya_desktop/core/theme/theme_paths.dart';
 import 'package:querya_desktop/features/settings/preferences_controls.dart';
 import 'package:querya_desktop/features/settings/theme_picker_button.dart';
 import 'package:querya_desktop/features/settings/theme_preview_card.dart';
@@ -23,7 +25,9 @@ class _PreferencesAppearanceSectionState
     extends material.State<PreferencesAppearanceSection> {
   final _controller = ThemeController.instance;
   String? _importError;
+  String? _folderOpenError;
   bool _importing = false;
+  bool _openingThemesFolder = false;
 
   @override
   void initState() {
@@ -98,6 +102,25 @@ class _PreferencesAppearanceSectionState
     await _controller.loadAvailableThemes();
   }
 
+  Future<void> _openThemesFolder() async {
+    setState(() {
+      _openingThemesFolder = true;
+      _folderOpenError = null;
+    });
+    try {
+      final dir = await ThemePaths.ensureUserThemesDirectory();
+      final opened = await openDirectoryInFileManager(dir.path);
+      if (!mounted) return;
+      if (!opened) {
+        setState(() => _folderOpenError = 'Could not open themes folder.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _openingThemesFolder = false);
+      }
+    }
+  }
+
   Future<void> _setThemeAnimation(bool enabled) async {
     await _controller.setThemeAnimationEnabled(enabled);
   }
@@ -163,6 +186,16 @@ class _PreferencesAppearanceSectionState
             ),
           ),
         ],
+        const material.SizedBox(height: 8),
+        const material.Padding(
+          padding: material.EdgeInsets.only(left: kPreferencesLabelWidth + 12),
+          child: PreferencesHint(
+            'Themes are loaded from the app support themes folder. '
+            'Drop .json or .jsonc files there, then use Refresh themes. '
+            'The folder is not watched automatically.',
+          ),
+        ),
+        const material.SizedBox(height: 12),
         const PreferencesFieldRow(
           label: 'Interface scale',
           hint:
@@ -211,6 +244,14 @@ class _PreferencesAppearanceSectionState
               ),
             ),
             OutlineButton(
+              onPressed: (_importing || _openingThemesFolder)
+                  ? null
+                  : () => unawaited(_openThemesFolder()),
+              child: material.Text(
+                _openingThemesFolder ? 'Opening…' : 'Open themes folder',
+              ),
+            ),
+            OutlineButton(
               onPressed: () => unawaited(_resetAppearance()),
               child: const Text('Reset appearance'),
             ),
@@ -226,9 +267,20 @@ class _PreferencesAppearanceSectionState
             ),
           ),
         ],
+        if (_folderOpenError != null) ...[
+          const material.SizedBox(height: 8),
+          material.Text(
+            _folderOpenError!,
+            style: material.TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.destructive,
+            ),
+          ),
+        ],
         const material.SizedBox(height: 4),
         const PreferencesHint(
-          'Import VS Code theme JSON/JSONC (.colors subset). Changes apply immediately.',
+          'Import copies a theme into the themes folder. '
+          'VS Code JSON/JSONC (.colors subset) and Querya custom JSON are supported.',
         ),
       ],
     );
