@@ -5,8 +5,13 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 import 'parser/jsonc_preprocessor.dart';
+import 'parser/querya_theme_from_manifest.dart';
+import 'parser/querya_theme_from_vscode.dart';
 import 'parser/querya_theme_manifest.dart';
+import 'parser/vscode_theme_manifest.dart';
+import 'querya_theme.dart';
 import 'theme_definition.dart';
+import 'theme_load_result.dart';
 import 'theme_paths.dart';
 
 /// Scans theme directories and exposes lightweight [ThemeDefinition] metadata.
@@ -40,6 +45,73 @@ class ThemeRegistryService {
       (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
     );
     return List.unmodifiable(definitions);
+  }
+
+  /// Parses a scanned [definition] into a runtime [QueryaTheme].
+  Future<ThemeLoadResult> loadTheme(ThemeDefinition definition) async {
+    final path = definition.path;
+    if (path == null || path.isEmpty) {
+      return ThemeLoadFailure(
+        definition: definition,
+        message: 'Theme file path is missing.',
+      );
+    }
+
+    final file = File(path);
+    if (!await file.exists()) {
+      return ThemeLoadFailure(
+        definition: definition,
+        message: 'Theme file not found.',
+      );
+    }
+
+    try {
+      final raw = await file.readAsString();
+      final theme = switch (definition.format) {
+        ThemeFormat.queryaCustom => _loadCustomTheme(raw),
+        ThemeFormat.vscode => _loadVsCodeTheme(raw),
+      };
+      return ThemeLoadSuccess(definition: definition, theme: theme);
+    } on QueryaThemeManifestParseException catch (e) {
+      return ThemeLoadFailure(
+        definition: definition,
+        message: e.message,
+        error: e,
+      );
+    } on VsCodeThemeParseException catch (e) {
+      return ThemeLoadFailure(
+        definition: definition,
+        message: e.message,
+        error: e,
+      );
+    } on IOException catch (e) {
+      return ThemeLoadFailure(
+        definition: definition,
+        message: 'Failed to read theme file.',
+        error: e,
+      );
+    } on Object catch (e) {
+      return ThemeLoadFailure(
+        definition: definition,
+        message: 'Failed to load theme.',
+        error: e,
+      );
+    }
+  }
+
+  QueryaTheme _loadCustomTheme(String raw) {
+    final manifest = QueryaThemeManifest.fromJsonString(raw);
+    return queryaThemeFromManifest(manifest);
+  }
+
+  QueryaTheme _loadVsCodeTheme(String raw) {
+    final manifest = VsCodeThemeManifest.fromJsonString(raw);
+    if (manifest.colors.isEmpty) {
+      throw VsCodeThemeParseException(
+        'Theme file has no "colors" section to import.',
+      );
+    }
+    return buildQueryaThemeFromVsCodeManifest(manifest);
   }
 
   Future<void> _scanDirectory(
