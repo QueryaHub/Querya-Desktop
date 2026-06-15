@@ -59,6 +59,7 @@ class QueryaDropdown<T> extends material.StatefulWidget {
 class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
   late material.MenuController _controller;
   bool _triggerHovered = false;
+  bool _menuOpen = false;
   List<material.Widget>? _cachedMenuChildren;
   List<QueryaDropdownItem<T>>? _cachedMenuItems;
   T? _cachedMenuValue;
@@ -229,6 +230,8 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
 
     final anchor = material.MenuAnchor(
       controller: _controller,
+      onOpen: () => setState(() => _menuOpen = true),
+      onClose: () => setState(() => _menuOpen = false),
       crossAxisUnconstrained: false,
       alignmentOffset: material.Offset(
         widget.alignmentOffset.dx,
@@ -257,7 +260,16 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
           ),
         ),
       ),
-      menuChildren: menuChildren,
+      menuChildren: [
+        _QueryaDropdownMenuEnter(
+          open: _menuOpen,
+          child: material.Column(
+            mainAxisSize: material.MainAxisSize.min,
+            crossAxisAlignment: material.CrossAxisAlignment.stretch,
+            children: menuChildren,
+          ),
+        ),
+      ],
       builder: (context, controller, child) {
         final trigger = _buildTrigger(
           context: context,
@@ -277,6 +289,34 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
       return material.SizedBox(width: fieldWidth, child: anchor);
     }
     return anchor;
+  }
+}
+
+class _QueryaDropdownMenuEnter extends material.StatelessWidget {
+  const _QueryaDropdownMenuEnter({
+    required this.open,
+    required this.child,
+  });
+
+  final bool open;
+  final material.Widget child;
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    final duration = context.motionDuration(QueryaMotion.standard);
+    final curve = context.motionCurve(QueryaMotion.enter);
+    return material.AnimatedScale(
+      scale: open ? 1 : 0.96,
+      alignment: material.Alignment.topCenter,
+      duration: duration,
+      curve: curve,
+      child: material.AnimatedOpacity(
+        opacity: open ? 1 : 0,
+        duration: duration,
+        curve: curve,
+        child: child,
+      ),
+    );
   }
 }
 

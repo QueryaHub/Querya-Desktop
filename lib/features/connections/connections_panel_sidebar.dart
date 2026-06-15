@@ -272,8 +272,9 @@ class _FolderTileState extends State<_FolderTile> {
                 ),
               ),
             ),
-            if (_expanded)
-              material.Padding(
+            QueryaAnimatedExpand(
+              expanded: _expanded,
+              child: material.Padding(
                 padding: const material.EdgeInsets.only(left: 24),
                 child: lazyConnectionTreeList(
                   context: context,
@@ -295,6 +296,7 @@ class _FolderTileState extends State<_FolderTile> {
                   },
                 ),
               ),
+            ),
           ],
         ),
       ),

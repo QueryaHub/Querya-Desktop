@@ -194,7 +194,12 @@ class _MysqlConnectionTileState extends State<_MysqlConnectionTile> {
                 ),
               ],
             ),
-            if (_expanded) ...[
+            QueryaAnimatedExpand(
+              expanded: _expanded,
+              child: material.Column(
+                mainAxisSize: material.MainAxisSize.min,
+                crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                children: [
               if (_loading)
                 material.Padding(
                   padding:
@@ -236,6 +241,8 @@ class _MysqlConnectionTileState extends State<_MysqlConnectionTile> {
                   onMysqlOpenSqlWorkspace: widget.onMysqlOpenSqlWorkspace,
                 ),
             ],
+              ),
+            ),
           ],
         ),
       ),
@@ -412,7 +419,12 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
                 : (c, {database, schema, name, kind}) =>
                     widget.onMysqlOpenSqlWorkspace!(c),
           ),
-          if (_expanded) ...[
+          QueryaAnimatedExpand(
+            expanded: _expanded,
+            child: material.Column(
+              mainAxisSize: material.MainAxisSize.min,
+              crossAxisAlignment: material.CrossAxisAlignment.stretch,
+              children: [
             if (_loading)
               material.Padding(
                 padding:
@@ -541,7 +553,9 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
                   ],
                 ),
               ),
-          ],
+            ],
+            ),
+          ),
         ],
       ),
     );

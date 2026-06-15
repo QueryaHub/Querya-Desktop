@@ -189,7 +189,12 @@ class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
                 ),
               ],
             ),
-            if (_expanded) ...[
+            QueryaAnimatedExpand(
+              expanded: _expanded,
+              child: material.Column(
+                mainAxisSize: material.MainAxisSize.min,
+                crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                children: [
               if (_loading)
                 material.Padding(
                   padding:
@@ -231,6 +236,8 @@ class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
                   },
                 ),
             ],
+              ),
+            ),
           ],
         ),
       ),
