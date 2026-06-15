@@ -1575,7 +1575,7 @@ Add QA checklist:
 ## Optional follow-up issues
 
 These are intentionally out of the first implementation pass (**shipped in 0.4.2**).
-**Target milestone: 0.4.3** ([milestone](https://github.com/QueryaHub/Querya-Desktop/milestone/2), epic **#159**) — see [planned-0.4.3.md](planned-0.4.3.md).
+**Shipped in 0.4.3** ([milestone](https://github.com/QueryaHub/Querya-Desktop/milestone/2), epic **#159**) — see [planned-0.4.3.md](planned-0.4.3.md).
 
 ### TP-F1 — File watcher for user themes folder ([#160](https://github.com/QueryaHub/Querya-Desktop/issues/160))
 
