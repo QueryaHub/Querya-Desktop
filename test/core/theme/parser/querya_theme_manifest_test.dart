@@ -187,6 +187,19 @@ void main() {
       );
     });
 
+    test('serializes to valid JSON for export', () {
+      final raw =
+          File('test/fixtures/themes/querya_custom_dark.json').readAsStringSync();
+      final manifest = QueryaThemeManifest.fromJsonString(raw);
+
+      final exported = manifest.toJsonString();
+      final reparsed = QueryaThemeManifest.fromJsonString(exported);
+
+      expect(reparsed.id, manifest.id);
+      expect(reparsed.shadcnColors['primary'], manifest.shadcnColors['primary']);
+      expect(reparsed.tokenColors.length, manifest.tokenColors.length);
+    });
+
     test('reuses TokenColorRule parsing from VS Code themes', () {
       const src = '''
 {
