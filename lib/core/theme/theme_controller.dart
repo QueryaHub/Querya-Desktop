@@ -5,15 +5,20 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import 'parser/apply_token_colors_to_editor.dart';
 import 'parser/color_parser.dart';
+import 'parser/querya_theme_from_manifest.dart';
 import 'parser/querya_theme_from_vscode.dart';
+import 'parser/querya_theme_manifest.dart';
 import 'parser/vscode_colors_merge.dart';
 import 'parser/vscode_theme_manifest.dart';
 import 'querya_theme.dart';
 import 'querya_theme_preset.dart';
 import 'theme_definition.dart';
+import 'theme_folder_watcher.dart';
 import 'theme_import_service.dart';
 import 'theme_load_result.dart';
+import 'theme_paths.dart';
 import 'theme_registry_service.dart';
+import 'theme_remote_install_service.dart';
 
 /// Active theme state: preset, optional imported colors, user overrides.
 class ThemeController extends ChangeNotifier {
@@ -68,6 +73,9 @@ class ThemeController extends ChangeNotifier {
   QueryaTheme? _registryTheme;
   bool _registrySelectionFailed = false;
   bool _isLoadingAvailableThemes = false;
+  ThemeFolderWatcher? _themeFolderWatcher;
+  bool _editorPreviewActive = false;
+  String? _editorPreviewRestoreThemeId;
 
   QueryaTheme? _cachedLightTheme;
   QueryaTheme? _cachedDarkTheme;
@@ -170,6 +178,56 @@ class ThemeController extends ChangeNotifier {
   @visibleForTesting
   ThemeRegistryService get registryServiceForTest => _registryService;
 
+  @visibleForTesting
+  bool get isThemeFolderWatcherStarted =>
+      _themeFolderWatcher?.isStarted ?? false;
+
+  @visibleForTesting
+  bool get isEditorPreviewActive => _editorPreviewActive;
+
+  /// Applies [manifest] for live editor preview without persisting selection.
+  Future<void> previewEditorManifest(QueryaThemeManifest manifest) async {
+    if (!_editorPreviewActive) {
+      _editorPreviewRestoreThemeId = effectiveSelectedThemeId;
+      _editorPreviewActive = true;
+    }
+
+    _registryTheme = queryaThemeFromManifest(manifest);
+    _registrySelectionFailed = false;
+    _selectedThemeLoadError = null;
+    _themeMode = manifest.isLight ? ThemeMode.light : ThemeMode.dark;
+    _notifyThemeChanged();
+  }
+
+  /// Restores the theme that was active before editor preview.
+  Future<void> endEditorPreview() async {
+    if (!_editorPreviewActive) return;
+
+    final restoreId = _editorPreviewRestoreThemeId;
+    _editorPreviewActive = false;
+    _editorPreviewRestoreThemeId = null;
+
+    if (restoreId != null) {
+      await setThemeById(restoreId);
+    } else {
+      _notifyThemeChanged();
+    }
+  }
+
+  /// Watches `{appSupport}/themes/` and debounces [loadAvailableThemes].
+  Future<void> startThemeFolderWatcher() async {
+    _themeFolderWatcher ??= ThemeFolderWatcher(
+      themesDirectory: ThemePaths.userThemesDirectory,
+      onThemesChanged: loadAvailableThemes,
+    );
+    await _themeFolderWatcher!.start();
+  }
+
+  /// Stops the themes folder watcher (used in tests and app teardown).
+  Future<void> stopThemeFolderWatcher() async {
+    await _themeFolderWatcher?.stop();
+  }
+
   void _invalidateThemeCache() {
     _cachedLightTheme = null;
     _cachedDarkTheme = null;
@@ -217,6 +275,7 @@ class ThemeController extends ChangeNotifier {
       await _registryService.loadThemeDefinitions(),
     );
     await _restoreSelectedRegistryTheme();
+    await startThemeFolderWatcher();
 
     _loaded = true;
     _notifyThemeChanged();
@@ -380,6 +439,27 @@ class ThemeController extends ChangeNotifier {
     String path,
   ) async {
     final result = await _registryService.importThemeFile(path);
+    return _applyRegistryImportResult(result);
+  }
+
+  /// Downloads a theme from [url] and activates it when import succeeds.
+  Future<ThemeDefinitionImportResult> importRegistryThemeFromUrl(
+    String url, {
+    String? sha256Checksum,
+    ThemeRemoteInstallService? remoteInstallService,
+  }) async {
+    final installer = remoteInstallService ??
+        ThemeRemoteInstallService(_registryService);
+    final result = await installer.installFromUrl(
+      url,
+      sha256Checksum: sha256Checksum,
+    );
+    return _applyRegistryImportResult(result);
+  }
+
+  Future<ThemeDefinitionImportResult> _applyRegistryImportResult(
+    ThemeDefinitionImportResult result,
+  ) async {
     switch (result) {
       case ThemeDefinitionImportSuccess(:final definition):
         _availableThemes = _mergeBuiltinThemes(

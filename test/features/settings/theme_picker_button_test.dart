@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:querya_desktop/core/theme/theme_definition.dart';
+import 'package:querya_desktop/core/theme/theme_metadata.dart';
 import 'package:querya_desktop/features/settings/theme_picker_button.dart';
 import 'package:querya_desktop/features/settings/theme_preview_card.dart';
 
@@ -576,6 +577,28 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(picked, ThemeController.builtinQueryaLightId);
+    });
+  });
+
+  group('filterThemeDefinitions metadata', () {
+    test('matches author and tags', () {
+      final themes = [
+        const ThemeDefinition(
+          id: 'neon',
+          name: 'Neon Nights',
+          source: ThemeSource.filesystem,
+          format: ThemeFormat.queryaCustom,
+          isDark: true,
+          metadata: ThemeMetadata(
+            author: 'Querya Themes',
+            tags: ['cyberpunk', 'dark'],
+          ),
+        ),
+      ];
+
+      expect(filterThemeDefinitions(themes, 'querya themes'), hasLength(1));
+      expect(filterThemeDefinitions(themes, 'cyber'), hasLength(1));
+      expect(filterThemeDefinitions(themes, 'light'), isEmpty);
     });
   });
 }

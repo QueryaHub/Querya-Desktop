@@ -44,6 +44,10 @@ registry services described in
 | `description` | string | Short summary for theme picker / marketplace. |
 | `author` | string | Author or org name. |
 | `version` | string | Theme package version (informational). |
+| `homepage` | string | Project or theme homepage URL. |
+| `license` | string | SPDX or plain-text license id (e.g. `MIT`). |
+| `preview` | string | Preview image URL or relative asset path (stored only; not fetched by the registry). |
+| `tags` | string array | Search/filter labels (e.g. `dark`, `neon`). |
 
 Unknown root fields are ignored. In debug builds the parser may log skipped keys.
 
@@ -274,14 +278,21 @@ derive shadcn tokens from your palette or leave `{}` to use preset defaults.
 2. Copy it into the app support **themes folder** (`{appSupport}/themes/`). See
    [theme-import.md](theme-import.md) for platform-specific paths and the
    **Open themes folder** button in Preferences.
-3. In **Preferences → Appearance**, click **Refresh themes** and select your theme.
+3. In **Preferences → Appearance**, click **Refresh themes** (or wait for the folder watcher) and select your theme.
 
-The registry scans `.json` and `.jsonc` files on refresh; there is no live folder watcher.
+The registry scans `.json` and `.jsonc` files on refresh and when the themes folder changes.
 Invalid files are skipped (logged in debug builds). Required fields: `schema`, `id`,
 `name`, `type`, `shadcn_colors`, `editor_colors` (the color maps may be empty `{}`).
 
 Built-in bundled themes (under `assets/themes/`) ship with the app and do not require
 manual installation.
+
+## Visual editor (Preferences)
+
+Use **Edit theme colors…** in **Preferences → Appearance** to tweak MVP color tokens
+with live preview, then **Export theme…** to save a `querya.theme.v1` JSON file.
+Built-in themes are exported as copies with a new `id`; import the file via
+**Import theme…** or copy into the themes folder.
 
 ## Troubleshooting
 
@@ -292,7 +303,7 @@ manual installation.
 | *Selected theme failed to load. Using Querya Dark.* | Persisted theme id points to a missing or broken file | Restore the file under `themes/`, or pick another theme in Preferences. Settings are kept so you can fix the file and **Refresh themes**. |
 | Colors look wrong or default | Invalid hex for a key | Invalid optional colors are **skipped** (preset fallback used). Check `#RRGGBB` / `#RRGGBBAA` formats in [Color string formats](#color-string-formats). |
 | Duplicate theme names in picker | Same `id` with different content imported twice | Registry suffixes ids (`my-theme-2`). Rename files or ids to avoid confusion. |
-| Dropped file not visible | No folder watcher | Use **Refresh themes** after copying into `themes/` (restart not required). |
+| Dropped file not visible | Watcher debounce / invalid file | Wait a moment after copy, or click **Refresh themes**; validate required fields and `.json`/`.jsonc` extension. |
 
 ## Related docs
 

@@ -1,0 +1,19 @@
+{
+  "schema": "querya.theme.v1",
+  "id": "fixture-custom-metadata",
+  "name": "Fixture Custom Metadata",
+  "type": "dark",
+  "description": "Theme fixture with marketplace metadata fields.",
+  "author": "Querya Themes",
+  "version": "2.1.0",
+  "homepage": "https://github.com/QueryaHub/Querya-Desktop",
+  "license": "MIT",
+  "preview": "https://example.com/previews/fixture-custom-metadata.png",
+  "tags": ["cyberpunk", "neon", "dark"],
+  "shadcn_colors": {
+    "primary": "#38BDF8"
+  },
+  "editor_colors": {
+    "background": "#0F1117"
+  }
+}

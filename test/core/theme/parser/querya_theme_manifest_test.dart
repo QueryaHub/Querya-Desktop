@@ -6,6 +6,18 @@ import 'package:querya_desktop/core/theme/parser/vscode_theme_manifest.dart';
 
 void main() {
   group('QueryaThemeManifest', () {
+    test('parses marketplace metadata fields', () {
+      final raw = File('test/fixtures/themes/querya_custom_metadata.json')
+          .readAsStringSync();
+      final manifest = QueryaThemeManifest.fromJsonString(raw);
+
+      expect(manifest.homepage, 'https://github.com/QueryaHub/Querya-Desktop');
+      expect(manifest.license, 'MIT');
+      expect(manifest.preview,
+          'https://example.com/previews/fixture-custom-metadata.png');
+      expect(manifest.tags, ['cyberpunk', 'neon', 'dark']);
+    });
+
     test('parses full dark fixture', () {
       final raw =
           File('test/fixtures/themes/querya_custom_dark.json').readAsStringSync();
@@ -173,6 +185,19 @@ void main() {
         () => QueryaThemeManifest.fromJsonString('{ not json }'),
         throwsA(isA<QueryaThemeManifestParseException>()),
       );
+    });
+
+    test('serializes to valid JSON for export', () {
+      final raw =
+          File('test/fixtures/themes/querya_custom_dark.json').readAsStringSync();
+      final manifest = QueryaThemeManifest.fromJsonString(raw);
+
+      final exported = manifest.toJsonString();
+      final reparsed = QueryaThemeManifest.fromJsonString(exported);
+
+      expect(reparsed.id, manifest.id);
+      expect(reparsed.shadcnColors['primary'], manifest.shadcnColors['primary']);
+      expect(reparsed.tokenColors.length, manifest.tokenColors.length);
     });
 
     test('reuses TokenColorRule parsing from VS Code themes', () {

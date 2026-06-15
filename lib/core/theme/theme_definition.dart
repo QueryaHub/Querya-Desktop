@@ -1,3 +1,5 @@
+import 'theme_metadata.dart';
+
 enum ThemeSource {
   builtin,
   imported,
@@ -21,6 +23,7 @@ class ThemeDefinition {
     this.path,
     this.lastModified,
     this.contentHash,
+    this.metadata,
   });
 
   final String id;
@@ -31,6 +34,7 @@ class ThemeDefinition {
   final String? path;
   final DateTime? lastModified;
   final String? contentHash;
+  final ThemeMetadata? metadata;
 
   bool get isFileBacked =>
       source == ThemeSource.filesystem ||
@@ -51,7 +55,8 @@ class ThemeDefinition {
           isDark == other.isDark &&
           path == other.path &&
           lastModified == other.lastModified &&
-          contentHash == other.contentHash;
+          contentHash == other.contentHash &&
+          metadata == other.metadata;
 
   @override
   int get hashCode => Object.hash(
@@ -63,5 +68,6 @@ class ThemeDefinition {
         path,
         lastModified,
         contentHash,
+        metadata,
       );
 }
