@@ -1,6 +1,7 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/motion/querya_cross_fade_stack.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -109,9 +110,8 @@ class _MysqlWorkspaceHomeState extends material.State<MysqlWorkspaceHome> {
         ),
         const Divider(height: 1),
         Expanded(
-          child: material.IndexedStack(
+          child: QueryaCrossFadeStack(
             index: _tab,
-            sizing: material.StackFit.expand,
             children: [
               MysqlStatsView(
                 key: ValueKey('mysql_stats_${widget.connectionRow.id}'),

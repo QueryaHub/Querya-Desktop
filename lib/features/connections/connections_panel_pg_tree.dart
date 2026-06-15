@@ -234,8 +234,9 @@ class _PgDatabasesNodeState extends State<_PgDatabasesNode> {
             onContextRefresh: widget.onRefreshDatabases,
             onOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
           ),
-          if (_expanded)
-            lazyConnectionTreeList(
+          QueryaAnimatedExpand(
+            expanded: _expanded,
+            child: lazyConnectionTreeList(
               context: context,
               itemCount: widget.databases.length,
               itemBuilder: (context, index) {
@@ -249,6 +250,7 @@ class _PgDatabasesNodeState extends State<_PgDatabasesNode> {
                 );
               },
             ),
+          ),
         ],
       ),
     );
@@ -350,7 +352,12 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
             onContextRefresh: _loadSchemas,
             onOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
           ),
-          if (_expanded) ...[
+          QueryaAnimatedExpand(
+            expanded: _expanded,
+            child: material.Column(
+              mainAxisSize: material.MainAxisSize.min,
+              crossAxisAlignment: material.CrossAxisAlignment.stretch,
+              children: [
             _PgDbToolRow(
               connection: widget.connection,
               databaseName: widget.databaseName,
@@ -397,7 +404,9 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
                 onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
                 onRefreshSchemas: _loadSchemas,
               ),
-          ],
+            ],
+            ),
+          ),
         ],
       ),
     );
@@ -531,8 +540,9 @@ class _PgSchemasNodeState extends State<_PgSchemasNode> {
             onContextRefresh: widget.onRefreshSchemas,
             onOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
           ),
-          if (_expanded)
-            lazyConnectionTreeList(
+          QueryaAnimatedExpand(
+            expanded: _expanded,
+            child: lazyConnectionTreeList(
               context: context,
               itemCount: widget.schemas.length,
               itemBuilder: (context, index) {
@@ -549,6 +559,7 @@ class _PgSchemasNodeState extends State<_PgSchemasNode> {
                 );
               },
             ),
+          ),
         ],
       ),
     );
@@ -672,7 +683,12 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
             onContextRefresh: _loadObjects,
             onOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
           ),
-          if (_expanded) ...[
+          QueryaAnimatedExpand(
+            expanded: _expanded,
+            child: material.Column(
+              mainAxisSize: material.MainAxisSize.min,
+              crossAxisAlignment: material.CrossAxisAlignment.stretch,
+              children: [
             if (_loading)
               material.Padding(
                 padding:
@@ -825,7 +841,9 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
                 onContextRefresh: _loadObjects,
               ),
             ],
-          ],
+            ],
+            ),
+          ),
         ],
       ),
     );
@@ -963,8 +981,9 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
             onContextRefresh: widget.onRefresh,
             onOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
           ),
-          if (_expanded)
-            lazyConnectionTreeList(
+          QueryaAnimatedExpand(
+            expanded: _expanded,
+            child: lazyConnectionTreeList(
               context: context,
               itemCount: widget.items.length,
               itemExtent: kConnectionTreeRowExtent,
@@ -998,6 +1017,7 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
                 );
               },
             ),
+          ),
         ],
       ),
     );
