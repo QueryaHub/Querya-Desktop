@@ -1575,21 +1575,21 @@ Add QA checklist:
 ## Optional follow-up issues
 
 These are intentionally out of the first implementation pass (**shipped in 0.4.2**).
-**Target milestone: 0.4.3** — see [planned-0.4.3.md](planned-0.4.3.md).
+**Target milestone: 0.4.3** ([milestone](https://github.com/QueryaHub/Querya-Desktop/milestone/2), epic **#159**) — see [planned-0.4.3.md](planned-0.4.3.md).
 
-### TP-F1 — File watcher for user themes folder
+### TP-F1 — File watcher for user themes folder ([#160](https://github.com/QueryaHub/Querya-Desktop/issues/160))
 
 Use a filesystem watcher to auto-refresh themes after files are added/removed. Keep as follow-up because watchers differ by OS and can introduce lifecycle bugs.
 
-### TP-F2 — Theme marketplace metadata
+### TP-F2 — Theme marketplace metadata ([#161](https://github.com/QueryaHub/Querya-Desktop/issues/161))
 
 Support metadata fields like preview image, tags, homepage, license. Useful only after custom theme format is stable.
 
-### TP-F3 — Visual theme editor
+### TP-F3 — Visual theme editor ([#162](https://github.com/QueryaHub/Querya-Desktop/issues/162))
 
 Allow editing theme colors in Preferences and export to `querya.theme.v1`. This is larger than parser/import support.
 
-### TP-F4 — Remote theme install
+### TP-F4 — Remote theme install ([#163](https://github.com/QueryaHub/Querya-Desktop/issues/163))
 
 Install theme from URL. Requires network, trust/security decisions, and probably signature/checksum policy.
 
