@@ -192,6 +192,27 @@ jobs:
           cd dist
           sha256sum *.zip | tee SHA256SUMS.txt
 
+      - name: Build release notes from CHANGELOG.md
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.build-windows.outputs.version }}"
+          ./scripts/extract-changelog-section.sh "$VERSION" > release-notes.md
+          {
+            echo ""
+            echo "---"
+            echo ""
+            echo "### Downloads"
+            echo "- **Linux**: \`Querya-Desktop-${VERSION}-linux.zip\`"
+            echo "- **Windows**: \`Querya-Desktop-${VERSION}-windows.zip\`"
+            echo "- **macOS**: \`Querya-Desktop-${VERSION}-macos.zip\` (unsigned \`.app\` in zip; right-click → Open on first launch)"
+            echo ""
+            echo "Verify checksums: \`SHA256SUMS.txt\`"
+            echo ""
+            echo "### Build info"
+            echo "- **pubspec**: ${{ needs.build-windows.outputs.full_version }}"
+            echo "- **Commit**: ${{ github.sha }}"
+          } >> release-notes.md
+
       - name: Release tag name
         id: rel
         run: |
@@ -206,19 +227,7 @@ jobs:
         with:
           tag_name: ${{ steps.rel.outputs.tag }}
           name: Querya Desktop ${{ needs.build-windows.outputs.version }}
-          body: |
-            ## Querya Desktop ${{ needs.build-windows.outputs.version }}
-
-            ### Downloads
-            - **Linux**: `Querya-Desktop-${{ needs.build-windows.outputs.version }}-linux.zip`
-            - **Windows**: `Querya-Desktop-${{ needs.build-windows.outputs.version }}-windows.zip`
-            - **macOS**: `Querya-Desktop-${{ needs.build-windows.outputs.version }}-macos.zip` (unsigned `.app` in zip; right-click → Open on first launch)
-
-            Verify checksums: `SHA256SUMS.txt`
-
-            ### Build info
-            - **pubspec**: ${{ needs.build-windows.outputs.full_version }}
-            - **Commit**: ${{ github.sha }}
+          body_path: release-notes.md
           fail_on_unmatched_files: true
           files: |
             dist/*.zip

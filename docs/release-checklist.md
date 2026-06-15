@@ -48,6 +48,6 @@ Use **Preferences → Appearance** unless noted. Fixtures for copy/import tests 
 
 ## Docs
 
+- [ ] [CHANGELOG.md](../CHANGELOG.md) has a **`## [X.Y.Z]`** section for the release version (CI copies it into the GitHub Release body).
 - [ ] [security.md](security.md) still matches behavior if storage changed.
-- [ ] [README.md](../README.md) prerequisites (e.g. Linux deps) still accurate.
 - [ ] [roadmap.md](roadmap.md) updated if you are communicating upcoming themes externally.
