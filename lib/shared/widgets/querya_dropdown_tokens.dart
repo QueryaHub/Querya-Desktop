@@ -40,8 +40,6 @@ abstract final class QueryaDropdownTokens {
 
   static const double selectedCheckSlotWidth = 18.0;
 
-  static const int hoverAnimationMs = 120;
-
   static double scaledTriggerHeight(material.BuildContext context) =>
       context.scaled(triggerHeight);
 

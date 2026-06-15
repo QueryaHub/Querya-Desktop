@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/ui_scale.dart';
+import 'package:querya_desktop/core/motion/querya_motion.dart';
+import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/shared/widgets/querya_dropdown_tokens.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
@@ -154,10 +156,8 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
       onEnter: widget.enabled ? (_) => setState(() => _triggerHovered = true) : null,
       onExit: widget.enabled ? (_) => setState(() => _triggerHovered = false) : null,
       child: material.AnimatedContainer(
-        duration: const Duration(
-          milliseconds: QueryaDropdownTokens.hoverAnimationMs,
-        ),
-        curve: material.Curves.easeOut,
+        duration: context.motionDuration(QueryaMotion.fast),
+        curve: context.motionCurve(QueryaMotion.enter),
         height: triggerHeight,
         padding: QueryaDropdownTokens.scaledTriggerPadding(context),
         decoration: material.BoxDecoration(
@@ -350,10 +350,8 @@ class _QueryaDropdownMenuItemState<T> extends material.State<_QueryaDropdownMenu
         ),
         onPressed: widget.enabled ? widget.onPick : null,
         child: material.AnimatedContainer(
-          duration: const Duration(
-            milliseconds: QueryaDropdownTokens.hoverAnimationMs,
-          ),
-          curve: material.Curves.easeOut,
+          duration: context.motionDuration(QueryaMotion.fast),
+          curve: context.motionCurve(QueryaMotion.enter),
           constraints: material.BoxConstraints(minHeight: itemHeight),
           padding: material.EdgeInsets.symmetric(
             horizontal: context.scaled(QueryaDropdownTokens.menuItemPadding.horizontal),
