@@ -18,6 +18,7 @@ import 'theme_import_service.dart';
 import 'theme_load_result.dart';
 import 'theme_paths.dart';
 import 'theme_registry_service.dart';
+import 'theme_remote_install_service.dart';
 
 /// Active theme state: preset, optional imported colors, user overrides.
 class ThemeController extends ChangeNotifier {
@@ -438,6 +439,27 @@ class ThemeController extends ChangeNotifier {
     String path,
   ) async {
     final result = await _registryService.importThemeFile(path);
+    return _applyRegistryImportResult(result);
+  }
+
+  /// Downloads a theme from [url] and activates it when import succeeds.
+  Future<ThemeDefinitionImportResult> importRegistryThemeFromUrl(
+    String url, {
+    String? sha256Checksum,
+    ThemeRemoteInstallService? remoteInstallService,
+  }) async {
+    final installer = remoteInstallService ??
+        ThemeRemoteInstallService(_registryService);
+    final result = await installer.installFromUrl(
+      url,
+      sha256Checksum: sha256Checksum,
+    );
+    return _applyRegistryImportResult(result);
+  }
+
+  Future<ThemeDefinitionImportResult> _applyRegistryImportResult(
+    ThemeDefinitionImportResult result,
+  ) async {
     switch (result) {
       case ThemeDefinitionImportSuccess(:final definition):
         _availableThemes = _mergeBuiltinThemes(
