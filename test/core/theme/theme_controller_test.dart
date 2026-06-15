@@ -90,6 +90,7 @@ void main() {
   });
 
   tearDown(() async {
+    await ThemeController.instance.stopThemeFolderWatcher();
     await AppSettings.instance.clearThemeSettings();
     await ThemeImportService.deletePersistedImport();
     if (await themesDir.exists()) {
