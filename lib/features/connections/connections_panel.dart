@@ -8,6 +8,7 @@ import 'package:querya_desktop/core/database/redis_info.dart';
 import 'package:querya_desktop/core/storage/folders_storage.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
+import 'package:querya_desktop/core/motion/querya_animated_expand.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';

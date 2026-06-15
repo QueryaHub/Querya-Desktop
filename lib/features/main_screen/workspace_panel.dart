@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material show Alignment, Axis, Container, EdgeInsets, BoxDecoration, GestureDetector, Padding, BorderRadius, Center, Icon, Icons, MouseRegion, AnimatedContainer, AnimatedScale, SystemMouseCursors, SizedBox, SingleChildScrollView, Row, MainAxisSize;
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
+import 'package:querya_desktop/core/motion/querya_cross_fade_stack.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -212,7 +213,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
             ),
             const Divider(height: 1),
             Expanded(
-              child: IndexedStack(
+              child: QueryaCrossFadeStack(
                 index: _editorTabIndex,
                 children: const [
                   QueryEditorTab(),
@@ -233,7 +234,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
             ),
             const Divider(height: 1),
             Expanded(
-              child: IndexedStack(
+              child: QueryaCrossFadeStack(
                 index: _outputTabIndex,
                 children: const [
                   ResultsTab(),
