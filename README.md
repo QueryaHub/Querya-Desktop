@@ -26,7 +26,7 @@ a clean, dark UI inspired by tools like pgAdmin.
   statement timeouts, query history, and CSV/JSON export.
 - **Object browsing** — connection tree with databases, tables, views, and
   server stats.
-- **Themeable** — dark/light/system, **VS Code theme import**, custom `querya.theme.v1` registry, and bundled themes (0.4.2).
+- **Themeable** — dark/light/system, **VS Code theme import**, custom `querya.theme.v1` registry, visual editor, remote install, and bundled themes (0.4.3).
 - **Scalable UI** — global interface scaling for high-DPI and accessibility.
 - **Secure by default** — passwords and connection strings live in the OS secure
   store, never in plaintext.
