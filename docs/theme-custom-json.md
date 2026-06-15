@@ -287,6 +287,13 @@ Invalid files are skipped (logged in debug builds). Required fields: `schema`, `
 Built-in bundled themes (under `assets/themes/`) ship with the app and do not require
 manual installation.
 
+## Visual editor (Preferences)
+
+Use **Edit theme colors…** in **Preferences → Appearance** to tweak MVP color tokens
+with live preview, then **Export theme…** to save a `querya.theme.v1` JSON file.
+Built-in themes are exported as copies with a new `id`; import the file via
+**Import theme…** or copy into the themes folder.
+
 ## Troubleshooting
 
 | Symptom | Likely cause | What to do |

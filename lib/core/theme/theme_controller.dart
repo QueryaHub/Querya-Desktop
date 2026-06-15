@@ -5,7 +5,9 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import 'parser/apply_token_colors_to_editor.dart';
 import 'parser/color_parser.dart';
+import 'parser/querya_theme_from_manifest.dart';
 import 'parser/querya_theme_from_vscode.dart';
+import 'parser/querya_theme_manifest.dart';
 import 'parser/vscode_colors_merge.dart';
 import 'parser/vscode_theme_manifest.dart';
 import 'querya_theme.dart';
@@ -71,6 +73,8 @@ class ThemeController extends ChangeNotifier {
   bool _registrySelectionFailed = false;
   bool _isLoadingAvailableThemes = false;
   ThemeFolderWatcher? _themeFolderWatcher;
+  bool _editorPreviewActive = false;
+  String? _editorPreviewRestoreThemeId;
 
   QueryaTheme? _cachedLightTheme;
   QueryaTheme? _cachedDarkTheme;
@@ -176,6 +180,38 @@ class ThemeController extends ChangeNotifier {
   @visibleForTesting
   bool get isThemeFolderWatcherStarted =>
       _themeFolderWatcher?.isStarted ?? false;
+
+  @visibleForTesting
+  bool get isEditorPreviewActive => _editorPreviewActive;
+
+  /// Applies [manifest] for live editor preview without persisting selection.
+  Future<void> previewEditorManifest(QueryaThemeManifest manifest) async {
+    if (!_editorPreviewActive) {
+      _editorPreviewRestoreThemeId = effectiveSelectedThemeId;
+      _editorPreviewActive = true;
+    }
+
+    _registryTheme = queryaThemeFromManifest(manifest);
+    _registrySelectionFailed = false;
+    _selectedThemeLoadError = null;
+    _themeMode = manifest.isLight ? ThemeMode.light : ThemeMode.dark;
+    _notifyThemeChanged();
+  }
+
+  /// Restores the theme that was active before editor preview.
+  Future<void> endEditorPreview() async {
+    if (!_editorPreviewActive) return;
+
+    final restoreId = _editorPreviewRestoreThemeId;
+    _editorPreviewActive = false;
+    _editorPreviewRestoreThemeId = null;
+
+    if (restoreId != null) {
+      await setThemeById(restoreId);
+    } else {
+      _notifyThemeChanged();
+    }
+  }
 
   /// Watches `{appSupport}/themes/` and debounces [loadAvailableThemes].
   Future<void> startThemeFolderWatcher() async {

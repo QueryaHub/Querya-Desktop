@@ -124,16 +124,15 @@ void main() {
       expect(find.text('Reset appearance'), findsOneWidget);
     });
 
-    testWidgets('shows themes folder hint without live reload promise',
-        (tester) async {
+    testWidgets('shows themes folder hint and theme editor entry', (tester) async {
       await pumpSection(tester);
 
       expect(
         find.textContaining('Themes are loaded from the app support themes folder'),
         findsOneWidget,
       );
-      expect(find.textContaining('not watched automatically'), findsOneWidget);
-      expect(find.textContaining('live reload'), findsNothing);
+      expect(find.textContaining('watched automatically'), findsOneWidget);
+      expect(find.text('Edit theme colors…'), findsOneWidget);
     });
   });
 }
