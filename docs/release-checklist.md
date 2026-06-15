@@ -33,7 +33,8 @@ Use **Preferences → Appearance** unless noted. Fixtures for copy/import tests 
 
 ## Versioning and release
 
-- [ ] `pubspec.yaml` `version` is **`0.4.2+…`** (semver matches intended tag **`0.4.2`**).
+- [ ] `pubspec.yaml` on **`dev`** is **`0.4.1+7`** before merging to `main` (auto version-bump sets **`0.4.2+8`** on `main`).
+- [ ] After merge, confirm GitHub Action **Auto Version Bump** committed **`0.4.2+…`** on `main`.
 - [ ] **Tag** is placed on the **commit that includes all fixes** you want in binaries (a tag does not auto-include later commits; see [CONTRIBUTING.md](../CONTRIBUTING.md)).
 - [ ] Run the **Release** workflow from GitHub Actions (see [tags-and-releases.md](tags-and-releases.md)).
 - [ ] Verify **Linux** and **Windows** zip artifacts and `SHA256SUMS.txt` on the GitHub Release.
