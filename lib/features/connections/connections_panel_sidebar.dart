@@ -245,7 +245,8 @@ class _FolderTileState extends State<_FolderTile> {
                     children: [
                       material.AnimatedRotation(
                         turns: _expanded ? 0.25 : 0,
-                        duration: const Duration(milliseconds: 100),
+                        duration: context.motionDuration(QueryaMotion.fast),
+                        curve: context.motionCurve(QueryaMotion.standardCurve),
                         child: material.Icon(
                           material.Icons.chevron_right_rounded,
                           size: 18,

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/ui_scale.dart';
+import 'package:querya_desktop/core/motion/querya_motion.dart';
+import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/core/theme/theme_definition.dart';
 import 'package:querya_desktop/features/settings/theme_preview_card.dart';
@@ -379,10 +381,8 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
       onEnter: _enabled ? (_) => setState(() => _triggerHovered = true) : null,
       onExit: _enabled ? (_) => setState(() => _triggerHovered = false) : null,
       child: material.AnimatedContainer(
-        duration: const Duration(
-          milliseconds: QueryaDropdownTokens.hoverAnimationMs,
-        ),
-        curve: material.Curves.easeOut,
+        duration: context.motionDuration(QueryaMotion.fast),
+        curve: context.motionCurve(QueryaMotion.enter),
         height: triggerHeight,
         padding: QueryaDropdownTokens.scaledTriggerPadding(context),
         decoration: material.BoxDecoration(
@@ -490,10 +490,8 @@ class _ThemePickerRowState extends material.State<_ThemePickerRow> {
           onTap: widget.onSelected,
           borderRadius: material.BorderRadius.circular(radius),
           child: material.AnimatedContainer(
-            duration: const Duration(
-              milliseconds: QueryaDropdownTokens.hoverAnimationMs,
-            ),
-            curve: material.Curves.easeOut,
+            duration: context.motionDuration(QueryaMotion.fast),
+            curve: context.motionCurve(QueryaMotion.enter),
             constraints: material.BoxConstraints(minHeight: itemHeight),
             padding: material.EdgeInsets.symmetric(
               horizontal:

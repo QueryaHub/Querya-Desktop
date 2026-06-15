@@ -131,7 +131,8 @@ class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
                       padding: const material.EdgeInsets.all(2),
                       child: material.AnimatedRotation(
                         turns: _expanded ? 0.25 : 0,
-                        duration: const Duration(milliseconds: 100),
+                        duration: context.motionDuration(QueryaMotion.fast),
+                        curve: context.motionCurve(QueryaMotion.standardCurve),
                         child: material.Icon(
                           material.Icons.chevron_right_rounded,
                           size: 16,

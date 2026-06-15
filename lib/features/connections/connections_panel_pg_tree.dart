@@ -213,7 +213,8 @@ class _PgDatabasesNodeState extends State<_PgDatabasesNode> {
             label: 'Databases (${widget.databases.length})',
             leading: material.AnimatedRotation(
               turns: _expanded ? 0.25 : 0,
-              duration: const Duration(milliseconds: 100),
+              duration: context.motionDuration(QueryaMotion.fast),
+              curve: context.motionCurve(QueryaMotion.standardCurve),
               child: material.Icon(
                 material.Icons.chevron_right_rounded,
                 size: 14,
@@ -328,7 +329,8 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
             label: widget.databaseName,
             leading: material.AnimatedRotation(
               turns: _expanded ? 0.25 : 0,
-              duration: const Duration(milliseconds: 100),
+              duration: context.motionDuration(QueryaMotion.fast),
+              curve: context.motionCurve(QueryaMotion.standardCurve),
               child: material.Icon(
                 material.Icons.chevron_right_rounded,
                 size: 14,
@@ -509,7 +511,8 @@ class _PgSchemasNodeState extends State<_PgSchemasNode> {
             label: 'Schemas (${widget.schemas.length})',
             leading: material.AnimatedRotation(
               turns: _expanded ? 0.25 : 0,
-              duration: const Duration(milliseconds: 100),
+              duration: context.motionDuration(QueryaMotion.fast),
+              curve: context.motionCurve(QueryaMotion.standardCurve),
               child: material.Icon(
                 material.Icons.chevron_right_rounded,
                 size: 14,
@@ -649,7 +652,8 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
             label: widget.schemaName,
             leading: material.AnimatedRotation(
               turns: _expanded ? 0.25 : 0,
-              duration: const Duration(milliseconds: 100),
+              duration: context.motionDuration(QueryaMotion.fast),
+              curve: context.motionCurve(QueryaMotion.standardCurve),
               child: material.Icon(
                 material.Icons.chevron_right_rounded,
                 size: 14,
@@ -939,7 +943,8 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
             label: '${widget.label} (${widget.items.length})',
             leading: material.AnimatedRotation(
               turns: _expanded ? 0.25 : 0,
-              duration: const Duration(milliseconds: 100),
+              duration: context.motionDuration(QueryaMotion.fast),
+              curve: context.motionCurve(QueryaMotion.standardCurve),
               child: material.Icon(
                 material.Icons.chevron_right_rounded,
                 size: 13,
