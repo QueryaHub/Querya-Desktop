@@ -1,6 +1,6 @@
 # Planned release 0.4.3 — theme and extensions follow-ups
 
-**Status:** planning (GitHub milestone [**0.4.3**](https://github.com/QueryaHub/Querya-Desktop/milestone/2), epic **#159**).  
+**Status:** **shipped in 0.4.3** (GitHub milestone [**0.4.3**](https://github.com/QueryaHub/Querya-Desktop/milestone/2), epic **#159** closed).  
 **Depends on:** **0.4.2** custom theme registry (TP-01–TP-30, shipped).
 
 This document captures work intentionally deferred from the first custom-theme pass.
