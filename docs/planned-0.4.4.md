@@ -1,6 +1,6 @@
 # Planned release 0.4.4 — UI motion polish and high refresh rate
 
-**Status:** planning.
+**Status:** planning (GitHub milestone [**0.4.4**](https://github.com/QueryaHub/Querya-Desktop/milestone/3), epic **#170**).  
 **Depends on:** **0.4.3** theme follow-ups (shipped).
 **Design doc:** [motion-and-high-refresh.md](motion-and-high-refresh.md) — research, current-state audit, and per-platform Hz behavior.
 
@@ -13,14 +13,14 @@ Theme: make every animation **smooth and pleasant** through one motion system, a
 
 ## Scope
 
-| ID | Scope | Summary |
-|----|-------|---------|
-| **UI-A1** | `motion`, `core` | **Motion tokens** — `lib/core/motion/` with `QueryaMotion` durations/curves and a `context.motion()` reduced-motion helper. |
-| **UI-A2** | `motion`, `ui` | **Adopt tokens** — replace magic durations/curves in dialogs, dropdowns, tree, workspace panel, connection forms (no layout regressions). |
-| **UI-A3** | `motion`, `ui` | **Smoother transitions** — dialog retune, dropdown enter animation, `AnimatedSize` tree expand/collapse, `AnimatedSwitcher` tab/content cross-fade. |
-| **UI-A4** | `performance`, `platform` | **High refresh rate** — `refresh_rate` (or wrapper): unlock on macOS 14+ in `main()`, query active Hz, debug-only FPS/Hz overlay. Verify Windows/Linux follow the monitor. |
-| **UI-A5** | `accessibility`, `settings` | **Reduced motion** — honor OS "reduce motion"; **Preferences → Appearance → Motion** (Full / Reduced / Off). |
-| **UI-A6** | `docs`, `performance` | **Measurement & docs** — DevTools budget checklist (8.3 ms @120 Hz), per-OS Hz table, update design doc with measured results. |
+| ID | Issue | Scope | Summary |
+|----|-------|--------|---------|
+| **UI-A1** | [#173](https://github.com/QueryaHub/Querya-Desktop/issues/173) | `motion`, `core` | **Motion tokens** — `lib/core/motion/` with `QueryaMotion` durations/curves and a `context.motion()` reduced-motion helper. |
+| **UI-A2** | [#171](https://github.com/QueryaHub/Querya-Desktop/issues/171) | `motion`, `ui` | **Adopt tokens** — replace magic durations/curves in dialogs, dropdowns, tree, workspace panel, connection forms (no layout regressions). |
+| **UI-A3** | [#172](https://github.com/QueryaHub/Querya-Desktop/issues/172) | `motion`, `ui` | **Smoother transitions** — dialog retune, dropdown enter animation, `AnimatedSize` tree expand/collapse, `AnimatedSwitcher` tab/content cross-fade. |
+| **UI-A4** | [#174](https://github.com/QueryaHub/Querya-Desktop/issues/174) | `performance`, `platform` | **High refresh rate** — `refresh_rate` (or wrapper): unlock on macOS 14+ in `main()`, query active Hz, debug-only FPS/Hz overlay. Verify Windows/Linux follow the monitor. |
+| **UI-A5** | [#175](https://github.com/QueryaHub/Querya-Desktop/issues/175) | `accessibility`, `settings` | **Reduced motion** — honor OS "reduce motion"; **Preferences → Appearance → Motion** (Full / Reduced / Off). |
+| **UI-A6** | [#176](https://github.com/QueryaHub/Querya-Desktop/issues/176) | `docs`, `performance` | **Measurement & docs** — DevTools budget checklist (8.3 ms @120 Hz), per-OS Hz table, update design doc with measured results. |
 
 ## Suggested PR order
 

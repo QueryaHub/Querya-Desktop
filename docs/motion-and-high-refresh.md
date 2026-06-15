@@ -114,12 +114,14 @@ Introduce `lib/core/motion/` with a single source of truth for durations and cur
 
 Milestone **0.4.4** (see [planned-0.4.4.md](planned-0.4.4.md)).
 
-1. **UI-A1 — Motion tokens core.** `lib/core/motion/` with `QueryaMotion` durations/curves + `context.motion()` reduced-motion helper. Unit tests.
-2. **UI-A2 — Adopt tokens across widgets.** Replace magic `Duration(...)`/`Curves.easeOut` literals in dialogs, dropdowns, tree, workspace panel, connection forms. No behavior regressions in layout tests.
-3. **UI-A3 — Smoother transitions.** Dialog retune, dropdown enter animation, tree `AnimatedSize` expand/collapse, tab `AnimatedSwitcher`.
-4. **UI-A4 — High-refresh-rate enablement.** Add `refresh_rate` (or wrapper); unlock on macOS 14+ in `main()`; query active Hz; debug-only FPS/Hz overlay behind a flag.
-5. **UI-A5 — Reduced-motion + Preferences.** Honor OS "reduce motion"; add **Preferences → Appearance → Motion** (Full / Reduced / Off) wired to the motion helper.
-6. **UI-A6 — Measurement & docs.** DevTools timeline checklist in [perf-baseline.md](perf-baseline.md); per-OS Hz verification table; update this doc with measured results.
+Milestone **0.4.4** ([milestone](https://github.com/QueryaHub/Querya-Desktop/milestone/3), epic **#170**) — see [planned-0.4.4.md](planned-0.4.4.md).
+
+1. **UI-A1 — Motion tokens core** ([#173](https://github.com/QueryaHub/Querya-Desktop/issues/173)). `lib/core/motion/` with `QueryaMotion` durations/curves + `context.motion()` reduced-motion helper. Unit tests.
+2. **UI-A2 — Adopt tokens across widgets** ([#171](https://github.com/QueryaHub/Querya-Desktop/issues/171)). Replace magic `Duration(...)`/`Curves.easeOut` literals in dialogs, dropdowns, tree, workspace panel, connection forms. No behavior regressions in layout tests.
+3. **UI-A3 — Smoother transitions** ([#172](https://github.com/QueryaHub/Querya-Desktop/issues/172)). Dialog retune, dropdown enter animation, tree `AnimatedSize` expand/collapse, tab `AnimatedSwitcher`.
+4. **UI-A4 — High-refresh-rate enablement** ([#174](https://github.com/QueryaHub/Querya-Desktop/issues/174)). Add `refresh_rate` (or wrapper); unlock on macOS 14+ in `main()`; query active Hz; debug-only FPS/Hz overlay behind a flag.
+5. **UI-A5 — Reduced-motion + Preferences** ([#175](https://github.com/QueryaHub/Querya-Desktop/issues/175)). Honor OS "reduce motion"; add **Preferences → Appearance → Motion** (Full / Reduced / Off) wired to the motion helper.
+6. **UI-A6 — Measurement & docs** ([#176](https://github.com/QueryaHub/Querya-Desktop/issues/176)). DevTools timeline checklist in [perf-baseline.md](perf-baseline.md); per-OS Hz verification table; update this doc with measured results.
 
 Suggested order: A1 → A2 → A3 in parallel with A4; then A5; A6 closes the milestone.
 
