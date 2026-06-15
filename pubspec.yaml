@@ -12,6 +12,7 @@ dependencies:
     sdk: flutter
   http: ^1.2.2
   crypto: ^3.0.6
+  refresh_rate: ^1.0.2
   shadcn_flutter: ^0.0.52
   bitsdojo_window: ^0.1.6
   path: ^1.9.0
