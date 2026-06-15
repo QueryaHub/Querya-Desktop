@@ -26,6 +26,7 @@ Index of Querya Desktop documentation, grouped by audience.
 ## Planning
 
 - [Roadmap](roadmap.md) — current direction and follow-ups.
+- [Planned 0.4.3](planned-0.4.3.md) — deferred theme/extensions follow-ups after 0.4.2.
 - [Custom theme parser requirements](scheme-parcer.md) — JSON theme format and scaling spec.
 - [Theme parser implementation plan](theme-parser-implementation-tasks.md) — task breakdown and architecture.
 - [Theme parser GitHub issues](theme-parser-github-issues.md) — issue templates for epic #96–#125.

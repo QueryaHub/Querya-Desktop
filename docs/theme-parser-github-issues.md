@@ -1574,7 +1574,8 @@ Add QA checklist:
 
 ## Optional follow-up issues
 
-These are intentionally out of the first implementation pass.
+These are intentionally out of the first implementation pass (**shipped in 0.4.2**).
+**Target milestone: 0.4.3** — see [planned-0.4.3.md](planned-0.4.3.md).
 
 ### TP-F1 — File watcher for user themes folder
 
@@ -1594,33 +1595,33 @@ Install theme from URL. Requires network, trust/security decisions, and probably
 
 ## Master checklist
 
-- [ ] TP-01 docs schema
-- [ ] TP-02 fixtures
-- [ ] TP-03 manifest model
-- [ ] TP-04 color parser wrapper
-- [ ] TP-05 shadcn color scheme mapping
-- [ ] TP-06 editor theme mapping
-- [ ] TP-07 workbench theme mapping
-- [ ] TP-08 QueryaTheme factory
-- [ ] TP-09 load result types
-- [ ] TP-10 ThemeDefinition
-- [ ] TP-11 theme paths
-- [ ] TP-12 filesystem scan
-- [ ] TP-13 load selected definition
-- [ ] TP-14 parsed theme cache
-- [ ] TP-15 AppSettings selected theme
-- [ ] TP-16 legacy imported migration
-- [ ] TP-17 ThemeController registry integration
-- [ ] TP-18 ThemePickerButton shell
-- [ ] TP-19 picker search/filter
-- [ ] TP-20 safe preview card
-- [ ] TP-21 Preferences integration
-- [ ] TP-22 refresh themes action
-- [ ] TP-23 multi-theme import
-- [ ] TP-24 built-in theme assets
-- [ ] TP-25 user theme folder docs
-- [ ] TP-26 window chrome sync
-- [ ] TP-27 startup fallback
-- [ ] TP-28 50+ themes performance test
-- [ ] TP-29 end-to-end import test
-- [ ] TP-30 release QA docs
+- [x] TP-01 docs schema
+- [x] TP-02 fixtures
+- [x] TP-03 manifest model
+- [x] TP-04 color parser wrapper
+- [x] TP-05 shadcn color scheme mapping
+- [x] TP-06 editor theme mapping
+- [x] TP-07 workbench theme mapping
+- [x] TP-08 QueryaTheme factory
+- [x] TP-09 load result types
+- [x] TP-10 ThemeDefinition
+- [x] TP-11 theme paths
+- [x] TP-12 filesystem scan
+- [x] TP-13 load selected definition
+- [x] TP-14 parsed theme cache
+- [x] TP-15 AppSettings selected theme
+- [x] TP-16 legacy imported migration
+- [x] TP-17 ThemeController registry integration
+- [x] TP-18 ThemePickerButton shell
+- [x] TP-19 picker search/filter
+- [x] TP-20 safe preview card
+- [x] TP-21 Preferences integration
+- [x] TP-22 refresh themes action
+- [x] TP-23 multi-theme import
+- [x] TP-24 built-in theme assets
+- [x] TP-25 user theme folder docs
+- [x] TP-26 window chrome sync
+- [x] TP-27 startup fallback
+- [x] TP-28 50+ themes performance test
+- [x] TP-29 end-to-end import test
+- [x] TP-30 release QA docs
