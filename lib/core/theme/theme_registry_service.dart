@@ -16,6 +16,7 @@ import 'querya_theme.dart';
 import 'theme_definition.dart';
 import 'theme_import_service.dart';
 import 'theme_load_result.dart';
+import 'theme_metadata.dart';
 import 'theme_paths.dart';
 
 /// Scans theme directories and exposes lightweight [ThemeDefinition] metadata.
@@ -491,6 +492,7 @@ class ThemeRegistryService {
       path: path,
       lastModified: lastModified,
       contentHash: contentHash,
+      metadata: ThemeMetadata.fromQueryaJson(json),
     );
   }
 

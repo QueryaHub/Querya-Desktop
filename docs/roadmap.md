@@ -8,7 +8,9 @@ Living document for planned work. Not a commitment order; adjust as priorities c
   highlighting, P0 workbench migration, Preferences, tests, docs — [theme.md](theme.md).
 - **Shipped in 0.4.1 ([#93](https://github.com/QueryaHub/Querya-Desktop/issues/93)):** UI performance — virtual result grid, lazy connection tree, decoupled scale preview, stats polling, MySQL stats dashboard, local `docker/` dev stack — [perf-baseline.md](perf-baseline.md).
 - **Shipped in 0.4.2 (TP-01–TP-30, #96–#125):** custom theme registry — `querya.theme.v1` + VS Code JSON/JSONC scan, Theme picker (50+), import/refresh, built-in Cyberpunk Neon asset, startup fallback, window chrome sync — [theme-custom-json.md](theme-custom-json.md), [theme-import.md](theme-import.md).
-- **Planned 0.4.3:** theme follow-ups (file watcher, marketplace metadata, visual editor, remote install) — [planned-0.4.3.md](planned-0.4.3.md).
+- **Shipped in 0.4.3 (TP-F1–TP-F4, #159–#163):** theme folder watcher, marketplace metadata on manifests, visual theme editor with export, HTTPS remote install with checksum — [planned-0.4.3.md](planned-0.4.3.md).
+- **Planned 0.4.4:** UI motion polish + high refresh rate (90/120/144 Hz) — [planned-0.4.4.md](planned-0.4.4.md), [motion-and-high-refresh.md](motion-and-high-refresh.md).
+- **Planned 0.4.5+:** Extensions sidebar and marketplace Explore UI — [market-tech.md](market-tech.md).
 - **Optional:** Preferences → **Animate theme changes** (off by default).
 - **Later:** P2 Mongo/Redis token colors; `re_editor` if perf gap; LSP epic per
   [archive/code-forge-evaluation.md](archive/code-forge-evaluation.md) (**NO-GO** on `code_forge` for 0.3).

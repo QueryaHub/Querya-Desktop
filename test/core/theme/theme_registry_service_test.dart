@@ -61,6 +61,24 @@ void main() {
   });
 
   group('ThemeRegistryService.loadThemeDefinitions', () {
+    test('preserves marketplace metadata on custom theme scan', () async {
+      await _copyFixture(
+        'querya_custom_metadata.json',
+        File(p.join(themesDir.path, 'querya_custom_metadata.json')),
+      );
+
+      final definitions = await registry.loadThemeDefinitions();
+      final metadataTheme = definitions.singleWhere(
+        (d) => d.id == 'fixture-custom-metadata',
+      );
+
+      expect(metadataTheme.metadata, isNotNull);
+      expect(metadataTheme.metadata!.author, 'Querya Themes');
+      expect(metadataTheme.metadata!.license, 'MIT');
+      expect(metadataTheme.metadata!.tags, ['cyberpunk', 'neon', 'dark']);
+      expect(metadataTheme.metadata!.pickerSubtitle, 'Querya Themes');
+    });
+
     test('includes valid custom and VS Code themes, skips broken file', () async {
       await _copyFixture(
         'querya_custom_dark.json',

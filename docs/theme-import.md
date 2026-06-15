@@ -59,7 +59,9 @@ In **Preferences → Appearance**:
 - **Theme mode** — Dark / Light / System
 - **Theme** — built-in presets, bundled themes, and themes from the user themes folder
 - **Import theme…** — pick `.json` / `.jsonc` and copy into the themes folder
-- **Refresh themes** — rescan the themes folder (no live file watcher)
+- **Refresh themes** — rescan the themes folder (also runs automatically when files change; see below)
+- **Install from URL…** — download a theme over HTTPS with optional SHA-256 checksum
+- **Theme editor** — tweak workbench colors with live preview and export `querya.theme.v1`
 - **Open themes folder** — reveal the app support `themes/` directory in the file manager
 - **Reset appearance** — clears overrides and returns to Querya Dark
 
@@ -83,9 +85,9 @@ Querya loads themes from the **application support** directory (see
 | macOS | `~/Library/Application Support/com.example.querya_desktop/themes` |
 | Windows | `%APPDATA%\com.example.querya_desktop\themes` |
 
-**Workflow:** copy or import a theme file into `themes/`, then click **Refresh themes**
-in Preferences. The app does **not** watch the folder; a restart is not required after
-refresh.
+**Workflow:** copy or import a theme file into `themes/`. A **file watcher** (0.4.3+)
+debounces changes under `themes/` and refreshes the registry automatically; use
+**Refresh themes** if the list looks stale. A restart is not required after refresh.
 
 **Accepted extensions:** `.json`, `.jsonc` (comments and trailing commas stripped before parse).
 
@@ -121,6 +123,23 @@ Built-in preset defaults apply for keys not present in the merged map.
 
 API: `ThemeController.setWorkbenchColor(key, color?)`,
 `ThemeController.clearColorOverrides()` (user layer only).
+
+## Remote install from URL (0.4.3+)
+
+**Preferences → Appearance → Install from URL…** downloads a theme over **HTTPS only**
+and imports it into `{appSupport}/themes/` using the same deduplication rules as
+**Import theme…**.
+
+- Public HTTPS URLs only (no `http://`, no private/loopback hosts in release builds).
+- Optional **SHA-256** checksum in the dialog or as `?sha256=` on the URL.
+- Invalid JSON or checksum mismatch aborts install; nothing is written to the themes folder.
+- No silent background downloads — install runs only after you confirm in the dialog.
+
+Trust model: treat remote theme URLs like any untrusted file; prefer checksums from a
+known publisher. Signature verification is not implemented yet.
+
+Implementation: `lib/core/theme/theme_remote_install_service.dart`,
+`lib/core/market/marketplace_client.dart` (stub for future Explore UI).
 
 ## Sample themes (manual import)
 

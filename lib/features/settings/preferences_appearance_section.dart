@@ -8,8 +8,10 @@ import 'package:querya_desktop/core/theme/theme_import_service.dart';
 import 'package:querya_desktop/core/theme/theme_load_result.dart';
 import 'package:querya_desktop/core/theme/theme_paths.dart';
 import 'package:querya_desktop/features/settings/preferences_controls.dart';
+import 'package:querya_desktop/features/settings/theme_editor_section.dart';
 import 'package:querya_desktop/features/settings/theme_picker_button.dart';
 import 'package:querya_desktop/features/settings/theme_preview_card.dart';
+import 'package:querya_desktop/features/settings/theme_remote_install_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Appearance / theme controls for [PreferencesDialog].
@@ -27,6 +29,7 @@ class _PreferencesAppearanceSectionState
   String? _importError;
   String? _folderOpenError;
   bool _importing = false;
+  bool _installingFromUrl = false;
   bool _openingThemesFolder = false;
 
   @override
@@ -89,6 +92,33 @@ class _PreferencesAppearanceSectionState
     } finally {
       if (mounted) {
         setState(() => _importing = false);
+      }
+    }
+  }
+
+  Future<void> _installThemeFromUrl() async {
+    final request = await showThemeRemoteInstallDialog(context);
+    if (request == null) return;
+
+    setState(() {
+      _installingFromUrl = true;
+      _importError = null;
+    });
+    try {
+      final result = await _controller.importRegistryThemeFromUrl(
+        request.url,
+        sha256Checksum: request.sha256Checksum,
+      );
+      if (!mounted) return;
+      switch (result) {
+        case ThemeDefinitionImportSuccess():
+          setState(() => _importError = null);
+        case ThemeDefinitionImportFailure(:final message):
+          setState(() => _importError = message);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _installingFromUrl = false);
       }
     }
   }
@@ -191,10 +221,11 @@ class _PreferencesAppearanceSectionState
           padding: material.EdgeInsets.only(left: kPreferencesLabelWidth + 12),
           child: PreferencesHint(
             'Themes are loaded from the app support themes folder. '
-            'Drop .json or .jsonc files there, then use Refresh themes. '
-            'The folder is not watched automatically.',
+            'Drop .json or .jsonc files there; the folder is watched automatically '
+            'or use Refresh themes.',
           ),
         ),
+        const ThemeEditorSection(),
         const material.SizedBox(height: 12),
         const PreferencesFieldRow(
           label: 'Interface scale',
@@ -231,12 +262,21 @@ class _PreferencesAppearanceSectionState
           runSpacing: 8,
           children: [
             OutlineButton(
-              onPressed:
-                  _importing ? null : () => unawaited(_pickAndImportTheme()),
+              onPressed: (_importing || _installingFromUrl)
+                  ? null
+                  : () => unawaited(_pickAndImportTheme()),
               child: material.Text(_importing ? 'Importing…' : 'Import theme…'),
             ),
             OutlineButton(
-              onPressed: (_importing || refreshingThemes)
+              onPressed: (_importing || _installingFromUrl || refreshingThemes)
+                  ? null
+                  : () => unawaited(_installThemeFromUrl()),
+              child: material.Text(
+                _installingFromUrl ? 'Installing…' : 'Install from URL…',
+              ),
+            ),
+            OutlineButton(
+              onPressed: (_importing || _installingFromUrl || refreshingThemes)
                   ? null
                   : () => unawaited(_refreshThemes()),
               child: material.Text(
@@ -244,7 +284,7 @@ class _PreferencesAppearanceSectionState
               ),
             ),
             OutlineButton(
-              onPressed: (_importing || _openingThemesFolder)
+              onPressed: (_importing || _installingFromUrl || _openingThemesFolder)
                   ? null
                   : () => unawaited(_openThemesFolder()),
               child: material.Text(
@@ -280,6 +320,7 @@ class _PreferencesAppearanceSectionState
         const material.SizedBox(height: 4),
         const PreferencesHint(
           'Import copies a theme into the themes folder. '
+          'Install from URL requires HTTPS and optional SHA-256 verification. '
           'VS Code JSON/JSONC (.colors subset) and Querya custom JSON are supported.',
         ),
       ],

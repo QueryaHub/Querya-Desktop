@@ -25,15 +25,27 @@
 - Имена архивов: `Querya-Desktop-X.Y.Z-linux.zip`, `Querya-Desktop-X.Y.Z-windows.zip`, `Querya-Desktop-X.Y.Z-macos.zip` (внутри неподписанный `.app`).
 - Версия для имён и тега — **semver из pubspec**; build `+N` попадает в текст релиза как **полный pubspec version**.
 
-## Changelog (git-cliff)
+## Changelog в GitHub Release
 
-- В репозитории есть [cliff.toml](../cliff.toml) — его можно использовать **локально** для черновика release notes:
+При публикации релиза workflow **[Release](../.github/workflows/release.yml)** автоматически берёт секцию из [CHANGELOG.md](../CHANGELOG.md) для semver из `pubspec` (например `## [0.4.3]`). Скрипт: [scripts/extract-changelog-section.sh](../scripts/extract-changelog-section.sh).
 
-  ```bash
-  git-cliff --latest --strip header
-  ```
+Перед тегом убедитесь, что в `CHANGELOG.md` есть секция для этой версии — иначе job **Publish GitHub Release** упадёт.
 
-- Генерация changelog **не подключена** к `release.yml`; при необходимости вставьте вывод git-cliff в описание релиза вручную на GitHub или расширьте workflow.
+Локальная проверка:
+
+```bash
+./scripts/extract-changelog-section.sh 0.4.3
+```
+
+### git-cliff (черновик)
+
+Для черновика release notes из коммитов можно использовать [cliff.toml](../cliff.toml) локально:
+
+```bash
+git-cliff --latest --strip header
+```
+
+Генерация git-cliff **не подключена** к `release.yml`; источник правды для релизов — **CHANGELOG.md**.
 
 ## Где смотреть настройки
 
