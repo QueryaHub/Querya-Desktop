@@ -119,6 +119,7 @@ void main() {
       await pumpSection(tester);
 
       expect(find.text('Import theme…'), findsOneWidget);
+      expect(find.text('Install from URL…'), findsOneWidget);
       expect(find.text('Refresh themes'), findsOneWidget);
       expect(find.text('Open themes folder'), findsOneWidget);
       expect(find.text('Reset appearance'), findsOneWidget);
