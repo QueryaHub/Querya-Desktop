@@ -23,6 +23,10 @@ class QueryaThemeManifest {
     this.description,
     this.author,
     this.version,
+    this.homepage,
+    this.license,
+    this.preview,
+    this.tags = const [],
   });
 
   final String schema;
@@ -35,6 +39,10 @@ class QueryaThemeManifest {
   final String? description;
   final String? author;
   final String? version;
+  final String? homepage;
+  final String? license;
+  final String? preview;
+  final List<String> tags;
 
   bool get isDark => type == QueryaThemeType.dark;
   bool get isLight => type == QueryaThemeType.light;
@@ -93,7 +101,23 @@ class QueryaThemeManifest {
       description: _optionalString(json['description']),
       author: _optionalString(json['author']),
       version: _optionalString(json['version']),
+      homepage: _optionalString(json['homepage']),
+      license: _optionalString(json['license']),
+      preview: _optionalString(json['preview']),
+      tags: _parseTags(json['tags']),
     );
+  }
+
+  static List<String> _parseTags(Object? raw) {
+    if (raw is! List) return const [];
+
+    final tags = <String>[];
+    for (final item in raw) {
+      if (item is! String) continue;
+      final trimmed = item.trim();
+      if (trimmed.isNotEmpty) tags.add(trimmed);
+    }
+    return List.unmodifiable(tags);
   }
 
   static String _requiredString(Map<String, dynamic> json, String key) {
@@ -156,7 +180,11 @@ class QueryaThemeManifest {
           _listEquals(tokenColors, other.tokenColors) &&
           description == other.description &&
           author == other.author &&
-          version == other.version;
+          version == other.version &&
+          homepage == other.homepage &&
+          license == other.license &&
+          preview == other.preview &&
+          _stringListEquals(tags, other.tags);
 
   @override
   int get hashCode => Object.hash(
@@ -170,6 +198,10 @@ class QueryaThemeManifest {
         description,
         author,
         version,
+        homepage,
+        license,
+        preview,
+        Object.hashAll(tags),
       );
 
   static bool _mapEquals(Map<String, String> a, Map<String, String> b) {
@@ -181,6 +213,14 @@ class QueryaThemeManifest {
   }
 
   static bool _listEquals(List<TokenColorRule> a, List<TokenColorRule> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  static bool _stringListEquals(List<String> a, List<String> b) {
     if (a.length != b.length) return false;
     for (var i = 0; i < a.length; i++) {
       if (a[i] != b[i]) return false;
