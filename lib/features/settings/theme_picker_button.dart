@@ -55,7 +55,13 @@ List<ThemeDefinition> filterThemeDefinitions(
             theme.name.toLowerCase().contains(normalized) ||
             theme.id.toLowerCase().contains(normalized) ||
             theme.source.name.toLowerCase().contains(normalized) ||
-            _sourceBadgeLabel(theme.source).toLowerCase().contains(normalized),
+            _sourceBadgeLabel(theme.source).toLowerCase().contains(normalized) ||
+            (theme.metadata?.author?.toLowerCase().contains(normalized) ??
+                false) ||
+            (theme.metadata?.tags.any(
+                  (tag) => tag.toLowerCase().contains(normalized),
+                ) ??
+                false),
       )
       .toList(growable: false);
 }
@@ -515,15 +521,10 @@ class _ThemePickerRowState extends material.State<_ThemePickerRow> {
                 ),
                 material.SizedBox(width: context.scaled(6)),
                 material.Expanded(
-                  child: material.Text(
-                    widget.definition.name,
-                    maxLines: 1,
-                    overflow: material.TextOverflow.ellipsis,
-                    style: QueryaDropdownTokens.menuItemTextStyle(
-                      context,
-                      cs.popoverForeground,
-                      selected: widget.selected,
-                    ),
+                  child: _ThemePickerRowTitle(
+                    definition: widget.definition,
+                    colorScheme: cs,
+                    selected: widget.selected,
                   ),
                 ),
                 material.SizedBox(width: context.scaled(6)),
@@ -538,6 +539,64 @@ class _ThemePickerRowState extends material.State<_ThemePickerRow> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ThemePickerRowTitle extends material.StatelessWidget {
+  const _ThemePickerRowTitle({
+    required this.definition,
+    required this.colorScheme,
+    required this.selected,
+  });
+
+  final ThemeDefinition definition;
+  final ColorScheme colorScheme;
+  final bool selected;
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    final cs = colorScheme;
+    final subtitle = definition.metadata?.pickerSubtitle;
+
+    if (subtitle == null) {
+      return material.Text(
+        definition.name,
+        maxLines: 1,
+        overflow: material.TextOverflow.ellipsis,
+        style: QueryaDropdownTokens.menuItemTextStyle(
+          context,
+          cs.popoverForeground,
+          selected: selected,
+        ),
+      );
+    }
+
+    return material.Column(
+      crossAxisAlignment: material.CrossAxisAlignment.start,
+      mainAxisSize: material.MainAxisSize.min,
+      children: [
+        material.Text(
+          definition.name,
+          maxLines: 1,
+          overflow: material.TextOverflow.ellipsis,
+          style: QueryaDropdownTokens.menuItemTextStyle(
+            context,
+            cs.popoverForeground,
+            selected: selected,
+          ),
+        ),
+        material.Text(
+          subtitle,
+          maxLines: 1,
+          overflow: material.TextOverflow.ellipsis,
+          style: material.TextStyle(
+            fontSize: context.scaled(11),
+            height: 1.2,
+            color: cs.mutedForeground,
+          ),
+        ),
+      ],
     );
   }
 }
