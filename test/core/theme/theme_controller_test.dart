@@ -91,6 +91,7 @@ void main() {
 
   tearDown(() async {
     await ThemeController.instance.stopThemeFolderWatcher();
+    await ThemeController.instance.endEditorPreview();
     await AppSettings.instance.clearThemeSettings();
     await ThemeImportService.deletePersistedImport();
     if (await themesDir.exists()) {

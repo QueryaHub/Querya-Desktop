@@ -47,6 +47,44 @@ class QueryaThemeManifest {
   bool get isDark => type == QueryaThemeType.dark;
   bool get isLight => type == QueryaThemeType.light;
 
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{
+      'schema': schema,
+      'id': id,
+      'name': name,
+      'type': type.name,
+      'shadcn_colors': shadcnColors,
+      'editor_colors': editorColors,
+    };
+
+    if (tokenColors.isNotEmpty) {
+      json['tokenColors'] = tokenColors.map(_tokenColorRuleToJson).toList();
+    }
+    if (description != null) json['description'] = description;
+    if (author != null) json['author'] = author;
+    if (version != null) json['version'] = version;
+    if (homepage != null) json['homepage'] = homepage;
+    if (license != null) json['license'] = license;
+    if (preview != null) json['preview'] = preview;
+    if (tags.isNotEmpty) json['tags'] = tags;
+
+    return json;
+  }
+
+  String toJsonString() => const JsonEncoder.withIndent('  ').convert(toJson());
+
+  static Map<String, dynamic> _tokenColorRuleToJson(TokenColorRule rule) {
+    final settings = <String, dynamic>{};
+    if (rule.foreground != null) settings['foreground'] = rule.foreground;
+    if (rule.background != null) settings['background'] = rule.background;
+    if (rule.fontStyle != null) settings['fontStyle'] = rule.fontStyle;
+
+    return {
+      'scope': rule.scopes.length == 1 ? rule.scopes.first : rule.scopes,
+      if (settings.isNotEmpty) 'settings': settings,
+    };
+  }
+
   factory QueryaThemeManifest.fromJsonString(String source) {
     final cleaned = stripJsonc(source);
     final dynamic decoded;
