@@ -7,9 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned (0.4.3)
+## [0.4.3] - 2026-06-15
 
-Theme and extensions follow-ups — see [docs/planned-0.4.3.md](docs/planned-0.4.3.md): file watcher (TP-F1), marketplace metadata (TP-F2), visual theme editor (TP-F3), remote theme install (TP-F4).
+Theme follow-ups release (TP-F1–TP-F4, GitHub issues **#159–#163**). Git tag **`0.4.3`**.
+
+### Added
+
+- **Theme folder watcher (TP-F1)** — debounced `Directory.watch` on `{appSupport}/themes/` auto-refreshes the registry when files are added, removed, or renamed.
+- **Marketplace metadata (TP-F2)** — optional manifest fields (`homepage`, `license`, `preview`, `tags`); theme picker shows author/tags; `ExtensionManifest` stub in `lib/core/market/` for future Explore UI.
+- **Visual theme editor (TP-F3)** — Preferences section to tweak workbench colors with live preview and export `querya.theme.v1` JSON.
+- **Remote theme install (TP-F4)** — **Install from URL…** (HTTPS-only, public hosts, optional SHA-256); `ThemeRemoteInstallService` with checksum verify before import.
+- **Docs / QA** — remote install section in [theme-import.md](docs/theme-import.md); 0.4.3 items in [release-checklist.md](docs/release-checklist.md).
+- **Tests** — file watcher, remote install policy/service, theme editor and metadata coverage.
 
 ## [0.4.2] - 2026-06-14
 
