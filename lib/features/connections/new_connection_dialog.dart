@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/window_layout.dart';
+import 'package:querya_desktop/core/motion/querya_motion.dart';
+import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Database type for new connection.
@@ -383,8 +385,8 @@ class _DbTypeCardState extends material.State<_DbTypeCard> {
       child: material.GestureDetector(
         onTap: widget.onTap,
         child: material.AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          curve: material.Curves.easeOut,
+          duration: context.motionDuration(QueryaMotion.fast),
+          curve: context.motionCurve(QueryaMotion.enter),
           padding: const material.EdgeInsets.symmetric(vertical: 10, horizontal: 8),
           decoration: material.BoxDecoration(
             color: highlighted ? t.muted.withValues(alpha: 0.4) : t.muted.withValues(alpha: 0.12),
