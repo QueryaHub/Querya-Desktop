@@ -122,6 +122,23 @@ Built-in preset defaults apply for keys not present in the merged map.
 API: `ThemeController.setWorkbenchColor(key, color?)`,
 `ThemeController.clearColorOverrides()` (user layer only).
 
+## Remote install from URL (0.4.3+)
+
+**Preferences → Appearance → Install from URL…** downloads a theme over **HTTPS only**
+and imports it into `{appSupport}/themes/` using the same deduplication rules as
+**Import theme…**.
+
+- Public HTTPS URLs only (no `http://`, no private/loopback hosts in release builds).
+- Optional **SHA-256** checksum in the dialog or as `?sha256=` on the URL.
+- Invalid JSON or checksum mismatch aborts install; nothing is written to the themes folder.
+- No silent background downloads — install runs only after you confirm in the dialog.
+
+Trust model: treat remote theme URLs like any untrusted file; prefer checksums from a
+known publisher. Signature verification is not implemented yet.
+
+Implementation: `lib/core/theme/theme_remote_install_service.dart`,
+`lib/core/market/marketplace_client.dart` (stub for future Explore UI).
+
 ## Sample themes (manual import)
 
 - `themes/samples/cyberpunk-neon.json` — cyberpunk dark preset for UI + SQL/JSON tokens
