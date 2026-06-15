@@ -1,0 +1,14 @@
+{
+  "schema": "querya.theme.v1",
+  "id": "fixture-invalid-color",
+  "name": "Fixture Invalid Color",
+  "type": "dark",
+  "shadcn_colors": {
+    "primary": "not-a-color",
+    "background": "#101014"
+  },
+  "editor_colors": {
+    "background": "#0F1117",
+    "selection": "ZZZZZZ"
+  }
+}

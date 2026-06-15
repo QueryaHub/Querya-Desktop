@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'parser/vscode_theme_manifest.dart';
+import 'theme_definition.dart';
 
 /// Result of importing a VS Code theme file.
 sealed class ThemeImportResult {
@@ -31,9 +32,53 @@ class ThemeImportFailure extends ThemeImportResult {
   final String message;
 }
 
+/// Result of copying a theme file into the user themes directory.
+sealed class ThemeDefinitionImportResult {
+  const ThemeDefinitionImportResult();
+}
+
+final class ThemeDefinitionImportSuccess extends ThemeDefinitionImportResult {
+  const ThemeDefinitionImportSuccess({
+    required this.definition,
+    required this.reusedExisting,
+  });
+
+  final ThemeDefinition definition;
+  final bool reusedExisting;
+}
+
+final class ThemeDefinitionImportFailure extends ThemeDefinitionImportResult {
+  const ThemeDefinitionImportFailure(this.message);
+  final String message;
+}
+
 /// Parses and persists an imported VS Code theme under app support.
 abstract final class ThemeImportService {
-  static const String _storedFileName = 'imported.json';
+  static const String legacyImportedThemeId = 'imported';
+  static const String storedFileName = 'imported.json';
+
+  /// Lowercase slug for VS Code theme filenames.
+  static String slugifyThemeName(String name) {
+    final slug = name
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+        .replaceAll(RegExp(r'-+'), '-')
+        .replaceAll(RegExp(r'^-|-$'), '');
+    return slug.isEmpty ? 'vscode-theme' : slug;
+  }
+
+  /// Safe basename for theme files (without extension).
+  static String safeThemeFileBase(String value) {
+    final safe = value
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9._-]+'), '-')
+        .replaceAll(RegExp(r'-+'), '-')
+        .replaceAll(RegExp(r'^-|-$'), '');
+    return safe.isEmpty ? 'theme' : safe;
+  }
+
+  /// Path to the persisted legacy import copy under app support.
+  static Future<File> persistedImportFile() => _storedThemeFile();
 
   /// Reads [sourcePath], parses JSON/JSONC, copies to app data, returns colors.
   static Future<ThemeImportResult> importFromPath(String sourcePath) async {
@@ -109,6 +154,6 @@ abstract final class ThemeImportService {
 
   static Future<File> _storedThemeFile() async {
     final support = await getApplicationSupportDirectory();
-    return File(p.join(support.path, 'themes', _storedFileName));
+    return File(p.join(support.path, 'themes', storedFileName));
   }
 }

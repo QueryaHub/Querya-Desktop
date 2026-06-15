@@ -227,6 +227,55 @@ void main() {
       await AppSettings.instance.clearThemeColorOverrides();
       expect(await AppSettings.instance.getThemeColorOverrides(), isEmpty);
     });
+
+    test('selected theme registry id/source/path roundtrip', () async {
+      expect(await AppSettings.instance.getSelectedThemeId(), isNull);
+      expect(await AppSettings.instance.getSelectedThemeSource(), isNull);
+      expect(await AppSettings.instance.getSelectedThemePath(), isNull);
+
+      await AppSettings.instance.setSelectedThemeId('fixture-custom-dark');
+      await AppSettings.instance.setSelectedThemeSource('filesystem');
+      await AppSettings.instance.setSelectedThemePath(
+        '/data/themes/fixture-custom-dark.json',
+      );
+
+      expect(
+        await AppSettings.instance.getSelectedThemeId(),
+        'fixture-custom-dark',
+      );
+      expect(
+        await AppSettings.instance.getSelectedThemeSource(),
+        'filesystem',
+      );
+      expect(
+        await AppSettings.instance.getSelectedThemePath(),
+        '/data/themes/fixture-custom-dark.json',
+      );
+    });
+
+    test('clearSelectedThemeRegistry clears registry selection', () async {
+      await AppSettings.instance.setSelectedThemeId('fixture-custom-dark');
+      await AppSettings.instance.setSelectedThemeSource('imported');
+      await AppSettings.instance.setSelectedThemePath('/tmp/theme.json');
+
+      await AppSettings.instance.clearSelectedThemeRegistry();
+
+      expect(await AppSettings.instance.getSelectedThemeId(), isNull);
+      expect(await AppSettings.instance.getSelectedThemeSource(), isNull);
+      expect(await AppSettings.instance.getSelectedThemePath(), isNull);
+    });
+
+    test('clearThemeSettings clears selected registry theme', () async {
+      await AppSettings.instance.setSelectedThemeId('fixture-custom-light');
+      await AppSettings.instance.setSelectedThemeSource('filesystem');
+      await AppSettings.instance.setSelectedThemePath('/tmp/light.json');
+
+      await AppSettings.instance.clearThemeSettings();
+
+      expect(await AppSettings.instance.getSelectedThemeId(), isNull);
+      expect(await AppSettings.instance.getSelectedThemeSource(), isNull);
+      expect(await AppSettings.instance.getSelectedThemePath(), isNull);
+    });
   });
 
   group('ui scale', () {
