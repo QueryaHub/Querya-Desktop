@@ -11,8 +11,10 @@ import 'parser/vscode_theme_manifest.dart';
 import 'querya_theme.dart';
 import 'querya_theme_preset.dart';
 import 'theme_definition.dart';
+import 'theme_folder_watcher.dart';
 import 'theme_import_service.dart';
 import 'theme_load_result.dart';
+import 'theme_paths.dart';
 import 'theme_registry_service.dart';
 
 /// Active theme state: preset, optional imported colors, user overrides.
@@ -68,6 +70,7 @@ class ThemeController extends ChangeNotifier {
   QueryaTheme? _registryTheme;
   bool _registrySelectionFailed = false;
   bool _isLoadingAvailableThemes = false;
+  ThemeFolderWatcher? _themeFolderWatcher;
 
   QueryaTheme? _cachedLightTheme;
   QueryaTheme? _cachedDarkTheme;
@@ -170,6 +173,24 @@ class ThemeController extends ChangeNotifier {
   @visibleForTesting
   ThemeRegistryService get registryServiceForTest => _registryService;
 
+  @visibleForTesting
+  bool get isThemeFolderWatcherStarted =>
+      _themeFolderWatcher?.isStarted ?? false;
+
+  /// Watches `{appSupport}/themes/` and debounces [loadAvailableThemes].
+  Future<void> startThemeFolderWatcher() async {
+    _themeFolderWatcher ??= ThemeFolderWatcher(
+      themesDirectory: ThemePaths.userThemesDirectory,
+      onThemesChanged: loadAvailableThemes,
+    );
+    await _themeFolderWatcher!.start();
+  }
+
+  /// Stops the themes folder watcher (used in tests and app teardown).
+  Future<void> stopThemeFolderWatcher() async {
+    await _themeFolderWatcher?.stop();
+  }
+
   void _invalidateThemeCache() {
     _cachedLightTheme = null;
     _cachedDarkTheme = null;
@@ -217,6 +238,7 @@ class ThemeController extends ChangeNotifier {
       await _registryService.loadThemeDefinitions(),
     );
     await _restoreSelectedRegistryTheme();
+    await startThemeFolderWatcher();
 
     _loaded = true;
     _notifyThemeChanged();
