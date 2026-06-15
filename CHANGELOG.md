@@ -5,6 +5,26 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Planned (0.4.3)
+
+Theme and extensions follow-ups — see [docs/planned-0.4.3.md](docs/planned-0.4.3.md): file watcher (TP-F1), marketplace metadata (TP-F2), visual theme editor (TP-F3), remote theme install (TP-F4).
+
+## [0.4.2] - 2026-06-14
+
+Custom theme registry release (parser epic TP-01–TP-30, GitHub issues **#96–#125**). Git tag **`0.4.2`**.
+
+### Added
+
+- **Custom theme registry** — scan `{appSupport}/themes/` for `querya.theme.v1` and VS Code JSON/JSONC; **Theme** picker with search, hover preview, **Refresh themes**, and **Open themes folder** (Preferences → Appearance).
+- **Built-in bundled themes** — **Querya Cyberpunk Neon** from `assets/themes/` (no manual install).
+- **Theme import** — **Import theme…** copies into the user themes directory with content-hash and id deduplication; selection persists across restarts.
+- **Startup safety** — missing or broken selected theme falls back to Querya Dark with a Preferences error; saved theme id is kept until the user picks another theme.
+- **Window chrome** — title bar and window controls follow active `QueryaThemeScope` workbench tokens.
+- **Docs / QA** — [theme-custom-json.md](docs/theme-custom-json.md), updated [theme-import.md](docs/theme-import.md), custom-theme section in [release-checklist.md](docs/release-checklist.md).
+- **Tests** — registry/parser/controller coverage, 60-theme picker performance guard, end-to-end import flow (`theme_import_flow_test.dart`).
+
 ## [0.4.1] - 2026-06-13
 
 Performance and UX release ([#93](https://github.com/QueryaHub/Querya-Desktop/issues/93)). Git tag **`0.4.1`**.

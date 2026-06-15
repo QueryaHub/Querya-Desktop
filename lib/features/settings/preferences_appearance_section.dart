@@ -2,10 +2,14 @@ import 'dart:async' show unawaited;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart' as material;
-import 'package:querya_desktop/core/theme/querya_theme_preset.dart';
+import 'package:querya_desktop/core/platform/open_directory.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:querya_desktop/core/theme/theme_import_service.dart';
+import 'package:querya_desktop/core/theme/theme_load_result.dart';
+import 'package:querya_desktop/core/theme/theme_paths.dart';
 import 'package:querya_desktop/features/settings/preferences_controls.dart';
+import 'package:querya_desktop/features/settings/theme_picker_button.dart';
+import 'package:querya_desktop/features/settings/theme_preview_card.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Appearance / theme controls for [PreferencesDialog].
@@ -21,7 +25,9 @@ class _PreferencesAppearanceSectionState
     extends material.State<PreferencesAppearanceSection> {
   final _controller = ThemeController.instance;
   String? _importError;
+  String? _folderOpenError;
   bool _importing = false;
+  bool _openingThemesFolder = false;
 
   @override
   void initState() {
@@ -43,8 +49,16 @@ class _PreferencesAppearanceSectionState
     await _controller.setThemeMode(mode);
   }
 
-  Future<void> _setPreset(QueryaThemePreset preset) async {
-    await _controller.setPreset(preset);
+  Future<void> _setThemeById(String id) async {
+    await _controller.setThemeById(id);
+  }
+
+  Future<ThemePreviewResult> _previewThemeById(String id) async {
+    final result = await _controller.previewThemeById(id);
+    return switch (result) {
+      ThemeLoadSuccess(:final theme) => ThemePreviewResult.theme(theme),
+      ThemeLoadFailure(:final message) => ThemePreviewResult.error(message),
+    };
   }
 
   Future<void> _pickAndImportTheme() async {
@@ -64,12 +78,12 @@ class _PreferencesAppearanceSectionState
       if (file == null) return;
       final path = file.path;
       if (path.isEmpty) return;
-      final result = await _controller.importThemeFromFile(path);
+      final result = await _controller.importRegistryThemeFile(path);
       if (!mounted) return;
       switch (result) {
-        case ThemeImportSuccess():
+        case ThemeDefinitionImportSuccess():
           setState(() => _importError = null);
-        case ThemeImportFailure(:final message):
+        case ThemeDefinitionImportFailure(:final message):
           setState(() => _importError = message);
       }
     } finally {
@@ -84,6 +98,29 @@ class _PreferencesAppearanceSectionState
     if (mounted) setState(() => _importError = null);
   }
 
+  Future<void> _refreshThemes() async {
+    await _controller.loadAvailableThemes();
+  }
+
+  Future<void> _openThemesFolder() async {
+    setState(() {
+      _openingThemesFolder = true;
+      _folderOpenError = null;
+    });
+    try {
+      final dir = await ThemePaths.ensureUserThemesDirectory();
+      final opened = await openDirectoryInFileManager(dir.path);
+      if (!mounted) return;
+      if (!opened) {
+        setState(() => _folderOpenError = 'Could not open themes folder.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _openingThemesFolder = false);
+      }
+    }
+  }
+
   Future<void> _setThemeAnimation(bool enabled) async {
     await _controller.setThemeAnimationEnabled(enabled);
   }
@@ -91,9 +128,8 @@ class _PreferencesAppearanceSectionState
   @override
   material.Widget build(material.BuildContext context) {
     final c = _controller;
-    final importedLabel = c.hasImportedTheme
-        ? 'Imported: ${c.importedThemeName ?? 'theme'}'
-        : 'Imported theme (none)';
+    final themes = c.availableThemes;
+    final refreshingThemes = c.isLoadingAvailableThemes;
 
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.start,
@@ -125,27 +161,38 @@ class _PreferencesAppearanceSectionState
         ),
         const material.SizedBox(height: 12),
         PreferencesFieldRow(
-          label: 'Color preset',
-          control: PreferencesDropdownMenu<QueryaThemePreset>(
-            value: c.preset,
-            onSelected: (v) {
-              if (v != null) unawaited(_setPreset(v));
-            },
-            entries: [
-              const material.DropdownMenuEntry(
-                value: QueryaThemePreset.queryaDark,
-                label: 'Querya Dark',
+          label: 'Theme',
+          control: ThemePickerButton(
+            themes: themes,
+            selectedThemeId: c.effectiveSelectedThemeId,
+            expandToParent: true,
+            isLoading: refreshingThemes,
+            onSelected: (id) => unawaited(_setThemeById(id)),
+            onPreviewTheme: _previewThemeById,
+          ),
+        ),
+        if (c.selectedThemeLoadError != null) ...[
+          const material.SizedBox(height: 8),
+          material.Padding(
+            padding: const material.EdgeInsets.only(
+              left: kPreferencesLabelWidth + 12,
+            ),
+            child: material.Text(
+              c.selectedThemeLoadError!,
+              style: material.TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.destructive,
               ),
-              const material.DropdownMenuEntry(
-                value: QueryaThemePreset.queryaLight,
-                label: 'Querya Light',
-              ),
-              material.DropdownMenuEntry(
-                value: QueryaThemePreset.imported,
-                enabled: c.hasImportedTheme,
-                label: importedLabel,
-              ),
-            ],
+            ),
+          ),
+        ],
+        const material.SizedBox(height: 8),
+        const material.Padding(
+          padding: material.EdgeInsets.only(left: kPreferencesLabelWidth + 12),
+          child: PreferencesHint(
+            'Themes are loaded from the app support themes folder. '
+            'Drop .json or .jsonc files there, then use Refresh themes. '
+            'The folder is not watched automatically.',
           ),
         ),
         const material.SizedBox(height: 12),
@@ -189,6 +236,22 @@ class _PreferencesAppearanceSectionState
               child: material.Text(_importing ? 'Importing…' : 'Import theme…'),
             ),
             OutlineButton(
+              onPressed: (_importing || refreshingThemes)
+                  ? null
+                  : () => unawaited(_refreshThemes()),
+              child: material.Text(
+                refreshingThemes ? 'Refreshing…' : 'Refresh themes',
+              ),
+            ),
+            OutlineButton(
+              onPressed: (_importing || _openingThemesFolder)
+                  ? null
+                  : () => unawaited(_openThemesFolder()),
+              child: material.Text(
+                _openingThemesFolder ? 'Opening…' : 'Open themes folder',
+              ),
+            ),
+            OutlineButton(
               onPressed: () => unawaited(_resetAppearance()),
               child: const Text('Reset appearance'),
             ),
@@ -204,9 +267,20 @@ class _PreferencesAppearanceSectionState
             ),
           ),
         ],
+        if (_folderOpenError != null) ...[
+          const material.SizedBox(height: 8),
+          material.Text(
+            _folderOpenError!,
+            style: material.TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.destructive,
+            ),
+          ),
+        ],
         const material.SizedBox(height: 4),
         const PreferencesHint(
-          'Import VS Code theme JSON/JSONC (.colors subset). Changes apply immediately.',
+          'Import copies a theme into the themes folder. '
+          'VS Code JSON/JSONC (.colors subset) and Querya custom JSON are supported.',
         ),
       ],
     );

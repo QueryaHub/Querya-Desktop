@@ -14,6 +14,7 @@ Index of Querya Desktop documentation, grouped by audience.
 - [Architecture](architecture.md) — `lib/` layout and module responsibilities.
 - [Theme system](theme.md) — runtime theming and VS Code theme tokens.
 - [Theme import](theme-import.md) — supported `colors` keys and merge behavior.
+- [Custom theme JSON](theme-custom-json.md) — `querya.theme.v1` schema and fallback rules.
 - [Performance baseline](perf-baseline.md) — per-milestone DevTools checklist.
 
 ## For release managers
@@ -25,6 +26,11 @@ Index of Querya Desktop documentation, grouped by audience.
 ## Planning
 
 - [Roadmap](roadmap.md) — current direction and follow-ups.
+- [Planned 0.4.3](planned-0.4.3.md) — deferred theme/extensions follow-ups after 0.4.2.
+- [Custom theme parser requirements](scheme-parcer.md) — JSON theme format and scaling spec.
+- [Theme parser implementation plan](theme-parser-implementation-tasks.md) — task breakdown and architecture.
+- [Theme parser GitHub issues](theme-parser-github-issues.md) — issue templates for epic #96–#125.
+- [Marketplace extensions spec](market-tech.md) — extensions manager and marketplace integration.
 
 ## Archive
 
