@@ -67,6 +67,7 @@ Root cause (engine): per `flutter/flutter#160952`, the engine "can render at 120
 - **Windows / Linux:** most likely already render at monitor Hz; the job is to **measure and verify**, then ensure no app-side code caps frames (e.g. heavy `setState`, unbounded rebuilds during animation).
 - **macOS:** the real high-Hz work — confirm ProMotion behavior; unlock via `refresh_rate` if capped at 60.
 - Use `refresh_rate` (or a thin wrapper) primarily for **diagnostics**: a debug-only FPS/Hz overlay and a benchmark to prove smoothness on each machine, plus the macOS unlock call in `main()`.
+- **Implementation:** `lib/core/motion/display_refresh_service.dart` calls `RefreshRate.enable()` in `main()`. Debug Hz badge: `flutter run --dart-define=QUERYA_REFRESH_OVERLAY=true`.
 
 ---
 
