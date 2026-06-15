@@ -229,7 +229,12 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
               ],
             ),
             // Expanded database children
-            if (_expanded) ...[
+            QueryaAnimatedExpand(
+              expanded: _expanded,
+              child: material.Column(
+                mainAxisSize: material.MainAxisSize.min,
+                crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                children: [
               if (_loading)
                 material.Padding(
                   padding: const material.EdgeInsets.only(left: 28, top: 4, bottom: 4),
@@ -301,6 +306,8 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
                   },
                 ),
             ],
+              ),
+            ),
           ],
         ),
       ),
