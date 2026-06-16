@@ -66,7 +66,6 @@ void main() {
       await themesDir.delete(recursive: true);
     }
     ThemeController.instance.setRegistryServiceForTest(ThemeRegistryService());
-    await ThemeController.instance.load();
   });
 
   group('ThemeRemoteInstallService', () {

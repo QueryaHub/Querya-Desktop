@@ -83,7 +83,6 @@ void main() {
         assetLoader: _fixtureAssetLoader,
       ),
     );
-    await ThemeController.instance.load();
   });
 
   tearDownAll(() async {
