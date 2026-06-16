@@ -12,6 +12,7 @@ Living document for planned work. Not a commitment order; adjust as priorities c
 - **Shipped in 0.4.4:** UI motion polish + high refresh rate (90/120/144 Hz), memory and security fixes — [planned-0.4.4.md](planned-0.4.4.md), [motion-and-high-refresh.md](motion-and-high-refresh.md), epic [#170](https://github.com/QueryaHub/Querya-Desktop/issues/170), milestone [0.4.4](https://github.com/QueryaHub/Querya-Desktop/milestone/3).
 - **Planned 0.4.5:** SQLite Database Connector — [planned-0.4.5.md](planned-0.4.5.md), milestone [0.4.5](https://github.com/QueryaHub/Querya-Desktop/milestones).
 - **Planned 0.4.6+:** Extensions sidebar and marketplace Explore UI — [market-tech.md](market-tech.md).
+
 - **Optional:** Preferences → **Animate theme changes** (off by default).
 - **Later:** P2 Mongo/Redis token colors; `re_editor` if perf gap; LSP epic per
   [archive/code-forge-evaluation.md](archive/code-forge-evaluation.md) (**NO-GO** on `code_forge` for 0.3).
