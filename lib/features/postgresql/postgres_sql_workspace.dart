@@ -261,7 +261,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
   Future<void> _execute() async {
     final userSql = _sqlController.text.trim();
     if (userSql.isEmpty) return;
-    var sql = userSql;
+    var sql = injectSqlLimit(userSql, _resultMaxRows);
 
     setState(() {
       _running = true;
@@ -323,9 +323,9 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
           _statusLine =
               'Command completed. Rows affected: ${result.affectedRows}.';
         } else {
-          final truncated = result.length > cap;
+          final truncated = result.length >= cap;
           _statusLine = truncated
-              ? 'Showing first $cap of ${result.length} row(s).'
+              ? 'Showing first $cap row(s) (result capped).'
               : '${result.length} row(s).';
         }
         _running = false;

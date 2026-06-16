@@ -1,5 +1,8 @@
-import 'package:flutter/material.dart' as material show Alignment, Axis, Container, EdgeInsets, BoxDecoration, GestureDetector, Padding, BorderRadius, Center, Icon, Icons, MouseRegion, AnimatedContainer, AnimatedScale, Curves, SystemMouseCursors, SizedBox, SingleChildScrollView, Row, MainAxisSize;
+import 'package:flutter/material.dart' as material show Alignment, Axis, Container, EdgeInsets, BoxDecoration, GestureDetector, Padding, BorderRadius, Center, Icon, Icons, MouseRegion, AnimatedContainer, AnimatedScale, SystemMouseCursors, SizedBox, SingleChildScrollView, Row, MainAxisSize;
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
+import 'package:querya_desktop/core/motion/querya_cross_fade_stack.dart';
+import 'package:querya_desktop/core/motion/querya_motion.dart';
+import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -210,7 +213,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
             ),
             const Divider(height: 1),
             Expanded(
-              child: IndexedStack(
+              child: QueryaCrossFadeStack(
                 index: _editorTabIndex,
                 children: const [
                   QueryEditorTab(),
@@ -231,7 +234,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
             ),
             const Divider(height: 1),
             Expanded(
-              child: IndexedStack(
+              child: QueryaCrossFadeStack(
                 index: _outputTabIndex,
                 children: const [
                   ResultsTab(),
@@ -341,8 +344,8 @@ class _TabButtonState extends State<_TabButton> {
         child: material.GestureDetector(
           onTap: widget.onTap,
           child: material.AnimatedContainer(
-            duration: const Duration(milliseconds: 120),
-            curve: material.Curves.easeOut,
+            duration: context.motionDuration(QueryaMotion.fast),
+            curve: context.motionCurve(QueryaMotion.enter),
             padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: material.BoxDecoration(
               color: bgColor,
@@ -376,8 +379,8 @@ class _RunButtonState extends State<_RunButton> {
       cursor: material.SystemMouseCursors.click,
       child: material.AnimatedScale(
         scale: _hovered ? 1.03 : 1.0,
-        duration: const Duration(milliseconds: 100),
-        curve: material.Curves.easeOut,
+        duration: context.motionDuration(QueryaMotion.fast),
+        curve: context.motionCurve(QueryaMotion.enter),
         child: OutlineButton(
           onPressed: () {},
           leading: const material.Icon(material.Icons.play_arrow, size: 18),

@@ -2,6 +2,9 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import 'package:querya_desktop/core/motion/querya_motion.dart';
+import 'package:querya_desktop/core/motion/querya_motion_context.dart';
+
 /// Shows a modal dialog with a frosted, dimmed backdrop over the app.
 ///
 /// Use instead of [showDialog] so every overlay has consistent blur.
@@ -15,7 +18,7 @@ Future<T?> showAppDialog<T>({
     barrierDismissible: false,
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
     barrierColor: Colors.transparent,
-    transitionDuration: const Duration(milliseconds: 200),
+    transitionDuration: context.motionDuration(QueryaMotion.standard),
     pageBuilder: (ctx, animation, secondaryAnimation) {
       return _BlurredDialogScaffold(
         barrierDismissible: barrierDismissible,
@@ -44,12 +47,11 @@ class _BlurredDialogScaffold extends StatelessWidget {
   final Animation<double> animation;
   final Widget child;
 
-  // Eased curve for dialog card fade-in / scale-up.
-  static final _curve = CurveTween(curve: Curves.easeOutCubic);
-
   @override
   Widget build(BuildContext context) {
-    final curved = animation.drive(_curve);
+    final curved = animation.drive(
+      CurveTween(curve: context.motionCurve(QueryaMotion.enter)),
+    );
     return Material(
       type: MaterialType.transparency,
       child: Stack(

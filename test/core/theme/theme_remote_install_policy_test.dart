@@ -57,5 +57,53 @@ void main() {
         isFalse,
       );
     });
+
+    test('rejects link-local, unique-local, unspecified, and multicast IPv6 addresses', () {
+      expect(
+        ThemeRemoteInstallPolicy.isAllowedUrl(
+          Uri.parse('https://[fe80::1]/theme.json'),
+          allowLocalhostInDebug: false,
+        ),
+        isFalse,
+      );
+      expect(
+        ThemeRemoteInstallPolicy.isAllowedUrl(
+          Uri.parse('https://[fd00::1]/theme.json'),
+          allowLocalhostInDebug: false,
+        ),
+        isFalse,
+      );
+      expect(
+        ThemeRemoteInstallPolicy.isAllowedUrl(
+          Uri.parse('https://[ff02::1]/theme.json'),
+          allowLocalhostInDebug: false,
+        ),
+        isFalse,
+      );
+      expect(
+        ThemeRemoteInstallPolicy.isAllowedUrl(
+          Uri.parse('https://[::]/theme.json'),
+          allowLocalhostInDebug: false,
+        ),
+        isFalse,
+      );
+    });
+
+    test('rejects loopback and private IPv4-mapped IPv6 addresses', () {
+      expect(
+        ThemeRemoteInstallPolicy.isAllowedUrl(
+          Uri.parse('https://[::ffff:127.0.0.1]/theme.json'),
+          allowLocalhostInDebug: false,
+        ),
+        isFalse,
+      );
+      expect(
+        ThemeRemoteInstallPolicy.isAllowedUrl(
+          Uri.parse('https://[::ffff:192.168.1.10]/theme.json'),
+          allowLocalhostInDebug: false,
+        ),
+        isFalse,
+      );
+    });
   });
 }
