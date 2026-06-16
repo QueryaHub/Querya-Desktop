@@ -239,11 +239,12 @@ class MysqlConnection {
   Future<IResultSet> execute(
     String sql, [
     Map<String, dynamic>? params,
+    bool iterable = false,
   ]) async {
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to MySQL');
     }
-    return _conn!.execute(sql, params);
+    return _conn!.execute(sql, params, iterable);
   }
 
   /// Runs [execute] with an application-level [timeout] (driver limits still apply).
@@ -251,8 +252,9 @@ class MysqlConnection {
     String sql, {
     Duration? timeout,
     Map<String, dynamic>? params,
+    bool iterable = false,
   }) async {
-    final f = execute(sql, params);
+    final f = execute(sql, params, iterable);
     if (timeout == null) return f;
     return f.timeout(timeout);
   }
