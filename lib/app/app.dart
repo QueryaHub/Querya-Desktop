@@ -48,7 +48,12 @@ class QueryaApp extends StatelessWidget {
                       scale: scale,
                       child: MediaQuery(
                         data: (mq ?? const MediaQueryData()).copyWith(
-                          textScaler: TextScaler.linear(scale),
+                          textScaler: TextScaler.linear(
+                            (mq ?? const MediaQueryData())
+                                    .textScaler
+                                    .scale(1.0) *
+                                scale,
+                          ),
                         ),
                         child: QueryaThemeScope(
                           data: queryaTheme,

@@ -205,8 +205,8 @@ class _PostgresSequenceViewState extends material.State<PostgresSequenceView> {
                 OutlineButton(
                   size: ButtonSize.small,
                   onPressed: _connectAndLoad,
-                  leading: const material.Icon(
-                      material.Icons.refresh_rounded, size: 14),
+                  leading: const material.Icon(material.Icons.refresh_rounded,
+                      size: 14),
                   child: const Text('Refresh'),
                 ),
               ],

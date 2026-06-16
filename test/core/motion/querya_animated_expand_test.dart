@@ -3,7 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/motion/querya_animated_expand.dart';
 
 void main() {
-  testWidgets('QueryaAnimatedExpand hides child when collapsed', (tester) async {
+  testWidgets('QueryaAnimatedExpand hides child when collapsed',
+      (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: _ExpandHost(expanded: false),

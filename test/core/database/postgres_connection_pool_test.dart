@@ -97,8 +97,10 @@ void main() {
 
       final pool = PostgresConnectionPool(createAndConnect: factory);
       final r = _row();
-      final ro = await pool.acquire(r, database: 'postgres', mode: PgSessionMode.readOnly);
-      final rw = await pool.acquire(r, database: 'postgres', mode: PgSessionMode.readWrite);
+      final ro = await pool.acquire(r,
+          database: 'postgres', mode: PgSessionMode.readOnly);
+      final rw = await pool.acquire(r,
+          database: 'postgres', mode: PgSessionMode.readWrite);
       expect(identical(ro.connection, rw.connection), isFalse);
       expect(created.length, 2);
       ro.release();

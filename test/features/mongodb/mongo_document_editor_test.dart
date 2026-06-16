@@ -60,7 +60,8 @@ void main() {
     expect(find.textContaining('Invalid JSON'), findsNothing);
   });
 
-  testWidgets('invalid JSON shows error banner without breaking editor', (tester) async {
+  testWidgets('invalid JSON shows error banner without breaking editor',
+      (tester) async {
     await pumpEditor(tester);
     await tester.enterText(find.byType(material.EditableText), '{not json');
     await tester.pump();
@@ -81,10 +82,12 @@ void main() {
 
     final editorFinder = find.byType(QueryaCodeEditor);
     final container = tester.widget<material.Container>(
-      find.ancestor(
-        of: editorFinder,
-        matching: find.byType(material.Container),
-      ).first,
+      find
+          .ancestor(
+            of: editorFinder,
+            matching: find.byType(material.Container),
+          )
+          .first,
     );
     expect(container.color, bg);
   });

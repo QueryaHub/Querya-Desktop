@@ -17,7 +17,8 @@ class ThemeEditorSection extends material.StatefulWidget {
   const ThemeEditorSection({super.key});
 
   @override
-  material.State<ThemeEditorSection> createState() => _ThemeEditorSectionState();
+  material.State<ThemeEditorSection> createState() =>
+      _ThemeEditorSectionState();
 }
 
 class _ThemeEditorSectionState extends material.State<ThemeEditorSection> {

@@ -26,7 +26,8 @@ void main() {
     expect(tapped, isTrue);
   });
 
-  testWidgets('WorkspaceEmptyHero mock uses workbench surface color', (tester) async {
+  testWidgets('WorkspaceEmptyHero mock uses workbench surface color',
+      (tester) async {
     const surface = material.Color(0xFFABCDEF);
     final theme = QueryaTheme.darkDefault.copyWith(
       workbench: QueryaTheme.darkDefault.workbench.copyWith(surface: surface),
@@ -44,12 +45,15 @@ void main() {
     );
     await tester.pump();
 
-    final container = tester.widgetList<material.Container>(
-      find.byType(material.Container),
-    ).firstWhere(
-      (c) => c.decoration is material.BoxDecoration &&
-          (c.decoration! as material.BoxDecoration).color == surface,
-    );
+    final container = tester
+        .widgetList<material.Container>(
+          find.byType(material.Container),
+        )
+        .firstWhere(
+          (c) =>
+              c.decoration is material.BoxDecoration &&
+              (c.decoration! as material.BoxDecoration).color == surface,
+        );
     expect(container.decoration, isNotNull);
   });
 }

@@ -4,7 +4,8 @@ import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 
 void main() {
-  testWidgets('dialogConstraints scales with QueryaUiScaleScope', (tester) async {
+  testWidgets('dialogConstraints scales with QueryaUiScaleScope',
+      (tester) async {
     await tester.pumpWidget(
       QueryaUiScaleScope(
         scale: 1.25,
@@ -28,7 +29,8 @@ void main() {
     );
   });
 
-  testWidgets('scaledDialogExtent applies scale before viewport clamp', (tester) async {
+  testWidgets('scaledDialogExtent applies scale before viewport clamp',
+      (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         builder: (context, child) => QueryaUiScaleScope(

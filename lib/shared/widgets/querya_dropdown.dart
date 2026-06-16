@@ -59,7 +59,7 @@ class QueryaDropdown<T> extends material.StatefulWidget {
 class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
   late material.MenuController _controller;
   bool _triggerHovered = false;
-  bool _menuOpen = false;
+  final material.ValueNotifier<bool> _menuOpen = material.ValueNotifier(false);
   List<material.Widget>? _cachedMenuChildren;
   List<QueryaDropdownItem<T>>? _cachedMenuItems;
   T? _cachedMenuValue;
@@ -68,6 +68,12 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
   void initState() {
     super.initState();
     _controller = widget.controller ?? material.MenuController();
+  }
+
+  @override
+  void dispose() {
+    _menuOpen.dispose();
+    super.dispose();
   }
 
   @override
@@ -154,8 +160,11 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
       cursor: widget.enabled
           ? material.SystemMouseCursors.click
           : material.SystemMouseCursors.basic,
-      onEnter: widget.enabled ? (_) => setState(() => _triggerHovered = true) : null,
-      onExit: widget.enabled ? (_) => setState(() => _triggerHovered = false) : null,
+      onEnter:
+          widget.enabled ? (_) => setState(() => _triggerHovered = true) : null,
+      onExit: widget.enabled
+          ? (_) => setState(() => _triggerHovered = false)
+          : null,
       child: material.AnimatedContainer(
         duration: context.motionDuration(QueryaMotion.fast),
         curve: context.motionCurve(QueryaMotion.enter),
@@ -230,8 +239,8 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
 
     final anchor = material.MenuAnchor(
       controller: _controller,
-      onOpen: () => setState(() => _menuOpen = true),
-      onClose: () => setState(() => _menuOpen = false),
+      onOpen: () => _menuOpen.value = true,
+      onClose: () => _menuOpen.value = false,
       crossAxisUnconstrained: false,
       alignmentOffset: material.Offset(
         widget.alignmentOffset.dx,
@@ -262,7 +271,7 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
       ),
       menuChildren: [
         _QueryaDropdownMenuEnter(
-          open: _menuOpen,
+          openNotifier: _menuOpen,
           child: material.Column(
             mainAxisSize: material.MainAxisSize.min,
             crossAxisAlignment: material.CrossAxisAlignment.stretch,
@@ -294,28 +303,33 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
 
 class _QueryaDropdownMenuEnter extends material.StatelessWidget {
   const _QueryaDropdownMenuEnter({
-    required this.open,
+    required this.openNotifier,
     required this.child,
   });
 
-  final bool open;
+  final material.ValueNotifier<bool> openNotifier;
   final material.Widget child;
 
   @override
   material.Widget build(material.BuildContext context) {
     final duration = context.motionDuration(QueryaMotion.standard);
     final curve = context.motionCurve(QueryaMotion.enter);
-    return material.AnimatedScale(
-      scale: open ? 1 : 0.96,
-      alignment: material.Alignment.topCenter,
-      duration: duration,
-      curve: curve,
-      child: material.AnimatedOpacity(
-        opacity: open ? 1 : 0,
-        duration: duration,
-        curve: curve,
-        child: child,
-      ),
+    return material.ValueListenableBuilder<bool>(
+      valueListenable: openNotifier,
+      builder: (context, open, _) {
+        return material.AnimatedScale(
+          scale: open ? 1 : 0.96,
+          alignment: material.Alignment.topCenter,
+          duration: duration,
+          curve: curve,
+          child: material.AnimatedOpacity(
+            opacity: open ? 1 : 0,
+            duration: duration,
+            curve: curve,
+            child: child,
+          ),
+        );
+      },
     );
   }
 }
@@ -340,7 +354,8 @@ class _QueryaDropdownMenuItem<T> extends material.StatefulWidget {
       _QueryaDropdownMenuItemState<T>();
 }
 
-class _QueryaDropdownMenuItemState<T> extends material.State<_QueryaDropdownMenuItem<T>> {
+class _QueryaDropdownMenuItemState<T>
+    extends material.State<_QueryaDropdownMenuItem<T>> {
   bool _hovered = false;
 
   material.Widget _leading(material.BuildContext context, ColorScheme cs) {
@@ -394,8 +409,10 @@ class _QueryaDropdownMenuItemState<T> extends material.State<_QueryaDropdownMenu
           curve: context.motionCurve(QueryaMotion.enter),
           constraints: material.BoxConstraints(minHeight: itemHeight),
           padding: material.EdgeInsets.symmetric(
-            horizontal: context.scaled(QueryaDropdownTokens.menuItemPadding.horizontal),
-            vertical: context.scaled(QueryaDropdownTokens.menuItemPadding.vertical),
+            horizontal:
+                context.scaled(QueryaDropdownTokens.menuItemPadding.horizontal),
+            vertical:
+                context.scaled(QueryaDropdownTokens.menuItemPadding.vertical),
           ),
           decoration: material.BoxDecoration(
             color: bg,

@@ -173,12 +173,12 @@ class _PgTreeRow extends material.StatelessWidget {
               color: theme.colorScheme.mutedForeground,
             ),
             onPressed: (_) => onOpenSqlWorkspace!(
-                  connection!,
-                  database: openSqlDatabase,
-                  schema: openSqlSchema,
-                  name: openSqlName,
-                  kind: openSqlKind,
-                ),
+              connection!,
+              database: openSqlDatabase,
+              schema: openSqlSchema,
+              name: openSqlName,
+              kind: openSqlKind,
+            ),
             child: const Text('Open in SQL'),
           ),
         if (onContextDelete != null)
@@ -242,7 +242,8 @@ class _PgDatabasesNodeState extends State<_PgDatabasesNode> {
               itemBuilder: (context, index) {
                 final db = widget.databases[index];
                 return _PgDatabaseNode(
-                  key: material.ValueKey('pg-db-${widget.connection.id ?? 0}-$db'),
+                  key: material.ValueKey(
+                      'pg-db-${widget.connection.id ?? 0}-$db'),
                   connection: widget.connection,
                   databaseName: db,
                   onPostgresObjectSelected: widget.onPostgresObjectSelected,
@@ -358,53 +359,54 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
               mainAxisSize: material.MainAxisSize.min,
               crossAxisAlignment: material.CrossAxisAlignment.stretch,
               children: [
-            _PgDbToolRow(
-              connection: widget.connection,
-              databaseName: widget.databaseName,
-              label: 'Extensions',
-              icon: material.Icons.extension_rounded,
-              kind: PostgresObjectKind.databaseExtensions,
-              onPostgresObjectSelected: widget.onPostgresObjectSelected,
-              onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
-              onContextRefresh: _loadSchemas,
-            ),
-            _PgDbToolRow(
-              connection: widget.connection,
-              databaseName: widget.databaseName,
-              label: 'Foreign data',
-              icon: material.Icons.public_rounded,
-              kind: PostgresObjectKind.databaseForeignData,
-              onPostgresObjectSelected: widget.onPostgresObjectSelected,
-              onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
-              onContextRefresh: _loadSchemas,
-            ),
-            if (_loading)
-              material.Padding(
-                padding:
-                    const material.EdgeInsets.only(left: 24, top: 2, bottom: 2),
-                child: material.Row(
-                  children: [
-                    const material.SizedBox(
-                      width: 10,
-                      height: 10,
-                      child:
-                          material.CircularProgressIndicator(strokeWidth: 1.5),
-                    ),
-                    const Gap(6),
-                    const Text('Loading...').muted().xSmall(),
-                  ],
+                _PgDbToolRow(
+                  connection: widget.connection,
+                  databaseName: widget.databaseName,
+                  label: 'Extensions',
+                  icon: material.Icons.extension_rounded,
+                  kind: PostgresObjectKind.databaseExtensions,
+                  onPostgresObjectSelected: widget.onPostgresObjectSelected,
+                  onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
+                  onContextRefresh: _loadSchemas,
                 ),
-              ),
-            if (_schemas.isNotEmpty)
-              _PgSchemasNode(
-                connection: widget.connection,
-                databaseName: widget.databaseName,
-                schemas: _schemas,
-                onPostgresObjectSelected: widget.onPostgresObjectSelected,
-                onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
-                onRefreshSchemas: _loadSchemas,
-              ),
-            ],
+                _PgDbToolRow(
+                  connection: widget.connection,
+                  databaseName: widget.databaseName,
+                  label: 'Foreign data',
+                  icon: material.Icons.public_rounded,
+                  kind: PostgresObjectKind.databaseForeignData,
+                  onPostgresObjectSelected: widget.onPostgresObjectSelected,
+                  onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
+                  onContextRefresh: _loadSchemas,
+                ),
+                if (_loading)
+                  material.Padding(
+                    padding: const material.EdgeInsets.only(
+                        left: 24, top: 2, bottom: 2),
+                    child: material.Row(
+                      children: [
+                        const material.SizedBox(
+                          width: 10,
+                          height: 10,
+                          child: material.CircularProgressIndicator(
+                              strokeWidth: 1.5),
+                        ),
+                        const Gap(6),
+                        const Text('Loading...').muted().xSmall(),
+                      ],
+                    ),
+                  ),
+                if (_schemas.isNotEmpty)
+                  _PgSchemasNode(
+                    connection: widget.connection,
+                    databaseName: widget.databaseName,
+                    schemas: _schemas,
+                    onPostgresObjectSelected: widget.onPostgresObjectSelected,
+                    onPostgresOpenSqlWorkspace:
+                        widget.onPostgresOpenSqlWorkspace,
+                    onRefreshSchemas: _loadSchemas,
+                  ),
+              ],
             ),
           ),
         ],
@@ -625,8 +627,7 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
       final views = await conn.listViews(schema: widget.schemaName);
       List<String> matviews = [];
       try {
-        matviews =
-            await conn.listMaterializedViews(schema: widget.schemaName);
+        matviews = await conn.listMaterializedViews(schema: widget.schemaName);
       } catch (_) {
         // pg_matviews / permissions may fail on some servers; keep tree usable.
       }
@@ -689,159 +690,167 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
               mainAxisSize: material.MainAxisSize.min,
               crossAxisAlignment: material.CrossAxisAlignment.stretch,
               children: [
-            if (_loading)
-              material.Padding(
-                padding:
-                    const material.EdgeInsets.only(left: 24, top: 2, bottom: 2),
-                child: material.Row(
-                  children: [
-                    const material.SizedBox(
-                      width: 10,
-                      height: 10,
-                      child:
-                          material.CircularProgressIndicator(strokeWidth: 1.5),
+                if (_loading)
+                  material.Padding(
+                    padding: const material.EdgeInsets.only(
+                        left: 24, top: 2, bottom: 2),
+                    child: material.Row(
+                      children: [
+                        const material.SizedBox(
+                          width: 10,
+                          height: 10,
+                          child: material.CircularProgressIndicator(
+                              strokeWidth: 1.5),
+                        ),
+                        const Gap(6),
+                        const Text('Loading...').muted().xSmall(),
+                      ],
                     ),
-                    const Gap(6),
-                    const Text('Loading...').muted().xSmall(),
-                  ],
-                ),
-              ),
-            if (_loaded) ...[
-              _PgObjectGroup(
-                connection: widget.connection,
-                databaseName: widget.databaseName,
-                schemaName: widget.schemaName,
-                objectKind: PostgresObjectKind.table,
-                onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
-                onRefresh: _loadObjects,
-                label: 'Tables',
-                icon: material.Icons.table_chart_rounded,
-                items: _tables,
-                onItemTap: widget.onPostgresObjectSelected != null
-                    ? (name) => widget.onPostgresObjectSelected!(
-                          widget.connection,
-                          widget.databaseName,
-                          widget.schemaName,
-                          name,
-                          PostgresObjectKind.table,
-                        )
-                    : null,
-              ),
-              _PgObjectGroup(
-                connection: widget.connection,
-                databaseName: widget.databaseName,
-                schemaName: widget.schemaName,
-                objectKind: PostgresObjectKind.view,
-                onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
-                onRefresh: _loadObjects,
-                label: 'Views',
-                icon: material.Icons.view_agenda_rounded,
-                items: _views,
-                onItemTap: widget.onPostgresObjectSelected != null
-                    ? (name) => widget.onPostgresObjectSelected!(
-                          widget.connection,
-                          widget.databaseName,
-                          widget.schemaName,
-                          name,
-                          PostgresObjectKind.view,
-                        )
-                    : null,
-              ),
-              _PgObjectGroup(
-                connection: widget.connection,
-                databaseName: widget.databaseName,
-                schemaName: widget.schemaName,
-                objectKind: PostgresObjectKind.materializedView,
-                onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
-                onRefresh: _loadObjects,
-                label: 'Materialized views',
-                icon: material.Icons.dynamic_feed_rounded,
-                items: _matviews,
-                onItemTap: widget.onPostgresObjectSelected != null
-                    ? (name) => widget.onPostgresObjectSelected!(
-                          widget.connection,
-                          widget.databaseName,
-                          widget.schemaName,
-                          name,
-                          PostgresObjectKind.materializedView,
-                        )
-                    : null,
-              ),
-              _PgObjectGroup(
-                connection: widget.connection,
-                databaseName: widget.databaseName,
-                schemaName: widget.schemaName,
-                objectKind: PostgresObjectKind.function,
-                onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
-                onRefresh: _loadObjects,
-                label: 'Functions',
-                icon: material.Icons.functions_rounded,
-                items: _functions,
-                onItemTap: widget.onPostgresObjectSelected != null
-                    ? (name) => widget.onPostgresObjectSelected!(
-                          widget.connection,
-                          widget.databaseName,
-                          widget.schemaName,
-                          name,
-                          PostgresObjectKind.function,
-                        )
-                    : null,
-              ),
-              _PgObjectGroup(
-                connection: widget.connection,
-                databaseName: widget.databaseName,
-                schemaName: widget.schemaName,
-                objectKind: PostgresObjectKind.sequence,
-                onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
-                onRefresh: _loadObjects,
-                label: 'Sequences',
-                icon: material.Icons.format_list_numbered_rounded,
-                items: _sequences,
-                onItemTap: widget.onPostgresObjectSelected != null
-                    ? (name) => widget.onPostgresObjectSelected!(
-                          widget.connection,
-                          widget.databaseName,
-                          widget.schemaName,
-                          name,
-                          PostgresObjectKind.sequence,
-                        )
-                    : null,
-              ),
-              _PgSchemaToolRow(
-                connection: widget.connection,
-                databaseName: widget.databaseName,
-                schemaName: widget.schemaName,
-                label: 'Indexes',
-                icon: material.Icons.table_rows_rounded,
-                kind: PostgresObjectKind.schemaIndexes,
-                onPostgresObjectSelected: widget.onPostgresObjectSelected,
-                onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
-                onContextRefresh: _loadObjects,
-              ),
-              _PgSchemaToolRow(
-                connection: widget.connection,
-                databaseName: widget.databaseName,
-                schemaName: widget.schemaName,
-                label: 'Triggers',
-                icon: material.Icons.bolt_rounded,
-                kind: PostgresObjectKind.schemaTriggers,
-                onPostgresObjectSelected: widget.onPostgresObjectSelected,
-                onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
-                onContextRefresh: _loadObjects,
-              ),
-              _PgSchemaToolRow(
-                connection: widget.connection,
-                databaseName: widget.databaseName,
-                schemaName: widget.schemaName,
-                label: 'Types',
-                icon: material.Icons.category_rounded,
-                kind: PostgresObjectKind.schemaTypes,
-                onPostgresObjectSelected: widget.onPostgresObjectSelected,
-                onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
-                onContextRefresh: _loadObjects,
-              ),
-            ],
-            ],
+                  ),
+                if (_loaded) ...[
+                  _PgObjectGroup(
+                    connection: widget.connection,
+                    databaseName: widget.databaseName,
+                    schemaName: widget.schemaName,
+                    objectKind: PostgresObjectKind.table,
+                    onPostgresOpenSqlWorkspace:
+                        widget.onPostgresOpenSqlWorkspace,
+                    onRefresh: _loadObjects,
+                    label: 'Tables',
+                    icon: material.Icons.table_chart_rounded,
+                    items: _tables,
+                    onItemTap: widget.onPostgresObjectSelected != null
+                        ? (name) => widget.onPostgresObjectSelected!(
+                              widget.connection,
+                              widget.databaseName,
+                              widget.schemaName,
+                              name,
+                              PostgresObjectKind.table,
+                            )
+                        : null,
+                  ),
+                  _PgObjectGroup(
+                    connection: widget.connection,
+                    databaseName: widget.databaseName,
+                    schemaName: widget.schemaName,
+                    objectKind: PostgresObjectKind.view,
+                    onPostgresOpenSqlWorkspace:
+                        widget.onPostgresOpenSqlWorkspace,
+                    onRefresh: _loadObjects,
+                    label: 'Views',
+                    icon: material.Icons.view_agenda_rounded,
+                    items: _views,
+                    onItemTap: widget.onPostgresObjectSelected != null
+                        ? (name) => widget.onPostgresObjectSelected!(
+                              widget.connection,
+                              widget.databaseName,
+                              widget.schemaName,
+                              name,
+                              PostgresObjectKind.view,
+                            )
+                        : null,
+                  ),
+                  _PgObjectGroup(
+                    connection: widget.connection,
+                    databaseName: widget.databaseName,
+                    schemaName: widget.schemaName,
+                    objectKind: PostgresObjectKind.materializedView,
+                    onPostgresOpenSqlWorkspace:
+                        widget.onPostgresOpenSqlWorkspace,
+                    onRefresh: _loadObjects,
+                    label: 'Materialized views',
+                    icon: material.Icons.dynamic_feed_rounded,
+                    items: _matviews,
+                    onItemTap: widget.onPostgresObjectSelected != null
+                        ? (name) => widget.onPostgresObjectSelected!(
+                              widget.connection,
+                              widget.databaseName,
+                              widget.schemaName,
+                              name,
+                              PostgresObjectKind.materializedView,
+                            )
+                        : null,
+                  ),
+                  _PgObjectGroup(
+                    connection: widget.connection,
+                    databaseName: widget.databaseName,
+                    schemaName: widget.schemaName,
+                    objectKind: PostgresObjectKind.function,
+                    onPostgresOpenSqlWorkspace:
+                        widget.onPostgresOpenSqlWorkspace,
+                    onRefresh: _loadObjects,
+                    label: 'Functions',
+                    icon: material.Icons.functions_rounded,
+                    items: _functions,
+                    onItemTap: widget.onPostgresObjectSelected != null
+                        ? (name) => widget.onPostgresObjectSelected!(
+                              widget.connection,
+                              widget.databaseName,
+                              widget.schemaName,
+                              name,
+                              PostgresObjectKind.function,
+                            )
+                        : null,
+                  ),
+                  _PgObjectGroup(
+                    connection: widget.connection,
+                    databaseName: widget.databaseName,
+                    schemaName: widget.schemaName,
+                    objectKind: PostgresObjectKind.sequence,
+                    onPostgresOpenSqlWorkspace:
+                        widget.onPostgresOpenSqlWorkspace,
+                    onRefresh: _loadObjects,
+                    label: 'Sequences',
+                    icon: material.Icons.format_list_numbered_rounded,
+                    items: _sequences,
+                    onItemTap: widget.onPostgresObjectSelected != null
+                        ? (name) => widget.onPostgresObjectSelected!(
+                              widget.connection,
+                              widget.databaseName,
+                              widget.schemaName,
+                              name,
+                              PostgresObjectKind.sequence,
+                            )
+                        : null,
+                  ),
+                  _PgSchemaToolRow(
+                    connection: widget.connection,
+                    databaseName: widget.databaseName,
+                    schemaName: widget.schemaName,
+                    label: 'Indexes',
+                    icon: material.Icons.table_rows_rounded,
+                    kind: PostgresObjectKind.schemaIndexes,
+                    onPostgresObjectSelected: widget.onPostgresObjectSelected,
+                    onPostgresOpenSqlWorkspace:
+                        widget.onPostgresOpenSqlWorkspace,
+                    onContextRefresh: _loadObjects,
+                  ),
+                  _PgSchemaToolRow(
+                    connection: widget.connection,
+                    databaseName: widget.databaseName,
+                    schemaName: widget.schemaName,
+                    label: 'Triggers',
+                    icon: material.Icons.bolt_rounded,
+                    kind: PostgresObjectKind.schemaTriggers,
+                    onPostgresObjectSelected: widget.onPostgresObjectSelected,
+                    onPostgresOpenSqlWorkspace:
+                        widget.onPostgresOpenSqlWorkspace,
+                    onContextRefresh: _loadObjects,
+                  ),
+                  _PgSchemaToolRow(
+                    connection: widget.connection,
+                    databaseName: widget.databaseName,
+                    schemaName: widget.schemaName,
+                    label: 'Types',
+                    icon: material.Icons.category_rounded,
+                    kind: PostgresObjectKind.schemaTypes,
+                    onPostgresObjectSelected: widget.onPostgresObjectSelected,
+                    onPostgresOpenSqlWorkspace:
+                        widget.onPostgresOpenSqlWorkspace,
+                    onContextRefresh: _loadObjects,
+                  ),
+                ],
+              ],
             ),
           ),
         ],
@@ -997,8 +1006,7 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
                   label: item,
                   icon: widget.icon,
                   iconSize: 12,
-                  iconColor:
-                      theme.colorScheme.primary.withValues(alpha: 0.5),
+                  iconColor: theme.colorScheme.primary.withValues(alpha: 0.5),
                   textStyle: material.TextStyle(
                     fontSize: 11,
                     color: theme.colorScheme.foreground,

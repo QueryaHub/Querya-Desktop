@@ -58,7 +58,8 @@ abstract class SessionScorer {
     );
   }
 
-  static Verdict _computeVerdict(double avgFps, double targetHz, double missedPct) {
+  static Verdict _computeVerdict(
+      double avgFps, double targetHz, double missedPct) {
     if (avgFps == 0) return Verdict.inconclusive;
     final hitRate = avgFps / targetHz;
     if (hitRate >= 0.95 && missedPct < 2) return Verdict.excellent;
@@ -76,7 +77,8 @@ abstract class SessionScorer {
     required ThermalState thermalState,
   }) {
     if (isLowPowerMode == true) return Bottleneck.powerLimited;
-    if (thermalState == ThermalState.serious || thermalState == ThermalState.critical) {
+    if (thermalState == ThermalState.serious ||
+        thermalState == ThermalState.critical) {
       return Bottleneck.thermalLimited;
     }
     final budgetMs = 1000.0 / targetHz;
@@ -86,7 +88,8 @@ abstract class SessionScorer {
     }
     // Below 85%: check for build vs raster bottleneck
     if (avgFps < targetHz * 0.85) {
-      if (avgBuild > avgRaster && avgBuild > budgetMs * 0.5) return Bottleneck.buildBound;
+      if (avgBuild > avgRaster && avgBuild > budgetMs * 0.5)
+        return Bottleneck.buildBound;
       if (avgRaster > budgetMs * 0.5) return Bottleneck.rasterBound;
     }
     return Bottleneck.none;

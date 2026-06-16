@@ -32,8 +32,8 @@ void main() {
   late ThemeRegistryService registry;
 
   setUpAll(() async {
-    tempDir =
-        await Directory.systemTemp.createTemp('querya_builtin_theme_assets_test_');
+    tempDir = await Directory.systemTemp
+        .createTemp('querya_builtin_theme_assets_test_');
     PathProviderPlatform.instance = _FakePathProvider(tempDir.path);
   });
 

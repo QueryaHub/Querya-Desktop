@@ -8,7 +8,8 @@ void main() {
     });
 
     test('allows WITH', () {
-      expect(isAllowedMysqlSelectQuery('WITH x AS (SELECT 1) SELECT * FROM x'), isTrue);
+      expect(isAllowedMysqlSelectQuery('WITH x AS (SELECT 1) SELECT * FROM x'),
+          isTrue);
     });
 
     test('rejects multi-statement', () {

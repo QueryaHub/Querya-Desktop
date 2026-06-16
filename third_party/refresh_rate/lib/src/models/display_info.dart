@@ -80,7 +80,8 @@ class DisplayInfo {
       currentRate: msg.currentRate ?? 60.0,
       maxRate: msg.maxRate ?? 60.0,
       minRate: msg.minRate ?? 60.0,
-      supportedRates: msg.supportedRates?.whereType<double>().toList() ?? const [60.0],
+      supportedRates:
+          msg.supportedRates?.whereType<double>().toList() ?? const [60.0],
       isVariableRefreshRate: msg.isVariableRefreshRate ?? false,
       engineTargetRate: msg.engineTargetRate ?? 60.0,
       iosProMotionEnabled: msg.iosProMotionEnabled,
@@ -96,14 +97,14 @@ class DisplayInfo {
   /// A safe fallback [DisplayInfo] used before the first [RefreshRate.refresh]
   /// call completes. Assumes a standard 60 Hz non-VRR display.
   static const DisplayInfo fallback = DisplayInfo(
-        currentRate: 60.0,
-        maxRate: 60.0,
-        minRate: 60.0,
-        supportedRates: [60.0],
-        isVariableRefreshRate: false,
-        engineTargetRate: 60.0,
-        thermalState: ThermalState.unknown,
-      );
+    currentRate: 60.0,
+    maxRate: 60.0,
+    minRate: 60.0,
+    supportedRates: [60.0],
+    isVariableRefreshRate: false,
+    engineTargetRate: 60.0,
+    thermalState: ThermalState.unknown,
+  );
 
   @override
   bool operator ==(Object other) =>

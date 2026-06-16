@@ -199,8 +199,8 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
                         keyInfo: _keys[i],
                         colorScheme: cs,
                         shadcnCs: shadcnCs,
-                        onTap: () => widget.onKeyTap?.call(
-                            _keys[i].name, _keys[i].type),
+                        onTap: () =>
+                            widget.onKeyTap?.call(_keys[i].name, _keys[i].type),
                         onDelete: () => _deleteKey(_keys[i]),
                       ),
                     );
@@ -251,8 +251,7 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
 
   Widget _buildErrorBanner(ColorScheme cs) {
     return material.Container(
-      padding:
-          const material.EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const material.EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: cs.destructive.withValues(alpha: 0.1),
       child: Row(
         children: [
@@ -262,8 +261,7 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
           material.Expanded(
             child: Text(
               _error!,
-              style:
-                  material.TextStyle(color: cs.destructive, fontSize: 13),
+              style: material.TextStyle(color: cs.destructive, fontSize: 13),
             ),
           ),
           material.InkWell(
@@ -393,8 +391,8 @@ class _KeyTile extends material.StatelessWidget {
         hoverColor: shadcnCs.muted.withValues(alpha: 0.15),
         borderRadius: material.BorderRadius.circular(8),
         child: material.Padding(
-          padding: const material.EdgeInsets.symmetric(
-              horizontal: 16, vertical: 10),
+          padding:
+              const material.EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: material.Row(
             children: [
               material.Icon(_typeIcon(ki.type), size: 16, color: typeCol),

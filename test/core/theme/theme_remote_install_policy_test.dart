@@ -58,7 +58,9 @@ void main() {
       );
     });
 
-    test('rejects link-local, unique-local, unspecified, and multicast IPv6 addresses', () {
+    test(
+        'rejects link-local, unique-local, unspecified, and multicast IPv6 addresses',
+        () {
       expect(
         ThemeRemoteInstallPolicy.isAllowedUrl(
           Uri.parse('https://[fe80::1]/theme.json'),

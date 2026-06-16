@@ -76,8 +76,7 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
       _statsTotal = 0;
     });
     try {
-      final names =
-          await widget.connection.listCollections(widget.database);
+      final names = await widget.connection.listCollections(widget.database);
       if (!mounted || gen != _loadGeneration) return;
 
       setState(() {
@@ -112,7 +111,8 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
                 size: _toInt(stats['size']),
               );
             } catch (_) {
-              return _CollectionInfo(name: name, documentCount: null, size: null);
+              return _CollectionInfo(
+                  name: name, documentCount: null, size: null);
             }
           }),
         );
@@ -281,9 +281,7 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
                           padding: const material.EdgeInsets.only(top: 4),
                           child: Text(
                             'Loading stats $_statsProgress / $_statsTotal…',
-                          )
-                              .muted()
-                              .xSmall(),
+                          ).muted().xSmall(),
                         ),
                     ],
                   ),
@@ -299,8 +297,8 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
                 PrimaryButton(
                   onPressed: _createCollection,
                   size: ButtonSize.small,
-                  leading: const material.Icon(material.Icons.add_rounded,
-                      size: 16),
+                  leading:
+                      const material.Icon(material.Icons.add_rounded, size: 16),
                   child: const Text('Create'),
                 ),
               ],
@@ -317,14 +315,12 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
               children: [
                 const material.SizedBox(width: 80),
                 material.Expanded(
-                    child:
-                        const Text('Collection Name').semiBold().xSmall()),
+                    child: const Text('Collection Name').semiBold().xSmall()),
                 material.SizedBox(
                     width: 100,
                     child: const Text('Documents').semiBold().xSmall()),
                 material.SizedBox(
-                    width: 100,
-                    child: const Text('Size').semiBold().xSmall()),
+                    width: 100, child: const Text('Size').semiBold().xSmall()),
                 const material.SizedBox(width: 60),
               ],
             ),
@@ -346,10 +342,9 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
                       return _CollectionRow(
                         collection: _collections[i],
                         colorScheme: cs,
-                        onView: () => widget.onCollectionTap
-                            ?.call(_collections[i].name),
-                        onDrop: () =>
-                            _dropCollection(_collections[i].name),
+                        onView: () =>
+                            widget.onCollectionTap?.call(_collections[i].name),
+                        onDrop: () => _dropCollection(_collections[i].name),
                       );
                     },
                   ),
@@ -384,8 +379,8 @@ class _CollectionRow extends StatelessWidget {
         onTap: onView,
         hoverColor: cs.muted.withValues(alpha: 0.15),
         child: material.Padding(
-          padding: const material.EdgeInsets.symmetric(
-              horizontal: 20, vertical: 10),
+          padding:
+              const material.EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           child: Row(
             children: [
               _ActionButton(
@@ -464,8 +459,8 @@ class _ActionButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: material.BorderRadius.circular(6),
         child: material.Container(
-          padding: const material.EdgeInsets.symmetric(
-              horizontal: 12, vertical: 6),
+          padding:
+              const material.EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: material.BoxDecoration(
             color: color.withValues(alpha: 0.8),
             borderRadius: material.BorderRadius.circular(6),

@@ -73,4 +73,3 @@ String injectSqlLimit(String sql, int limit) {
 
   return '$body\nLIMIT $limit$suffix';
 }
-

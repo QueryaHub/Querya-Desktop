@@ -125,11 +125,13 @@ void main() {
       expect(find.text('Reset appearance'), findsOneWidget);
     });
 
-    testWidgets('shows themes folder hint and theme editor entry', (tester) async {
+    testWidgets('shows themes folder hint and theme editor entry',
+        (tester) async {
       await pumpSection(tester);
 
       expect(
-        find.textContaining('Themes are loaded from the app support themes folder'),
+        find.textContaining(
+            'Themes are loaded from the app support themes folder'),
         findsOneWidget,
       );
       expect(find.textContaining('watched automatically'), findsOneWidget);

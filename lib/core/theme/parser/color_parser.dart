@@ -70,8 +70,11 @@ Color parseQueryaThemeColor(String raw) {
 
 /// Encodes a [Color] as a VS Code hex string (`#RRGGBB` or `#RRGGBBAA`).
 String formatVsCodeColor(Color color) {
-  String channel(double component) =>
-      (component * 255.0).round().clamp(0, 255).toRadixString(16).padLeft(2, '0');
+  String channel(double component) => (component * 255.0)
+      .round()
+      .clamp(0, 255)
+      .toRadixString(16)
+      .padLeft(2, '0');
   final rr = channel(color.r);
   final gg = channel(color.g);
   final bb = channel(color.b);

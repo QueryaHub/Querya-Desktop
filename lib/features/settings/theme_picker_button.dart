@@ -57,7 +57,9 @@ List<ThemeDefinition> filterThemeDefinitions(
             theme.name.toLowerCase().contains(normalized) ||
             theme.id.toLowerCase().contains(normalized) ||
             theme.source.name.toLowerCase().contains(normalized) ||
-            _sourceBadgeLabel(theme.source).toLowerCase().contains(normalized) ||
+            _sourceBadgeLabel(theme.source)
+                .toLowerCase()
+                .contains(normalized) ||
             (theme.metadata?.author?.toLowerCase().contains(normalized) ??
                 false) ||
             (theme.metadata?.tags.any(
@@ -70,7 +72,8 @@ List<ThemeDefinition> filterThemeDefinitions(
 
 class _ThemePickerButtonState extends material.State<ThemePickerButton> {
   final material.MenuController _controller = material.MenuController();
-  final material.ScrollController _scrollController = material.ScrollController();
+  final material.ScrollController _scrollController =
+      material.ScrollController();
   final material.TextEditingController _searchController =
       material.TextEditingController();
   bool _triggerHovered = false;
@@ -210,7 +213,8 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
         minimumSize: material.WidgetStatePropertyAll(
           material.Size(menuWidth, 0),
         ),
-        padding: const material.WidgetStatePropertyAll(material.EdgeInsets.zero),
+        padding:
+            const material.WidgetStatePropertyAll(material.EdgeInsets.zero),
         shape: material.WidgetStatePropertyAll(
           material.RoundedRectangleBorder(
             borderRadius: material.BorderRadius.circular(radius),
@@ -245,7 +249,8 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
     return anchor;
   }
 
-  material.Widget _buildMenuPanel(material.BuildContext context, ColorScheme cs) {
+  material.Widget _buildMenuPanel(
+      material.BuildContext context, ColorScheme cs) {
     final filteredThemes = _filteredThemes;
     final radius = context.scaled(QueryaDropdownTokens.menuBorderRadius);
 
@@ -494,8 +499,8 @@ class _ThemePickerRowState extends material.State<_ThemePickerRow> {
             curve: context.motionCurve(QueryaMotion.enter),
             constraints: material.BoxConstraints(minHeight: itemHeight),
             padding: material.EdgeInsets.symmetric(
-              horizontal:
-                  context.scaled(QueryaDropdownTokens.menuItemPadding.horizontal),
+              horizontal: context
+                  .scaled(QueryaDropdownTokens.menuItemPadding.horizontal),
               vertical:
                   context.scaled(QueryaDropdownTokens.menuItemPadding.vertical),
             ),
@@ -531,7 +536,8 @@ class _ThemePickerRowState extends material.State<_ThemePickerRow> {
                   colorScheme: cs,
                 ),
                 material.SizedBox(width: context.scaled(6)),
-                _BrightnessLabel(isDark: widget.definition.isDark, colorScheme: cs),
+                _BrightnessLabel(
+                    isDark: widget.definition.isDark, colorScheme: cs),
               ],
             ),
           ),

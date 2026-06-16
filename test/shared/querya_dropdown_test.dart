@@ -8,7 +8,8 @@ void main() {
   group('QueryaDropdownTokens', () {
     test('uses design-system defaults from issue #89', () {
       expect(QueryaDropdownTokens.triggerHeight, 36.0);
-      expect(QueryaDropdownTokens.menuAlignmentOffset, const material.Offset(0, 4));
+      expect(QueryaDropdownTokens.menuAlignmentOffset,
+          const material.Offset(0, 4));
       expect(QueryaDropdownTokens.menuMaxHeight, 300.0);
       expect(QueryaDropdownTokens.menuBorderRadius, 6.0);
       expect(QueryaDropdownTokens.fontSize, 14.0);
@@ -16,7 +17,8 @@ void main() {
   });
 
   group('QueryaDropdown', () {
-    testWidgets('builds MenuAnchor with current label and chevron', (tester) async {
+    testWidgets('builds MenuAnchor with current label and chevron',
+        (tester) async {
       await tester.pumpWidget(
         queryaThemeTestShell(
           child: material.Scaffold(
@@ -35,7 +37,8 @@ void main() {
 
       expect(find.byType(material.MenuAnchor), findsOneWidget);
       expect(find.text('Beta'), findsOneWidget);
-      expect(find.byIcon(material.Icons.keyboard_arrow_down_rounded), findsOneWidget);
+      expect(find.byIcon(material.Icons.keyboard_arrow_down_rounded),
+          findsOneWidget);
 
       final box = tester.getSize(find.byType(material.AnimatedContainer).first);
       expect(box.height, QueryaDropdownTokens.triggerHeight);

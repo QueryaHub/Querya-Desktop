@@ -86,7 +86,8 @@ class ThemeRemoteInstallService {
 
       final body = response.body;
       if (body.trim().isEmpty) {
-        return const ThemeDefinitionImportFailure('Downloaded theme file is empty.');
+        return const ThemeDefinitionImportFailure(
+            'Downloaded theme file is empty.');
       }
 
       final actualChecksum = sha256.convert(utf8.encode(body)).toString();
@@ -96,7 +97,8 @@ class ThemeRemoteInstallService {
         );
       }
 
-      final tempDir = Directory.systemTemp.createTempSync('querya_theme_remote_');
+      final tempDir =
+          Directory.systemTemp.createTempSync('querya_theme_remote_');
       tempFile = File(p.join(tempDir.path, 'remote-theme.json'));
       await tempFile.writeAsString(body);
 

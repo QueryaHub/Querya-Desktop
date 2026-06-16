@@ -179,6 +179,7 @@ class SessionReport {
       }
       return s;
     }
+
     final headers = m.keys.join(',');
     final values = m.values.map(esc).join(',');
     return '$headers\n$values';

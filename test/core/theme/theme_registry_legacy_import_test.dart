@@ -30,8 +30,8 @@ void main() {
   late ThemeRegistryService registry;
 
   setUpAll(() async {
-    tempDir =
-        await Directory.systemTemp.createTemp('querya_theme_legacy_import_test_');
+    tempDir = await Directory.systemTemp
+        .createTemp('querya_theme_legacy_import_test_');
     PathProviderPlatform.instance = _FakePathProvider(tempDir.path);
     await LocalDb.initFfi();
   });
@@ -65,9 +65,11 @@ void main() {
   });
 
   group('ThemeRegistryService legacy imported migration', () {
-    test('exposes legacy imported theme from persisted import settings', () async {
+    test('exposes legacy imported theme from persisted import settings',
+        () async {
       final fixture = File('test/fixtures/themes/dark_subset.json');
-      final importResult = await ThemeImportService.importFromPath(fixture.path);
+      final importResult =
+          await ThemeImportService.importFromPath(fixture.path);
       expect(importResult, isA<ThemeImportSuccess>());
       final success = importResult as ThemeImportSuccess;
 
@@ -93,7 +95,8 @@ void main() {
 
     test('loads legacy imported theme definition', () async {
       final fixture = File('test/fixtures/themes/dark_subset.json');
-      final importResult = await ThemeImportService.importFromPath(fixture.path);
+      final importResult =
+          await ThemeImportService.importFromPath(fixture.path);
       final success = importResult as ThemeImportSuccess;
 
       await AppSettings.instance.setThemeImportedColors(success.colors);
@@ -132,7 +135,8 @@ void main() {
       expect((result as ThemeLoadFailure).message, 'Theme file not found.');
     });
 
-    test('QueryaThemePreset.imported still applies via ThemeController', () async {
+    test('QueryaThemePreset.imported still applies via ThemeController',
+        () async {
       final controller = ThemeController.instance;
       final fixture = File('test/fixtures/themes/dark_subset.json');
       final result = await controller.importThemeFromFile(fixture.path);

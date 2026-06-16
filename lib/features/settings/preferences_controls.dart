@@ -163,55 +163,53 @@ class _InterfaceScaleSliderState extends material.State<InterfaceScaleSlider> {
     final fine = _fineControl;
 
     return material.Row(
-          children: [
-            material.Expanded(
-              child: Slider(
-                value: SliderValue.single(
-                  _sliderPosition(displayScale, fine: fine),
-                ),
-                min: fine ? kMinUiScale : 0,
-                max: fine
-                    ? kMaxUiScale
-                    : (kUiScalePresets.length - 1).toDouble(),
-                divisions: fine ? _fineDivisions : kUiScalePresets.length - 1,
-                hintValue: const SliderValue.single(kDefaultUiScale),
-                onChanged: (value) {
-                  final next = _scaleFromSlider(
-                    value.value,
-                    fine: _shiftHeld,
-                  );
-                  setState(() => _dragScale = next);
-                },
-                onChangeEnd: (value) {
-                  final next = _scaleFromSlider(
-                    value.value,
-                    fine: _shiftHeld,
-                  );
-                  setState(() => _dragScale = null);
-                  unawaited(
-                    UiScaleController.instance.commitScale(
-                      next,
-                      fine: _shiftHeld,
-                    ),
-                  );
-                },
-              ),
+      children: [
+        material.Expanded(
+          child: Slider(
+            value: SliderValue.single(
+              _sliderPosition(displayScale, fine: fine),
             ),
-            const material.SizedBox(width: 8),
-            material.SizedBox(
-              width: 44,
-              child: material.Text(
-                '$pct%',
-                textAlign: material.TextAlign.right,
-                style: material.TextStyle(
-                  fontSize: 13,
-                  fontWeight: material.FontWeight.w600,
-                  color: cs.popoverForeground,
+            min: fine ? kMinUiScale : 0,
+            max: fine ? kMaxUiScale : (kUiScalePresets.length - 1).toDouble(),
+            divisions: fine ? _fineDivisions : kUiScalePresets.length - 1,
+            hintValue: const SliderValue.single(kDefaultUiScale),
+            onChanged: (value) {
+              final next = _scaleFromSlider(
+                value.value,
+                fine: _shiftHeld,
+              );
+              setState(() => _dragScale = next);
+            },
+            onChangeEnd: (value) {
+              final next = _scaleFromSlider(
+                value.value,
+                fine: _shiftHeld,
+              );
+              setState(() => _dragScale = null);
+              unawaited(
+                UiScaleController.instance.commitScale(
+                  next,
+                  fine: _shiftHeld,
                 ),
-              ),
+              );
+            },
+          ),
+        ),
+        const material.SizedBox(width: 8),
+        material.SizedBox(
+          width: 44,
+          child: material.Text(
+            '$pct%',
+            textAlign: material.TextAlign.right,
+            style: material.TextStyle(
+              fontSize: 13,
+              fontWeight: material.FontWeight.w600,
+              color: cs.popoverForeground,
             ),
-          ],
-        );
+          ),
+        ),
+      ],
+    );
   }
 }
 

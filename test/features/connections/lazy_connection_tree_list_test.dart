@@ -3,7 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
 
 void main() {
-  testWidgets('lazyConnectionTreeList uses ListView for large lists', (tester) async {
+  testWidgets('lazyConnectionTreeList uses ListView for large lists',
+      (tester) async {
     await tester.pumpWidget(
       material.MaterialApp(
         home: material.Scaffold(
@@ -26,7 +27,8 @@ void main() {
     expect(find.byType(material.ListView), findsOneWidget);
   });
 
-  testWidgets('lazyConnectionTreeList uses Column for small lists', (tester) async {
+  testWidgets('lazyConnectionTreeList uses Column for small lists',
+      (tester) async {
     await tester.pumpWidget(
       material.MaterialApp(
         home: material.Scaffold(

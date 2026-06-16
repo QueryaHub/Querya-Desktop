@@ -52,7 +52,8 @@ void main() {
           const material.Size(800, 600),
           queryaThemeTestShell(
             child: const material.SizedBox.expand(
-              child: WorkspacePanel(activeConnection: stubSplitWorkspaceConnection),
+              child: WorkspacePanel(
+                  activeConnection: stubSplitWorkspaceConnection),
             ),
           ),
         );
