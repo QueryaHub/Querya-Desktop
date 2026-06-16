@@ -29,7 +29,8 @@ class PostgresIndexListView extends material.StatefulWidget {
       _PostgresIndexListViewState();
 }
 
-class _PostgresIndexListViewState extends material.State<PostgresIndexListView> {
+class _PostgresIndexListViewState
+    extends material.State<PostgresIndexListView> {
   PgLease? _lease;
 
   bool _loading = true;
@@ -208,7 +209,8 @@ class PostgresTriggerListView extends material.StatefulWidget {
       _PostgresTriggerListViewState();
 }
 
-class _PostgresTriggerListViewState extends material.State<PostgresTriggerListView> {
+class _PostgresTriggerListViewState
+    extends material.State<PostgresTriggerListView> {
   PgLease? _lease;
 
   bool _loading = true;
@@ -868,7 +870,8 @@ material.Widget _browserToolbar(
         OutlineButton(
           size: ButtonSize.small,
           onPressed: onRefresh,
-          leading: const material.Icon(material.Icons.refresh_rounded, size: 14),
+          leading:
+              const material.Icon(material.Icons.refresh_rounded, size: 14),
           child: const Text('Refresh'),
         ),
       ],

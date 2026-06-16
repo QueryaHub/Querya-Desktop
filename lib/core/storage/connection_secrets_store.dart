@@ -38,7 +38,8 @@ class ConnectionSecretsStore {
 
   static const _keyPrefix = 'querya.v1.conn';
 
-  static String _passwordKey(int connectionId) => '$_keyPrefix.$connectionId.password';
+  static String _passwordKey(int connectionId) =>
+      '$_keyPrefix.$connectionId.password';
   static String _connectionStringKey(int connectionId) =>
       '$_keyPrefix.$connectionId.connection_string';
 
@@ -51,11 +52,13 @@ class ConnectionSecretsStore {
     await backend.write(_connectionStringKey(connectionId), connectionString);
   }
 
-  static Future<({String? password, String? connectionString})> readForConnection(
+  static Future<({String? password, String? connectionString})>
+      readForConnection(
     int connectionId,
   ) async {
     final password = await backend.read(_passwordKey(connectionId));
-    final connectionString = await backend.read(_connectionStringKey(connectionId));
+    final connectionString =
+        await backend.read(_connectionStringKey(connectionId));
     return (password: password, connectionString: connectionString);
   }
 

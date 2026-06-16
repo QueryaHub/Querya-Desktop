@@ -71,8 +71,8 @@ void main() {
 
   group('ThemeRemoteInstallService', () {
     test('installs valid HTTPS theme content', () async {
-      final raw =
-          await File('test/fixtures/themes/querya_custom_dark.json').readAsString();
+      final raw = await File('test/fixtures/themes/querya_custom_dark.json')
+          .readAsString();
       final service = ThemeRemoteInstallService(
         registry,
         allowLocalhostInDebug: false,
@@ -96,8 +96,8 @@ void main() {
     });
 
     test('rejects checksum mismatch and does not write theme file', () async {
-      final raw =
-          await File('test/fixtures/themes/querya_custom_dark.json').readAsString();
+      final raw = await File('test/fixtures/themes/querya_custom_dark.json')
+          .readAsString();
       final service = ThemeRemoteInstallService(
         registry,
         allowLocalhostInDebug: false,
@@ -149,8 +149,8 @@ void main() {
     });
 
     test('reuses existing file when remote content hash matches', () async {
-      final raw =
-          await File('test/fixtures/themes/querya_custom_dark.json').readAsString();
+      final raw = await File('test/fixtures/themes/querya_custom_dark.json')
+          .readAsString();
       await File(p.join(themesDir.path, 'fixture-custom-dark.json'))
           .writeAsString(raw);
 
@@ -174,8 +174,8 @@ void main() {
 
   group('ThemeController remote install', () {
     test('importRegistryThemeFromUrl activates imported theme', () async {
-      final raw =
-          await File('test/fixtures/themes/querya_custom_dark.json').readAsString();
+      final raw = await File('test/fixtures/themes/querya_custom_dark.json')
+          .readAsString();
       final controller = ThemeController.instance;
       await controller.load();
 

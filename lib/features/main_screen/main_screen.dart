@@ -267,8 +267,7 @@ class _MainContentSplitState extends State<_MainContentSplit> {
                       selectedRedisDb: ws.activeRedisDb,
                       selectedMongoDb: ws.activeMongoDB,
                       selectedPostgresObject: ws.selectedPostgresObject,
-                      postgresSqlTabRequestToken:
-                          ws.postgresSqlTabRequestToken,
+                      postgresSqlTabRequestToken: ws.postgresSqlTabRequestToken,
                       postgresSqlEditorContext: ws.postgresSqlEditorContext,
                       postgresSqlEditorContextToken:
                           ws.postgresSqlEditorContextToken,

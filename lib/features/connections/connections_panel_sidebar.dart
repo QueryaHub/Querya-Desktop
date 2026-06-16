@@ -28,6 +28,7 @@ material.Widget _sidebarConnectionShell({
     ),
   );
 }
+
 class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.message});
 
@@ -37,7 +38,8 @@ class _EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return material.Container(
-      padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      padding:
+          const material.EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       decoration: material.BoxDecoration(
         color: theme.colorScheme.muted.withValues(alpha: 0.25),
         borderRadius: material.BorderRadius.circular(8),
@@ -102,7 +104,8 @@ class _ConnectionTile extends StatelessWidget {
     return ContextMenu(
       items: [
         MenuButton(
-          leading: material.Icon(material.Icons.delete_outline_rounded, size: 18, color: theme.colorScheme.mutedForeground),
+          leading: material.Icon(material.Icons.delete_outline_rounded,
+              size: 18, color: theme.colorScheme.mutedForeground),
           onPressed: (_) => onRemove(),
           child: const Text('Remove connection'),
         ),
@@ -181,8 +184,10 @@ class _FolderTile extends StatefulWidget {
   final material.IconData Function(String type) iconForType;
   final Future<void> Function(int id) onRemoveConnection;
   final void Function(ConnectionRow connection)? onConnectionTap;
-  final void Function(ConnectionRow connection, int database)? onRedisDatabaseTap;
-  final void Function(ConnectionRow connection, String database)? onMongoDBDatabaseTap;
+  final void Function(ConnectionRow connection, int database)?
+      onRedisDatabaseTap;
+  final void Function(ConnectionRow connection, String database)?
+      onMongoDBDatabaseTap;
   final Widget Function(ConnectionRow conn)? buildConnectionTile;
 
   @override
@@ -218,12 +223,14 @@ class _FolderTileState extends State<_FolderTile> {
     return ContextMenu(
       items: [
         MenuButton(
-          leading: material.Icon(material.Icons.settings_ethernet_rounded, size: 18, color: theme.colorScheme.mutedForeground),
+          leading: material.Icon(material.Icons.settings_ethernet_rounded,
+              size: 18, color: theme.colorScheme.mutedForeground),
           onPressed: (menuContext) => widget.onNewConnection(widget.name),
           child: const Text('New connection'),
         ),
         MenuButton(
-          leading: material.Icon(material.Icons.delete_outline_rounded, size: 18, color: theme.colorScheme.mutedForeground),
+          leading: material.Icon(material.Icons.delete_outline_rounded,
+              size: 18, color: theme.colorScheme.mutedForeground),
           onPressed: (_) => widget.onRemove(),
           child: const Text('Remove folder'),
         ),
@@ -240,7 +247,8 @@ class _FolderTileState extends State<_FolderTile> {
                 onTap: _toggle,
                 borderRadius: material.BorderRadius.circular(6),
                 child: material.Padding(
-                  padding: const material.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  padding: const material.EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 6),
                   child: material.Row(
                     children: [
                       material.AnimatedRotation(
@@ -254,7 +262,8 @@ class _FolderTileState extends State<_FolderTile> {
                         ),
                       ),
                       const Gap(2),
-                      material.Icon(material.Icons.folder_rounded, size: 18, color: theme.colorScheme.primary),
+                      material.Icon(material.Icons.folder_rounded,
+                          size: 18, color: theme.colorScheme.primary),
                       const Gap(8),
                       material.Expanded(
                         child: material.Text(

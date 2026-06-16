@@ -26,7 +26,8 @@ void main() {
   late Directory tempDir;
 
   setUpAll(() async {
-    tempDir = await Directory.systemTemp.createTemp('querya_motion_controller_test_');
+    tempDir =
+        await Directory.systemTemp.createTemp('querya_motion_controller_test_');
     PathProviderPlatform.instance = _FakePathProvider(tempDir.path);
     await LocalDb.initFfi();
   });

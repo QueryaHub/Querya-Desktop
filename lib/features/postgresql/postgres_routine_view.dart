@@ -201,8 +201,8 @@ class _PostgresRoutineViewState extends material.State<PostgresRoutineView> {
                 OutlineButton(
                   size: ButtonSize.small,
                   onPressed: _connectAndLoad,
-                  leading: const material.Icon(
-                      material.Icons.refresh_rounded, size: 14),
+                  leading: const material.Icon(material.Icons.refresh_rounded,
+                      size: 14),
                   child: const Text('Refresh'),
                 ),
               ],

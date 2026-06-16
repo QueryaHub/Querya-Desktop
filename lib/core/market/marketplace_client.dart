@@ -23,13 +23,11 @@ class MockMarketplaceClient implements MarketplaceClient {
     String? type,
   }) async {
     final normalized = query.trim().toLowerCase();
-    return _items
-        .where((item) {
-          if (type != null && item.type != type) return false;
-          if (normalized.isEmpty) return true;
-          return item.name.toLowerCase().contains(normalized) ||
-              item.id.toLowerCase().contains(normalized);
-        })
-        .toList(growable: false);
+    return _items.where((item) {
+      if (type != null && item.type != type) return false;
+      if (normalized.isEmpty) return true;
+      return item.name.toLowerCase().contains(normalized) ||
+          item.id.toLowerCase().contains(normalized);
+    }).toList(growable: false);
   }
 }

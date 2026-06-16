@@ -32,7 +32,8 @@ void main() {
   late ThemeRegistryService registry;
 
   setUpAll(() async {
-    tempDir = await Directory.systemTemp.createTemp('querya_theme_registry_test_');
+    tempDir =
+        await Directory.systemTemp.createTemp('querya_theme_registry_test_');
     PathProviderPlatform.instance = _FakePathProvider(tempDir.path);
   });
 
@@ -79,7 +80,8 @@ void main() {
       expect(metadataTheme.metadata!.pickerSubtitle, 'Querya Themes');
     });
 
-    test('includes valid custom and VS Code themes, skips broken file', () async {
+    test('includes valid custom and VS Code themes, skips broken file',
+        () async {
       await _copyFixture(
         'querya_custom_dark.json',
         File(p.join(themesDir.path, 'querya_custom_dark.json')),
@@ -167,7 +169,8 @@ void main() {
     });
 
     test('ignores non-json theme extensions', () async {
-      await File(p.join(themesDir.path, 'notes.txt')).writeAsString('not a theme');
+      await File(p.join(themesDir.path, 'notes.txt'))
+          .writeAsString('not a theme');
       await _copyFixture(
         'querya_custom_dark.json',
         File(p.join(themesDir.path, 'querya_custom_dark.json')),
@@ -193,7 +196,8 @@ void main() {
       final success = result as ThemeLoadSuccess;
       expect(success.definition, definition);
       expect(success.theme.brightness, Brightness.dark);
-      expect(success.theme.colorScheme.primary, parseQueryaThemeColor('#38BDF8'));
+      expect(
+          success.theme.colorScheme.primary, parseQueryaThemeColor('#38BDF8'));
     });
 
     test('loads VS Code theme successfully', () async {
@@ -247,7 +251,8 @@ void main() {
 
   group('ThemeRegistryService.importThemeFile', () {
     test('imports custom theme into user themes directory', () async {
-      final source = File(p.join('test/fixtures/themes', 'querya_custom_dark.json'));
+      final source =
+          File(p.join('test/fixtures/themes', 'querya_custom_dark.json'));
       final result = await registry.importThemeFile(source.path);
 
       expect(result, isA<ThemeDefinitionImportSuccess>());
@@ -281,7 +286,8 @@ void main() {
     });
 
     test('reuses existing file when content hash matches', () async {
-      final source = File(p.join('test/fixtures/themes', 'querya_custom_minimal.json'));
+      final source =
+          File(p.join('test/fixtures/themes', 'querya_custom_minimal.json'));
       final first = await registry.importThemeFile(source.path);
       expect(first, isA<ThemeDefinitionImportSuccess>());
       final firstSuccess = first as ThemeDefinitionImportSuccess;
@@ -300,8 +306,10 @@ void main() {
       expect(themeFiles, 1);
     });
 
-    test('suffixes custom theme id when same id has different content', () async {
-      final source = File(p.join('test/fixtures/themes', 'querya_custom_minimal.json'));
+    test('suffixes custom theme id when same id has different content',
+        () async {
+      final source =
+          File(p.join('test/fixtures/themes', 'querya_custom_minimal.json'));
       final first = await registry.importThemeFile(source.path);
       expect(first, isA<ThemeDefinitionImportSuccess>());
 

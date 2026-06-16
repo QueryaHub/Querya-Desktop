@@ -19,8 +19,8 @@ void main() {
     });
 
     test('parses full dark fixture', () {
-      final raw =
-          File('test/fixtures/themes/querya_custom_dark.json').readAsStringSync();
+      final raw = File('test/fixtures/themes/querya_custom_dark.json')
+          .readAsStringSync();
       final manifest = QueryaThemeManifest.fromJsonString(raw);
 
       expect(manifest.schema, queryaThemeSchemaV1);
@@ -37,8 +37,8 @@ void main() {
     });
 
     test('parses full light fixture', () {
-      final raw =
-          File('test/fixtures/themes/querya_custom_light.json').readAsStringSync();
+      final raw = File('test/fixtures/themes/querya_custom_light.json')
+          .readAsStringSync();
       final manifest = QueryaThemeManifest.fromJsonString(raw);
 
       expect(manifest.type, QueryaThemeType.light);
@@ -53,8 +53,8 @@ void main() {
     });
 
     test('parses minimal fixture with sparse colors', () {
-      final raw =
-          File('test/fixtures/themes/querya_custom_minimal.json').readAsStringSync();
+      final raw = File('test/fixtures/themes/querya_custom_minimal.json')
+          .readAsStringSync();
       final manifest = QueryaThemeManifest.fromJsonString(raw);
 
       expect(manifest.id, 'fixture-custom-minimal');
@@ -65,8 +65,8 @@ void main() {
     });
 
     test('parses JSONC fixture with comments and trailing commas', () {
-      final raw =
-          File('test/fixtures/themes/querya_custom_jsonc.jsonc').readAsStringSync();
+      final raw = File('test/fixtures/themes/querya_custom_jsonc.jsonc')
+          .readAsStringSync();
       final manifest = QueryaThemeManifest.fromJsonString(raw);
 
       expect(manifest.id, 'fixture-custom-jsonc');
@@ -94,8 +94,8 @@ void main() {
     });
 
     test('returns unmodifiable color maps', () {
-      final raw =
-          File('test/fixtures/themes/querya_custom_minimal.json').readAsStringSync();
+      final raw = File('test/fixtures/themes/querya_custom_minimal.json')
+          .readAsStringSync();
       final manifest = QueryaThemeManifest.fromJsonString(raw);
 
       expect(
@@ -125,8 +125,9 @@ void main() {
     });
 
     test('throws when id is missing', () {
-      final raw = File('test/fixtures/themes/querya_custom_invalid_missing_id.json')
-          .readAsStringSync();
+      final raw =
+          File('test/fixtures/themes/querya_custom_invalid_missing_id.json')
+              .readAsStringSync();
 
       expect(
         () => QueryaThemeManifest.fromJsonString(raw),
@@ -188,15 +189,16 @@ void main() {
     });
 
     test('serializes to valid JSON for export', () {
-      final raw =
-          File('test/fixtures/themes/querya_custom_dark.json').readAsStringSync();
+      final raw = File('test/fixtures/themes/querya_custom_dark.json')
+          .readAsStringSync();
       final manifest = QueryaThemeManifest.fromJsonString(raw);
 
       final exported = manifest.toJsonString();
       final reparsed = QueryaThemeManifest.fromJsonString(exported);
 
       expect(reparsed.id, manifest.id);
-      expect(reparsed.shadcnColors['primary'], manifest.shadcnColors['primary']);
+      expect(
+          reparsed.shadcnColors['primary'], manifest.shadcnColors['primary']);
       expect(reparsed.tokenColors.length, manifest.tokenColors.length);
     });
 

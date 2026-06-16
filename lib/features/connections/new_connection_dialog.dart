@@ -27,6 +27,7 @@ extension ConnectionTypeX on ConnectionType {
         ConnectionType.redis => material.Icons.memory_rounded,
         ConnectionType.mongodb => material.Icons.eco_rounded,
       };
+
   /// Asset path for custom icon (from Downloads).
   String? get iconAsset => switch (this) {
         ConnectionType.postgresql => 'assets/images/postgresql_icon.png',
@@ -34,12 +35,18 @@ extension ConnectionTypeX on ConnectionType {
         ConnectionType.redis => 'assets/images/redis_icon.png',
         ConnectionType.mongodb => 'assets/images/mongodb_icon.png',
       };
-  bool get isSql => this == ConnectionType.postgresql || this == ConnectionType.mysql;
+  bool get isSql =>
+      this == ConnectionType.postgresql || this == ConnectionType.mysql;
 }
 
 const _sqlTypes = [ConnectionType.postgresql, ConnectionType.mysql];
 const _noSqlTypes = [ConnectionType.redis, ConnectionType.mongodb];
-const _allTypes = [ConnectionType.postgresql, ConnectionType.mysql, ConnectionType.redis, ConnectionType.mongodb];
+const _allTypes = [
+  ConnectionType.postgresql,
+  ConnectionType.mysql,
+  ConnectionType.redis,
+  ConnectionType.mongodb
+];
 
 enum _Category { all, sql, nosql }
 
@@ -60,10 +67,12 @@ class _NewConnectionDialogContent extends material.StatefulWidget {
   const _NewConnectionDialogContent();
 
   @override
-  material.State<_NewConnectionDialogContent> createState() => _NewConnectionDialogContentState();
+  material.State<_NewConnectionDialogContent> createState() =>
+      _NewConnectionDialogContentState();
 }
 
-class _NewConnectionDialogContentState extends material.State<_NewConnectionDialogContent> {
+class _NewConnectionDialogContentState
+    extends material.State<_NewConnectionDialogContent> {
   _Category _category = _Category.all;
   ConnectionType? _selectedType;
   final _searchController = material.TextEditingController();
@@ -84,7 +93,9 @@ class _NewConnectionDialogContentState extends material.State<_NewConnectionDial
   List<ConnectionType> get _filteredTypes {
     if (_searchQuery.trim().isEmpty) return _categoryTypes;
     final q = _searchQuery.trim().toLowerCase();
-    return _categoryTypes.where((t) => t.label.toLowerCase().contains(q)).toList();
+    return _categoryTypes
+        .where((t) => t.label.toLowerCase().contains(q))
+        .toList();
   }
 
   @override
@@ -113,143 +124,154 @@ class _NewConnectionDialogContentState extends material.State<_NewConnectionDial
         child: material.SizedBox(
           height: dialogH,
           child: material.Column(
-          mainAxisSize: material.MainAxisSize.min,
-          crossAxisAlignment: material.CrossAxisAlignment.stretch,
-          children: [
-            material.Padding(
-              padding: material.EdgeInsets.fromLTRB(headerPadH, 20, headerPadH, 8),
-              child: Column(
-                crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                children: [
-                  const Text('Select your database').large().semiBold(),
-                  const material.SizedBox(height: 6),
-                  const Text(
-                    'Create new database connection. Find your database driver in the list below.',
-                  ).muted().small(),
-                  const material.SizedBox(height: 12),
-                  material.Container(
-                    decoration: material.BoxDecoration(
-                      color: theme.muted.withValues(alpha: 0.2),
-                      borderRadius: material.BorderRadius.circular(8),
-                      border: material.Border.all(color: theme.border.withValues(alpha: 0.4)),
-                    ),
-                    padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    child: material.Row(
-                      children: [
-                        material.Icon(
-                          material.Icons.search_rounded,
-                          size: 20,
-                          color: theme.mutedForeground,
-                        ),
-                        const material.SizedBox(width: 10),
-                        material.Expanded(
-                          child: TextField(
-                            controller: _searchController,
-                            placeholder: const Text('Search...'),
-                            onChanged: (v) => setState(() {
-                              _searchQuery = v;
-                              if (_selectedType != null &&
-                                  !_filteredTypes.contains(_selectedType)) {
-                                _selectedType = null;
-                              }
-                            }),
+            mainAxisSize: material.MainAxisSize.min,
+            crossAxisAlignment: material.CrossAxisAlignment.stretch,
+            children: [
+              material.Padding(
+                padding:
+                    material.EdgeInsets.fromLTRB(headerPadH, 20, headerPadH, 8),
+                child: Column(
+                  crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                  children: [
+                    const Text('Select your database').large().semiBold(),
+                    const material.SizedBox(height: 6),
+                    const Text(
+                      'Create new database connection. Find your database driver in the list below.',
+                    ).muted().small(),
+                    const material.SizedBox(height: 12),
+                    material.Container(
+                      decoration: material.BoxDecoration(
+                        color: theme.muted.withValues(alpha: 0.2),
+                        borderRadius: material.BorderRadius.circular(8),
+                        border: material.Border.all(
+                            color: theme.border.withValues(alpha: 0.4)),
+                      ),
+                      padding: const material.EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 4),
+                      child: material.Row(
+                        children: [
+                          material.Icon(
+                            material.Icons.search_rounded,
+                            size: 20,
+                            color: theme.mutedForeground,
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const material.SizedBox(height: 12),
-                  _FilterDropdowns(
-                    stackVertically: stackFilters,
-                    category: _category,
-                    selectedType: _selectedType,
-                    filteredTypes: _filteredTypes,
-                    onCategoryChanged: (category) {
-                      setState(() {
-                        _category = category;
-                        if (_selectedType != null &&
-                            !_categoryTypes.contains(_selectedType)) {
-                          _selectedType = null;
-                        }
-                      });
-                    },
-                    onTypeChanged: (type) => setState(() => _selectedType = type),
-                  ),
-                ],
-              ),
-            ),
-            material.Expanded(
-              child: material.LayoutBuilder(
-                builder: (context, constraints) {
-                  const spacing = 12.0;
-                  final gridPad = dialogMaxW < 420 ? 12.0 : 16.0;
-                  final innerW = math.max(0.0, constraints.maxWidth - gridPad * 2);
-                  final crossAxisCount =
-                      WindowLayout.dbTypeGridCrossAxisCount(innerW);
-                    final cardHeight =
-                        WindowLayout.dbTypeCardHeight(context, crossAxisCount);
-                  final cardWidth = crossAxisCount > 0
-                      ? (innerW - spacing * (crossAxisCount - 1)) / crossAxisCount
-                      : innerW;
-                  final aspect = cardHeight > 0 ? cardWidth / cardHeight : 1.0;
-                  return material.Padding(
-                    padding: material.EdgeInsets.all(gridPad),
-                    child: _filteredTypes.isEmpty
-                        ? material.Center(
-                            child: const Text('No databases match your search.')
-                                .muted()
-                                .small(),
-                          )
-                        : material.GridView.count(
-                            crossAxisCount: crossAxisCount,
-                            mainAxisSpacing: spacing,
-                            crossAxisSpacing: spacing,
-                            childAspectRatio: aspect.clamp(0.4, 4.0),
-                            shrinkWrap: true,
-                            physics: const material.ClampingScrollPhysics(),
-                            children: [
-                              for (final t in _filteredTypes)
-                                _DbTypeCard(
-                                  type: t,
-                                  theme: theme,
-                                  selected: _selectedType == t,
-                                  onTap: () => setState(() => _selectedType = t),
-                                ),
-                            ],
+                          const material.SizedBox(width: 10),
+                          material.Expanded(
+                            child: TextField(
+                              controller: _searchController,
+                              placeholder: const Text('Search...'),
+                              onChanged: (v) => setState(() {
+                                _searchQuery = v;
+                                if (_selectedType != null &&
+                                    !_filteredTypes.contains(_selectedType)) {
+                                  _selectedType = null;
+                                }
+                              }),
+                            ),
                           ),
-                  );
-                },
-              ),
-            ),
-            material.Container(
-              padding: material.EdgeInsets.symmetric(
-                horizontal: headerPadH,
-                vertical: 14,
-              ),
-              decoration: material.BoxDecoration(
-                border: material.Border(
-                  top: material.BorderSide(color: theme.border.withValues(alpha: 0.3)),
+                        ],
+                      ),
+                    ),
+                    const material.SizedBox(height: 12),
+                    _FilterDropdowns(
+                      stackVertically: stackFilters,
+                      category: _category,
+                      selectedType: _selectedType,
+                      filteredTypes: _filteredTypes,
+                      onCategoryChanged: (category) {
+                        setState(() {
+                          _category = category;
+                          if (_selectedType != null &&
+                              !_categoryTypes.contains(_selectedType)) {
+                            _selectedType = null;
+                          }
+                        });
+                      },
+                      onTypeChanged: (type) =>
+                          setState(() => _selectedType = type),
+                    ),
+                  ],
                 ),
               ),
-              child: material.Row(
-                mainAxisAlignment: material.MainAxisAlignment.end,
-                children: [
-                  GhostButton(
-                    onPressed: () => material.Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
-                  ),
-                  const material.SizedBox(width: 12),
-                  PrimaryButton(
-                    onPressed: _selectedType == null
-                        ? null
-                        : () => material.Navigator.of(context).pop(_selectedType),
-                    child: const Text('Next'),
-                  ),
-                ],
+              material.Expanded(
+                child: material.LayoutBuilder(
+                  builder: (context, constraints) {
+                    const spacing = 12.0;
+                    final gridPad = dialogMaxW < 420 ? 12.0 : 16.0;
+                    final innerW =
+                        math.max(0.0, constraints.maxWidth - gridPad * 2);
+                    final crossAxisCount =
+                        WindowLayout.dbTypeGridCrossAxisCount(innerW);
+                    final cardHeight =
+                        WindowLayout.dbTypeCardHeight(context, crossAxisCount);
+                    final cardWidth = crossAxisCount > 0
+                        ? (innerW - spacing * (crossAxisCount - 1)) /
+                            crossAxisCount
+                        : innerW;
+                    final aspect =
+                        cardHeight > 0 ? cardWidth / cardHeight : 1.0;
+                    return material.Padding(
+                      padding: material.EdgeInsets.all(gridPad),
+                      child: _filteredTypes.isEmpty
+                          ? material.Center(
+                              child:
+                                  const Text('No databases match your search.')
+                                      .muted()
+                                      .small(),
+                            )
+                          : material.GridView.count(
+                              crossAxisCount: crossAxisCount,
+                              mainAxisSpacing: spacing,
+                              crossAxisSpacing: spacing,
+                              childAspectRatio: aspect.clamp(0.4, 4.0),
+                              shrinkWrap: true,
+                              physics: const material.ClampingScrollPhysics(),
+                              children: [
+                                for (final t in _filteredTypes)
+                                  _DbTypeCard(
+                                    type: t,
+                                    theme: theme,
+                                    selected: _selectedType == t,
+                                    onTap: () =>
+                                        setState(() => _selectedType = t),
+                                  ),
+                              ],
+                            ),
+                    );
+                  },
+                ),
               ),
-            ),
-          ],
-        ),
+              material.Container(
+                padding: material.EdgeInsets.symmetric(
+                  horizontal: headerPadH,
+                  vertical: 14,
+                ),
+                decoration: material.BoxDecoration(
+                  border: material.Border(
+                    top: material.BorderSide(
+                        color: theme.border.withValues(alpha: 0.3)),
+                  ),
+                ),
+                child: material.Row(
+                  mainAxisAlignment: material.MainAxisAlignment.end,
+                  children: [
+                    GhostButton(
+                      onPressed: () => material.Navigator.of(context).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                    const material.SizedBox(width: 12),
+                    PrimaryButton(
+                      onPressed: _selectedType == null
+                          ? null
+                          : () =>
+                              material.Navigator.of(context).pop(_selectedType),
+                      child: const Text('Next'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -387,12 +409,17 @@ class _DbTypeCardState extends material.State<_DbTypeCard> {
         child: material.AnimatedContainer(
           duration: context.motionDuration(QueryaMotion.fast),
           curve: context.motionCurve(QueryaMotion.enter),
-          padding: const material.EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          padding:
+              const material.EdgeInsets.symmetric(vertical: 10, horizontal: 8),
           decoration: material.BoxDecoration(
-            color: highlighted ? t.muted.withValues(alpha: 0.4) : t.muted.withValues(alpha: 0.12),
+            color: highlighted
+                ? t.muted.withValues(alpha: 0.4)
+                : t.muted.withValues(alpha: 0.12),
             borderRadius: material.BorderRadius.circular(10),
             border: material.Border.all(
-              color: widget.selected ? t.primary.withValues(alpha: 0.6) : t.border.withValues(alpha: 0.35),
+              color: widget.selected
+                  ? t.primary.withValues(alpha: 0.6)
+                  : t.border.withValues(alpha: 0.35),
               width: widget.selected ? 1.5 : 1,
             ),
           ),
@@ -410,7 +437,8 @@ class _DbTypeCardState extends material.State<_DbTypeCard> {
                             fit: material.BoxFit.contain,
                             filterQuality: material.FilterQuality.medium,
                           )
-                        : material.Icon(widget.type.icon, size: 52, color: t.primary),
+                        : material.Icon(widget.type.icon,
+                            size: 52, color: t.primary),
                   ),
                 ),
               ),

@@ -53,7 +53,9 @@ double contrastRatio(Color a, Color b) {
 
 double _relativeLuminance(Color c) {
   double channel(double v) {
-    final normalized = v <= 0.03928 ? v / 12.92 : math.pow((v + 0.055) / 1.055, 2.4).toDouble();
+    final normalized = v <= 0.03928
+        ? v / 12.92
+        : math.pow((v + 0.055) / 1.055, 2.4).toDouble();
     return normalized;
   }
 

@@ -18,10 +18,12 @@ class _CreateMongoDBDialogContent extends material.StatefulWidget {
   const _CreateMongoDBDialogContent();
 
   @override
-  material.State<_CreateMongoDBDialogContent> createState() => _CreateMongoDBDialogContentState();
+  material.State<_CreateMongoDBDialogContent> createState() =>
+      _CreateMongoDBDialogContentState();
 }
 
-class _CreateMongoDBDialogContentState extends material.State<_CreateMongoDBDialogContent> {
+class _CreateMongoDBDialogContentState
+    extends material.State<_CreateMongoDBDialogContent> {
   final _nameController = material.TextEditingController();
 
   @override
@@ -71,13 +73,16 @@ class _CreateMongoDBDialogContentState extends material.State<_CreateMongoDBDial
                 children: [
                   material.Row(
                     children: [
-                      material.Icon(material.Icons.storage_rounded, size: 24, color: theme.primary),
+                      material.Icon(material.Icons.storage_rounded,
+                          size: 24, color: theme.primary),
                       const Gap(12),
                       const Text('Create Database').large().semiBold(),
                     ],
                   ),
                   const Gap(8),
-                  const Text('Enter the name for the new MongoDB database.').muted().small(),
+                  const Text('Enter the name for the new MongoDB database.')
+                      .muted()
+                      .small(),
                 ],
               ),
             ),
@@ -98,7 +103,8 @@ class _CreateMongoDBDialogContentState extends material.State<_CreateMongoDBDial
             ),
             const material.Divider(height: 1),
             material.Container(
-              padding: const material.EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: const material.EdgeInsets.symmetric(
+                  horizontal: 24, vertical: 16),
               child: material.Row(
                 mainAxisAlignment: material.MainAxisAlignment.end,
                 children: [

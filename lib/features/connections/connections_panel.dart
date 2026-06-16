@@ -1,4 +1,57 @@
-import 'package:flutter/material.dart' as material show AlertDialog, BoxConstraints, BuildContext, Column, ConstrainedBox, Container, BoxDecoration, Border, BorderSide, InkWell, Icon, Icons, IconData, Image, EdgeInsets, EdgeInsetsGeometry, BorderRadius, CrossAxisAlignment, MainAxisSize, MouseRegion, SystemMouseCursors, TextStyle, CustomScrollView, SliverFillRemaining, SliverPadding, SliverList, SliverChildBuilderDelegate, GestureDetector, HitTestBehavior, SizedBox, AnimatedRotation, Row, BoxFit, Text, TextOverflow, Expanded, CircularProgressIndicator, Material, StatelessWidget, Colors, Tooltip, Color, SelectableText, Padding, Widget, Navigator, ValueKey, FontWeight, VoidCallback, RepaintBoundary, ListView, ClampingScrollPhysics;
+import 'package:flutter/material.dart' as material
+    show
+        AlertDialog,
+        BoxConstraints,
+        BuildContext,
+        Column,
+        ConstrainedBox,
+        Container,
+        BoxDecoration,
+        Border,
+        BorderSide,
+        InkWell,
+        Icon,
+        Icons,
+        IconData,
+        Image,
+        EdgeInsets,
+        EdgeInsetsGeometry,
+        BorderRadius,
+        CrossAxisAlignment,
+        MainAxisSize,
+        MouseRegion,
+        SystemMouseCursors,
+        TextStyle,
+        CustomScrollView,
+        SliverFillRemaining,
+        SliverPadding,
+        SliverList,
+        SliverChildBuilderDelegate,
+        GestureDetector,
+        HitTestBehavior,
+        SizedBox,
+        AnimatedRotation,
+        Row,
+        BoxFit,
+        Text,
+        TextOverflow,
+        Expanded,
+        CircularProgressIndicator,
+        Material,
+        StatelessWidget,
+        Colors,
+        Tooltip,
+        Color,
+        SelectableText,
+        Padding,
+        Widget,
+        Navigator,
+        ValueKey,
+        FontWeight,
+        VoidCallback,
+        RepaintBoundary,
+        ListView,
+        ClampingScrollPhysics;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
@@ -96,6 +149,7 @@ class ConnectionsPanel extends StatefulWidget {
     this.onPostgresOpenSqlWorkspace,
     this.onMysqlObjectSelected,
     this.onMysqlOpenSqlWorkspace,
+
     /// When true, [initState] does not call [_loadData]. Widget tests that seed
     /// SQLite in setUp should call [ConnectionsPanelState.reloadConnectionsFromDb]
     /// inside [WidgetTester.runAsync] so only one load runs (avoids overlapping
@@ -151,6 +205,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
   List<ConnectionRow> _connections = [];
   Map<String, int> _folderIdByName = {};
   final Set<String> _expandedFolders = {};
+
   /// Ignores stale [setState] when multiple [_loadData] runs overlap (e.g. tests).
   int _loadDataGeneration = 0;
 
@@ -258,8 +313,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
   }
 
   Widget _buildConnectionTile(ConnectionRow conn) {
-    final isSelected =
-        widget.selectedConnectionId != null && widget.selectedConnectionId == conn.id;
+    final isSelected = widget.selectedConnectionId != null &&
+        widget.selectedConnectionId == conn.id;
     if (conn.type == 'postgresql') {
       return _PostgresConnectionTile(
         connection: conn,
@@ -318,7 +373,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     final theme = Theme.of(context);
 
     // Connections without a folder
-    final rootConnections = _connections.where((c) => c.folderId == null).toList();
+    final rootConnections =
+        _connections.where((c) => c.folderId == null).toList();
     final showEmptyState = _connections.isEmpty && _folders.isEmpty;
     final topLevelCount =
         _folders.length + rootConnections.length + (showEmptyState ? 1 : 0);
@@ -349,95 +405,113 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
               ),
             ),
           ),
-          Divider(height: 1, color: theme.colorScheme.border.withValues(alpha: 0.22)),
+          Divider(
+              height: 1,
+              color: theme.colorScheme.border.withValues(alpha: 0.22)),
           Expanded(
             child: material.RepaintBoundary(
               child: material.CustomScrollView(
                 slivers: [
-                material.SliverPadding(
-                  padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                  sliver: material.SliverList(
-                    delegate: material.SliverChildBuilderDelegate(
-                      (context, index) {
-                        if (showEmptyState && index == 0) {
-                          return const material.Padding(
-                            padding: material.EdgeInsets.only(top: 8),
-                            child: _EmptyState(message: 'No connections yet'),
-                          );
-                        }
-                        final folderOffset = showEmptyState ? 1 : 0;
-                        final folderIndex = index - folderOffset;
-                        if (folderIndex < _folders.length) {
-                          final name = _folders[folderIndex];
-                          return _FolderTile(
-                            name: name,
-                            initiallyExpanded: _expandedFolders.contains(name),
-                            onExpansionCommitted: (folderName, expanded) {
-                              if (expanded) {
-                                _expandedFolders.add(folderName);
-                              } else {
-                                _expandedFolders.remove(folderName);
-                              }
-                            },
-                            connections: _connections
-                                .where((c) => c.folderId == _folderIdByName[name])
-                                .toList(),
-                            onRemove: () async {
-                              await FoldersStorage.instance.remove(name);
-                              await _loadData();
-                            },
-                            onNewConnection: (folderName) async {
-                              final folderId =
-                                  await LocalDb.instance.getFolderIdByName(folderName);
-                              await _createConnection(folderId: folderId);
-                            },
-                            iconForType: _iconForType,
-                            onRemoveConnection: _removeConnection,
-                            onConnectionTap: widget.onConnectionSelected,
-                            onRedisDatabaseTap: widget.onRedisDatabaseSelected,
-                            onMongoDBDatabaseTap: widget.onMongoDBDatabaseSelected,
-                            buildConnectionTile: _buildConnectionTile,
-                          );
-                        }
-                        final connIndex = folderIndex - _folders.length;
-                        return _buildConnectionTile(rootConnections[connIndex]);
-                      },
-                      childCount: topLevelCount,
-                    ),
-                  ),
-                ),
-                material.SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: ContextMenu(
-                    items: [
-                      MenuButton(
-                        leading: material.Icon(material.Icons.add_rounded, size: 18, color: theme.colorScheme.mutedForeground),
-                        subMenu: [
-                          MenuButton(
-                            leading: material.Icon(material.Icons.settings_ethernet_rounded, size: 18, color: theme.colorScheme.mutedForeground),
-                            onPressed: (menuContext) async {
-                              await Future.delayed(const Duration(milliseconds: 100));
-                              if (!mounted) return;
-                              await _createConnection();
-                            },
-                            child: const Text('New Connection'),
-                          ),
-                          MenuButton(
-                            leading: material.Icon(material.Icons.folder_rounded, size: 18, color: theme.colorScheme.mutedForeground),
-                            onPressed: (menuContext) => _createFolder(menuContext),
-                            child: const Text('New Folder'),
-                          ),
-                        ],
-                        child: const Text('Create'),
+                  material.SliverPadding(
+                    padding: const material.EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 12),
+                    sliver: material.SliverList(
+                      delegate: material.SliverChildBuilderDelegate(
+                        (context, index) {
+                          if (showEmptyState && index == 0) {
+                            return const material.Padding(
+                              padding: material.EdgeInsets.only(top: 8),
+                              child: _EmptyState(message: 'No connections yet'),
+                            );
+                          }
+                          final folderOffset = showEmptyState ? 1 : 0;
+                          final folderIndex = index - folderOffset;
+                          if (folderIndex < _folders.length) {
+                            final name = _folders[folderIndex];
+                            return _FolderTile(
+                              name: name,
+                              initiallyExpanded:
+                                  _expandedFolders.contains(name),
+                              onExpansionCommitted: (folderName, expanded) {
+                                if (expanded) {
+                                  _expandedFolders.add(folderName);
+                                } else {
+                                  _expandedFolders.remove(folderName);
+                                }
+                              },
+                              connections: _connections
+                                  .where((c) =>
+                                      c.folderId == _folderIdByName[name])
+                                  .toList(),
+                              onRemove: () async {
+                                await FoldersStorage.instance.remove(name);
+                                await _loadData();
+                              },
+                              onNewConnection: (folderName) async {
+                                final folderId = await LocalDb.instance
+                                    .getFolderIdByName(folderName);
+                                await _createConnection(folderId: folderId);
+                              },
+                              iconForType: _iconForType,
+                              onRemoveConnection: _removeConnection,
+                              onConnectionTap: widget.onConnectionSelected,
+                              onRedisDatabaseTap:
+                                  widget.onRedisDatabaseSelected,
+                              onMongoDBDatabaseTap:
+                                  widget.onMongoDBDatabaseSelected,
+                              buildConnectionTile: _buildConnectionTile,
+                            );
+                          }
+                          final connIndex = folderIndex - _folders.length;
+                          return _buildConnectionTile(
+                              rootConnections[connIndex]);
+                        },
+                        childCount: topLevelCount,
                       ),
-                    ],
-                    child: material.GestureDetector(
-                      behavior: material.HitTestBehavior.opaque,
-                      child: const material.SizedBox.expand(),
                     ),
                   ),
-                ),
-              ],
+                  material.SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: ContextMenu(
+                      items: [
+                        MenuButton(
+                          leading: material.Icon(material.Icons.add_rounded,
+                              size: 18,
+                              color: theme.colorScheme.mutedForeground),
+                          subMenu: [
+                            MenuButton(
+                              leading: material.Icon(
+                                  material.Icons.settings_ethernet_rounded,
+                                  size: 18,
+                                  color: theme.colorScheme.mutedForeground),
+                              onPressed: (menuContext) async {
+                                await Future.delayed(
+                                    const Duration(milliseconds: 100));
+                                if (!mounted) return;
+                                await _createConnection();
+                              },
+                              child: const Text('New Connection'),
+                            ),
+                            MenuButton(
+                              leading: material.Icon(
+                                  material.Icons.folder_rounded,
+                                  size: 18,
+                                  color: theme.colorScheme.mutedForeground),
+                              onPressed: (menuContext) =>
+                                  _createFolder(menuContext),
+                              child: const Text('New Folder'),
+                            ),
+                          ],
+                          child: const Text('Create'),
+                        ),
+                      ],
+                      child: material.GestureDetector(
+                        behavior: material.HitTestBehavior.opaque,
+                        child: const material.SizedBox.expand(),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

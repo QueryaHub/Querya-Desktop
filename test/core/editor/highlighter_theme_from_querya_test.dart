@@ -11,7 +11,8 @@ void main() {
   });
 
   test('highlighterThemeFromQueryaEditor produces SQL spans', () {
-    final theme = highlighterThemeFromQueryaEditor(QueryaTheme.darkDefault.editor);
+    final theme =
+        highlighterThemeFromQueryaEditor(QueryaTheme.darkDefault.editor);
     final highlighter = Highlighter(language: 'sql', theme: theme);
     final span = highlighter.highlight('SELECT 1 -- comment');
     expect(span.children, isNotNull);
@@ -19,7 +20,8 @@ void main() {
   });
 
   test('highlighterThemeFromQueryaEditor produces JSON spans', () {
-    final theme = highlighterThemeFromQueryaEditor(QueryaTheme.darkDefault.editor);
+    final theme =
+        highlighterThemeFromQueryaEditor(QueryaTheme.darkDefault.editor);
     final highlighter = Highlighter(language: 'json', theme: theme);
     const sample = '{"name": "x", "count": 1, "ok": true, "nil": null}';
     final span = highlighter.highlight(sample);

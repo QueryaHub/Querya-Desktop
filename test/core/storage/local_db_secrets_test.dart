@@ -35,7 +35,8 @@ class _FakePathProvider extends PathProviderPlatform {
   Future<List<String>?> getExternalCachePaths() async => [_root];
 
   @override
-  Future<List<String>?> getExternalStoragePaths({StorageDirectory? type}) async =>
+  Future<List<String>?> getExternalStoragePaths(
+          {StorageDirectory? type}) async =>
       [_root];
 
   @override
@@ -87,7 +88,8 @@ void main() {
         options: OpenDatabaseOptions(readOnly: true),
       );
       try {
-        final maps = await raw.query('connections', where: 'id = ?', whereArgs: [id]);
+        final maps =
+            await raw.query('connections', where: 'id = ?', whereArgs: [id]);
         expect(maps.single['password'], isNull);
       } finally {
         await raw.close();

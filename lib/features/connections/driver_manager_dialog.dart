@@ -81,12 +81,14 @@ class _DriverManagerDialogContent extends material.StatelessWidget {
               ),
             ),
             material.Padding(
-              padding: const material.EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              padding: const material.EdgeInsets.symmetric(
+                  horizontal: 24, vertical: 12),
               child: material.Container(
                 decoration: material.BoxDecoration(
                   color: theme.muted.withValues(alpha: 0.15),
                   borderRadius: material.BorderRadius.circular(10),
-                  border: material.Border.all(color: theme.border.withValues(alpha: 0.3)),
+                  border: material.Border.all(
+                      color: theme.border.withValues(alpha: 0.3)),
                 ),
                 child: material.ListView.separated(
                   shrinkWrap: true,
@@ -108,10 +110,12 @@ class _DriverManagerDialogContent extends material.StatelessWidget {
               ),
             ),
             material.Container(
-              padding: const material.EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: const material.EdgeInsets.symmetric(
+                  horizontal: 24, vertical: 16),
               decoration: material.BoxDecoration(
                 border: material.Border(
-                  top: material.BorderSide(color: theme.border.withValues(alpha: 0.3)),
+                  top: material.BorderSide(
+                      color: theme.border.withValues(alpha: 0.3)),
                 ),
               ),
               child: material.Row(
@@ -145,7 +149,8 @@ class _DriverRow extends material.StatelessWidget {
   @override
   material.Widget build(material.BuildContext context) {
     return material.Padding(
-      padding: const material.EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding:
+          const material.EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: material.Row(
         crossAxisAlignment: material.CrossAxisAlignment.center,
         children: [
@@ -174,7 +179,8 @@ class _DriverRow extends material.StatelessWidget {
           ),
           const material.SizedBox(width: 8),
           material.Container(
-            padding: const material.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: const material.EdgeInsets.symmetric(
+                horizontal: 10, vertical: 6),
             decoration: material.BoxDecoration(
               color: theme.primary.withValues(alpha: 0.12),
               borderRadius: material.BorderRadius.circular(6),

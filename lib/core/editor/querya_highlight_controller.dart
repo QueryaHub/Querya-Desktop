@@ -43,9 +43,8 @@ class QueryaHighlightController extends TextEditingController {
     required bool withComposing,
   }) {
     final brightness = Theme.of(context).brightness;
-    final themeConfig = brightness == Brightness.light
-        ? lightThemeConfig
-        : darkThemeConfig;
+    final themeConfig =
+        brightness == Brightness.light ? lightThemeConfig : darkThemeConfig;
 
     if (_cachedText == text &&
         _cachedBrightness == brightness &&

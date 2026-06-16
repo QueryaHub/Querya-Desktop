@@ -15,20 +15,18 @@ class QueryaThemeScope extends InheritedWidget {
   final QueryaTheme data;
 
   static QueryaTheme of(BuildContext context) {
-    final scope = context.dependOnInheritedWidgetOfExactType<QueryaThemeScope>();
+    final scope =
+        context.dependOnInheritedWidgetOfExactType<QueryaThemeScope>();
     assert(scope != null, 'QueryaThemeScope not found in context');
     return scope!.data;
   }
 
   static QueryaTheme? maybeOf(BuildContext context) {
-    return context
-        .dependOnInheritedWidgetOfExactType<QueryaThemeScope>()
-        ?.data;
+    return context.dependOnInheritedWidgetOfExactType<QueryaThemeScope>()?.data;
   }
 
   @override
-  bool updateShouldNotify(QueryaThemeScope oldWidget) =>
-      data != oldWidget.data;
+  bool updateShouldNotify(QueryaThemeScope oldWidget) => data != oldWidget.data;
 }
 
 /// Convenient access to [QueryaTheme] tokens from [BuildContext].

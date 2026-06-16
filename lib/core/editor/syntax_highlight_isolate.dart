@@ -113,9 +113,8 @@ TextStyle? _styleFromSegment(HighlightSegment s, TextStyle? base) {
   return (base ?? const TextStyle()).copyWith(
     color: s.colorArgb != null ? Color(s.colorArgb!) : null,
     fontWeight: _fontWeightFromValue(s.fontWeightValue),
-    fontStyle: s.fontStyleIndex != null
-        ? FontStyle.values[s.fontStyleIndex!]
-        : null,
+    fontStyle:
+        s.fontStyleIndex != null ? FontStyle.values[s.fontStyleIndex!] : null,
   );
 }
 

@@ -6,7 +6,8 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 import '../../support/querya_theme_test_shell.dart';
 
 void main() {
-  testWidgets('QueryEditorTab applies fontSize to EditableText', (tester) async {
+  testWidgets('QueryEditorTab applies fontSize to EditableText',
+      (tester) async {
     await tester.pumpWidget(
       queryaThemeTestShell(
         child: const material.Scaffold(

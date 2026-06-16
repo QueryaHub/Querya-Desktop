@@ -69,7 +69,8 @@ class _BlurredDialogScaffold extends StatelessWidget {
                   final t = curved.value;
                   return ClipRect(
                     child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 8.0 * t, sigmaY: 8.0 * t),
+                      filter:
+                          ImageFilter.blur(sigmaX: 8.0 * t, sigmaY: 8.0 * t),
                       child: Container(
                         color: Colors.black.withValues(alpha: 0.32 * t),
                       ),

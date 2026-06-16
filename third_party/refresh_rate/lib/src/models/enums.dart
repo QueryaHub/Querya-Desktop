@@ -18,11 +18,16 @@ enum RateCategory {
   /// Returns the [RateCategory] matching [index], or [none] if unknown.
   static RateCategory fromIndex(int? index) {
     switch (index) {
-      case 0: return none;
-      case 1: return low;
-      case 2: return normal;
-      case 3: return high;
-      default: return none;
+      case 0:
+        return none;
+      case 1:
+        return low;
+      case 2:
+        return normal;
+      case 3:
+        return high;
+      default:
+        return none;
     }
   }
 }
@@ -50,11 +55,16 @@ enum ThermalState {
   /// Returns the [ThermalState] matching [index], or [unknown] if not found.
   static ThermalState fromIndex(int? index) {
     switch (index) {
-      case 0: return nominal;
-      case 1: return fair;
-      case 2: return serious;
-      case 3: return critical;
-      default: return unknown;
+      case 0:
+        return nominal;
+      case 1:
+        return fair;
+      case 2:
+        return serious;
+      case 3:
+        return critical;
+      default:
+        return unknown;
     }
   }
 }

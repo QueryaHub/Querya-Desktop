@@ -23,9 +23,8 @@ class QueryaAnimatedExpand extends StatelessWidget {
       curve: context.motionCurve(QueryaMotion.enter),
       alignment: alignment,
       clipBehavior: Clip.hardEdge,
-      child: expanded
-          ? child
-          : const SizedBox(width: double.infinity, height: 0),
+      child:
+          expanded ? child : const SizedBox(width: double.infinity, height: 0),
     );
   }
 }

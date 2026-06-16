@@ -25,7 +25,8 @@ void main() {
 
     test('UiScaleController.normalize snaps to presets unless fine mode', () {
       expect(UiScaleController.normalize(1.15), 1.1);
-      expect(UiScaleController.normalize(1.15, fine: true), closeTo(1.15, 0.001));
+      expect(
+          UiScaleController.normalize(1.15, fine: true), closeTo(1.15, 0.001));
       expect(UiScaleController.normalize(0.88), 0.9);
     });
   });

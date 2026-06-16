@@ -182,16 +182,19 @@ class QueryaThemeManifest {
       case 'light':
         return QueryaThemeType.light;
       default:
-        throw QueryaThemeManifestParseException('Invalid type "$raw"; expected dark or light');
+        throw QueryaThemeManifestParseException(
+            'Invalid type "$raw"; expected dark or light');
     }
   }
 
   static Map<String, String> _parseColorMap(Object? raw, String fieldName) {
     if (raw == null) {
-      throw QueryaThemeManifestParseException('Missing required field "$fieldName"');
+      throw QueryaThemeManifestParseException(
+          'Missing required field "$fieldName"');
     }
     if (raw is! Map) {
-      throw QueryaThemeManifestParseException('"$fieldName" must be a JSON object');
+      throw QueryaThemeManifestParseException(
+          '"$fieldName" must be a JSON object');
     }
 
     final colors = <String, String>{};

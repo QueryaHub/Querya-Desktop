@@ -42,8 +42,12 @@ class PostgresSqlWorkspace extends material.StatefulWidget {
   final material.ValueNotifier<bool?>? transactionOpenNotifier;
 
   /// Table/view/matview from the tree: sets session DB (if non-empty) and editor template.
-  final ({String database, String schema, String name, PostgresObjectKind kind})?
-      postgresSqlEditorContext;
+  final ({
+    String database,
+    String schema,
+    String name,
+    PostgresObjectKind kind
+  })? postgresSqlEditorContext;
 
   /// Increments when [postgresSqlEditorContext] should be re-applied to the editor.
   final int postgresSqlEditorContextToken;
@@ -181,8 +185,9 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     _interruptDatabase = db;
   }
 
-  Duration? _statementTimeout() =>
-      _queryTimeoutSeconds == null ? null : Duration(seconds: _queryTimeoutSeconds!);
+  Duration? _statementTimeout() => _queryTimeoutSeconds == null
+      ? null
+      : Duration(seconds: _queryTimeoutSeconds!);
 
   Future<void> _refreshTxStatus() async {
     final conn = _lease?.connection;
@@ -244,7 +249,8 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
 
   @override
   void dispose() {
-    SqlWorkspaceSettingsRevision.listenable.removeListener(_appSettingsListener);
+    SqlWorkspaceSettingsRevision.listenable
+        .removeListener(_appSettingsListener);
     _topFraction.dispose();
     if (_running) {
       PostgresService.instance.interrupt(
@@ -390,8 +396,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
                     onExecute: _running ? null : _execute,
                     running: _running,
                     autocommit: _autocommit,
-                    onAutocommitChanged: (v) =>
-                        setState(() => _autocommit = v),
+                    onAutocommitChanged: (v) => setState(() => _autocommit = v),
                     queryTimeoutSeconds: _queryTimeoutSeconds,
                     onQueryTimeoutChanged: _onStmtTimeoutChanged,
                     onOpenPreferences: () => showPreferencesDialog(context),
@@ -406,10 +411,8 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
                           }
                         : null,
                     txOpen: _txOpen,
-                    onBegin:
-                        _running ? null : () => _runTxCommand('BEGIN'),
-                    onCommit:
-                        _running ? null : () => _runTxCommand('COMMIT'),
+                    onBegin: _running ? null : () => _runTxCommand('BEGIN'),
+                    onCommit: _running ? null : () => _runTxCommand('COMMIT'),
                     onRollback:
                         _running ? null : () => _runTxCommand('ROLLBACK'),
                   ),

@@ -10,8 +10,8 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 void main() {
   group('colorSchemeFromQueryaThemeColors', () {
     test('full fixture maps custom shadcn values', () {
-      final raw =
-          File('test/fixtures/themes/querya_custom_dark.json').readAsStringSync();
+      final raw = File('test/fixtures/themes/querya_custom_dark.json')
+          .readAsStringSync();
       final manifest = QueryaThemeManifest.fromJsonString(raw);
       final scheme = colorSchemeFromQueryaThemeColors(
         colors: manifest.shadcnColors,

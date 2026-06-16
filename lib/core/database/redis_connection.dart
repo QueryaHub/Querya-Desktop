@@ -125,10 +125,8 @@ class RedisConnection {
     final result = await sendCommand(args);
     if (result is List && result.length == 2) {
       final nextCursor = int.tryParse(result[0].toString()) ?? 0;
-      final keys = (result[1] as List?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          [];
+      final keys =
+          (result[1] as List?)?.map((e) => e.toString()).toList() ?? [];
       return (nextCursor, keys);
     }
     return (0, <String>[]);

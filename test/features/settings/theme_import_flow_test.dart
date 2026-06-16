@@ -123,7 +123,8 @@ void main() {
         await File(p.join(themesDir.path, 'fixture-custom-dark.json')).exists(),
         isTrue,
       );
-      expect(await AppSettings.instance.getSelectedThemeId(), 'fixture-custom-dark');
+      expect(await AppSettings.instance.getSelectedThemeId(),
+          'fixture-custom-dark');
       expect(
         await AppSettings.instance.getSelectedThemeSource(),
         'filesystem',

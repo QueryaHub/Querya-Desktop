@@ -27,7 +27,8 @@ Future<ConnectionRow?> promptCreateConnection(
   if (!dialogContext.mounted) return null;
   switch (type) {
     case ConnectionType.postgresql:
-      return await showPostgresConnectionForm(dialogContext, folderId: folderId);
+      return await showPostgresConnectionForm(dialogContext,
+          folderId: folderId);
     case ConnectionType.mysql:
       return await showMysqlConnectionForm(dialogContext, folderId: folderId);
     case ConnectionType.mongodb:

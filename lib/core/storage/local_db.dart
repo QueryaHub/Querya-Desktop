@@ -115,8 +115,10 @@ class LocalDb {
       await db.execute('ALTER TABLE connections ADD COLUMN password TEXT');
       await db.execute('ALTER TABLE connections ADD COLUMN database_name TEXT');
       await db.execute('ALTER TABLE connections ADD COLUMN auth_source TEXT');
-      await db.execute('ALTER TABLE connections ADD COLUMN use_ssl INTEGER NOT NULL DEFAULT 0');
-      await db.execute('ALTER TABLE connections ADD COLUMN connection_string TEXT');
+      await db.execute(
+          'ALTER TABLE connections ADD COLUMN use_ssl INTEGER NOT NULL DEFAULT 0');
+      await db
+          .execute('ALTER TABLE connections ADD COLUMN connection_string TEXT');
     }
     if (oldVersion < 3) {
       await db.execute('PRAGMA foreign_keys=ON');
@@ -319,15 +321,18 @@ class LocalDb {
 
   Future<int?> getFolderIdByName(String name) async {
     final db = await _open();
-    final rows = await db.query('folders', columns: ['id'], where: 'name = ?', whereArgs: [name]);
+    final rows = await db.query('folders',
+        columns: ['id'], where: 'name = ?', whereArgs: [name]);
     if (rows.isEmpty) return null;
     return _sqliteInt(rows.first['id']);
   }
 
   Future<List<ConnectionRow>> getConnections() async {
     final db = await _open();
-    final rows = await db.query('connections', orderBy: 'sort_order ASC, name ASC');
-    final futures = rows.map((m) => _hydrateConnection(ConnectionRow.fromMap(m)));
+    final rows =
+        await db.query('connections', orderBy: 'sort_order ASC, name ASC');
+    final futures =
+        rows.map((m) => _hydrateConnection(ConnectionRow.fromMap(m)));
     return Future.wait(futures);
   }
 

@@ -19,14 +19,17 @@ void main() {
         theme: theme,
       );
 
-      expect(draft.shadcnColors['primary'], formatVsCodeColor(theme.colorScheme.primary));
-      expect(draft.editorColors['background'], formatVsCodeColor(theme.editor.background));
-      expect(draft.editorColors['canvas'], formatVsCodeColor(theme.workbench.canvas));
+      expect(draft.shadcnColors['primary'],
+          formatVsCodeColor(theme.colorScheme.primary));
+      expect(draft.editorColors['background'],
+          formatVsCodeColor(theme.editor.background));
+      expect(draft.editorColors['canvas'],
+          formatVsCodeColor(theme.workbench.canvas));
     });
 
     test('setColor updates manifest and round-trips export', () {
-      final raw =
-          File('test/fixtures/themes/querya_custom_dark.json').readAsStringSync();
+      final raw = File('test/fixtures/themes/querya_custom_dark.json')
+          .readAsStringSync();
       final source = QueryaThemeManifest.fromJsonString(raw);
       final draft = ThemeEditorDraft.fromManifest(source);
 
@@ -56,7 +59,8 @@ void main() {
       expect(exported.id, 'querya-dark-edited');
       expect(exported.name, 'Querya Dark (edited)');
 
-      final json = jsonDecode(exported.toExportJsonString()) as Map<String, dynamic>;
+      final json =
+          jsonDecode(exported.toExportJsonString()) as Map<String, dynamic>;
       expect(json['schema'], queryaThemeSchemaV1);
       expect(json['id'], 'querya-dark-edited');
     });

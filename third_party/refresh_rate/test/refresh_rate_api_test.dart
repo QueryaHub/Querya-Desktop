@@ -7,20 +7,57 @@ class _FakeHostApi implements RefreshRateApiAdapter {
   final calls = <String>[];
   @override
   DisplayInfoMessage getDisplayInfo() => DisplayInfoMessage(
-        currentRate: 120.0, maxRate: 120.0, minRate: 60.0,
-        supportedRates: [60.0, 120.0], isVariableRefreshRate: true,
-        engineTargetRate: 120.0, thermalStateIndex: 0,
+        currentRate: 120.0,
+        maxRate: 120.0,
+        minRate: 60.0,
+        supportedRates: [60.0, 120.0],
+        isVariableRefreshRate: true,
+        engineTargetRate: 120.0,
+        thermalStateIndex: 0,
       );
 
-  @override void enable() { calls.add('enable'); }
-  @override void disable() { calls.add('disable'); }
-  @override void preferMax() { calls.add('preferMax'); }
-  @override void preferDefault() { calls.add('preferDefault'); }
-  @override void matchContent(double fps) { calls.add('matchContent:$fps'); }
-  @override void boost(int durationMs) { calls.add('boost:$durationMs'); }
-  @override void setCategory(int c) { calls.add('setCategory:$c'); }
-  @override void setTouchBoost(bool e) { calls.add('setTouchBoost:$e'); }
-  @override bool isSupported() => true;
+  @override
+  void enable() {
+    calls.add('enable');
+  }
+
+  @override
+  void disable() {
+    calls.add('disable');
+  }
+
+  @override
+  void preferMax() {
+    calls.add('preferMax');
+  }
+
+  @override
+  void preferDefault() {
+    calls.add('preferDefault');
+  }
+
+  @override
+  void matchContent(double fps) {
+    calls.add('matchContent:$fps');
+  }
+
+  @override
+  void boost(int durationMs) {
+    calls.add('boost:$durationMs');
+  }
+
+  @override
+  void setCategory(int c) {
+    calls.add('setCategory:$c');
+  }
+
+  @override
+  void setTouchBoost(bool e) {
+    calls.add('setTouchBoost:$e');
+  }
+
+  @override
+  bool isSupported() => true;
 }
 
 void main() {

@@ -34,7 +34,8 @@ class ThemeFolderWatcher {
       try {
         await directory.create(recursive: true);
       } on Object catch (error) {
-        debugPrint('ThemeFolderWatcher: cannot create themes directory ($error)');
+        debugPrint(
+            'ThemeFolderWatcher: cannot create themes directory ($error)');
         return;
       }
     }

@@ -18,7 +18,11 @@ void main() {
 
     test('pads short rows', () {
       expect(
-        resultGridAsCsv(const ['x', 'y', 'z'], const [
+        resultGridAsCsv(const [
+          'x',
+          'y',
+          'z'
+        ], const [
           ['only'],
         ]),
         'x,y,z\nonly,,',

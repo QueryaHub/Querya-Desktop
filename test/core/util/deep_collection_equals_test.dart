@@ -7,15 +7,27 @@ void main() {
     test('compares nested maps and lists', () {
       const a = {
         'x': 1,
-        'y': [1, 2, {'z': 'ok'}],
+        'y': [
+          1,
+          2,
+          {'z': 'ok'}
+        ],
       };
       const b = {
         'x': 1,
-        'y': [1, 2, {'z': 'ok'}],
+        'y': [
+          1,
+          2,
+          {'z': 'ok'}
+        ],
       };
       const c = {
         'x': 1,
-        'y': [1, 2, {'z': 'nope'}],
+        'y': [
+          1,
+          2,
+          {'z': 'nope'}
+        ],
       };
       expect(deepCollectionEquals(a, b), isTrue);
       expect(deepCollectionEquals(a, c), isFalse);

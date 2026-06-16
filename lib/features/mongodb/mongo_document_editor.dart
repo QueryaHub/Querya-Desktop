@@ -267,8 +267,8 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
                     ? const material.SizedBox(
                         width: 14,
                         height: 14,
-                        child: material.CircularProgressIndicator(
-                            strokeWidth: 2),
+                        child:
+                            material.CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const material.Icon(material.Icons.save_rounded,
                         size: 14),
@@ -322,8 +322,7 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
                 const Gap(8),
                 material.Expanded(
                   child: Text(_success!,
-                      style: material.TextStyle(
-                          color: success, fontSize: 12)),
+                      style: material.TextStyle(color: success, fontSize: 12)),
                 ),
               ],
             ),
@@ -360,8 +359,8 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
               const Spacer(),
               if (_dirty)
                 Text('Modified',
-                        style: material.TextStyle(
-                            color: cs.primary, fontSize: 11))
+                        style:
+                            material.TextStyle(color: cs.primary, fontSize: 11))
                     .xSmall(),
             ],
           ),

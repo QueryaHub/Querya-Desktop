@@ -1,12 +1,6 @@
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart' as material
-    show
-        BuildContext,
-        Container,
-        Icon,
-        Icons,
-        MainAxisSize,
-        Widget;
+    show BuildContext, Container, Icon, Icons, MainAxisSize, Widget;
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/connections/driver_manager_dialog.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
@@ -111,7 +105,8 @@ class QueryaWindowTitleBar extends StatelessWidget {
                           subMenu: [
                             MenuButton(
                               leading: const material.Icon(
-                                  material.Icons.add_link_rounded, size: 18),
+                                  material.Icons.add_link_rounded,
+                                  size: 18),
                               trailing:
                                   const Text('Shift+Ctrl+N').xSmall().muted(),
                               onPressed: (_) => onNewDatabaseConnection(),
@@ -119,13 +114,15 @@ class QueryaWindowTitleBar extends StatelessWidget {
                             ),
                             MenuButton(
                               leading: const material.Icon(
-                                  material.Icons.link_rounded, size: 18),
+                                  material.Icons.link_rounded,
+                                  size: 18),
                               onPressed: (_) {},
                               child: const Text('New Connection from URL'),
                             ),
                             MenuButton(
                               leading: const material.Icon(
-                                  material.Icons.settings_rounded, size: 18),
+                                  material.Icons.settings_rounded,
+                                  size: 18),
                               onPressed: (ctx) => showDriverManagerDialog(ctx),
                               child: const Text('Driver Manager'),
                             ),
@@ -133,19 +130,22 @@ class QueryaWindowTitleBar extends StatelessWidget {
                             MenuButton(
                               enabled: false,
                               leading: const material.Icon(
-                                  material.Icons.power_rounded, size: 18),
+                                  material.Icons.power_rounded,
+                                  size: 18),
                               onPressed: (_) {},
                               child: const Text('Connect'),
                             ),
                             MenuButton(
                               leading: const material.Icon(
-                                  material.Icons.refresh_rounded, size: 18),
+                                  material.Icons.refresh_rounded,
+                                  size: 18),
                               onPressed: (_) {},
                               child: const Text('Invalidate/Reconnect'),
                             ),
                             MenuButton(
                               leading: const material.Icon(
-                                  material.Icons.power_off_rounded, size: 18),
+                                  material.Icons.power_off_rounded,
+                                  size: 18),
                               onPressed: (_) {},
                               child: const Text('Disconnect'),
                             ),
