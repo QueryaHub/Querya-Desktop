@@ -1,6 +1,7 @@
 # Planned release 0.4.4 — UI motion polish and high refresh rate
 
-**Status:** **shipped in 0.4.4** (GitHub milestone [**0.4.4**](https://github.com/QueryaHub/Querya-Desktop/milestone/3), epic **#170** closed).  
+
+**Status:** planning (GitHub milestone [**0.4.4**](https://github.com/QueryaHub/Querya-Desktop/milestone/3), epic **#170**).  
 **Depends on:** **0.4.3** theme follow-ups (shipped).
 **Design doc:** [motion-and-high-refresh.md](motion-and-high-refresh.md) — research, current-state audit, and per-platform Hz behavior.
 
