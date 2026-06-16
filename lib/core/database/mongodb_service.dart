@@ -126,23 +126,26 @@ class MongoService {
 
     return _withDb(connection, database, (db) async {
       final coll = db.collection(collection);
-      final selector = filter ?? <String, dynamic>{};
+      
+      final selector = where;
+      if (filter != null && filter.isNotEmpty) {
+        selector.raw(filter);
+      }
+      if (sort != null && sort.isNotEmpty) {
+        for (final entry in sort.entries) {
+          final isDesc = entry.value == -1 || entry.value == 'desc' || entry.value == 'DESC';
+          selector.sortBy(entry.key, descending: isDesc);
+        }
+      }
+      if (skip != null && skip > 0) {
+        selector.skip(skip);
+      }
+      if (limit != null && limit > 0) {
+        selector.limit(limit);
+      }
 
       final stream = coll.find(selector);
-      final results = <Map<String, dynamic>>[];
-      int count = 0;
-      await for (final doc in stream) {
-        if (skip != null && count < skip) {
-          count++;
-          continue;
-        }
-        if (limit != null && results.length >= limit) {
-          break;
-        }
-        results.add(doc);
-        count++;
-      }
-      return results;
+      return await stream.toList();
     });
   }
 
