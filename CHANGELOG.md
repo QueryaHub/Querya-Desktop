@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-06-16
+
+UI motion polish and high refresh rate release (UI-A1–UI-A6, GitHub issues **#171–#176**). Git tag **`0.4.4`**.
+
+### Added
+
+- **Motion tokens core (UI-A1)** — `QueryaMotion` core durations and curves, providing a single source of truth for all animations.
+- **Token adoption (UI-A2)** — replace magic/scattered duration and curve literals with standardized tokens.
+- **Smoother transitions (UI-A3)** — menu/dropdown enter fade+scale, dialog blur/scale retune, tree height animation (`QueryaAnimatedExpand`), and workspace tab content cross-fade (`QueryaCrossFadeStack`).
+- **High refresh rate (UI-A4)** — unlock native ProMotion on macOS 14+, active Hz logging at startup, and FPS/Hz debug overlay.
+- **Reduced motion setting (UI-A5)** — Preferences toggle (`Full` / `Reduced` / `Off`) and automatic OS reduced-motion configuration matching.
+- **Docs & performance checks (UI-A6)** — per-OS measured refresh-rate verification table, DevTools performance checklists, and release QA items.
+
 ## [0.4.3] - 2026-06-15
 
 Theme follow-ups release (TP-F1–TP-F4, GitHub issues **#159–#163**). Git tag **`0.4.3`**.
