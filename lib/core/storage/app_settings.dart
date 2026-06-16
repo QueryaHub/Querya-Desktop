@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
+import '../motion/querya_motion_scope.dart';
 import '../theme/querya_theme_preset.dart';
 import 'local_db.dart';
 
@@ -111,6 +112,7 @@ abstract final class AppSettingsKeys {
   static const themeSelectedPath = 'theme_selected_path';
   static const themeAnimationEnabled = 'theme_animation_enabled';
   static const uiScale = 'ui_scale';
+  static const motionLevel = 'motion_level';
 }
 
 /// Bumps [listenable] when any preference is persisted (theme, legacy listeners).
@@ -522,6 +524,25 @@ class AppSettings {
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeSelectedSource);
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeSelectedPath);
     await deleteThemeImportKeys();
+    AppSettingsRevision.bump();
+  }
+
+  Future<QueryaMotionLevel> getMotionLevel() async {
+    final v = await LocalDb.instance.getAppSetting(AppSettingsKeys.motionLevel);
+    return switch (v) {
+      'off' => QueryaMotionLevel.off,
+      'reduced' => QueryaMotionLevel.reduced,
+      _ => QueryaMotionLevel.full,
+    };
+  }
+
+  Future<void> setMotionLevel(QueryaMotionLevel level) async {
+    final stored = switch (level) {
+      QueryaMotionLevel.off => 'off',
+      QueryaMotionLevel.reduced => 'reduced',
+      QueryaMotionLevel.full => 'full',
+    };
+    await LocalDb.instance.setAppSetting(AppSettingsKeys.motionLevel, stored);
     AppSettingsRevision.bump();
   }
 }

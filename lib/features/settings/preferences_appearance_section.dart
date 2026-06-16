@@ -2,6 +2,8 @@ import 'dart:async' show unawaited;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/motion/querya_motion_controller.dart';
+import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
 import 'package:querya_desktop/core/platform/open_directory.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:querya_desktop/core/theme/theme_import_service.dart';
@@ -255,6 +257,40 @@ class _PreferencesAppearanceSectionState
         const material.SizedBox(height: 4),
         const PreferencesHint(
           'Smooth transitions when switching dark/light or presets. Off by default for stability.',
+        ),
+        const material.SizedBox(height: 12),
+        PreferencesFieldRow(
+          label: 'Motion',
+          control: material.ListenableBuilder(
+            listenable: QueryaMotionController.instance,
+            builder: (context, _) {
+              final controller = QueryaMotionController.instance;
+              return PreferencesDropdownMenu<QueryaMotionLevel>(
+                value: controller.level,
+                onSelected: (v) {
+                  if (v != null) unawaited(controller.setLevel(v));
+                },
+                entries: const [
+                  material.DropdownMenuEntry(
+                    value: QueryaMotionLevel.full,
+                    label: 'Full',
+                  ),
+                  material.DropdownMenuEntry(
+                    value: QueryaMotionLevel.reduced,
+                    label: 'Reduced',
+                  ),
+                  material.DropdownMenuEntry(
+                    value: QueryaMotionLevel.off,
+                    label: 'Off',
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+        const material.SizedBox(height: 4),
+        const PreferencesHint(
+          'Full enables all animations. Reduced cuts durations in half. Off disables all transitions.',
         ),
         const material.SizedBox(height: 12),
         material.Wrap(
