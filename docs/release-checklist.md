@@ -1,6 +1,6 @@
-# Pre-release checklist (release **0.4.3**)
+# Pre-release checklist (release **0.4.4**)
 
-Use this before tagging **`0.4.3`** or running the **Release** workflow.
+Use this before tagging **`0.4.4`** or running the **Release** workflow.
 See [tags-and-releases.md](tags-and-releases.md) and [CHANGELOG.md](../CHANGELOG.md).
 
 ## Product smoke (manual)
@@ -32,6 +32,18 @@ Use **Preferences → Appearance** unless noted. Fixtures for copy/import tests 
 - [ ] **Visual theme editor (TP-F3)** — open **Theme editor**, change a workbench color, confirm live preview; **Export** writes valid `querya.theme.v1` JSON; import exported file applies the same colors.
 - [ ] **Remote install (TP-F4)** — **Install from URL…** with a public HTTPS theme JSON (optional SHA-256): theme imports and appears in picker; `http://` or localhost URL is rejected with a clear error.
 
+## Motion and High-Hz 0.4.4 (manual QA)
+
+Verify the 0.4.4 motion tokens, smooth animations, and high refresh rate support:
+
+- [ ] **Motion preferences** — open **Preferences → Appearance**, verify **Motion** option appears.
+- [ ] **Motion Full** — set to **Full**, check that all animations run normally.
+- [ ] **Motion Reduced** — set to **Reduced**, check that animations are visibly faster (durations cut in half).
+- [ ] **Motion Off** — set to **Off**, check that animations complete instantly (0 ms).
+- [ ] **OS Reduced Motion** — enable reduced motion in OS settings. The app should automatically disable animations (acting as Off) regardless of in-app Full/Reduced settings (OS setting wins).
+- [ ] **Hz diagnostics** — start the app with `--dart-define=QUERYA_REFRESH_OVERLAY=true`. The overlay should display the correct target refresh rate of the monitor.
+- [ ] **High refresh rate smoothness** — verify dialog fade+scale, dropdown show, and tree expand/collapse look extremely smooth at high-Hz (90/120/144 Hz) without jank.
+
 ## Automated
 
 - [ ] `flutter analyze` — clean (on Linux, if the analyzer crashes with **Too many open files**, try `ulimit -n 8192`; see [CONTRIBUTING.md](../CONTRIBUTING.md)).
@@ -40,8 +52,8 @@ Use **Preferences → Appearance** unless noted. Fixtures for copy/import tests 
 
 ## Versioning and release
 
-- [ ] `pubspec.yaml` on **`dev`** is **`0.4.1+7`** before merging to `main` (auto version-bump sets **`0.4.3+9`** on `main`).
-- [ ] After merge, confirm GitHub Action **Auto Version Bump** committed **`0.4.3+…`** on `main`.
+- [ ] `pubspec.yaml` on **`dev`** is **`0.4.1+7`** before merging to `main` (auto version-bump sets **`0.4.4+8`** on `main`).
+- [ ] After merge, confirm GitHub Action **Auto Version Bump** committed **`0.4.4+…`** on `main`.
 - [ ] **Tag** is placed on the **commit that includes all fixes** you want in binaries (a tag does not auto-include later commits; see [CONTRIBUTING.md](../CONTRIBUTING.md)).
 - [ ] Run the **Release** workflow from GitHub Actions (see [tags-and-releases.md](tags-and-releases.md)).
 - [ ] Verify **Linux** and **Windows** zip artifacts and `SHA256SUMS.txt` on the GitHub Release.
