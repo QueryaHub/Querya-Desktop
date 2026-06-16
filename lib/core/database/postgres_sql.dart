@@ -36,3 +36,41 @@ bool shouldSkipImplicitBegin(String sql) {
 
   return false;
 }
+
+/// Injects a `LIMIT` clause to a read-only query (SELECT, WITH, VALUES)
+/// if it does not already contain a `LIMIT` clause.
+String injectSqlLimit(String sql, int limit) {
+  final cleanSql = stripLeadingWhitespaceAndLineComments(sql);
+  final upper = cleanSql.toUpperCase();
+
+  final isSelect = upper.startsWith('SELECT') ||
+      upper.startsWith('WITH') ||
+      upper.startsWith('VALUES');
+
+  if (!isSelect) {
+    return sql;
+  }
+
+  // Check if it already has a LIMIT clause
+  final hasLimit = RegExp(r'\bLIMIT\b', caseSensitive: false).hasMatch(sql);
+  if (hasLimit) {
+    return sql;
+  }
+
+  // Strip trailing whitespace and semicolons to build the body
+  var body = sql.trimRight();
+  var suffix = '';
+
+  while (true) {
+    if (body.isEmpty) break;
+    if (body.endsWith(';')) {
+      body = body.substring(0, body.length - 1).trimRight();
+      suffix = ';$suffix';
+      continue;
+    }
+    break;
+  }
+
+  return '$body\nLIMIT $limit$suffix';
+}
+

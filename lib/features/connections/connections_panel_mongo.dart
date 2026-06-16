@@ -169,7 +169,8 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
                       padding: const material.EdgeInsets.all(2),
                       child: material.AnimatedRotation(
                         turns: _expanded ? 0.25 : 0,
-                        duration: const Duration(milliseconds: 100),
+                        duration: context.motionDuration(QueryaMotion.fast),
+                        curve: context.motionCurve(QueryaMotion.standardCurve),
                         child: material.Icon(
                           material.Icons.chevron_right_rounded,
                           size: 16,
@@ -228,7 +229,12 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
               ],
             ),
             // Expanded database children
-            if (_expanded) ...[
+            QueryaAnimatedExpand(
+              expanded: _expanded,
+              child: material.Column(
+                mainAxisSize: material.MainAxisSize.min,
+                crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                children: [
               if (_loading)
                 material.Padding(
                   padding: const material.EdgeInsets.only(left: 28, top: 4, bottom: 4),
@@ -300,6 +306,8 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
                   },
                 ),
             ],
+              ),
+            ),
           ],
         ),
       ),

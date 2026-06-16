@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/ui_scale.dart';
+import 'package:querya_desktop/core/motion/querya_motion.dart';
+import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/shared/widgets/querya_dropdown_tokens.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
@@ -57,6 +59,7 @@ class QueryaDropdown<T> extends material.StatefulWidget {
 class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
   late material.MenuController _controller;
   bool _triggerHovered = false;
+  bool _menuOpen = false;
   List<material.Widget>? _cachedMenuChildren;
   List<QueryaDropdownItem<T>>? _cachedMenuItems;
   T? _cachedMenuValue;
@@ -154,10 +157,8 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
       onEnter: widget.enabled ? (_) => setState(() => _triggerHovered = true) : null,
       onExit: widget.enabled ? (_) => setState(() => _triggerHovered = false) : null,
       child: material.AnimatedContainer(
-        duration: const Duration(
-          milliseconds: QueryaDropdownTokens.hoverAnimationMs,
-        ),
-        curve: material.Curves.easeOut,
+        duration: context.motionDuration(QueryaMotion.fast),
+        curve: context.motionCurve(QueryaMotion.enter),
         height: triggerHeight,
         padding: QueryaDropdownTokens.scaledTriggerPadding(context),
         decoration: material.BoxDecoration(
@@ -229,6 +230,8 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
 
     final anchor = material.MenuAnchor(
       controller: _controller,
+      onOpen: () => setState(() => _menuOpen = true),
+      onClose: () => setState(() => _menuOpen = false),
       crossAxisUnconstrained: false,
       alignmentOffset: material.Offset(
         widget.alignmentOffset.dx,
@@ -257,7 +260,16 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
           ),
         ),
       ),
-      menuChildren: menuChildren,
+      menuChildren: [
+        _QueryaDropdownMenuEnter(
+          open: _menuOpen,
+          child: material.Column(
+            mainAxisSize: material.MainAxisSize.min,
+            crossAxisAlignment: material.CrossAxisAlignment.stretch,
+            children: menuChildren,
+          ),
+        ),
+      ],
       builder: (context, controller, child) {
         final trigger = _buildTrigger(
           context: context,
@@ -277,6 +289,34 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
       return material.SizedBox(width: fieldWidth, child: anchor);
     }
     return anchor;
+  }
+}
+
+class _QueryaDropdownMenuEnter extends material.StatelessWidget {
+  const _QueryaDropdownMenuEnter({
+    required this.open,
+    required this.child,
+  });
+
+  final bool open;
+  final material.Widget child;
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    final duration = context.motionDuration(QueryaMotion.standard);
+    final curve = context.motionCurve(QueryaMotion.enter);
+    return material.AnimatedScale(
+      scale: open ? 1 : 0.96,
+      alignment: material.Alignment.topCenter,
+      duration: duration,
+      curve: curve,
+      child: material.AnimatedOpacity(
+        opacity: open ? 1 : 0,
+        duration: duration,
+        curve: curve,
+        child: child,
+      ),
+    );
   }
 }
 
@@ -350,10 +390,8 @@ class _QueryaDropdownMenuItemState<T> extends material.State<_QueryaDropdownMenu
         ),
         onPressed: widget.enabled ? widget.onPick : null,
         child: material.AnimatedContainer(
-          duration: const Duration(
-            milliseconds: QueryaDropdownTokens.hoverAnimationMs,
-          ),
-          curve: material.Curves.easeOut,
+          duration: context.motionDuration(QueryaMotion.fast),
+          curve: context.motionCurve(QueryaMotion.enter),
           constraints: material.BoxConstraints(minHeight: itemHeight),
           padding: material.EdgeInsets.symmetric(
             horizontal: context.scaled(QueryaDropdownTokens.menuItemPadding.horizontal),

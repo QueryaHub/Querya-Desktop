@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-06-16
+
+UI motion polish, high refresh rate, performance fixes, and security improvements release. Git tag **`0.4.4`**.
+
+### Added
+
+- **Motion tokens core (UI-A1)** — `QueryaMotion` core durations and curves, providing a single source of truth for all animations.
+- **Token adoption (UI-A2)** — replace magic/scattered duration and curve literals with standardized tokens.
+- **Smoother transitions (UI-A3)** — menu/dropdown enter fade+scale, dialog blur/scale retune, tree height animation (`QueryaAnimatedExpand`), and workspace tab content cross-fade (`QueryaCrossFadeStack`).
+- **High refresh rate (UI-A4)** — unlock native ProMotion on macOS 14+, active Hz logging at startup, and FPS/Hz debug overlay.
+- **Reduced motion setting (UI-A5)** — Preferences toggle (`Full` / `Reduced` / `Off`) and automatic OS reduced-motion configuration matching.
+- **Docs & performance checks (UI-A6)** — per-OS measured refresh-rate verification table, DevTools performance checklists, and release QA items.
+- **SQLite Database Support Plan (0.4.5)** — design and implementation roadmap for local SQLite file connector support.
+
+### Fixed
+
+- **Memory: SQL Result Capping (Issue #184)** — PostgreSQL and MySQL query execution now limits client memory usage by applying query LIMITs database-side and streaming rows using `rowsStream` (breaking early).
+- **Performance: MongoDB Client-side Pagination (Issue #185)** — uses `SelectorBuilder` skip/limit operators on the server instead of client-side stream buffering.
+- **Performance: N+1 secure storage lookups (Issue #186)** — parallelizes connection secrets hydration on startup.
+- **Performance: Redis Key Scanning round-trips (Issue #187)** — runs type and TTL lookups concurrently for key batches.
+- **Security: Theme Remote Installation SSRF (Issue #183)** — parses and filters IPv6 and private/loopback/multicast/mapped hosts using `InternetAddress.tryParse`.
+- **UX: Focus leak on QueryaCrossFadeStack** — wraps inactive children in `ExcludeFocus` and `ExcludeSemantics` to prevent tab-indexing into off-screen tabs.
+
 ## [0.4.3] - 2026-06-15
 
 Theme follow-ups release (TP-F1–TP-F4, GitHub issues **#159–#163**). Git tag **`0.4.3`**.

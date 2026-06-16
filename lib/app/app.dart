@@ -1,5 +1,7 @@
 import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/layout/ui_scale_controller.dart';
+import 'package:querya_desktop/core/motion/querya_motion_controller.dart';
+import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -14,6 +16,7 @@ class QueryaApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeController = ThemeController.instance;
     final uiScaleController = UiScaleController.instance;
+    final motionController = QueryaMotionController.instance;
 
     return ListenableBuilder(
       listenable: themeController,
@@ -25,34 +28,43 @@ class QueryaApp extends StatelessWidget {
           listenable: uiScaleController,
           builder: (context, _) {
             final scale = uiScaleController.scale;
-            return ShadcnApp(
-              title: 'Querya',
-              theme: themeController.lightShadcnTheme,
-              darkTheme: themeController.darkShadcnTheme,
-              themeMode: themeController.themeMode,
-              materialTheme: themeController.materialThemeFor(colorScheme),
-              debugShowCheckedModeBanner: false,
-              enableThemeAnimation: themeController.themeAnimationEnabled,
-              enableScrollInterception: false,
-              // Above navigator so dialogs/overlays (SQL editor, Preferences) see tokens.
-              builder: (context, child) {
-                final mq = MediaQuery.maybeOf(context);
-                return QueryaUiScaleScope(
-                  scale: scale,
-                  child: MediaQuery(
-                    data: (mq ?? const MediaQueryData()).copyWith(
-                      textScaler: TextScaler.linear(scale),
-                    ),
-                    child: QueryaThemeScope(
-                      data: queryaTheme,
-                      child: child ?? const SizedBox.shrink(),
-                    ),
+            return ListenableBuilder(
+              listenable: motionController,
+              builder: (context, _) {
+                final motionLevel = motionController.level;
+                return ShadcnApp(
+                  title: 'Querya',
+                  theme: themeController.lightShadcnTheme,
+                  darkTheme: themeController.darkShadcnTheme,
+                  themeMode: themeController.themeMode,
+                  materialTheme: themeController.materialThemeFor(colorScheme),
+                  debugShowCheckedModeBanner: false,
+                  enableThemeAnimation: themeController.themeAnimationEnabled,
+                  enableScrollInterception: false,
+                  // Above navigator so dialogs/overlays (SQL editor, Preferences) see tokens.
+                  builder: (context, child) {
+                    final mq = MediaQuery.maybeOf(context);
+                    return QueryaUiScaleScope(
+                      scale: scale,
+                      child: MediaQuery(
+                        data: (mq ?? const MediaQueryData()).copyWith(
+                          textScaler: TextScaler.linear(scale),
+                        ),
+                        child: QueryaThemeScope(
+                          data: queryaTheme,
+                          child: QueryaMotionScope(
+                            level: motionLevel,
+                            child: child ?? const SizedBox.shrink(),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  home: const AppLifecycleCleanup(
+                    child: MainScreen(),
                   ),
                 );
               },
-              home: const AppLifecycleCleanup(
-                child: MainScreen(),
-              ),
             );
           },
         );

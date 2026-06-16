@@ -1,6 +1,9 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/motion/querya_cross_fade_stack.dart';
+import 'package:querya_desktop/core/motion/querya_motion.dart';
+import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
 import 'package:querya_desktop/features/postgresql/postgres_sql_workspace.dart';
@@ -123,7 +126,8 @@ class _PostgresWorkspaceHomeState extends material.State<PostgresWorkspaceHome> 
                     child: material.GestureDetector(
                       onTap: () => _selectTab(i),
                       child: material.AnimatedContainer(
-                        duration: const Duration(milliseconds: 120),
+                        duration: context.motionDuration(QueryaMotion.fast),
+                        curve: context.motionCurve(QueryaMotion.enter),
                         padding: const material.EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 8,
@@ -149,9 +153,8 @@ class _PostgresWorkspaceHomeState extends material.State<PostgresWorkspaceHome> 
         ),
         const Divider(height: 1),
         Expanded(
-          child: material.IndexedStack(
+          child: QueryaCrossFadeStack(
             index: _tab,
-            sizing: material.StackFit.expand,
             children: [
               PostgresStatsView(
                 key: ValueKey('pg_stats_${widget.connectionRow.id}'),

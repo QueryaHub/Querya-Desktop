@@ -12,6 +12,7 @@ dependencies:
     sdk: flutter
   http: ^1.2.2
   crypto: ^3.0.6
+  refresh_rate: ^1.0.2
   shadcn_flutter: ^0.0.52
   bitsdojo_window: ^0.1.6
   path: ^1.9.0
@@ -38,6 +39,9 @@ dependency_overrides:
   # Patched ToastLayer (fixes InheritedNotifier crash on resize / hot reload).
   shadcn_flutter:
     path: third_party/shadcn_flutter
+  # Linux -Werror: fix uninitialized rates[0] in refresh_rate 1.0.2.
+  refresh_rate:
+    path: third_party/refresh_rate
 
 flutter:
   uses-material-design: true
