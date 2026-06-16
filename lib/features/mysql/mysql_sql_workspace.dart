@@ -147,7 +147,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       }
 
       final to = _statementTimeout();
-      final rs = await conn.executeWithTimeout(userSql, timeout: to);
+      final rs = await conn.executeWithTimeout(userSql, timeout: to, iterable: true);
 
       if (!mounted) return;
 
@@ -159,8 +159,12 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       final rawRows = <List<Object?>>[];
       var n = 0;
       final cap = _resultMaxRows;
-      for (final row in rs.rows) {
-        if (n >= cap) break;
+      var truncated = false;
+      await for (final row in rs.rowsStream) {
+        if (n >= cap) {
+          truncated = true;
+          break;
+        }
         rawRows.add(
           List.generate(row.numOfColumns, (i) => row.colAt(i)),
         );
@@ -186,11 +190,9 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
               ? 'OK. Rows affected: $affected.'
               : 'Command completed.';
         } else {
-          final total = rs.numOfRows;
-          final truncated = total > cap;
           _statusLine = truncated
-              ? 'Showing first $cap of $total row(s).'
-              : '$total row(s).';
+              ? 'Showing first $cap row(s) (result capped).'
+              : '$n row(s).';
         }
         _running = false;
       });
