@@ -327,11 +327,8 @@ class LocalDb {
   Future<List<ConnectionRow>> getConnections() async {
     final db = await _open();
     final rows = await db.query('connections', orderBy: 'sort_order ASC, name ASC');
-    final out = <ConnectionRow>[];
-    for (final m in rows) {
-      out.add(await _hydrateConnection(ConnectionRow.fromMap(m)));
-    }
-    return out;
+    final futures = rows.map((m) => _hydrateConnection(ConnectionRow.fromMap(m)));
+    return Future.wait(futures);
   }
 
   static Future<ConnectionRow> _hydrateConnection(ConnectionRow row) async {
