@@ -27,11 +27,17 @@ class QueryaCrossFadeStack extends StatelessWidget {
           Positioned.fill(
             child: IgnorePointer(
               ignoring: index != i,
-              child: AnimatedOpacity(
-                opacity: index == i ? 1 : 0,
-                duration: duration,
-                curve: curve,
-                child: children[i],
+              child: ExcludeFocus(
+                excluding: index != i,
+                child: ExcludeSemantics(
+                  excluding: index != i,
+                  child: AnimatedOpacity(
+                    opacity: index == i ? 1 : 0,
+                    duration: duration,
+                    curve: curve,
+                    child: children[i],
+                  ),
+                ),
               ),
             ),
           ),
