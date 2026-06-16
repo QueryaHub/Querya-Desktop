@@ -76,17 +76,17 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
       count: 100,
     );
 
-    // Fetch type and TTL for each key
-    final infos = <_KeyInfo>[];
-    for (final name in keyNames) {
+    // Fetch type and TTL for each key concurrently
+    final futures = keyNames.map((name) async {
       try {
         final type = await widget.connection.keyType(name);
         final ttl = await widget.connection.ttl(name);
-        infos.add(_KeyInfo(name: name, type: type, ttl: ttl));
+        return _KeyInfo(name: name, type: type, ttl: ttl);
       } catch (_) {
-        infos.add(_KeyInfo(name: name, type: 'unknown', ttl: -1));
+        return _KeyInfo(name: name, type: 'unknown', ttl: -1);
       }
-    }
+    });
+    final infos = await Future.wait(futures);
 
     if (!mounted) return;
     setState(() {
