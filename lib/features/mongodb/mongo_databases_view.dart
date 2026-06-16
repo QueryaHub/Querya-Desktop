@@ -79,7 +79,8 @@ class _MongoDatabasesViewState extends State<MongoDatabasesView> {
           await conn.connect();
         }
       } else {
-        conn = await MongoService.instance.ensureConnected(widget.connectionRow);
+        conn =
+            await MongoService.instance.ensureConnected(widget.connectionRow);
       }
       if (!mounted) return;
       _connection = conn;
@@ -226,8 +227,8 @@ class _MongoDatabasesViewState extends State<MongoDatabasesView> {
               const Gap(8),
               material.SelectableText(
                 _error!,
-                style: material.TextStyle(
-                    color: cs.mutedForeground, fontSize: 13),
+                style:
+                    material.TextStyle(color: cs.mutedForeground, fontSize: 13),
               ),
               const Gap(24),
               OutlineButton(
@@ -295,8 +296,8 @@ class _MongoDatabasesViewState extends State<MongoDatabasesView> {
                 PrimaryButton(
                   onPressed: _createDatabase,
                   size: ButtonSize.small,
-                  leading: const material.Icon(material.Icons.add_rounded,
-                      size: 16),
+                  leading:
+                      const material.Icon(material.Icons.add_rounded, size: 16),
                   child: const Text('Create'),
                 ),
               ],
@@ -315,8 +316,7 @@ class _MongoDatabasesViewState extends State<MongoDatabasesView> {
                 material.Expanded(
                     child: const Text('Database Name').semiBold().xSmall()),
                 material.SizedBox(
-                    width: 120,
-                    child: const Text('Size').semiBold().xSmall()),
+                    width: 120, child: const Text('Size').semiBold().xSmall()),
                 const material.SizedBox(width: 60),
               ],
             ),
@@ -324,9 +324,7 @@ class _MongoDatabasesViewState extends State<MongoDatabasesView> {
           // Database rows
           for (var i = 0; i < _databases.length; i++) ...[
             if (i > 0)
-              Divider(
-                  height: 1,
-                  color: cs.border.withValues(alpha: 0.15)),
+              Divider(height: 1, color: cs.border.withValues(alpha: 0.15)),
             _DatabaseRow(
               database: _databases[i],
               colorScheme: cs,
@@ -371,8 +369,8 @@ class _DatabaseRow extends StatelessWidget {
         onTap: onView,
         hoverColor: cs.muted.withValues(alpha: 0.15),
         child: material.Padding(
-          padding: const material.EdgeInsets.symmetric(
-              horizontal: 20, vertical: 10),
+          padding:
+              const material.EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           child: Row(
             children: [
               _ActionButton(
@@ -445,8 +443,8 @@ class _ActionButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: material.BorderRadius.circular(6),
         child: material.Container(
-          padding: const material.EdgeInsets.symmetric(
-              horizontal: 12, vertical: 6),
+          padding:
+              const material.EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: material.BoxDecoration(
             color: color.withValues(alpha: 0.8),
             borderRadius: material.BorderRadius.circular(6),

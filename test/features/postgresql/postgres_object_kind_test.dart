@@ -22,9 +22,12 @@ void main() {
     });
 
     test('materializedView and schema metadata kinds are distinct', () {
-      expect(PostgresObjectKind.materializedView, isNot(PostgresObjectKind.view));
-      expect(PostgresObjectKind.schemaIndexes, isNot(PostgresObjectKind.schemaTriggers));
-      expect(PostgresObjectKind.databaseExtensions, isNot(PostgresObjectKind.databaseForeignData));
+      expect(
+          PostgresObjectKind.materializedView, isNot(PostgresObjectKind.view));
+      expect(PostgresObjectKind.schemaIndexes,
+          isNot(PostgresObjectKind.schemaTriggers));
+      expect(PostgresObjectKind.databaseExtensions,
+          isNot(PostgresObjectKind.databaseForeignData));
     });
   });
 }

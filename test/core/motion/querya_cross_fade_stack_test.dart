@@ -3,7 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/motion/querya_cross_fade_stack.dart';
 
 void main() {
-  testWidgets('QueryaCrossFadeStack cross-fades children and excludes focus', (WidgetTester tester) async {
+  testWidgets('QueryaCrossFadeStack cross-fades children and excludes focus',
+      (WidgetTester tester) async {
     final focusNode1 = FocusNode();
     final focusNode2 = FocusNode();
 
@@ -31,8 +32,10 @@ void main() {
     final animatedOpacityFinder = find.byType(AnimatedOpacity);
     expect(animatedOpacityFinder, findsNWidgets(2));
 
-    final opacity1 = tester.widget<AnimatedOpacity>(animatedOpacityFinder.at(0)).opacity;
-    final opacity2 = tester.widget<AnimatedOpacity>(animatedOpacityFinder.at(1)).opacity;
+    final opacity1 =
+        tester.widget<AnimatedOpacity>(animatedOpacityFinder.at(0)).opacity;
+    final opacity2 =
+        tester.widget<AnimatedOpacity>(animatedOpacityFinder.at(1)).opacity;
     expect(opacity1, 1.0);
     expect(opacity2, 0.0);
 

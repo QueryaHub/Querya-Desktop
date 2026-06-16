@@ -91,8 +91,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
       _showStats = false;
     });
     try {
-      final conn =
-          RedisService.instance.createConnection(widget.connectionRow);
+      final conn = RedisService.instance.createConnection(widget.connectionRow);
       await conn.connect();
       if (!mounted) {
         conn.disconnect();
@@ -132,8 +131,8 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
 
   List<_Crumb> get _crumbs {
     final list = <_Crumb>[
-      _Crumb('${widget.connectionRow.name} › db${widget.database}',
-          _Level.keys),
+      _Crumb(
+          '${widget.connectionRow.name} › db${widget.database}', _Level.keys),
     ];
     if (_selectedKey != null) {
       list.add(_Crumb(_selectedKey!, _Level.key));
@@ -297,8 +296,8 @@ class _BreadcrumbBar extends StatelessWidget {
                   for (var i = 0; i < crumbs.length; i++) ...[
                     if (i > 0) ...[
                       material.Padding(
-                        padding: const material.EdgeInsets.symmetric(
-                            horizontal: 6),
+                        padding:
+                            const material.EdgeInsets.symmetric(horizontal: 6),
                         child: material.Icon(
                             material.Icons.chevron_right_rounded,
                             size: 16,
@@ -374,7 +373,8 @@ class _CrumbChip extends material.StatelessWidget {
 
     if (onTap == null) {
       return material.Padding(
-        padding: const material.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding:
+            const material.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: child,
       );
     }

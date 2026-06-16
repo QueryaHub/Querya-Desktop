@@ -5,12 +5,16 @@ import 'package:flutter/scheduler.dart';
 class FrameSample {
   /// Time spent in the UI build thread, in microseconds.
   final int buildUs;
+
   /// Time spent in the raster thread, in microseconds.
   final int rasterUs;
+
   /// Total time to render the frame, in microseconds.
   final int totalUs;
+
   /// Vsync timestamp, in microseconds.
   final int vsyncUs;
+
   /// System time when the sample was recorded.
   final DateTime timestamp;
 
@@ -61,7 +65,8 @@ class FpsTracker {
   /// FPS over the last [n] frames — used by the live overlay.
   double recentFps([int n = 60]) {
     if (_samples.length < 2) return 0.0;
-    final window = _samples.length <= n ? _samples : _samples.sublist(_samples.length - n);
+    final window =
+        _samples.length <= n ? _samples : _samples.sublist(_samples.length - n);
     return _fpsFromWindow(window);
   }
 
@@ -75,19 +80,25 @@ class FpsTracker {
   /// Average duration of the UI build phase across all samples, in ms.
   double get avgBuildMs {
     if (_samples.isEmpty) return 0.0;
-    return _samples.fold<int>(0, (s, f) => s + f.buildUs) / _samples.length / 1000.0;
+    return _samples.fold<int>(0, (s, f) => s + f.buildUs) /
+        _samples.length /
+        1000.0;
   }
 
   /// Average duration of the raster phase across all samples, in ms.
   double get avgRasterMs {
     if (_samples.isEmpty) return 0.0;
-    return _samples.fold<int>(0, (s, f) => s + f.rasterUs) / _samples.length / 1000.0;
+    return _samples.fold<int>(0, (s, f) => s + f.rasterUs) /
+        _samples.length /
+        1000.0;
   }
 
   /// Average total duration (build + raster) across all samples, in ms.
   double get avgTotalMs {
     if (_samples.isEmpty) return 0.0;
-    return _samples.fold<int>(0, (s, f) => s + f.totalUs) / _samples.length / 1000.0;
+    return _samples.fold<int>(0, (s, f) => s + f.totalUs) /
+        _samples.length /
+        1000.0;
   }
 
   /// Worst 1-percentile frame rate.
@@ -97,7 +108,8 @@ class FpsTracker {
     final cutoff = (sorted.length * 0.99).floor();
     final slowSamples = sorted.skip(cutoff).toList();
     if (slowSamples.isEmpty) return avgFps;
-    final avgSlowUs = slowSamples.fold<int>(0, (s, v) => s + v) / slowSamples.length;
+    final avgSlowUs =
+        slowSamples.fold<int>(0, (s, v) => s + v) / slowSamples.length;
     return avgSlowUs > 0 ? 1000000 / avgSlowUs : 0.0;
   }
 
@@ -108,7 +120,8 @@ class FpsTracker {
     final cutoff = (sorted.length * 0.95).floor();
     final slowSamples = sorted.skip(cutoff).toList();
     if (slowSamples.isEmpty) return avgFps;
-    final avgSlowUs = slowSamples.fold<int>(0, (s, v) => s + v) / slowSamples.length;
+    final avgSlowUs =
+        slowSamples.fold<int>(0, (s, v) => s + v) / slowSamples.length;
     return avgSlowUs > 0 ? 1000000 / avgSlowUs : 0.0;
   }
 

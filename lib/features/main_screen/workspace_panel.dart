@@ -1,4 +1,25 @@
-import 'package:flutter/material.dart' as material show Alignment, Axis, Container, EdgeInsets, BoxDecoration, GestureDetector, Padding, BorderRadius, Center, Icon, Icons, MouseRegion, AnimatedContainer, AnimatedScale, SystemMouseCursors, SizedBox, SingleChildScrollView, Row, MainAxisSize;
+import 'package:flutter/material.dart' as material
+    show
+        Alignment,
+        Axis,
+        Container,
+        EdgeInsets,
+        BoxDecoration,
+        GestureDetector,
+        Padding,
+        BorderRadius,
+        Center,
+        Icon,
+        Icons,
+        MouseRegion,
+        AnimatedContainer,
+        AnimatedScale,
+        SystemMouseCursors,
+        SizedBox,
+        SingleChildScrollView,
+        Row,
+        MainAxisSize,
+        Widget;
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/motion/querya_cross_fade_stack.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
@@ -49,20 +70,31 @@ class WorkspacePanel extends StatefulWidget {
 
   /// When set, the user selected a PostgreSQL object in the sidebar tree.
   /// null = show stats, non-null = show table/grid or definition view.
-  final ({String database, String schema, String name, PostgresObjectKind kind})?
-      selectedPostgresObject;
+  final ({
+    String database,
+    String schema,
+    String name,
+    PostgresObjectKind kind
+  })? selectedPostgresObject;
 
   /// Incremented by [MainScreen] to switch the PostgreSQL home view to the SQL tab.
   final int postgresSqlTabRequestToken;
 
   /// Seeds the SQL editor from the last table/view/matview tree selection.
-  final ({String database, String schema, String name, PostgresObjectKind kind})?
-      postgresSqlEditorContext;
+  final ({
+    String database,
+    String schema,
+    String name,
+    PostgresObjectKind kind
+  })? postgresSqlEditorContext;
   final int postgresSqlEditorContextToken;
 
   /// When set, the user selected a MySQL table or view in the sidebar tree.
-  final ({String database, String name, MysqlObjectKind kind})?
-      selectedMysqlObject;
+  final ({
+    String database,
+    String name,
+    MysqlObjectKind kind
+  })? selectedMysqlObject;
 
   /// Incremented by [MainScreen] to switch the MySQL home view to the SQL tab.
   final int mysqlSqlTabRequestToken;
@@ -89,110 +121,85 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    if (widget.activeConnection == null) {
+    final activeConn = widget.activeConnection;
+    if (activeConn == null) {
       return material.Container(
         color: theme.colorScheme.background,
         alignment: material.Alignment.topCenter,
         child: WorkspaceEmptyHero(
-          onNewConnection:
-              widget.onRequestNewConnection ?? () {},
+          onNewConnection: widget.onRequestNewConnection ?? () {},
         ),
       );
     }
 
-    // If a PostgreSQL connection is selected → stats, table/view, function, or sequence
-    if (widget.activeConnection != null &&
-        widget.activeConnection!.type == 'postgresql') {
-      final pg = widget.selectedPostgresObject;
-      return material.Container(
-        color: theme.colorScheme.background,
-        child: material.SizedBox.expand(
-          child: pg == null
-              ? PostgresWorkspaceHome(
-                  key: ValueKey('pg_home_${widget.activeConnection!.id}'),
-                  connectionRow: widget.activeConnection!,
-                  postgresSqlEditorContext: widget.postgresSqlEditorContext,
-                  postgresSqlEditorContextToken:
-                      widget.postgresSqlEditorContextToken,
-                  sqlTabRequestToken: widget.postgresSqlTabRequestToken,
-                )
-              : buildPostgresObjectWorkspace(
-                  connection: widget.activeConnection!,
-                  pg: pg,
+    material.Widget? driverWorkspace;
+    switch (activeConn.type) {
+      case 'postgresql':
+        final pg = widget.selectedPostgresObject;
+        driverWorkspace = pg == null
+            ? PostgresWorkspaceHome(
+                key: ValueKey('pg_home_${activeConn.id}'),
+                connectionRow: activeConn,
+                postgresSqlEditorContext: widget.postgresSqlEditorContext,
+                postgresSqlEditorContextToken:
+                    widget.postgresSqlEditorContextToken,
+                sqlTabRequestToken: widget.postgresSqlTabRequestToken,
+              )
+            : buildPostgresObjectWorkspace(
+                connection: activeConn,
+                pg: pg,
+              );
+        break;
+      case 'mysql':
+        final my = widget.selectedMysqlObject;
+        driverWorkspace = my == null
+            ? MysqlWorkspaceHome(
+                key: ValueKey('mysql_home_${activeConn.id}'),
+                connectionRow: activeConn,
+                sqlTabRequestToken: widget.mysqlSqlTabRequestToken,
+              )
+            : MysqlTableView(
+                key: ValueKey(
+                  'mysql_${activeConn.id}_${my.database}_${my.name}_${my.kind}',
                 ),
-        ),
-      );
+                connectionRow: activeConn,
+                database: my.database,
+                tableName: my.name,
+                isView: my.kind == MysqlObjectKind.view,
+              );
+        break;
+      case 'mongodb':
+        final mongoDb = widget.selectedMongoDb;
+        driverWorkspace = mongoDb != null
+            ? MongoExplorerView(
+                key: ValueKey('mongo_${activeConn.id}_db_$mongoDb'),
+                connectionRow: activeConn,
+                database: mongoDb,
+              )
+            : MongoStatsView(
+                key: ValueKey(activeConn.id),
+                connectionRow: activeConn,
+              );
+        break;
+      case 'redis':
+        final redisDb = widget.selectedRedisDb;
+        driverWorkspace = redisDb != null
+            ? RedisExplorerView(
+                key: ValueKey('redis_${activeConn.id}_db_$redisDb'),
+                connectionRow: activeConn,
+                database: redisDb,
+              )
+            : RedisView(
+                key: ValueKey(activeConn.id),
+                connectionRow: activeConn,
+              );
+        break;
     }
 
-    // MySQL / MariaDB
-    if (widget.activeConnection != null &&
-        widget.activeConnection!.type == 'mysql') {
-      final my = widget.selectedMysqlObject;
+    if (driverWorkspace != null) {
       return material.Container(
         color: theme.colorScheme.background,
-        child: material.SizedBox.expand(
-          child: my == null
-              ? MysqlWorkspaceHome(
-                  key: ValueKey('mysql_home_${widget.activeConnection!.id}'),
-                  connectionRow: widget.activeConnection!,
-                  sqlTabRequestToken: widget.mysqlSqlTabRequestToken,
-                )
-              : MysqlTableView(
-                  key: ValueKey(
-                    'mysql_${widget.activeConnection!.id}_${my.database}_${my.name}_${my.kind}',
-                  ),
-                  connectionRow: widget.activeConnection!,
-                  database: my.database,
-                  tableName: my.name,
-                  isView: my.kind == MysqlObjectKind.view,
-                ),
-        ),
-      );
-    }
-
-    // If a MongoDB connection is selected
-    if (widget.activeConnection != null &&
-        widget.activeConnection!.type == 'mongodb') {
-      final mongoDb = widget.selectedMongoDb;
-      return material.Container(
-        color: theme.colorScheme.background,
-        child: material.SizedBox.expand(
-          // DB selected → data explorer; no DB → stats
-          child: mongoDb != null
-              ? MongoExplorerView(
-                  key: ValueKey(
-                      'mongo_${widget.activeConnection!.id}_db_$mongoDb'),
-                  connectionRow: widget.activeConnection!,
-                  database: mongoDb,
-                )
-              : MongoStatsView(
-                  key: ValueKey(widget.activeConnection!.id),
-                  connectionRow: widget.activeConnection!,
-                ),
-        ),
-      );
-    }
-
-    // If a Redis connection is selected
-    if (widget.activeConnection != null &&
-        widget.activeConnection!.type == 'redis') {
-      final redisDb = widget.selectedRedisDb;
-      return material.Container(
-        color: theme.colorScheme.background,
-        child: material.SizedBox.expand(
-          // DB selected → data explorer; no DB → stats
-          child: redisDb != null
-              ? RedisExplorerView(
-                  key: ValueKey(
-                      'redis_${widget.activeConnection!.id}_db_$redisDb'),
-                  connectionRow: widget.activeConnection!,
-                  database: redisDb,
-                )
-              : RedisView(
-                  key: ValueKey(widget.activeConnection!.id),
-                  connectionRow: widget.activeConnection!,
-                ),
-        ),
+        child: material.SizedBox.expand(child: driverWorkspace),
       );
     }
 
@@ -346,7 +353,8 @@ class _TabButtonState extends State<_TabButton> {
           child: material.AnimatedContainer(
             duration: context.motionDuration(QueryaMotion.fast),
             curve: context.motionCurve(QueryaMotion.enter),
-            padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const material.EdgeInsets.symmetric(
+                horizontal: 12, vertical: 8),
             decoration: material.BoxDecoration(
               color: bgColor,
               borderRadius: material.BorderRadius.circular(6),

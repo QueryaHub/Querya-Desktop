@@ -40,7 +40,8 @@ void main() {
     };
 
     for (final entry in sizes.entries) {
-      testWidgets('no overflow at ${entry.key} with long title', (tester) async {
+      testWidgets('no overflow at ${entry.key} with long title',
+          (tester) async {
         await expectNoLayoutOverflow(() async {
           await pumpWidgetWithSurfaceSize(
             tester,

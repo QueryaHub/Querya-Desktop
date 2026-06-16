@@ -13,8 +13,10 @@ void main() {
     await Highlighter.initialize(['sql']);
   });
 
-  test('Dracula-like tokenColors distinguish comment, keyword, string in SQL', () {
-    final raw = File('test/fixtures/themes/dracula_tokens.json').readAsStringSync();
+  test('Dracula-like tokenColors distinguish comment, keyword, string in SQL',
+      () {
+    final raw =
+        File('test/fixtures/themes/dracula_tokens.json').readAsStringSync();
     final manifest = VsCodeThemeManifest.fromJsonString(raw);
     final theme = highlighterThemeFromQueryaEditor(
       QueryaTheme.darkDefault.editor,

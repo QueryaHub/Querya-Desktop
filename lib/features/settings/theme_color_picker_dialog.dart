@@ -27,7 +27,8 @@ Future<Color?> showThemeColorPickerDialog({
             child: const material.Text('Cancel'),
           ),
           material.TextButton(
-            onPressed: () => material.Navigator.pop(dialogContext, picked.toColor()),
+            onPressed: () =>
+                material.Navigator.pop(dialogContext, picked.toColor()),
             child: const material.Text('Apply'),
           ),
         ],

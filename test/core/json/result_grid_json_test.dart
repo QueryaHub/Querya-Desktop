@@ -40,7 +40,11 @@ void main() {
     });
 
     test('pads short rows', () {
-      final s = resultGridAsJson(const ['x', 'y', 'z'], const [
+      final s = resultGridAsJson(const [
+        'x',
+        'y',
+        'z'
+      ], const [
         ['only'],
       ]);
       expect(jsonDecode(s), {

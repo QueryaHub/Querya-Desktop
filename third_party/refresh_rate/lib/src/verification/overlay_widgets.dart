@@ -53,6 +53,7 @@ mixin _OverlayStateMixin<T extends StatefulWidget> on State<T> {
 class FpsOverlayWidget extends StatefulWidget {
   /// The [FpsTracker] providing frame timings.
   final FpsTracker tracker;
+
   /// Creates a [FpsOverlayWidget].
   const FpsOverlayWidget({super.key, required this.tracker});
   @override
@@ -84,6 +85,7 @@ class _FpsOverlayWidgetState extends State<FpsOverlayWidget>
 class HzOverlayWidget extends StatefulWidget {
   /// The [FpsTracker] (unused but required for generic widget creation).
   final FpsTracker tracker;
+
   /// Creates a [HzOverlayWidget].
   const HzOverlayWidget({super.key, required this.tracker});
   @override
@@ -115,6 +117,7 @@ class _HzOverlayWidgetState extends State<HzOverlayWidget>
 class FullOverlayWidget extends StatefulWidget {
   /// The [FpsTracker] providing frame timings.
   final FpsTracker tracker;
+
   /// Creates a [FullOverlayWidget].
   const FullOverlayWidget({super.key, required this.tracker});
   @override
@@ -151,8 +154,10 @@ class _FullOverlayWidgetState extends State<FullOverlayWidget>
                 fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
-            Text('build ${buildMs.toStringAsFixed(1)}ms  raster ${rasterMs.toStringAsFixed(1)}ms'),
-            Text('budget ${budgetMs.toStringAsFixed(1)}ms @ ${targetHz.toStringAsFixed(0)}Hz'),
+            Text(
+                'build ${buildMs.toStringAsFixed(1)}ms  raster ${rasterMs.toStringAsFixed(1)}ms'),
+            Text(
+                'budget ${budgetMs.toStringAsFixed(1)}ms @ ${targetHz.toStringAsFixed(0)}Hz'),
             if (RefreshRate.isLowPowerMode)
               const Text(
                 '\u26a1 Low Power',

@@ -320,9 +320,10 @@ class _PreferencesAppearanceSectionState
               ),
             ),
             OutlineButton(
-              onPressed: (_importing || _installingFromUrl || _openingThemesFolder)
-                  ? null
-                  : () => unawaited(_openThemesFolder()),
+              onPressed:
+                  (_importing || _installingFromUrl || _openingThemesFolder)
+                      ? null
+                      : () => unawaited(_openThemesFolder()),
               child: material.Text(
                 _openingThemesFolder ? 'Opening…' : 'Open themes folder',
               ),

@@ -28,10 +28,12 @@ class _RedisConnectionFormContent extends material.StatefulWidget {
   final int? folderId;
 
   @override
-  material.State<_RedisConnectionFormContent> createState() => _RedisConnectionFormContentState();
+  material.State<_RedisConnectionFormContent> createState() =>
+      _RedisConnectionFormContentState();
 }
 
-class _RedisConnectionFormContentState extends material.State<_RedisConnectionFormContent> {
+class _RedisConnectionFormContentState
+    extends material.State<_RedisConnectionFormContent> {
   final _nameController = material.TextEditingController();
   final _hostController = material.TextEditingController(text: 'localhost');
   final _portController = material.TextEditingController(text: '6379');
@@ -88,11 +90,16 @@ class _RedisConnectionFormContentState extends material.State<_RedisConnectionFo
     try {
       final conn = RedisConnection(
         id: 0,
-        name: _nameController.text.trim().isEmpty ? 'test' : _nameController.text.trim(),
+        name: _nameController.text.trim().isEmpty
+            ? 'test'
+            : _nameController.text.trim(),
         host: _hostController.text.trim(),
         port: int.tryParse(_portController.text.trim()) ?? 6379,
-        username: _usernameController.text.trim().isEmpty ? null : _usernameController.text.trim(),
-        password: _passwordController.text.isEmpty ? null : _passwordController.text,
+        username: _usernameController.text.trim().isEmpty
+            ? null
+            : _usernameController.text.trim(),
+        password:
+            _passwordController.text.isEmpty ? null : _passwordController.text,
       );
       final ok = await conn.testConnection();
       if (mounted) _showTestResult(ok ? 'success' : 'failed');
@@ -112,8 +119,11 @@ class _RedisConnectionFormContentState extends material.State<_RedisConnectionFo
       name: displayName,
       host: host,
       port: port,
-      username: _usernameController.text.trim().isEmpty ? null : _usernameController.text.trim(),
-      password: _passwordController.text.isEmpty ? null : _passwordController.text,
+      username: _usernameController.text.trim().isEmpty
+          ? null
+          : _usernameController.text.trim(),
+      password:
+          _passwordController.text.isEmpty ? null : _passwordController.text,
       folderId: widget.folderId,
       createdAt: DateTime.now().toUtc().toIso8601String(),
     );
@@ -163,7 +173,8 @@ class _RedisConnectionFormContentState extends material.State<_RedisConnectionFo
                 children: [
                   material.Row(
                     children: [
-                      material.Icon(material.Icons.memory_rounded, size: 24, color: theme.primary),
+                      material.Icon(material.Icons.memory_rounded,
+                          size: 24, color: theme.primary),
                       const Gap(12),
                       const Text('Redis Connection').large().semiBold(),
                     ],
@@ -192,7 +203,8 @@ class _RedisConnectionFormContentState extends material.State<_RedisConnectionFo
                         material.Expanded(
                           flex: 3,
                           child: material.Column(
-                            crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                            crossAxisAlignment:
+                                material.CrossAxisAlignment.stretch,
                             mainAxisSize: material.MainAxisSize.min,
                             children: [
                               const Text('Host').small().semiBold(),
@@ -208,7 +220,8 @@ class _RedisConnectionFormContentState extends material.State<_RedisConnectionFo
                         material.Expanded(
                           flex: 1,
                           child: material.Column(
-                            crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                            crossAxisAlignment:
+                                material.CrossAxisAlignment.stretch,
                             mainAxisSize: material.MainAxisSize.min,
                             children: [
                               const Text('Port').small().semiBold(),
@@ -223,11 +236,14 @@ class _RedisConnectionFormContentState extends material.State<_RedisConnectionFo
                       ],
                     ),
                     const Gap(16),
-                    const Text('Username (optional, Redis 6+ ACL)').small().semiBold(),
+                    const Text('Username (optional, Redis 6+ ACL)')
+                        .small()
+                        .semiBold(),
                     const Gap(8),
                     TextField(
                       controller: _usernameController,
-                      placeholder: const Text('default (leave empty for default user)'),
+                      placeholder:
+                          const Text('default (leave empty for default user)'),
                     ),
                     const Gap(16),
                     const Text('Password (optional)').small().semiBold(),
@@ -251,7 +267,8 @@ class _RedisConnectionFormContentState extends material.State<_RedisConnectionFo
                                     : material.Icons.visibility,
                                 size: 20,
                               ),
-                              onPressed: () => setState(() => _showPassword = !_showPassword),
+                              onPressed: () => setState(
+                                  () => _showPassword = !_showPassword),
                               padding: material.EdgeInsets.zero,
                               constraints: const material.BoxConstraints(),
                             ),
@@ -273,7 +290,8 @@ class _RedisConnectionFormContentState extends material.State<_RedisConnectionFo
                     onTap: _dismissResult,
                     borderRadius: material.BorderRadius.circular(8),
                     child: material.Container(
-                      padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      padding: const material.EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
                       decoration: material.BoxDecoration(
                         color: _testResult == 'success'
                             ? theme.primary.withValues(alpha: 0.12)
@@ -330,7 +348,8 @@ class _RedisConnectionFormContentState extends material.State<_RedisConnectionFo
                 ),
               ),
             material.Container(
-              padding: const material.EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: const material.EdgeInsets.symmetric(
+                  horizontal: 24, vertical: 16),
               child: ValueListenableBuilder<bool>(
                 valueListenable: _formValidNotifier.listenable,
                 builder: (context, formValid, _) {

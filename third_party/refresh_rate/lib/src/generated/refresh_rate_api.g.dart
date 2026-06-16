@@ -17,7 +17,8 @@ PlatformException _createConnectionError(String channelName) {
   );
 }
 
-List<Object?> wrapResponse({Object? result, PlatformException? error, bool empty = false}) {
+List<Object?> wrapResponse(
+    {Object? result, PlatformException? error, bool empty = false}) {
   if (empty) {
     return <Object?>[];
   }
@@ -108,7 +109,6 @@ class DisplayInfoMessage {
   }
 }
 
-
 class _PigeonCodec extends StandardMessageCodec {
   const _PigeonCodec();
   @override
@@ -116,7 +116,7 @@ class _PigeonCodec extends StandardMessageCodec {
     if (value is int) {
       buffer.putUint8(4);
       buffer.putInt64(value);
-    }    else if (value is DisplayInfoMessage) {
+    } else if (value is DisplayInfoMessage) {
       buffer.putUint8(129);
       writeValue(buffer, value.encode());
     } else {
@@ -127,7 +127,7 @@ class _PigeonCodec extends StandardMessageCodec {
   @override
   Object? readValueOfType(int type, ReadBuffer buffer) {
     switch (type) {
-      case 129: 
+      case 129:
         return DisplayInfoMessage.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
@@ -139,9 +139,11 @@ class RefreshRateHostApi {
   /// Constructor for [RefreshRateHostApi].  The [binaryMessenger] named argument is
   /// available for dependency injection.  If it is left null, the default
   /// BinaryMessenger will be used which routes to the host platform.
-  RefreshRateHostApi({BinaryMessenger? binaryMessenger, String messageChannelSuffix = ''})
+  RefreshRateHostApi(
+      {BinaryMessenger? binaryMessenger, String messageChannelSuffix = ''})
       : pigeonVar_binaryMessenger = binaryMessenger,
-        pigeonVar_messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
+        pigeonVar_messageChannelSuffix =
+            messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
   final BinaryMessenger? pigeonVar_binaryMessenger;
 
   static const MessageCodec<Object?> pigeonChannelCodec = _PigeonCodec();
@@ -149,8 +151,10 @@ class RefreshRateHostApi {
   final String pigeonVar_messageChannelSuffix;
 
   Future<DisplayInfoMessage> getDisplayInfo() async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.refresh_rate.RefreshRateHostApi.getDisplayInfo$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.refresh_rate.RefreshRateHostApi.getDisplayInfo$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -176,8 +180,10 @@ class RefreshRateHostApi {
   }
 
   Future<void> enable() async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.refresh_rate.RefreshRateHostApi.enable$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.refresh_rate.RefreshRateHostApi.enable$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -198,8 +204,10 @@ class RefreshRateHostApi {
   }
 
   Future<void> disable() async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.refresh_rate.RefreshRateHostApi.disable$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.refresh_rate.RefreshRateHostApi.disable$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -220,8 +228,10 @@ class RefreshRateHostApi {
   }
 
   Future<void> preferMax() async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.refresh_rate.RefreshRateHostApi.preferMax$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.refresh_rate.RefreshRateHostApi.preferMax$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -242,8 +252,10 @@ class RefreshRateHostApi {
   }
 
   Future<void> preferDefault() async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.refresh_rate.RefreshRateHostApi.preferDefault$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.refresh_rate.RefreshRateHostApi.preferDefault$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -264,8 +276,10 @@ class RefreshRateHostApi {
   }
 
   Future<void> matchContent(double fps) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.refresh_rate.RefreshRateHostApi.matchContent$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.refresh_rate.RefreshRateHostApi.matchContent$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -286,8 +300,10 @@ class RefreshRateHostApi {
   }
 
   Future<void> boost(int durationMs) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.refresh_rate.RefreshRateHostApi.boost$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.refresh_rate.RefreshRateHostApi.boost$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -308,14 +324,16 @@ class RefreshRateHostApi {
   }
 
   Future<void> setCategory(int categoryIndex) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.refresh_rate.RefreshRateHostApi.setCategory$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.refresh_rate.RefreshRateHostApi.setCategory$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final List<Object?>? pigeonVar_replyList =
-        await pigeonVar_channel.send(<Object?>[categoryIndex]) as List<Object?>?;
+    final List<Object?>? pigeonVar_replyList = await pigeonVar_channel
+        .send(<Object?>[categoryIndex]) as List<Object?>?;
     if (pigeonVar_replyList == null) {
       throw _createConnectionError(pigeonVar_channelName);
     } else if (pigeonVar_replyList.length > 1) {
@@ -330,8 +348,10 @@ class RefreshRateHostApi {
   }
 
   Future<void> setTouchBoost(bool enabled) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.refresh_rate.RefreshRateHostApi.setTouchBoost$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.refresh_rate.RefreshRateHostApi.setTouchBoost$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -352,8 +372,10 @@ class RefreshRateHostApi {
   }
 
   Future<bool> isSupported() async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.refresh_rate.RefreshRateHostApi.isSupported$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.refresh_rate.RefreshRateHostApi.isSupported$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -384,18 +406,26 @@ abstract class RefreshRateFlutterApi {
 
   void onDisplayInfoChanged(DisplayInfoMessage info);
 
-  static void setUp(RefreshRateFlutterApi? api, {BinaryMessenger? binaryMessenger, String messageChannelSuffix = '',}) {
-    messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
+  static void setUp(
+    RefreshRateFlutterApi? api, {
+    BinaryMessenger? binaryMessenger,
+    String messageChannelSuffix = '',
+  }) {
+    messageChannelSuffix =
+        messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
     {
-      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.refresh_rate.RefreshRateFlutterApi.onDisplayInfoChanged$messageChannelSuffix', pigeonChannelCodec,
+      final BasicMessageChannel<
+          Object?> pigeonVar_channel = BasicMessageChannel<
+              Object?>(
+          'dev.flutter.pigeon.refresh_rate.RefreshRateFlutterApi.onDisplayInfoChanged$messageChannelSuffix',
+          pigeonChannelCodec,
           binaryMessenger: binaryMessenger);
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
         pigeonVar_channel.setMessageHandler((Object? message) async {
           assert(message != null,
-          'Argument for dev.flutter.pigeon.refresh_rate.RefreshRateFlutterApi.onDisplayInfoChanged was null.');
+              'Argument for dev.flutter.pigeon.refresh_rate.RefreshRateFlutterApi.onDisplayInfoChanged was null.');
           final List<Object?> args = (message as List<Object?>?)!;
           final DisplayInfoMessage? arg_info = (args[0] as DisplayInfoMessage?);
           assert(arg_info != null,
@@ -405,8 +435,9 @@ abstract class RefreshRateFlutterApi {
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+                error: PlatformException(code: 'error', message: e.toString()));
           }
         });
       }

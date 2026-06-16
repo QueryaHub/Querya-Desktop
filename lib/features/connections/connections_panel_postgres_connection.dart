@@ -94,7 +94,8 @@ class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
               color: theme.colorScheme.primary,
             ),
           )
-        : material.Icon(widget.icon, size: 16, color: theme.colorScheme.primary);
+        : material.Icon(widget.icon,
+            size: 16, color: theme.colorScheme.primary);
 
     return ContextMenu(
       items: [
@@ -195,47 +196,48 @@ class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
                 mainAxisSize: material.MainAxisSize.min,
                 crossAxisAlignment: material.CrossAxisAlignment.stretch,
                 children: [
-              if (_loading)
-                material.Padding(
-                  padding:
-                      const material.EdgeInsets.only(left: 28, top: 4, bottom: 4),
-                  child: material.Row(
-                    children: [
-                      const material.SizedBox(
-                        width: 12,
-                        height: 12,
-                        child:
-                            material.CircularProgressIndicator(strokeWidth: 1.5),
+                  if (_loading)
+                    material.Padding(
+                      padding: const material.EdgeInsets.only(
+                          left: 28, top: 4, bottom: 4),
+                      child: material.Row(
+                        children: [
+                          const material.SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: material.CircularProgressIndicator(
+                                strokeWidth: 1.5),
+                          ),
+                          const Gap(8),
+                          const Text('Loading...').muted().xSmall(),
+                        ],
                       ),
-                      const Gap(8),
-                      const Text('Loading...').muted().xSmall(),
-                    ],
-                  ),
-                ),
-              if (_error != null)
-                material.Padding(
-                  padding:
-                      const material.EdgeInsets.only(left: 28, top: 4, bottom: 4),
-                  child: material.Text(
-                    'Error',
-                    overflow: material.TextOverflow.ellipsis,
-                    maxLines: 1,
-                    style: material.TextStyle(
-                        fontSize: 11, color: theme.colorScheme.destructive),
-                  ),
-                ),
-              if (_databases.isNotEmpty)
-                _PgDatabasesNode(
-                  connection: widget.connection,
-                  databases: _databases,
-                  onPostgresObjectSelected: widget.onPostgresObjectSelected,
-                  onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
-                  onRefreshDatabases: () {
-                    setState(() => _databases = []);
-                    _loadDatabases();
-                  },
-                ),
-            ],
+                    ),
+                  if (_error != null)
+                    material.Padding(
+                      padding: const material.EdgeInsets.only(
+                          left: 28, top: 4, bottom: 4),
+                      child: material.Text(
+                        'Error',
+                        overflow: material.TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: material.TextStyle(
+                            fontSize: 11, color: theme.colorScheme.destructive),
+                      ),
+                    ),
+                  if (_databases.isNotEmpty)
+                    _PgDatabasesNode(
+                      connection: widget.connection,
+                      databases: _databases,
+                      onPostgresObjectSelected: widget.onPostgresObjectSelected,
+                      onPostgresOpenSqlWorkspace:
+                          widget.onPostgresOpenSqlWorkspace,
+                      onRefreshDatabases: () {
+                        setState(() => _databases = []);
+                        _loadDatabases();
+                      },
+                    ),
+                ],
               ),
             ),
           ],

@@ -162,12 +162,14 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
               const Gap(8),
               material.SelectableText(
                 err,
-                style: material.TextStyle(color: cs.mutedForeground, fontSize: 13),
+                style:
+                    material.TextStyle(color: cs.mutedForeground, fontSize: 13),
               ),
               const Gap(24),
               OutlineButton(
                 onPressed: _load,
-                leading: const material.Icon(material.Icons.refresh_rounded, size: 18),
+                leading: const material.Icon(material.Icons.refresh_rounded,
+                    size: 18),
                 child: const Text('Retry'),
               ),
             ],
@@ -255,7 +257,8 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
         ),
         OutlineButton(
           onPressed: _load,
-          leading: const material.Icon(material.Icons.refresh_rounded, size: 18),
+          leading:
+              const material.Icon(material.Icons.refresh_rounded, size: 18),
           child: const Text('Refresh'),
         ),
       ],
@@ -304,13 +307,16 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
     material.Widget chip(String label, String value, material.IconData icon) {
       return material.Expanded(
         child: material.ConstrainedBox(
-          constraints: const material.BoxConstraints(minHeight: _summaryChipHeight),
+          constraints:
+              const material.BoxConstraints(minHeight: _summaryChipHeight),
           child: material.Container(
-            padding: const material.EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const material.EdgeInsets.symmetric(
+                horizontal: 16, vertical: 12),
             decoration: material.BoxDecoration(
               color: cs.card,
               borderRadius: material.BorderRadius.circular(10),
-              border: material.Border.all(color: cs.border.withValues(alpha: 0.5)),
+              border:
+                  material.Border.all(color: cs.border.withValues(alpha: 0.5)),
             ),
             child: material.Row(
               crossAxisAlignment: material.CrossAxisAlignment.start,
@@ -354,9 +360,11 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
       children: [
         chip('Version', versionShort, material.Icons.tag_rounded),
         const Gap(12),
-        chip('Uptime', _formatUptime(uptimeSec), material.Icons.schedule_rounded),
+        chip('Uptime', _formatUptime(uptimeSec),
+            material.Icons.schedule_rounded),
         const Gap(12),
-        chip('Connections', '$connected / $maxConn', material.Icons.people_outline_rounded),
+        chip('Connections', '$connected / $maxConn',
+            material.Icons.people_outline_rounded),
         const Gap(12),
         chip('Queries', questions, material.Icons.speed_rounded),
       ],
@@ -422,8 +430,10 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
         [
           _metricRow(context, 'Connected', _status(stats, 'Threads_connected')),
           _metricRow(context, 'Running', _status(stats, 'Threads_running')),
-          _metricRow(context, 'Max used', _status(stats, 'Max_used_connections')),
-          _metricRow(context, 'Max allowed', _variable(stats, 'max_connections')),
+          _metricRow(
+              context, 'Max used', _status(stats, 'Max_used_connections')),
+          _metricRow(
+              context, 'Max allowed', _variable(stats, 'max_connections')),
         ],
         stretch: true,
       ),
@@ -443,7 +453,8 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
           _metricRow(context, 'Questions', _status(stats, 'Questions')),
           _metricRow(context, 'Slow queries', _status(stats, 'Slow_queries')),
           _metricRow(context, 'Open tables', _status(stats, 'Open_tables')),
-          _metricRow(context, 'Aborted connects', _status(stats, 'Aborted_connects')),
+          _metricRow(
+              context, 'Aborted connects', _status(stats, 'Aborted_connects')),
         ],
         stretch: true,
       ),
@@ -483,8 +494,10 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
         context,
         [
           _metricRow(context, 'InnoDB buffer pool', _formatBytes(pool)),
-          _metricRow(context, 'Charset', _variable(stats, 'character_set_server')),
-          _metricRow(context, 'Collation', _variable(stats, 'collation_server')),
+          _metricRow(
+              context, 'Charset', _variable(stats, 'character_set_server')),
+          _metricRow(
+              context, 'Collation', _variable(stats, 'collation_server')),
           _metricRow(context, 'Port', _variable(stats, 'port')),
         ],
         stretch: true,
@@ -496,8 +509,7 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
 
   material.Widget _databasesCard(
       material.BuildContext context, Map<String, dynamic> stats) {
-    final databases =
-        stats['databases'] as List<Map<String, dynamic>>? ?? [];
+    final databases = stats['databases'] as List<Map<String, dynamic>>? ?? [];
     if (databases.isEmpty) return const material.SizedBox.shrink();
 
     final cs = shadcn.Theme.of(context).colorScheme;
@@ -535,7 +547,8 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
                     width: 180,
                     child: material.Text(
                       '${db['name']}',
-                      style: material.TextStyle(fontSize: 13, color: cs.foreground),
+                      style: material.TextStyle(
+                          fontSize: 13, color: cs.foreground),
                       overflow: material.TextOverflow.ellipsis,
                     ),
                   ),

@@ -176,9 +176,8 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       int totalRows;
       if (refreshCount || _totalRowCount == null) {
         final countRs = await conn.execute(countSql);
-        totalRows = countRs.rows.isEmpty
-            ? 0
-            : _asInt(countRs.rows.first.colAt(0));
+        totalRows =
+            countRs.rows.isEmpty ? 0 : _asInt(countRs.rows.first.colAt(0));
       } else {
         totalRows = _totalRowCount!;
       }
@@ -305,8 +304,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
     unawaited(_fetch());
   }
 
-  bool get _canGoPrevious =>
-      !_customSqlActive && _offset > 0 && !_loading;
+  bool get _canGoPrevious => !_customSqlActive && _offset > 0 && !_loading;
 
   bool get _canGoNext {
     if (_customSqlActive) return false;
@@ -480,14 +478,15 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
                 ],
                 const Gap(6),
                 GhostButton(
-                  onPressed: (!_canGoPrevious || _loading)
-                      ? null
-                      : _goToPreviousPage,
-                  child: const Icon(material.Icons.chevron_left_rounded, size: 20),
+                  onPressed:
+                      (!_canGoPrevious || _loading) ? null : _goToPreviousPage,
+                  child:
+                      const Icon(material.Icons.chevron_left_rounded, size: 20),
                 ),
                 GhostButton(
                   onPressed: (!_canGoNext || _loading) ? null : _goToNextPage,
-                  child: const Icon(material.Icons.chevron_right_rounded, size: 20),
+                  child: const Icon(material.Icons.chevron_right_rounded,
+                      size: 20),
                 ),
               ],
             ),
@@ -555,8 +554,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
                                         _rowNumberCell(cs, '$displayRowNum'),
                                         for (var c = 0; c < colCount; c++)
                                           _dataCell(
-                                              cs,
-                                              row.length > c ? row[c] : ''),
+                                              cs, row.length > c ? row[c] : ''),
                                       ],
                                     ),
                                   );

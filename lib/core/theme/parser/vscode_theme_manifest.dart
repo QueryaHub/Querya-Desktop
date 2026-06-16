@@ -29,7 +29,8 @@ class VsCodeThemeManifest {
     try {
       decoded = jsonDecode(cleaned);
     } on FormatException catch (e) {
-      throw VsCodeThemeParseException('Invalid JSON after JSONC strip: ${e.message}');
+      throw VsCodeThemeParseException(
+          'Invalid JSON after JSONC strip: ${e.message}');
     }
     if (decoded is! Map<String, dynamic>) {
       throw VsCodeThemeParseException('Theme root must be a JSON object');

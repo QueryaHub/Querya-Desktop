@@ -120,9 +120,8 @@ class _MysqlConnectionFormContentState
         username: _usernameController.text.trim().isEmpty
             ? null
             : _usernameController.text.trim(),
-        password: _passwordController.text.isEmpty
-            ? null
-            : _passwordController.text,
+        password:
+            _passwordController.text.isEmpty ? null : _passwordController.text,
         useSSL: _useSSL,
         connectionString: uri.isEmpty ? null : uri,
       );
@@ -155,9 +154,8 @@ class _MysqlConnectionFormContentState
           : _usernameController.text.trim(),
       password:
           _passwordController.text.isEmpty ? null : _passwordController.text,
-      databaseName: uri.isNotEmpty
-          ? null
-          : (database.isEmpty ? null : database),
+      databaseName:
+          uri.isNotEmpty ? null : (database.isEmpty ? null : database),
       useSSL: _useSSL,
       connectionString: uri.isEmpty ? null : uri,
       folderId: widget.folderId,
@@ -196,12 +194,11 @@ class _MysqlConnectionFormContentState
     final radius = Theme.of(context).radiusXxl;
 
     return material.Container(
-      constraints:
-          WindowLayout.dialogConstraints(
-            context,
-            maxWidth: 600,
-            maxHeight: 640,
-          ),
+      constraints: WindowLayout.dialogConstraints(
+        context,
+        maxWidth: 600,
+        maxHeight: 640,
+      ),
       decoration: material.BoxDecoration(
         color: theme.popover,
         borderRadius: material.BorderRadius.circular(radius),
@@ -347,8 +344,8 @@ class _MysqlConnectionFormContentState
                                     : material.Icons.visibility,
                                 size: 20,
                               ),
-                              onPressed: () =>
-                                  setState(() => _showPassword = !_showPassword),
+                              onPressed: () => setState(
+                                  () => _showPassword = !_showPassword),
                               padding: material.EdgeInsets.zero,
                               constraints: const material.BoxConstraints(),
                             ),
@@ -361,8 +358,7 @@ class _MysqlConnectionFormContentState
                       children: [
                         material.Checkbox(
                           value: _useSSL,
-                          onChanged: (v) =>
-                              setState(() => _useSSL = v ?? true),
+                          onChanged: (v) => setState(() => _useSSL = v ?? true),
                         ),
                         const Gap(8),
                         const Text('Use SSL/TLS').small(),

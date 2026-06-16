@@ -50,16 +50,18 @@ void main() {
     });
 
     test('parses all sections', () {
-      expect(info.keys, containsAll([
-        'Server',
-        'Clients',
-        'Memory',
-        'Stats',
-        'CPU',
-        'Errorstats',
-        'Keyspace',
-        'Replication',
-      ]));
+      expect(
+          info.keys,
+          containsAll([
+            'Server',
+            'Clients',
+            'Memory',
+            'Stats',
+            'CPU',
+            'Errorstats',
+            'Keyspace',
+            'Replication',
+          ]));
     });
 
     test('parses key:value pairs correctly', () {

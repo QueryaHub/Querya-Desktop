@@ -122,9 +122,8 @@ class _PostgresConnectionFormContentState
         username: _usernameController.text.trim().isEmpty
             ? null
             : _usernameController.text.trim(),
-        password: _passwordController.text.isEmpty
-            ? null
-            : _passwordController.text,
+        password:
+            _passwordController.text.isEmpty ? null : _passwordController.text,
         useSSL: _useSSL,
         connectionString: uri.isEmpty ? null : uri,
       );
@@ -157,7 +156,8 @@ class _PostgresConnectionFormContentState
           : _usernameController.text.trim(),
       password:
           _passwordController.text.isEmpty ? null : _passwordController.text,
-      databaseName: uri.isNotEmpty ? null : (database.isEmpty ? null : database),
+      databaseName:
+          uri.isNotEmpty ? null : (database.isEmpty ? null : database),
       useSSL: _useSSL,
       connectionString: uri.isEmpty ? null : uri,
       folderId: widget.folderId,
@@ -196,12 +196,11 @@ class _PostgresConnectionFormContentState
     final radius = Theme.of(context).radiusXxl;
 
     return material.Container(
-      constraints:
-          WindowLayout.dialogConstraints(
-            context,
-            maxWidth: 600,
-            maxHeight: 640,
-          ),
+      constraints: WindowLayout.dialogConstraints(
+        context,
+        maxWidth: 600,
+        maxHeight: 640,
+      ),
       decoration: material.BoxDecoration(
         color: theme.popover,
         borderRadius: material.BorderRadius.circular(radius),
@@ -356,8 +355,8 @@ class _PostgresConnectionFormContentState
                                     : material.Icons.visibility,
                                 size: 20,
                               ),
-                              onPressed: () =>
-                                  setState(() => _showPassword = !_showPassword),
+                              onPressed: () => setState(
+                                  () => _showPassword = !_showPassword),
                               padding: material.EdgeInsets.zero,
                               constraints: const material.BoxConstraints(),
                             ),

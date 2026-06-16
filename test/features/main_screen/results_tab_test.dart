@@ -93,7 +93,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Header + only visible rows (not all 500).
-      final dataRowWidgets = tester.widgetList(find.byType(material.Row)).length;
+      final dataRowWidgets =
+          tester.widgetList(find.byType(material.Row)).length;
       expect(dataRowWidgets, lessThan(80));
     });
   });

@@ -35,8 +35,7 @@ class TokenStyleResolver {
   List<String> _scopePrefixes(String scope) {
     final parts = scope.split('.');
     return [
-      for (var i = parts.length; i >= 1; i--)
-        parts.sublist(0, i).join('.'),
+      for (var i = parts.length; i >= 1; i--) parts.sublist(0, i).join('.'),
     ];
   }
 

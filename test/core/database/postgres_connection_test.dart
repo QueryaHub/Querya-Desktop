@@ -378,7 +378,8 @@ void main() {
   });
 
   group('PostgresConnection.connectToDatabase', () {
-    test('returns new PostgresConnection with same params and given database', () async {
+    test('returns new PostgresConnection with same params and given database',
+        () async {
       final conn = PostgresConnection(
         id: 10,
         name: 'Server',

@@ -122,7 +122,8 @@ class PostgresTableToolbar extends material.StatelessWidget {
                           const Gap(4),
                           OutlineButton(
                             size: ButtonSize.small,
-                            onPressed: loading ? null : onRefreshMaterializedView,
+                            onPressed:
+                                loading ? null : onRefreshMaterializedView,
                             leading: const material.Icon(
                               material.Icons.sync_rounded,
                               size: 15,

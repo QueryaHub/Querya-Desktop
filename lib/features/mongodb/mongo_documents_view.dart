@@ -230,8 +230,7 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
                       index: _skip + i,
                       colorScheme: cs,
                       shadcnCs: shadcnCs,
-                      onView: () =>
-                          widget.onDocumentTap?.call(_documents[i]),
+                      onView: () => widget.onDocumentTap?.call(_documents[i]),
                       onDelete: () => _deleteDocument(_documents[i]),
                     );
                   },
@@ -246,7 +245,8 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
   Widget _buildFilterBar(ColorScheme cs) {
     final shadcnCs = shadcn.Theme.of(context).colorScheme;
     return material.Container(
-      padding: const material.EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding:
+          const material.EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: material.BoxDecoration(
         color: shadcnCs.muted.withValues(alpha: 0.15),
       ),
@@ -278,8 +278,7 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
           PrimaryButton(
             onPressed: _addDocument,
             size: ButtonSize.small,
-            leading:
-                const material.Icon(material.Icons.add_rounded, size: 16),
+            leading: const material.Icon(material.Icons.add_rounded, size: 16),
             child: const Text('Add Document'),
           ),
         ],
@@ -342,9 +341,8 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
               child: material.Icon(
                 material.Icons.chevron_left_rounded,
                 size: 20,
-                color: _skip > 0
-                    ? shadcnCs.foreground
-                    : shadcnCs.mutedForeground,
+                color:
+                    _skip > 0 ? shadcnCs.foreground : shadcnCs.mutedForeground,
               ),
             ),
           ),

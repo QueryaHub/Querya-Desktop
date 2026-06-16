@@ -51,7 +51,8 @@ class _FakePathProvider extends PathProviderPlatform {
   Future<List<String>?> getExternalCachePaths() async => [_root];
 
   @override
-  Future<List<String>?> getExternalStoragePaths({StorageDirectory? type}) async =>
+  Future<List<String>?> getExternalStoragePaths(
+          {StorageDirectory? type}) async =>
       [_root];
 
   @override
@@ -103,7 +104,8 @@ void main() {
               themeMode: ThemeMode.dark,
               home: material.SizedBox.expand(
                 child: ConnectionsPanel(
-                  onPostgresOpenSqlWorkspace: (_, {database, schema, name, kind}) {},
+                  onPostgresOpenSqlWorkspace: (_,
+                      {database, schema, name, kind}) {},
                 ),
               ),
             ),
@@ -189,7 +191,8 @@ void main() {
           home: material.SizedBox.expand(
             child: ConnectionsPanel(
               skipInitialDbLoadForTest: true,
-              onPostgresOpenSqlWorkspace: (_, {database, schema, name, kind}) {},
+              onPostgresOpenSqlWorkspace: (_,
+                  {database, schema, name, kind}) {},
             ),
           ),
         ),

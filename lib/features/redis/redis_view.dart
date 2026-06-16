@@ -192,15 +192,19 @@ class _RedisViewState extends material.State<RedisView> {
           child: material.Column(
             mainAxisSize: material.MainAxisSize.min,
             children: [
-              material.Icon(material.Icons.error_outline_rounded, size: 48, color: cs.destructive),
+              material.Icon(material.Icons.error_outline_rounded,
+                  size: 48, color: cs.destructive),
               const Gap(16),
               const Text('Connection Error').large().semiBold(),
               const Gap(8),
-              material.SelectableText(err, style: material.TextStyle(color: cs.mutedForeground, fontSize: 13)),
+              material.SelectableText(err,
+                  style: material.TextStyle(
+                      color: cs.mutedForeground, fontSize: 13)),
               const Gap(24),
               OutlineButton(
                 onPressed: _load,
-                leading: const material.Icon(material.Icons.refresh_rounded, size: 18),
+                leading: const material.Icon(material.Icons.refresh_rounded,
+                    size: 18),
                 child: const Text('Retry'),
               ),
             ],
@@ -240,7 +244,12 @@ class _RedisViewState extends material.State<RedisView> {
                 ),
                 const Gap(24),
                 _sectionCard(context, 'Server', info['Server'], keys: const [
-                  'redis_version', 'redis_mode', 'os', 'tcp_port', 'uptime_in_days', 'config_file',
+                  'redis_version',
+                  'redis_mode',
+                  'os',
+                  'tcp_port',
+                  'uptime_in_days',
+                  'config_file',
                 ]),
                 const Gap(12),
                 material.LayoutBuilder(
@@ -252,10 +261,15 @@ class _RedisViewState extends material.State<RedisView> {
                         children: [
                           _sectionCard(context, 'Clients', info['Clients']),
                           const Gap(12),
-                          _sectionCard(context, 'Persistence', info['Persistence'], keys: const [
-                            'rdb_bgsave_in_progress', 'rdb_last_save_time', 'rdb_last_bgsave_status',
-                            'aof_enabled', 'aof_last_rewrite_time_sec',
-                          ]),
+                          _sectionCard(
+                              context, 'Persistence', info['Persistence'],
+                              keys: const [
+                                'rdb_bgsave_in_progress',
+                                'rdb_last_save_time',
+                                'rdb_last_bgsave_status',
+                                'aof_enabled',
+                                'aof_last_rewrite_time_sec',
+                              ]),
                         ],
                       );
                     }
@@ -263,14 +277,20 @@ class _RedisViewState extends material.State<RedisView> {
                       crossAxisAlignment: material.CrossAxisAlignment.start,
                       children: [
                         material.Expanded(
-                          child: _sectionCard(context, 'Clients', info['Clients']),
+                          child:
+                              _sectionCard(context, 'Clients', info['Clients']),
                         ),
                         const Gap(16),
                         material.Expanded(
-                          child: _sectionCard(context, 'Persistence', info['Persistence'], keys: const [
-                            'rdb_bgsave_in_progress', 'rdb_last_save_time', 'rdb_last_bgsave_status',
-                            'aof_enabled', 'aof_last_rewrite_time_sec',
-                          ]),
+                          child: _sectionCard(
+                              context, 'Persistence', info['Persistence'],
+                              keys: const [
+                                'rdb_bgsave_in_progress',
+                                'rdb_last_save_time',
+                                'rdb_last_bgsave_status',
+                                'aof_enabled',
+                                'aof_last_rewrite_time_sec',
+                              ]),
                         ),
                       ],
                     );
@@ -298,7 +318,8 @@ class _RedisViewState extends material.State<RedisView> {
             color: cs.primary.withValues(alpha: 0.12),
             borderRadius: material.BorderRadius.circular(12),
           ),
-          child: material.Icon(material.Icons.memory_rounded, size: 28, color: cs.primary),
+          child: material.Icon(material.Icons.memory_rounded,
+              size: 28, color: cs.primary),
         ),
         const Gap(16),
         material.Expanded(
@@ -309,23 +330,24 @@ class _RedisViewState extends material.State<RedisView> {
               Text(widget.connectionRow.name).large().semiBold(),
               const Gap(4),
               Text('${widget.connectionRow.host ?? 'localhost'}:${widget.connectionRow.port ?? 6379}')
-                  .muted().small(),
+                  .muted()
+                  .small(),
             ],
           ),
         ),
         if (widget.onBack != null) ...[
           OutlineButton(
             onPressed: widget.onBack,
-            leading: const material.Icon(
-                material.Icons.grid_view_rounded, size: 18),
+            leading:
+                const material.Icon(material.Icons.grid_view_rounded, size: 18),
             child: const Text('Explorer'),
           ),
           const Gap(8),
         ],
         OutlineButton(
           onPressed: _load,
-          leading: const material.Icon(
-              material.Icons.refresh_rounded, size: 18),
+          leading:
+              const material.Icon(material.Icons.refresh_rounded, size: 18),
           child: const Text('Refresh'),
         ),
       ],
@@ -356,9 +378,11 @@ class _RedisViewState extends material.State<RedisView> {
     return '${minutes}m';
   }
 
-  String _labelFor(String key) => _redisFieldLabels[key] ?? key.replaceAll('_', ' ');
+  String _labelFor(String key) =>
+      _redisFieldLabels[key] ?? key.replaceAll('_', ' ');
 
-  material.Widget _summaryChips(material.BuildContext context, RedisInfoSections info) {
+  material.Widget _summaryChips(
+      material.BuildContext context, RedisInfoSections info) {
     final cs = shadcn.Theme.of(context).colorScheme;
     final version = sectionValue(info, 'Server', 'redis_version') ?? '—';
     final uptime = _formatUptime(info);
@@ -368,13 +392,16 @@ class _RedisViewState extends material.State<RedisView> {
     material.Widget chip(String label, String value, material.IconData icon) {
       return material.Expanded(
         child: material.ConstrainedBox(
-          constraints: const material.BoxConstraints(minHeight: _summaryChipHeight),
+          constraints:
+              const material.BoxConstraints(minHeight: _summaryChipHeight),
           child: material.Container(
-            padding: const material.EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const material.EdgeInsets.symmetric(
+                horizontal: 16, vertical: 12),
             decoration: material.BoxDecoration(
               color: cs.card,
               borderRadius: material.BorderRadius.circular(10),
-              border: material.Border.all(color: cs.border.withValues(alpha: 0.5)),
+              border:
+                  material.Border.all(color: cs.border.withValues(alpha: 0.5)),
             ),
             child: material.Row(
               crossAxisAlignment: material.CrossAxisAlignment.start,
@@ -412,6 +439,7 @@ class _RedisViewState extends material.State<RedisView> {
         ),
       );
     }
+
     return material.Row(
       crossAxisAlignment: material.CrossAxisAlignment.start,
       children: [
@@ -419,7 +447,8 @@ class _RedisViewState extends material.State<RedisView> {
         const Gap(12),
         chip('Uptime', uptime, material.Icons.schedule_rounded),
         const Gap(12),
-        chip('Clients', '$clients / $maxClients', material.Icons.people_outline_rounded),
+        chip('Clients', '$clients / $maxClients',
+            material.Icons.people_outline_rounded),
         const Gap(12),
         chip('Ops/s', '$ops', material.Icons.speed_rounded),
       ],
@@ -475,10 +504,13 @@ class _RedisViewState extends material.State<RedisView> {
     );
   }
 
-  material.Widget _memoryCard(material.BuildContext context, RedisInfoSections info) {
+  material.Widget _memoryCard(
+      material.BuildContext context, RedisInfoSections info) {
     final usedHuman = sectionValue(info, 'Memory', 'used_memory_human') ?? '—';
-    final peakHuman = sectionValue(info, 'Memory', 'used_memory_peak_human') ?? '—';
-    final frag = sectionDouble(info, 'Memory', 'mem_fragmentation_ratio') ?? 0.0;
+    final peakHuman =
+        sectionValue(info, 'Memory', 'used_memory_peak_human') ?? '—';
+    final frag =
+        sectionDouble(info, 'Memory', 'mem_fragmentation_ratio') ?? 0.0;
     final rss = sectionValue(info, 'Memory', 'used_memory_rss_human') ?? '—';
     return _card(
       context,
@@ -498,13 +530,15 @@ class _RedisViewState extends material.State<RedisView> {
     );
   }
 
-  material.Widget _statsCard(material.BuildContext context, RedisInfoSections info) {
+  material.Widget _statsCard(
+      material.BuildContext context, RedisInfoSections info) {
     final ops = sectionInt(info, 'Stats', 'instantaneous_ops_per_sec') ?? 0;
     final totalOps = sectionInt(info, 'Stats', 'total_commands_processed');
     final keyspaceHits = sectionInt(info, 'Stats', 'keyspace_hits') ?? 0;
     final keyspaceMisses = sectionInt(info, 'Stats', 'keyspace_misses') ?? 0;
     final total = keyspaceHits + keyspaceMisses;
-    final hitRate = total > 0 ? (keyspaceHits / total * 100).toStringAsFixed(1) : '—';
+    final hitRate =
+        total > 0 ? (keyspaceHits / total * 100).toStringAsFixed(1) : '—';
     return _card(
       context,
       'Performance',
@@ -513,8 +547,10 @@ class _RedisViewState extends material.State<RedisView> {
         [
           _metricRow(context, 'Ops/s', '$ops'),
           _metricRow(context, 'Total commands', totalOps?.toString() ?? '—'),
-          _metricRow(context, 'Hits / misses', '$keyspaceHits / $keyspaceMisses'),
-          _metricRow(context, 'Hit rate', hitRate == '—' ? hitRate : '$hitRate%'),
+          _metricRow(
+              context, 'Hits / misses', '$keyspaceHits / $keyspaceMisses'),
+          _metricRow(
+              context, 'Hit rate', hitRate == '—' ? hitRate : '$hitRate%'),
         ],
         stretch: true,
       ),
@@ -523,14 +559,16 @@ class _RedisViewState extends material.State<RedisView> {
     );
   }
 
-  material.Widget _keyspaceCard(material.BuildContext context, RedisInfoSections info) {
+  material.Widget _keyspaceCard(
+      material.BuildContext context, RedisInfoSections info) {
     final keyspace = info['Keyspace'];
     final rows = <material.Widget>[];
     if (keyspace != null && keyspace.isNotEmpty) {
       final entries = keyspace.entries.toList()
         ..sort((a, b) => a.key.compareTo(b.key));
       for (final entry in entries) {
-        rows.add(_metricRow(context, entry.key, _formatKeyspaceEntry(entry.value)));
+        rows.add(
+            _metricRow(context, entry.key, _formatKeyspaceEntry(entry.value)));
       }
     } else {
       rows.add(
@@ -581,7 +619,8 @@ class _RedisViewState extends material.State<RedisView> {
     return '${(seconds / 86400).toStringAsFixed(1)}d';
   }
 
-  material.Widget _cpuCard(material.BuildContext context, RedisInfoSections info) {
+  material.Widget _cpuCard(
+      material.BuildContext context, RedisInfoSections info) {
     final sys = sectionDouble(info, 'CPU', 'used_cpu_sys_main_thread');
     final user = sectionDouble(info, 'CPU', 'used_cpu_user_main_thread');
     return _card(
@@ -600,10 +639,16 @@ class _RedisViewState extends material.State<RedisView> {
     );
   }
 
-  material.Widget _sectionCard(material.BuildContext context, String title, Map<String, String>? data, {List<String>? keys}) {
+  material.Widget _sectionCard(
+      material.BuildContext context, String title, Map<String, String>? data,
+      {List<String>? keys}) {
     if (data == null || data.isEmpty) return const material.SizedBox.shrink();
     final entries = keys != null
-        ? keys.map((k) => MapEntry(k, data[k])).where((e) => e.value != null).map((e) => MapEntry(e.key, e.value as String)).toList()
+        ? keys
+            .map((k) => MapEntry(k, data[k]))
+            .where((e) => e.value != null)
+            .map((e) => MapEntry(e.key, e.value as String))
+            .toList()
         : data.entries.toList();
     if (entries.isEmpty) return const material.SizedBox.shrink();
     return _card(
@@ -623,7 +668,9 @@ class _RedisViewState extends material.State<RedisView> {
     if (entries.length <= 4) {
       return material.Column(
         crossAxisAlignment: material.CrossAxisAlignment.stretch,
-        children: [for (final e in entries) _metricRow(context, e.key, e.value)],
+        children: [
+          for (final e in entries) _metricRow(context, e.key, e.value)
+        ],
       );
     }
     final mid = (entries.length / 2).ceil();
@@ -635,21 +682,26 @@ class _RedisViewState extends material.State<RedisView> {
         material.Expanded(
           child: material.Column(
             crossAxisAlignment: material.CrossAxisAlignment.stretch,
-            children: [for (final e in left) _metricRow(context, e.key, e.value)],
+            children: [
+              for (final e in left) _metricRow(context, e.key, e.value)
+            ],
           ),
         ),
         const Gap(24),
         material.Expanded(
           child: material.Column(
             crossAxisAlignment: material.CrossAxisAlignment.stretch,
-            children: [for (final e in right) _metricRow(context, e.key, e.value)],
+            children: [
+              for (final e in right) _metricRow(context, e.key, e.value)
+            ],
           ),
         ),
       ],
     );
   }
 
-  material.Widget _errorStatsCard(material.BuildContext context, RedisInfoSections info) {
+  material.Widget _errorStatsCard(
+      material.BuildContext context, RedisInfoSections info) {
     final data = info['Errorstats'];
     if (data == null || data.isEmpty) return const material.SizedBox.shrink();
     return _card(
@@ -665,7 +717,8 @@ class _RedisViewState extends material.State<RedisView> {
     );
   }
 
-  material.Widget _metricRow(material.BuildContext context, String label, String value) {
+  material.Widget _metricRow(
+      material.BuildContext context, String label, String value) {
     final cs = shadcn.Theme.of(context).colorScheme;
     return material.Padding(
       padding: const material.EdgeInsets.symmetric(vertical: 6),

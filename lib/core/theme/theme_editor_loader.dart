@@ -7,7 +7,8 @@ import 'package:querya_desktop/core/theme/theme_editor_draft.dart';
 
 /// Builds a [ThemeEditorDraft] from the active theme selection.
 abstract final class ThemeEditorLoader {
-  static Future<ThemeEditorDraft> fromController(ThemeController controller) async {
+  static Future<ThemeEditorDraft> fromController(
+      ThemeController controller) async {
     final selectedId = controller.effectiveSelectedThemeId;
     final definition = _definitionForId(controller, selectedId);
     final readOnlySource = definition?.source == ThemeSource.builtin;

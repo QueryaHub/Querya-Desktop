@@ -44,7 +44,8 @@ void main() {
       expect(manifest.tags, ['neon']);
     });
 
-    test('fromThemeDefinition falls back to content hash and 0.0.0 version', () {
+    test('fromThemeDefinition falls back to content hash and 0.0.0 version',
+        () {
       const definition = ThemeDefinition(
         id: 'minimal',
         name: 'Minimal',

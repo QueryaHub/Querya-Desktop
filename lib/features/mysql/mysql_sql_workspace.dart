@@ -27,8 +27,7 @@ class MysqlSqlWorkspace extends material.StatefulWidget {
   final ConnectionRow connectionRow;
 
   @override
-  material.State<MysqlSqlWorkspace> createState() =>
-      _MysqlSqlWorkspaceState();
+  material.State<MysqlSqlWorkspace> createState() => _MysqlSqlWorkspaceState();
 }
 
 class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
@@ -101,12 +100,14 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
     _lease = lease;
   }
 
-  Duration? _statementTimeout() =>
-      _queryTimeoutSeconds == null ? null : Duration(seconds: _queryTimeoutSeconds!);
+  Duration? _statementTimeout() => _queryTimeoutSeconds == null
+      ? null
+      : Duration(seconds: _queryTimeoutSeconds!);
 
   @override
   void dispose() {
-    SqlWorkspaceSettingsRevision.listenable.removeListener(_appSettingsListener);
+    SqlWorkspaceSettingsRevision.listenable
+        .removeListener(_appSettingsListener);
     _topFraction.dispose();
     if (_running) {
       MysqlService.instance.interrupt(
@@ -147,7 +148,8 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       }
 
       final to = _statementTimeout();
-      final rs = await conn.executeWithTimeout(userSql, timeout: to, iterable: true);
+      final rs =
+          await conn.executeWithTimeout(userSql, timeout: to, iterable: true);
 
       if (!mounted) return;
 
