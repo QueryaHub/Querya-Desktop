@@ -28,12 +28,14 @@ class ThemeFolderWatcher {
   /// and cannot be created.
   Future<void> start() async {
     if (_started) return;
+    _started = true; // Set synchronously to prevent concurrent leaks
 
     final directory = await _themesDirectory();
     if (!await directory.exists()) {
       try {
         await directory.create(recursive: true);
       } on Object catch (error) {
+        _started = false;
         debugPrint(
             'ThemeFolderWatcher: cannot create themes directory ($error)');
         return;
@@ -47,8 +49,8 @@ class ThemeFolderWatcher {
           debugPrint('ThemeFolderWatcher: watch error ($error)');
         },
       );
-      _started = true;
     } on Object catch (error) {
+      _started = false;
       debugPrint('ThemeFolderWatcher: watch unavailable ($error)');
     }
   }

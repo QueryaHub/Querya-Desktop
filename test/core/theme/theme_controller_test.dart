@@ -98,7 +98,6 @@ void main() {
       await themesDir.delete(recursive: true);
     }
     ThemeController.instance.setRegistryServiceForTest(ThemeRegistryService());
-    await ThemeController.instance.load();
   });
 
   test('load defaults to dark preset', () async {
@@ -131,6 +130,7 @@ void main() {
 
   test('resetToDefaults restores dark', () async {
     final c = ThemeController.instance;
+    await c.load();
     await c.setThemeMode(ThemeMode.light);
     await c.resetToDefaults();
     expect(c.themeMode, ThemeMode.dark);
@@ -194,6 +194,7 @@ void main() {
 
   test('clearColorOverrides does not reset theme mode', () async {
     final c = ThemeController.instance;
+    await c.load();
     await c.setThemeMode(ThemeMode.light);
     await c.setWorkbenchColor('editor.background', const Color(0xFF111111));
     await c.clearColorOverrides();
