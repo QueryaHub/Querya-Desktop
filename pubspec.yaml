@@ -39,6 +39,9 @@ dependency_overrides:
   # Patched ToastLayer (fixes InheritedNotifier crash on resize / hot reload).
   shadcn_flutter:
     path: third_party/shadcn_flutter
+  # Linux -Werror: fix uninitialized rates[0] in refresh_rate 1.0.2.
+  refresh_rate:
+    path: third_party/refresh_rate
 
 flutter:
   uses-material-design: true
