@@ -54,7 +54,6 @@ void main() {
     if (await themesDir.exists()) {
       await themesDir.delete(recursive: true);
     }
-    await ThemeController.instance.load();
   });
 
   tearDownAll(() async {
