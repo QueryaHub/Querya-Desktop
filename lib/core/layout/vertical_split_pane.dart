@@ -13,7 +13,7 @@ class SplitPanePair extends StatelessWidget {
 }
 
 /// Vertical split whose drag updates [fraction] without rebuilding [top]/[bottom].
-class VerticalSplitPane extends StatefulWidget {
+class VerticalSplitPane extends StatelessWidget {
   const VerticalSplitPane({
     super.key,
     required this.fraction,
@@ -32,40 +32,35 @@ class VerticalSplitPane extends StatefulWidget {
   final Key? handleKey;
 
   @override
-  State<VerticalSplitPane> createState() => _VerticalSplitPaneState();
-}
-
-class _VerticalSplitPaneState extends State<VerticalSplitPane> {
-  final GlobalKey _columnKey = GlobalKey();
-
-  @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<double>(
-      valueListenable: widget.fraction,
-      builder: (context, value, panes) {
-        final pair = panes! as SplitPanePair;
-        final topFlex = (value * 100).round().clamp(20, 80).toInt();
-        final bottomFlex = 100 - topFlex;
-        return Column(
-          key: _columnKey,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(flex: topFlex, child: pair.top),
-            _VerticalSplitHandle(
-              key: widget.handleKey,
-              onDrag: (dy) {
-                final box = _columnKey.currentContext?.findRenderObject() as RenderBox?;
-                final totalHeight = box?.size.height ?? 0;
-                if (totalHeight <= 0) return;
-                widget.fraction.value = (widget.fraction.value + dy / totalHeight)
-                    .clamp(widget.minFraction, widget.maxFraction);
-              },
-            ),
-            Expanded(flex: bottomFlex, child: pair.bottom),
-          ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final totalHeight = constraints.maxHeight;
+        return ValueListenableBuilder<double>(
+          valueListenable: fraction,
+          builder: (context, value, panes) {
+            final pair = panes! as SplitPanePair;
+            final topFlex = (value * 100).round().clamp(20, 80).toInt();
+            final bottomFlex = 100 - topFlex;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(flex: topFlex, child: pair.top),
+                _VerticalSplitHandle(
+                  key: handleKey,
+                  onDrag: (dy) {
+                    if (totalHeight <= 0) return;
+                    fraction.value = (fraction.value + dy / totalHeight)
+                        .clamp(minFraction, maxFraction);
+                  },
+                ),
+                Expanded(flex: bottomFlex, child: pair.bottom),
+              ],
+            );
+          },
+          child: SplitPanePair(top: top, bottom: bottom),
         );
       },
-      child: SplitPanePair(top: widget.top, bottom: widget.bottom),
     );
   }
 }

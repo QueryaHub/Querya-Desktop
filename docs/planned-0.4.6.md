@@ -1,6 +1,6 @@
-# Planned release 0.4.5 — SQLite Database Connector
+# Shipped release 0.4.6 — SQLite Database Connector
 
-**Status:** **Planned** (GitHub milestone [**0.4.5**](https://github.com/QueryaHub/Querya-Desktop/milestones), epic **#194**).  
+**Status:** **Shipped** (GitHub milestone [**0.4.6**](https://github.com/QueryaHub/Querya-Desktop/milestones), epic **#194**).  
 **Depends on:** **0.4.4** UI motion polish (shipped).
 
 Theme: Add support for local SQLite database file connections. This allows users to select `.db`, `.sqlite`, or `.sqlite3` files from their disk, browse their schema, run arbitrary SQL queries in a dedicated workspace, and view paginated table grids.
@@ -29,8 +29,8 @@ Theme: Add support for local SQLite database file connections. This allows users
 4. SQL-S5 — SQLite SQL workspace editor and paginated data table
 5. SQL-S6 — Tests and verification
 
-## Out of scope for 0.4.5
+## Out of scope for 0.4.6
 
-- **SQLCipher / Encrypted SQLite files** — deferred to **0.4.6+** (requires compiling/linking SQLCipher binary dependencies).
+- **SQLCipher / Encrypted SQLite files** — deferred to **0.4.7+** (requires compiling/linking SQLCipher binary dependencies).
 - **In-Memory SQLite Database connections** — deferred.
 - **Local DB migration to another engine**.
