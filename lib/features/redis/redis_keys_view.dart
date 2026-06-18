@@ -277,7 +277,7 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
   Widget _buildStatusBar(ColorScheme cs) {
     final shadcnCs = shadcn.Theme.of(context).colorScheme;
     return material.Container(
-      height: 44,
+      constraints: const material.BoxConstraints(minHeight: 44),
       padding: const material.EdgeInsets.symmetric(horizontal: 16),
       decoration: material.BoxDecoration(
         color: shadcnCs.muted.withValues(alpha: 0.15),

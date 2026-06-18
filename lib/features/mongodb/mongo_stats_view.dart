@@ -765,10 +765,12 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
   Map<String, String> _extractServerInfo(Map<String, dynamic> status) {
     final result = <String, String>{};
     if (status['host'] != null) result['Host'] = status['host'].toString();
-    if (status['version'] != null)
+    if (status['version'] != null) {
       result['Version'] = status['version'].toString();
-    if (status['process'] != null)
+    }
+    if (status['process'] != null) {
       result['Process'] = status['process'].toString();
+    }
     final uptime = _getInt(status, 'uptime');
     if (uptime != null) {
       result['Uptime'] = '${_formatUptime(uptime)} ($uptime s)';
@@ -791,12 +793,15 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     final result = <String, String>{};
     final repl = status['repl'] as Map<String, dynamic>?;
     if (repl != null) {
-      if (repl['setName'] != null)
+      if (repl['setName'] != null) {
         result['Replica set'] = repl['setName'].toString();
-      if (repl['ismaster'] != null)
+      }
+      if (repl['ismaster'] != null) {
         result['Is master'] = repl['ismaster'].toString();
-      if (repl['secondary'] != null)
+      }
+      if (repl['secondary'] != null) {
         result['Secondary'] = repl['secondary'].toString();
+      }
     }
     return result;
   }
@@ -819,8 +824,9 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
   String _formatBytes(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024)
+    if (bytes < 1024 * 1024 * 1024) {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 }

@@ -375,87 +375,83 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context);
 
-    return material.LayoutBuilder(
-      builder: (context, constraints) {
-        return material.CallbackShortcuts(
-          bindings: {
-            const material.SingleActivator(LogicalKeyboardKey.f5): () {
-              if (!_running) _execute();
-            },
-          },
-          child: material.Focus(
-            autofocus: true,
-            child: VerticalSplitPane(
-              fraction: _topFraction,
-              maxFraction: 0.85,
-              top: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _SqlToolbar(
-                    sessionDatabase: _effectiveSessionDatabase(),
-                    onExecute: _running ? null : _execute,
-                    running: _running,
-                    autocommit: _autocommit,
-                    onAutocommitChanged: (v) => setState(() => _autocommit = v),
-                    queryTimeoutSeconds: _queryTimeoutSeconds,
-                    onQueryTimeoutChanged: _onStmtTimeoutChanged,
-                    onOpenPreferences: () => showPreferencesDialog(context),
-                    onOpenHistory: widget.connectionRow.id != null && !_running
-                        ? () {
-                            showSqlQueryHistoryDialog(
-                              context: context,
-                              connectionId: widget.connectionRow.id!,
-                              databaseName: _effectiveSessionDatabase(),
-                              sqlController: _sqlController,
-                            );
-                          }
-                        : null,
-                    txOpen: _txOpen,
-                    onBegin: _running ? null : () => _runTxCommand('BEGIN'),
-                    onCommit: _running ? null : () => _runTxCommand('COMMIT'),
-                    onRollback:
-                        _running ? null : () => _runTxCommand('ROLLBACK'),
-                  ),
-                  const Divider(height: 1),
-                  Expanded(
-                    child: QueryEditorTab(
-                      controller: _sqlController,
-                      fontSize: _editorFontSize,
-                    ),
-                  ),
-                ],
-              ),
-              bottom: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  material.Container(
-                    height: 44,
-                    padding: const material.EdgeInsets.symmetric(
-                      horizontal: 12,
-                    ),
-                    decoration: material.BoxDecoration(
-                      color: theme.colorScheme.muted.withValues(alpha: 0.6),
-                    ),
-                    alignment: material.Alignment.centerLeft,
-                    child: const Text('Data Output').semiBold().small(),
-                  ),
-                  const Divider(height: 1),
-                  Expanded(
-                    child: ResultsTab(
-                      columns: _columns,
-                      rows: _rows,
-                      errorMessage: _error,
-                      isLoading: _running,
-                      affectedRows: _affectedRows,
-                      statusLine: _statusLine,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
+    return material.CallbackShortcuts(
+      bindings: {
+        const material.SingleActivator(LogicalKeyboardKey.f5): () {
+          if (!_running) _execute();
+        },
       },
+      child: material.Focus(
+        autofocus: true,
+        child: VerticalSplitPane(
+          fraction: _topFraction,
+          maxFraction: 0.85,
+          top: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _SqlToolbar(
+                sessionDatabase: _effectiveSessionDatabase(),
+                onExecute: _running ? null : _execute,
+                running: _running,
+                autocommit: _autocommit,
+                onAutocommitChanged: (v) => setState(() => _autocommit = v),
+                queryTimeoutSeconds: _queryTimeoutSeconds,
+                onQueryTimeoutChanged: _onStmtTimeoutChanged,
+                onOpenPreferences: () => showPreferencesDialog(context),
+                onOpenHistory: widget.connectionRow.id != null && !_running
+                    ? () {
+                        showSqlQueryHistoryDialog(
+                          context: context,
+                          connectionId: widget.connectionRow.id!,
+                          databaseName: _effectiveSessionDatabase(),
+                          sqlController: _sqlController,
+                        );
+                      }
+                    : null,
+                txOpen: _txOpen,
+                onBegin: _running ? null : () => _runTxCommand('BEGIN'),
+                onCommit: _running ? null : () => _runTxCommand('COMMIT'),
+                onRollback:
+                    _running ? null : () => _runTxCommand('ROLLBACK'),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: QueryEditorTab(
+                  controller: _sqlController,
+                  fontSize: _editorFontSize,
+                ),
+              ),
+            ],
+          ),
+          bottom: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              material.Container(
+                constraints: const material.BoxConstraints(minHeight: 44),
+                padding: const material.EdgeInsets.symmetric(
+                  horizontal: 12,
+                ),
+                decoration: material.BoxDecoration(
+                  color: theme.colorScheme.muted.withValues(alpha: 0.6),
+                ),
+                alignment: material.Alignment.centerLeft,
+                child: const Text('Data Output').semiBold().small(),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: ResultsTab(
+                  columns: _columns,
+                  rows: _rows,
+                  errorMessage: _error,
+                  isLoading: _running,
+                  affectedRows: _affectedRows,
+                  statusLine: _statusLine,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

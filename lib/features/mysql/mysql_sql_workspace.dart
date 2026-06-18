@@ -235,81 +235,77 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context);
 
-    return material.LayoutBuilder(
-      builder: (context, constraints) {
-        return material.CallbackShortcuts(
-          bindings: {
-            const material.SingleActivator(LogicalKeyboardKey.f5): () {
-              if (!_running) {
-                unawaited(_execute());
-              }
-            },
-          },
-          child: material.Focus(
-            autofocus: true,
-            child: VerticalSplitPane(
-              fraction: _topFraction,
-              maxFraction: 0.85,
-              top: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _MysqlSqlToolbar(
-                    onExecute: _running ? null : _execute,
-                    running: _running,
-                    queryTimeoutSeconds: _queryTimeoutSeconds,
-                    onQueryTimeoutChanged: _onStmtTimeoutChanged,
-                    onOpenPreferences: () => showPreferencesDialog(context),
-                    onOpenHistory: widget.connectionRow.id != null && !_running
-                        ? () {
-                            showSqlQueryHistoryDialog(
-                              context: context,
-                              connectionId: widget.connectionRow.id!,
-                              databaseName: widget.connectionRow.databaseName,
-                              sqlController: _sqlController,
-                            );
-                          }
-                        : null,
-                  ),
-                  const Divider(height: 1),
-                  Expanded(
-                    child: QueryEditorTab(
-                      controller: _sqlController,
-                      fontSize: _editorFontSize,
-                    ),
-                  ),
-                ],
-              ),
-              bottom: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  material.Container(
-                    height: 44,
-                    padding: const material.EdgeInsets.symmetric(
-                      horizontal: 12,
-                    ),
-                    decoration: material.BoxDecoration(
-                      color: theme.colorScheme.muted.withValues(alpha: 0.6),
-                    ),
-                    alignment: material.Alignment.centerLeft,
-                    child: const Text('Data Output').semiBold().small(),
-                  ),
-                  const Divider(height: 1),
-                  Expanded(
-                    child: ResultsTab(
-                      columns: _columns,
-                      rows: _rows,
-                      errorMessage: _error,
-                      isLoading: _running,
-                      affectedRows: _affectedRows,
-                      statusLine: _statusLine,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
+    return material.CallbackShortcuts(
+      bindings: {
+        const material.SingleActivator(LogicalKeyboardKey.f5): () {
+          if (!_running) {
+            unawaited(_execute());
+          }
+        },
       },
+      child: material.Focus(
+        autofocus: true,
+        child: VerticalSplitPane(
+          fraction: _topFraction,
+          maxFraction: 0.85,
+          top: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _MysqlSqlToolbar(
+                onExecute: _running ? null : _execute,
+                running: _running,
+                queryTimeoutSeconds: _queryTimeoutSeconds,
+                onQueryTimeoutChanged: _onStmtTimeoutChanged,
+                onOpenPreferences: () => showPreferencesDialog(context),
+                onOpenHistory: widget.connectionRow.id != null && !_running
+                    ? () {
+                        showSqlQueryHistoryDialog(
+                          context: context,
+                          connectionId: widget.connectionRow.id!,
+                          databaseName: widget.connectionRow.databaseName,
+                          sqlController: _sqlController,
+                        );
+                      }
+                    : null,
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: QueryEditorTab(
+                  controller: _sqlController,
+                  fontSize: _editorFontSize,
+                ),
+              ),
+            ],
+          ),
+          bottom: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              material.Container(
+                constraints: const material.BoxConstraints(minHeight: 44),
+                padding: const material.EdgeInsets.symmetric(
+                  horizontal: 12,
+                ),
+                decoration: material.BoxDecoration(
+                  color: theme.colorScheme.muted.withValues(alpha: 0.6),
+                ),
+                alignment: material.Alignment.centerLeft,
+                child: const Text('Data Output').semiBold().small(),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: ResultsTab(
+                  columns: _columns,
+                  rows: _rows,
+                  errorMessage: _error,
+                  isLoading: _running,
+                  affectedRows: _affectedRows,
+                  statusLine: _statusLine,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
