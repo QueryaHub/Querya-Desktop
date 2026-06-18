@@ -180,15 +180,17 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context);
 
-    return material.CallbackShortcuts(
-      bindings: {
-        const material.SingleActivator(LogicalKeyboardKey.f5): () {
-          if (!_running) {
-            unawaited(_execute());
-          }
-        },
-      },
-      child: material.Focus(
+    return material.LayoutBuilder(
+      builder: (context, constraints) {
+        return material.CallbackShortcuts(
+          bindings: {
+            const material.SingleActivator(LogicalKeyboardKey.f5): () {
+              if (!_running) {
+                unawaited(_execute());
+              }
+            },
+          },
+          child: material.Focus(
         autofocus: true,
         child: VerticalSplitPane(
           fraction: _topFraction,
@@ -249,6 +251,8 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
           ),
         ),
       ),
+    );
+      },
     );
   }
 }
