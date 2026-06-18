@@ -99,8 +99,7 @@ class RefreshRate {
   ///
   /// Commonly used when a gesture or animation starts — the display snaps to
   /// high-Hz immediately and returns to the preferred rate after the duration.
-  static void boost(Duration duration) =>
-      _api.boost(duration.inMilliseconds);
+  static void boost(Duration duration) => _api.boost(duration.inMilliseconds);
 
   /// Boosts the refresh rate for the lifetime of an [AnimationController].
   ///
@@ -113,7 +112,7 @@ class RefreshRate {
           status == AnimationStatus.reverse) {
         _api.boost(controller.duration?.inMilliseconds ?? 500);
       } else if (status == AnimationStatus.completed ||
-                 status == AnimationStatus.dismissed) {
+          status == AnimationStatus.dismissed) {
         controller.removeStatusListener(statusListener);
       }
     };
@@ -185,14 +184,12 @@ class RefreshRate {
   ///
   /// Returns `false` until a successful [refresh] is completed and the device
   /// is an iPhone/iPad with a ProMotion display.
-  static bool get isProMotionReady =>
-      _cachedInfo.iosProMotionEnabled == true;
+  static bool get isProMotionReady => _cachedInfo.iosProMotionEnabled == true;
 
   /// Whether the device is currently in Low Power Mode.
   ///
   /// Defaults to `false` when the value cannot be determined.
-  static bool get isLowPowerMode =>
-      _cachedInfo.isLowPowerMode ?? false;
+  static bool get isLowPowerMode => _cachedInfo.isLowPowerMode ?? false;
 
   /// The current thermal state of the device.
   ///
@@ -216,6 +213,7 @@ class RefreshRate {
     void handle(DisplayInfoMessage msg) {
       _cachedInfo = DisplayInfo.fromMessage(msg);
     }
+
     void handleError(Object e) {
       assert(() {
         debugPrint('RefreshRate: _refreshInfo error: $e');

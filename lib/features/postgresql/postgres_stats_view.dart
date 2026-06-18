@@ -208,8 +208,7 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
                 material.Row(
                   crossAxisAlignment: material.CrossAxisAlignment.start,
                   children: [
-                    material.Expanded(
-                        child: _connectionsCard(context, stats)),
+                    material.Expanded(child: _connectionsCard(context, stats)),
                     const Gap(16),
                     material.Expanded(
                         child: _serverSettingsCard(context, stats)),
@@ -261,16 +260,14 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
                     ),
                     const Gap(16),
                     material.ConstrainedBox(
-                      constraints:
-                          const material.BoxConstraints(maxWidth: 420),
+                      constraints: const material.BoxConstraints(maxWidth: 420),
                       child: material.Column(
                         crossAxisAlignment: material.CrossAxisAlignment.start,
                         mainAxisSize: material.MainAxisSize.min,
                         children: [
                           Text(widget.connectionRow.name).large().semiBold(),
                           const Gap(4),
-                          Text(
-                                  '${widget.connectionRow.host ?? 'localhost'}:${widget.connectionRow.port ?? 5432}')
+                          Text('${widget.connectionRow.host ?? 'localhost'}:${widget.connectionRow.port ?? 5432}')
                               .muted()
                               .small(),
                         ],
@@ -280,8 +277,8 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
                 ),
                 OutlineButton(
                   onPressed: _load,
-                  leading: const material.Icon(
-                      material.Icons.refresh_rounded, size: 18),
+                  leading: const material.Icon(material.Icons.refresh_rounded,
+                      size: 18),
                   child: const Text('Refresh'),
                 ),
               ],
@@ -307,8 +304,7 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
     final dbSize = stats['current_db_size'];
     final dbSizeStr = dbSize != null ? _formatBytes(dbSize as int) : '—';
 
-    material.Widget chip(
-        String label, String value, material.IconData icon) {
+    material.Widget chip(String label, String value, material.IconData icon) {
       return material.Expanded(
         child: material.ConstrainedBox(
           constraints: const material.BoxConstraints(
@@ -320,8 +316,8 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
             decoration: material.BoxDecoration(
               color: cs.card,
               borderRadius: material.BorderRadius.circular(10),
-              border: material.Border.all(
-                  color: cs.border.withValues(alpha: 0.5)),
+              border:
+                  material.Border.all(color: cs.border.withValues(alpha: 0.5)),
             ),
             child: material.Row(
               crossAxisAlignment: material.CrossAxisAlignment.start,
@@ -374,8 +370,8 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
     );
   }
 
-  material.Widget _card(material.BuildContext context, String title,
-      material.Widget body,
+  material.Widget _card(
+      material.BuildContext context, String title, material.Widget body,
       {double? minHeight}) {
     final cs = shadcn.Theme.of(context).colorScheme;
     return material.Container(
@@ -387,8 +383,7 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
       decoration: material.BoxDecoration(
         color: cs.card,
         borderRadius: material.BorderRadius.circular(12),
-        border:
-            material.Border.all(color: cs.border.withValues(alpha: 0.4)),
+        border: material.Border.all(color: cs.border.withValues(alpha: 0.4)),
       ),
       child: material.Column(
         mainAxisSize: material.MainAxisSize.min,
@@ -450,8 +445,7 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
 
   material.Widget _databasesCard(
       material.BuildContext context, Map<String, dynamic> stats) {
-    final databases =
-        stats['databases'] as List<Map<String, dynamic>>? ?? [];
+    final databases = stats['databases'] as List<Map<String, dynamic>>? ?? [];
     if (databases.isEmpty) return const material.SizedBox.shrink();
 
     final cs = shadcn.Theme.of(context).colorScheme;
@@ -472,21 +466,17 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
                 material.SizedBox(
                     width: 80, child: const Text('Size').muted().xSmall()),
                 material.SizedBox(
-                    width: 70,
-                    child: const Text('Backends').muted().xSmall()),
+                    width: 70, child: const Text('Backends').muted().xSmall()),
                 material.SizedBox(
-                    width: 80,
-                    child: const Text('Commits').muted().xSmall()),
+                    width: 80, child: const Text('Commits').muted().xSmall()),
                 material.SizedBox(
-                    width: 80,
-                    child: const Text('Rollbacks').muted().xSmall()),
+                    width: 80, child: const Text('Rollbacks').muted().xSmall()),
                 material.Expanded(
                     child: const Text('Hit ratio').muted().xSmall()),
               ],
             ),
           ),
-          material.Divider(
-              height: 1, color: cs.border.withValues(alpha: 0.3)),
+          material.Divider(height: 1, color: cs.border.withValues(alpha: 0.3)),
           for (final db in databases)
             material.Padding(
               padding: const material.EdgeInsets.symmetric(vertical: 5),
@@ -503,28 +493,21 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
                   ),
                   material.SizedBox(
                     width: 80,
-                    child: Text(_formatBytes(
-                            (db['size'] as int?) ?? 0))
+                    child: Text(_formatBytes((db['size'] as int?) ?? 0))
                         .muted()
                         .xSmall(),
                   ),
                   material.SizedBox(
                     width: 70,
-                    child: Text('${db['numbackends'] ?? 0}')
-                        .muted()
-                        .xSmall(),
+                    child: Text('${db['numbackends'] ?? 0}').muted().xSmall(),
                   ),
                   material.SizedBox(
                     width: 80,
-                    child: Text('${db['xact_commit'] ?? 0}')
-                        .muted()
-                        .xSmall(),
+                    child: Text('${db['xact_commit'] ?? 0}').muted().xSmall(),
                   ),
                   material.SizedBox(
                     width: 80,
-                    child: Text('${db['xact_rollback'] ?? 0}')
-                        .muted()
-                        .xSmall(),
+                    child: Text('${db['xact_rollback'] ?? 0}').muted().xSmall(),
                   ),
                   material.Expanded(
                     child: Text(_hitRatio(db)).muted().xSmall(),
@@ -548,8 +531,8 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
           material.SizedBox(width: 160, child: Text(key).muted().small()),
           material.Expanded(
               child: material.SelectableText(value,
-                  style: material.TextStyle(
-                      fontSize: 13, color: cs.foreground))),
+                  style:
+                      material.TextStyle(fontSize: 13, color: cs.foreground))),
         ],
       ),
     );

@@ -94,8 +94,7 @@ class MongoConnection {
     //    fall back to "admin" (Mongo's default authSource).
     final existingAuthSource = uri.queryParameters['authSource'];
     final hasCredentials =
-        uri.userInfo.isNotEmpty ||
-        (username != null && username!.isNotEmpty);
+        uri.userInfo.isNotEmpty || (username != null && username!.isNotEmpty);
 
     Map<String, String>? newQueryParams;
     if (existingAuthSource == null && hasCredentials) {

@@ -309,8 +309,8 @@ class _QueryaCodeEditorState extends State<QueryaCodeEditor> {
         decoration: material.InputDecoration(
           border: material.InputBorder.none,
           hintText: widget.hintText,
-          contentPadding: widget.contentPadding ??
-              const material.EdgeInsets.all(12),
+          contentPadding:
+              widget.contentPadding ?? const material.EdgeInsets.all(12),
         ),
         onChanged: widget.onChanged,
       );

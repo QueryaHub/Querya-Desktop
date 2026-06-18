@@ -115,7 +115,8 @@ class _MysqlSqlEditorDialogState extends material.State<_MysqlSqlEditorDialog> {
                 child: material.SizedBox(
                   height: 280,
                   child: material.Container(
-                    decoration: SqlEditorChrome.inlineFieldDecorationFromContext(
+                    decoration:
+                        SqlEditorChrome.inlineFieldDecorationFromContext(
                       context,
                     ),
                     child: QueryaCodeEditor(
@@ -132,8 +133,7 @@ class _MysqlSqlEditorDialogState extends material.State<_MysqlSqlEditorDialog> {
               ),
               if (_error != null)
                 material.Padding(
-                  padding:
-                      const material.EdgeInsets.fromLTRB(24, 8, 24, 0),
+                  padding: const material.EdgeInsets.fromLTRB(24, 8, 24, 0),
                   child: material.Text(
                     _error!,
                     style: material.TextStyle(
@@ -146,8 +146,7 @@ class _MysqlSqlEditorDialogState extends material.State<_MysqlSqlEditorDialog> {
                   mainAxisAlignment: material.MainAxisAlignment.end,
                   children: [
                     OutlineButton(
-                      onPressed: () =>
-                          material.Navigator.of(context).pop(),
+                      onPressed: () => material.Navigator.of(context).pop(),
                       child: const Text('Cancel'),
                     ),
                     const Gap(8),

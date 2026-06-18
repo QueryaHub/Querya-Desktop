@@ -9,7 +9,12 @@ import 'package:querya_desktop/features/postgresql/postgres_table_view.dart';
 /// Workspace content for a single PostgreSQL tree object (grid, routine, lists).
 Widget buildPostgresObjectWorkspace({
   required ConnectionRow connection,
-  required ({String database, String schema, String name, PostgresObjectKind kind}) pg,
+  required ({
+    String database,
+    String schema,
+    String name,
+    PostgresObjectKind kind
+  }) pg,
 }) {
   switch (pg.kind) {
     case PostgresObjectKind.table:

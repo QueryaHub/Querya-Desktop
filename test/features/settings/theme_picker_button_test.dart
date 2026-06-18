@@ -71,7 +71,8 @@ void main() {
       expect(find.byType(material.ListView), findsNothing);
     });
 
-    testWidgets('opens scrollable menu and renders visible rows', (tester) async {
+    testWidgets('opens scrollable menu and renders visible rows',
+        (tester) async {
       final themes = _fakeThemes(60);
 
       await tester.pumpWidget(
@@ -224,7 +225,8 @@ void main() {
       );
     });
 
-    testWidgets('builds only a visible subset of 60 theme rows', (tester) async {
+    testWidgets('builds only a visible subset of 60 theme rows',
+        (tester) async {
       final themes = _fakeThemes(60);
 
       await tester.pumpWidget(
@@ -343,7 +345,8 @@ void main() {
       );
     });
 
-    testWidgets('shows empty message when filter has no results', (tester) async {
+    testWidgets('shows empty message when filter has no results',
+        (tester) async {
       await tester.pumpWidget(
         queryaThemeTestShell(
           child: material.Scaffold(

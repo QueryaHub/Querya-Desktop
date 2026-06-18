@@ -85,14 +85,13 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
         case 'hash':
           _hashValue = await widget.connection.hgetall(widget.keyName);
         case 'list':
-          _listValue =
-              await widget.connection.lrange(widget.keyName, 0, -1);
+          _listValue = await widget.connection.lrange(widget.keyName, 0, -1);
         case 'set':
           _setValue = await widget.connection.smembers(widget.keyName);
           _setValue.sort();
         case 'zset':
-          _zsetValue = await widget.connection
-              .zrangeWithScores(widget.keyName, 0, -1);
+          _zsetValue =
+              await widget.connection.zrangeWithScores(widget.keyName, 0, -1);
         default:
           _stringValue = await widget.connection.get(widget.keyName);
           _stringController.text = _stringValue ?? '';
@@ -335,12 +334,11 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       ),
       child: material.Row(
         children: [
-          material.Icon(_typeIcon(widget.keyType),
-              size: 18, color: typeCol),
+          material.Icon(_typeIcon(widget.keyType), size: 18, color: typeCol),
           const Gap(8),
           material.Container(
-            padding: const material.EdgeInsets.symmetric(
-                horizontal: 6, vertical: 2),
+            padding:
+                const material.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: material.BoxDecoration(
               color: typeCol.withValues(alpha: 0.12),
               borderRadius: material.BorderRadius.circular(4),
@@ -371,8 +369,8 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
           const Gap(8),
           // TTL badge
           material.Container(
-            padding: const material.EdgeInsets.symmetric(
-                horizontal: 8, vertical: 3),
+            padding:
+                const material.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: material.BoxDecoration(
               color: scs.muted.withValues(alpha: 0.3),
               borderRadius: material.BorderRadius.circular(6),
@@ -462,19 +460,18 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
             PrimaryButton(
               onPressed: _saveString,
               size: ButtonSize.small,
-              leading: const material.Icon(material.Icons.save_rounded,
-                  size: 14),
+              leading:
+                  const material.Icon(material.Icons.save_rounded, size: 14),
               child: const Text('Save'),
             ),
           ],
         ),
         const Gap(8),
         material.Container(
-          constraints:
-              const material.BoxConstraints(minHeight: 200),
+          constraints: const material.BoxConstraints(minHeight: 200),
           decoration: material.BoxDecoration(
-            border: material.Border.all(
-                color: cs.border.withValues(alpha: 0.3)),
+            border:
+                material.Border.all(color: cs.border.withValues(alpha: 0.3)),
             borderRadius: material.BorderRadius.circular(8),
           ),
           child: material.TextField(
@@ -683,8 +680,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
             PrimaryButton(
               onPressed: () {
                 final m = _newValueController.text.trim();
-                final s =
-                    double.tryParse(_newFieldController.text.trim());
+                final s = double.tryParse(_newFieldController.text.trim());
                 if (m.isEmpty || s == null) return;
                 _zsetAdd(m, s);
                 _newValueController.clear();
@@ -781,7 +777,8 @@ class _RedisTtlDialogContent extends material.StatefulWidget {
       _RedisTtlDialogContentState();
 }
 
-class _RedisTtlDialogContentState extends material.State<_RedisTtlDialogContent> {
+class _RedisTtlDialogContentState
+    extends material.State<_RedisTtlDialogContent> {
   late final material.TextEditingController _controller;
 
   @override
@@ -854,8 +851,7 @@ class _FieldRow extends StatelessWidget {
   @override
   material.Widget build(material.BuildContext context) {
     return material.Container(
-      padding:
-          const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: material.BoxDecoration(
         color: colorScheme.card,
         borderRadius: material.BorderRadius.circular(6),
@@ -920,8 +916,7 @@ class _IndexedValueRow extends StatelessWidget {
   @override
   material.Widget build(material.BuildContext context) {
     return material.Container(
-      padding:
-          const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: material.BoxDecoration(
         color: colorScheme.card,
         borderRadius: material.BorderRadius.circular(6),
@@ -974,8 +969,7 @@ class _MemberRow extends StatelessWidget {
   @override
   material.Widget build(material.BuildContext context) {
     return material.Container(
-      padding:
-          const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: material.BoxDecoration(
         color: colorScheme.card,
         borderRadius: material.BorderRadius.circular(6),
@@ -1028,8 +1022,7 @@ class _ScoredMemberRow extends StatelessWidget {
   @override
   material.Widget build(material.BuildContext context) {
     return material.Container(
-      padding:
-          const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: material.BoxDecoration(
         color: colorScheme.card,
         borderRadius: material.BorderRadius.circular(6),
@@ -1039,8 +1032,8 @@ class _ScoredMemberRow extends StatelessWidget {
       child: material.Row(
         children: [
           material.Container(
-            padding: const material.EdgeInsets.symmetric(
-                horizontal: 6, vertical: 2),
+            padding:
+                const material.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: material.BoxDecoration(
               color: shadcnCs.muted.withValues(alpha: 0.3),
               borderRadius: material.BorderRadius.circular(4),

@@ -11,8 +11,7 @@ import 'querya_workbench_theme_from_manifest.dart';
 QueryaTheme queryaThemeFromManifest(QueryaThemeManifest manifest) {
   final fallback =
       manifest.isLight ? QueryaTheme.lightDefault : QueryaTheme.darkDefault;
-  final brightness =
-      manifest.isLight ? Brightness.light : Brightness.dark;
+  final brightness = manifest.isLight ? Brightness.light : Brightness.dark;
 
   var editor = editorThemeFromQueryaColors(
     colors: manifest.editorColors,

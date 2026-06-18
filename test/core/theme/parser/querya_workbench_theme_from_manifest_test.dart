@@ -9,8 +9,8 @@ import 'package:querya_desktop/core/theme/querya_theme.dart';
 void main() {
   group('workbenchThemeFromQueryaColors', () {
     test('full fixture maps custom workbench values', () {
-      final raw =
-          File('test/fixtures/themes/querya_custom_dark.json').readAsStringSync();
+      final raw = File('test/fixtures/themes/querya_custom_dark.json')
+          .readAsStringSync();
       final manifest = QueryaThemeManifest.fromJsonString(raw);
       final workbench = workbenchThemeFromQueryaColors(
         colors: manifest.editorColors,

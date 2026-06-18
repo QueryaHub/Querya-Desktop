@@ -109,7 +109,8 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
               color: theme.colorScheme.primary,
             ),
           )
-        : material.Icon(widget.icon, size: 16, color: theme.colorScheme.primary);
+        : material.Icon(widget.icon,
+            size: 16, color: theme.colorScheme.primary);
 
     return ContextMenu(
       items: [
@@ -214,39 +215,42 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
                 mainAxisSize: material.MainAxisSize.min,
                 crossAxisAlignment: material.CrossAxisAlignment.stretch,
                 children: [
-              if (_loading)
-                material.Padding(
-                  padding: const material.EdgeInsets.only(left: 28, top: 4, bottom: 4),
-                  child: material.Row(
-                    children: [
-                      const material.SizedBox(
-                        width: 12,
-                        height: 12,
-                        child: material.CircularProgressIndicator(strokeWidth: 1.5),
+                  if (_loading)
+                    material.Padding(
+                      padding: const material.EdgeInsets.only(
+                          left: 28, top: 4, bottom: 4),
+                      child: material.Row(
+                        children: [
+                          const material.SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: material.CircularProgressIndicator(
+                                strokeWidth: 1.5),
+                          ),
+                          const Gap(8),
+                          const Text('Loading...').muted().xSmall(),
+                        ],
                       ),
-                      const Gap(8),
-                      const Text('Loading...').muted().xSmall(),
-                    ],
-                  ),
-                ),
-              if (_error != null)
-                material.Padding(
-                  padding: const material.EdgeInsets.only(left: 28, top: 4, bottom: 4),
-                  child: material.Text(
-                    'Error',
-                    overflow: material.TextOverflow.ellipsis,
-                    maxLines: 1,
-                    style: material.TextStyle(
-                        fontSize: 11, color: theme.colorScheme.destructive),
-                  ),
-                ),
-              for (final db in _databases)
-                _RedisDatabaseNode(
-                  index: db.index,
-                  keys: db.keys,
-                  onTap: () => widget.onDatabaseTap?.call(db.index),
-                ),
-            ],
+                    ),
+                  if (_error != null)
+                    material.Padding(
+                      padding: const material.EdgeInsets.only(
+                          left: 28, top: 4, bottom: 4),
+                      child: material.Text(
+                        'Error',
+                        overflow: material.TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: material.TextStyle(
+                            fontSize: 11, color: theme.colorScheme.destructive),
+                      ),
+                    ),
+                  for (final db in _databases)
+                    _RedisDatabaseNode(
+                      index: db.index,
+                      keys: db.keys,
+                      onTap: () => widget.onDatabaseTap?.call(db.index),
+                    ),
+                ],
               ),
             ),
           ],
@@ -278,8 +282,8 @@ class _RedisDatabaseNode extends StatelessWidget {
           onTap: onTap,
           borderRadius: material.BorderRadius.circular(6),
           child: material.Padding(
-            padding: const material.EdgeInsets.symmetric(
-                horizontal: 8, vertical: 5),
+            padding:
+                const material.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
             child: material.Row(
               children: [
                 material.Icon(
@@ -287,7 +291,8 @@ class _RedisDatabaseNode extends StatelessWidget {
                   size: 14,
                   color: keys > 0
                       ? theme.colorScheme.primary.withValues(alpha: 0.7)
-                      : theme.colorScheme.mutedForeground.withValues(alpha: 0.5),
+                      : theme.colorScheme.mutedForeground
+                          .withValues(alpha: 0.5),
                 ),
                 const Gap(8),
                 material.Expanded(
@@ -307,8 +312,7 @@ class _RedisDatabaseNode extends StatelessWidget {
                   material.Text(
                     '$keys',
                     style: material.TextStyle(
-                        fontSize: 10,
-                        color: theme.colorScheme.mutedForeground),
+                        fontSize: 10, color: theme.colorScheme.mutedForeground),
                   ),
               ],
             ),

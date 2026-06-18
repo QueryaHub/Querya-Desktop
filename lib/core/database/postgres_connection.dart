@@ -700,8 +700,7 @@ ORDER BY grantee, privilege_type
         .toList();
   }
 
-  static String _quoteIdent(String id) =>
-      '"${id.replaceAll('"', '""')}"';
+  static String _quoteIdent(String id) => '"${id.replaceAll('"', '""')}"';
 
   static bool _parsePgBool(Object? v) {
     if (v is bool) return v;

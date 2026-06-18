@@ -8,7 +8,8 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('RedisKeysView lists keys from ListView after load', (tester) async {
+  testWidgets('RedisKeysView lists keys from ListView after load',
+      (tester) async {
     final fake = RedisConnectionTestFake(
       firstScanKeys: const ['key_a', 'key_b'],
       dbSizeResult: 2,

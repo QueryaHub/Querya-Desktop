@@ -52,7 +52,8 @@ abstract final class QueryaDropdownTokens {
   static double scaledMenuMaxHeight(material.BuildContext context) =>
       context.scaled(menuMaxHeight);
 
-  static material.EdgeInsets scaledTriggerPadding(material.BuildContext context) =>
+  static material.EdgeInsets scaledTriggerPadding(
+          material.BuildContext context) =>
       material.EdgeInsets.symmetric(
         horizontal: context.scaled(triggerPaddingHorizontal),
       );
@@ -79,7 +80,8 @@ abstract final class QueryaDropdownTokens {
     return material.TextStyle(
       fontSize: size,
       height: lineHeight,
-      fontWeight: selected ? material.FontWeight.w600 : material.FontWeight.w400,
+      fontWeight:
+          selected ? material.FontWeight.w600 : material.FontWeight.w400,
       color: color,
     );
   }

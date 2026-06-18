@@ -2198,6 +2198,7 @@ class ContextCallbackAction<T extends Intent> extends ContextAction<T> {
 class ErrorFilter extends StatefulWidget {
   /// Child widget to wrap with error filtering.
   final Widget child;
+
   /// Creates an [ErrorFilter].
   ///
   /// Parameters:

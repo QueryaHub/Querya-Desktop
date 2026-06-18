@@ -61,10 +61,12 @@ class _MongoConnectionFormContent extends material.StatefulWidget {
   final int? folderId;
 
   @override
-  material.State<_MongoConnectionFormContent> createState() => _MongoConnectionFormContentState();
+  material.State<_MongoConnectionFormContent> createState() =>
+      _MongoConnectionFormContentState();
 }
 
-class _MongoConnectionFormContentState extends material.State<_MongoConnectionFormContent> {
+class _MongoConnectionFormContentState
+    extends material.State<_MongoConnectionFormContent> {
   final _nameController = material.TextEditingController();
   final _hostController = material.TextEditingController(text: 'localhost');
   final _portController = material.TextEditingController(text: '27017');
@@ -124,10 +126,17 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
         name: _nameController.text.trim(),
         host: _hostController.text.trim(),
         port: int.tryParse(_portController.text.trim()) ?? 27017,
-        username: _usernameController.text.trim().isEmpty ? null : _usernameController.text.trim(),
-        password: _passwordController.text.isEmpty ? null : _passwordController.text,
-        database: _databaseController.text.trim().isEmpty ? null : _databaseController.text.trim(),
-        authSource: _authSourceController.text.trim().isEmpty ? null : _authSourceController.text.trim(),
+        username: _usernameController.text.trim().isEmpty
+            ? null
+            : _usernameController.text.trim(),
+        password:
+            _passwordController.text.isEmpty ? null : _passwordController.text,
+        database: _databaseController.text.trim().isEmpty
+            ? null
+            : _databaseController.text.trim(),
+        authSource: _authSourceController.text.trim().isEmpty
+            ? null
+            : _authSourceController.text.trim(),
         useSSL: _useSSL,
         connectionString: _connectionStringController.text.trim().isEmpty
             ? null
@@ -187,9 +196,8 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
     final data = _formData;
     if (!data.isValid) return;
 
-    final displayName = data.name.isNotEmpty
-        ? data.name
-        : 'MongoDB ${data.host}:${data.port}';
+    final displayName =
+        data.name.isNotEmpty ? data.name : 'MongoDB ${data.host}:${data.port}';
 
     final row = ConnectionRow(
       type: 'mongodb',
@@ -247,7 +255,9 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
                     ],
                   ),
                   const Gap(8),
-                  const Text('Configure your MongoDB connection settings').muted().small(),
+                  const Text('Configure your MongoDB connection settings')
+                      .muted()
+                      .small(),
                 ],
               ),
             ),
@@ -278,7 +288,8 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
                       const Gap(8),
                       TextField(
                         controller: _connectionStringController,
-                        placeholder: const Text('mongodb://username:password@host:port/database'),
+                        placeholder: const Text(
+                            'mongodb://username:password@host:port/database'),
                         maxLines: 2,
                       ),
                     ] else ...[
@@ -296,7 +307,8 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
                           material.Expanded(
                             flex: 3,
                             child: material.Column(
-                              crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                              crossAxisAlignment:
+                                  material.CrossAxisAlignment.stretch,
                               mainAxisSize: material.MainAxisSize.min,
                               children: [
                                 const Text('Host').small().semiBold(),
@@ -312,7 +324,8 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
                           material.Expanded(
                             flex: 1,
                             child: material.Column(
-                              crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                              crossAxisAlignment:
+                                  material.CrossAxisAlignment.stretch,
                               mainAxisSize: material.MainAxisSize.min,
                               children: [
                                 const Text('Port').small().semiBold(),
@@ -328,7 +341,9 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
                       ),
                       const Gap(16),
                       // Authentication
-                      const Text('Authentication (Optional)').small().semiBold(),
+                      const Text('Authentication (Optional)')
+                          .small()
+                          .semiBold(),
                       const Gap(8),
                       TextField(
                         controller: _usernameController,
@@ -349,10 +364,13 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
                             child: material.Center(
                               child: material.IconButton(
                                 icon: material.Icon(
-                                  _showPassword ? material.Icons.visibility_off : material.Icons.visibility,
+                                  _showPassword
+                                      ? material.Icons.visibility_off
+                                      : material.Icons.visibility,
                                   size: 20,
                                 ),
-                                onPressed: () => setState(() => _showPassword = !_showPassword),
+                                onPressed: () => setState(
+                                    () => _showPassword = !_showPassword),
                                 padding: material.EdgeInsets.zero,
                                 constraints: const material.BoxConstraints(),
                               ),
@@ -366,10 +384,13 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
                         children: [
                           material.Expanded(
                             child: material.Column(
-                              crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                              crossAxisAlignment:
+                                  material.CrossAxisAlignment.stretch,
                               mainAxisSize: material.MainAxisSize.min,
                               children: [
-                                const Text('Default Database (Optional)').small().semiBold(),
+                                const Text('Default Database (Optional)')
+                                    .small()
+                                    .semiBold(),
                                 const Gap(8),
                                 TextField(
                                   controller: _databaseController,
@@ -381,10 +402,13 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
                           const Gap(12),
                           material.Expanded(
                             child: material.Column(
-                              crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                              crossAxisAlignment:
+                                  material.CrossAxisAlignment.stretch,
                               mainAxisSize: material.MainAxisSize.min,
                               children: [
-                                const Text('Auth Source (Optional)').small().semiBold(),
+                                const Text('Auth Source (Optional)')
+                                    .small()
+                                    .semiBold(),
                                 const Gap(8),
                                 TextField(
                                   controller: _authSourceController,
@@ -401,7 +425,8 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
                         children: [
                           material.Checkbox(
                             value: _useSSL,
-                            onChanged: (v) => setState(() => _useSSL = v ?? false),
+                            onChanged: (v) =>
+                                setState(() => _useSSL = v ?? false),
                           ),
                           const Gap(8),
                           const Text('Use SSL/TLS').small(),
@@ -422,7 +447,8 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
                     onTap: _dismissResult,
                     borderRadius: material.BorderRadius.circular(8),
                     child: material.Container(
-                      padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      padding: const material.EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
                       decoration: material.BoxDecoration(
                         color: _testResult == 'success'
                             ? theme.primary.withValues(alpha: 0.12)
@@ -479,7 +505,8 @@ class _MongoConnectionFormContentState extends material.State<_MongoConnectionFo
                 ),
               ),
             material.Container(
-              padding: const material.EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: const material.EdgeInsets.symmetric(
+                  horizontal: 24, vertical: 16),
               child: ValueListenableBuilder<bool>(
                 valueListenable: _formValidNotifier.listenable,
                 builder: (context, formValid, _) {

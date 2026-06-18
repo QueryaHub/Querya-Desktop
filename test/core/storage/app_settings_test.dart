@@ -34,7 +34,8 @@ class _FakePathProvider extends PathProviderPlatform {
   Future<List<String>?> getExternalCachePaths() async => [_root];
 
   @override
-  Future<List<String>?> getExternalStoragePaths({StorageDirectory? type}) async =>
+  Future<List<String>?> getExternalStoragePaths(
+          {StorageDirectory? type}) async =>
       [_root];
 
   @override
@@ -47,7 +48,8 @@ void main() {
   late Directory tempDir;
 
   setUpAll(() async {
-    tempDir = await Directory.systemTemp.createTemp('querya_app_settings_test_');
+    tempDir =
+        await Directory.systemTemp.createTemp('querya_app_settings_test_');
     PathProviderPlatform.instance = _FakePathProvider(tempDir.path);
     await LocalDb.initFfi();
   });
@@ -63,72 +65,91 @@ void main() {
     await AppSettings.instance.setPostgresSqlStmtTimeoutSeconds(null);
     await AppSettings.instance.setMysqlSqlStmtTimeoutSeconds(null);
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.sqlResultMaxRows);
-    await LocalDb.instance.deleteAppSetting(AppSettingsKeys.sqlEditorFontSizePoints);
-    await LocalDb.instance.deleteAppSetting(AppSettingsKeys.sqlHistoryMaxEntries);
+    await LocalDb.instance
+        .deleteAppSetting(AppSettingsKeys.sqlEditorFontSizePoints);
+    await LocalDb.instance
+        .deleteAppSetting(AppSettingsKeys.sqlHistoryMaxEntries);
     await AppSettings.instance.clearThemeSettings();
   });
 
   group('AppSettings', () {
     test('getPostgresSqlStmtTimeoutSeconds roundtrip', () async {
-      expect(await AppSettings.instance.getPostgresSqlStmtTimeoutSeconds(), isNull);
+      expect(await AppSettings.instance.getPostgresSqlStmtTimeoutSeconds(),
+          isNull);
 
       await AppSettings.instance.setPostgresSqlStmtTimeoutSeconds(90);
       expect(await AppSettings.instance.getPostgresSqlStmtTimeoutSeconds(), 90);
 
       await AppSettings.instance.setPostgresSqlStmtTimeoutSeconds(null);
-      expect(await AppSettings.instance.getPostgresSqlStmtTimeoutSeconds(), isNull);
+      expect(await AppSettings.instance.getPostgresSqlStmtTimeoutSeconds(),
+          isNull);
     });
 
-    test('getPostgresSqlStmtTimeoutSeconds returns null for invalid stored value', () async {
+    test(
+        'getPostgresSqlStmtTimeoutSeconds returns null for invalid stored value',
+        () async {
       await LocalDb.instance.setAppSetting(
         AppSettingsKeys.postgresSqlStmtTimeoutSeconds,
         'not-a-number',
       );
-      expect(await AppSettings.instance.getPostgresSqlStmtTimeoutSeconds(), isNull);
+      expect(await AppSettings.instance.getPostgresSqlStmtTimeoutSeconds(),
+          isNull);
     });
 
     test('getMysqlSqlStmtTimeoutSeconds roundtrip', () async {
-      expect(await AppSettings.instance.getMysqlSqlStmtTimeoutSeconds(), isNull);
+      expect(
+          await AppSettings.instance.getMysqlSqlStmtTimeoutSeconds(), isNull);
 
       await AppSettings.instance.setMysqlSqlStmtTimeoutSeconds(60);
       expect(await AppSettings.instance.getMysqlSqlStmtTimeoutSeconds(), 60);
 
       await AppSettings.instance.setMysqlSqlStmtTimeoutSeconds(null);
-      expect(await AppSettings.instance.getMysqlSqlStmtTimeoutSeconds(), isNull);
+      expect(
+          await AppSettings.instance.getMysqlSqlStmtTimeoutSeconds(), isNull);
     });
 
-    test('getMysqlSqlStmtTimeoutSeconds returns null for invalid stored value', () async {
+    test('getMysqlSqlStmtTimeoutSeconds returns null for invalid stored value',
+        () async {
       await LocalDb.instance.setAppSetting(
         AppSettingsKeys.mysqlSqlStmtTimeoutSeconds,
         'not-a-number',
       );
-      expect(await AppSettings.instance.getMysqlSqlStmtTimeoutSeconds(), isNull);
+      expect(
+          await AppSettings.instance.getMysqlSqlStmtTimeoutSeconds(), isNull);
     });
 
     test('getSqlResultMaxRows defaults and normalizes to preset', () async {
-      expect(await AppSettings.instance.getSqlResultMaxRows(), kDefaultSqlResultMaxRows);
+      expect(await AppSettings.instance.getSqlResultMaxRows(),
+          kDefaultSqlResultMaxRows);
 
       await AppSettings.instance.setSqlResultMaxRows(10000);
       expect(await AppSettings.instance.getSqlResultMaxRows(), 10000);
 
-      await LocalDb.instance.setAppSetting(AppSettingsKeys.sqlResultMaxRows, '7777');
+      await LocalDb.instance
+          .setAppSetting(AppSettingsKeys.sqlResultMaxRows, '7777');
       expect(await AppSettings.instance.getSqlResultMaxRows(), 10000);
 
-      await LocalDb.instance.setAppSetting(AppSettingsKeys.sqlResultMaxRows, 'not-int');
-      expect(await AppSettings.instance.getSqlResultMaxRows(), kDefaultSqlResultMaxRows);
+      await LocalDb.instance
+          .setAppSetting(AppSettingsKeys.sqlResultMaxRows, 'not-int');
+      expect(await AppSettings.instance.getSqlResultMaxRows(),
+          kDefaultSqlResultMaxRows);
     });
 
     test('getSqlEditorFontSize roundtrip and invalid stored', () async {
-      expect(await AppSettings.instance.getSqlEditorFontSize(), kDefaultSqlEditorFontSize);
+      expect(await AppSettings.instance.getSqlEditorFontSize(),
+          kDefaultSqlEditorFontSize);
 
       await AppSettings.instance.setSqlEditorFontSize(16);
       expect(await AppSettings.instance.getSqlEditorFontSize(), 16);
 
-      await LocalDb.instance.setAppSetting(AppSettingsKeys.sqlEditorFontSizePoints, '99');
+      await LocalDb.instance
+          .setAppSetting(AppSettingsKeys.sqlEditorFontSizePoints, '99');
       expect(await AppSettings.instance.getSqlEditorFontSize(), 24);
 
-      await LocalDb.instance.setAppSetting(AppSettingsKeys.sqlEditorFontSizePoints, 'x');
-      expect(await AppSettings.instance.getSqlEditorFontSize(), kDefaultSqlEditorFontSize);
+      await LocalDb.instance
+          .setAppSetting(AppSettingsKeys.sqlEditorFontSizePoints, 'x');
+      expect(await AppSettings.instance.getSqlEditorFontSize(),
+          kDefaultSqlEditorFontSize);
     });
 
     test('setSqlResultMaxRows snaps non-preset to nearest', () async {
@@ -305,7 +326,8 @@ void main() {
       expect(AppSettingsRevision.listenable.value, start + 1);
     });
 
-    test('mutating SQL workspace settings notifies SqlWorkspaceSettingsRevision',
+    test(
+        'mutating SQL workspace settings notifies SqlWorkspaceSettingsRevision',
         () async {
       var calls = 0;
       void listener() => calls++;
@@ -313,7 +335,8 @@ void main() {
       SqlWorkspaceSettingsRevision.listenable.addListener(listener);
       final before = SqlWorkspaceSettingsRevision.listenable.value;
       await AppSettings.instance.setPostgresSqlStmtTimeoutSeconds(45);
-      expect(SqlWorkspaceSettingsRevision.listenable.value, greaterThan(before));
+      expect(
+          SqlWorkspaceSettingsRevision.listenable.value, greaterThan(before));
       expect(calls, greaterThan(0));
       SqlWorkspaceSettingsRevision.listenable.removeListener(listener);
     });

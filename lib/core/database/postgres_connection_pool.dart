@@ -79,7 +79,8 @@ class PostgresConnectionPool {
       entry.refs++;
       if (!entry.connection.isConnected) {
         await entry.connection.connect();
-        await entry.connection.setSessionReadOnly(mode == PgSessionMode.readOnly);
+        await entry.connection
+            .setSessionReadOnly(mode == PgSessionMode.readOnly);
       }
       return PgLease._(this, k, entry.connection);
     }

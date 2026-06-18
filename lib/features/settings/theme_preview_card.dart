@@ -8,7 +8,8 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 sealed class ThemePreviewResult {
   const ThemePreviewResult();
 
-  const factory ThemePreviewResult.theme(QueryaTheme theme) = ThemePreviewSuccess;
+  const factory ThemePreviewResult.theme(QueryaTheme theme) =
+      ThemePreviewSuccess;
   const factory ThemePreviewResult.error(String message) = ThemePreviewFailure;
   const factory ThemePreviewResult.loading() = ThemePreviewLoading;
 }

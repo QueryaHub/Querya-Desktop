@@ -126,14 +126,16 @@ class MongoService {
 
     return _withDb(connection, database, (db) async {
       final coll = db.collection(collection);
-      
+
       final selector = where;
       if (filter != null && filter.isNotEmpty) {
         selector.raw(filter);
       }
       if (sort != null && sort.isNotEmpty) {
         for (final entry in sort.entries) {
-          final isDesc = entry.value == -1 || entry.value == 'desc' || entry.value == 'DESC';
+          final isDesc = entry.value == -1 ||
+              entry.value == 'desc' ||
+              entry.value == 'DESC';
           selector.sortBy(entry.key, descending: isDesc);
         }
       }

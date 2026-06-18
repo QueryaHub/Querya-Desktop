@@ -361,8 +361,7 @@ class ThemeRegistryService {
     return file.readAsString();
   }
 
-  Future<String> _readAssetString(String assetPath) =>
-      _assetLoader(assetPath);
+  Future<String> _readAssetString(String assetPath) => _assetLoader(assetPath);
 
   static bool _isAssetPath(String path) => path.startsWith('assets/');
 
@@ -634,7 +633,8 @@ class ThemeRegistryService {
       if (!await candidate.exists()) return candidate;
     }
     return File(
-      p.join(themesDir.path, '$baseName-${DateTime.now().millisecondsSinceEpoch}.json'),
+      p.join(themesDir.path,
+          '$baseName-${DateTime.now().millisecondsSinceEpoch}.json'),
     );
   }
 

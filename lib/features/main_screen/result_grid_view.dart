@@ -72,8 +72,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   @override
   void didUpdateWidget(VirtualResultGrid oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.columns != widget.columns ||
-        oldWidget.rows != widget.rows) {
+    if (oldWidget.columns != widget.columns || oldWidget.rows != widget.rows) {
       _widthsNeedUpdate = true;
     }
   }

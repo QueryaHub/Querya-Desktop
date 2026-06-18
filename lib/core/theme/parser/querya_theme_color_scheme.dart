@@ -65,7 +65,8 @@ ColorScheme colorSchemeFromQueryaThemeColors({
   final destructive = pick('destructive', base.destructive);
   // querya.theme.v1 still maps this key; shadcn marks the ColorScheme field legacy.
   // ignore: deprecated_member_use
-  final destructiveForeground = pick('destructiveForeground', base.destructiveForeground);
+  final destructiveForeground =
+      pick('destructiveForeground', base.destructiveForeground);
 
   return ColorScheme(
     brightness: base.brightness,

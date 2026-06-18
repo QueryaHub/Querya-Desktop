@@ -38,7 +38,8 @@ class _FakePathProvider extends PathProviderPlatform {
   Future<List<String>?> getExternalCachePaths() async => [_root];
 
   @override
-  Future<List<String>?> getExternalStoragePaths({StorageDirectory? type}) async =>
+  Future<List<String>?> getExternalStoragePaths(
+          {StorageDirectory? type}) async =>
       [_root];
 
   @override
@@ -58,7 +59,8 @@ void main() {
   );
 
   group('MysqlWorkspaceHome', () {
-    testWidgets('shows tabs and SQL tab exposes Execute control', (tester) async {
+    testWidgets('shows tabs and SQL tab exposes Execute control',
+        (tester) async {
       await tester.pumpWidget(
         queryaThemeTestShell(
           child: const material.Scaffold(
@@ -85,7 +87,8 @@ void main() {
   });
 
   group('Driver Manager dialog', () {
-    testWidgets('showDriverManagerDialog shows built-in drivers copy', (tester) async {
+    testWidgets('showDriverManagerDialog shows built-in drivers copy',
+        (tester) async {
       await tester.binding.setSurfaceSize(const material.Size(900, 1200));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -120,8 +123,8 @@ void main() {
     late Directory tempDir;
 
     setUpAll(() async {
-      tempDir = await Directory.systemTemp
-          .createTemp('querya_prefs_dialog_test_');
+      tempDir =
+          await Directory.systemTemp.createTemp('querya_prefs_dialog_test_');
       PathProviderPlatform.instance = _FakePathProvider(tempDir.path);
       await LocalDb.initFfi();
       await LocalDb.instance.close();
@@ -134,7 +137,8 @@ void main() {
       }
     });
 
-    testWidgets('showPreferencesDialog shows preferences title', (tester) async {
+    testWidgets('showPreferencesDialog shows preferences title',
+        (tester) async {
       late material.BuildContext ctx;
       await tester.pumpWidget(
         ShadcnApp(

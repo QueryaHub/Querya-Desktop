@@ -367,8 +367,8 @@ class _BreadcrumbBar extends StatelessWidget {
                   for (var i = 0; i < crumbs.length; i++) ...[
                     if (i > 0) ...[
                       material.Padding(
-                        padding: const material.EdgeInsets.symmetric(
-                            horizontal: 6),
+                        padding:
+                            const material.EdgeInsets.symmetric(horizontal: 6),
                         child: material.Icon(
                             material.Icons.chevron_right_rounded,
                             size: 16,
@@ -444,7 +444,8 @@ class _CrumbChip extends material.StatelessWidget {
 
     if (onTap == null) {
       return material.Padding(
-        padding: const material.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding:
+            const material.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: child,
       );
     }

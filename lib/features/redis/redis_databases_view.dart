@@ -72,7 +72,8 @@ class _RedisDatabasesViewState extends material.State<RedisDatabasesView> {
             }
           }
         }
-        dbs.add(_DbInfo(index: i, keys: keys, expires: expires, hasData: data != null));
+        dbs.add(_DbInfo(
+            index: i, keys: keys, expires: expires, hasData: data != null));
       }
 
       if (!mounted) return;
@@ -123,8 +124,8 @@ class _RedisDatabasesViewState extends material.State<RedisDatabasesView> {
                   size: 48, color: cs.destructive),
               const Gap(16),
               Text(_error!,
-                  style: material.TextStyle(
-                      color: cs.destructive, fontSize: 13)),
+                  style:
+                      material.TextStyle(color: cs.destructive, fontSize: 13)),
               const Gap(16),
               OutlineButton(
                 onPressed: _load,
@@ -138,8 +139,7 @@ class _RedisDatabasesViewState extends material.State<RedisDatabasesView> {
 
     final dbsWithData = _databases.where((d) => d.hasData).toList();
     final dbsEmpty = _databases.where((d) => !d.hasData).toList();
-    final totalKeys =
-        _databases.fold<int>(0, (sum, d) => sum + d.keys);
+    final totalKeys = _databases.fold<int>(0, (sum, d) => sum + d.keys);
 
     return material.SingleChildScrollView(
       padding: const material.EdgeInsets.all(16),
@@ -172,8 +172,8 @@ class _RedisDatabasesViewState extends material.State<RedisDatabasesView> {
           // Databases with data
           material.Container(
             decoration: material.BoxDecoration(
-              border: material.Border.all(
-                  color: cs.border.withValues(alpha: 0.3)),
+              border:
+                  material.Border.all(color: cs.border.withValues(alpha: 0.3)),
               borderRadius: const material.BorderRadius.only(
                 bottomLeft: Radius.circular(8),
                 bottomRight: Radius.circular(8),
@@ -261,8 +261,8 @@ class _DatabaseTile extends material.StatelessWidget {
         onTap: onTap,
         hoverColor: shadcnCs.primary.withValues(alpha: 0.06),
         child: material.Padding(
-          padding: const material.EdgeInsets.symmetric(
-              horizontal: 20, vertical: 10),
+          padding:
+              const material.EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           child: material.Row(
             children: [
               material.Icon(

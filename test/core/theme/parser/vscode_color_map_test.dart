@@ -67,7 +67,8 @@ void main() {
       expect(theme.workbench.surface, const Color(0xFFFFFFFF));
     });
 
-    test('unknown keys are reported and defaults kept for unmapped tokens', () async {
+    test('unknown keys are reported and defaults kept for unmapped tokens',
+        () async {
       final src = await fixture('with_unknown_keys.json');
       final manifest = VsCodeThemeManifest.fromJsonString(src);
       final unknown = <String>[];

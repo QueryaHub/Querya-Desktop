@@ -44,7 +44,10 @@ class FoldersStorage {
       final decoded = jsonDecode(content) as Map<String, Object?>;
       final list = decoded[_keyFolders];
       final names = list != null && list is List<Object?>
-          ? list.map((e) => e?.toString() ?? '').where((s) => s.isNotEmpty).toList()
+          ? list
+              .map((e) => e?.toString() ?? '')
+              .where((s) => s.isNotEmpty)
+              .toList()
           : <String>[];
       final existing = await LocalDb.instance.getFolders();
       for (final name in names) {

@@ -29,7 +29,8 @@ class WorkspaceEmptyHero extends StatelessWidget {
         final mockH = WindowLayout.heroMockWindowHeight(maxContent);
         final compact = vw < WindowLayout.compactWindowWidth;
         return material.SingleChildScrollView(
-          padding: material.EdgeInsets.symmetric(horizontal: padH, vertical: padV),
+          padding:
+              material.EdgeInsets.symmetric(horizontal: padH, vertical: padV),
           child: material.Align(
             alignment: material.Alignment.topCenter,
             child: material.ConstrainedBox(

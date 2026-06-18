@@ -98,7 +98,8 @@ class ThemeController extends ChangeNotifier {
 
   String? get importedThemeName => _importedThemeName;
 
-  List<ThemeDefinition> get availableThemes => List.unmodifiable(_availableThemes);
+  List<ThemeDefinition> get availableThemes =>
+      List.unmodifiable(_availableThemes);
 
   /// True while [loadAvailableThemes] is scanning the registry.
   bool get isLoadingAvailableThemes => _isLoadingAvailableThemes;
@@ -162,8 +163,7 @@ class ThemeController extends ChangeNotifier {
 
   /// Cached Material theme for dialogs/dropdowns (avoids rebuild churn).
   material.ThemeData materialThemeFor(ColorScheme scheme) {
-    if (_cachedMaterialTheme != null &&
-        _cachedMaterialThemeScheme == scheme) {
+    if (_cachedMaterialTheme != null && _cachedMaterialThemeScheme == scheme) {
       return _cachedMaterialTheme!;
     }
     _cachedMaterialThemeScheme = scheme;
@@ -358,7 +358,8 @@ class ThemeController extends ChangeNotifier {
             ? ThemeMode.light
             : ThemeMode.dark;
         await AppSettings.instance.setSelectedThemeId(definition.id);
-        await AppSettings.instance.setSelectedThemeSource(definition.source.name);
+        await AppSettings.instance
+            .setSelectedThemeSource(definition.source.name);
         await AppSettings.instance.setSelectedThemePath(definition.path);
         await AppSettings.instance.setThemeMode(_themeMode);
         _notifyThemeChanged();
@@ -448,8 +449,8 @@ class ThemeController extends ChangeNotifier {
     String? sha256Checksum,
     ThemeRemoteInstallService? remoteInstallService,
   }) async {
-    final installer = remoteInstallService ??
-        ThemeRemoteInstallService(_registryService);
+    final installer =
+        remoteInstallService ?? ThemeRemoteInstallService(_registryService);
     final result = await installer.installFromUrl(
       url,
       sha256Checksum: sha256Checksum,
@@ -624,7 +625,8 @@ class ThemeController extends ChangeNotifier {
   List<ThemeDefinition> _mergeBuiltinThemes(List<ThemeDefinition> scanned) {
     final merged = <ThemeDefinition>[..._builtinThemeDefinitions];
     for (final definition in scanned) {
-      if (!_builtinThemeDefinitions.any((builtin) => builtin.id == definition.id)) {
+      if (!_builtinThemeDefinitions
+          .any((builtin) => builtin.id == definition.id)) {
         merged.add(definition);
       }
     }
