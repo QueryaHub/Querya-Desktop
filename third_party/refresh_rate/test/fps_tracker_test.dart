@@ -144,9 +144,13 @@ void main() {
     test('starts in running state', () {
       WidgetsFlutterBinding.ensureInitialized();
       final info = DisplayInfo(
-        currentRate: 120.0, maxRate: 120.0, minRate: 60.0,
-        supportedRates: [60.0, 120.0], isVariableRefreshRate: true,
-        engineTargetRate: 120.0, thermalState: ThermalState.nominal,
+        currentRate: 120.0,
+        maxRate: 120.0,
+        minRate: 60.0,
+        supportedRates: [60.0, 120.0],
+        isVariableRefreshRate: true,
+        engineTargetRate: 120.0,
+        thermalState: ThermalState.nominal,
       );
       final session = RefreshRateSession.create('test', info);
       expect(session.state, SessionState.running);
@@ -156,9 +160,13 @@ void main() {
     test('end() returns a SessionReport', () async {
       WidgetsFlutterBinding.ensureInitialized();
       final info = DisplayInfo(
-        currentRate: 120.0, maxRate: 120.0, minRate: 60.0,
-        supportedRates: [60.0, 120.0], isVariableRefreshRate: true,
-        engineTargetRate: 120.0, thermalState: ThermalState.nominal,
+        currentRate: 120.0,
+        maxRate: 120.0,
+        minRate: 60.0,
+        supportedRates: [60.0, 120.0],
+        isVariableRefreshRate: true,
+        engineTargetRate: 120.0,
+        thermalState: ThermalState.nominal,
       );
       final session = RefreshRateSession.create('scroll_test', info);
       final report = await session.end();
@@ -183,17 +191,17 @@ List<FrameTiming> _fakeTimingSequence(List<int> durationsUs) {
 List<FrameTiming> _fakeTimings(int count, int intervalUs) =>
     _fakeTimingSequence(List.filled(count, intervalUs));
 
-
-
 class _MockFrameTiming implements FrameTiming {
   final int _totalUs;
   final int _vsyncUs;
   _MockFrameTiming(this._totalUs, this._vsyncUs);
 
   @override
-  Duration get buildDuration => Duration(microseconds: (_totalUs * 0.6).toInt());
+  Duration get buildDuration =>
+      Duration(microseconds: (_totalUs * 0.6).toInt());
   @override
-  Duration get rasterDuration => Duration(microseconds: (_totalUs * 0.4).toInt());
+  Duration get rasterDuration =>
+      Duration(microseconds: (_totalUs * 0.4).toInt());
   @override
   Duration get totalSpan => Duration(microseconds: _totalUs);
   @override

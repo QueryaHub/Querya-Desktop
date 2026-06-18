@@ -90,7 +90,8 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
       if (supplied != null && supplied.isConnected) {
         conn = supplied;
       } else {
-        conn = await MongoService.instance.ensureConnected(widget.connectionRow);
+        conn =
+            await MongoService.instance.ensureConnected(widget.connectionRow);
       }
       if (!mounted) {
         return;
@@ -211,15 +212,19 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
           child: material.Column(
             mainAxisSize: material.MainAxisSize.min,
             children: [
-              material.Icon(material.Icons.error_outline_rounded, size: 48, color: cs.destructive),
+              material.Icon(material.Icons.error_outline_rounded,
+                  size: 48, color: cs.destructive),
               const Gap(16),
               const Text('Connection Error').large().semiBold(),
               const Gap(8),
-              material.SelectableText(err, style: material.TextStyle(color: cs.mutedForeground, fontSize: 13)),
+              material.SelectableText(err,
+                  style: material.TextStyle(
+                      color: cs.mutedForeground, fontSize: 13)),
               const Gap(24),
               OutlineButton(
                 onPressed: _load,
-                leading: const material.Icon(material.Icons.refresh_rounded, size: 18),
+                leading: const material.Icon(material.Icons.refresh_rounded,
+                    size: 18),
                 child: const Text('Retry'),
               ),
             ],
@@ -283,14 +288,16 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
                         ),
                         const Gap(16),
                         material.Expanded(
-                          child: _sectionCard(context, 'Replication', replication),
+                          child:
+                              _sectionCard(context, 'Replication', replication),
                         ),
                       ],
                     );
                   },
                 ),
                 const Gap(12),
-                _sectionCard(context, 'WiredTiger', _extractWiredTigerInfo(status)),
+                _sectionCard(
+                    context, 'WiredTiger', _extractWiredTigerInfo(status)),
               ],
             ),
           ),
@@ -314,7 +321,8 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
                 color: cs.primary.withValues(alpha: 0.12),
                 borderRadius: material.BorderRadius.circular(12),
               ),
-              child: material.Icon(material.Icons.eco_rounded, size: 28, color: cs.primary),
+              child: material.Icon(material.Icons.eco_rounded,
+                  size: 28, color: cs.primary),
             ),
             const Gap(16),
             material.Expanded(
@@ -346,8 +354,7 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
             if (widget.onBack != null)
               OutlineButton(
                 onPressed: widget.onBack,
-                leading: const material.Icon(
-                    material.Icons.grid_view_rounded,
+                leading: const material.Icon(material.Icons.grid_view_rounded,
                     size: 18),
                 child: const Text('Explorer'),
               ),
@@ -359,7 +366,8 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
                       height: 16,
                       child: material.CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const material.Icon(material.Icons.refresh_rounded, size: 18),
+                  : const material.Icon(material.Icons.refresh_rounded,
+                      size: 18),
               child: const Text('Refresh now'),
             ),
             material.SizedBox(
@@ -368,11 +376,16 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
                 expandToParent: true,
                 value: _autoRefreshInterval,
                 items: const [
-                  QueryaDropdownItem<Duration?>(value: null, label: 'Auto: off'),
-                  QueryaDropdownItem(value: Duration(seconds: 3), label: 'Auto: 3 s'),
-                  QueryaDropdownItem(value: Duration(seconds: 10), label: 'Auto: 10 s'),
-                  QueryaDropdownItem(value: Duration(seconds: 30), label: 'Auto: 30 s'),
-                  QueryaDropdownItem(value: Duration(seconds: 60), label: 'Auto: 60 s'),
+                  QueryaDropdownItem<Duration?>(
+                      value: null, label: 'Auto: off'),
+                  QueryaDropdownItem(
+                      value: Duration(seconds: 3), label: 'Auto: 3 s'),
+                  QueryaDropdownItem(
+                      value: Duration(seconds: 10), label: 'Auto: 10 s'),
+                  QueryaDropdownItem(
+                      value: Duration(seconds: 30), label: 'Auto: 30 s'),
+                  QueryaDropdownItem(
+                      value: Duration(seconds: 60), label: 'Auto: 60 s'),
                 ],
                 onSelected: (value) {
                   setState(() => _autoRefreshInterval = value);
@@ -409,7 +422,8 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     return '${minutes}m';
   }
 
-  material.Widget _summaryChips(material.BuildContext context, Map<String, dynamic> status) {
+  material.Widget _summaryChips(
+      material.BuildContext context, Map<String, dynamic> status) {
     final cs = shadcn.Theme.of(context).colorScheme;
     final version = _getString(status, 'version') ?? '—';
     final uptime = _formatUptime(_getInt(status, 'uptime') ?? 0);
@@ -419,13 +433,16 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     material.Widget chip(String label, String value, material.IconData icon) {
       return material.Expanded(
         child: material.ConstrainedBox(
-          constraints: const material.BoxConstraints(minHeight: _summaryChipHeight),
+          constraints:
+              const material.BoxConstraints(minHeight: _summaryChipHeight),
           child: material.Container(
-            padding: const material.EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const material.EdgeInsets.symmetric(
+                horizontal: 16, vertical: 12),
             decoration: material.BoxDecoration(
               color: cs.card,
               borderRadius: material.BorderRadius.circular(10),
-              border: material.Border.all(color: cs.border.withValues(alpha: 0.5)),
+              border:
+                  material.Border.all(color: cs.border.withValues(alpha: 0.5)),
             ),
             child: material.Row(
               crossAxisAlignment: material.CrossAxisAlignment.start,
@@ -463,6 +480,7 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
         ),
       );
     }
+
     return material.Row(
       crossAxisAlignment: material.CrossAxisAlignment.start,
       children: [
@@ -470,7 +488,8 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
         const Gap(12),
         chip('Uptime', uptime, material.Icons.schedule_rounded),
         const Gap(12),
-        chip('Connections', '$connections / $available', material.Icons.people_outline_rounded),
+        chip('Connections', '$connections / $available',
+            material.Icons.people_outline_rounded),
         const Gap(12),
         chip('Queries', '$ops', material.Icons.speed_rounded),
       ],
@@ -526,7 +545,8 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     );
   }
 
-  material.Widget _memoryCard(material.BuildContext context, Map<String, dynamic> status) {
+  material.Widget _memoryCard(
+      material.BuildContext context, Map<String, dynamic> status) {
     final mem = status['mem'] as Map<String, dynamic>?;
     final resident = _getInt(mem, 'resident') ?? 0;
     final virtual = _getInt(mem, 'virtual') ?? 0;
@@ -541,7 +561,8 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
           _metricRow(context, 'Resident', _formatBytes(resident)),
           _metricRow(context, 'Virtual', _formatBytes(virtual)),
           _metricRow(context, 'Mapped', _formatBytes(mapped)),
-          _metricRow(context, 'Mapped + Journal', _formatBytes(mappedWithJournal)),
+          _metricRow(
+              context, 'Mapped + Journal', _formatBytes(mappedWithJournal)),
         ],
         stretch: true,
       ),
@@ -550,7 +571,8 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     );
   }
 
-  material.Widget _operationsCard(material.BuildContext context, Map<String, dynamic> status) {
+  material.Widget _operationsCard(
+      material.BuildContext context, Map<String, dynamic> status) {
     final opcounters = status['opcounters'] as Map<String, dynamic>?;
     final inserts = _getInt(opcounters, 'insert') ?? 0;
     final queries = _getInt(opcounters, 'query') ?? 0;
@@ -574,11 +596,13 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     );
   }
 
-  material.Widget _connectionsCard(material.BuildContext context, Map<String, dynamic> status) {
+  material.Widget _connectionsCard(
+      material.BuildContext context, Map<String, dynamic> status) {
     final connections = status['connections'] as Map<String, dynamic>?;
     final current = _getInt(connections, 'current') ?? 0;
     final available = _getInt(connections, 'available') ?? 0;
-    final active = _getNestedInt(status, 'globalLock', 'activeClients', 'total') ?? 0;
+    final active =
+        _getNestedInt(status, 'globalLock', 'activeClients', 'total') ?? 0;
     return _card(
       context,
       'Connections',
@@ -596,7 +620,8 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     );
   }
 
-  material.Widget _networkCard(material.BuildContext context, Map<String, dynamic> status) {
+  material.Widget _networkCard(
+      material.BuildContext context, Map<String, dynamic> status) {
     final network = status['network'] as Map<String, dynamic>?;
     final bytesIn = _getInt(network, 'bytesIn') ?? 0;
     final bytesOut = _getInt(network, 'bytesOut') ?? 0;
@@ -618,7 +643,8 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     );
   }
 
-  material.Widget _sectionCard(material.BuildContext context, String title, Map<String, String>? data) {
+  material.Widget _sectionCard(
+      material.BuildContext context, String title, Map<String, String>? data) {
     if (data == null || data.isEmpty) return const material.SizedBox.shrink();
     return _card(
       context,
@@ -637,7 +663,9 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     if (entries.length <= 4) {
       return material.Column(
         crossAxisAlignment: material.CrossAxisAlignment.stretch,
-        children: [for (final e in entries) _metricRow(context, e.key, e.value)],
+        children: [
+          for (final e in entries) _metricRow(context, e.key, e.value)
+        ],
       );
     }
     final mid = (entries.length / 2).ceil();
@@ -649,21 +677,26 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
         material.Expanded(
           child: material.Column(
             crossAxisAlignment: material.CrossAxisAlignment.stretch,
-            children: [for (final e in left) _metricRow(context, e.key, e.value)],
+            children: [
+              for (final e in left) _metricRow(context, e.key, e.value)
+            ],
           ),
         ),
         const Gap(24),
         material.Expanded(
           child: material.Column(
             crossAxisAlignment: material.CrossAxisAlignment.stretch,
-            children: [for (final e in right) _metricRow(context, e.key, e.value)],
+            children: [
+              for (final e in right) _metricRow(context, e.key, e.value)
+            ],
           ),
         ),
       ],
     );
   }
 
-  material.Widget _metricRow(material.BuildContext context, String label, String value) {
+  material.Widget _metricRow(
+      material.BuildContext context, String label, String value) {
     final cs = shadcn.Theme.of(context).colorScheme;
     return material.Padding(
       padding: const material.EdgeInsets.symmetric(vertical: 6),
@@ -711,7 +744,8 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     return null;
   }
 
-  int? _getNestedInt(Map<String, dynamic>? map, String key1, String key2, [String? key3]) {
+  int? _getNestedInt(Map<String, dynamic>? map, String key1, String key2,
+      [String? key3]) {
     final m1 = map?[key1] as Map<String, dynamic>?;
     if (m1 == null) return null;
     if (key3 != null) {
@@ -731,8 +765,10 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
   Map<String, String> _extractServerInfo(Map<String, dynamic> status) {
     final result = <String, String>{};
     if (status['host'] != null) result['Host'] = status['host'].toString();
-    if (status['version'] != null) result['Version'] = status['version'].toString();
-    if (status['process'] != null) result['Process'] = status['process'].toString();
+    if (status['version'] != null)
+      result['Version'] = status['version'].toString();
+    if (status['process'] != null)
+      result['Process'] = status['process'].toString();
     final uptime = _getInt(status, 'uptime');
     if (uptime != null) {
       result['Uptime'] = '${_formatUptime(uptime)} ($uptime s)';
@@ -755,9 +791,12 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     final result = <String, String>{};
     final repl = status['repl'] as Map<String, dynamic>?;
     if (repl != null) {
-      if (repl['setName'] != null) result['Replica set'] = repl['setName'].toString();
-      if (repl['ismaster'] != null) result['Is master'] = repl['ismaster'].toString();
-      if (repl['secondary'] != null) result['Secondary'] = repl['secondary'].toString();
+      if (repl['setName'] != null)
+        result['Replica set'] = repl['setName'].toString();
+      if (repl['ismaster'] != null)
+        result['Is master'] = repl['ismaster'].toString();
+      if (repl['secondary'] != null)
+        result['Secondary'] = repl['secondary'].toString();
     }
     return result;
   }
@@ -780,7 +819,8 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
   String _formatBytes(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    if (bytes < 1024 * 1024 * 1024)
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 }

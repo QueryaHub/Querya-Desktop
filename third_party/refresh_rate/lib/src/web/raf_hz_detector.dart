@@ -54,7 +54,18 @@ class RafHzDetector {
   /// Snaps a raw Hz measurement to the nearest common display refresh rate
   /// when the raw value is within 3% tolerance.
   static double _snapToCommonHz(double raw) {
-    const commonRates = [30.0, 48.0, 60.0, 72.0, 90.0, 120.0, 144.0, 165.0, 240.0, 360.0];
+    const commonRates = [
+      30.0,
+      48.0,
+      60.0,
+      72.0,
+      90.0,
+      120.0,
+      144.0,
+      165.0,
+      240.0,
+      360.0
+    ];
     for (final rate in commonRates) {
       if ((raw - rate).abs() / rate < 0.03) return rate;
     }

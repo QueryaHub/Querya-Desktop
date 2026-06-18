@@ -92,8 +92,7 @@ QueryaTheme buildQueryaThemeFromVsCodeManifest(
     brightness: brightness,
   );
 
-  final editorForegroundChanged =
-      editor.foreground != base.editor.foreground;
+  final editorForegroundChanged = editor.foreground != base.editor.foreground;
   if (schemeForeground != null || editorForegroundChanged) {
     final fg = schemeForeground ?? editor.foreground;
     colorScheme = colorScheme.copyWith(

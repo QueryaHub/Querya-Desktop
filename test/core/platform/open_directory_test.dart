@@ -7,8 +7,8 @@ import 'package:querya_desktop/core/platform/open_directory.dart';
 void main() {
   group('openDirectoryInFileManager', () {
     test('creates missing directory before delegating to opener', () async {
-      final root = await Directory.systemTemp
-          .createTemp('querya_open_directory_test_');
+      final root =
+          await Directory.systemTemp.createTemp('querya_open_directory_test_');
       addTearDown(() async {
         if (await root.exists()) {
           await root.delete(recursive: true);

@@ -94,7 +94,8 @@ void main() {
         [1, null, 'x', 2.5, true, DateTime.utc(2026, 1, 1)],
       ]);
       expect(result.length, 1);
-      expect(result.first, ['1', 'NULL', 'x', '2.5', 'true', '2026-01-01T00:00:00.000Z']);
+      expect(result.first,
+          ['1', 'NULL', 'x', '2.5', 'true', '2026-01-01T00:00:00.000Z']);
     });
   });
 }

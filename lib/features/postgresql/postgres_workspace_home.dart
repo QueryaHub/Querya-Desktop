@@ -23,8 +23,12 @@ class PostgresWorkspaceHome extends material.StatefulWidget {
   final ConnectionRow connectionRow;
 
   /// Set when opening SQL from the tree (e.g. "Open in SQL") to seed session DB + template.
-  final ({String database, String schema, String name, PostgresObjectKind kind})?
-      postgresSqlEditorContext;
+  final ({
+    String database,
+    String schema,
+    String name,
+    PostgresObjectKind kind
+  })? postgresSqlEditorContext;
 
   /// Bumps when [postgresSqlEditorContext] should be applied to the editor.
   final int postgresSqlEditorContextToken;
@@ -37,7 +41,8 @@ class PostgresWorkspaceHome extends material.StatefulWidget {
       _PostgresWorkspaceHomeState();
 }
 
-class _PostgresWorkspaceHomeState extends material.State<PostgresWorkspaceHome> {
+class _PostgresWorkspaceHomeState
+    extends material.State<PostgresWorkspaceHome> {
   int _tab = 0;
   late final material.ValueNotifier<bool?> _sqlTxNotifier;
   int _lastAppliedSqlTabToken = 0;
@@ -140,9 +145,7 @@ class _PostgresWorkspaceHomeState extends material.State<PostgresWorkspaceHome> 
                         ),
                         child: selected
                             ? Text(labels[i]).small().semiBold()
-                            : Text(labels[i])
-                                .small()
-                                .muted(),
+                            : Text(labels[i]).small().muted(),
                       ),
                     ),
                   ),

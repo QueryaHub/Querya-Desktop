@@ -83,7 +83,8 @@ void main() {
   });
 
   group('SqlEditorChrome widget', () {
-    testWidgets('applies imported editor background and border', (tester) async {
+    testWidgets('applies imported editor background and border',
+        (tester) async {
       final queryaTheme = buildQueryaThemeFromVsCodeColors(
         brightness: Brightness.dark,
         colors: const {
@@ -120,7 +121,8 @@ void main() {
         return d is material.BoxDecoration &&
             d.color == const Color(0xFFAABBCC);
       });
-      final border = (inner.decoration! as material.BoxDecoration).border as Border;
+      final border =
+          (inner.decoration! as material.BoxDecoration).border as Border;
       expect(
         border.top.color,
         const Color(0xFF112233).withValues(alpha: 0.5),
@@ -132,7 +134,8 @@ void main() {
           .expand((d) => d.boxShadow ?? const <material.BoxShadow>[])
           .map((s) => s.color)
           .whereType<Color>()
-          .firstWhere((c) => c == const Color(0xFF00FFEE).withValues(alpha: 0.1));
+          .firstWhere(
+              (c) => c == const Color(0xFF00FFEE).withValues(alpha: 0.1));
       expect(outerGlow, const Color(0xFF00FFEE).withValues(alpha: 0.1));
     });
   });

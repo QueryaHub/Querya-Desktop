@@ -21,16 +21,27 @@ class MainScreenWorkspaceState {
   final ConnectionRow? activeConnection;
   final int? activeRedisDb;
   final String? activeMongoDB;
-  final ({String database, String schema, String name, PostgresObjectKind kind})?
-      selectedPostgresObject;
+  final ({
+    String database,
+    String schema,
+    String name,
+    PostgresObjectKind kind
+  })? selectedPostgresObject;
   final int postgresSqlTabRequestToken;
 
   /// Seeds the SQL editor when using "Open in SQL" (table/view/matview from current tree selection).
-  final ({String database, String schema, String name, PostgresObjectKind kind})?
-      postgresSqlEditorContext;
+  final ({
+    String database,
+    String schema,
+    String name,
+    PostgresObjectKind kind
+  })? postgresSqlEditorContext;
   final int postgresSqlEditorContextToken;
-  final ({String database, String name, MysqlObjectKind kind})?
-      selectedMysqlObject;
+  final ({
+    String database,
+    String name,
+    MysqlObjectKind kind
+  })? selectedMysqlObject;
   final int mysqlSqlTabRequestToken;
 
   static const empty = MainScreenWorkspaceState();
@@ -133,8 +144,12 @@ class MainScreenWorkspaceState {
     String? seedName,
     PostgresObjectKind? seedKind,
   }) {
-    ({String database, String schema, String name, PostgresObjectKind kind})?
-        seed;
+    ({
+      String database,
+      String schema,
+      String name,
+      PostgresObjectKind kind
+    })? seed;
 
     final explicit = seedDatabase != null &&
         seedSchema != null &&

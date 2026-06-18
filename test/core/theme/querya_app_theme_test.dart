@@ -42,10 +42,10 @@ void main() {
 
   tearDown(() async {
     await AppSettings.instance.clearThemeSettings();
-    await ThemeController.instance.load();
   });
 
-  test('ThemeController shadcn themes differ for light vs dark background', () async {
+  test('ThemeController shadcn themes differ for light vs dark background',
+      () async {
     final controller = ThemeController.instance;
     await controller.load();
 

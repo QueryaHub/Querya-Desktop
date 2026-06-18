@@ -14,7 +14,8 @@ void main() {
     TestWidgetsFlutterBinding.ensureInitialized();
     await SyntaxHighlightService.ensureInitialized();
   });
-  testWidgets('QueryaCodeEditor shadcn applies fontSize from props', (tester) async {
+  testWidgets('QueryaCodeEditor shadcn applies fontSize from props',
+      (tester) async {
     await tester.pumpWidget(
       queryaThemeTestShell(
         child: const material.SizedBox(
@@ -35,7 +36,8 @@ void main() {
     expect(editable.style.fontSize, 17);
   });
 
-  testWidgets('QueryaCodeEditor material variant uses editor foreground', (tester) async {
+  testWidgets('QueryaCodeEditor material variant uses editor foreground',
+      (tester) async {
     final theme = QueryaTheme.darkDefault.copyWith(
       editor: QueryaTheme.darkDefault.editor.copyWith(
         foreground: const Color(0xFFABCDEF),
@@ -56,11 +58,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final field = tester.widget<material.TextField>(find.byType(material.TextField));
+    final field =
+        tester.widget<material.TextField>(find.byType(material.TextField));
     expect(field.style?.color, const Color(0xFFABCDEF));
   });
 
-  testWidgets('SQL highlighting keeps external controller in sync', (tester) async {
+  testWidgets('SQL highlighting keeps external controller in sync',
+      (tester) async {
     final external = material.TextEditingController();
     await tester.pumpWidget(
       queryaThemeTestShell(
@@ -84,7 +88,10 @@ void main() {
     await tester.pump();
     await pumpSyntaxHighlightDebounce(tester);
     expect(
-      tester.widget<material.EditableText>(find.byType(material.EditableText)).controller.text,
+      tester
+          .widget<material.EditableText>(find.byType(material.EditableText))
+          .controller
+          .text,
       'UPDATE x',
     );
   });

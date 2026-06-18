@@ -333,7 +333,8 @@ class AppSettings {
   }
 
   Future<String?> getSelectedThemeId() async {
-    final v = await LocalDb.instance.getAppSetting(AppSettingsKeys.themeSelectedId);
+    final v =
+        await LocalDb.instance.getAppSetting(AppSettingsKeys.themeSelectedId);
     if (v == null || v.isEmpty) return null;
     return v;
   }
@@ -348,8 +349,8 @@ class AppSettings {
   }
 
   Future<String?> getSelectedThemeSource() async {
-    final v =
-        await LocalDb.instance.getAppSetting(AppSettingsKeys.themeSelectedSource);
+    final v = await LocalDb.instance
+        .getAppSetting(AppSettingsKeys.themeSelectedSource);
     if (v == null || v.isEmpty) return null;
     return v;
   }
@@ -377,7 +378,8 @@ class AppSettings {
 
   Future<void> setSelectedThemePath(String? path) async {
     if (path == null || path.isEmpty) {
-      await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeSelectedPath);
+      await LocalDb.instance
+          .deleteAppSetting(AppSettingsKeys.themeSelectedPath);
     } else {
       await LocalDb.instance.setAppSetting(
         AppSettingsKeys.themeSelectedPath,
@@ -389,7 +391,8 @@ class AppSettings {
 
   Future<void> clearSelectedThemeRegistry() async {
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeSelectedId);
-    await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeSelectedSource);
+    await LocalDb.instance
+        .deleteAppSetting(AppSettingsKeys.themeSelectedSource);
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeSelectedPath);
     AppSettingsRevision.bump();
   }
@@ -452,8 +455,8 @@ class AppSettings {
   }
 
   Future<Map<String, String>> getThemeColorOverrides() async {
-    final v =
-        await LocalDb.instance.getAppSetting(AppSettingsKeys.themeOverridesJson);
+    final v = await LocalDb.instance
+        .getAppSetting(AppSettingsKeys.themeOverridesJson);
     if (v == null || v.isEmpty) return {};
     try {
       final decoded = jsonDecode(v);
@@ -519,9 +522,11 @@ class AppSettings {
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeMode);
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themePreset);
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeOverridesJson);
-    await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeAnimationEnabled);
+    await LocalDb.instance
+        .deleteAppSetting(AppSettingsKeys.themeAnimationEnabled);
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeSelectedId);
-    await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeSelectedSource);
+    await LocalDb.instance
+        .deleteAppSetting(AppSettingsKeys.themeSelectedSource);
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.themeSelectedPath);
     await deleteThemeImportKeys();
     AppSettingsRevision.bump();

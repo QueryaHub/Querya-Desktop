@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart' as material show EdgeInsets, Padding, TextEditingController;
+import 'package:flutter/material.dart' as material
+    show EdgeInsets, Padding, TextEditingController;
 import 'package:querya_desktop/core/editor/querya_code_editor.dart';
 import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/features/main_screen/sql_editor_chrome.dart';

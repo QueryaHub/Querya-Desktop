@@ -76,7 +76,8 @@ void main() {
 
   group('PgForeignServerRow', () {
     test('stores server and FDW name', () {
-      const row = PgForeignServerRow(serverName: 'remote_pg', fdwName: 'postgres_fdw');
+      const row =
+          PgForeignServerRow(serverName: 'remote_pg', fdwName: 'postgres_fdw');
       expect(row.serverName, 'remote_pg');
       expect(row.fdwName, 'postgres_fdw');
     });

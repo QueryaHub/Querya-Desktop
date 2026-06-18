@@ -1,7 +1,8 @@
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 
 /// Shared in-memory backend wired from `test/flutter_test_config.dart`.
-final MemorySecretsStorageBackend testMemorySecrets = MemorySecretsStorageBackend();
+final MemorySecretsStorageBackend testMemorySecrets =
+    MemorySecretsStorageBackend();
 
 /// In-memory secrets backend for `flutter test` (no OS keychain / libsecret).
 class MemorySecretsStorageBackend implements SecretsStorageBackend {

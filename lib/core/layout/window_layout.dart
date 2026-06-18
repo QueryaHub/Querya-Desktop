@@ -30,7 +30,8 @@ abstract class WindowLayout {
     return BoxConstraints(
       maxWidth: maxWidth != null ? context.scaled(maxWidth) : double.infinity,
       minWidth: minWidth != null ? context.scaled(minWidth) : 0,
-      maxHeight: maxHeight != null ? context.scaled(maxHeight) : double.infinity,
+      maxHeight:
+          maxHeight != null ? context.scaled(maxHeight) : double.infinity,
       minHeight: minHeight != null ? context.scaled(minHeight) : 0,
     );
   }
@@ -45,7 +46,8 @@ abstract class WindowLayout {
     double viewportFactor = 1.0,
   }) {
     final available = math.max(0.0, screenExtent - insetTotal);
-    final base = math.min(baseMax, math.max(baseMin, available * viewportFactor));
+    final base =
+        math.min(baseMax, math.max(baseMin, available * viewportFactor));
     return math.min(context.scaled(base), available);
   }
 

@@ -66,12 +66,12 @@ void main() {
       await themesDir.delete(recursive: true);
     }
     ThemeController.instance.setRegistryServiceForTest(ThemeRegistryService());
-    await ThemeController.instance.load();
   });
 
   group('ThemeEditorLoader', () {
     test('loads custom theme file manifest when available', () async {
-      final source = File(p.join('test/fixtures/themes', 'querya_custom_dark.json'));
+      final source =
+          File(p.join('test/fixtures/themes', 'querya_custom_dark.json'));
       await File(p.join(themesDir.path, 'querya_custom_dark.json'))
           .writeAsString(await source.readAsString());
 
@@ -105,7 +105,8 @@ void main() {
 
       await c.previewEditorManifest(manifest);
       expect(c.isEditorPreviewActive, isTrue);
-      expect(c.activeTheme.colorScheme.primary, parseQueryaThemeColor('#FF00AA'));
+      expect(
+          c.activeTheme.colorScheme.primary, parseQueryaThemeColor('#FF00AA'));
 
       await c.endEditorPreview();
       expect(c.isEditorPreviewActive, isFalse);

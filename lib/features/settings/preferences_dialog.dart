@@ -202,7 +202,8 @@ class _PreferencesDialogContentState
                                     }
                                   },
                                   entries: [
-                                    for (final n in kSqlHistoryMaxEntriesPresets)
+                                    for (final n
+                                        in kSqlHistoryMaxEntriesPresets)
                                       material.DropdownMenuEntry(
                                         value: n,
                                         label: '$n entries',

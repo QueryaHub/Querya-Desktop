@@ -10,8 +10,8 @@ import 'package:querya_desktop/core/theme/querya_theme.dart';
 void main() {
   group('queryaThemeFromManifest', () {
     test('full dark fixture builds dark QueryaTheme', () {
-      final raw =
-          File('test/fixtures/themes/querya_custom_dark.json').readAsStringSync();
+      final raw = File('test/fixtures/themes/querya_custom_dark.json')
+          .readAsStringSync();
       final manifest = QueryaThemeManifest.fromJsonString(raw);
       final theme = queryaThemeFromManifest(manifest);
 
@@ -23,8 +23,8 @@ void main() {
     });
 
     test('full light fixture builds light QueryaTheme', () {
-      final raw =
-          File('test/fixtures/themes/querya_custom_light.json').readAsStringSync();
+      final raw = File('test/fixtures/themes/querya_custom_light.json')
+          .readAsStringSync();
       final manifest = QueryaThemeManifest.fromJsonString(raw);
       final theme = queryaThemeFromManifest(manifest);
 
@@ -35,8 +35,8 @@ void main() {
     });
 
     test('preserves tokenColors from manifest', () {
-      final raw =
-          File('test/fixtures/themes/querya_custom_dark.json').readAsStringSync();
+      final raw = File('test/fixtures/themes/querya_custom_dark.json')
+          .readAsStringSync();
       final manifest = QueryaThemeManifest.fromJsonString(raw);
       final theme = queryaThemeFromManifest(manifest);
 
@@ -60,8 +60,8 @@ void main() {
     });
 
     test('does not create ThemeData', () {
-      final raw =
-          File('test/fixtures/themes/querya_custom_dark.json').readAsStringSync();
+      final raw = File('test/fixtures/themes/querya_custom_dark.json')
+          .readAsStringSync();
       final manifest = QueryaThemeManifest.fromJsonString(raw);
 
       expect(queryaThemeFromManifest(manifest), isA<QueryaTheme>());

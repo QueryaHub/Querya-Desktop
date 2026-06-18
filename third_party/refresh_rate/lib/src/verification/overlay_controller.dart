@@ -8,6 +8,7 @@ enum _OverlayMode { none, fps, hz, full }
 /// Manages the visibility and rendering of debug overlays.
 class OverlayController {
   OverlayController._();
+
   /// The singleton instance of [OverlayController].
   static final instance = OverlayController._();
 
@@ -21,8 +22,10 @@ class OverlayController {
 
   /// Shows a compact FPS overlay.
   void showFPS() => _show(_OverlayMode.fps);
+
   /// Shows a compact Hz (refresh rate) overlay.
   void showHz() => _show(_OverlayMode.hz);
+
   /// Shows the full debug overlay with detailed metrics.
   void showFull() => _show(_OverlayMode.full);
 
@@ -61,6 +64,7 @@ class OverlayController {
       }
       element.visitChildren(visit);
     }
+
     root.visitChildren(visit);
     return found;
   }

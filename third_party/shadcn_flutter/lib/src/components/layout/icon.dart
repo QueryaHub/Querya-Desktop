@@ -1,4 +1,5 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+
 /// Provides themed icon container widgets for shadcn_flutter components.
 ///
 /// Includes [IconContainerTheme] and [IconContainer] for styling icons with background, padding, and border radius.
@@ -6,10 +7,13 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 class IconContainerTheme extends ComponentThemeData {
   /// Background color for the icon container.
   final Color? backgroundColor;
+
   /// Color for the icon inside the container.
   final Color? iconColor;
+
   /// Padding inside the icon container.
   final EdgeInsetsGeometry? padding;
+
   /// Border radius for the icon container.
   final BorderRadius? borderRadius;
 
@@ -87,14 +91,19 @@ class IconContainerTheme extends ComponentThemeData {
 class IconContainer extends StatelessWidget {
   /// The icon widget to display.
   final Widget icon;
+
   /// Padding inside the container.
   final EdgeInsetsGeometry? padding;
+
   /// Border radius for the container.
   final BorderRadius? borderRadius;
+
   /// Background color for the container.
   final Color? backgroundColor;
+
   /// Color for the icon.
   final Color? iconColor;
+
   /// Creates an [IconContainer].
   ///
   /// Parameters:

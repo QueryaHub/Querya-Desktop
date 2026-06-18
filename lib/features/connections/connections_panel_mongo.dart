@@ -45,7 +45,8 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
       _error = null;
     });
     try {
-      final conn = await MongoService.instance.ensureConnected(widget.connection);
+      final conn =
+          await MongoService.instance.ensureConnected(widget.connection);
       final dbs = await conn.listDatabases();
 
       if (!mounted) return;
@@ -93,7 +94,8 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
     );
     if (ok != true || !mounted) return;
     try {
-      final conn = await MongoService.instance.ensureConnected(widget.connection);
+      final conn =
+          await MongoService.instance.ensureConnected(widget.connection);
       await conn.dropDatabase(dbName);
 
       if (mounted) {
@@ -124,7 +126,8 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
               color: theme.colorScheme.primary,
             ),
           )
-        : material.Icon(widget.icon, size: 16, color: theme.colorScheme.primary);
+        : material.Icon(widget.icon,
+            size: 16, color: theme.colorScheme.primary);
 
     return ContextMenu(
       items: [
@@ -235,77 +238,82 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
                 mainAxisSize: material.MainAxisSize.min,
                 crossAxisAlignment: material.CrossAxisAlignment.stretch,
                 children: [
-              if (_loading)
-                material.Padding(
-                  padding: const material.EdgeInsets.only(left: 28, top: 4, bottom: 4),
-                  child: material.Row(
-                    children: [
-                      const material.SizedBox(
-                        width: 12,
-                        height: 12,
-                        child: material.CircularProgressIndicator(strokeWidth: 1.5),
+                  if (_loading)
+                    material.Padding(
+                      padding: const material.EdgeInsets.only(
+                          left: 28, top: 4, bottom: 4),
+                      child: material.Row(
+                        children: [
+                          const material.SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: material.CircularProgressIndicator(
+                                strokeWidth: 1.5),
+                          ),
+                          const Gap(8),
+                          const Text('Loading...').muted().xSmall(),
+                        ],
                       ),
-                      const Gap(8),
-                      const Text('Loading...').muted().xSmall(),
-                    ],
-                  ),
-                ),
-              if (_error != null)
-                material.Padding(
-                  padding: const material.EdgeInsets.only(left: 28, top: 4, bottom: 4, right: 8),
-                  child: material.ConstrainedBox(
-                    constraints: const material.BoxConstraints(maxWidth: double.infinity),
-                    child: material.Column(
-                      crossAxisAlignment: material.CrossAxisAlignment.start,
-                      mainAxisSize: material.MainAxisSize.min,
-                      children: [
-                        material.Row(
+                    ),
+                  if (_error != null)
+                    material.Padding(
+                      padding: const material.EdgeInsets.only(
+                          left: 28, top: 4, bottom: 4, right: 8),
+                      child: material.ConstrainedBox(
+                        constraints: const material.BoxConstraints(
+                            maxWidth: double.infinity),
+                        child: material.Column(
                           crossAxisAlignment: material.CrossAxisAlignment.start,
+                          mainAxisSize: material.MainAxisSize.min,
                           children: [
-                            material.Icon(
-                              material.Icons.error_outline_rounded,
-                              size: 14,
-                              color: theme.colorScheme.destructive,
-                            ),
-                            const Gap(6),
-                            material.Expanded(
-                              child: material.Text(
-                                'Could not load databases',
-                                maxLines: 2,
-                                overflow: material.TextOverflow.ellipsis,
-                                style: material.TextStyle(
-                                  fontSize: 12,
+                            material.Row(
+                              crossAxisAlignment:
+                                  material.CrossAxisAlignment.start,
+                              children: [
+                                material.Icon(
+                                  material.Icons.error_outline_rounded,
+                                  size: 14,
                                   color: theme.colorScheme.destructive,
                                 ),
+                                const Gap(6),
+                                material.Expanded(
+                                  child: material.Text(
+                                    'Could not load databases',
+                                    maxLines: 2,
+                                    overflow: material.TextOverflow.ellipsis,
+                                    style: material.TextStyle(
+                                      fontSize: 12,
+                                      color: theme.colorScheme.destructive,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const Gap(6),
+                            material.SelectableText(
+                              _error!,
+                              style: material.TextStyle(
+                                fontSize: 10,
+                                height: 1.35,
+                                color: theme.colorScheme.mutedForeground,
                               ),
                             ),
                           ],
                         ),
-                        const Gap(6),
-                        material.SelectableText(
-                          _error!,
-                          style: material.TextStyle(
-                            fontSize: 10,
-                            height: 1.35,
-                            color: theme.colorScheme.mutedForeground,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-              for (final db in _databases)
-                _MongoDatabaseNode(
-                  connection: widget.connection,
-                  name: db,
-                  onTap: () => widget.onDatabaseTap?.call(db),
-                  onDelete: () => _deleteDatabase(db),
-                  onRefreshDatabases: () {
-                    setState(() => _databases = []);
-                    _loadDatabases();
-                  },
-                ),
-            ],
+                  for (final db in _databases)
+                    _MongoDatabaseNode(
+                      connection: widget.connection,
+                      name: db,
+                      onTap: () => widget.onDatabaseTap?.call(db),
+                      onDelete: () => _deleteDatabase(db),
+                      onRefreshDatabases: () {
+                        setState(() => _databases = []);
+                        _loadDatabases();
+                      },
+                    ),
+                ],
               ),
             ),
           ],

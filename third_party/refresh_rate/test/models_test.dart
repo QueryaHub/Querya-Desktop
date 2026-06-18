@@ -30,8 +30,11 @@ void main() {
 
     test('handles null thermalStateIndex as unknown', () {
       final msg = DisplayInfoMessage(
-        currentRate: 60.0, maxRate: 60.0, minRate: 60.0,
-        supportedRates: [60.0], isVariableRefreshRate: false,
+        currentRate: 60.0,
+        maxRate: 60.0,
+        minRate: 60.0,
+        supportedRates: [60.0],
+        isVariableRefreshRate: false,
         engineTargetRate: 60.0,
         thermalStateIndex: null,
       );
