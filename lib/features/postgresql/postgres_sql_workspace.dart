@@ -375,6 +375,18 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context);
 
+    return material.CallbackShortcuts(
+      bindings: {
+        const material.SingleActivator(LogicalKeyboardKey.f5): () {
+          if (!_running) _execute();
+        },
+      },
+      child: material.Focus(
+        autofocus: true,
+        child: VerticalSplitPane(
+          fraction: _topFraction,
+          maxFraction: 0.85,
+          top: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _SqlToolbar(
@@ -440,8 +452,6 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
           ),
         ),
       ),
-    );
-      },
     );
   }
 }
