@@ -18,7 +18,13 @@ SQLite database connector release. Git tag **`0.4.5`**.
 - **Connection dialog (SQL-S3)** — SQLite connection form with native file-picking (`file_selector`) and read-only toggle.
 - **Connections sidebar (SQL-S4)** — integrated SQLite nodes with expand/collapse hierarchy under Connections.
 - **SQL Workspace editor & Paginated table (SQL-S5)** — SQLite query workspace supporting history lookups, statement executions, and paginated data grid browser.
-- **Unit and Integration tests (SQL-S6)** — robust unit tests for connecting, catalog schema listing, and read-only permissions check.
+- **Docker test database** — added `sqlite-seed` container to `docker-compose.yml` to automatically generate a local `querya.db` file with mock data alongside other test databases.
+
+### Fixed
+
+- **UI / Accessibility** — fixed text clipping in workspace toolbars and settings when increasing the interface scale (e.g., 150%). Replaced hardcoded heights with `minHeight` constraints and dynamically scaled label widths.
+- **UI / Stability** — resolved `A RenderAnimatedSize was mutated in its own performLayout implementation` crash during split pane dragging by removing redundant `LayoutBuilder` wrappers.
+- **Linting** — resolved `flutter analyze` warnings for deprecated Shadcn legacy colors and flow control structures.
 
 ## [0.4.4] - 2026-06-16
 
