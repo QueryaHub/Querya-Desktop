@@ -24,7 +24,7 @@ void main() {
     });
 
     test('constructs from ConnectionRow correctly', () {
-      final row = ConnectionRow(
+      const row = ConnectionRow(
         id: 456,
         type: 'sqlite',
         name: 'Row SQLite',
