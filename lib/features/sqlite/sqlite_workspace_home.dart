@@ -21,8 +21,8 @@ class _SqliteWorkspaceHomeState extends material.State<SqliteWorkspaceHome> {
   @override
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context);
-    return material.Column(
-      crossAxisAlignment: material.CrossAxisAlignment.stretch,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         material.Container(
           constraints: const material.BoxConstraints(minHeight: 44),
