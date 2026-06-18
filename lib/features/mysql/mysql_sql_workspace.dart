@@ -235,17 +235,15 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context);
 
-    return material.LayoutBuilder(
-      builder: (context, constraints) {
-        return material.CallbackShortcuts(
-          bindings: {
-            const material.SingleActivator(LogicalKeyboardKey.f5): () {
-              if (!_running) {
-                unawaited(_execute());
-              }
-            },
-          },
-          child: material.Focus(
+    return material.CallbackShortcuts(
+      bindings: {
+        const material.SingleActivator(LogicalKeyboardKey.f5): () {
+          if (!_running) {
+            unawaited(_execute());
+          }
+        },
+      },
+      child: material.Focus(
         autofocus: true,
         child: VerticalSplitPane(
           fraction: _topFraction,
@@ -308,8 +306,6 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
           ),
         ),
       ),
-    );
-      },
     );
   }
 }
