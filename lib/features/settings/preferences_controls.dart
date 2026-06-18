@@ -3,6 +3,7 @@ import 'dart:async' show unawaited;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/layout/ui_scale_controller.dart';
+import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/shared/widgets/querya_dropdown.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -52,13 +53,11 @@ class PreferencesFieldRow extends StatelessWidget {
         material.Row(
           crossAxisAlignment: material.CrossAxisAlignment.start,
           children: [
-            material.SizedBox(
-              width: labelWidth,
-              height: triggerHeight,
-              child: material.Align(
-                alignment: material.Alignment.centerLeft,
-                child: Text(label).small().foreground(),
-              ),
+            material.Container(
+              width: context.scaled(labelWidth),
+              constraints: material.BoxConstraints(minHeight: triggerHeight),
+              alignment: material.Alignment.centerLeft,
+              child: Text(label).small().foreground(),
             ),
             const material.SizedBox(width: 12),
             material.Expanded(child: control),
@@ -67,7 +66,7 @@ class PreferencesFieldRow extends StatelessWidget {
         if (hint != null) ...[
           const material.SizedBox(height: 4),
           material.Padding(
-            padding: material.EdgeInsets.only(left: labelWidth + 12),
+            padding: material.EdgeInsets.only(left: context.scaled(labelWidth) + 12),
             child: PreferencesHint(hint!),
           ),
         ],

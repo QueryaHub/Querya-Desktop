@@ -10,6 +10,7 @@ import 'package:querya_desktop/core/theme/theme_import_service.dart';
 import 'package:querya_desktop/core/theme/theme_load_result.dart';
 import 'package:querya_desktop/core/theme/theme_paths.dart';
 import 'package:querya_desktop/features/settings/preferences_controls.dart';
+import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/features/settings/theme_editor_section.dart';
 import 'package:querya_desktop/features/settings/theme_picker_button.dart';
 import 'package:querya_desktop/features/settings/theme_preview_card.dart';
@@ -206,8 +207,8 @@ class _PreferencesAppearanceSectionState
         if (c.selectedThemeLoadError != null) ...[
           const material.SizedBox(height: 8),
           material.Padding(
-            padding: const material.EdgeInsets.only(
-              left: kPreferencesLabelWidth + 12,
+            padding: material.EdgeInsets.only(
+              left: context.scaled(kPreferencesLabelWidth) + 12,
             ),
             child: material.Text(
               c.selectedThemeLoadError!,
@@ -219,9 +220,9 @@ class _PreferencesAppearanceSectionState
           ),
         ],
         const material.SizedBox(height: 8),
-        const material.Padding(
-          padding: material.EdgeInsets.only(left: kPreferencesLabelWidth + 12),
-          child: PreferencesHint(
+        material.Padding(
+          padding: material.EdgeInsets.only(left: context.scaled(kPreferencesLabelWidth) + 12),
+          child: const PreferencesHint(
             'Themes are loaded from the app support themes folder. '
             'Drop .json or .jsonc files there; the folder is watched automatically '
             'or use Refresh themes.',
