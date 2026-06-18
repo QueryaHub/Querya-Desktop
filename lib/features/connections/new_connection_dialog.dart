@@ -12,6 +12,7 @@ enum ConnectionType {
   mysql,
   redis,
   mongodb,
+  sqlite,
 }
 
 extension ConnectionTypeX on ConnectionType {
@@ -20,12 +21,14 @@ extension ConnectionTypeX on ConnectionType {
         ConnectionType.mysql => 'MySQL',
         ConnectionType.redis => 'Redis',
         ConnectionType.mongodb => 'MongoDB',
+        ConnectionType.sqlite => 'SQLite',
       };
   material.IconData get icon => switch (this) {
         ConnectionType.postgresql => material.Icons.storage_rounded,
         ConnectionType.mysql => material.Icons.table_chart_rounded,
         ConnectionType.redis => material.Icons.memory_rounded,
         ConnectionType.mongodb => material.Icons.eco_rounded,
+        ConnectionType.sqlite => material.Icons.folder_open_rounded,
       };
 
   /// Asset path for custom icon (from Downloads).
@@ -34,16 +37,18 @@ extension ConnectionTypeX on ConnectionType {
         ConnectionType.mysql => 'assets/images/mysql_icon.png',
         ConnectionType.redis => 'assets/images/redis_icon.png',
         ConnectionType.mongodb => 'assets/images/mongodb_icon.png',
+        ConnectionType.sqlite => null,
       };
   bool get isSql =>
-      this == ConnectionType.postgresql || this == ConnectionType.mysql;
+      this == ConnectionType.postgresql || this == ConnectionType.mysql || this == ConnectionType.sqlite;
 }
 
-const _sqlTypes = [ConnectionType.postgresql, ConnectionType.mysql];
+const _sqlTypes = [ConnectionType.postgresql, ConnectionType.mysql, ConnectionType.sqlite];
 const _noSqlTypes = [ConnectionType.redis, ConnectionType.mongodb];
 const _allTypes = [
   ConnectionType.postgresql,
   ConnectionType.mysql,
+  ConnectionType.sqlite,
   ConnectionType.redis,
   ConnectionType.mongodb
 ];

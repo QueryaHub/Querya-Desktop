@@ -58,6 +58,7 @@ import 'package:querya_desktop/core/database/mysql_service.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/database/redis_info.dart';
+import 'package:querya_desktop/core/database/sqlite_service.dart';
 import 'package:querya_desktop/core/storage/folders_storage.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
@@ -78,6 +79,7 @@ part 'connections_panel_mongo.dart';
 part 'connections_panel_postgres_connection.dart';
 part 'connections_panel_mysql.dart';
 part 'connections_panel_pg_tree.dart';
+part 'connections_panel_sqlite.dart';
 
 /// Opens the PostgreSQL SQL tab; optional tree fields seed the editor for the
 /// row that was right-clicked (left-click is not required).
@@ -149,6 +151,8 @@ class ConnectionsPanel extends StatefulWidget {
     this.onPostgresOpenSqlWorkspace,
     this.onMysqlObjectSelected,
     this.onMysqlOpenSqlWorkspace,
+    this.onSqliteObjectSelected,
+    this.onSqliteOpenSqlWorkspace,
 
     /// When true, [initState] does not call [_loadData]. Widget tests that seed
     /// SQLite in setUp should call [ConnectionsPanelState.reloadConnectionsFromDb]
@@ -193,6 +197,16 @@ class ConnectionsPanel extends StatefulWidget {
 
   /// Opens the MySQL workspace home and switches to the SQL tab.
   final void Function(ConnectionRow connection)? onMysqlOpenSqlWorkspace;
+
+  /// SQLite table or view selected in the tree.
+  final void Function(
+    ConnectionRow connection,
+    String name,
+    SqliteObjectKind kind,
+  )? onSqliteObjectSelected;
+
+  /// Opens the SQLite workspace home and switches to the SQL tab.
+  final void Function(ConnectionRow connection)? onSqliteOpenSqlWorkspace;
 
   final bool skipInitialDbLoadForTest;
 
@@ -286,6 +300,14 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
 
   Future<void> _removeConnection(int id) async {
     await MongoService.instance.disconnectByConnectionId(id);
+    SqliteService.instance.interrupt(
+      ConnectionRow(id: id, type: 'sqlite', name: '', createdAt: ''),
+      mode: SqliteSessionMode.readOnly,
+    );
+    SqliteService.instance.interrupt(
+      ConnectionRow(id: id, type: 'sqlite', name: '', createdAt: ''),
+      mode: SqliteSessionMode.readWrite,
+    );
     await LocalDb.instance.removeConnection(id);
     await _loadData();
   }
@@ -297,6 +319,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
       'postgresql' => material.Icons.storage_rounded,
       'mysql' => material.Icons.table_chart_rounded,
       'redis' => material.Icons.memory_rounded,
+      'sqlite' => material.Icons.folder_open_rounded,
       _ => material.Icons.settings_ethernet_rounded,
     };
   }
@@ -356,6 +379,17 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         onRemove: () => _removeConnection(conn.id!),
         onTap: () => widget.onConnectionSelected?.call(conn),
         onDatabaseTap: (db) => widget.onMongoDBDatabaseSelected?.call(conn, db),
+      );
+    } else if (conn.type == 'sqlite') {
+      return _SqliteConnectionTile(
+        connection: conn,
+        isSelected: isSelected,
+        icon: _iconForType(conn.type),
+        iconAsset: _iconAssetForType(conn.type),
+        onRemove: () => _removeConnection(conn.id!),
+        onTap: () => widget.onConnectionSelected?.call(conn),
+        onSqliteObjectSelected: widget.onSqliteObjectSelected,
+        onSqliteOpenSqlWorkspace: widget.onSqliteOpenSqlWorkspace,
       );
     }
     return _ConnectionTile(

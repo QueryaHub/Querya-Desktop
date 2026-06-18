@@ -37,6 +37,9 @@ import 'package:querya_desktop/features/postgresql/postgres_object_workspace.dar
 import 'package:querya_desktop/features/postgresql/postgres_workspace_home.dart';
 import 'package:querya_desktop/features/redis/redis_explorer_view.dart';
 import 'package:querya_desktop/features/redis/redis_view.dart';
+import 'package:querya_desktop/features/connections/connections_panel.dart' show SqliteObjectKind;
+import 'package:querya_desktop/features/sqlite/sqlite_table_view.dart';
+import 'package:querya_desktop/features/sqlite/sqlite_workspace_home.dart';
 import 'query_editor_tab.dart';
 import 'results_tab.dart';
 import 'workspace_empty_hero.dart';
@@ -54,6 +57,8 @@ class WorkspacePanel extends StatefulWidget {
     this.postgresSqlEditorContextToken = 0,
     this.selectedMysqlObject,
     this.mysqlSqlTabRequestToken = 0,
+    this.selectedSqliteObject,
+    this.sqliteSqlTabRequestToken = 0,
     this.onRequestNewConnection,
   });
 
@@ -98,6 +103,15 @@ class WorkspacePanel extends StatefulWidget {
 
   /// Incremented by [MainScreen] to switch the MySQL home view to the SQL tab.
   final int mysqlSqlTabRequestToken;
+
+  /// When set, the user selected a SQLite table or view in the sidebar tree.
+  final ({
+    String name,
+    SqliteObjectKind kind
+  })? selectedSqliteObject;
+
+  /// Incremented by [MainScreen] to switch the SQLite home view to the SQL tab.
+  final int sqliteSqlTabRequestToken;
 
   /// Empty-state hero: primary CTA to add a connection.
   final void Function()? onRequestNewConnection;
@@ -192,6 +206,23 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
             : RedisView(
                 key: ValueKey(activeConn.id),
                 connectionRow: activeConn,
+              );
+        break;
+      case 'sqlite':
+        final sq = widget.selectedSqliteObject;
+        driverWorkspace = sq == null
+            ? SqliteWorkspaceHome(
+                key: ValueKey('sqlite_home_${activeConn.id}'),
+                connectionRow: activeConn,
+                sqlTabRequestToken: widget.sqliteSqlTabRequestToken,
+              )
+            : SqliteTableView(
+                key: ValueKey(
+                  'sqlite_${activeConn.id}_${sq.name}_${sq.kind}',
+                ),
+                connectionRow: activeConn,
+                tableName: sq.name,
+                isView: sq.kind == SqliteObjectKind.view,
               );
         break;
     }

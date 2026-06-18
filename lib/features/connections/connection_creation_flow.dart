@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' as material;
 
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/connections/new_connection_dialog.dart';
+import 'package:querya_desktop/features/connections/sqlite_connection_form.dart';
 import 'package:querya_desktop/features/mongodb/mongodb_connection_form.dart';
 import 'package:querya_desktop/features/mysql/mysql_connection_form.dart';
 import 'package:querya_desktop/features/postgresql/postgresql_connection_form.dart';
@@ -35,5 +36,7 @@ Future<ConnectionRow?> promptCreateConnection(
       return await showMongoConnectionForm(dialogContext, folderId: folderId);
     case ConnectionType.redis:
       return await showRedisConnectionForm(dialogContext, folderId: folderId);
+    case ConnectionType.sqlite:
+      return await showSqliteConnectionForm(dialogContext, folderId: folderId);
   }
 }
