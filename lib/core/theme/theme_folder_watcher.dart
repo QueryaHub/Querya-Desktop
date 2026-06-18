@@ -43,11 +43,13 @@ class ThemeFolderWatcher {
     }
 
     try {
-      _subscription = directory.watch(recursive: true).listen(
+      final stream = directory.watch(recursive: true);
+      _subscription = stream.listen(
         _onFilesystemEvent,
         onError: (Object error) {
           debugPrint('ThemeFolderWatcher: watch error ($error)');
         },
+        cancelOnError: false,
       );
     } on Object catch (error) {
       _started = false;
