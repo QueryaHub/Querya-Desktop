@@ -427,7 +427,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               material.Container(
-                height: 44,
+                constraints: const material.BoxConstraints(minHeight: 44),
                 padding: const material.EdgeInsets.symmetric(
                   horizontal: 12,
                 ),

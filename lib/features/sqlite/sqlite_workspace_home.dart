@@ -25,7 +25,7 @@ class _SqliteWorkspaceHomeState extends material.State<SqliteWorkspaceHome> {
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
         material.Container(
-          height: 44,
+          constraints: const material.BoxConstraints(minHeight: 44),
           padding: const material.EdgeInsets.symmetric(horizontal: 12),
           decoration: material.BoxDecoration(
             color: theme.colorScheme.muted.withValues(alpha: 0.6),

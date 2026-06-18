@@ -19,7 +19,8 @@ import 'package:flutter/material.dart' as material
         SingleChildScrollView,
         Row,
         MainAxisSize,
-        Widget;
+        Widget,
+        BoxConstraints;
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/motion/querya_cross_fade_stack.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
@@ -307,7 +308,7 @@ class _SectionBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return material.Container(
-      height: 44,
+      constraints: const material.BoxConstraints(minHeight: 44),
       padding: const material.EdgeInsets.symmetric(horizontal: 12),
       decoration: material.BoxDecoration(
         color: theme.colorScheme.muted.withValues(alpha: 0.6),

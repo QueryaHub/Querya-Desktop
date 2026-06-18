@@ -224,7 +224,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
             crossAxisAlignment: material.CrossAxisAlignment.stretch,
             children: [
               material.Container(
-                height: 44,
+                constraints: const material.BoxConstraints(minHeight: 44),
                 padding: const material.EdgeInsets.symmetric(
                   horizontal: 12,
                 ),
