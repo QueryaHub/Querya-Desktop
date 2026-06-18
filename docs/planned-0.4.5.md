@@ -14,12 +14,12 @@ Theme: Add support for local SQLite database file connections. This allows users
 
 | ID | Issue | Scope | Summary |
 |----|-------|--------|---------|
-| **SQL-S1** | #195 | `sqlite`, `core` | **Core Driver** — implement `SqliteConnection` wrapping `sqflite_common_ffi` and `SqliteService` to manage active connection handles to local files. |
-| **SQL-S2** | #196 | `sqlite`, `core` | **Schema Resolver** — read tables, views, and indexes metadata via `sqlite_master` catalog tables and column info via `PRAGMA table_info`. |
-| **SQL-S3** | #197 | `sqlite`, `ui` | **Connection Form** — create `SqliteConnectionForm` integrating native OS file picker (`file_selector` package) and a "Read-Only" safety toggle. |
-| **SQL-S4** | #198 | `sqlite`, `ui` | **Sidebar Integration** — render SQLite connections and their schema nodes in `ConnectionsPanel` connection tree. |
-| **SQL-S5** | #199 | `sqlite`, `ui` | **Workspace & Table View** — implement `SqliteWorkspaceHome` (SQL editor) and a paginated `SqliteTableView` database browser. |
-| **SQL-S6** | #200 | `sqlite`, `test` | **Test Coverage** — write unit tests for connection driver and widget/integration tests for workspace actions. |
+| **SQL-S1** | [#198](https://github.com/QueryaHub/Querya-Desktop/issues/198) | `sqlite`, `core` | **Core Driver** — implement `SqliteConnection` wrapping `sqflite_common_ffi` and `SqliteService` to manage active connection handles to local files. |
+| **SQL-S2** | [#199](https://github.com/QueryaHub/Querya-Desktop/issues/199) | `sqlite`, `core` | **Schema Resolver** — read tables, views, and indexes metadata via `sqlite_master` catalog tables and column info via `PRAGMA table_info`. |
+| **SQL-S3** | [#200](https://github.com/QueryaHub/Querya-Desktop/issues/200) | `sqlite`, `ui` | **Connection Form** — create `SqliteConnectionForm` integrating native OS file picker (`file_selector` package) and a "Read-Only" safety toggle. |
+| **SQL-S4** | [#201](https://github.com/QueryaHub/Querya-Desktop/issues/201) | `sqlite`, `ui` | **Sidebar Integration** — render SQLite connections and their schema nodes in `ConnectionsPanel` connection tree. |
+| **SQL-S5** | [#202](https://github.com/QueryaHub/Querya-Desktop/issues/202) | `sqlite`, `ui` | **Workspace & Table View** — implement `SqliteWorkspaceHome` (SQL editor) and a paginated `SqliteTableView` database browser. |
+| **SQL-S6** | [#203](https://github.com/QueryaHub/Querya-Desktop/issues/203) | `sqlite`, `tests` | **Test Coverage** — write unit tests for connection driver and widget/integration tests for workspace actions. |
 
 ## Suggested PR order
 
