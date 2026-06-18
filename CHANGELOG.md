@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.6-a] - 2026-06-18
+
+### Changed
+
+- **UI / Sidebar** — implemented collapsible dropdown tree nodes for tables and views in SQLite and MySQL connections.
+
 ## [0.4.6] - 2026-06-18
 
 SQLite database connector release. Git tag **`0.4.6`**.
