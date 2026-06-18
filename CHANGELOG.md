@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-06-18
+
+SQLite database connector release. Git tag **`0.4.5`**.
+
+### Added
+
+- **SQLite connection driver (SQL-S1)** — support local SQLite database files opening, closing, and queries via FFI.
+- **Catalog schema resolver (SQL-S2)** — automatic tables, views, indexes, and column schema detection.
+- **Connection dialog (SQL-S3)** — SQLite connection form with native file-picking (`file_selector`) and read-only toggle.
+- **Connections sidebar (SQL-S4)** — integrated SQLite nodes with expand/collapse hierarchy under Connections.
+- **SQL Workspace editor & Paginated table (SQL-S5)** — SQLite query workspace supporting history lookups, statement executions, and paginated data grid browser.
+- **Unit and Integration tests (SQL-S6)** — robust unit tests for connecting, catalog schema listing, and read-only permissions check.
+
 ## [0.4.4] - 2026-06-16
 
 UI motion polish, high refresh rate, performance fixes, and security improvements release. Git tag **`0.4.4`**.

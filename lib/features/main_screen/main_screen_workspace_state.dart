@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/connections/connections_panel.dart' show SqliteObjectKind;
 import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
 
@@ -16,6 +17,8 @@ class MainScreenWorkspaceState {
     this.postgresSqlEditorContextToken = 0,
     this.selectedMysqlObject,
     this.mysqlSqlTabRequestToken = 0,
+    this.selectedSqliteObject,
+    this.sqliteSqlTabRequestToken = 0,
   });
 
   final ConnectionRow? activeConnection;
@@ -37,12 +40,19 @@ class MainScreenWorkspaceState {
     PostgresObjectKind kind
   })? postgresSqlEditorContext;
   final int postgresSqlEditorContextToken;
+  
   final ({
     String database,
     String name,
     MysqlObjectKind kind
   })? selectedMysqlObject;
   final int mysqlSqlTabRequestToken;
+
+  final ({
+    String name,
+    SqliteObjectKind kind
+  })? selectedSqliteObject;
+  final int sqliteSqlTabRequestToken;
 
   static const empty = MainScreenWorkspaceState();
 
@@ -57,6 +67,8 @@ class MainScreenWorkspaceState {
       postgresSqlEditorContextToken: 0,
       selectedMysqlObject: null,
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
+      selectedSqliteObject: null,
+      sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
     );
   }
 
@@ -82,6 +94,8 @@ class MainScreenWorkspaceState {
       postgresSqlEditorContextToken: 0,
       selectedMysqlObject: null,
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
+      selectedSqliteObject: null,
+      sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
     );
   }
 
@@ -105,6 +119,31 @@ class MainScreenWorkspaceState {
         kind: kind,
       ),
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
+      selectedSqliteObject: null,
+      sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
+    );
+  }
+
+  MainScreenWorkspaceState selectSqliteObject(
+    ConnectionRow connection,
+    String name,
+    SqliteObjectKind kind,
+  ) {
+    return MainScreenWorkspaceState(
+      activeConnection: connection,
+      activeRedisDb: null,
+      activeMongoDB: null,
+      selectedPostgresObject: null,
+      postgresSqlTabRequestToken: postgresSqlTabRequestToken,
+      postgresSqlEditorContext: null,
+      postgresSqlEditorContextToken: 0,
+      selectedMysqlObject: null,
+      mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
+      selectedSqliteObject: (
+        name: name,
+        kind: kind,
+      ),
+      sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
     );
   }
 
@@ -119,6 +158,8 @@ class MainScreenWorkspaceState {
       postgresSqlEditorContextToken: 0,
       selectedMysqlObject: null,
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
+      selectedSqliteObject: null,
+      sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
     );
   }
 
@@ -134,6 +175,8 @@ class MainScreenWorkspaceState {
       postgresSqlEditorContextToken: 0,
       selectedMysqlObject: null,
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
+      selectedSqliteObject: null,
+      sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
     );
   }
 
@@ -190,6 +233,8 @@ class MainScreenWorkspaceState {
           seed != null ? postgresSqlEditorContextToken + 1 : 0,
       selectedMysqlObject: null,
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
+      selectedSqliteObject: null,
+      sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
     );
   }
 
@@ -204,6 +249,24 @@ class MainScreenWorkspaceState {
       postgresSqlEditorContextToken: postgresSqlEditorContextToken,
       selectedMysqlObject: null,
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken + 1,
+      selectedSqliteObject: null,
+      sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
+    );
+  }
+
+  MainScreenWorkspaceState openSqliteSqlWorkspace(ConnectionRow connection) {
+    return MainScreenWorkspaceState(
+      activeConnection: connection,
+      activeRedisDb: null,
+      activeMongoDB: null,
+      selectedPostgresObject: null,
+      postgresSqlTabRequestToken: postgresSqlTabRequestToken,
+      postgresSqlEditorContext: postgresSqlEditorContext,
+      postgresSqlEditorContextToken: postgresSqlEditorContextToken,
+      selectedMysqlObject: null,
+      mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
+      selectedSqliteObject: null,
+      sqliteSqlTabRequestToken: sqliteSqlTabRequestToken + 1,
     );
   }
 
@@ -219,7 +282,9 @@ class MainScreenWorkspaceState {
         _pgEquals(postgresSqlEditorContext, other.postgresSqlEditorContext) &&
         postgresSqlEditorContextToken == other.postgresSqlEditorContextToken &&
         _mysqlEquals(selectedMysqlObject, other.selectedMysqlObject) &&
-        mysqlSqlTabRequestToken == other.mysqlSqlTabRequestToken;
+        mysqlSqlTabRequestToken == other.mysqlSqlTabRequestToken &&
+        _sqliteEquals(selectedSqliteObject, other.selectedSqliteObject) &&
+        sqliteSqlTabRequestToken == other.sqliteSqlTabRequestToken;
   }
 
   @override
@@ -253,6 +318,13 @@ class MainScreenWorkspaceState {
                 selectedMysqlObject!.kind,
               ),
         mysqlSqlTabRequestToken,
+        selectedSqliteObject == null
+            ? 0
+            : Object.hash(
+                selectedSqliteObject!.name,
+                selectedSqliteObject!.kind,
+              ),
+        sqliteSqlTabRequestToken,
       );
 }
 
@@ -275,4 +347,13 @@ bool _mysqlEquals(
   if (identical(a, b)) return true;
   if (a == null || b == null) return false;
   return a.database == b.database && a.name == b.name && a.kind == b.kind;
+}
+
+bool _sqliteEquals(
+  ({String name, SqliteObjectKind kind})? a,
+  ({String name, SqliteObjectKind kind})? b,
+) {
+  if (identical(a, b)) return true;
+  if (a == null || b == null) return false;
+  return a.name == b.name && a.kind == b.kind;
 }

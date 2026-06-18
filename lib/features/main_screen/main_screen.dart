@@ -106,6 +106,22 @@ class _MainScreenState extends State<MainScreen> {
     _workspace.value = _workspace.value.openMysqlSqlWorkspace(connection);
   }
 
+  void _onSqliteObjectSelected(
+    ConnectionRow connection,
+    String name,
+    SqliteObjectKind kind,
+  ) {
+    _workspace.value = _workspace.value.selectSqliteObject(
+      connection,
+      name,
+      kind,
+    );
+  }
+
+  void _onSqliteOpenSqlWorkspace(ConnectionRow connection) {
+    _workspace.value = _workspace.value.openSqliteSqlWorkspace(connection);
+  }
+
   Future<void> _openNewConnectionFromHero() async {
     final row = await promptCreateConnection(context);
     if (!mounted || row == null) return;
@@ -144,10 +160,12 @@ class _MainScreenState extends State<MainScreen> {
                 onConnectionSelected: _onConnectionSelected,
                 onPostgresObjectSelected: _onPostgresObjectSelected,
                 onMysqlObjectSelected: _onMysqlObjectSelected,
+                onSqliteObjectSelected: _onSqliteObjectSelected,
                 onRedisDatabaseSelected: _onRedisDatabaseSelected,
                 onMongoDBDatabaseSelected: _onMongoDBDatabaseSelected,
                 onPostgresOpenSqlWorkspace: _onPostgresOpenSqlWorkspace,
                 onMysqlOpenSqlWorkspace: _onMysqlOpenSqlWorkspace,
+                onSqliteOpenSqlWorkspace: _onSqliteOpenSqlWorkspace,
                 onRequestNewConnection: _openNewConnectionFromHero,
               ),
             ),
@@ -166,10 +184,12 @@ class _MainContentSplit extends StatefulWidget {
     required this.onConnectionSelected,
     required this.onPostgresObjectSelected,
     required this.onMysqlObjectSelected,
+    required this.onSqliteObjectSelected,
     required this.onRedisDatabaseSelected,
     required this.onMongoDBDatabaseSelected,
     required this.onPostgresOpenSqlWorkspace,
     required this.onMysqlOpenSqlWorkspace,
+    required this.onSqliteOpenSqlWorkspace,
     required this.onRequestNewConnection,
   });
 
@@ -189,10 +209,16 @@ class _MainContentSplit extends StatefulWidget {
     String name,
     MysqlObjectKind kind,
   ) onMysqlObjectSelected;
+  final void Function(
+    ConnectionRow,
+    String name,
+    SqliteObjectKind kind,
+  ) onSqliteObjectSelected;
   final void Function(ConnectionRow, int) onRedisDatabaseSelected;
   final void Function(ConnectionRow, String) onMongoDBDatabaseSelected;
   final OnPostgresOpenSqlWorkspace onPostgresOpenSqlWorkspace;
   final void Function(ConnectionRow) onMysqlOpenSqlWorkspace;
+  final void Function(ConnectionRow) onSqliteOpenSqlWorkspace;
   final VoidCallback onRequestNewConnection;
 
   @override
@@ -242,6 +268,8 @@ class _MainContentSplitState extends State<_MainContentSplit> {
                   onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
                   onMysqlObjectSelected: widget.onMysqlObjectSelected,
                   onMysqlOpenSqlWorkspace: widget.onMysqlOpenSqlWorkspace,
+                  onSqliteObjectSelected: widget.onSqliteObjectSelected,
+                  onSqliteOpenSqlWorkspace: widget.onSqliteOpenSqlWorkspace,
                 ),
               ),
             ),
@@ -273,6 +301,8 @@ class _MainContentSplitState extends State<_MainContentSplit> {
                           ws.postgresSqlEditorContextToken,
                       selectedMysqlObject: ws.selectedMysqlObject,
                       mysqlSqlTabRequestToken: ws.mysqlSqlTabRequestToken,
+                      selectedSqliteObject: ws.selectedSqliteObject,
+                      sqliteSqlTabRequestToken: ws.sqliteSqlTabRequestToken,
                       onRequestNewConnection: widget.onRequestNewConnection,
                     );
                   },
@@ -294,10 +324,12 @@ class _ConnectionsPanelSlot extends StatefulWidget {
     required this.onConnectionSelected,
     required this.onPostgresObjectSelected,
     required this.onMysqlObjectSelected,
+    required this.onSqliteObjectSelected,
     required this.onRedisDatabaseSelected,
     required this.onMongoDBDatabaseSelected,
     required this.onPostgresOpenSqlWorkspace,
     required this.onMysqlOpenSqlWorkspace,
+    required this.onSqliteOpenSqlWorkspace,
   });
 
   final GlobalKey<ConnectionsPanelState> connectionsPanelKey;
@@ -316,10 +348,16 @@ class _ConnectionsPanelSlot extends StatefulWidget {
     String name,
     MysqlObjectKind kind,
   ) onMysqlObjectSelected;
+  final void Function(
+    ConnectionRow,
+    String name,
+    SqliteObjectKind kind,
+  ) onSqliteObjectSelected;
   final void Function(ConnectionRow, int) onRedisDatabaseSelected;
   final void Function(ConnectionRow, String) onMongoDBDatabaseSelected;
   final OnPostgresOpenSqlWorkspace onPostgresOpenSqlWorkspace;
   final void Function(ConnectionRow) onMysqlOpenSqlWorkspace;
+  final void Function(ConnectionRow) onSqliteOpenSqlWorkspace;
 
   @override
   State<_ConnectionsPanelSlot> createState() => _ConnectionsPanelSlotState();
@@ -360,6 +398,8 @@ class _ConnectionsPanelSlotState extends State<_ConnectionsPanelSlot> {
       onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
       onMysqlObjectSelected: widget.onMysqlObjectSelected,
       onMysqlOpenSqlWorkspace: widget.onMysqlOpenSqlWorkspace,
+      onSqliteObjectSelected: widget.onSqliteObjectSelected,
+      onSqliteOpenSqlWorkspace: widget.onSqliteOpenSqlWorkspace,
     );
   }
 }
