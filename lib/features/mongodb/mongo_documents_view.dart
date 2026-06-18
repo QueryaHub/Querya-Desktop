@@ -319,7 +319,7 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
     final to = (_skip + _limit).clamp(0, _totalCount);
 
     return material.Container(
-      height: 44,
+      constraints: const material.BoxConstraints(minHeight: 44),
       padding: const material.EdgeInsets.symmetric(horizontal: 16),
       decoration: material.BoxDecoration(
         color: shadcnCs.muted.withValues(alpha: 0.15),

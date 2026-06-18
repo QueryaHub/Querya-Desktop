@@ -10,6 +10,7 @@ import 'package:querya_desktop/core/theme/theme_editor_draft.dart';
 import 'package:querya_desktop/core/theme/theme_editor_loader.dart';
 import 'package:querya_desktop/features/settings/preferences_controls.dart';
 import 'package:querya_desktop/features/settings/theme_color_picker_dialog.dart';
+import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// MVP visual theme editor in Preferences → Appearance.
@@ -240,7 +241,7 @@ class _ThemeEditorColorRow extends material.StatelessWidget {
       child: material.Row(
         children: [
           material.SizedBox(
-            width: kPreferencesLabelWidth,
+            width: context.scaled(kPreferencesLabelWidth),
             child: material.Text(
               field.label,
               style: material.TextStyle(

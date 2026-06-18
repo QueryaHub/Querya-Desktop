@@ -40,3 +40,4 @@ coverage/
 *.dll
 *.exe
 design-front/
+docker/sqlite/data/
