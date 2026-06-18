@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/foundation.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
@@ -64,7 +66,6 @@ ColorScheme colorSchemeFromQueryaThemeColors({
 
   final destructive = pick('destructive', base.destructive);
   // querya.theme.v1 still maps this key; shadcn marks the ColorScheme field legacy.
-  // ignore: deprecated_member_use
   final destructiveForeground =
       pick('destructiveForeground', base.destructiveForeground);
 
@@ -85,7 +86,6 @@ ColorScheme colorSchemeFromQueryaThemeColors({
     accent: pick('accent', base.accent),
     accentForeground: pick('accentForeground', base.accentForeground),
     destructive: destructive,
-    // ignore: deprecated_member_use
     destructiveForeground: destructiveForeground,
     border: pick('border', base.border),
     input: pick('input', base.input),
