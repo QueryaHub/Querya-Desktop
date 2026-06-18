@@ -11,8 +11,11 @@ Living document for planned work. Not a commitment order; adjust as priorities c
 - **Shipped in 0.4.3 (TP-F1–TP-F4, #159–#163):** theme folder watcher, marketplace metadata on manifests, visual theme editor with export, HTTPS remote install with checksum — [planned-0.4.3.md](planned-0.4.3.md).
 - **Shipped in 0.4.4:** UI motion polish + high refresh rate (90/120/144 Hz), memory and security fixes — [planned-0.4.4.md](planned-0.4.4.md), [motion-and-high-refresh.md](motion-and-high-refresh.md), epic [#170](https://github.com/QueryaHub/Querya-Desktop/issues/170), milestone [0.4.4](https://github.com/QueryaHub/Querya-Desktop/milestone/3).
 - **Planned 0.4.5:** SQLite Database Connector — [planned-0.4.5.md](planned-0.4.5.md), milestone [0.4.5](https://github.com/QueryaHub/Querya-Desktop/milestones).
-- **Planned 0.4.6+:** Extensions sidebar and marketplace Explore UI — [market-tech.md](market-tech.md).
-
+- **Planned 0.4.6:** Local Extension Discovery — `ExtensionManifest`, сканирование локальных папок и миграция тем на формат расширений ([planned-0.4.6.md](planned-0.4.6.md)).
+- **Planned 0.4.7:** Extension Manager UI — Вкладка или боковая панель для просмотра и включения/выключения локальных расширений.
+- **Planned 0.4.8:** RPC Protocol Bridge — Транспортный слой (`json_rpc_2` + `Process.start`) для будущих плагинов баз данных.
+- **Planned 0.4.9:** Server-Driven UI (SDUI) — Динамические компоненты (формы, деревья), рендерящиеся из JSON-схем, присылаемых расширениями.
+- **Planned 0.5.0:** Marketplace Launch — Запуск Маркетплейса (клиентская часть). Скачивание, валидация `sha256` и установка тем из сети. База под другие расширения (ДБ драйверы) полностью готова!
 - **Optional:** Preferences → **Animate theme changes** (off by default).
 - **Later:** P2 Mongo/Redis token colors; `re_editor` if perf gap; LSP epic per
   [archive/code-forge-evaluation.md](archive/code-forge-evaluation.md) (**NO-GO** on `code_forge` for 0.3).
