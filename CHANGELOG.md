@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.4.5] - 2026-06-18
+## [0.4.6] - 2026-06-18
 
-SQLite database connector release. Git tag **`0.4.5`**.
+SQLite database connector release. Git tag **`0.4.6`**.
 
 ### Added
 
