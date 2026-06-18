@@ -242,106 +242,40 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
                       child: material.Column(
                         crossAxisAlignment: material.CrossAxisAlignment.start,
                         children: [
-                          if (_tables.isNotEmpty) ...[
-                            _PgTreeRow(
-                              label: 'Tables (${_tables.length})',
+                          if (_tables.isNotEmpty)
+                            _SqliteObjectGroup(
+                              connection: widget.connection,
+                              objectKind: SqliteObjectKind.table,
+                              onRefresh: _loadTables,
+                              label: 'Tables',
                               icon: material.Icons.table_chart_rounded,
-                              iconSize: 13,
-                              iconColor: theme.colorScheme.mutedForeground,
-                              textStyle: material.TextStyle(
-                                fontSize: 11,
-                                color: theme.colorScheme.mutedForeground,
-                              ),
-                              verticalPadding: 3,
-                              onTap: null,
+                              itemIcon: material.Icons.grid_on_rounded,
+                              items: _tables,
+                              onItemTap: widget.onSqliteObjectSelected == null
+                                  ? null
+                                  : (name) => widget.onSqliteObjectSelected!(
+                                        widget.connection,
+                                        name,
+                                        SqliteObjectKind.table,
+                                      ),
+                            ),
+                          if (_views.isNotEmpty)
+                            _SqliteObjectGroup(
                               connection: widget.connection,
-                              onContextRefresh: _loadTables,
-                              onOpenSqlWorkspace: null,
-                            ),
-                            lazyConnectionTreeList(
-                              context: context,
-                              itemCount: _tables.length,
-                              itemExtent: kConnectionTreeRowExtent,
-                              padding: const material.EdgeInsets.only(left: 12),
-                              itemBuilder: (context, index) {
-                                final t = _tables[index];
-                                return _PgTreeRow(
-                                  key: material.ValueKey(
-                                    'sqlite-table-${widget.connection.id ?? 0}-$t',
-                                  ),
-                                  label: t,
-                                  icon: material.Icons.grid_on_rounded,
-                                  iconSize: 12,
-                                  iconColor: theme.colorScheme.mutedForeground,
-                                  textStyle: material.TextStyle(
-                                    fontSize: 11,
-                                    color: theme.colorScheme.foreground,
-                                  ),
-                                  verticalPadding: 2,
-                                  onTap: widget.onSqliteObjectSelected == null
-                                      ? null
-                                      : () => widget.onSqliteObjectSelected!(
-                                            widget.connection,
-                                            t,
-                                            SqliteObjectKind.table,
-                                          ),
-                                  connection: widget.connection,
-                                  onContextRefresh: null,
-                                  onOpenSqlWorkspace: null,
-                                );
-                              },
-                            ),
-                          ],
-                          if (_views.isNotEmpty) ...[
-                            _PgTreeRow(
-                              label: 'Views (${_views.length})',
+                              objectKind: SqliteObjectKind.view,
+                              onRefresh: _loadTables,
+                              label: 'Views',
                               icon: material.Icons.view_agenda_rounded,
-                              iconSize: 13,
-                              iconColor: theme.colorScheme.mutedForeground,
-                              textStyle: material.TextStyle(
-                                fontSize: 11,
-                                color: theme.colorScheme.mutedForeground,
-                              ),
-                              verticalPadding: 3,
-                              onTap: null,
-                              connection: widget.connection,
-                              onContextRefresh: _loadTables,
-                              onOpenSqlWorkspace: null,
+                              itemIcon: material.Icons.view_week_rounded,
+                              items: _views,
+                              onItemTap: widget.onSqliteObjectSelected == null
+                                  ? null
+                                  : (name) => widget.onSqliteObjectSelected!(
+                                        widget.connection,
+                                        name,
+                                        SqliteObjectKind.view,
+                                      ),
                             ),
-                            lazyConnectionTreeList(
-                              context: context,
-                              itemCount: _views.length,
-                              itemExtent: kConnectionTreeRowExtent,
-                              padding: const material.EdgeInsets.only(left: 12),
-                              itemBuilder: (context, index) {
-                                final v = _views[index];
-                                return _PgTreeRow(
-                                  key: material.ValueKey(
-                                    'sqlite-view-${widget.connection.id ?? 0}-$v',
-                                  ),
-                                  label: v,
-                                  icon: material.Icons.grid_on_rounded,
-                                  iconSize: 12,
-                                  iconColor: theme.colorScheme.mutedForeground,
-                                  textStyle: material.TextStyle(
-                                    fontSize: 11,
-                                    color: theme.colorScheme.foreground,
-                                  ),
-                                  verticalPadding: 2,
-                                  onTap: widget.onSqliteObjectSelected == null
-                                      ? null
-                                      : () => widget.onSqliteObjectSelected!(
-                                            widget.connection,
-                                            v,
-                                            SqliteObjectKind.view,
-                                          ),
-                                  connection: widget.connection,
-                                  onContextRefresh: null,
-                                  onOpenSqlWorkspace: null,
-                                );
-                              },
-                            ),
-                          ],
                           if (_tables.isEmpty && _views.isEmpty)
                             material.Padding(
                               padding: const material.EdgeInsets.only(
@@ -358,6 +292,104 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SqliteObjectGroup extends StatefulWidget {
+  const _SqliteObjectGroup({
+    required this.connection,
+    required this.objectKind,
+    required this.onRefresh,
+    required this.label,
+    required this.icon,
+    required this.itemIcon,
+    required this.items,
+    this.onItemTap,
+  });
+
+  final ConnectionRow connection;
+  final SqliteObjectKind objectKind;
+  final VoidCallback onRefresh;
+  final String label;
+  final material.IconData icon;
+  final material.IconData itemIcon;
+  final List<String> items;
+  final void Function(String itemName)? onItemTap;
+
+  @override
+  State<_SqliteObjectGroup> createState() => _SqliteObjectGroupState();
+}
+
+class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return material.Padding(
+      padding: const material.EdgeInsets.only(bottom: 2),
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.start,
+        mainAxisSize: material.MainAxisSize.min,
+        children: [
+          _PgTreeRow(
+            label: '${widget.label} (${widget.items.length})',
+            leading: material.AnimatedRotation(
+              turns: _expanded ? 0.25 : 0,
+              duration: context.motionDuration(QueryaMotion.fast),
+              curve: context.motionCurve(QueryaMotion.standardCurve),
+              child: material.Icon(
+                material.Icons.chevron_right_rounded,
+                size: 13,
+                color: theme.colorScheme.mutedForeground,
+              ),
+            ),
+            icon: widget.icon,
+            iconSize: 13,
+            iconColor: theme.colorScheme.mutedForeground,
+            textStyle: material.TextStyle(
+              fontSize: 11,
+              color: theme.colorScheme.mutedForeground,
+            ),
+            onTap: () => setState(() => _expanded = !_expanded),
+            connection: widget.connection,
+            onContextRefresh: widget.onRefresh,
+          ),
+          QueryaAnimatedExpand(
+            expanded: _expanded,
+            child: lazyConnectionTreeList(
+              context: context,
+              itemCount: widget.items.length,
+              itemExtent: kConnectionTreeRowExtent,
+              padding: const material.EdgeInsets.only(left: 22),
+              itemBuilder: (context, index) {
+                final item = widget.items[index];
+                return _PgTreeRow(
+                  key: material.ValueKey(
+                    'sqlite-${widget.objectKind.name}-$item',
+                  ),
+                  label: item,
+                  icon: widget.itemIcon,
+                  iconSize: 12,
+                  iconColor: theme.colorScheme.mutedForeground,
+                  textStyle: material.TextStyle(
+                    fontSize: 11,
+                    color: theme.colorScheme.foreground,
+                  ),
+                  verticalPadding: 2,
+                  onTap: widget.onItemTap != null
+                      ? () => widget.onItemTap!(item)
+                      : null,
+                  connection: widget.connection,
+                  onContextRefresh: null,
+                  onOpenSqlWorkspace: null,
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
