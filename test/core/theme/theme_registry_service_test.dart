@@ -8,6 +8,8 @@ import 'package:querya_desktop/core/theme/parser/color_parser.dart';
 import 'package:querya_desktop/core/theme/theme_definition.dart';
 import 'package:querya_desktop/core/theme/theme_import_service.dart';
 import 'package:querya_desktop/core/theme/theme_load_result.dart';
+import 'package:querya_desktop/core/extensions/extension_paths.dart';
+import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/theme/theme_registry_service.dart';
 
 class _FakePathProvider extends PathProviderPlatform {
@@ -42,6 +44,14 @@ void main() {
     importedDir = Directory(p.join(themesDir.path, 'imported'));
     await importedDir.create(recursive: true);
 
+    final extDir = Directory(p.join(tempDir.path, 'extensions'));
+    ExtensionPaths.mockExtensionsDirectory = extDir;
+    if (await extDir.exists()) {
+      await extDir.delete(recursive: true);
+    }
+    await extDir.create(recursive: true);
+    await LocalExtensionRegistry.instance.reload();
+
     registry = ThemeRegistryService(
       userThemesDirectory: () async => themesDir,
       importedThemesDirectory: () async => importedDir,
@@ -53,6 +63,12 @@ void main() {
     if (await themesDir.exists()) {
       await themesDir.delete(recursive: true);
     }
+    final extDir = ExtensionPaths.mockExtensionsDirectory;
+    if (extDir != null && await extDir.exists()) {
+      await extDir.delete(recursive: true);
+    }
+    ExtensionPaths.mockExtensionsDirectory = null;
+    await LocalExtensionRegistry.instance.reload();
   });
 
   tearDownAll(() async {
@@ -147,8 +163,9 @@ void main() {
       expect(before, hasLength(1));
       final originalHash = before.single.contentHash;
 
-      final raw = await themeFile.readAsString();
-      await themeFile.writeAsString(raw.replaceFirst('#FF00AA', '#00FFAA'));
+      final extFile = File(before.single.path!);
+      final raw = await extFile.readAsString();
+      await extFile.writeAsString(raw.replaceFirst('#FF00AA', '#00FFAA'));
 
       final after = await registry.loadThemeDefinitions();
       expect(after, hasLength(1));
@@ -261,7 +278,7 @@ void main() {
       expect(success.definition.id, 'fixture-custom-dark');
       expect(success.definition.source, ThemeSource.filesystem);
       expect(
-        await File(p.join(themesDir.path, 'fixture-custom-dark.json')).exists(),
+        await File(p.join(tempDir.path, 'extensions', 'fixture-custom-dark', 'theme.json')).exists(),
         isTrue,
       );
 
@@ -281,7 +298,11 @@ void main() {
       expect(success.definition.format, ThemeFormat.vscode);
       expect(
         p.basename(success.definition.path!),
-        'fixture-dark-subset.json',
+        'theme.json',
+      );
+      expect(
+        p.basename(p.dirname(success.definition.path!)),
+        'fixture-dark-subset',
       );
     });
 
@@ -298,11 +319,8 @@ void main() {
       expect(secondSuccess.reusedExisting, isTrue);
       expect(secondSuccess.definition.path, firstSuccess.definition.path);
 
-      final themeFiles = themesDir
-          .listSync()
-          .whereType<File>()
-          .where((f) => p.extension(f.path) == '.json')
-          .length;
+      final extDir = ExtensionPaths.mockExtensionsDirectory!;
+      final themeFiles = extDir.listSync().length;
       expect(themeFiles, 1);
     });
 
