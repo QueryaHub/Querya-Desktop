@@ -16,9 +16,9 @@ import 'theme_definition.dart';
 import 'theme_folder_watcher.dart';
 import 'theme_import_service.dart';
 import 'theme_load_result.dart';
-import 'theme_paths.dart';
 import 'theme_registry_service.dart';
 import 'theme_remote_install_service.dart';
+import '../extensions/extension_paths.dart';
 
 /// Active theme state: preset, optional imported colors, user overrides.
 class ThemeController extends ChangeNotifier {
@@ -214,10 +214,10 @@ class ThemeController extends ChangeNotifier {
     }
   }
 
-  /// Watches `{appSupport}/themes/` and debounces [loadAvailableThemes].
+  /// Watches extensions directory and debounces [loadAvailableThemes].
   Future<void> startThemeFolderWatcher() async {
     _themeFolderWatcher ??= ThemeFolderWatcher(
-      themesDirectory: ThemePaths.userThemesDirectory,
+      themesDirectory: ExtensionPaths.extensionsDirectory,
       onThemesChanged: loadAvailableThemes,
     );
     await _themeFolderWatcher!.start();
