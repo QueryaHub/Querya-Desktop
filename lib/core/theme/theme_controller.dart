@@ -16,9 +16,9 @@ import 'theme_definition.dart';
 import 'theme_folder_watcher.dart';
 import 'theme_import_service.dart';
 import 'theme_load_result.dart';
-import 'theme_paths.dart';
 import 'theme_registry_service.dart';
 import 'theme_remote_install_service.dart';
+import '../extensions/extension_paths.dart';
 
 /// Active theme state: preset, optional imported colors, user overrides.
 class ThemeController extends ChangeNotifier {
@@ -214,10 +214,10 @@ class ThemeController extends ChangeNotifier {
     }
   }
 
-  /// Watches `{appSupport}/themes/` and debounces [loadAvailableThemes].
+  /// Watches extensions directory and debounces [loadAvailableThemes].
   Future<void> startThemeFolderWatcher() async {
     _themeFolderWatcher ??= ThemeFolderWatcher(
-      themesDirectory: ThemePaths.userThemesDirectory,
+      themesDirectory: ExtensionPaths.extensionsDirectory,
       onThemesChanged: loadAvailableThemes,
     );
     await _themeFolderWatcher!.start();
@@ -473,37 +473,7 @@ class ThemeController extends ChangeNotifier {
     return result;
   }
 
-  /// Parses a VS Code theme file, persists it, and activates the imported preset.
-  Future<ThemeImportResult> importThemeFromFile(String path) async {
-    final result = await ThemeImportService.importFromPath(path);
-    switch (result) {
-      case ThemeImportSuccess(
-          :final name,
-          :final isDark,
-          :final colors,
-          :final tokenColors,
-          :final storedPath,
-        ):
-        await _clearRegistrySelection();
-        _importedColors = Map.unmodifiable(colors);
-        _importedTokenColors = List.unmodifiable(tokenColors);
-        _importedThemeName = name;
-        _preset = QueryaThemePreset.imported;
-        _themeMode = isDark ? ThemeMode.dark : ThemeMode.light;
-        await AppSettings.instance.setThemeImportedColors(colors);
-        await AppSettings.instance.setThemeImportName(name);
-        await AppSettings.instance.setThemeImportPath(storedPath);
-        await AppSettings.instance.setThemePreset(QueryaThemePreset.imported);
-        await AppSettings.instance.setThemeMode(_themeMode);
-        _availableThemes = _mergeBuiltinThemes(
-          await _registryService.loadThemeDefinitions(),
-        );
-        _notifyThemeChanged();
-        return result;
-      case ThemeImportFailure():
-        return result;
-    }
-  }
+
 
   /// Sets or clears a user override for a VS Code `colors` key.
   Future<void> setWorkbenchColor(String vscodeKey, Color? value) async {

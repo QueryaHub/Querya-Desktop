@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.7] - 2026-06-21
+
+Local extension discovery and manifest foundation release. Git tag **`0.4.7`**.
+
+### Added
+
+- **Extension models (EXT-1)** — data models `ExtensionManifest` and `ExtensionType` to parse `manifest.json`.
+- **Local scanner (EXT-2)** — `LocalExtensionRegistry` scans `~/.querya/extensions/` to find and load extension manifests.
+- **Theme migration (EXT-3)** — migrated legacy custom themes to the new unified extension package format.
+- **Unit tests (EXT-4)** — unit tests for manifest parsing, directory scanning, and registry cache logic.
+
+### Fixed
+
+- **Theme importing security** — resolved concurrent import TOCTOU filesystem races and theme ID collisions during migration, and cleaned up deprecated legacy import code.
+- **Appearance Settings test** — resolved the preferences appearance section widget test failure by mocking the extensions directory.
+
 ## [0.4.6-a] - 2026-06-18
 
 ### Changed

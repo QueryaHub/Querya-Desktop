@@ -6,31 +6,6 @@ import 'package:path_provider/path_provider.dart';
 import 'parser/vscode_theme_manifest.dart';
 import 'theme_definition.dart';
 
-/// Result of importing a VS Code theme file.
-sealed class ThemeImportResult {
-  const ThemeImportResult();
-}
-
-class ThemeImportSuccess extends ThemeImportResult {
-  const ThemeImportSuccess({
-    required this.name,
-    required this.isDark,
-    required this.colors,
-    required this.tokenColors,
-    required this.storedPath,
-  });
-
-  final String name;
-  final bool isDark;
-  final Map<String, String> colors;
-  final List<TokenColorRule> tokenColors;
-  final String storedPath;
-}
-
-class ThemeImportFailure extends ThemeImportResult {
-  const ThemeImportFailure(this.message);
-  final String message;
-}
 
 /// Result of copying a theme file into the user themes directory.
 sealed class ThemeDefinitionImportResult {
@@ -80,46 +55,6 @@ abstract final class ThemeImportService {
   /// Path to the persisted legacy import copy under app support.
   static Future<File> persistedImportFile() => _storedThemeFile();
 
-  /// Reads [sourcePath], parses JSON/JSONC, copies to app data, returns colors.
-  static Future<ThemeImportResult> importFromPath(String sourcePath) async {
-    try {
-      final source = File(sourcePath);
-      if (!await source.exists()) {
-        return const ThemeImportFailure('Theme file not found.');
-      }
-      final raw = await source.readAsString();
-      final manifest = VsCodeThemeManifest.fromJsonString(raw);
-      if (manifest.colors.isEmpty) {
-        return const ThemeImportFailure(
-          'Theme file has no "colors" section to import.',
-        );
-      }
-
-      final storedFile = await _storedThemeFile();
-      await storedFile.parent.create(recursive: true);
-      await storedFile.writeAsString(raw);
-
-      final name = manifest.name?.trim().isNotEmpty == true
-          ? manifest.name!.trim()
-          : p.basenameWithoutExtension(sourcePath);
-
-      return ThemeImportSuccess(
-        name: name,
-        isDark: manifest.isDark || !manifest.isLight,
-        colors: Map.unmodifiable(manifest.colors),
-        tokenColors: List.unmodifiable(manifest.tokenColors),
-        storedPath: storedFile.path,
-      );
-    } on VsCodeThemeParseException catch (e) {
-      return ThemeImportFailure(e.message);
-    } on FormatException catch (e) {
-      return ThemeImportFailure(e.message);
-    } on IOException catch (e) {
-      return ThemeImportFailure(e.toString());
-    } on Object catch (e) {
-      return ThemeImportFailure(e.toString());
-    }
-  }
 
   /// Reloads colors from the persisted import file, if present.
   static Future<Map<String, String>?> loadPersistedColors() async {

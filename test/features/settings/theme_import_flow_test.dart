@@ -9,6 +9,8 @@ import 'package:querya_desktop/core/theme/parser/color_parser.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:querya_desktop/core/theme/theme_definition.dart';
 import 'package:querya_desktop/core/theme/theme_import_service.dart';
+import 'package:querya_desktop/core/extensions/extension_paths.dart';
+import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/theme/theme_registry_service.dart';
 
 class _FakePathProvider extends PathProviderPlatform {
@@ -61,6 +63,10 @@ void main() {
     importedDir = Directory(p.join(themesDir.path, 'imported'));
     await importedDir.create(recursive: true);
 
+    final extensionsDir = Directory(p.join(tempDir.path, 'extensions'));
+    ExtensionPaths.mockExtensionsDirectory = extensionsDir;
+    await LocalExtensionRegistry.instance.reload();
+
     registry = ThemeRegistryService(
       userThemesDirectory: () async => themesDir,
       importedThemesDirectory: () async => importedDir,
@@ -76,6 +82,8 @@ void main() {
     if (await themesDir.exists()) {
       await themesDir.delete(recursive: true);
     }
+    ExtensionPaths.mockExtensionsDirectory = null;
+    await LocalExtensionRegistry.instance.reload();
     ThemeController.instance.setRegistryServiceForTest(
       ThemeRegistryService(
         userThemesDirectory: () async => themesDir,
@@ -119,7 +127,7 @@ void main() {
         parseQueryaThemeColor('#38BDF8'),
       );
       expect(
-        await File(p.join(themesDir.path, 'fixture-custom-dark.json')).exists(),
+        await File(p.join(tempDir.path, 'extensions', 'fixture-custom-dark', 'theme.json')).exists(),
         isTrue,
       );
       expect(await AppSettings.instance.getSelectedThemeId(),
