@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/extensions/extension_paths.dart';
+import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:querya_desktop/core/theme/theme_folder_watcher.dart';
 import 'package:querya_desktop/core/theme/theme_import_service.dart';
@@ -40,6 +42,14 @@ void main() {
   setUp(() async {
     themesDir = Directory(p.join(tempDir.path, 'themes'));
     await Directory(p.join(themesDir.path, 'imported')).create(recursive: true);
+
+    final extDir = Directory(p.join(tempDir.path, 'extensions'));
+    ExtensionPaths.mockExtensionsDirectory = extDir;
+    if (await extDir.exists()) {
+      await extDir.delete(recursive: true);
+    }
+    await extDir.create(recursive: true);
+    await LocalExtensionRegistry.instance.reload();
   });
 
   tearDownAll(() async {
@@ -56,6 +66,12 @@ void main() {
     if (await themesDir.exists()) {
       await themesDir.delete(recursive: true);
     }
+    final extDir = ExtensionPaths.mockExtensionsDirectory;
+    if (extDir != null && await extDir.exists()) {
+      await extDir.delete(recursive: true);
+    }
+    ExtensionPaths.mockExtensionsDirectory = null;
+    await LocalExtensionRegistry.instance.reload();
     ThemeController.instance.setRegistryServiceForTest(ThemeRegistryService());
   });
 
@@ -146,10 +162,21 @@ void main() {
       expect(c.isThemeFolderWatcherStarted, isTrue);
       final beforeCount = c.availableThemes.length;
 
-      await _copyFixture(
-        'querya_custom_dark.json',
-        File(p.join(themesDir.path, 'querya_custom_dark.json')),
+      final extDir = ExtensionPaths.mockExtensionsDirectory!;
+      final themeExt = Directory(p.join(extDir.path, 'fixture-custom-dark'));
+      await themeExt.create(recursive: true);
+      await File(p.join(themeExt.path, 'theme.json')).writeAsString(
+        await File('test/fixtures/themes/querya_custom_dark.json').readAsString(),
       );
+      await File(p.join(themeExt.path, 'manifest.json')).writeAsString('''{
+        "schema": "querya.extension.v1",
+        "id": "fixture-custom-dark",
+        "name": "Fixture Custom Dark",
+        "version": "1.0.0",
+        "publisher": "Unknown",
+        "type": "theme",
+        "main": "theme.json"
+      }''');
 
       await Future<void>.delayed(const Duration(milliseconds: 700));
 

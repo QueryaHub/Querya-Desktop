@@ -70,7 +70,7 @@ class ThemeRegistryService {
       _hasMigratedThemes = true;
     }
 
-    await LocalExtensionRegistry.instance.load();
+    await LocalExtensionRegistry.instance.reload();
     for (final manifest in LocalExtensionRegistry.instance.manifests) {
       if (manifest.type != ExtensionType.theme) continue;
       final installPath = manifest.installPath;
@@ -80,7 +80,11 @@ class ThemeRegistryService {
       final file = File(p.join(installPath, mainFile));
       if (!await file.exists()) continue;
 
-      final definition = await _definitionFromFile(file, ThemeSource.filesystem, extensionId: manifest.id);
+      final source = manifest.publisher.toLowerCase() == 'imported'
+          ? ThemeSource.imported
+          : ThemeSource.filesystem;
+
+      final definition = await _definitionFromFile(file, source, extensionId: manifest.id);
       if (definition != null) {
         definitions.add(definition);
       }
@@ -104,13 +108,15 @@ class ThemeRegistryService {
 
   Future<void> _migrateLegacyThemesToExtensions() async {
     final dirs = [
-      await _userThemesDirectory(),
-      await _importedThemesDirectory(),
+      (await _userThemesDirectory(), ThemeSource.filesystem),
+      (await _importedThemesDirectory(), ThemeSource.imported),
     ];
 
     final extensionsDir = await ExtensionPaths.ensureExtensionsDirectory();
 
-    for (final directory in dirs) {
+    for (final pair in dirs) {
+      final directory = pair.$1;
+      final source = pair.$2;
       if (!await directory.exists()) continue;
 
       await for (final entity in directory.list(followLinks: false)) {
@@ -123,7 +129,7 @@ class ThemeRegistryService {
 
         try {
           final definition =
-              await _definitionFromFile(entity, ThemeSource.filesystem);
+              await _definitionFromFile(entity, source);
           if (definition == null) continue;
 
           final slug = ThemeImportService.slugifyThemeName(definition.name);
@@ -143,7 +149,7 @@ class ThemeRegistryService {
             id: definition.id,
             name: definition.name,
             version: '1.0.0',
-            publisher: 'Unknown',
+            publisher: source == ThemeSource.imported ? 'Imported' : 'Unknown',
             type: ExtensionType.theme,
             engines: const {'querya_desktop': '*'},
             main: 'theme.json',
@@ -179,8 +185,8 @@ class ThemeRegistryService {
       final extensionsDir = await ExtensionPaths.ensureExtensionsDirectory();
 
       final schema = json['schema']?.toString();
-      late final String logicalId;
-      late final String preferredBaseName;
+      late String logicalId;
+      late String preferredBaseName;
       late String contentToWrite;
 
       if (schema == queryaThemeSchemaV1) {
@@ -204,22 +210,55 @@ class ThemeRegistryService {
       }
 
       await LocalExtensionRegistry.instance.load();
-      bool reused = false;
-      String? existingInstallPath;
+      final hash = _contentHash(raw);
+
+      File? sameHashFile;
+      ExtensionManifest? sameHashManifest;
+      ExtensionManifest? sameIdManifest;
 
       for (final extManifest in LocalExtensionRegistry.instance.manifests) {
-        if (extManifest.type == ExtensionType.theme &&
-            extManifest.id == logicalId) {
-          reused = true;
-          existingInstallPath = extManifest.installPath;
-          break;
+        if (extManifest.type != ExtensionType.theme) continue;
+        final installPath = extManifest.installPath;
+        final mainFile = extManifest.main;
+        if (installPath == null || mainFile == null) continue;
+
+        final file = File(p.join(installPath, mainFile));
+        if (await file.exists()) {
+          final existingRaw = await file.readAsString();
+          if (_contentHash(existingRaw) == hash) {
+            sameHashFile = file;
+            sameHashManifest = extManifest;
+            break;
+          }
+        }
+
+        if (extManifest.id == logicalId) {
+          sameIdManifest = extManifest;
         }
       }
 
+      bool reused = false;
       File resolvedFile;
-      if (reused && existingInstallPath != null) {
-        resolvedFile = File(p.join(existingInstallPath, 'theme.json'));
+
+      if (sameHashManifest != null) {
+        reused = true;
+        resolvedFile = sameHashFile!;
+        logicalId = sameHashManifest.id;
       } else {
+        if (sameIdManifest != null) {
+          var suffix = 2;
+          var candidateId = '$logicalId-$suffix';
+          while (LocalExtensionRegistry.instance.manifests.any((m) => m.type == ExtensionType.theme && m.id == candidateId)) {
+            suffix++;
+            candidateId = '$logicalId-$suffix';
+          }
+          logicalId = candidateId;
+          preferredBaseName = ThemeImportService.safeThemeFileBase(logicalId);
+          if (schema == queryaThemeSchemaV1) {
+            contentToWrite = _rewriteCustomThemeId(raw, logicalId);
+          }
+        }
+
         var finalExtDir =
             Directory(p.join(extensionsDir.path, preferredBaseName));
         var counter = 2;
@@ -268,6 +307,13 @@ class ThemeRegistryService {
     } on Object catch (e) {
       return ThemeDefinitionImportFailure(e.toString());
     }
+  }
+
+  String _rewriteCustomThemeId(String raw, String newId) {
+    final decoded = jsonDecode(stripJsonc(raw));
+    if (decoded is! Map<String, dynamic>) return raw;
+    decoded['id'] = newId;
+    return const JsonEncoder.withIndent('  ').convert(decoded);
   }
 
   /// Parses a scanned [definition] into a runtime [QueryaTheme].
