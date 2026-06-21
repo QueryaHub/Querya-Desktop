@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:querya_desktop/core/theme/theme_load_result.dart';
+import 'package:querya_desktop/core/extensions/extension_paths.dart';
+import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/theme/theme_registry_service.dart';
 
 class _FakePathProvider extends PathProviderPlatform {
@@ -37,6 +39,14 @@ void main() {
     importedDir = Directory(p.join(themesDir.path, 'imported'));
     await importedDir.create(recursive: true);
 
+    final extDir = Directory(p.join(tempDir.path, 'extensions'));
+    ExtensionPaths.mockExtensionsDirectory = extDir;
+    if (await extDir.exists()) {
+      await extDir.delete(recursive: true);
+    }
+    await extDir.create(recursive: true);
+    await LocalExtensionRegistry.instance.reload();
+
     registry = ThemeRegistryService(
       userThemesDirectory: () async => themesDir,
       importedThemesDirectory: () async => importedDir,
@@ -48,6 +58,12 @@ void main() {
     if (await themesDir.exists()) {
       await themesDir.delete(recursive: true);
     }
+    final extDir = ExtensionPaths.mockExtensionsDirectory;
+    if (extDir != null && await extDir.exists()) {
+      await extDir.delete(recursive: true);
+    }
+    ExtensionPaths.mockExtensionsDirectory = null;
+    await LocalExtensionRegistry.instance.reload();
   });
 
   tearDownAll(() async {
@@ -81,8 +97,9 @@ void main() {
       await registry.loadTheme(before);
       expect(registry.themeParseCount, 1);
 
-      final raw = await themeFile.readAsString();
-      await themeFile.writeAsString(raw.replaceFirst('#FF00AA', '#00FFAA'));
+      final extFile = File(before.path!);
+      final raw = await extFile.readAsString();
+      await extFile.writeAsString(raw.replaceFirst('#FF00AA', '#00FFAA'));
 
       final after = (await registry.loadThemeDefinitions()).single;
       expect(after.contentHash, isNot(before.contentHash));

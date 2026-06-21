@@ -4,6 +4,8 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:querya_desktop/core/extensions/extension_paths.dart';
+import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
@@ -52,6 +54,15 @@ void main() {
     themesDir = Directory(p.join(tempDir.path, 'themes'));
     importedDir = Directory(p.join(themesDir.path, 'imported'));
     await importedDir.create(recursive: true);
+
+    final extDir = Directory(p.join(tempDir.path, 'extensions'));
+    ExtensionPaths.mockExtensionsDirectory = extDir;
+    if (await extDir.exists()) {
+      await extDir.delete(recursive: true);
+    }
+    await extDir.create(recursive: true);
+    await LocalExtensionRegistry.instance.reload();
+
     registry = ThemeRegistryService(
       userThemesDirectory: () async => themesDir,
       importedThemesDirectory: () async => importedDir,
@@ -69,6 +80,13 @@ void main() {
   });
 
   tearDown(() async {
+    final extDir = ExtensionPaths.mockExtensionsDirectory;
+    if (extDir != null && await extDir.exists()) {
+      await extDir.delete(recursive: true);
+    }
+    ExtensionPaths.mockExtensionsDirectory = null;
+    await LocalExtensionRegistry.instance.reload();
+
     ThemeController.instance.setRegistryServiceForTest(
       ThemeRegistryService(
         userThemesDirectory: () async => themesDir,
@@ -108,8 +126,7 @@ void main() {
       expect(find.byType(ThemePickerButton), findsOneWidget);
 
       await tester.tap(find.text('Querya Dark'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pumpAndSettle();
 
       expect(find.text('Querya Light'), findsOneWidget);
     });

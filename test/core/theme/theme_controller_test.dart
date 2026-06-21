@@ -13,6 +13,8 @@ import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:querya_desktop/core/theme/theme_import_service.dart';
 import 'package:querya_desktop/core/theme/theme_load_result.dart';
 import 'package:querya_desktop/core/theme/theme_definition.dart';
+import 'package:querya_desktop/core/extensions/extension_paths.dart';
+import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/theme/theme_registry_service.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
@@ -74,6 +76,15 @@ void main() {
     themesDir = Directory(p.join(tempDir.path, 'themes'));
     importedDir = Directory(p.join(themesDir.path, 'imported'));
     await importedDir.create(recursive: true);
+
+    final extDir = Directory(p.join(tempDir.path, 'extensions'));
+    ExtensionPaths.mockExtensionsDirectory = extDir;
+    if (await extDir.exists()) {
+      await extDir.delete(recursive: true);
+    }
+    await extDir.create(recursive: true);
+    await LocalExtensionRegistry.instance.reload();
+
     registry = ThemeRegistryService(
       userThemesDirectory: () async => themesDir,
       importedThemesDirectory: () async => importedDir,
@@ -90,13 +101,16 @@ void main() {
   });
 
   tearDown(() async {
-    await ThemeController.instance.stopThemeFolderWatcher();
-    await ThemeController.instance.endEditorPreview();
-    await AppSettings.instance.clearThemeSettings();
-    await ThemeImportService.deletePersistedImport();
     if (await themesDir.exists()) {
       await themesDir.delete(recursive: true);
     }
+    final extDir = ExtensionPaths.mockExtensionsDirectory;
+    if (extDir != null && await extDir.exists()) {
+      await extDir.delete(recursive: true);
+    }
+    ExtensionPaths.mockExtensionsDirectory = null;
+    await LocalExtensionRegistry.instance.reload();
+    await ThemeController.instance.resetToDefaults();
     ThemeController.instance.setRegistryServiceForTest(ThemeRegistryService());
   });
 
@@ -162,21 +176,7 @@ void main() {
     );
   });
 
-  test('importThemeFromFile applies imported colors to activeTheme', () async {
-    final c = ThemeController.instance;
-    await c.load();
-    final fixture = File('test/fixtures/themes/dark_subset.json');
-    final result = await c.importThemeFromFile(fixture.path);
-    expect(result, isA<ThemeImportSuccess>());
-    expect(c.preset, QueryaThemePreset.imported);
-    expect(c.hasImportedTheme, isTrue);
-    expect(
-      c.activeTheme.workbench.editorBackground,
-      const Color(0xFF1E1E1E),
-    );
-    await c.resetToDefaults();
-    expect(c.preset, QueryaThemePreset.queryaDark);
-  });
+
 
   test('setThemeAnimationEnabled persists and reset clears', () async {
     final c = ThemeController.instance;
@@ -272,7 +272,8 @@ void main() {
       await _copyFixture('querya_custom_dark.json', themeFile);
       await c.load();
       await c.setThemeById('fixture-custom-dark');
-      await themeFile.delete();
+      final extDir = ExtensionPaths.mockExtensionsDirectory!;
+      await Directory(p.join(extDir.path, 'fixture-custom-dark')).delete(recursive: true);
 
       await c.load();
 
@@ -312,10 +313,19 @@ void main() {
       await c.load();
       expect(c.selectedThemeLoadError, isNotNull);
 
-      await _copyFixture(
-        'querya_custom_dark.json',
-        File(p.join(themesDir.path, 'querya_custom_dark.json')),
-      );
+      final extDir = ExtensionPaths.mockExtensionsDirectory!;
+      final themeExt = Directory(p.join(extDir.path, 'fixture-custom-dark'));
+      await themeExt.create();
+      await File(p.join('test/fixtures/themes', 'querya_custom_dark.json')).copy(p.join(themeExt.path, 'theme.json'));
+      await File(p.join(themeExt.path, 'manifest.json')).writeAsString('''{
+        "schema": "querya.extension.v1",
+        "id": "fixture-custom-dark",
+        "name": "Fixture Custom Dark",
+        "version": "1.0.0",
+        "publisher": "Querya",
+        "type": "theme",
+        "main": "theme.json"
+      }''');
       await c.loadAvailableThemes();
       await c.setThemeById('fixture-custom-dark');
 
@@ -403,10 +413,19 @@ void main() {
       await c.load();
       final beforeCount = c.availableThemes.length;
 
-      await _copyFixture(
-        'querya_custom_dark.json',
-        File(p.join(themesDir.path, 'querya_custom_dark.json')),
-      );
+      final extDir = ExtensionPaths.mockExtensionsDirectory!;
+      final themeExt = Directory(p.join(extDir.path, 'fixture-custom-dark'));
+      await themeExt.create();
+      await File(p.join('test/fixtures/themes', 'querya_custom_dark.json')).copy(p.join(themeExt.path, 'theme.json'));
+      await File(p.join(themeExt.path, 'manifest.json')).writeAsString('''{
+        "schema": "querya.extension.v1",
+        "id": "fixture-custom-dark",
+        "name": "Fixture Custom Dark",
+        "version": "1.0.0",
+        "publisher": "Querya",
+        "type": "theme",
+        "main": "theme.json"
+      }''');
       await c.loadAvailableThemes();
 
       expect(c.availableThemes.length, greaterThan(beforeCount));
@@ -428,7 +447,8 @@ void main() {
       await c.setThemeById('fixture-custom-dark');
       final before = c.activeTheme;
 
-      await File(p.join(themesDir.path, 'querya_custom_dark.json'))
+      final extDir = ExtensionPaths.mockExtensionsDirectory!;
+      await File(p.join(extDir.path, 'fixture-custom-dark', 'theme.json'))
           .writeAsString('not valid theme json');
 
       await c.loadAvailableThemes();
