@@ -10,6 +10,7 @@ class ExtensionManifest {
   final String? main;
   final String? icon;
   final String? description;
+  final String? installPath;
 
   const ExtensionManifest({
     required this.id,
@@ -21,9 +22,10 @@ class ExtensionManifest {
     this.main,
     this.icon,
     this.description,
+    this.installPath,
   });
 
-  factory ExtensionManifest.fromJson(Map<String, dynamic> json) {
+  factory ExtensionManifest.fromJson(Map<String, dynamic> json, {String? installPath}) {
     return ExtensionManifest(
       id: json['id'] as String,
       name: json['name'] as String,
@@ -34,6 +36,7 @@ class ExtensionManifest {
       main: json['main'] as String?,
       icon: json['icon'] as String?,
       description: json['description'] as String?,
+      installPath: installPath,
     );
   }
 
