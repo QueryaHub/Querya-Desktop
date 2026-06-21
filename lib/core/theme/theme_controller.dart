@@ -16,7 +16,6 @@ import 'theme_definition.dart';
 import 'theme_folder_watcher.dart';
 import 'theme_import_service.dart';
 import 'theme_load_result.dart';
-import 'theme_paths.dart';
 import 'theme_registry_service.dart';
 import 'theme_remote_install_service.dart';
 import '../extensions/extension_paths.dart';
