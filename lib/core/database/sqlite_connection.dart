@@ -90,7 +90,11 @@ class SqliteConnection {
     if (!isConnected || _db == null) {
       throw StateError('Not connected to SQLite');
     }
-    final sqlLower = sql.trim().toLowerCase();
+    final sqlLower = sql
+        .replaceAll(RegExp(r'--.*$', multiLine: true), '')
+        .replaceAll(RegExp(r'/\*.*?\*/', dotAll: true), '')
+        .trim()
+        .toLowerCase();
     
     // SQLite can execute PRAGMA, SELECT, EXPLAIN statements, which return data
     final isQuery = sqlLower.startsWith('select') ||

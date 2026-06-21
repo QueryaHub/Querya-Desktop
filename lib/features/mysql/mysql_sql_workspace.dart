@@ -122,7 +122,13 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
   }
 
   Future<void> _execute() async {
-    final userSql = _sqlController.text.trim();
+    final selection = _sqlController.selection;
+    String userSql;
+    if (selection.isValid && !selection.isCollapsed) {
+      userSql = selection.textInside(_sqlController.text).trim();
+    } else {
+      userSql = _sqlController.text.trim();
+    }
     if (userSql.isEmpty) return;
 
     setState(() {
