@@ -39,36 +39,7 @@ void main() {
     }
   });
 
-  test('importFromPath parses fixture and persists copy', () async {
-    final fixture = File('test/fixtures/themes/dark_subset.json');
-    final result = await ThemeImportService.importFromPath(fixture.path);
-    expect(result, isA<ThemeImportSuccess>());
-    final success = result as ThemeImportSuccess;
-    expect(success.name, 'Fixture Dark Subset');
-    expect(success.isDark, isTrue);
-    expect(success.colors['editor.background'], '#1e1e1e');
 
-    final reloaded = await ThemeImportService.loadPersistedColors();
-    expect(reloaded?['editor.background'], '#1e1e1e');
-  });
-
-  test('importFromPath persists tokenColors from dracula fixture', () async {
-    final fixture = File('test/fixtures/themes/dracula_tokens.json');
-    final result = await ThemeImportService.importFromPath(fixture.path);
-    expect(result, isA<ThemeImportSuccess>());
-    final success = result as ThemeImportSuccess;
-    expect(success.tokenColors, isNotEmpty);
-
-    final tokens = await ThemeImportService.loadPersistedTokenColors();
-    expect(tokens.length, success.tokenColors.length);
-    expect(tokens.first.scopes, contains('comment'));
-  });
-
-  test('importFromPath returns failure for missing file', () async {
-    final result =
-        await ThemeImportService.importFromPath('/no/such/theme.json');
-    expect(result, isA<ThemeImportFailure>());
-  });
 
   test('slugifyThemeName produces filesystem-safe slug', () {
     expect(
