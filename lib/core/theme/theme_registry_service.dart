@@ -80,8 +80,7 @@ class ThemeRegistryService {
       final file = File(p.join(installPath, mainFile));
       if (!await file.exists()) continue;
 
-      final definition =
-          await _definitionFromFile(file, ThemeSource.filesystem);
+      final definition = await _definitionFromFile(file, ThemeSource.filesystem, extensionId: manifest.id);
       if (definition != null) {
         definitions.add(definition);
       }
@@ -250,8 +249,7 @@ class ThemeRegistryService {
         await LocalExtensionRegistry.instance.reload();
       }
 
-      final definition =
-          await _definitionFromFile(resolvedFile, ThemeSource.filesystem);
+      final definition = await _definitionFromFile(resolvedFile, ThemeSource.filesystem, extensionId: logicalId);
       if (definition == null) {
         return const ThemeDefinitionImportFailure(
             'Failed to index imported theme.');
@@ -466,8 +464,9 @@ class ThemeRegistryService {
 
   Future<ThemeDefinition?> _definitionFromFile(
     File file,
-    ThemeSource source,
-  ) async {
+    ThemeSource source, {
+    String? extensionId,
+  }) async {
     try {
       final stat = await file.stat();
       final raw = await file.readAsString();
@@ -487,6 +486,7 @@ class ThemeRegistryService {
           source: source,
           contentHash: hash,
           lastModified: stat.modified,
+          extensionId: extensionId,
         );
       }
 
@@ -497,6 +497,7 @@ class ThemeRegistryService {
         source: source,
         contentHash: hash,
         lastModified: stat.modified,
+        extensionId: extensionId,
       );
     } on Object catch (e) {
       _logScanError(file.path, e);
@@ -511,6 +512,7 @@ class ThemeRegistryService {
     required ThemeSource source,
     required String contentHash,
     DateTime? lastModified,
+    String? extensionId,
   }) {
     final schema = json['schema']?.toString();
     if (schema == queryaThemeSchemaV1) {
@@ -520,6 +522,7 @@ class ThemeRegistryService {
         contentHash: contentHash,
         path: path,
         lastModified: lastModified,
+        extensionId: extensionId,
       );
     }
 
@@ -530,6 +533,7 @@ class ThemeRegistryService {
       fileBaseName: fileBaseName,
       path: path,
       lastModified: lastModified,
+      extensionId: extensionId,
     );
   }
 
@@ -539,8 +543,9 @@ class ThemeRegistryService {
     required String contentHash,
     required String path,
     DateTime? lastModified,
+    String? extensionId,
   }) {
-    final id = json['id']?.toString().trim();
+    final id = extensionId ?? json['id']?.toString().trim();
     final name = json['name']?.toString().trim();
     final type = json['type']?.toString().trim().toLowerCase();
 
@@ -573,13 +578,14 @@ class ThemeRegistryService {
     required String fileBaseName,
     required String path,
     DateTime? lastModified,
+    String? extensionId,
   }) {
     final rawName = json['name']?.toString().trim();
     final name = rawName != null && rawName.isNotEmpty ? rawName : fileBaseName;
     final type = json['type']?.toString().trim().toLowerCase();
 
     return ThemeDefinition(
-      id: fileBaseName,
+      id: extensionId ?? fileBaseName,
       name: name,
       source: source,
       format: ThemeFormat.vscode,
