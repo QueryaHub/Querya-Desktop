@@ -13,6 +13,7 @@ class LocalExtensionRegistry {
 
   List<ExtensionManifest> _manifests = [];
   bool _loaded = false;
+  Future<List<ExtensionManifest>>? _loadFuture;
 
   /// Returns an unmodifiable list of loaded manifests.
   List<ExtensionManifest> get manifests => List.unmodifiable(_manifests);
@@ -20,13 +21,24 @@ class LocalExtensionRegistry {
   /// Reloads manifests from the disk.
   Future<void> reload() async {
     _loaded = false;
+    _loadFuture = null;
     await load();
   }
 
   /// Loads manifests from the extensions directory if not already loaded.
   Future<List<ExtensionManifest>> load() async {
     if (_loaded) return manifests;
-    
+    if (_loadFuture != null) return _loadFuture!;
+
+    _loadFuture = _doLoad();
+    try {
+      return await _loadFuture!;
+    } finally {
+      _loadFuture = null;
+    }
+  }
+
+  Future<List<ExtensionManifest>> _doLoad() async {
     final dir = await ExtensionPaths.extensionsDirectory();
     final loadedManifests = <ExtensionManifest>[];
 

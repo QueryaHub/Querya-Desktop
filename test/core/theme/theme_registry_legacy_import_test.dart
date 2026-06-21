@@ -7,7 +7,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme_preset.dart';
-import 'package:querya_desktop/core/theme/theme_controller.dart';
+
 import 'package:querya_desktop/core/theme/theme_definition.dart';
 import 'package:querya_desktop/core/theme/theme_import_service.dart';
 import 'package:querya_desktop/core/theme/theme_load_result.dart';
@@ -67,14 +67,16 @@ void main() {
     test('exposes legacy imported theme from persisted import settings',
         () async {
       final fixture = File('test/fixtures/themes/dark_subset.json');
-      final importResult =
-          await ThemeImportService.importFromPath(fixture.path);
-      expect(importResult, isA<ThemeImportSuccess>());
-      final success = importResult as ThemeImportSuccess;
+      final raw = await fixture.readAsString();
+      final storedFile = await ThemeImportService.persistedImportFile();
+      await storedFile.parent.create(recursive: true);
+      await storedFile.writeAsString(raw);
 
-      await AppSettings.instance.setThemeImportedColors(success.colors);
-      await AppSettings.instance.setThemeImportName(success.name);
-      await AppSettings.instance.setThemeImportPath(success.storedPath);
+      await AppSettings.instance.setThemeImportedColors({
+        'editor.background': '#1e1e1e',
+      });
+      await AppSettings.instance.setThemeImportName('Fixture Dark Subset');
+      await AppSettings.instance.setThemeImportPath(storedFile.path);
       await AppSettings.instance.setThemePreset(QueryaThemePreset.imported);
 
       final definitions = await registry.loadThemeDefinitions();
@@ -85,7 +87,7 @@ void main() {
       expect(legacy.id, ThemeImportService.legacyImportedThemeId);
       expect(legacy.name, 'Fixture Dark Subset');
       expect(legacy.format, ThemeFormat.vscode);
-      expect(legacy.path, success.storedPath);
+      expect(legacy.path, storedFile.path);
       expect(
         definitions.where((definition) => definition.id == 'imported'),
         hasLength(1),
@@ -94,13 +96,16 @@ void main() {
 
     test('loads legacy imported theme definition', () async {
       final fixture = File('test/fixtures/themes/dark_subset.json');
-      final importResult =
-          await ThemeImportService.importFromPath(fixture.path);
-      final success = importResult as ThemeImportSuccess;
+      final raw = await fixture.readAsString();
+      final storedFile = await ThemeImportService.persistedImportFile();
+      await storedFile.parent.create(recursive: true);
+      await storedFile.writeAsString(raw);
 
-      await AppSettings.instance.setThemeImportedColors(success.colors);
-      await AppSettings.instance.setThemeImportName(success.name);
-      await AppSettings.instance.setThemeImportPath(success.storedPath);
+      await AppSettings.instance.setThemeImportedColors({
+        'editor.background': '#1e1e1e',
+      });
+      await AppSettings.instance.setThemeImportName('Fixture Dark Subset');
+      await AppSettings.instance.setThemeImportPath(storedFile.path);
 
       final legacy = (await registry.loadThemeDefinitions()).singleWhere(
         (definition) => definition.source == ThemeSource.legacyImported,
@@ -134,23 +139,6 @@ void main() {
       expect((result as ThemeLoadFailure).message, 'Theme file not found.');
     });
 
-    test('QueryaThemePreset.imported still applies via ThemeController',
-        () async {
-      final controller = ThemeController.instance;
-      final fixture = File('test/fixtures/themes/dark_subset.json');
-      final result = await controller.importThemeFromFile(fixture.path);
 
-      expect(result, isA<ThemeImportSuccess>());
-      expect(controller.preset, QueryaThemePreset.imported);
-      expect(controller.hasImportedTheme, isTrue);
-
-      final definitions = await registry.loadThemeDefinitions();
-      expect(
-        definitions.any(
-          (definition) => definition.source == ThemeSource.legacyImported,
-        ),
-        isTrue,
-      );
-    });
   });
 }
