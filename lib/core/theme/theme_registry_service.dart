@@ -132,21 +132,46 @@ class ThemeRegistryService {
               await _definitionFromFile(entity, source);
           if (definition == null) continue;
 
+          // Resolve ID collisions for legacy themes
+          var logicalId = definition.id;
+          var idSuffix = 2;
+          var candidateId = logicalId;
+          while (LocalExtensionRegistry.instance.manifests.any(
+              (m) => m.type == ExtensionType.theme && m.id == candidateId)) {
+            candidateId = '$logicalId-$idSuffix';
+            idSuffix++;
+          }
+          logicalId = candidateId;
+
           final slug = ThemeImportService.slugifyThemeName(definition.name);
           var finalExtDir = Directory(p.join(extensionsDir.path, slug));
           var counter = 2;
-          while (await finalExtDir.exists()) {
+          while (true) {
+            if (!await finalExtDir.exists()) {
+              try {
+                await finalExtDir.create(recursive: false);
+                break;
+              } on FileSystemException {
+                // Another async task or process claimed it, keep looping.
+              }
+            }
             finalExtDir =
                 Directory(p.join(extensionsDir.path, '$slug-$counter'));
             counter++;
           }
-          await finalExtDir.create(recursive: true);
 
           final themeFile = File(p.join(finalExtDir.path, 'theme.json'));
-          await entity.copy(themeFile.path);
+          
+          if (logicalId != definition.id && definition.format == ThemeFormat.queryaCustom) {
+             final raw = await entity.readAsString();
+             final contentToWrite = _rewriteCustomThemeId(raw, logicalId);
+             await themeFile.writeAsString(contentToWrite);
+          } else {
+             await entity.copy(themeFile.path);
+          }
 
           final manifest = ExtensionManifest(
-            id: definition.id,
+            id: logicalId,
             name: definition.name,
             version: '1.0.0',
             publisher: source == ThemeSource.imported ? 'Imported' : 'Unknown',
@@ -262,12 +287,19 @@ class ThemeRegistryService {
         var finalExtDir =
             Directory(p.join(extensionsDir.path, preferredBaseName));
         var counter = 2;
-        while (await finalExtDir.exists()) {
+        while (true) {
+          if (!await finalExtDir.exists()) {
+            try {
+              await finalExtDir.create(recursive: false);
+              break;
+            } on FileSystemException {
+              // Another async task or process claimed it, keep looping.
+            }
+          }
           finalExtDir = Directory(
               p.join(extensionsDir.path, '$preferredBaseName-$counter'));
           counter++;
         }
-        await finalExtDir.create(recursive: true);
 
         resolvedFile = File(p.join(finalExtDir.path, 'theme.json'));
         await resolvedFile.writeAsString(contentToWrite);

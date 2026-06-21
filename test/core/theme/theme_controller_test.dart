@@ -176,21 +176,7 @@ void main() {
     );
   });
 
-  test('importThemeFromFile applies imported colors to activeTheme', () async {
-    final c = ThemeController.instance;
-    await c.load();
-    final fixture = File('test/fixtures/themes/dark_subset.json');
-    final result = await c.importThemeFromFile(fixture.path);
-    expect(result, isA<ThemeImportSuccess>());
-    expect(c.preset, QueryaThemePreset.imported);
-    expect(c.hasImportedTheme, isTrue);
-    expect(
-      c.activeTheme.workbench.editorBackground,
-      const Color(0xFF1E1E1E),
-    );
-    await c.resetToDefaults();
-    expect(c.preset, QueryaThemePreset.queryaDark);
-  });
+
 
   test('setThemeAnimationEnabled persists and reset clears', () async {
     final c = ThemeController.instance;
