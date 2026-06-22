@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.7-a] - 2026-06-22
+
+### Added
+
+- **Connection Invalidate/Reconnect** — added Invalidate/Reconnect action in the application menu and window title bar.
+- **Connection Read-only Mode** — added Read-only mode for PostgreSQL and SQLite database connections to prevent write operations (displays a lock icon in the workspace).
+- **Connection Lifecycle Management** — added Connect and Disconnect menu items and corresponding title bar controls.
+
+### Documentation
+
+- Added comprehensive setup guides for SQLite, Read-only connection mode, and connection lifecycle controls in the English user guide and Obsidian Russian notes.
+
 ## [0.4.7] - 2026-06-21
 
 Local extension discovery and manifest foundation release. Git tag **`0.4.7`**.
