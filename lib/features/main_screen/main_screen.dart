@@ -149,8 +149,35 @@ class _MainScreenState extends State<MainScreen> {
         width: 1,
         child: Column(
           children: [
-            QueryaWindowTitleBar(
-              onNewDatabaseConnection: _onNewDatabaseConnectionFromMenu,
+            ValueListenableBuilder<MainScreenWorkspaceState>(
+              valueListenable: _workspace,
+              builder: (context, workspace, _) {
+                return QueryaWindowTitleBar(
+                  onNewDatabaseConnection: _onNewDatabaseConnectionFromMenu,
+                  activeConnection: workspace.activeConnection,
+                  onConnect: () {
+                    final active = workspace.activeConnection;
+                    if (active != null && active.id != null) {
+                      _connectionsPanelKey.currentState?.connect(active.id!);
+                    }
+                  },
+                  onDisconnect: () {
+                    final active = workspace.activeConnection;
+                    if (active != null) {
+                      _connectionsPanelKey.currentState?.disconnect(active);
+                    }
+                  },
+                  onDisconnectAll: () {
+                    _connectionsPanelKey.currentState?.disconnectAll();
+                  },
+                  onDisconnectOthers: () {
+                    final active = workspace.activeConnection;
+                    if (active != null) {
+                      _connectionsPanelKey.currentState?.disconnectOthers(active);
+                    }
+                  },
+                );
+              },
             ),
             Divider(height: 1, color: wb.borderSubtle.withValues(alpha: 0.22)),
             Expanded(

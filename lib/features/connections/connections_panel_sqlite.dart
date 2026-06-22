@@ -15,6 +15,8 @@ class _SqliteConnectionTile extends StatefulWidget {
     this.onTap,
     this.onSqliteObjectSelected,
     this.onSqliteOpenSqlWorkspace,
+    this.isExpanded = false,
+    this.onExpandedChanged,
   });
 
   final ConnectionRow connection;
@@ -29,23 +31,47 @@ class _SqliteConnectionTile extends StatefulWidget {
     SqliteObjectKind kind,
   )? onSqliteObjectSelected;
   final void Function(ConnectionRow connection)? onSqliteOpenSqlWorkspace;
+  final bool isExpanded;
+  final ValueChanged<bool>? onExpandedChanged;
 
   @override
   State<_SqliteConnectionTile> createState() => _SqliteConnectionTileState();
 }
 
 class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
-  bool _expanded = false;
+  bool get _expanded => widget.isExpanded;
   bool _loading = false;
   String? _error;
   List<String> _tables = [];
   List<String> _views = [];
 
-  void _toggle() {
-    setState(() => _expanded = !_expanded);
-    if (_expanded && _tables.isEmpty && _views.isEmpty && !_loading) {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isExpanded) {
       _loadTables();
     }
+  }
+
+  @override
+  void didUpdateWidget(_SqliteConnectionTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isExpanded && !oldWidget.isExpanded) {
+      if (_tables.isEmpty && _views.isEmpty && !_loading) {
+        _loadTables();
+      }
+    } else if (!widget.isExpanded && oldWidget.isExpanded) {
+      setState(() {
+        _tables = [];
+        _views = [];
+        _loading = false;
+        _error = null;
+      });
+    }
+  }
+
+  void _toggle() {
+    widget.onExpandedChanged?.call(!widget.isExpanded);
   }
 
   Future<void> _loadTables() async {

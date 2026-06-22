@@ -1,6 +1,7 @@
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart' as material
     show BuildContext, Container, Icon, Icons, MainAxisSize, Widget;
+import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/connections/driver_manager_dialog.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
@@ -12,9 +13,19 @@ class QueryaWindowTitleBar extends StatelessWidget {
   const QueryaWindowTitleBar({
     super.key,
     required this.onNewDatabaseConnection,
+    this.activeConnection,
+    this.onConnect,
+    this.onDisconnect,
+    this.onDisconnectAll,
+    this.onDisconnectOthers,
   });
 
   final Future<void> Function() onNewDatabaseConnection;
+  final ConnectionRow? activeConnection;
+  final VoidCallback? onConnect;
+  final VoidCallback? onDisconnect;
+  final VoidCallback? onDisconnectAll;
+  final VoidCallback? onDisconnectOthers;
 
   @visibleForTesting
   static Color titleBarBackground(BuildContext context) =>
@@ -147,11 +158,11 @@ class QueryaWindowTitleBar extends StatelessWidget {
                             ),
                             const MenuDivider(),
                             MenuButton(
-                              enabled: false,
+                              enabled: activeConnection != null,
                               leading: const material.Icon(
                                   material.Icons.power_rounded,
                                   size: 18),
-                              onPressed: (_) {},
+                              onPressed: (_) => onConnect?.call(),
                               child: const Text('Connect'),
                             ),
                             MenuButton(
@@ -162,17 +173,19 @@ class QueryaWindowTitleBar extends StatelessWidget {
                               child: const Text('Invalidate/Reconnect'),
                             ),
                             MenuButton(
+                              enabled: activeConnection != null,
                               leading: const material.Icon(
                                   material.Icons.power_off_rounded,
                                   size: 18),
-                              onPressed: (_) {},
+                              onPressed: (_) => onDisconnect?.call(),
                               child: const Text('Disconnect'),
                             ),
                             MenuButton(
-                                onPressed: (_) {},
+                                onPressed: (_) => onDisconnectAll?.call(),
                                 child: const Text('Disconnect All')),
                             MenuButton(
-                                onPressed: (_) {},
+                                enabled: activeConnection != null,
+                                onPressed: (_) => onDisconnectOthers?.call(),
                                 child: const Text('Disconnect Others')),
                             const MenuDivider(),
                             MenuButton(

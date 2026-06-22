@@ -246,4 +246,113 @@ void main() {
       _expectTextCount('Mongo local', 1);
     });
   });
+
+  group('ConnectionsPanel state control methods', () {
+    late Directory stateTempDir;
+
+    setUp(() async {
+      stateTempDir = await Directory.systemTemp.createTemp('querya_conn_state_test_');
+      PathProviderPlatform.instance = _FakePathProvider(stateTempDir.path);
+      await LocalDb.instance.close();
+      await LocalDb.instance.addConnection(
+        ConnectionRow(
+          type: 'generic',
+          name: 'Conn 1',
+          createdAt: _isoNow(),
+        ),
+      );
+      await LocalDb.instance.addConnection(
+        ConnectionRow(
+          type: 'generic',
+          name: 'Conn 2',
+          createdAt: _isoNow(),
+        ),
+      );
+      await FoldersStorage.instance.reload();
+    });
+
+    tearDown(() async {
+      await LocalDb.instance.close();
+      if (await stateTempDir.exists()) {
+        await stateTempDir.delete(recursive: true);
+      }
+    });
+
+    testWidgets('connect, disconnect, disconnectAll, and disconnectOthers update state', (tester) async {
+      await tester.pumpWidget(
+        ShadcnApp(
+          theme: AppTheme.dark,
+          home: material.SizedBox.expand(
+            child: ConnectionsPanel(
+              skipInitialDbLoadForTest: true,
+              onPostgresOpenSqlWorkspace: (_, {database, schema, name, kind}) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final panelState = tester.state<ConnectionsPanelState>(
+        find.byType(ConnectionsPanel),
+      );
+
+      await tester.runAsync(() async {
+        await panelState.reloadConnectionsFromDb();
+      });
+      await tester.pump();
+
+      late final List<ConnectionRow> conns;
+      await tester.runAsync(() async {
+        conns = await LocalDb.instance.getConnections();
+      });
+      final conn1 = conns.firstWhere((c) => c.name == 'Conn 1');
+      final conn2 = conns.firstWhere((c) => c.name == 'Conn 2');
+      final id1 = conn1.id!;
+      final id2 = conn2.id!;
+
+      // 1. Initial state
+      expect(panelState.isConnectionExpanded(id1), false);
+      expect(panelState.isConnectionExpanded(id2), false);
+
+      // 2. Connect
+      panelState.connect(id1);
+      await tester.pump();
+      expect(panelState.isConnectionExpanded(id1), true);
+      expect(panelState.isConnectionExpanded(id2), false);
+
+      // 3. Disconnect Others
+      panelState.connect(id2);
+      await tester.pump();
+      expect(panelState.isConnectionExpanded(id1), true);
+      expect(panelState.isConnectionExpanded(id2), true);
+
+      await tester.runAsync(() async {
+        await panelState.disconnectOthers(conn1);
+      });
+      await tester.pump();
+      expect(panelState.isConnectionExpanded(id1), true);
+      expect(panelState.isConnectionExpanded(id2), false);
+
+      // 4. Disconnect
+      await tester.runAsync(() async {
+        await panelState.disconnect(conn1);
+      });
+      await tester.pump();
+      expect(panelState.isConnectionExpanded(id1), false);
+
+      // 5. Disconnect All
+      panelState.connect(id1);
+      panelState.connect(id2);
+      await tester.pump();
+      expect(panelState.isConnectionExpanded(id1), true);
+      expect(panelState.isConnectionExpanded(id2), true);
+
+      await tester.runAsync(() async {
+        await panelState.disconnectAll();
+      });
+      await tester.pump();
+      expect(panelState.isConnectionExpanded(id1), false);
+      expect(panelState.isConnectionExpanded(id2), false);
+    });
+  });
 }

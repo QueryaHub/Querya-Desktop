@@ -12,6 +12,8 @@ class _PostgresConnectionTile extends StatefulWidget {
     this.onTap,
     this.onPostgresObjectSelected,
     this.onPostgresOpenSqlWorkspace,
+    this.isExpanded = false,
+    this.onExpandedChanged,
   });
 
   final ConnectionRow connection;
@@ -28,6 +30,8 @@ class _PostgresConnectionTile extends StatefulWidget {
     PostgresObjectKind kind,
   )? onPostgresObjectSelected;
   final OnPostgresOpenSqlWorkspace? onPostgresOpenSqlWorkspace;
+  final bool isExpanded;
+  final ValueChanged<bool>? onExpandedChanged;
 
   @override
   State<_PostgresConnectionTile> createState() =>
@@ -35,16 +39,37 @@ class _PostgresConnectionTile extends StatefulWidget {
 }
 
 class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
-  bool _expanded = false;
+  bool get _expanded => widget.isExpanded;
   bool _loading = false;
   String? _error;
   List<String> _databases = [];
 
-  void _toggle() {
-    setState(() => _expanded = !_expanded);
-    if (_expanded && _databases.isEmpty && !_loading) {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isExpanded) {
       _loadDatabases();
     }
+  }
+
+  @override
+  void didUpdateWidget(_PostgresConnectionTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isExpanded && !oldWidget.isExpanded) {
+      if (_databases.isEmpty && !_loading) {
+        _loadDatabases();
+      }
+    } else if (!widget.isExpanded && oldWidget.isExpanded) {
+      setState(() {
+        _databases = [];
+        _loading = false;
+        _error = null;
+      });
+    }
+  }
+
+  void _toggle() {
+    widget.onExpandedChanged?.call(!widget.isExpanded);
   }
 
   Future<void> _loadDatabases() async {

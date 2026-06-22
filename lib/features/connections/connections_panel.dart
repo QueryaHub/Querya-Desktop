@@ -57,6 +57,7 @@ import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
+import 'package:meta/meta.dart' show visibleForTesting;
 import 'package:querya_desktop/core/database/redis_info.dart';
 import 'package:querya_desktop/core/database/sqlite_service.dart';
 import 'package:querya_desktop/core/storage/folders_storage.dart';
@@ -67,6 +68,8 @@ import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
+import 'package:querya_desktop/core/database/redis_service.dart';
+import 'package:querya_desktop/app/app_shutdown.dart';
 
 import 'package:querya_desktop/features/mongodb/mongo_database_dialog.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
@@ -219,6 +222,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
   List<ConnectionRow> _connections = [];
   Map<String, int> _folderIdByName = {};
   final Set<String> _expandedFolders = {};
+  final Set<int> _expandedConnections = {};
 
   /// Ignores stale [setState] when multiple [_loadData] runs overlap (e.g. tests).
   int _loadDataGeneration = 0;
@@ -312,6 +316,59 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     await _loadData();
   }
 
+  void connect(int connectionId) {
+    setState(() {
+      _expandedConnections.add(connectionId);
+    });
+  }
+
+  @visibleForTesting
+  bool isConnectionExpanded(int id) => _expandedConnections.contains(id);
+
+  Future<void> disconnect(ConnectionRow conn) async {
+    final id = conn.id!;
+    setState(() {
+      _expandedConnections.remove(id);
+    });
+    if (conn.type == 'postgresql') {
+      PostgresService.instance.interrupt(conn, database: conn.databaseName ?? 'postgres', mode: PgSessionMode.readOnly);
+      PostgresService.instance.interrupt(conn, database: conn.databaseName ?? 'postgres', mode: PgSessionMode.readWrite);
+    } else if (conn.type == 'mysql') {
+      MysqlService.instance.interrupt(conn, database: conn.databaseName ?? '', mode: MysqlSessionMode.readOnly);
+      MysqlService.instance.interrupt(conn, database: conn.databaseName ?? '', mode: MysqlSessionMode.readWrite);
+    } else if (conn.type == 'sqlite') {
+      SqliteService.instance.interrupt(conn, mode: SqliteSessionMode.readOnly);
+      SqliteService.instance.interrupt(conn, mode: SqliteSessionMode.readWrite);
+    } else if (conn.type == 'redis') {
+      final redisConn = RedisService.instance.getConnection(id);
+      if (redisConn != null) {
+        await RedisService.instance.disconnect(redisConn);
+      }
+    } else if (conn.type == 'mongodb') {
+      await MongoService.instance.disconnectByConnectionId(id);
+    }
+  }
+
+  Future<void> disconnectAll() async {
+    setState(() {
+      _expandedConnections.clear();
+    });
+    await disconnectAllExternalServices();
+    await SqliteService.instance.disconnectAll();
+  }
+
+  Future<void> disconnectOthers(ConnectionRow keepConn) async {
+    final keepId = keepConn.id!;
+    setState(() {
+      _expandedConnections.clear();
+      _expandedConnections.add(keepId);
+    });
+    for (final conn in _connections) {
+      if (conn.id == keepId) continue;
+      await disconnect(conn);
+    }
+  }
+
   /// Icon for a connection type (matches New Connection dialog).
   material.IconData _iconForType(String type) {
     return switch (type) {
@@ -338,6 +395,17 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
   Widget _buildConnectionTile(ConnectionRow conn) {
     final isSelected = widget.selectedConnectionId != null &&
         widget.selectedConnectionId == conn.id;
+    final isExpanded = _expandedConnections.contains(conn.id);
+    void handleExpandedChanged(bool expanded) {
+      setState(() {
+        if (expanded) {
+          _expandedConnections.add(conn.id!);
+        } else {
+          _expandedConnections.remove(conn.id!);
+        }
+      });
+    }
+
     if (conn.type == 'postgresql') {
       return _PostgresConnectionTile(
         connection: conn,
@@ -348,6 +416,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         onTap: () => widget.onConnectionSelected?.call(conn),
         onPostgresObjectSelected: widget.onPostgresObjectSelected,
         onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
+        isExpanded: isExpanded,
+        onExpandedChanged: handleExpandedChanged,
       );
     } else if (conn.type == 'mysql') {
       return _MysqlConnectionTile(
@@ -359,6 +429,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         onTap: () => widget.onConnectionSelected?.call(conn),
         onMysqlObjectSelected: widget.onMysqlObjectSelected,
         onMysqlOpenSqlWorkspace: widget.onMysqlOpenSqlWorkspace,
+        isExpanded: isExpanded,
+        onExpandedChanged: handleExpandedChanged,
       );
     } else if (conn.type == 'redis') {
       return _RedisConnectionTile(
@@ -369,6 +441,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         onRemove: () => _removeConnection(conn.id!),
         onTap: () => widget.onConnectionSelected?.call(conn),
         onDatabaseTap: (db) => widget.onRedisDatabaseSelected?.call(conn, db),
+        isExpanded: isExpanded,
+        onExpandedChanged: handleExpandedChanged,
       );
     } else if (conn.type == 'mongodb') {
       return _MongoConnectionTile(
@@ -379,6 +453,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         onRemove: () => _removeConnection(conn.id!),
         onTap: () => widget.onConnectionSelected?.call(conn),
         onDatabaseTap: (db) => widget.onMongoDBDatabaseSelected?.call(conn, db),
+        isExpanded: isExpanded,
+        onExpandedChanged: handleExpandedChanged,
       );
     } else if (conn.type == 'sqlite') {
       return _SqliteConnectionTile(
@@ -390,6 +466,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         onTap: () => widget.onConnectionSelected?.call(conn),
         onSqliteObjectSelected: widget.onSqliteObjectSelected,
         onSqliteOpenSqlWorkspace: widget.onSqliteOpenSqlWorkspace,
+        isExpanded: isExpanded,
+        onExpandedChanged: handleExpandedChanged,
       );
     }
     return _ConnectionTile(
