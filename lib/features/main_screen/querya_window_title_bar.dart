@@ -84,7 +84,8 @@ class QueryaWindowTitleBar extends StatelessWidget {
                                 onPressed: (_) {}, child: const Text('Save')),
                             const MenuDivider(),
                             MenuButton(
-                                onPressed: (_) {}, child: const Text('Exit')),
+                                onPressed: (_) => appWindow.close(),
+                                child: const Text('Exit')),
                           ],
                           child: const Text('File'),
                         ),
