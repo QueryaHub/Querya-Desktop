@@ -8,10 +8,12 @@ class SqliteWorkspaceHome extends material.StatefulWidget {
     super.key,
     required this.connectionRow,
     this.sqlTabRequestToken = 0,
+    this.isReadOnly = false,
   });
 
   final ConnectionRow connectionRow;
   final int sqlTabRequestToken;
+  final bool isReadOnly;
 
   @override
   material.State<SqliteWorkspaceHome> createState() => _SqliteWorkspaceHomeState();
@@ -33,6 +35,14 @@ class _SqliteWorkspaceHomeState extends material.State<SqliteWorkspaceHome> {
           child: material.Row(
             children: [
               const Text('SQLite').semiBold().small(),
+              if (widget.isReadOnly) ...[
+                const Gap(6),
+                material.Icon(
+                  material.Icons.lock_outline_rounded,
+                  size: 14,
+                  color: theme.colorScheme.mutedForeground,
+                ),
+              ],
               const Spacer(),
               material.Container(
                 padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -50,6 +60,7 @@ class _SqliteWorkspaceHomeState extends material.State<SqliteWorkspaceHome> {
           child: SqliteSqlWorkspace(
             key: ValueKey('sqlite_sql_${widget.connectionRow.id}'),
             connectionRow: widget.connectionRow,
+            isReadOnly: widget.isReadOnly,
           ),
         ),
       ],

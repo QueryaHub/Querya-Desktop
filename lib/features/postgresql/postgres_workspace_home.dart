@@ -18,9 +18,11 @@ class PostgresWorkspaceHome extends material.StatefulWidget {
     this.postgresSqlEditorContext,
     this.postgresSqlEditorContextToken = 0,
     this.sqlTabRequestToken = 0,
+    this.isReadOnly = false,
   });
 
   final ConnectionRow connectionRow;
+  final bool isReadOnly;
 
   /// Set when opening SQL from the tree (e.g. "Open in SQL") to seed session DB + template.
   final ({
@@ -120,6 +122,14 @@ class _PostgresWorkspaceHomeState
           child: material.Row(
             children: [
               const Text('PostgreSQL').semiBold().small(),
+              if (widget.isReadOnly) ...[
+                const Gap(6),
+                material.Icon(
+                  material.Icons.lock_outline_rounded,
+                  size: 14,
+                  color: theme.colorScheme.mutedForeground,
+                ),
+              ],
               const Spacer(),
               ...List.generate(2, (i) {
                 final labels = ['Server', 'SQL'];
@@ -170,6 +180,7 @@ class _PostgresWorkspaceHomeState
                 postgresSqlEditorContext: widget.postgresSqlEditorContext,
                 postgresSqlEditorContextToken:
                     widget.postgresSqlEditorContextToken,
+                isReadOnly: widget.isReadOnly,
               ),
             ],
           ),

@@ -21,9 +21,11 @@ class SqliteSqlWorkspace extends material.StatefulWidget {
   const SqliteSqlWorkspace({
     super.key,
     required this.connectionRow,
+    this.isReadOnly = false,
   });
 
   final ConnectionRow connectionRow;
+  final bool isReadOnly;
 
   @override
   material.State<SqliteSqlWorkspace> createState() => _SqliteSqlWorkspaceState();
@@ -60,6 +62,15 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
     });
   }
 
+  @override
+  void didUpdateWidget(covariant SqliteSqlWorkspace oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isReadOnly != widget.isReadOnly) {
+      _lease?.release();
+      _lease = null;
+    }
+  }
+
   Future<void> _loadWorkspaceSettings() async {
     final rows = await AppSettings.instance.getSqlResultMaxRows();
     final hist = await AppSettings.instance.getSqlHistoryMaxEntries();
@@ -78,7 +89,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
     _lease = null;
     final lease = await SqliteService.instance.acquire(
       widget.connectionRow,
-      mode: SqliteSessionMode.readWrite,
+      mode: widget.isReadOnly ? SqliteSessionMode.readOnly : SqliteSessionMode.readWrite,
     );
     if (!mounted) {
       lease.release();

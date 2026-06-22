@@ -15,9 +15,11 @@ class MysqlWorkspaceHome extends material.StatefulWidget {
     super.key,
     required this.connectionRow,
     this.sqlTabRequestToken = 0,
+    this.isReadOnly = false,
   });
 
   final ConnectionRow connectionRow;
+  final bool isReadOnly;
 
   /// Parent increments to switch to the SQL tab (e.g. context menu on connection).
   final int sqlTabRequestToken;
@@ -74,6 +76,14 @@ class _MysqlWorkspaceHomeState extends material.State<MysqlWorkspaceHome> {
           child: material.Row(
             children: [
               const Text('MySQL').semiBold().small(),
+              if (widget.isReadOnly) ...[
+                const Gap(6),
+                material.Icon(
+                  material.Icons.lock_outline_rounded,
+                  size: 14,
+                  color: theme.colorScheme.mutedForeground,
+                ),
+              ],
               const Spacer(),
               ...List.generate(2, (i) {
                 final labels = ['Server', 'SQL'];
@@ -120,6 +130,7 @@ class _MysqlWorkspaceHomeState extends material.State<MysqlWorkspaceHome> {
               MysqlSqlWorkspace(
                 key: ValueKey('mysql_sql_${widget.connectionRow.id}'),
                 connectionRow: widget.connectionRow,
+                isReadOnly: widget.isReadOnly,
               ),
             ],
           ),

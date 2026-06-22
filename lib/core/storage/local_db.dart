@@ -379,6 +379,7 @@ class LocalDb {
   Future<void> close() async {
     await _db?.close();
     _db = null;
+    _cachedDbPath = null;
   }
 }
 
