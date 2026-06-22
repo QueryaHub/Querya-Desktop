@@ -1,9 +1,11 @@
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart' as material
     show BuildContext, Container, Icon, Icons, MainAxisSize, Widget;
+import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/connections/driver_manager_dialog.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
+import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// Custom bitsdojo title bar styled from [QueryaThemeScope] workbench tokens.
@@ -11,9 +13,25 @@ class QueryaWindowTitleBar extends StatelessWidget {
   const QueryaWindowTitleBar({
     super.key,
     required this.onNewDatabaseConnection,
+    this.activeConnection,
+    this.onConnect,
+    this.onReconnect,
+    this.onDisconnect,
+    this.onDisconnectAll,
+    this.onDisconnectOthers,
+    this.isReadOnly = false,
+    this.onReadOnlyChanged,
   });
 
   final Future<void> Function() onNewDatabaseConnection;
+  final ConnectionRow? activeConnection;
+  final VoidCallback? onConnect;
+  final VoidCallback? onReconnect;
+  final VoidCallback? onDisconnect;
+  final VoidCallback? onDisconnectAll;
+  final VoidCallback? onDisconnectOthers;
+  final bool isReadOnly;
+  final VoidCallback? onReadOnlyChanged;
 
   @visibleForTesting
   static Color titleBarBackground(BuildContext context) =>
@@ -76,15 +94,33 @@ class QueryaWindowTitleBar extends StatelessWidget {
                         MenuButton(
                           subMenu: [
                             MenuButton(
-                                onPressed: (_) {}, child: const Text('New')),
+                                onPressed: (ctx) {
+                                  Actions.maybeInvoke(
+                                    FocusManager.instance.primaryFocus?.context ?? ctx,
+                                    const NewSqlIntent(),
+                                  );
+                                },
+                                child: const Text('New')),
                             MenuButton(
-                                onPressed: (_) {},
+                                onPressed: (ctx) {
+                                  Actions.maybeInvoke(
+                                    FocusManager.instance.primaryFocus?.context ?? ctx,
+                                    const OpenSqlIntent(),
+                                  );
+                                },
                                 child: const Text('Open...')),
                             MenuButton(
-                                onPressed: (_) {}, child: const Text('Save')),
+                                onPressed: (ctx) {
+                                  Actions.maybeInvoke(
+                                    FocusManager.instance.primaryFocus?.context ?? ctx,
+                                    const SaveSqlIntent(),
+                                  );
+                                },
+                                child: const Text('Save')),
                             const MenuDivider(),
                             MenuButton(
-                                onPressed: (_) {}, child: const Text('Exit')),
+                                onPressed: (_) => appWindow.close(),
+                                child: const Text('Exit')),
                           ],
                           child: const Text('File'),
                         ),
@@ -128,39 +164,48 @@ class QueryaWindowTitleBar extends StatelessWidget {
                             ),
                             const MenuDivider(),
                             MenuButton(
-                              enabled: false,
+                              enabled: activeConnection != null,
                               leading: const material.Icon(
                                   material.Icons.power_rounded,
                                   size: 18),
-                              onPressed: (_) {},
+                              onPressed: (_) => onConnect?.call(),
                               child: const Text('Connect'),
                             ),
                             MenuButton(
+                              enabled: activeConnection != null,
                               leading: const material.Icon(
                                   material.Icons.refresh_rounded,
                                   size: 18),
-                              onPressed: (_) {},
+                              onPressed: (_) => onReconnect?.call(),
                               child: const Text('Invalidate/Reconnect'),
                             ),
                             MenuButton(
+                              enabled: activeConnection != null,
                               leading: const material.Icon(
                                   material.Icons.power_off_rounded,
                                   size: 18),
-                              onPressed: (_) {},
+                              onPressed: (_) => onDisconnect?.call(),
                               child: const Text('Disconnect'),
                             ),
                             MenuButton(
-                                onPressed: (_) {},
+                                onPressed: (_) => onDisconnectAll?.call(),
                                 child: const Text('Disconnect All')),
                             MenuButton(
-                                onPressed: (_) {},
+                                enabled: activeConnection != null,
+                                onPressed: (_) => onDisconnectOthers?.call(),
                                 child: const Text('Disconnect Others')),
                             const MenuDivider(),
                             MenuButton(
+                              enabled: activeConnection != null,
                               leading: const material.Icon(
                                   material.Icons.lock_outline_rounded,
                                   size: 18),
-                              onPressed: (_) {},
+                              trailing: isReadOnly
+                                  ? const material.Icon(
+                                      material.Icons.check_rounded,
+                                      size: 16)
+                                  : null,
+                              onPressed: (_) => onReadOnlyChanged?.call(),
                               child: const Text('Read-only'),
                             ),
                           ],

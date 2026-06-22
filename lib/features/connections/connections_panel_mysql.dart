@@ -12,6 +12,8 @@ class _MysqlConnectionTile extends StatefulWidget {
     this.onTap,
     this.onMysqlObjectSelected,
     this.onMysqlOpenSqlWorkspace,
+    this.isExpanded = false,
+    this.onExpandedChanged,
   });
 
   final ConnectionRow connection;
@@ -27,22 +29,45 @@ class _MysqlConnectionTile extends StatefulWidget {
     MysqlObjectKind kind,
   )? onMysqlObjectSelected;
   final void Function(ConnectionRow connection)? onMysqlOpenSqlWorkspace;
+  final bool isExpanded;
+  final ValueChanged<bool>? onExpandedChanged;
 
   @override
   State<_MysqlConnectionTile> createState() => _MysqlConnectionTileState();
 }
 
 class _MysqlConnectionTileState extends State<_MysqlConnectionTile> {
-  bool _expanded = false;
+  bool get _expanded => widget.isExpanded;
   bool _loading = false;
   String? _error;
   List<String> _databases = [];
 
-  void _toggle() {
-    setState(() => _expanded = !_expanded);
-    if (_expanded && _databases.isEmpty && !_loading) {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isExpanded) {
       _loadDatabases();
     }
+  }
+
+  @override
+  void didUpdateWidget(_MysqlConnectionTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isExpanded && !oldWidget.isExpanded) {
+      if (_databases.isEmpty && !_loading) {
+        _loadDatabases();
+      }
+    } else if (!widget.isExpanded && oldWidget.isExpanded) {
+      setState(() {
+        _databases = [];
+        _loading = false;
+        _error = null;
+      });
+    }
+  }
+
+  void _toggle() {
+    widget.onExpandedChanged?.call(!widget.isExpanded);
   }
 
   Future<void> _loadDatabases() async {

@@ -60,11 +60,13 @@ class WorkspacePanel extends StatefulWidget {
     this.mysqlSqlTabRequestToken = 0,
     this.selectedSqliteObject,
     this.sqliteSqlTabRequestToken = 0,
+    this.isReadOnly = false,
     this.onRequestNewConnection,
   });
 
   /// Currently selected connection from the sidebar.
   final ConnectionRow? activeConnection;
+  final bool isReadOnly;
 
   /// When set, the user selected a specific Redis database in the sidebar tree.
   /// null = show stats, non-null = show data explorer for that db.
@@ -159,6 +161,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
                 postgresSqlEditorContextToken:
                     widget.postgresSqlEditorContextToken,
                 sqlTabRequestToken: widget.postgresSqlTabRequestToken,
+                isReadOnly: widget.isReadOnly,
               )
             : buildPostgresObjectWorkspace(
                 connection: activeConn,
@@ -172,6 +175,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
                 key: ValueKey('mysql_home_${activeConn.id}'),
                 connectionRow: activeConn,
                 sqlTabRequestToken: widget.mysqlSqlTabRequestToken,
+                isReadOnly: widget.isReadOnly,
               )
             : MysqlTableView(
                 key: ValueKey(
@@ -216,6 +220,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
                 key: ValueKey('sqlite_home_${activeConn.id}'),
                 connectionRow: activeConn,
                 sqlTabRequestToken: widget.sqliteSqlTabRequestToken,
+                isReadOnly: widget.isReadOnly,
               )
             : SqliteTableView(
                 key: ValueKey(
