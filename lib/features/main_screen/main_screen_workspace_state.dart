@@ -19,6 +19,7 @@ class MainScreenWorkspaceState {
     this.mysqlSqlTabRequestToken = 0,
     this.selectedSqliteObject,
     this.sqliteSqlTabRequestToken = 0,
+    this.isReadOnly = false,
   });
 
   final ConnectionRow? activeConnection;
@@ -53,8 +54,26 @@ class MainScreenWorkspaceState {
     SqliteObjectKind kind
   })? selectedSqliteObject;
   final int sqliteSqlTabRequestToken;
+  final bool isReadOnly;
 
   static const empty = MainScreenWorkspaceState();
+
+  MainScreenWorkspaceState toggleReadOnly() {
+    return MainScreenWorkspaceState(
+      activeConnection: activeConnection,
+      activeRedisDb: activeRedisDb,
+      activeMongoDB: activeMongoDB,
+      selectedPostgresObject: selectedPostgresObject,
+      postgresSqlTabRequestToken: postgresSqlTabRequestToken,
+      postgresSqlEditorContext: postgresSqlEditorContext,
+      postgresSqlEditorContextToken: postgresSqlEditorContextToken,
+      selectedMysqlObject: selectedMysqlObject,
+      mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
+      selectedSqliteObject: selectedSqliteObject,
+      sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
+      isReadOnly: !isReadOnly,
+    );
+  }
 
   MainScreenWorkspaceState selectConnection(ConnectionRow connection) {
     return MainScreenWorkspaceState(
@@ -69,6 +88,7 @@ class MainScreenWorkspaceState {
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
       selectedSqliteObject: null,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
+      isReadOnly: false,
     );
   }
 
@@ -96,6 +116,7 @@ class MainScreenWorkspaceState {
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
       selectedSqliteObject: null,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
+      isReadOnly: isReadOnly,
     );
   }
 
@@ -121,6 +142,7 @@ class MainScreenWorkspaceState {
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
       selectedSqliteObject: null,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
+      isReadOnly: isReadOnly,
     );
   }
 
@@ -144,6 +166,7 @@ class MainScreenWorkspaceState {
         kind: kind,
       ),
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
+      isReadOnly: isReadOnly,
     );
   }
 
@@ -160,6 +183,7 @@ class MainScreenWorkspaceState {
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
       selectedSqliteObject: null,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
+      isReadOnly: isReadOnly,
     );
   }
 
@@ -177,6 +201,7 @@ class MainScreenWorkspaceState {
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
       selectedSqliteObject: null,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
+      isReadOnly: isReadOnly,
     );
   }
 
@@ -235,6 +260,7 @@ class MainScreenWorkspaceState {
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
       selectedSqliteObject: null,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
+      isReadOnly: isReadOnly,
     );
   }
 
@@ -251,6 +277,7 @@ class MainScreenWorkspaceState {
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken + 1,
       selectedSqliteObject: null,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
+      isReadOnly: isReadOnly,
     );
   }
 
@@ -267,6 +294,7 @@ class MainScreenWorkspaceState {
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
       selectedSqliteObject: null,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken + 1,
+      isReadOnly: isReadOnly,
     );
   }
 
@@ -284,7 +312,8 @@ class MainScreenWorkspaceState {
         _mysqlEquals(selectedMysqlObject, other.selectedMysqlObject) &&
         mysqlSqlTabRequestToken == other.mysqlSqlTabRequestToken &&
         _sqliteEquals(selectedSqliteObject, other.selectedSqliteObject) &&
-        sqliteSqlTabRequestToken == other.sqliteSqlTabRequestToken;
+        sqliteSqlTabRequestToken == other.sqliteSqlTabRequestToken &&
+        isReadOnly == other.isReadOnly;
   }
 
   @override
@@ -325,6 +354,7 @@ class MainScreenWorkspaceState {
                 selectedSqliteObject!.kind,
               ),
         sqliteSqlTabRequestToken,
+        isReadOnly,
       );
 }
 

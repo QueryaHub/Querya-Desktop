@@ -11,6 +11,8 @@ class _MongoConnectionTile extends StatefulWidget {
     required this.onRemove,
     this.onTap,
     this.onDatabaseTap,
+    this.isExpanded = false,
+    this.onExpandedChanged,
   });
 
   final ConnectionRow connection;
@@ -20,22 +22,45 @@ class _MongoConnectionTile extends StatefulWidget {
   final VoidCallback onRemove;
   final VoidCallback? onTap;
   final void Function(String database)? onDatabaseTap;
+  final bool isExpanded;
+  final ValueChanged<bool>? onExpandedChanged;
 
   @override
   State<_MongoConnectionTile> createState() => _MongoConnectionTileState();
 }
 
 class _MongoConnectionTileState extends State<_MongoConnectionTile> {
-  bool _expanded = false;
+  bool get _expanded => widget.isExpanded;
   bool _loading = false;
   String? _error;
   List<String> _databases = [];
 
-  void _toggle() {
-    setState(() => _expanded = !_expanded);
-    if (_expanded && _databases.isEmpty && !_loading) {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isExpanded) {
       _loadDatabases();
     }
+  }
+
+  @override
+  void didUpdateWidget(_MongoConnectionTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isExpanded && !oldWidget.isExpanded) {
+      if (_databases.isEmpty && !_loading) {
+        _loadDatabases();
+      }
+    } else if (!widget.isExpanded && oldWidget.isExpanded) {
+      setState(() {
+        _databases = [];
+        _loading = false;
+        _error = null;
+      });
+    }
+  }
+
+  void _toggle() {
+    widget.onExpandedChanged?.call(!widget.isExpanded);
   }
 
   Future<void> _loadDatabases() async {
