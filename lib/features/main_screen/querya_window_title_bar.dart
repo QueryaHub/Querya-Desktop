@@ -19,6 +19,8 @@ class QueryaWindowTitleBar extends StatelessWidget {
     this.onDisconnect,
     this.onDisconnectAll,
     this.onDisconnectOthers,
+    this.isReadOnly = false,
+    this.onReadOnlyChanged,
   });
 
   final Future<void> Function() onNewDatabaseConnection;
@@ -28,6 +30,8 @@ class QueryaWindowTitleBar extends StatelessWidget {
   final VoidCallback? onDisconnect;
   final VoidCallback? onDisconnectAll;
   final VoidCallback? onDisconnectOthers;
+  final bool isReadOnly;
+  final VoidCallback? onReadOnlyChanged;
 
   @visibleForTesting
   static Color titleBarBackground(BuildContext context) =>
@@ -192,10 +196,16 @@ class QueryaWindowTitleBar extends StatelessWidget {
                                 child: const Text('Disconnect Others')),
                             const MenuDivider(),
                             MenuButton(
+                              enabled: activeConnection != null,
                               leading: const material.Icon(
                                   material.Icons.lock_outline_rounded,
                                   size: 18),
-                              onPressed: (_) {},
+                              trailing: isReadOnly
+                                  ? const material.Icon(
+                                      material.Icons.check_rounded,
+                                      size: 16)
+                                  : null,
+                              onPressed: (_) => onReadOnlyChanged?.call(),
                               child: const Text('Read-only'),
                             ),
                           ],

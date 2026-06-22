@@ -25,9 +25,11 @@ class MysqlSqlWorkspace extends material.StatefulWidget {
   const MysqlSqlWorkspace({
     super.key,
     required this.connectionRow,
+    this.isReadOnly = false,
   });
 
   final ConnectionRow connectionRow;
+  final bool isReadOnly;
 
   @override
   material.State<MysqlSqlWorkspace> createState() => _MysqlSqlWorkspaceState();
@@ -66,6 +68,15 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
     });
   }
 
+  @override
+  void didUpdateWidget(covariant MysqlSqlWorkspace oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isReadOnly != widget.isReadOnly) {
+      _lease?.release();
+      _lease = null;
+    }
+  }
+
   Future<void> _loadWorkspaceSettings() async {
     final t = await AppSettings.instance.getMysqlSqlStmtTimeoutSeconds();
     final rows = await AppSettings.instance.getSqlResultMaxRows();
@@ -94,7 +105,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
     final lease = await MysqlService.instance.acquire(
       widget.connectionRow,
       database: _poolDatabaseKey(),
-      mode: MysqlSessionMode.readWrite,
+      mode: widget.isReadOnly ? MysqlSessionMode.readOnly : MysqlSessionMode.readWrite,
     );
     if (!mounted) {
       lease.release();
@@ -116,7 +127,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       MysqlService.instance.interrupt(
         widget.connectionRow,
         database: _poolDatabaseKey(),
-        mode: MysqlSessionMode.readWrite,
+        mode: widget.isReadOnly ? MysqlSessionMode.readOnly : MysqlSessionMode.readWrite,
       );
     }
     _lease?.release();

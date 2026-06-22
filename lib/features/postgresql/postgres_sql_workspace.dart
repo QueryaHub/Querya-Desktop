@@ -37,9 +37,11 @@ class PostgresSqlWorkspace extends material.StatefulWidget {
     this.transactionOpenNotifier,
     this.postgresSqlEditorContext,
     this.postgresSqlEditorContextToken = 0,
+    this.isReadOnly = false,
   });
 
   final ConnectionRow connectionRow;
+  final bool isReadOnly;
 
   /// Updated when transaction state changes (for tab-switch warnings).
   final material.ValueNotifier<bool?>? transactionOpenNotifier;
@@ -113,6 +115,9 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     if (oldWidget.connectionRow.id != widget.connectionRow.id) {
       _lastAppliedSqlContextToken = -1;
     }
+    if (oldWidget.isReadOnly != widget.isReadOnly) {
+      _dropLease();
+    }
     _syncPostgresSqlTreeContext();
   }
 
@@ -178,7 +183,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     final lease = await PostgresService.instance.acquire(
       widget.connectionRow,
       database: db,
-      mode: PgSessionMode.readWrite,
+      mode: widget.isReadOnly ? PgSessionMode.readOnly : PgSessionMode.readWrite,
     );
     if (!mounted) {
       lease.release();
@@ -259,7 +264,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       PostgresService.instance.interrupt(
         widget.connectionRow,
         database: _interruptDatabase ?? _effectiveSessionDatabase(),
-        mode: PgSessionMode.readWrite,
+        mode: widget.isReadOnly ? PgSessionMode.readOnly : PgSessionMode.readWrite,
       );
     }
     _dropLease();

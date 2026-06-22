@@ -155,6 +155,10 @@ class _MainScreenState extends State<MainScreen> {
                 return QueryaWindowTitleBar(
                   onNewDatabaseConnection: _onNewDatabaseConnectionFromMenu,
                   activeConnection: workspace.activeConnection,
+                  isReadOnly: workspace.isReadOnly,
+                  onReadOnlyChanged: () {
+                    _workspace.value = _workspace.value.toggleReadOnly();
+                  },
                   onConnect: () {
                     final active = workspace.activeConnection;
                     if (active != null && active.id != null) {
@@ -336,6 +340,7 @@ class _MainContentSplitState extends State<_MainContentSplit> {
                       mysqlSqlTabRequestToken: ws.mysqlSqlTabRequestToken,
                       selectedSqliteObject: ws.selectedSqliteObject,
                       sqliteSqlTabRequestToken: ws.sqliteSqlTabRequestToken,
+                      isReadOnly: ws.isReadOnly,
                       onRequestNewConnection: widget.onRequestNewConnection,
                     );
                   },

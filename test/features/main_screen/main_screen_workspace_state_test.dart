@@ -166,5 +166,23 @@ void main() {
       );
       expect(a, isNot(c));
     });
+
+    test('read-only state toggle and reset', () {
+      var state = MainScreenWorkspaceState.empty;
+      expect(state.isReadOnly, isFalse);
+
+      state = state.toggleReadOnly();
+      expect(state.isReadOnly, isTrue);
+
+      state = state.toggleReadOnly();
+      expect(state.isReadOnly, isFalse);
+
+      state = state.toggleReadOnly();
+      expect(state.isReadOnly, isTrue);
+
+      // Selecting a new connection should reset isReadOnly to false
+      state = state.selectConnection(mysqlConn);
+      expect(state.isReadOnly, isFalse);
+    });
   });
 }
