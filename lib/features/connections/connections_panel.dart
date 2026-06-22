@@ -369,6 +369,15 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     }
   }
 
+  Future<void> reconnect(ConnectionRow conn) async {
+    final id = conn.id!;
+    await disconnect(conn);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    if (mounted) {
+      connect(id);
+    }
+  }
+
   /// Icon for a connection type (matches New Connection dialog).
   material.IconData _iconForType(String type) {
     return switch (type) {

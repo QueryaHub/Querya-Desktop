@@ -15,6 +15,7 @@ class QueryaWindowTitleBar extends StatelessWidget {
     required this.onNewDatabaseConnection,
     this.activeConnection,
     this.onConnect,
+    this.onReconnect,
     this.onDisconnect,
     this.onDisconnectAll,
     this.onDisconnectOthers,
@@ -23,6 +24,7 @@ class QueryaWindowTitleBar extends StatelessWidget {
   final Future<void> Function() onNewDatabaseConnection;
   final ConnectionRow? activeConnection;
   final VoidCallback? onConnect;
+  final VoidCallback? onReconnect;
   final VoidCallback? onDisconnect;
   final VoidCallback? onDisconnectAll;
   final VoidCallback? onDisconnectOthers;
@@ -166,10 +168,11 @@ class QueryaWindowTitleBar extends StatelessWidget {
                               child: const Text('Connect'),
                             ),
                             MenuButton(
+                              enabled: activeConnection != null,
                               leading: const material.Icon(
                                   material.Icons.refresh_rounded,
                                   size: 18),
-                              onPressed: (_) {},
+                              onPressed: (_) => onReconnect?.call(),
                               child: const Text('Invalidate/Reconnect'),
                             ),
                             MenuButton(

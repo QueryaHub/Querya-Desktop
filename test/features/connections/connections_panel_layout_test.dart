@@ -353,6 +353,17 @@ void main() {
       await tester.pump();
       expect(panelState.isConnectionExpanded(id1), false);
       expect(panelState.isConnectionExpanded(id2), false);
+
+      // 6. Reconnect
+      panelState.connect(id1);
+      await tester.pump();
+      expect(panelState.isConnectionExpanded(id1), true);
+
+      await tester.runAsync(() async {
+        await panelState.reconnect(conn1);
+      });
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(panelState.isConnectionExpanded(id1), true);
     });
   });
 }

@@ -161,6 +161,12 @@ class _MainScreenState extends State<MainScreen> {
                       _connectionsPanelKey.currentState?.connect(active.id!);
                     }
                   },
+                  onReconnect: () {
+                    final active = workspace.activeConnection;
+                    if (active != null) {
+                      _connectionsPanelKey.currentState?.reconnect(active);
+                    }
+                  },
                   onDisconnect: () {
                     final active = workspace.activeConnection;
                     if (active != null) {
