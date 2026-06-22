@@ -4,8 +4,17 @@
 
 1. Start the app.
 2. Create a connection: **Connection → New Database Connection** (or right-click **Servers** in the tree).
-3. Pick **PostgreSQL**, **MySQL**, **Redis**, or **MongoDB** and fill in host, port, and credentials.
+3. Pick **PostgreSQL**, **MySQL**, **SQLite**, **Redis**, or **MongoDB**. For SQLite, select the database file; for other databases, fill in host, port, and credentials.
+   - **Read-only mode**: You can toggle the **Read-only** option to prevent write operations (a lock icon will appear in the workspace).
 4. Saved connections appear in the left tree.
+
+## Connection Actions
+
+The application menu and window title bar provide actions for managing database connections:
+- **Connect**: Connect to the selected database connection.
+- **Invalidate/Reconnect**: Refresh and re-establish the connection to the database.
+- **Disconnect**: Safely close the active session.
+- **Read-only**: Toggle read-only mode for the current session.
 
 ## Where data is stored
 
@@ -33,6 +42,6 @@ Preferences (except secrets) live in the same local SQLite file as connection me
 
 ## Supported capabilities
 
-High-level feature depth varies by database type. PostgreSQL and MySQL include rich object trees and SQL workspaces; Redis and MongoDB focus on data exploration and commands suitable for day-to-day development.
+High-level feature depth varies by database type. PostgreSQL, MySQL, and SQLite include rich object trees and SQL workspaces (with SQLite utilizing local `.db` files); Redis and MongoDB focus on data exploration and commands suitable for day-to-day development.
 
 For troubleshooting build/run issues, see the main [README.md](../README.md).

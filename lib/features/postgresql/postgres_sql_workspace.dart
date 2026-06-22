@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
+import 'package:file_selector/file_selector.dart';
+import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:postgres/postgres.dart' as pg;
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/postgres_sql.dart';
@@ -34,9 +37,11 @@ class PostgresSqlWorkspace extends material.StatefulWidget {
     this.transactionOpenNotifier,
     this.postgresSqlEditorContext,
     this.postgresSqlEditorContextToken = 0,
+    this.isReadOnly = false,
   });
 
   final ConnectionRow connectionRow;
+  final bool isReadOnly;
 
   /// Updated when transaction state changes (for tab-switch warnings).
   final material.ValueNotifier<bool?>? transactionOpenNotifier;
@@ -110,6 +115,9 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     if (oldWidget.connectionRow.id != widget.connectionRow.id) {
       _lastAppliedSqlContextToken = -1;
     }
+    if (oldWidget.isReadOnly != widget.isReadOnly) {
+      _dropLease();
+    }
     _syncPostgresSqlTreeContext();
   }
 
@@ -175,7 +183,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     final lease = await PostgresService.instance.acquire(
       widget.connectionRow,
       database: db,
-      mode: PgSessionMode.readWrite,
+      mode: widget.isReadOnly ? PgSessionMode.readOnly : PgSessionMode.readWrite,
     );
     if (!mounted) {
       lease.release();
@@ -256,7 +264,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       PostgresService.instance.interrupt(
         widget.connectionRow,
         database: _interruptDatabase ?? _effectiveSessionDatabase(),
-        mode: PgSessionMode.readWrite,
+        mode: widget.isReadOnly ? PgSessionMode.readOnly : PgSessionMode.readWrite,
       );
     }
     _dropLease();
@@ -377,84 +385,141 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     return v.toString();
   }
 
+  Future<void> _openSqlFile() async {
+    try {
+      final file = await openFile(
+        acceptedTypeGroups: const [
+          XTypeGroup(
+            label: 'SQL query',
+            extensions: ['sql'],
+          ),
+        ],
+      );
+      if (file == null) return;
+      final text = await file.readAsString();
+      if (!mounted) return;
+      _sqlController.value = material.TextEditingValue(
+        text: text,
+        selection: material.TextSelection.collapsed(offset: text.length),
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _saveSqlFile() async {
+    try {
+      final name = 'query_${DateTime.now().toIso8601String().replaceAll(':', '-')}.sql';
+      final location = await getSaveLocation(
+        acceptedTypeGroups: const [
+          XTypeGroup(label: 'SQL', extensions: ['sql']),
+        ],
+        suggestedName: name,
+      );
+      final path = location?.path;
+      if (path == null || path.isEmpty) return;
+      await File(path).writeAsString(_sqlController.text);
+    } catch (_) {}
+  }
+
   @override
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context);
 
-    return material.CallbackShortcuts(
-      bindings: {
-        const material.SingleActivator(LogicalKeyboardKey.f5): () {
-          if (!_running) _execute();
-        },
+    return Actions(
+      actions: <Type, Action<Intent>>{
+        NewSqlIntent: CallbackAction<NewSqlIntent>(
+          onInvoke: (intent) {
+            _sqlController.clear();
+            return null;
+          },
+        ),
+        OpenSqlIntent: CallbackAction<OpenSqlIntent>(
+          onInvoke: (intent) {
+            unawaited(_openSqlFile());
+            return null;
+          },
+        ),
+        SaveSqlIntent: CallbackAction<SaveSqlIntent>(
+          onInvoke: (intent) {
+            unawaited(_saveSqlFile());
+            return null;
+          },
+        ),
       },
-      child: material.Focus(
-        autofocus: true,
-        child: VerticalSplitPane(
-          fraction: _topFraction,
-          maxFraction: 0.85,
-          top: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _SqlToolbar(
-                sessionDatabase: _effectiveSessionDatabase(),
-                onExecute: _running ? null : _execute,
-                running: _running,
-                autocommit: _autocommit,
-                onAutocommitChanged: (v) => setState(() => _autocommit = v),
-                queryTimeoutSeconds: _queryTimeoutSeconds,
-                onQueryTimeoutChanged: _onStmtTimeoutChanged,
-                onOpenPreferences: () => showPreferencesDialog(context),
-                onOpenHistory: widget.connectionRow.id != null && !_running
-                    ? () {
-                        showSqlQueryHistoryDialog(
-                          context: context,
-                          connectionId: widget.connectionRow.id!,
-                          databaseName: _effectiveSessionDatabase(),
-                          sqlController: _sqlController,
-                        );
-                      }
-                    : null,
-                txOpen: _txOpen,
-                onBegin: _running ? null : () => _runTxCommand('BEGIN'),
-                onCommit: _running ? null : () => _runTxCommand('COMMIT'),
-                onRollback:
-                    _running ? null : () => _runTxCommand('ROLLBACK'),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: QueryEditorTab(
-                  controller: _sqlController,
-                  fontSize: _editorFontSize,
+      child: material.CallbackShortcuts(
+        bindings: {
+          const material.SingleActivator(LogicalKeyboardKey.f5): () {
+            if (!_running) _execute();
+          },
+        },
+        child: material.Focus(
+          autofocus: true,
+          child: VerticalSplitPane(
+            fraction: _topFraction,
+            maxFraction: 0.85,
+            top: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _SqlToolbar(
+                  sessionDatabase: _effectiveSessionDatabase(),
+                  onExecute: _running ? null : _execute,
+                  running: _running,
+                  autocommit: _autocommit,
+                  onAutocommitChanged: (v) => setState(() => _autocommit = v),
+                  queryTimeoutSeconds: _queryTimeoutSeconds,
+                  onQueryTimeoutChanged: _onStmtTimeoutChanged,
+                  onOpenPreferences: () => showPreferencesDialog(context),
+                  onOpenHistory: widget.connectionRow.id != null && !_running
+                      ? () {
+                          showSqlQueryHistoryDialog(
+                            context: context,
+                            connectionId: widget.connectionRow.id!,
+                            databaseName: _effectiveSessionDatabase(),
+                            sqlController: _sqlController,
+                          );
+                        }
+                      : null,
+                  txOpen: _txOpen,
+                  onBegin: _running ? null : () => _runTxCommand('BEGIN'),
+                  onCommit: _running ? null : () => _runTxCommand('COMMIT'),
+                  onRollback:
+                      _running ? null : () => _runTxCommand('ROLLBACK'),
                 ),
-              ),
-            ],
-          ),
-          bottom: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              material.Container(
-                constraints: const material.BoxConstraints(minHeight: 44),
-                padding: const material.EdgeInsets.symmetric(
-                  horizontal: 12,
+                const Divider(height: 1),
+                Expanded(
+                  child: QueryEditorTab(
+                    controller: _sqlController,
+                    fontSize: _editorFontSize,
+                  ),
                 ),
-                decoration: material.BoxDecoration(
-                  color: theme.colorScheme.muted.withValues(alpha: 0.6),
+              ],
+            ),
+            bottom: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                material.Container(
+                  constraints: const material.BoxConstraints(minHeight: 44),
+                  padding: const material.EdgeInsets.symmetric(
+                    horizontal: 12,
+                  ),
+                  decoration: material.BoxDecoration(
+                    color: theme.colorScheme.muted.withValues(alpha: 0.6),
+                  ),
+                  alignment: material.Alignment.centerLeft,
+                  child: const Text('Data Output').semiBold().small(),
                 ),
-                alignment: material.Alignment.centerLeft,
-                child: const Text('Data Output').semiBold().small(),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: ResultsTab(
-                  columns: _columns,
-                  rows: _rows,
-                  errorMessage: _error,
-                  isLoading: _running,
-                  affectedRows: _affectedRows,
-                  statusLine: _statusLine,
+                const Divider(height: 1),
+                Expanded(
+                  child: ResultsTab(
+                    columns: _columns,
+                    rows: _rows,
+                    errorMessage: _error,
+                    isLoading: _running,
+                    affectedRows: _affectedRows,
+                    statusLine: _statusLine,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
