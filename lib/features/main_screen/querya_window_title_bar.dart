@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' as material
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/connections/driver_manager_dialog.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
+import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// Custom bitsdojo title bar styled from [QueryaThemeScope] workbench tokens.
@@ -76,12 +77,29 @@ class QueryaWindowTitleBar extends StatelessWidget {
                         MenuButton(
                           subMenu: [
                             MenuButton(
-                                onPressed: (_) {}, child: const Text('New')),
+                                onPressed: (ctx) {
+                                  Actions.maybeInvoke(
+                                    FocusManager.instance.primaryFocus?.context ?? ctx,
+                                    const NewSqlIntent(),
+                                  );
+                                },
+                                child: const Text('New')),
                             MenuButton(
-                                onPressed: (_) {},
+                                onPressed: (ctx) {
+                                  Actions.maybeInvoke(
+                                    FocusManager.instance.primaryFocus?.context ?? ctx,
+                                    const OpenSqlIntent(),
+                                  );
+                                },
                                 child: const Text('Open...')),
                             MenuButton(
-                                onPressed: (_) {}, child: const Text('Save')),
+                                onPressed: (ctx) {
+                                  Actions.maybeInvoke(
+                                    FocusManager.instance.primaryFocus?.context ?? ctx,
+                                    const SaveSqlIntent(),
+                                  );
+                                },
+                                child: const Text('Save')),
                             const MenuDivider(),
                             MenuButton(
                                 onPressed: (_) => appWindow.close(),
