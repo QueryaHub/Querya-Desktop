@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
+import 'package:querya_desktop/core/extensions/models/extension_type.dart';
+import 'package:querya_desktop/features/extensions/presentation/widgets/extension_card.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -23,6 +26,30 @@ class _ExtensionManagerContent extends material.StatefulWidget {
 
 class _ExtensionManagerContentState extends material.State<_ExtensionManagerContent> {
   int _tabIndex = 0;
+
+  final List<ExtensionManifest> _installedMocks = [
+    const ExtensionManifest(
+      id: 'queryahub.clickhouse-driver',
+      name: 'ClickHouse Driver',
+      version: '1.0.0',
+      publisher: 'QueryaHub',
+      type: ExtensionType.databaseDriver,
+      engines: {'querya_desktop': '^0.4.7'},
+      description: 'Full support for ClickHouse databases including Dictionaries and Materialized Views.',
+    ),
+  ];
+
+  final List<ExtensionManifest> _marketMocks = [
+    const ExtensionManifest(
+      id: 'community.redis-driver',
+      name: 'Redis Driver',
+      version: '0.9.5',
+      publisher: 'Community',
+      type: ExtensionType.databaseDriver,
+      engines: {'querya_desktop': '^0.4.7'},
+      description: 'Connect to Redis instances and visualize key-value storage.',
+    ),
+  ];
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -120,14 +147,32 @@ class _ExtensionManagerContentState extends material.State<_ExtensionManagerCont
   }
 
   material.Widget _buildInstalledTab() {
-    return const material.Center(child: Text('Installed extensions will appear here.'));
+    return material.ListView.separated(
+      padding: const material.EdgeInsets.all(24),
+      itemCount: _installedMocks.length,
+      separatorBuilder: (_, __) => const material.SizedBox(height: 16),
+      itemBuilder: (ctx, i) => ExtensionCard(
+        manifest: _installedMocks[i],
+        isInstalled: true,
+        onUninstall: () {},
+      ),
+    );
   }
 
   material.Widget _buildMarketplaceTab() {
-    return const material.Center(child: Text('Marketplace extensions will appear here.'));
+    return material.ListView.separated(
+      padding: const material.EdgeInsets.all(24),
+      itemCount: _marketMocks.length,
+      separatorBuilder: (_, __) => const material.SizedBox(height: 16),
+      itemBuilder: (ctx, i) => ExtensionCard(
+        manifest: _marketMocks[i],
+        isInstalled: false,
+        onInstall: () {},
+      ),
+    );
   }
 
   material.Widget _buildUpdatesTab() {
-    return const material.Center(child: Text('Extension updates will appear here.'));
+    return const material.Center(child: material.Text('No updates available.'));
   }
 }
