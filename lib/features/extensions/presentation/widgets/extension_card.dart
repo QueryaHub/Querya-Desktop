@@ -28,7 +28,7 @@ class ExtensionCard extends material.StatelessWidget {
     return material.Container(
       padding: const material.EdgeInsets.all(16),
       decoration: material.BoxDecoration(
-        color: theme.surface,
+        color: theme.card,
         border: material.Border.all(color: theme.border),
         borderRadius: material.BorderRadius.circular(radius),
       ),
