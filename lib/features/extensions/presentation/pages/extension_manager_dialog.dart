@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart' as material;
-import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -27,8 +26,8 @@ class _ExtensionManagerContentState extends material.State<_ExtensionManagerCont
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = material.Theme.of(context).colorScheme;
-    final radius = material.Theme.of(context).radiusXxl;
+    final theme = Theme.of(context).colorScheme;
+    final radius = Theme.of(context).radiusXxl;
     final onPopover = theme.popoverForeground;
 
     return material.DefaultTextStyle(
@@ -111,8 +110,11 @@ class _ExtensionManagerContentState extends material.State<_ExtensionManagerCont
     final isSelected = _tabIndex == index;
     return SecondaryButton(
       onPressed: () => setState(() => _tabIndex = index),
-      child: Text(label).withColor(
-        isSelected ? material.Theme.of(context).colorScheme.primary : null,
+      child: material.Text(
+        label,
+        style: material.TextStyle(
+          color: isSelected ? Theme.of(context).colorScheme.primary : null,
+        ),
       ),
     );
   }
