@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
+import 'package:querya_desktop/core/extensions/models/extension_type.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 class ExtensionCard extends material.StatelessWidget {
@@ -8,6 +9,8 @@ class ExtensionCard extends material.StatelessWidget {
     required this.manifest,
     required this.isInstalled,
     this.hasUpdate = false,
+    this.isInstalling = false,
+    this.installProgress,
     this.onInstall,
     this.onUninstall,
     this.onUpdate,
@@ -16,6 +19,8 @@ class ExtensionCard extends material.StatelessWidget {
   final ExtensionManifest manifest;
   final bool isInstalled;
   final bool hasUpdate;
+  final bool isInstalling;
+  final double? installProgress;
   final material.VoidCallback? onInstall;
   final material.VoidCallback? onUninstall;
   final material.VoidCallback? onUpdate;
@@ -71,6 +76,17 @@ class ExtensionCard extends material.StatelessWidget {
                   maxLines: 2,
                   overflow: material.TextOverflow.ellipsis,
                 ).muted(),
+                if (manifest.tags.isNotEmpty) ...[
+                  const material.SizedBox(height: 10),
+                  material.Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: manifest.tags
+                        .take(5)
+                        .map((tag) => _buildTagBadge(theme, tag))
+                        .toList(),
+                  ),
+                ],
               ],
             ),
           ),
@@ -79,7 +95,7 @@ class ExtensionCard extends material.StatelessWidget {
             mainAxisAlignment: material.MainAxisAlignment.center,
             crossAxisAlignment: material.CrossAxisAlignment.end,
             children: [
-              if (isInstalled && hasUpdate)
+              if (isInstalled && hasUpdate && !isInstalling)
                 material.Padding(
                   padding: const material.EdgeInsets.only(bottom: 8.0),
                   child: PrimaryButton(
@@ -87,12 +103,34 @@ class ExtensionCard extends material.StatelessWidget {
                     child: const Text('Update'),
                   ),
                 ),
-              if (isInstalled)
+              if (isInstalling)
+                material.Column(
+                  crossAxisAlignment: material.CrossAxisAlignment.end,
+                  children: [
+                    material.SizedBox(
+                      width: 110,
+                      child: material.LinearProgressIndicator(
+                        value: installProgress,
+                        backgroundColor: theme.muted,
+                        color: theme.primary,
+                        minHeight: 6,
+                        borderRadius: material.BorderRadius.circular(3),
+                      ),
+                    ),
+                    const material.SizedBox(height: 6),
+                    Text(installProgress != null
+                            ? 'Installing ${(installProgress! * 100).toInt()}%'
+                            : 'Installing...')
+                        .muted()
+                        .small(),
+                  ],
+                )
+              else if (isInstalled)
                 SecondaryButton(
                   onPressed: onUninstall,
                   child: const Text('Uninstall'),
-                ),
-              if (!isInstalled)
+                )
+              else
                 PrimaryButton(
                   onPressed: onInstall,
                   child: const Text('Install'),
@@ -113,10 +151,31 @@ class ExtensionCard extends material.StatelessWidget {
         borderRadius: material.BorderRadius.circular(radius),
       ),
       child: material.Icon(
-        material.Icons.extension_rounded,
+        manifest.type == ExtensionType.theme
+            ? material.Icons.palette_outlined
+            : material.Icons.extension_rounded,
         size: 24,
         color: theme.mutedForeground,
       ),
     );
   }
+
+  material.Widget _buildTagBadge(ColorScheme theme, String tag) {
+    return material.Container(
+      padding: const material.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: material.BoxDecoration(
+        color: theme.muted,
+        borderRadius: material.BorderRadius.circular(4),
+      ),
+      child: material.Text(
+        tag,
+        style: material.TextStyle(
+          fontSize: 11,
+          color: theme.mutedForeground,
+          fontWeight: material.FontWeight.w500,
+        ),
+      ),
+    );
+  }
 }
+
