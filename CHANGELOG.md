@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **SQLite / RETURNING clause support (#243)** — support RETURNING clauses for INSERT, UPDATE, and DELETE DML queries in the SQLite database driver, returning the resulting rows to the client.
+- **Security / MySQL Injection Fix (#241)** — replaced manual escaping and string concatenation in schema introspection methods (`listViews`, `listColumnNames`, `listTables`) in the MySQL database driver with parameterized queries using parameter binding.
 
 ## [0.4.7-a] - 2026-06-22
 

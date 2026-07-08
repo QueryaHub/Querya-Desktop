@@ -39,4 +39,93 @@ void main() {
       );
     });
   });
+
+  group('MysqlConnection when not connected', () {
+    late MysqlConnection conn;
+
+    setUp(() {
+      conn = MysqlConnection(
+        id: 1,
+        name: 'test',
+        host: 'localhost',
+      );
+    });
+
+    test('execute throws StateError', () {
+      expect(
+        () => conn.execute('SELECT 1'),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Not connected to MySQL'),
+        )),
+      );
+    });
+
+    test('listDatabases throws StateError', () {
+      expect(
+        () => conn.listDatabases(),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Not connected to MySQL'),
+        )),
+      );
+    });
+
+    test('listViews throws StateError', () {
+      expect(
+        () => conn.listViews(schema: 'db'),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Not connected to MySQL'),
+        )),
+      );
+    });
+
+    test('listColumnNames throws StateError', () {
+      expect(
+        () => conn.listColumnNames(database: 'db', table: 'tbl'),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Not connected to MySQL'),
+        )),
+      );
+    });
+
+    test('listTables throws StateError', () {
+      expect(
+        () => conn.listTables(schema: 'db'),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Not connected to MySQL'),
+        )),
+      );
+    });
+
+    test('serverVersion throws StateError', () {
+      expect(
+        () => conn.serverVersion(),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Not connected to MySQL'),
+        )),
+      );
+    });
+
+    test('serverStats throws StateError', () {
+      expect(
+        () => conn.serverStats(),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Not connected to MySQL'),
+        )),
+      );
+    });
+  });
 }

@@ -76,9 +76,7 @@ class MysqlConnection {
   bool get _usesConnectionString =>
       connectionString != null && connectionString!.trim().isNotEmpty;
 
-  static String _escapeSqlString(String s) {
-    return s.replaceAll(r'\', r'\\').replaceAll("'", "''");
-  }
+
 
   /// MySQL identifier quoting (backticks).
   static String quoteIdentifier(String id) {
@@ -284,11 +282,11 @@ class MysqlConnection {
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to MySQL');
     }
-    final s = _escapeSqlString(schema);
     final rs = await execute(
       'SELECT TABLE_NAME FROM information_schema.TABLES '
-      "WHERE TABLE_SCHEMA = '$s' AND TABLE_TYPE = 'VIEW' "
+      "WHERE TABLE_SCHEMA = :schema AND TABLE_TYPE = 'VIEW' "
       'ORDER BY TABLE_NAME',
+      {'schema': schema},
     );
     return rs.rows.map((r) => r.colAt(0)!).toList();
   }
@@ -301,12 +299,14 @@ class MysqlConnection {
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to MySQL');
     }
-    final d = _escapeSqlString(database);
-    final t = _escapeSqlString(table);
     final rs = await execute(
       'SELECT COLUMN_NAME FROM information_schema.COLUMNS '
-      "WHERE TABLE_SCHEMA = '$d' AND TABLE_NAME = '$t' "
+      "WHERE TABLE_SCHEMA = :database AND TABLE_NAME = :table "
       'ORDER BY ORDINAL_POSITION',
+      {
+        'database': database,
+        'table': table,
+      },
     );
     return rs.rows.map((r) => r.colAt(0)!).toList();
   }
@@ -316,11 +316,11 @@ class MysqlConnection {
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to MySQL');
     }
-    final s = _escapeSqlString(schema);
     final rs = await execute(
       'SELECT TABLE_NAME FROM information_schema.TABLES '
-      "WHERE TABLE_SCHEMA = '$s' AND TABLE_TYPE = 'BASE TABLE' "
+      "WHERE TABLE_SCHEMA = :schema AND TABLE_TYPE = 'BASE TABLE' "
       'ORDER BY TABLE_NAME',
+      {'schema': schema},
     );
     return rs.rows.map((r) => r.colAt(0)!).toList();
   }
