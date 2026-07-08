@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **SQLite / RETURNING clause support (#243)** — support RETURNING clauses for INSERT, UPDATE, and DELETE DML queries in the SQLite database driver, returning the resulting rows to the client.
+
 ## [0.4.7-a] - 2026-06-22
 
 ### Added
