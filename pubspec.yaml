@@ -27,6 +27,7 @@ dependencies:
   flutter_secure_storage: ^9.2.4
   file_selector: ^1.1.0
   syntax_highlight: ^0.5.0
+  archive: ^4.0.9
 
 dev_dependencies:
   flutter_test:
