@@ -97,18 +97,21 @@ class SqliteConnection {
         .toLowerCase();
     
     // SQLite can execute PRAGMA, SELECT, EXPLAIN statements, which return data
-    final isQuery = sqlLower.startsWith('select') ||
+    final isReadOnlyQuery = sqlLower.startsWith('select') ||
         sqlLower.startsWith('pragma') ||
         sqlLower.startsWith('explain') ||
         sqlLower.startsWith('with') ||
         sqlLower.startsWith('values');
 
-    if (isQuery) {
+    final hasReturning = RegExp(r'\breturning\b').hasMatch(sqlLower);
+
+    if (readOnly && !isReadOnlyQuery) {
+      throw StateError('Database connection is read-only');
+    }
+
+    if (isReadOnlyQuery || hasReturning) {
       return await _db!.rawQuery(sql, arguments);
     } else {
-      if (readOnly) {
-        throw StateError('Database connection is read-only');
-      }
       await _db!.execute(sql, arguments);
       return [];
     }
