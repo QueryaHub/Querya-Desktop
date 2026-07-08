@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
-import 'package:querya_desktop/core/extensions/models/extension_type.dart';
-import 'package:querya_desktop/features/extensions/presentation/widgets/extension_card.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
+import 'package:querya_desktop/core/market/marketplace_repository.dart';
+import 'package:querya_desktop/features/extensions/presentation/widgets/extension_card.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 void showExtensionManagerDialog(material.BuildContext context) {
@@ -26,30 +27,73 @@ class _ExtensionManagerContent extends material.StatefulWidget {
 
 class _ExtensionManagerContentState extends material.State<_ExtensionManagerContent> {
   int _tabIndex = 0;
+  List<ExtensionManifest> _installed = [];
+  List<ExtensionManifest> _marketplace = [];
+  bool _loading = true;
+  final Map<String, double> _installingProgress = {};
 
-  final List<ExtensionManifest> _installedMocks = [
-    const ExtensionManifest(
-      id: 'queryahub.clickhouse-driver',
-      name: 'ClickHouse Driver',
-      version: '1.0.0',
-      publisher: 'QueryaHub',
-      type: ExtensionType.databaseDriver,
-      engines: {'querya_desktop': '^0.4.7'},
-      description: 'Full support for ClickHouse databases including Dictionaries and Materialized Views.',
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
 
-  final List<ExtensionManifest> _marketMocks = [
-    const ExtensionManifest(
-      id: 'community.redis-driver',
-      name: 'Redis Driver',
-      version: '0.9.5',
-      publisher: 'Community',
-      type: ExtensionType.databaseDriver,
-      engines: {'querya_desktop': '^0.4.7'},
-      description: 'Connect to Redis instances and visualize key-value storage.',
-    ),
-  ];
+  Future<void> _loadData() async {
+    setState(() => _loading = true);
+    await LocalExtensionRegistry.instance.load();
+    final installed = LocalExtensionRegistry.instance.manifests;
+    final market = await MarketplaceRepository.instance.getTrending();
+    if (mounted) {
+      setState(() {
+        _installed = installed;
+        _marketplace = market;
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _onSearchChanged(String query) async {
+    if (query.trim().isEmpty) {
+      final market = await MarketplaceRepository.instance.getTrending();
+      if (mounted) setState(() => _marketplace = market);
+    } else {
+      final market = await MarketplaceRepository.instance.search(query);
+      if (mounted) setState(() => _marketplace = market);
+    }
+  }
+
+  Future<void> _installExtension(ExtensionManifest manifest) async {
+    setState(() => _installingProgress[manifest.id] = 0.01);
+    try {
+      await MarketplaceRepository.instance.install(
+        manifest,
+        onProgress: (progress) {
+          if (mounted) {
+            setState(() => _installingProgress[manifest.id] = progress);
+          }
+        },
+      );
+      if (mounted) {
+        setState(() {
+          _installingProgress.remove(manifest.id);
+          _installed = LocalExtensionRegistry.instance.manifests;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _installingProgress.remove(manifest.id));
+      }
+    }
+  }
+
+  Future<void> _uninstallExtension(ExtensionManifest manifest) async {
+    await MarketplaceRepository.instance.uninstall(manifest.id);
+    if (mounted) {
+      setState(() {
+        _installed = LocalExtensionRegistry.instance.manifests;
+      });
+    }
+  }
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -84,16 +128,19 @@ class _ExtensionManagerContentState extends material.State<_ExtensionManagerCont
                     mainAxisAlignment: material.MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: material.CrossAxisAlignment.center,
                     children: [
-                      material.Column(
-                        crossAxisAlignment: material.CrossAxisAlignment.start,
-                        children: [
-                          const Text('Extensions').large().semiBold().foreground(),
-                          const material.SizedBox(height: 6),
-                          const Text('Manage local and marketplace extensions')
-                              .muted()
-                              .small(),
-                        ],
+                      material.Expanded(
+                        child: material.Column(
+                          crossAxisAlignment: material.CrossAxisAlignment.start,
+                          children: [
+                            const Text('Extensions').large().semiBold().foreground(),
+                            const material.SizedBox(height: 6),
+                            const Text('Manage local and marketplace extensions')
+                                .muted()
+                                .small(),
+                          ],
+                        ),
                       ),
+                      const material.SizedBox(width: 16),
                       PrimaryButton(
                         onPressed: () => material.Navigator.of(context).pop(),
                         child: const Text('Close'),
@@ -104,12 +151,12 @@ class _ExtensionManagerContentState extends material.State<_ExtensionManagerCont
                 material.Padding(
                   padding: const material.EdgeInsets.symmetric(
                       horizontal: 24.0, vertical: 8.0),
-                  child: material.Row(
+                  child: material.Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
-                      _buildTabButton(0, 'Installed'),
-                      const material.SizedBox(width: 8),
+                      _buildTabButton(0, 'Installed', count: _installed.length),
                       _buildTabButton(1, 'Marketplace'),
-                      const material.SizedBox(width: 8),
                       _buildTabButton(2, 'Updates'),
                     ],
                   ),
@@ -133,46 +180,115 @@ class _ExtensionManagerContentState extends material.State<_ExtensionManagerCont
     );
   }
 
-  material.Widget _buildTabButton(int index, String label) {
+  material.Widget _buildTabButton(int index, String label, {int? count}) {
     final isSelected = _tabIndex == index;
+    final displayLabel = count != null ? '$label ($count)' : label;
     return SecondaryButton(
       onPressed: () => setState(() => _tabIndex = index),
       child: material.Text(
-        label,
+        displayLabel,
         style: material.TextStyle(
           color: isSelected ? Theme.of(context).colorScheme.primary : null,
+          fontWeight: isSelected ? material.FontWeight.w600 : material.FontWeight.w400,
         ),
       ),
     );
   }
 
   material.Widget _buildInstalledTab() {
+    if (_loading) {
+      return const material.Center(
+        child: material.CircularProgressIndicator(),
+      );
+    }
+    if (_installed.isEmpty) {
+      return const material.Center(
+        child: material.Padding(
+          padding: material.EdgeInsets.all(32.0),
+          child: Text('No extensions installed yet. Explore the Marketplace tab to get started!'),
+        ),
+      );
+    }
     return material.ListView.separated(
       padding: const material.EdgeInsets.all(24),
-      itemCount: _installedMocks.length,
+      itemCount: _installed.length,
       separatorBuilder: (_, __) => const material.SizedBox(height: 16),
-      itemBuilder: (ctx, i) => ExtensionCard(
-        manifest: _installedMocks[i],
-        isInstalled: true,
-        onUninstall: () {},
-      ),
+      itemBuilder: (ctx, i) {
+        final manifest = _installed[i];
+        final isInstalling = _installingProgress.containsKey(manifest.id);
+        final progress = _installingProgress[manifest.id];
+        return ExtensionCard(
+          manifest: manifest,
+          isInstalled: true,
+          isInstalling: isInstalling,
+          installProgress: progress,
+          onUninstall: () => _uninstallExtension(manifest),
+        );
+      },
     );
   }
 
   material.Widget _buildMarketplaceTab() {
-    return material.ListView.separated(
-      padding: const material.EdgeInsets.all(24),
-      itemCount: _marketMocks.length,
-      separatorBuilder: (_, __) => const material.SizedBox(height: 16),
-      itemBuilder: (ctx, i) => ExtensionCard(
-        manifest: _marketMocks[i],
-        isInstalled: false,
-        onInstall: () {},
-      ),
+    if (_loading) {
+      return const material.Center(
+        child: material.CircularProgressIndicator(),
+      );
+    }
+    return material.Column(
+      children: [
+        material.Padding(
+          padding: const material.EdgeInsets.fromLTRB(24, 16, 24, 8),
+          child: TextField(
+            placeholder: const material.Text('Search extensions by name, tag, or description...'),
+            onChanged: _onSearchChanged,
+            features: const [
+              InputFeature.leading(
+                Padding(
+                  padding: material.EdgeInsets.only(right: 8),
+                  child: material.Icon(material.Icons.search_rounded, size: 18),
+                ),
+              ),
+            ],
+          ),
+        ),
+        material.Expanded(
+          child: _marketplace.isEmpty
+              ? const material.Center(
+                  child: material.Padding(
+                    padding: material.EdgeInsets.all(32.0),
+                    child: Text('No extensions found matching your search.'),
+                  ),
+                )
+              : material.ListView.separated(
+                  padding: const material.EdgeInsets.all(24),
+                  itemCount: _marketplace.length,
+                  separatorBuilder: (_, __) => const material.SizedBox(height: 16),
+                  itemBuilder: (ctx, i) {
+                    final manifest = _marketplace[i];
+                    final isInstalled = _installed.any((e) => e.id == manifest.id);
+                    final isInstalling = _installingProgress.containsKey(manifest.id);
+                    final progress = _installingProgress[manifest.id];
+                    return ExtensionCard(
+                      manifest: manifest,
+                      isInstalled: isInstalled,
+                      isInstalling: isInstalling,
+                      installProgress: progress,
+                      onInstall: () => _installExtension(manifest),
+                      onUninstall: () => _uninstallExtension(manifest),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 
   material.Widget _buildUpdatesTab() {
-    return const material.Center(child: material.Text('No updates available.'));
+    return const material.Center(
+      child: material.Padding(
+        padding: material.EdgeInsets.all(32.0),
+        child: Text('All installed extensions are up to date!'),
+      ),
+    );
   }
 }
