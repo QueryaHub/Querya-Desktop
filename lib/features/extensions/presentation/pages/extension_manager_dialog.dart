@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
-import 'package:querya_desktop/core/extensions/models/extension_type.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/market/marketplace_repository.dart';
 import 'package:querya_desktop/features/extensions/presentation/widgets/extension_card.dart';
@@ -31,7 +30,6 @@ class _ExtensionManagerContentState extends material.State<_ExtensionManagerCont
   List<ExtensionManifest> _installed = [];
   List<ExtensionManifest> _marketplace = [];
   bool _loading = true;
-  String _searchQuery = '';
   final Map<String, double> _installingProgress = {};
 
   @override
@@ -55,7 +53,6 @@ class _ExtensionManagerContentState extends material.State<_ExtensionManagerCont
   }
 
   Future<void> _onSearchChanged(String query) async {
-    setState(() => _searchQuery = query);
     if (query.trim().isEmpty) {
       final market = await MarketplaceRepository.instance.getTrending();
       if (mounted) setState(() => _marketplace = market);
@@ -244,9 +241,9 @@ class _ExtensionManagerContentState extends material.State<_ExtensionManagerCont
           child: TextField(
             placeholder: const material.Text('Search extensions by name, tag, or description...'),
             onChanged: _onSearchChanged,
-            features: [
+            features: const [
               InputFeature.leading(
-                const material.Padding(
+                Padding(
                   padding: material.EdgeInsets.only(right: 8),
                   child: material.Icon(material.Icons.search_rounded, size: 18),
                 ),

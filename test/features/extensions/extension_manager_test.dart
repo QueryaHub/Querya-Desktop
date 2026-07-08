@@ -28,7 +28,7 @@ void main() {
 
       await tester.pumpWidget(
         queryaThemeTestShell(
-          child: material.Scaffold(
+          child: const material.Scaffold(
             body: ExtensionCard(
               manifest: manifest,
               isInstalled: false,
@@ -57,7 +57,7 @@ void main() {
 
       await tester.pumpWidget(
         queryaThemeTestShell(
-          child: material.Scaffold(
+          child: const material.Scaffold(
             body: ExtensionCard(
               manifest: manifest,
               isInstalled: false,

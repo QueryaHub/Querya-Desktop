@@ -159,14 +159,14 @@ void main() {
     test('install throws MarketplaceException on SHA256 checksum mismatch', () async {
       final archive = Archive();
       archive.addFile(ArchiveFile('test.txt', 4, utf8.encode('good')));
-      final zipBytes = ZipEncoder().encode(archive)!;
+      final zipBytes = ZipEncoder().encode(archive);
 
       final mockClient = MockClient((request) async {
         return http.Response.bytes(zipBytes, 200);
       });
 
       final repo = HttpMarketplaceRepository(client: mockClient);
-      final manifest = const ExtensionManifest(
+      const manifest = ExtensionManifest(
         id: 'test.sha256',
         name: 'SHA256 Test',
         version: '1.0.0',
@@ -190,7 +190,7 @@ void main() {
     test('install prevents Path Traversal during archive unpacking (Issue #242)', () async {
       final archive = Archive();
       archive.addFile(ArchiveFile('../evil.txt', 4, utf8.encode('evil')));
-      final zipBytes = ZipEncoder().encode(archive)!;
+      final zipBytes = ZipEncoder().encode(archive);
       final expectedSha256 = sha256.convert(zipBytes).toString();
 
       final mockClient = MockClient((request) async {
