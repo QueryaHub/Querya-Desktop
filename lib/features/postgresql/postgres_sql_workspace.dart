@@ -5,6 +5,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:file_selector/file_selector.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
+import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:postgres/postgres.dart' as pg;
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/postgres_sql.dart';
@@ -106,7 +107,18 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     material.WidgetsBinding.instance.addPostFrameCallback((_) {
       _syncPostgresSqlTreeContext();
       unawaited(_loadWorkspaceSettings());
+      _registerSqlEditorCommands();
     });
+  }
+
+  void _registerSqlEditorCommands() {
+    if (!mounted) return;
+    SqlEditorCommandBridge.instance.register(
+      connectionId: widget.connectionRow.id,
+      onNew: () => _sqlController.clear(),
+      onOpen: () => unawaited(_openSqlFile()),
+      onSave: () => unawaited(_saveSqlFile()),
+    );
   }
 
   @override
@@ -257,6 +269,8 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
 
   @override
   void dispose() {
+    SqlEditorCommandBridge.instance
+        .unregister(connectionId: widget.connectionRow.id);
     SqlWorkspaceSettingsRevision.listenable
         .removeListener(_appSettingsListener);
     _topFraction.dispose();
