@@ -43,14 +43,20 @@ class ThemeFolderWatcher {
     }
 
     try {
-      final stream = directory.watch(recursive: true);
-      _subscription = stream.listen(
-        _onFilesystemEvent,
-        onError: (Object error) {
-          debugPrint('ThemeFolderWatcher: watch error ($error)');
-        },
-        cancelOnError: false,
-      );
+      runZonedGuarded(() {
+        final stream = directory.watch(recursive: true);
+        _subscription = stream.listen(
+          _onFilesystemEvent,
+          onError: (Object error) {
+            _started = false;
+            debugPrint('ThemeFolderWatcher: watch error ($error)');
+          },
+          cancelOnError: false,
+        );
+      }, (error, stack) {
+        _started = false;
+        debugPrint('ThemeFolderWatcher: watch unavailable zone ($error)');
+      });
     } on Object catch (error) {
       _started = false;
       debugPrint('ThemeFolderWatcher: watch unavailable ($error)');
@@ -65,6 +71,7 @@ class ThemeFolderWatcher {
     _subscription = null;
     _started = false;
     _refreshInFlight = false;
+    await Future<void>.delayed(const Duration(milliseconds: 150));
   }
 
   void _onFilesystemEvent(FileSystemEvent event) {
