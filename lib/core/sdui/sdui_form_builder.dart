@@ -179,7 +179,7 @@ class SduiFormBuilderState extends material.State<SduiFormBuilder> {
             Text(field.label).small().semiBold(),
             const Gap(4),
             material.DropdownButtonFormField<String>(
-              value: _selectValues[field.id],
+              initialValue: _selectValues[field.id],
               items: [
                 for (final opt in field.options)
                   material.DropdownMenuItem(
