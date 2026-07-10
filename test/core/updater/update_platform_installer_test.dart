@@ -54,7 +54,7 @@ void main() {
         executable: '/opt/querya/querya_desktop',
       );
       expect(script, contains('PID="4242"'));
-      expect(script, contains('EXE="/opt/querya/querya_desktop"'));
+      expect(script, contains("EXE='/opt/querya/querya_desktop'"));
       expect(script, contains('exec "\$EXE"'));
     });
 

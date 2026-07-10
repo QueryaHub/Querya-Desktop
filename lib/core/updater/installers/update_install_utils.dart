@@ -101,9 +101,9 @@ String buildLinuxBundleReplaceScript({
 #!/bin/sh
 set -e
 PID="$pid"
-SRC="${_shellQuote(sourceDir)}"
-DST="${_shellQuote(targetDir)}"
-EXE="${_shellQuote(executable)}"
+SRC='${_shellQuote(sourceDir)}'
+DST='${_shellQuote(targetDir)}'
+EXE='${_shellQuote(executable)}'
 while kill -0 "\$PID" 2>/dev/null; do sleep 0.2; done
 if command -v rsync >/dev/null 2>&1; then
   rsync -a --delete "\$SRC"/ "\$DST"/
@@ -126,8 +126,8 @@ String buildLinuxAppImageReplaceScript({
 #!/bin/sh
 set -e
 PID="$pid"
-TARGET="${_shellQuote(targetAppImage)}"
-STAGED="${_shellQuote(stagedAppImage)}"
+TARGET='${_shellQuote(targetAppImage)}'
+STAGED='${_shellQuote(stagedAppImage)}'
 while kill -0 "\$PID" 2>/dev/null; do sleep 0.2; done
 mv "\$TARGET" "\$TARGET.old" 2>/dev/null || true
 mv "\$STAGED" "\$TARGET"
@@ -146,9 +146,9 @@ String buildWindowsReplaceBatch({
   return '''
 @echo off
 set PID=$pid
-set SRC=$sourceDir
-set DST=$targetDir
-set EXE=$targetDir\\$executable
+set "SRC=$sourceDir"
+set "DST=$targetDir"
+set "EXE=$targetDir\\$executable"
 :wait
 tasklist /FI "PID eq %PID%" 2>NUL | find "%PID%" >NUL
 if %ERRORLEVEL%==0 (
@@ -171,9 +171,9 @@ String buildMacAppReplaceScript({
 #!/bin/sh
 set -e
 PID="$pid"
-NEW="${_shellQuote(newAppBundle)}"
-TARGET="${_shellQuote(targetAppBundle)}"
-EXE="${_shellQuote(executable)}"
+NEW='${_shellQuote(newAppBundle)}'
+TARGET='${_shellQuote(targetAppBundle)}'
+EXE='${_shellQuote(executable)}'
 while kill -0 "\$PID" 2>/dev/null; do sleep 0.2; done
 rm -rf "\$TARGET.old" 2>/dev/null || true
 mv "\$TARGET" "\$TARGET.old" 2>/dev/null || true
