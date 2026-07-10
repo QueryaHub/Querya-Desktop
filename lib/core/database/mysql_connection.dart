@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:mysql_client/mysql_client.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 
@@ -192,7 +193,9 @@ class MysqlConnection {
       if (c != null && c.connected) {
         await c.close();
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('MysqlConnection.disconnect: $e');
+    }
   }
 
   /// Best-effort close. The `mysql_client` driver may not allow graceful [close]
@@ -206,7 +209,9 @@ class MysqlConnection {
       if (c.connected) {
         await c.close();
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('MysqlConnection.forceClose: $e');
+    }
   }
 
   /// Session hint for read-only browsing (MySQL 8+ / MariaDB — semantics differ from PostgreSQL).

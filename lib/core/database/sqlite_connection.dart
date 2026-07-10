@@ -1,4 +1,6 @@
 import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 
@@ -62,7 +64,9 @@ class SqliteConnection {
     _db = null;
     try {
       await d?.close();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('SqliteConnection.disconnect: $e');
+    }
   }
 
   Future<void> forceClose() => disconnect();
