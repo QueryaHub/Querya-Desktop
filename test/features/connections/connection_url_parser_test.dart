@@ -54,6 +54,47 @@ void main() {
       expect(result.row!.useSSL, true);
     });
 
+    test('parses postgresql sslmode=verify-full as SSL enabled', () {
+      final result = parseConnectionUrlInput(
+        'postgresql://localhost/postgres?sslmode=verify-full',
+      );
+      expect(result.error, isNull);
+      expect(result.row!.useSSL, true);
+    });
+
+    test('parses postgresql sslmode=verify-ca as SSL enabled', () {
+      final result = parseConnectionUrlInput(
+        'postgresql://localhost/postgres?sslmode=verify-ca',
+      );
+      expect(result.error, isNull);
+      expect(result.row!.useSSL, true);
+    });
+
+    test('parses postgresql sslmode=disable as SSL disabled', () {
+      final result = parseConnectionUrlInput(
+        'postgresql://localhost/postgres?sslmode=disable',
+      );
+      expect(result.error, isNull);
+      expect(result.row!.useSSL, false);
+    });
+
+    test('returns error for postgresql sslmode=prefer', () {
+      final result = parseConnectionUrlInput(
+        'postgresql://localhost/postgres?sslmode=prefer',
+      );
+      expect(result.row, isNull);
+      expect(result.error, contains('Unsupported sslmode'));
+      expect(result.error, contains('prefer'));
+    });
+
+    test('returns error for invalid postgresql sslmode', () {
+      final result = parseConnectionUrlInput(
+        'postgresql://localhost/postgres?sslmode=invalid',
+      );
+      expect(result.row, isNull);
+      expect(result.error, contains('Unsupported sslmode'));
+    });
+
     test('parses mysql URL', () {
       final result = parseConnectionUrlInput(
         'mysql://root:p%40ss@127.0.0.1:3307/sakila',
@@ -112,9 +153,16 @@ void main() {
       expect(result.error, isNull);
       final row = result.row!;
       expect(row.type, 'redis');
-      expect(row.name, 'Redis: localhost');
+      expect(row.name, 'Redis: localhost:6379');
       expect(row.password, 'password');
       expect(row.connectionString, isNull);
+    });
+
+    test('uses default driver port when URI omits port', () {
+      final result = parseConnectionUrlInput('postgresql://localhost/mydb');
+      expect(result.error, isNull);
+      expect(result.row!.port, 5432);
+      expect(result.row!.name, 'PostgreSQL: mydb');
     });
 
     test('parses rediss URL with SSL enabled', () {

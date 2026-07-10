@@ -11,6 +11,13 @@ const _supportedSchemes = {
   'rediss',
 };
 
+const _validPostgresSslModes = {
+  'disable',
+  'require',
+  'verify-ca',
+  'verify-full',
+};
+
 /// Parses a database connection URL into a [ConnectionRow], or returns an error message.
 ({ConnectionRow? row, String? error}) parseConnectionUrlInput(String input) {
   final trimmed = input.trim();
@@ -32,14 +39,67 @@ const _supportedSchemes = {
     );
   }
 
-  final row = _buildConnectionRow(trimmed, uri, scheme);
+  final sslResult = _resolveSslForScheme(scheme, uri);
+  if (sslResult.error != null) {
+    return (row: null, error: sslResult.error);
+  }
+
+  final row = _buildConnectionRow(trimmed, uri, scheme, sslResult.useSSL);
   if (row == null) {
     return (row: null, error: 'Failed to parse connection URL.');
   }
   return (row: row, error: null);
 }
 
-ConnectionRow? _buildConnectionRow(String url, Uri uri, String scheme) {
+({bool? useSSL, String? error}) _resolveSslForScheme(String scheme, Uri uri) {
+  final type = _schemeToType(scheme);
+  if (type == null) return (useSSL: null, error: null);
+
+  var useSSL = scheme == 'rediss';
+
+  if (type == 'postgresql') {
+    final sslMode = uri.queryParameters['sslmode']?.toLowerCase() ??
+        uri.queryParameters['ssl']?.toLowerCase();
+    if (sslMode != null && sslMode.isNotEmpty) {
+      if (!_validPostgresSslModes.contains(sslMode)) {
+        return (
+          useSSL: null,
+          error:
+              'Unsupported sslmode "$sslMode" for PostgreSQL. '
+              'Supported: disable, require, verify-ca, verify-full.',
+        );
+      }
+      useSSL = sslMode != 'disable';
+    }
+  } else if (type != 'sqlite') {
+    final sslQuery = uri.queryParameters['sslmode'] ??
+        uri.queryParameters['ssl'];
+    if (sslQuery != null) {
+      final lowerSsl = sslQuery.toLowerCase();
+      if (lowerSsl == 'true' || lowerSsl == 'require') {
+        useSSL = true;
+      }
+    }
+  }
+
+  return (useSSL: useSSL, error: null);
+}
+
+String? _schemeToType(String scheme) {
+  if (scheme == 'postgresql' || scheme == 'postgres') return 'postgresql';
+  if (scheme == 'mysql') return 'mysql';
+  if (scheme == 'sqlite') return 'sqlite';
+  if (scheme == 'mongodb' || scheme == 'mongodb+srv') return 'mongodb';
+  if (scheme == 'redis' || scheme == 'rediss') return 'redis';
+  return null;
+}
+
+ConnectionRow? _buildConnectionRow(
+  String url,
+  Uri uri,
+  String scheme,
+  bool? resolvedUseSSL,
+) {
   String type;
   int? defaultPort;
 
@@ -68,7 +128,7 @@ ConnectionRow? _buildConnectionRow(String url, Uri uri, String scheme) {
   String? databaseName;
   String? authSource;
   String? connectionString;
-  var useSSL = scheme == 'rediss';
+  var useSSL = resolvedUseSSL ?? (scheme == 'rediss');
 
   if (type == 'sqlite') {
     String path;
@@ -86,7 +146,7 @@ ConnectionRow? _buildConnectionRow(String url, Uri uri, String scheme) {
     host = path;
   } else {
     host = uri.host.isEmpty ? null : uri.host;
-    port = uri.hasPort ? uri.port : defaultPort;
+    port = uri.hasPort ? uri.port : null;
 
     if (uri.userInfo.isNotEmpty) {
       final parts = uri.userInfo.split(':');
@@ -106,26 +166,18 @@ ConnectionRow? _buildConnectionRow(String url, Uri uri, String scheme) {
     authSource = uri.queryParameters['authSource'] ??
         uri.queryParameters['authsource'];
 
-    final sslQuery = uri.queryParameters['sslmode'] ?? uri.queryParameters['ssl'];
-    if (sslQuery != null) {
-      final lowerSsl = sslQuery.toLowerCase();
-      if (lowerSsl == 'true' || lowerSsl == 'require' || lowerSsl == 'prefer') {
-        useSSL = true;
-      }
-    }
-
     if (type == 'postgresql' || type == 'mysql' || type == 'mongodb') {
       connectionString = url;
     }
   }
 
-  final name = _connectionName(type, host, databaseName);
+  final name = _connectionName(type, host, port, databaseName, defaultPort);
 
   return ConnectionRow(
     type: type,
     name: name,
     host: host,
-    port: port,
+    port: port ?? defaultPort,
     username: username,
     password: password,
     databaseName: databaseName,
@@ -136,12 +188,19 @@ ConnectionRow? _buildConnectionRow(String url, Uri uri, String scheme) {
   );
 }
 
-String _connectionName(String type, String? host, String? databaseName) {
+String _connectionName(
+  String type,
+  String? host,
+  int? port,
+  String? databaseName,
+  int? defaultPort,
+) {
   if (type == 'sqlite') {
     return host == ':memory:' ? 'SQLite (Memory)' : 'SQLite (${host!.split('/').last})';
   }
 
   final cleanHost = host ?? 'localhost';
+  final cleanPort = port ?? defaultPort;
   final cleanDb = databaseName ?? '';
   final typeName = switch (type) {
     'postgresql' => 'PostgreSQL',
@@ -151,6 +210,9 @@ String _connectionName(String type, String? host, String? databaseName) {
   };
   if (cleanDb.isNotEmpty) {
     return '$typeName: $cleanDb';
+  }
+  if (cleanPort != null) {
+    return '$typeName: $cleanHost:$cleanPort';
   }
   return '$typeName: $cleanHost';
 }
