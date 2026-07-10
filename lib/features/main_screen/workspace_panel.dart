@@ -13,14 +13,14 @@ import 'package:flutter/material.dart' as material
         Icons,
         MouseRegion,
         AnimatedContainer,
-        AnimatedScale,
         SystemMouseCursors,
         SizedBox,
         SingleChildScrollView,
         Row,
         MainAxisSize,
         Widget,
-        BoxConstraints;
+        BoxConstraints,
+        Tooltip;
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/motion/querya_cross_fade_stack.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
@@ -406,31 +406,22 @@ class _TabButtonState extends State<_TabButton> {
   }
 }
 
-class _RunButton extends StatefulWidget {
+class _RunButton extends StatelessWidget {
   const _RunButton();
 
-  @override
-  State<_RunButton> createState() => _RunButtonState();
-}
-
-class _RunButtonState extends State<_RunButton> {
-  bool _hovered = false;
+  static const _noConnectionTooltip =
+      'Select an active database connection to execute queries';
 
   @override
   Widget build(BuildContext context) {
-    return material.MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: material.SystemMouseCursors.click,
-      child: material.AnimatedScale(
-        scale: _hovered ? 1.03 : 1.0,
-        duration: context.motionDuration(QueryaMotion.fast),
-        curve: context.motionCurve(QueryaMotion.enter),
-        child: OutlineButton(
-          onPressed: () {},
-          leading: const material.Icon(material.Icons.play_arrow, size: 18),
-          child: const Text('Execute/Refresh (F5)'),
-        ),
+    return const material.Tooltip(
+      message: _noConnectionTooltip,
+      waitDuration: Duration(milliseconds: 450),
+      child: OutlineButton(
+        key: Key('workspace_run_button'),
+        onPressed: null,
+        leading: material.Icon(material.Icons.play_arrow, size: 18),
+        child: Text('Execute/Refresh (F5)'),
       ),
     );
   }
