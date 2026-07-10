@@ -127,8 +127,12 @@ class _PostgresConnectionFormContentState
         useSSL: _useSSL,
         connectionString: uri.isEmpty ? null : uri,
       );
-      final ok = await conn.testConnection();
-      if (mounted) _showTestResult(ok ? 'success' : 'failed');
+      final result = await conn.testConnection();
+      if (mounted) {
+        _showTestResult(
+          result.ok ? 'success' : (result.error ?? 'failed'),
+        );
+      }
     } catch (e) {
       if (mounted) _showTestResult('error: $e');
     }
