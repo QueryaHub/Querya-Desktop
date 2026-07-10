@@ -189,9 +189,9 @@ jobs:
           find "$APP/Contents/MacOS" -maxdepth 1 -type f -exec \
             codesign --force --timestamp --options runtime --sign "$MACOS_SIGN_IDENTITY" {} +
 
-          # Sign the main app bundle with hardened runtime and entitlements.
+          # Sign the main app bundle with hardened runtime and signed entitlements.
           codesign --force --timestamp --options runtime \
-            --entitlements macos/Runner/Release.entitlements \
+            --entitlements macos/Runner/ReleaseSigned.entitlements \
             --sign "$MACOS_SIGN_IDENTITY" "$APP"
 
           codesign --verify --deep --strict --verbose=2 "$APP"
