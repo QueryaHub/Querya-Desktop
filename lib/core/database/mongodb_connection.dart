@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:mongo_dart/mongo_dart.dart';
 import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
 
@@ -166,8 +167,8 @@ class MongoConnection {
     _db = null;
     try {
       await db?.close();
-    } catch (_) {
-      // Connection may already be closed — ignore.
+    } catch (e) {
+      debugPrint('MongoConnection.disconnect: $e');
     }
   }
 
