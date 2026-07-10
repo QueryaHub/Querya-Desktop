@@ -83,8 +83,10 @@ void main() {
       final archive = Archive();
       archive.addFile(ArchiveFile('../outside.txt', 4, [1, 2, 3, 4]));
       final encoded = ZipEncoder().encode(archive);
-      expect(encoded, isNotNull);
-      await zipFile.writeAsBytes(encoded as List<int>);
+      if (encoded == null) {
+        throw StateError('zip encode failed');
+      }
+      await zipFile.writeAsBytes(encoded);
 
       expect(
         () => extractZipSecurely(
