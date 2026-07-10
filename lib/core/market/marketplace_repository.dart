@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:querya_desktop/core/extensions/extension_support.dart';
 import 'package:querya_desktop/core/extensions/extension_paths.dart';
+import 'package:querya_desktop/core/extensions/sandbox/sandbox_policy.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/extensions/models/extension_type.dart';
@@ -183,9 +184,17 @@ class MockMarketplaceRepository implements MarketplaceRepository {
   Future<void> install(
     ExtensionManifest manifest, {
     void Function(double)? onProgress,
-  }) async {
+  }  ) async {
     if (ExtensionSupport.isPreviewOnly(manifest.type)) {
       throw MarketplaceException(ExtensionSupport.databaseDriverPreviewNotice);
+    }
+
+    final sandboxViolations = SandboxPolicy.validate(manifest);
+    if (sandboxViolations.isNotEmpty) {
+      throw MarketplaceException(
+        'Extension "${manifest.id}" requests sandbox permissions beyond the '
+        'security policy: ${sandboxViolations.join(' ')}',
+      );
     }
 
     // Simulate download & verification progress
