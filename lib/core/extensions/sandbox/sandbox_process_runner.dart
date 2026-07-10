@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:querya_desktop/core/extensions/models/sandbox_capabilities.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_launch_command.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_scratch_directory.dart';
+import 'package:querya_desktop/core/extensions/sandbox/sandbox_secret_guard.dart';
 
 /// Live handle for a sandboxed OS process (Block E Level 2).
 class SandboxProcessHandle {
@@ -98,6 +99,9 @@ class SandboxProcessRunner {
   }) processStarter;
 
   /// Spawns [pluginExecutable] inside the OS sandbox for [pluginId].
+  ///
+  /// Credentials must never be passed via [pluginArguments] or [environment];
+  /// use [SandboxCredentialsInjector] over Stdio JSON-RPC instead.
   Future<SandboxProcessHandle> start({
     required String pluginId,
     required String pluginExecutable,
@@ -106,6 +110,11 @@ class SandboxProcessRunner {
     SandboxCapabilities? capabilities,
     Map<String, String>? environment,
   }) async {
+    SandboxSecretGuard.assertNoSecrets(
+      arguments: pluginArguments,
+      environment: environment ?? const {},
+    );
+
     final scratch = await SandboxScratchDirectory.create(
       pluginId: pluginId,
       baseDirectory: scratchBaseDirectory,
