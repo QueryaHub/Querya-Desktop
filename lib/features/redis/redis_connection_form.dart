@@ -45,6 +45,8 @@ class _RedisConnectionFormContentState
   final _sslRootCertController = material.TextEditingController();
   final _sslCertController = material.TextEditingController();
   final _sslKeyController = material.TextEditingController();
+
+  bool _useSSL = false;
   bool _showPassword = false;
   bool _isTesting = false;
   String? _testResult;
