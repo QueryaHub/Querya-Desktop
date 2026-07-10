@@ -265,7 +265,8 @@ class PostgresConnection {
       );
       if (r.isEmpty) return null;
       return r.first[0] as bool;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('PostgresConnection.inOpenTransaction: $e');
       return null;
     }
   }
