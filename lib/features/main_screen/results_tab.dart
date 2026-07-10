@@ -123,8 +123,10 @@ class ResultsTab extends StatelessWidget {
                 OutlineButton(
                   size: ButtonSize.small,
                   onPressed: () {
-                    final csv = resultGridAsCsv(columns, rows);
-                    Clipboard.setData(ClipboardData(text: csv));
+                    unawaited(() async {
+                      final csv = await resultGridAsCsvAsync(columns, rows);
+                      await Clipboard.setData(ClipboardData(text: csv));
+                    }());
                   },
                   leading: const material.Icon(
                     material.Icons.copy_rounded,
