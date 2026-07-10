@@ -264,7 +264,7 @@ class _ExtensionManagerContentState extends material.State<_ExtensionManagerCont
                 ),
                 const material.SizedBox(width: 10),
                 material.Expanded(
-                  child: Text(ExtensionSupport.databaseDriverPreviewNotice)
+                  child: const Text(ExtensionSupport.databaseDriverPreviewNotice)
                       .muted()
                       .small(),
                 ),

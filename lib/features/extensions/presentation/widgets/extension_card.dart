@@ -137,11 +137,11 @@ class ExtensionCard extends material.StatelessWidget {
                   child: const Text('Uninstall'),
                 )
               else if (isPreview)
-                material.Tooltip(
+                const material.Tooltip(
                   message: ExtensionSupport.databaseDriverPreviewNotice,
                   child: OutlineButton(
                     onPressed: null,
-                    child: const Text('Preview'),
+                    child: Text('Preview'),
                   ),
                 )
               else
