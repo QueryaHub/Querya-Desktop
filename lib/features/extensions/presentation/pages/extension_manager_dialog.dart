@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/extensions/extension_support.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
@@ -82,6 +83,12 @@ class _ExtensionManagerContentState extends material.State<_ExtensionManagerCont
     } catch (e) {
       if (mounted) {
         setState(() => _installingProgress.remove(manifest.id));
+        final message = e is MarketplaceException
+            ? e.message
+            : 'Failed to install "${manifest.name}".';
+        material.ScaffoldMessenger.of(context).showSnackBar(
+          material.SnackBar(content: material.Text(message)),
+        );
       }
     }
   }
@@ -234,8 +241,37 @@ class _ExtensionManagerContentState extends material.State<_ExtensionManagerCont
         child: material.CircularProgressIndicator(),
       );
     }
+    final theme = Theme.of(context).colorScheme;
     return material.Column(
       children: [
+        material.Padding(
+          padding: const material.EdgeInsets.fromLTRB(24, 16, 24, 0),
+          child: material.Container(
+            width: double.infinity,
+            padding: const material.EdgeInsets.all(12),
+            decoration: material.BoxDecoration(
+              color: theme.muted.withValues(alpha: 0.35),
+              borderRadius: material.BorderRadius.circular(8),
+              border: material.Border.all(color: theme.border),
+            ),
+            child: material.Row(
+              crossAxisAlignment: material.CrossAxisAlignment.start,
+              children: [
+                material.Icon(
+                  material.Icons.info_outline_rounded,
+                  size: 18,
+                  color: theme.mutedForeground,
+                ),
+                const material.SizedBox(width: 10),
+                material.Expanded(
+                  child: Text(ExtensionSupport.databaseDriverPreviewNotice)
+                      .muted()
+                      .small(),
+                ),
+              ],
+            ),
+          ),
+        ),
         material.Padding(
           padding: const material.EdgeInsets.fromLTRB(24, 16, 24, 8),
           child: TextField(

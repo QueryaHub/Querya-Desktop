@@ -2,12 +2,21 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as p;
+import 'package:querya_desktop/core/extensions/extension_support.dart';
 import 'package:querya_desktop/core/extensions/extension_paths.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/extensions/models/extension_type.dart';
 
 export 'http_marketplace_repository.dart';
+
+/// Thrown when marketplace install, download, or validation fails.
+class MarketplaceException implements Exception {
+  MarketplaceException(this.message);
+  final String message;
+  @override
+  String toString() => 'MarketplaceException: $message';
+}
 
 /// Abstract repository contract for Marketplace operations (Block B).
 ///
@@ -175,6 +184,10 @@ class MockMarketplaceRepository implements MarketplaceRepository {
     ExtensionManifest manifest, {
     void Function(double)? onProgress,
   }) async {
+    if (ExtensionSupport.isPreviewOnly(manifest.type)) {
+      throw MarketplaceException(ExtensionSupport.databaseDriverPreviewNotice);
+    }
+
     // Simulate download & verification progress
     for (int i = 1; i <= 10; i++) {
       await Future.delayed(const Duration(milliseconds: 100));

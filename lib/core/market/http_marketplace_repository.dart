@@ -5,18 +5,12 @@ import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
+import 'package:querya_desktop/core/extensions/extension_support.dart';
 import 'package:querya_desktop/core/extensions/extension_paths.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/extensions/models/extension_type.dart';
 import 'marketplace_repository.dart';
-
-class MarketplaceException implements Exception {
-  MarketplaceException(this.message);
-  final String message;
-  @override
-  String toString() => 'MarketplaceException: $message';
-}
 
 /// HTTP implementation of [MarketplaceRepository] connecting to MarketApi backend.
 ///
@@ -104,6 +98,10 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
     ExtensionManifest manifest, {
     void Function(double)? onProgress,
   }) async {
+    if (ExtensionSupport.isPreviewOnly(manifest.type)) {
+      throw MarketplaceException(ExtensionSupport.databaseDriverPreviewNotice);
+    }
+
     final downloadUrl = manifest.downloadUrl;
     if (downloadUrl == null || downloadUrl.trim().isEmpty) {
       throw MarketplaceException('Extension manifest is missing downloadUrl');
@@ -164,6 +162,11 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
       }
 
       onProgress?.call(0.95);
+
+      ExtensionSupport.validateDriverPackage(
+        manifest: manifest,
+        installDir: extDir,
+      );
 
       // Step 4: Write/Update manifest.json in the extension directory
       final manifestFile = File(p.join(extDir.path, 'manifest.json'));
