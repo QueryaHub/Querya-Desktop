@@ -67,9 +67,15 @@ class JsonRpcStdioClient {
     _closed = true;
     await _subscription?.cancel();
     _subscription = null;
+    failAll(StateError('JsonRpcStdioClient closed'));
+  }
+
+  /// Completes all in-flight requests with [error] (e.g. plugin crash).
+  void failAll(Object error, [StackTrace? stackTrace]) {
+    _fatalError = error;
     for (final pending in _pending.values) {
       if (!pending.isCompleted) {
-        pending.completeError(StateError('JsonRpcStdioClient closed'));
+        pending.completeError(error, stackTrace);
       }
     }
     _pending.clear();
