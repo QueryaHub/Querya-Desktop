@@ -8,8 +8,10 @@ import 'package:path_provider/path_provider.dart';
 
 import '../storage/app_settings.dart';
 import 'github_releases_client.dart';
+import 'installers/update_install_context.dart';
 import 'sha256_checksums.dart';
 import 'update_manifest.dart';
+import 'update_platform_installer.dart';
 import 'update_version.dart';
 
 /// Core service for checking GitHub Releases and downloading verified update artifacts.
@@ -165,12 +167,15 @@ class AppUpdaterService {
     return destination;
   }
 
-  /// Phase 3 (#282) will replace this with native in-place installers.
+  /// Installs a verified update package using the platform-specific installer.
   Future<void> installDownloadedUpdate(File verifiedPackage) async {
-    throw AppUpdaterException(
-      'In-app installation is not available yet on this platform. '
-      'Verified package: ${verifiedPackage.path}',
-    );
+    await UpdatePlatformInstaller.forCurrentPlatform().install(verifiedPackage);
+  }
+
+  /// Whether in-app install is blocked by the current packaging (snap/flatpak).
+  bool get isInstallBlockedByPackageManager {
+    final context = UpdateInstallContext.current();
+    return context.isManagedPackage;
   }
 
   /// Picks the platform zip for the current OS from [manifest].
