@@ -22,6 +22,10 @@ final _driverInfoList = <_DriverInfo>[
     description: 'MySQL / MariaDB — built-in Dart driver (`mysql_client`).',
   ),
   (
+    type: ConnectionType.sqlite,
+    description: 'SQLite — built-in Dart driver (`sqflite_common_ffi`).',
+  ),
+  (
     type: ConnectionType.redis,
     description: 'Redis — built-in Dart client (`redis`).',
   ),
