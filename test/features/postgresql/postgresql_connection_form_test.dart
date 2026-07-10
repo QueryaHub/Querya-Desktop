@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/features/postgresql/postgresql_connection_form.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -87,6 +88,44 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(result, isNull);
+    });
+
+    testWidgets('Save from URI extracts host and port for display', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 700));
+      ConnectionRow? result;
+      await tester.pumpWidget(
+        ShadcnApp(
+          theme: AppTheme.dark,
+          darkTheme: AppTheme.dark,
+          themeMode: ThemeMode.dark,
+          home: material.Builder(
+            builder: (context) => material.ElevatedButton(
+              onPressed: () async {
+                result = await showPostgresConnectionForm(context);
+              },
+              child: const material.Text('Open'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byWidgetPredicate(
+          (w) => w is TextField && w.placeholder is Text && (w.placeholder as Text).data == 'postgresql://user:pass@host:5432/dbname?sslmode=require',
+        ),
+        'postgresql://u:p@remote.example.com:5433/db',
+      );
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      expect(result, isNotNull);
+      expect(result!.host, 'remote.example.com');
+      expect(result!.port, 5433);
+      expect(result!.name, 'PostgreSQL: remote.example.com:5433');
+      expect(result!.connectionString, 'postgresql://u:p@remote.example.com:5433/db');
     });
   });
 }
