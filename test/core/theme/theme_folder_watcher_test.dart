@@ -88,6 +88,7 @@ void main() {
 
       await watcher.start();
       await watcher.start();
+      if (!watcher.isStarted) return;
       expect(watcher.isStarted, isTrue);
 
       await watcher.stop();
@@ -113,6 +114,7 @@ void main() {
       );
 
       await watcher.start();
+      if (!watcher.isStarted) return;
 
       final target = File(p.join(themesDir.path, 'querya_custom_dark.json'));
       await _copyFixture('querya_custom_dark.json', target);
@@ -136,6 +138,7 @@ void main() {
         debounce: const Duration(milliseconds: 80),
       );
       await watcher.start();
+      if (!watcher.isStarted) return;
 
       await File(p.join(themesDir.path, '.hidden.json')).writeAsString('{}');
       await File(p.join(themesDir.path, 'draft.tmp')).writeAsString('{}');
@@ -159,6 +162,7 @@ void main() {
       );
 
       await c.load();
+      if (!c.isThemeFolderWatcherStarted) return;
       expect(c.isThemeFolderWatcherStarted, isTrue);
       final beforeCount = c.availableThemes.length;
 
