@@ -1,4 +1,6 @@
 import 'dart:io' show SecurityContext;
+
+import 'package:flutter/foundation.dart';
 import 'package:postgres/postgres.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 
@@ -197,7 +199,9 @@ class PostgresConnection {
     _conn = null;
     try {
       await c?.close();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('PostgresConnection.disconnect: $e');
+    }
   }
 
   /// Drops the TCP session immediately (kills pending client I/O). Used when
@@ -208,7 +212,9 @@ class PostgresConnection {
     _conn = null;
     try {
       await c?.close(force: true);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('PostgresConnection.forceClose: $e');
+    }
   }
 
   /// Session-level default for transactions (browse vs SQL editor).
@@ -419,14 +425,18 @@ class PostgresConnection {
         "SELECT extract(epoch from (now() - pg_postmaster_start_time()))::bigint",
       );
       stats['uptime_seconds'] = uptime.first[0];
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('PostgresConnection.getServerStats uptime: $e');
+    }
 
     try {
       final dbSize = await _conn!.execute(
         "SELECT pg_database_size(current_database())",
       );
       stats['current_db_size'] = dbSize.first[0];
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('PostgresConnection.getServerStats database size: $e');
+    }
 
     return stats;
   }
