@@ -10,6 +10,7 @@ import 'package:querya_desktop/core/extensions/extension_paths.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/extensions/models/extension_type.dart';
+import 'package:querya_desktop/core/extensions/models/sandbox_capabilities.dart';
 import 'package:querya_desktop/core/market/marketplace_repository.dart';
 
 void main() {
@@ -98,6 +99,32 @@ void main() {
           contains('sandbox permissions beyond the security policy'),
         )),
       );
+    });
+
+    test('install accepts database driver with valid process sandbox', () async {
+      final repo = MockMarketplaceRepository();
+      const manifest = ExtensionManifest(
+        id: 'test.sandboxed-driver',
+        name: 'Sandboxed Driver',
+        version: '1.0.0',
+        publisher: 'Test',
+        type: ExtensionType.databaseDriver,
+        engines: {'querya_desktop': '*'},
+        main: 'bin/driver',
+        sandbox: SandboxCapabilities(
+          engine: SandboxEngine.process,
+          network: NetworkPermission(
+            mode: NetworkPermissionMode.connectionHostOnly,
+            allowSsl: true,
+          ),
+        ),
+      );
+
+      await repo.install(manifest);
+
+      final extDir = Directory(p.join(tempDir.path, manifest.id));
+      expect(await extDir.exists(), isTrue);
+      expect(await File(p.join(extDir.path, 'manifest.json')).exists(), isTrue);
     });
 
     test('install theme creates theme.json in extension directory', () async {

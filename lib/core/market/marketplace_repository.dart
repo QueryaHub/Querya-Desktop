@@ -185,7 +185,7 @@ class MockMarketplaceRepository implements MarketplaceRepository {
     ExtensionManifest manifest, {
     void Function(double)? onProgress,
   }  ) async {
-    if (ExtensionSupport.isPreviewOnly(manifest.type)) {
+    if (ExtensionSupport.isPreviewOnlyManifest(manifest)) {
       throw MarketplaceException(ExtensionSupport.databaseDriverPreviewNotice);
     }
 
