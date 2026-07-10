@@ -242,12 +242,15 @@ class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
                     material.Padding(
                       padding: const material.EdgeInsets.only(
                           left: 28, top: 4, bottom: 4),
-                      child: material.Text(
-                        'Error',
-                        overflow: material.TextOverflow.ellipsis,
-                        maxLines: 1,
-                        style: material.TextStyle(
-                            fontSize: 11, color: theme.colorScheme.destructive),
+                      child: material.Tooltip(
+                        message: _error!,
+                        child: material.Text(
+                          _error!,
+                          overflow: material.TextOverflow.ellipsis,
+                          maxLines: 2,
+                          style: material.TextStyle(
+                              fontSize: 11, color: theme.colorScheme.destructive),
+                        ),
                       ),
                     ),
                   if (_databases.isNotEmpty)

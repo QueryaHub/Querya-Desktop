@@ -455,4 +455,19 @@ void main() {
       expect(out, isNot(contains('database=olddb')));
     });
   });
+
+  group('PostgresConnection.testConnection', () {
+    test('returns ok=false and error message when connection fails', () async {
+      final conn = PostgresConnection(
+        id: 1,
+        name: 'test',
+        host: 'localhost',
+        connectionString: 'postgresql://localhost/db?sslmode=invalid',
+      );
+      final result = await conn.testConnection();
+      expect(result.ok, false);
+      expect(result.error, isNotNull);
+      expect(result.error, contains('sslmode'));
+    });
+  });
 }

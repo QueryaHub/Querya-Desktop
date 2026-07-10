@@ -174,16 +174,17 @@ class PostgresConnection {
     );
   }
 
-  Future<bool> testConnection() async {
+  /// Tests connectivity and returns a result with an optional error message.
+  Future<({bool ok, String? error})> testConnection() async {
     try {
       await connect();
       if (_conn != null) {
         await _conn!.execute('SELECT 1');
-        return true;
+        return (ok: true, error: null);
       }
-      return false;
-    } catch (_) {
-      return false;
+      return (ok: false, error: 'Connection could not be established.');
+    } catch (e) {
+      return (ok: false, error: e.toString());
     } finally {
       await disconnect();
     }
