@@ -52,35 +52,24 @@ void main() {
       expect(empty, isEmpty);
     });
 
-    test('install writes manifest to disk and reloads LocalExtensionRegistry', () async {
+    test('install rejects preview database drivers', () async {
       final repo = MockMarketplaceRepository();
       final trending = await repo.getTrending();
       final target = trending.firstWhere((e) => e.id == 'queryahub.clickhouse-driver');
 
-      final progressValues = <double>[];
-      await repo.install(target, onProgress: (p) => progressValues.add(p));
+      expect(
+        () => repo.install(target),
+        throwsA(isA<MarketplaceException>().having(
+          (e) => e.message,
+          'message',
+          contains('preview listings only'),
+        )),
+      );
 
-      expect(progressValues, isNotEmpty);
-      expect(progressValues.last, 1.0);
-
-      expect(LocalExtensionRegistry.instance.manifests.any((e) => e.id == target.id), isTrue);
-      
-      final extDir = Directory(p.join(tempDir.path, target.id));
-      expect(await extDir.exists(), isTrue);
-      expect(await File(p.join(extDir.path, 'manifest.json')).exists(), isTrue);
-    });
-
-    test('uninstall removes directory and updates LocalExtensionRegistry', () async {
-      final repo = MockMarketplaceRepository();
-      final trending = await repo.getTrending();
-      final target = trending.firstWhere((e) => e.id == 'queryahub.clickhouse-driver');
-
-      await repo.install(target);
-      expect(LocalExtensionRegistry.instance.manifests.any((e) => e.id == target.id), isTrue);
-
-      await repo.uninstall(target.id);
-      expect(LocalExtensionRegistry.instance.manifests.any((e) => e.id == target.id), isFalse);
-      expect(await Directory(p.join(tempDir.path, target.id)).exists(), isFalse);
+      expect(
+        LocalExtensionRegistry.instance.manifests.any((e) => e.id == target.id),
+        isFalse,
+      );
     });
 
     test('install theme creates theme.json in extension directory', () async {
@@ -215,6 +204,38 @@ void main() {
           (e) => e.message,
           'message',
           contains('Security violation'),
+        )),
+      );
+    });
+    test('install rejects preview database drivers', () async {
+      final archive = Archive();
+      archive.addFile(ArchiveFile('index.js', 4, utf8.encode('stub')));
+      final zipBytes = ZipEncoder().encode(archive);
+      final expectedSha256 = sha256.convert(zipBytes).toString();
+
+      final mockClient = MockClient((request) async {
+        return http.Response.bytes(zipBytes, 200);
+      });
+
+      final repo = HttpMarketplaceRepository(client: mockClient);
+      final manifest = ExtensionManifest(
+        id: 'test.driver',
+        name: 'Driver Test',
+        version: '1.0.0',
+        publisher: 'Test',
+        type: ExtensionType.databaseDriver,
+        engines: const {'querya_desktop': '*'},
+        main: 'index.js',
+        downloadUrl: 'http://localhost:8000/driver.zip',
+        sha256Checksum: expectedSha256,
+      );
+
+      expect(
+        () => repo.install(manifest),
+        throwsA(isA<MarketplaceException>().having(
+          (e) => e.message,
+          'message',
+          contains('preview listings only'),
         )),
       );
     });
