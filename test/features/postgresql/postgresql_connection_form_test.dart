@@ -127,5 +127,146 @@ void main() {
       expect(result!.name, 'PostgreSQL: remote.example.com:5433');
       expect(result!.connectionString, 'postgresql://u:p@remote.example.com:5433/db');
     });
+
+    testWidgets('SSL certificate path is appended to the URI', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 700));
+      await tester.pumpWidget(
+        ShadcnApp(
+          theme: AppTheme.dark,
+          darkTheme: AppTheme.dark,
+          themeMode: ThemeMode.dark,
+          home: material.Builder(
+            builder: (context) => material.ElevatedButton(
+              onPressed: () => showPostgresConnectionForm(context),
+              child: const material.Text('Open'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byWidgetPredicate(
+          (w) => w is TextField && w.placeholder is Text && (w.placeholder as Text).data == 'postgresql://user:pass@host:5432/dbname?sslmode=require',
+        ),
+        'postgresql://u:p@remote.example.com:5433/db',
+      );
+
+      await tester.scrollUntilVisible(
+        find.byType(material.Checkbox).first,
+        300,
+        scrollable: find.byType(material.Scrollable).first,
+      );
+      await tester.tap(find.byType(material.Checkbox).first);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('Root CA / SSL Root Certificate')),
+        300,
+        scrollable: find.byType(material.Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('Root CA / SSL Root Certificate')),
+        '/certs/root.pem',
+      );
+      await tester.pumpAndSettle();
+
+      final uriField = tester.widget<TextField>(
+        find.byWidgetPredicate(
+          (w) => w is TextField && w.placeholder is Text && (w.placeholder as Text).data == 'postgresql://user:pass@host:5432/dbname?sslmode=require',
+        ),
+      );
+      expect(uriField.controller?.text, contains('sslrootcert'));
+      expect(uriField.controller?.text, contains('root.pem'));
+    });
+
+    testWidgets('Save with SSL certs and no URI builds a connection URI', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 700));
+      ConnectionRow? result;
+      await tester.pumpWidget(
+        ShadcnApp(
+          theme: AppTheme.dark,
+          darkTheme: AppTheme.dark,
+          themeMode: ThemeMode.dark,
+          home: material.Builder(
+            builder: (context) => material.ElevatedButton(
+              onPressed: () async {
+                result = await showPostgresConnectionForm(context);
+              },
+              child: const material.Text('Open'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byWidgetPredicate(
+          (w) => w is TextField && w.placeholder is Text && (w.placeholder as Text).data == 'My PostgreSQL Server',
+        ),
+        'Cert PG',
+      );
+      await tester.enterText(
+        find.byWidgetPredicate(
+          (w) => w is TextField && w.placeholder is Text && (w.placeholder as Text).data == 'localhost',
+        ).first,
+        'pg.example.com',
+      );
+      await tester.enterText(
+        find.byWidgetPredicate(
+          (w) => w is TextField && w.placeholder is Text && (w.placeholder as Text).data == 'postgres',
+        ).first,
+        'appdb',
+      );
+      await tester.enterText(
+        find.byWidgetPredicate(
+          (w) => w is TextField && w.placeholder is Text && (w.placeholder as Text).data == 'postgres',
+        ).last,
+        'admin',
+      );
+      await tester.enterText(
+        find.byWidgetPredicate(
+          (w) => w is TextField && w.placeholder is Text && (w.placeholder as Text).data == 'Password',
+        ),
+        'secret',
+      );
+
+      await tester.scrollUntilVisible(
+        find.byType(material.Checkbox).first,
+        300,
+        scrollable: find.byType(material.Scrollable).first,
+      );
+      await tester.tap(find.byType(material.Checkbox).first);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('Root CA / SSL Root Certificate')),
+        300,
+        scrollable: find.byType(material.Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('Root CA / SSL Root Certificate')),
+        '/certs/root.pem',
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      expect(result, isNotNull);
+      expect(result!.connectionString, isNotNull);
+      expect(result!.connectionString, contains('pg.example.com'));
+      expect(result!.connectionString, contains('sslrootcert'));
+      expect(result!.connectionString, contains('root.pem'));
+      expect(result!.connectionString, contains('admin'));
+      expect(result!.connectionString, contains('secret'));
+      expect(result!.useSSL, true);
+    });
   });
 }
