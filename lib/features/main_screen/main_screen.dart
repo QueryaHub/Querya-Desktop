@@ -12,6 +12,7 @@ import 'package:flutter/material.dart' as material
         BuildContext,
         Widget,
         RepaintBoundary;
+import 'package:querya_desktop/core/actions/sql_editor_global_actions.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -123,6 +124,17 @@ class _MainScreenState extends State<MainScreen> {
     _workspace.value = _workspace.value.openSqliteSqlWorkspace(connection);
   }
 
+  void _openSqlWorkspaceForConnection(ConnectionRow connection) {
+    switch (connection.type) {
+      case 'postgresql':
+        _onPostgresOpenSqlWorkspace(connection);
+      case 'mysql':
+        _onMysqlOpenSqlWorkspace(connection);
+      case 'sqlite':
+        _onSqliteOpenSqlWorkspace(connection);
+    }
+  }
+
   Future<void> _openNewConnectionFromHero() async {
     final row = await promptCreateConnection(context);
     if (!mounted || row == null) return;
@@ -152,17 +164,20 @@ class _MainScreenState extends State<MainScreen> {
   @override
   material.Widget build(material.BuildContext context) {
     final wb = context.workbench;
-    return material.Scaffold(
-      backgroundColor: wb.canvas,
-      body: WindowBorder(
-        color: wb.borderSubtle.withValues(alpha: 0.35),
-        width: 1,
-        child: Column(
-          children: [
-            ValueListenableBuilder<MainScreenWorkspaceState>(
-              valueListenable: _workspace,
-              builder: (context, workspace, _) {
-                return QueryaWindowTitleBar(
+    return ValueListenableBuilder<MainScreenWorkspaceState>(
+      valueListenable: _workspace,
+      builder: (context, workspace, _) {
+        return SqlEditorGlobalActions(
+          activeConnection: workspace.activeConnection,
+          onOpenSqlWorkspace: _openSqlWorkspaceForConnection,
+          child: material.Scaffold(
+            backgroundColor: wb.canvas,
+            body: WindowBorder(
+              color: wb.borderSubtle.withValues(alpha: 0.35),
+              width: 1,
+              child: Column(
+                children: [
+                  QueryaWindowTitleBar(
                   onNewDatabaseConnection: _onNewDatabaseConnectionFromMenu,
                   onNewDatabaseConnectionFromUrl: _onNewDatabaseConnectionFromUrl,
                   activeConnection: workspace.activeConnection,
@@ -197,29 +212,30 @@ class _MainScreenState extends State<MainScreen> {
                       _connectionsPanelKey.currentState?.disconnectOthers(active);
                     }
                   },
-                );
-              },
-            ),
-            Divider(height: 1, color: wb.borderSubtle.withValues(alpha: 0.22)),
-            Expanded(
-              child: _MainContentSplit(
-                connectionsPanelKey: _connectionsPanelKey,
-                workspace: _workspace,
-                onConnectionSelected: _onConnectionSelected,
-                onPostgresObjectSelected: _onPostgresObjectSelected,
-                onMysqlObjectSelected: _onMysqlObjectSelected,
-                onSqliteObjectSelected: _onSqliteObjectSelected,
-                onRedisDatabaseSelected: _onRedisDatabaseSelected,
-                onMongoDBDatabaseSelected: _onMongoDBDatabaseSelected,
-                onPostgresOpenSqlWorkspace: _onPostgresOpenSqlWorkspace,
-                onMysqlOpenSqlWorkspace: _onMysqlOpenSqlWorkspace,
-                onSqliteOpenSqlWorkspace: _onSqliteOpenSqlWorkspace,
-                onRequestNewConnection: _openNewConnectionFromHero,
+                ),
+                  Divider(height: 1, color: wb.borderSubtle.withValues(alpha: 0.22)),
+                  Expanded(
+                    child: _MainContentSplit(
+                      connectionsPanelKey: _connectionsPanelKey,
+                      workspace: _workspace,
+                      onConnectionSelected: _onConnectionSelected,
+                      onPostgresObjectSelected: _onPostgresObjectSelected,
+                      onMysqlObjectSelected: _onMysqlObjectSelected,
+                      onSqliteObjectSelected: _onSqliteObjectSelected,
+                      onRedisDatabaseSelected: _onRedisDatabaseSelected,
+                      onMongoDBDatabaseSelected: _onMongoDBDatabaseSelected,
+                      onPostgresOpenSqlWorkspace: _onPostgresOpenSqlWorkspace,
+                      onMysqlOpenSqlWorkspace: _onMysqlOpenSqlWorkspace,
+                      onSqliteOpenSqlWorkspace: _onSqliteOpenSqlWorkspace,
+                      onRequestNewConnection: _openNewConnectionFromHero,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
