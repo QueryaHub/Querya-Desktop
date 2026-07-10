@@ -20,7 +20,8 @@ import 'package:flutter/material.dart' as material
         Row,
         MainAxisSize,
         Widget,
-        BoxConstraints;
+        BoxConstraints,
+        Tooltip;
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/motion/querya_cross_fade_stack.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
@@ -253,7 +254,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
               tabs: const ['Query Editor', 'Query History'],
               index: _editorTabIndex,
               onTabChanged: (v) => setState(() => _editorTabIndex = v),
-              trailing: const _RunButton(),
+              trailing: _RunButton(activeConnection: activeConn),
             ),
             const Divider(height: 1),
             Expanded(
@@ -407,7 +408,16 @@ class _TabButtonState extends State<_TabButton> {
 }
 
 class _RunButton extends StatefulWidget {
-  const _RunButton();
+  const _RunButton({
+    required this.activeConnection,
+    this.onExecute,
+  });
+
+  final ConnectionRow? activeConnection;
+  final VoidCallback? onExecute;
+
+  static const _noConnectionTooltip =
+      'Select an active database connection to execute queries';
 
   @override
   State<_RunButton> createState() => _RunButtonState();
@@ -418,20 +428,33 @@ class _RunButtonState extends State<_RunButton> {
 
   @override
   Widget build(BuildContext context) {
-    return material.MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: material.SystemMouseCursors.click,
+    final canExecute =
+        widget.activeConnection != null && widget.onExecute != null;
+    final button = material.MouseRegion(
+      onEnter: canExecute ? (_) => setState(() => _hovered = true) : null,
+      onExit: canExecute ? (_) => setState(() => _hovered = false) : null,
+      cursor: canExecute
+          ? material.SystemMouseCursors.click
+          : material.SystemMouseCursors.basic,
       child: material.AnimatedScale(
-        scale: _hovered ? 1.03 : 1.0,
+        scale: canExecute && _hovered ? 1.03 : 1.0,
         duration: context.motionDuration(QueryaMotion.fast),
         curve: context.motionCurve(QueryaMotion.enter),
         child: OutlineButton(
-          onPressed: () {},
+          key: const Key('workspace_run_button'),
+          onPressed: canExecute ? widget.onExecute : null,
           leading: const material.Icon(material.Icons.play_arrow, size: 18),
           child: const Text('Execute/Refresh (F5)'),
         ),
       ),
+    );
+
+    if (canExecute) return button;
+
+    return material.Tooltip(
+      message: _RunButton._noConnectionTooltip,
+      waitDuration: const Duration(milliseconds: 450),
+      child: button,
     );
   }
 }
