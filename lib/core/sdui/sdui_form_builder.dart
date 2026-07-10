@@ -1,0 +1,267 @@
+import 'package:flutter/material.dart' as material;
+import 'package:file_selector/file_selector.dart';
+import 'package:querya_desktop/core/sdui/sdui_form_schema.dart';
+import 'package:querya_desktop/shared/widgets/widgets.dart';
+
+/// Renders a connection / settings form from an SDUI JSON schema (Block A).
+///
+/// Call [collectValues] after the user submits; returns `null` when validation
+/// fails. Password fields are included in the map — the host should persist
+/// them via `ConnectionSecretsStore`, never via the plugin process disk.
+class SduiFormBuilder extends material.StatefulWidget {
+  const SduiFormBuilder({
+    super.key,
+    required this.schema,
+    this.initialValues = const {},
+    this.onChanged,
+    this.filePicker,
+  });
+
+  final SduiFormSchema schema;
+  final Map<String, Object?> initialValues;
+  final void Function(Map<String, Object?> values)? onChanged;
+
+  /// Injectable file picker for tests. Defaults to `openFile`.
+  final Future<String?> Function(SduiFormField field)? filePicker;
+
+  @override
+  material.State<SduiFormBuilder> createState() => SduiFormBuilderState();
+}
+
+class SduiFormBuilderState extends material.State<SduiFormBuilder> {
+  final _formKey = material.GlobalKey<material.FormState>();
+  final Map<String, material.TextEditingController> _textControllers = {};
+  final Map<String, bool> _checkboxValues = {};
+  final Map<String, String?> _selectValues = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _hydrate();
+  }
+
+  @override
+  void didUpdateWidget(covariant SduiFormBuilder oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.schema != widget.schema) {
+      _disposeControllers();
+      _hydrate();
+    }
+  }
+
+  void _hydrate() {
+    for (final field in widget.schema.fields) {
+      final initial = widget.initialValues[field.id] ?? field.defaultValue;
+      switch (field.type) {
+        case SduiFieldType.checkbox:
+          _checkboxValues[field.id] = initial == true || initial == 'true';
+        case SduiFieldType.select:
+          _selectValues[field.id] = initial?.toString() ??
+              (field.options.isNotEmpty ? field.options.first.value : null);
+        case SduiFieldType.text:
+        case SduiFieldType.number:
+        case SduiFieldType.password:
+        case SduiFieldType.filePicker:
+          _textControllers[field.id] = material.TextEditingController(
+            text: initial?.toString() ?? '',
+          )..addListener(_notifyChanged);
+      }
+    }
+  }
+
+  void _notifyChanged() {
+    widget.onChanged?.call(snapshotValues());
+  }
+
+  /// Current values without validating required fields.
+  Map<String, Object?> snapshotValues() {
+    final out = <String, Object?>{};
+    for (final field in widget.schema.fields) {
+      switch (field.type) {
+        case SduiFieldType.checkbox:
+          out[field.id] = _checkboxValues[field.id] ?? false;
+        case SduiFieldType.select:
+          out[field.id] = _selectValues[field.id];
+        case SduiFieldType.number:
+          final raw = _textControllers[field.id]?.text.trim() ?? '';
+          if (raw.isEmpty) {
+            out[field.id] = null;
+          } else {
+            out[field.id] = num.tryParse(raw) ?? raw;
+          }
+        case SduiFieldType.text:
+        case SduiFieldType.password:
+        case SduiFieldType.filePicker:
+          final text = _textControllers[field.id]?.text ?? '';
+          out[field.id] = text;
+      }
+    }
+    return out;
+  }
+
+  /// Validates the form and returns values, or `null` if invalid.
+  Map<String, Object?>? collectValues() {
+    final valid = _formKey.currentState?.validate() ?? false;
+    if (!valid) return null;
+    return snapshotValues();
+  }
+
+  /// Ids of password fields (for secure storage by the host).
+  List<String> get passwordFieldIds => widget.schema.fields
+      .where((f) => f.type == SduiFieldType.password)
+      .map((f) => f.id)
+      .toList(growable: false);
+
+  @override
+  void dispose() {
+    _disposeControllers();
+    super.dispose();
+  }
+
+  void _disposeControllers() {
+    for (final c in _textControllers.values) {
+      c.dispose();
+    }
+    _textControllers.clear();
+    _checkboxValues.clear();
+    _selectValues.clear();
+  }
+
+  Future<void> _pickFile(SduiFormField field) async {
+    final picker = widget.filePicker;
+    final path = picker != null
+        ? await picker(field)
+        : (await openFile())?.path;
+    if (path == null || !mounted) return;
+    _textControllers[field.id]?.text = path;
+    _notifyChanged();
+    setState(() {});
+  }
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    return material.Form(
+      key: _formKey,
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        mainAxisSize: material.MainAxisSize.min,
+        children: [
+          if (widget.schema.title != null) ...[
+            Text(widget.schema.title!).large().semiBold(),
+            const Gap(12),
+          ],
+          for (var i = 0; i < widget.schema.fields.length; i++) ...[
+            if (i > 0) const Gap(12),
+            _buildField(widget.schema.fields[i]),
+          ],
+        ],
+      ),
+    );
+  }
+
+  material.Widget _buildField(SduiFormField field) {
+    switch (field.type) {
+      case SduiFieldType.checkbox:
+        return material.CheckboxListTile(
+          contentPadding: material.EdgeInsets.zero,
+          title: Text(field.label),
+          value: _checkboxValues[field.id] ?? false,
+          controlAffinity: material.ListTileControlAffinity.leading,
+          onChanged: (v) {
+            setState(() => _checkboxValues[field.id] = v ?? false);
+            _notifyChanged();
+          },
+        );
+      case SduiFieldType.select:
+        return material.Column(
+          crossAxisAlignment: material.CrossAxisAlignment.stretch,
+          children: [
+            Text(field.label).small().semiBold(),
+            const Gap(4),
+            material.DropdownButtonFormField<String>(
+              value: _selectValues[field.id],
+              items: [
+                for (final opt in field.options)
+                  material.DropdownMenuItem(
+                    value: opt.value,
+                    child: material.Text(opt.label),
+                  ),
+              ],
+              onChanged: (v) {
+                setState(() => _selectValues[field.id] = v);
+                _notifyChanged();
+              },
+              validator: field.required
+                  ? (v) =>
+                      (v == null || v.isEmpty) ? '${field.label} is required' : null
+                  : null,
+            ),
+          ],
+        );
+      case SduiFieldType.filePicker:
+        final controller = _textControllers[field.id]!;
+        return material.Column(
+          crossAxisAlignment: material.CrossAxisAlignment.stretch,
+          children: [
+            Text(field.label).small().semiBold(),
+            const Gap(4),
+            material.Row(
+              children: [
+                material.Expanded(
+                  child: material.TextFormField(
+                    controller: controller,
+                    decoration: material.InputDecoration(
+                      hintText: field.placeholder ?? 'Path…',
+                    ),
+                    validator: _validatorFor(field),
+                  ),
+                ),
+                const Gap(8),
+                OutlineButton(
+                  onPressed: () => _pickFile(field),
+                  child: const Text('Browse'),
+                ),
+              ],
+            ),
+          ],
+        );
+      case SduiFieldType.text:
+      case SduiFieldType.number:
+      case SduiFieldType.password:
+        final controller = _textControllers[field.id]!;
+        return material.Column(
+          crossAxisAlignment: material.CrossAxisAlignment.stretch,
+          children: [
+            Text(field.label).small().semiBold(),
+            const Gap(4),
+            material.TextFormField(
+              controller: controller,
+              obscureText: field.type == SduiFieldType.password,
+              keyboardType: field.type == SduiFieldType.number
+                  ? material.TextInputType.number
+                  : material.TextInputType.text,
+              decoration: material.InputDecoration(
+                hintText: field.placeholder,
+              ),
+              validator: _validatorFor(field),
+            ),
+          ],
+        );
+    }
+  }
+
+  material.FormFieldValidator<String>? _validatorFor(SduiFormField field) {
+    return (value) {
+      final text = value?.trim() ?? '';
+      if (field.required && text.isEmpty) {
+        return '${field.label} is required';
+      }
+      if (field.type == SduiFieldType.number && text.isNotEmpty) {
+        if (num.tryParse(text) == null) {
+          return '${field.label} must be a number';
+        }
+      }
+      return null;
+    };
+  }
+}
