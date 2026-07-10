@@ -4,7 +4,9 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
 import 'package:querya_desktop/shared/widgets/form_validity_notifier.dart';
+import 'package:querya_desktop/shared/widgets/ssl_certificate_fields.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// MongoDB connection form data.
@@ -75,6 +77,9 @@ class _MongoConnectionFormContentState
   final _databaseController = material.TextEditingController();
   final _authSourceController = material.TextEditingController();
   final _connectionStringController = material.TextEditingController();
+  final _sslRootCertController = material.TextEditingController();
+  final _sslCertController = material.TextEditingController();
+  final _sslKeyController = material.TextEditingController();
 
   bool _useConnectionString = false;
   bool _useSSL = false;
@@ -96,12 +101,85 @@ class _MongoConnectionFormContentState
     ]) {
       _formValidNotifier.listenTo(c);
     }
+    _connectionStringController.addListener(_populateSslFieldsFromUri);
+    _sslRootCertController.addListener(_syncUriSslParams);
+    _sslCertController.addListener(_syncUriSslParams);
+    _sslKeyController.addListener(_syncUriSslParams);
     _formValidNotifier.seed();
+  }
+
+  void _populateSslFieldsFromUri() {
+    populateSslControllersFromUri(
+      _connectionStringController.text,
+      rootCertController: _sslRootCertController,
+      clientCertController: _sslCertController,
+      clientKeyController: _sslKeyController,
+    );
+  }
+
+  void _syncUriSslParams() {
+    syncSslControllersIntoUri(
+      _connectionStringController,
+      rootCertController: _sslRootCertController,
+      clientCertController: _sslCertController,
+      clientKeyController: _sslKeyController,
+    );
+    _formValidNotifier.seed();
+  }
+
+  bool _hasSslCertificateFields() {
+    return hasSslCertificateControllerValues(
+      rootCertController: _sslRootCertController,
+      clientCertController: _sslCertController,
+      clientKeyController: _sslKeyController,
+    );
+  }
+
+  String _buildConnectionUri() {
+    final paths = sslPathsFromControllers(
+      rootCertController: _sslRootCertController,
+      clientCertController: _sslCertController,
+      clientKeyController: _sslKeyController,
+    );
+    final user = _usernameController.text.trim();
+    final pass = _passwordController.text;
+    final db = _databaseController.text.trim();
+    final authSource = _authSourceController.text.trim();
+    final userInfoParts = <String>[
+      if (user.isNotEmpty) Uri.encodeComponent(user),
+      if (pass.isNotEmpty) Uri.encodeComponent(pass),
+    ];
+    final params = <String, String>{
+      ...sslCertificateQueryParams(paths),
+      if (authSource.isNotEmpty) 'authSource': authSource,
+      if (_useSSL || paths.hasAny) 'ssl': 'true',
+    };
+    return Uri(
+      scheme: 'mongodb',
+      userInfo: userInfoParts.isEmpty ? null : userInfoParts.join(':'),
+      host: _hostController.text.trim(),
+      port: int.tryParse(_portController.text.trim()) ?? 27017,
+      path: db.isEmpty ? null : '/$db',
+      queryParameters: params.isEmpty ? null : params,
+    ).toString();
+  }
+
+  String? _effectiveConnectionString() {
+    final uri = _connectionStringController.text.trim();
+    if (_useConnectionString) {
+      return uri.isEmpty ? null : uri;
+    }
+    if (_hasSslCertificateFields()) return _buildConnectionUri();
+    return null;
   }
 
   @override
   void dispose() {
     _dismissTimer?.cancel();
+    _connectionStringController.removeListener(_populateSslFieldsFromUri);
+    _sslRootCertController.removeListener(_syncUriSslParams);
+    _sslCertController.removeListener(_syncUriSslParams);
+    _sslKeyController.removeListener(_syncUriSslParams);
     for (final c in [
       _nameController,
       _hostController,
@@ -119,6 +197,9 @@ class _MongoConnectionFormContentState
     _databaseController.dispose();
     _authSourceController.dispose();
     _connectionStringController.dispose();
+    _sslRootCertController.dispose();
+    _sslCertController.dispose();
+    _sslKeyController.dispose();
     super.dispose();
   }
 
@@ -137,10 +218,8 @@ class _MongoConnectionFormContentState
         authSource: _authSourceController.text.trim().isEmpty
             ? null
             : _authSourceController.text.trim(),
-        useSSL: _useSSL,
-        connectionString: _connectionStringController.text.trim().isEmpty
-            ? null
-            : _connectionStringController.text.trim(),
+        useSSL: _useSSL || _hasSslCertificateFields(),
+        connectionString: _effectiveConnectionString(),
       );
 
   void _showTestResult(String result) {
@@ -193,6 +272,7 @@ class _MongoConnectionFormContentState
   }
 
   void _save() {
+    _syncUriSslParams();
     final data = _formData;
     if (!data.isValid) return;
 
@@ -292,6 +372,27 @@ class _MongoConnectionFormContentState
                             'mongodb://username:password@host:port/database'),
                         maxLines: 2,
                       ),
+                      const Gap(16),
+                      material.Row(
+                        children: [
+                          material.Checkbox(
+                            value: _useSSL,
+                            onChanged: (v) =>
+                                setState(() => _useSSL = v ?? false),
+                          ),
+                          const Gap(8),
+                          const Text('Use SSL/TLS').small(),
+                        ],
+                      ),
+                      if (_useSSL) ...[
+                        const Gap(16),
+                        SslCertificateFields(
+                          rootCertController: _sslRootCertController,
+                          clientCertController: _sslCertController,
+                          clientKeyController: _sslKeyController,
+                          onChanged: _syncUriSslParams,
+                        ),
+                      ],
                     ] else ...[
                       // Connection name
                       const Text('Connection Name').small().semiBold(),
@@ -432,6 +533,15 @@ class _MongoConnectionFormContentState
                           const Text('Use SSL/TLS').small(),
                         ],
                       ),
+                      if (_useSSL) ...[
+                        const Gap(16),
+                        SslCertificateFields(
+                          rootCertController: _sslRootCertController,
+                          clientCertController: _sslCertController,
+                          clientKeyController: _sslKeyController,
+                          onChanged: _syncUriSslParams,
+                        ),
+                      ],
                     ],
                   ],
                 ),
