@@ -82,7 +82,9 @@ void main() {
       final zipFile = File(p.join(temp.path, 'evil.zip'));
       final archive = Archive();
       archive.addFile(ArchiveFile('../outside.txt', 4, [1, 2, 3, 4]));
-      await zipFile.writeAsBytes(ZipEncoder().encode(archive)!);
+      final encoded = ZipEncoder().encode(archive);
+      expect(encoded, isNotNull);
+      await zipFile.writeAsBytes(encoded as List<int>);
 
       expect(
         () => extractZipSecurely(
