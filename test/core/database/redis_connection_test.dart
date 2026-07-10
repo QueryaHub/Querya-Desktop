@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
+import 'package:querya_desktop/core/storage/local_db.dart';
 
 void main() {
   group('RedisConnection initial state', () {
@@ -91,6 +92,30 @@ void main() {
         host: 'localhost',
       );
       expect(() => conn.info(), throwsStateError);
+    });
+  });
+
+  group('RedisConnection.fromConnectionRow', () {
+    test('parses rediss URI and SSL flag', () {
+      final conn = RedisConnection.fromConnectionRow(
+        const ConnectionRow(
+          id: 3,
+          type: 'redis',
+          name: 'secure-redis',
+          host: 'localhost',
+          port: 6379,
+          useSSL: true,
+          connectionString:
+              'rediss://user:pass@cache.example.com:6380?sslrootcert=%2Fca.pem',
+          createdAt: '0',
+        ),
+      );
+      expect(conn.useSSL, isTrue);
+      expect(conn.host, 'cache.example.com');
+      expect(conn.port, 6380);
+      expect(conn.username, 'user');
+      expect(conn.password, 'pass');
+      expect(conn.connectionString, contains('sslrootcert'));
     });
   });
 
