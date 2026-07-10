@@ -79,7 +79,8 @@ class SqliteConnection {
         return true;
       }
       return false;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('SqliteConnection.testConnection: $e');
       return false;
     } finally {
       await disconnect();

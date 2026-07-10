@@ -254,7 +254,8 @@ class MysqlConnection {
         return true;
       }
       return false;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('MysqlConnection.testConnection: $e');
       return false;
     } finally {
       await disconnect();

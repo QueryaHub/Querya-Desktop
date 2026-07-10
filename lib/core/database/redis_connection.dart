@@ -112,8 +112,8 @@ class RedisConnection {
     _conn = null;
     try {
       await c?.close();
-    } catch (_) {
-      // Connection may already be closed — ignore.
+    } catch (e) {
+      debugPrint('RedisConnection.disconnect: $e');
     }
   }
 
@@ -129,7 +129,8 @@ class RedisConnection {
     try {
       await connect();
       return true;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('RedisConnection.testConnection: $e');
       return false;
     } finally {
       await disconnect();
@@ -164,7 +165,8 @@ class RedisConnection {
       if (result is List && result.length >= 2) {
         return int.tryParse(result[1].toString()) ?? 16;
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('RedisConnection.getMaxDatabases: $e');
       // Some Redis instances don't allow CONFIG; fall back.
     }
     return 16;
