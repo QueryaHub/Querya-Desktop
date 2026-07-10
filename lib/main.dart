@@ -11,6 +11,7 @@ import 'core/motion/display_refresh_service.dart';
 import 'core/motion/querya_motion_controller.dart';
 import 'core/storage/local_db.dart';
 import 'core/theme/theme_controller.dart';
+import 'features/updater/update_controller.dart';
 
 void main() async {
   runZonedGuarded(() async {
@@ -27,6 +28,7 @@ void main() async {
     await ThemeController.instance.load();
     await UiScaleController.instance.load();
     await QueryaMotionController.instance.load();
+    unawaited(UpdateController.instance.initialize());
     runApp(const QueryaApp());
     doWhenWindowReady(() {
       final win = appWindow;
