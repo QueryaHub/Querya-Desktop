@@ -23,7 +23,8 @@ dependencies:
   redis: ^4.0.0
   postgres: ^3.5.6
   fl_chart: ^0.69.0
-  mysql_client: ^0.0.27
+  mysql_client:
+    path: third_party/mysql_client
   flutter_secure_storage: ^9.2.4
   file_selector: ^1.1.0
   syntax_highlight: ^0.5.0

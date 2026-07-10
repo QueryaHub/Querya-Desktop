@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:mysql_client/mysql_client.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
 
 /// Replaces the database in a `mysql://` / `mariadb://` URI (path or `database=`).
 String replaceDatabaseInMysqlConnectionString(
@@ -98,16 +99,22 @@ class MysqlConnection {
               )
             : connectionString!.trim();
         final parsed = _parseMysqlUri(uriStr, fallbackSsl: useSSL);
+        final sslPaths = extractSslCertificatePathsFromString(uriStr);
+        final securityContext = buildSecurityContext(sslPaths);
         _conn = await MySQLConnection.createConnection(
           host: parsed.host,
           port: parsed.port,
           userName: parsed.userName,
           password: parsed.password,
-          secure: parsed.secure,
+          secure: parsed.secure || sslPaths.hasAny,
           databaseName: parsed.databaseName,
+          securityContext: securityContext,
         );
         await _conn!.connect(timeoutMs: connectTimeoutMs);
       } else {
+        final securityContext = buildSecurityContext(
+          extractSslCertificatePathsFromString(connectionString),
+        );
         _conn = await MySQLConnection.createConnection(
           host: host,
           port: port,
@@ -115,6 +122,7 @@ class MysqlConnection {
           password: pass,
           secure: useSSL,
           databaseName: database,
+          securityContext: securityContext,
         );
         await _conn!.connect(timeoutMs: connectTimeoutMs);
       }
@@ -174,6 +182,11 @@ class MysqlConnection {
     if (ssl == 'require' || ssl == 'verify_ca' || ssl == 'verify_identity') {
       secure = true;
     }
+    if (q.containsKey(kSslRootCertParam) ||
+        q.containsKey(kSslCertParam) ||
+        q.containsKey(kSslKeyParam)) {
+      secure = true;
+    }
 
     return (
       host: hostStr,
@@ -183,6 +196,15 @@ class MysqlConnection {
       databaseName: db,
       secure: secure,
     );
+  }
+
+  /// Whether [connectionString] implies a TLS session (including cert query params).
+  @visibleForTesting
+  static bool connectionStringRequiresSsl(
+    String connectionString, {
+    bool fallbackSsl = true,
+  }) {
+    return _parseMysqlUri(connectionString, fallbackSsl: fallbackSsl).secure;
   }
 
   Future<void> disconnect() async {

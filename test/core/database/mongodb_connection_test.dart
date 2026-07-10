@@ -114,6 +114,19 @@ void main() {
       expect(uri, contains('ssl=true'));
     });
 
+    test('connectionString with Querya SSL params is preserved', () {
+      final conn = MongoConnection(
+        id: 1,
+        name: 'test',
+        host: 'localhost',
+        connectionString:
+            'mongodb://localhost/app?sslrootcert=%2Fca.pem&sslcert=%2Fclient.crt',
+      );
+      final uri = conn.buildConnectionUri();
+      expect(uri, contains('sslrootcert'));
+      expect(uri, contains('sslcert'));
+    });
+
     test('multiple query params are joined with &', () {
       final conn = MongoConnection(
         id: 1,

@@ -4,7 +4,9 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
 import 'package:querya_desktop/shared/widgets/form_validity_notifier.dart';
+import 'package:querya_desktop/shared/widgets/ssl_certificate_fields.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Shows Redis connection form dialog. Returns ConnectionRow if saved, null if cancelled.
@@ -39,7 +41,10 @@ class _RedisConnectionFormContentState
   final _portController = material.TextEditingController(text: '6379');
   final _usernameController = material.TextEditingController();
   final _passwordController = material.TextEditingController();
-
+  final _connectionStringController = material.TextEditingController();
+  final _sslRootCertController = material.TextEditingController();
+  final _sslCertController = material.TextEditingController();
+  final _sslKeyController = material.TextEditingController();
   bool _showPassword = false;
   bool _isTesting = false;
   String? _testResult;
@@ -50,13 +55,82 @@ class _RedisConnectionFormContentState
   void initState() {
     super.initState();
     _formValidNotifier = FormValidityNotifier(_computeFormValid);
-    for (final c in [_nameController, _hostController, _portController]) {
+    for (final c in [
+      _nameController,
+      _hostController,
+      _portController,
+      _connectionStringController,
+    ]) {
       _formValidNotifier.listenTo(c);
     }
+    _connectionStringController.addListener(_populateSslFieldsFromUri);
+    _sslRootCertController.addListener(_syncUriSslParams);
+    _sslCertController.addListener(_syncUriSslParams);
+    _sslKeyController.addListener(_syncUriSslParams);
     _formValidNotifier.seed();
   }
 
+  bool _looksLikeRedisUri(String s) {
+    final t = s.trim().toLowerCase();
+    return t.startsWith('redis://') || t.startsWith('rediss://');
+  }
+
+  void _populateSslFieldsFromUri() {
+    populateSslControllersFromUri(
+      _connectionStringController.text,
+      rootCertController: _sslRootCertController,
+      clientCertController: _sslCertController,
+      clientKeyController: _sslKeyController,
+    );
+    final uri = _connectionStringController.text.trim();
+    if (uri.isNotEmpty && _looksLikeRedisUri(uri)) {
+      final parsed = Uri.parse(uri);
+      if (parsed.scheme == 'rediss') _useSSL = true;
+    }
+  }
+
+  void _syncUriSslParams() {
+    syncSslControllersIntoUri(
+      _connectionStringController,
+      rootCertController: _sslRootCertController,
+      clientCertController: _sslCertController,
+      clientKeyController: _sslKeyController,
+    );
+    _formValidNotifier.seed();
+  }
+
+  bool _hasSslCertificateFields() {
+    return hasSslCertificateControllerValues(
+      rootCertController: _sslRootCertController,
+      clientCertController: _sslCertController,
+      clientKeyController: _sslKeyController,
+    );
+  }
+
+  String _effectiveConnectionUri() {
+    final uri = _connectionStringController.text.trim();
+    if (uri.isNotEmpty) return uri;
+    if (!_useSSL && !_hasSslCertificateFields()) return '';
+    return buildRedisConnectionUri(
+      host: _hostController.text.trim(),
+      port: int.tryParse(_portController.text.trim()) ?? 6379,
+      username: _usernameController.text.trim().isEmpty
+          ? null
+          : _usernameController.text.trim(),
+      password:
+          _passwordController.text.isEmpty ? null : _passwordController.text,
+      useSSL: _useSSL || _hasSslCertificateFields(),
+      sslPaths: sslPathsFromControllers(
+        rootCertController: _sslRootCertController,
+        clientCertController: _sslCertController,
+        clientKeyController: _sslKeyController,
+      ),
+    );
+  }
+
   bool _computeFormValid() {
+    final uri = _connectionStringController.text.trim();
+    if (uri.isNotEmpty) return _looksLikeRedisUri(uri);
     final host = _hostController.text.trim();
     return host.isNotEmpty &&
         (_nameController.text.trim().isNotEmpty || host.isNotEmpty);
@@ -88,18 +162,21 @@ class _RedisConnectionFormContentState
       _testResult = null;
     });
     try {
+      final uri = _effectiveConnectionUri();
       final conn = RedisConnection(
         id: 0,
         name: _nameController.text.trim().isEmpty
             ? 'test'
             : _nameController.text.trim(),
-        host: _hostController.text.trim(),
+        host: uri.isNotEmpty ? 'localhost' : _hostController.text.trim(),
         port: int.tryParse(_portController.text.trim()) ?? 6379,
         username: _usernameController.text.trim().isEmpty
             ? null
             : _usernameController.text.trim(),
         password:
             _passwordController.text.isEmpty ? null : _passwordController.text,
+        useSSL: _useSSL || _hasSslCertificateFields(),
+        connectionString: uri.isEmpty ? null : uri,
       );
       final ok = await conn.testConnection();
       if (mounted) _showTestResult(ok ? 'success' : 'failed');
@@ -110,20 +187,24 @@ class _RedisConnectionFormContentState
 
   void _save() {
     if (!_formValidNotifier.value) return;
+    _syncUriSslParams();
     final name = _nameController.text.trim();
     final host = _hostController.text.trim();
     final port = int.tryParse(_portController.text.trim()) ?? 6379;
+    final uri = _effectiveConnectionUri();
     final displayName = name.isNotEmpty ? name : 'Redis $host:$port';
     final row = ConnectionRow(
       type: 'redis',
       name: displayName,
-      host: host,
-      port: port,
+      host: uri.isNotEmpty ? null : host,
+      port: uri.isNotEmpty ? null : port,
       username: _usernameController.text.trim().isEmpty
           ? null
           : _usernameController.text.trim(),
       password:
           _passwordController.text.isEmpty ? null : _passwordController.text,
+      useSSL: _useSSL || _hasSslCertificateFields(),
+      connectionString: uri.isEmpty ? null : uri,
       folderId: widget.folderId,
       createdAt: DateTime.now().toUtc().toIso8601String(),
     );
@@ -133,7 +214,16 @@ class _RedisConnectionFormContentState
   @override
   void dispose() {
     _dismissTimer?.cancel();
-    for (final c in [_nameController, _hostController, _portController]) {
+    _connectionStringController.removeListener(_populateSslFieldsFromUri);
+    _sslRootCertController.removeListener(_syncUriSslParams);
+    _sslCertController.removeListener(_syncUriSslParams);
+    _sslKeyController.removeListener(_syncUriSslParams);
+    for (final c in [
+      _nameController,
+      _hostController,
+      _portController,
+      _connectionStringController,
+    ]) {
       _formValidNotifier.unlistenFrom(c);
     }
     _formValidNotifier.dispose();
@@ -142,6 +232,10 @@ class _RedisConnectionFormContentState
     _portController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
+    _connectionStringController.dispose();
+    _sslRootCertController.dispose();
+    _sslCertController.dispose();
+    _sslKeyController.dispose();
     super.dispose();
   }
 
@@ -154,7 +248,7 @@ class _RedisConnectionFormContentState
       constraints: WindowLayout.dialogConstraints(
         context,
         maxWidth: 600,
-        maxHeight: 560,
+        maxHeight: 640,
       ),
       decoration: material.BoxDecoration(
         color: theme.popover,
@@ -196,6 +290,18 @@ class _RedisConnectionFormContentState
                     TextField(
                       controller: _nameController,
                       placeholder: const Text('My Redis Server'),
+                    ),
+                    const Gap(16),
+                    const Text('Connection URI (optional)').small().semiBold(),
+                    const Gap(4),
+                    const Text(
+                      'Use redis:// or rediss://. Query params: sslrootcert, '
+                      'sslcert, sslkey.',
+                    ).muted().small(),
+                    const Gap(8),
+                    TextField(
+                      controller: _connectionStringController,
+                      placeholder: const Text('rediss://user:pass@host:6379'),
                     ),
                     const Gap(16),
                     material.Row(
@@ -276,6 +382,27 @@ class _RedisConnectionFormContentState
                         ),
                       ],
                     ),
+                    const Gap(16),
+                    material.Row(
+                      children: [
+                        material.Checkbox(
+                          value: _useSSL,
+                          onChanged: (v) =>
+                              setState(() => _useSSL = v ?? false),
+                        ),
+                        const Gap(8),
+                        const Text('Use SSL/TLS').small(),
+                      ],
+                    ),
+                    if (_useSSL) ...[
+                      const Gap(16),
+                      SslCertificateFields(
+                        rootCertController: _sslRootCertController,
+                        clientCertController: _sslCertController,
+                        clientKeyController: _sslKeyController,
+                        onChanged: _syncUriSslParams,
+                      ),
+                    ],
                   ],
                 ),
               ),
