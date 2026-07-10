@@ -71,6 +71,50 @@ void main() {
       expect(LocalExtensionRegistry.instance.manifests, isEmpty);
     });
     
+    test('skips extensions violating sandbox policy', () async {
+      final badDir = Directory(p.join(tempDir.path, 'bad_sandbox'));
+      await badDir.create();
+      await File(p.join(badDir.path, 'manifest.json')).writeAsString(jsonEncode({
+        'id': 'test.bad-sandbox',
+        'name': 'Bad Sandbox Theme',
+        'version': '1.0.0',
+        'publisher': 'Test',
+        'type': 'theme',
+        'engines': {'querya_desktop': '*'},
+        'sandbox': {
+          'engine': 'process',
+          'permissions': {
+            'network': {'mode': 'connection_host_only'},
+          },
+        },
+      }));
+
+      final goodDir = Directory(p.join(tempDir.path, 'good_sandbox'));
+      await goodDir.create();
+      await File(p.join(goodDir.path, 'manifest.json')).writeAsString(jsonEncode({
+        'id': 'test.good-sandbox',
+        'name': 'Good Sandbox Driver',
+        'version': '1.0.0',
+        'publisher': 'Test',
+        'type': 'database_driver',
+        'engines': {'querya_desktop': '*'},
+        'sandbox': {
+          'engine': 'process',
+          'permissions': {
+            'network': {'mode': 'connection_host_only', 'allow_ssl': true},
+            'filesystem': {'scratch_mb': 100, 'access': 'scratch_only'},
+            'resources': {'memory_mb': 256, 'max_open_files': 64},
+          },
+        },
+      }));
+
+      await LocalExtensionRegistry.instance.reload();
+      final manifests = LocalExtensionRegistry.instance.manifests;
+
+      expect(manifests.length, 1);
+      expect(manifests.first.id, 'test.good-sandbox');
+    });
+
     test('returns cached manifests on subsequent load calls', () async {
       final extDir = Directory(p.join(tempDir.path, 'ext3'));
       await extDir.create();

@@ -1,5 +1,6 @@
 import '../../theme/theme_definition.dart';
 import 'extension_type.dart';
+import 'sandbox_capabilities.dart';
 
 class ExtensionManifest {
   static const typeTheme = ExtensionType.theme;
@@ -22,6 +23,10 @@ class ExtensionManifest {
   final String? preview;
   final List<String> tags;
 
+  /// Sandbox requirements declared by the extension (Block E). Null when the
+  /// manifest has no `sandbox` block (e.g. plain themes).
+  final SandboxCapabilities? sandbox;
+
   const ExtensionManifest({
     required this.id,
     required this.name,
@@ -40,6 +45,7 @@ class ExtensionManifest {
     this.license,
     this.preview,
     this.tags = const [],
+    this.sandbox,
   });
 
   /// Maps a registry [ThemeDefinition] into marketplace field names.
@@ -89,6 +95,9 @@ class ExtensionManifest {
       license: json['license'] as String?,
       preview: json['preview'] as String?,
       tags: List<String>.from(json['tags'] as List? ?? []),
+      sandbox: json['sandbox'] is Map<String, dynamic>
+          ? SandboxCapabilities.fromJson(json['sandbox'] as Map<String, dynamic>)
+          : null,
     );
   }
 
@@ -110,6 +119,7 @@ class ExtensionManifest {
       if (license != null) 'license': license,
       if (preview != null) 'preview': preview,
       if (tags.isNotEmpty) 'tags': tags,
+      if (sandbox != null) 'sandbox': sandbox!.toJson(),
     };
   }
 }

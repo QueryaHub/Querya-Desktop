@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 import 'extension_paths.dart';
 import 'models/extension_manifest.dart';
+import 'sandbox/sandbox_policy.dart';
 
 /// Scans the local filesystem for extensions and loads their manifests.
 class LocalExtensionRegistry {
@@ -56,10 +58,19 @@ class LocalExtensionRegistry {
                 json, 
                 installPath: entity.path,
               );
+              final violations = SandboxPolicy.validate(manifest);
+              if (violations.isNotEmpty) {
+                debugPrint(
+                  'LocalExtensionRegistry: skipped "${manifest.id}" — '
+                  'sandbox policy violations: ${violations.join(' ')}',
+                );
+                continue;
+              }
               loadedManifests.add(manifest);
             } catch (e) {
-              // Log or ignore invalid manifests
-              // In the future, we could report these to an error logging service
+              debugPrint(
+                'LocalExtensionRegistry: invalid manifest in ${entity.path} ($e)',
+              );
             }
           }
         }
