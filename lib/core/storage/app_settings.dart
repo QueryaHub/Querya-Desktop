@@ -116,6 +116,7 @@ abstract final class AppSettingsKeys {
   static const motionLevel = 'motion_level';
   static const updateChannel = 'update_channel';
   static const checkForUpdatesOnStartup = 'check_for_updates_on_startup';
+  static const updateDismissedVersion = 'update_dismissed_version';
 }
 
 /// Bumps [listenable] when any preference is persisted (theme, legacy listeners).
@@ -587,6 +588,29 @@ class AppSettings {
       AppSettingsKeys.checkForUpdatesOnStartup,
       enabled ? 'true' : 'false',
     );
+    AppSettingsRevision.bump();
+  }
+
+  /// Version the user dismissed via "Remind me later" (badge hidden until newer).
+  Future<String?> getUpdateDismissedVersion() async {
+    final v = await LocalDb.instance.getAppSetting(
+      AppSettingsKeys.updateDismissedVersion,
+    );
+    if (v == null || v.isEmpty) return null;
+    return v;
+  }
+
+  Future<void> setUpdateDismissedVersion(String? version) async {
+    if (version == null || version.isEmpty) {
+      await LocalDb.instance.deleteAppSetting(
+        AppSettingsKeys.updateDismissedVersion,
+      );
+    } else {
+      await LocalDb.instance.setAppSetting(
+        AppSettingsKeys.updateDismissedVersion,
+        version,
+      );
+    }
     AppSettingsRevision.bump();
   }
 }
