@@ -30,14 +30,14 @@ void main() {
       );
       expect(ExtensionSupport.isPreviewOnlyManifest(preview), isTrue);
 
-      final ready = ExtensionManifest(
+      const ready = ExtensionManifest(
         id: 'test.driver',
         name: 'Driver',
         version: '1.0.0',
         publisher: 'Test',
         type: ExtensionType.databaseDriver,
-        engines: const {'querya_desktop': '*'},
-        sandbox: const SandboxCapabilities(
+        engines: {'querya_desktop': '*'},
+        sandbox: SandboxCapabilities(
           engine: SandboxEngine.process,
           network: NetworkPermission(
             mode: NetworkPermissionMode.connectionHostOnly,
