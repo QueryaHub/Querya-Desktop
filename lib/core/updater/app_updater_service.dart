@@ -112,6 +112,7 @@ class AppUpdaterService {
     UpdateAsset asset, {
     UpdateManifest? manifest,
     UpdateDownloadProgressCallback? onProgress,
+    bool Function()? shouldCancel,
   }) async {
     final checksums = await _resolveChecksums(asset: asset, manifest: manifest);
     final expected = checksums[asset.name] ?? asset.sha256;
@@ -140,6 +141,9 @@ class AppUpdaterService {
     final sink = destination.openWrite();
     try {
       await for (final chunk in response.stream) {
+        if (shouldCancel?.call() == true) {
+          throw const AppUpdaterException('Download cancelled');
+        }
         received += chunk.length;
         sink.add(chunk);
         if (onProgress != null) {
@@ -150,8 +154,23 @@ class AppUpdaterService {
       await sink.close();
     }
 
+    if (shouldCancel?.call() == true) {
+      if (await destination.exists()) {
+        await destination.delete();
+      }
+      throw const AppUpdaterException('Download cancelled');
+    }
+
     await verifyFileSha256(file: destination, expectedHex: expected);
     return destination;
+  }
+
+  /// Phase 3 (#282) will replace this with native in-place installers.
+  Future<void> installDownloadedUpdate(File verifiedPackage) async {
+    throw AppUpdaterException(
+      'In-app installation is not available yet on this platform. '
+      'Verified package: ${verifiedPackage.path}',
+    );
   }
 
   /// Picks the platform zip for the current OS from [manifest].
