@@ -91,6 +91,30 @@ void main() {
       expect(columns, containsAll(['id', 'name']));
     });
 
+    test('executes INSERT, UPDATE, DELETE with RETURNING clause correctly', () async {
+      await conn.connect();
+
+      await conn.execute('CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)');
+
+      // INSERT with RETURNING
+      final insertRes = await conn.execute("INSERT INTO users (name) VALUES ('Alice') RETURNING id, name");
+      expect(insertRes, isNotEmpty);
+      expect(insertRes.first['id'], 1);
+      expect(insertRes.first['name'], 'Alice');
+
+      // UPDATE with RETURNING
+      final updateRes = await conn.execute("UPDATE users SET name = 'Bob' WHERE id = 1 RETURNING id, name");
+      expect(updateRes, isNotEmpty);
+      expect(updateRes.first['id'], 1);
+      expect(updateRes.first['name'], 'Bob');
+
+      // DELETE with RETURNING
+      final deleteRes = await conn.execute("DELETE FROM users WHERE id = 1 RETURNING id, name");
+      expect(deleteRes, isNotEmpty);
+      expect(deleteRes.first['id'], 1);
+      expect(deleteRes.first['name'], 'Bob');
+    });
+
     test('throws StateError for modify operations in read-only mode', () async {
       final roConn = SqliteConnection(
         id: 2,

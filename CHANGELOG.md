@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.9] - 2026-07-10
+
+PostgreSQL connection reliability and TLS improvements, plus menu and URI import polish.
+
+### Added
+
+- **Connection → New Connection from URL (#228)** — create a connection by pasting a database URI for PostgreSQL, MySQL, MongoDB, Redis, or SQLite. The URL is parsed, validated, and saved to `LocalDb`.
+- **Help → About & Documentation (#229)** — added an About dialog showing the app version, MIT license, and repository link; the Documentation menu item opens the project docs in the browser.
+- **PostgreSQL SSL certificate file pickers (#260)** — added optional file pickers for `sslrootcert`, `sslcert`, and `sslkey` in the PostgreSQL connection form. Paths are merged into the connection URI or used to generate a URI when in host/port mode.
+
+### Fixed
+
+- **PostgreSQL URL parser / SSL (#249, #253, #254, #257, #258)** — validate `sslmode` (reject `prefer` and unknown values), correctly map `useSSL` for `disable`/`require`/`verify-ca`/`verify-full`, use driver default ports when omitted, and preserve display host/port for URI-only connections.
+- **PostgreSQL connection error reporting (#250, #251, #252)** — `testConnection` now returns the underlying error message, the form shows the real failure reason, and the connection tree displays the full exception text instead of a generic "Error" label.
+- **PostgreSQL connection error typing (#256, #259)** — `connect()` throws `PostgresConnectionException` with the original cause and stack trace; the pool wraps unexpected factory errors in the same typed exception.
+
+## [0.4.8] - 2026-07-08
+
+### Fixed
+
+- **SQLite / RETURNING clause support (#243)** — support RETURNING clauses for INSERT, UPDATE, and DELETE DML queries in the SQLite database driver, returning the resulting rows to the client.
+- **Security / MySQL Injection Fix (#241)** — replaced manual escaping and string concatenation in schema introspection methods (`listViews`, `listColumnNames`, `listTables`) in the MySQL database driver with parameterized queries using parameter binding.
+
 ## [0.4.7-a] - 2026-06-22
 
 ### Added

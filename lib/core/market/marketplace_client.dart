@@ -1,4 +1,5 @@
 import 'extension_manifest.dart';
+import 'marketplace_repository.dart';
 
 /// Future marketplace API client (mockable until backend exists).
 ///
@@ -10,24 +11,19 @@ abstract class MarketplaceClient {
   });
 }
 
-/// In-memory placeholder for local development and tests.
+/// In-memory placeholder for local development and tests that delegates to [MarketplaceRepository].
 class MockMarketplaceClient implements MarketplaceClient {
   MockMarketplaceClient({List<ExtensionManifest>? seed})
-      : _items = List<ExtensionManifest>.from(seed ?? const []);
+      : _repository = MockMarketplaceRepository(seed: seed);
 
-  final List<ExtensionManifest> _items;
+  final MockMarketplaceRepository _repository;
 
   @override
   Future<List<ExtensionManifest>> searchExtensions({
     required String query,
     String? type,
   }) async {
-    final normalized = query.trim().toLowerCase();
-    return _items.where((item) {
-      if (type != null && item.type != type) return false;
-      if (normalized.isEmpty) return true;
-      return item.name.toLowerCase().contains(normalized) ||
-          item.id.toLowerCase().contains(normalized);
-    }).toList(growable: false);
+    return _repository.search(query);
   }
 }
+

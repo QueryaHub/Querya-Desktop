@@ -370,6 +370,30 @@ class LocalDb {
     return id;
   }
 
+  /// Atomically updates an existing connection row in SQLite and its secrets in the secure store.
+  Future<void> updateConnection(ConnectionRow row) async {
+    if (row.id == null) {
+      throw ArgumentError('ConnectionRow.id cannot be null when calling updateConnection');
+    }
+    final db = await _open();
+    await db.transaction((txn) async {
+      final count = await txn.update(
+        'connections',
+        row.toPersistenceMap(),
+        where: 'id = ?',
+        whereArgs: [row.id],
+      );
+      if (count == 0) {
+        throw ArgumentError('No connection found with id ${row.id}');
+      }
+    });
+    await ConnectionSecretsStore.writeForConnection(
+      row.id!,
+      password: row.password,
+      connectionString: row.connectionString,
+    );
+  }
+
   Future<void> removeConnection(int id) async {
     await ConnectionSecretsStore.deleteForConnection(id);
     final db = await _open();

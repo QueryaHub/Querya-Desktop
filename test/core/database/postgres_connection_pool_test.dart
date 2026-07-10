@@ -339,4 +339,50 @@ void main() {
       expect(fake.disconnectCount, 1);
     });
   });
+
+  group('PostgresConnectionPool error wrapping', () {
+    test('wraps unexpected factory errors in PostgresConnectionException', () async {
+      Future<PostgresConnection> factory(
+        ConnectionRow row, {
+        required String database,
+        required PgSessionMode mode,
+      }) async {
+        throw const FormatException('bad connection string');
+      }
+
+      final pool = PostgresConnectionPool(createAndConnect: factory);
+      await expectLater(
+        pool.acquire(_row(), database: 'postgres'),
+        throwsA(
+          isA<PostgresConnectionException>().having(
+            (e) => e.message,
+            'message',
+            contains('Failed to acquire PostgreSQL connection'),
+          ),
+        ),
+      );
+    });
+
+    test('rethrows PostgresConnectionException from factory', () async {
+      Future<PostgresConnection> factory(
+        ConnectionRow row, {
+        required String database,
+        required PgSessionMode mode,
+      }) async {
+        throw PostgresConnectionException('driver refused');
+      }
+
+      final pool = PostgresConnectionPool(createAndConnect: factory);
+      await expectLater(
+        pool.acquire(_row(), database: 'postgres'),
+        throwsA(
+          isA<PostgresConnectionException>().having(
+            (e) => e.message,
+            'message',
+            equals('driver refused'),
+          ),
+        ),
+      );
+    });
+  });
 }

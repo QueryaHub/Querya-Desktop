@@ -137,10 +137,17 @@ class PostgresConnection {
         );
       }
       _isConnected = true;
-    } catch (e) {
+    } catch (e, st) {
       _isConnected = false;
       _conn = null;
-      rethrow;
+      Error.throwWithStackTrace(
+        PostgresConnectionException(
+          'Failed to connect to PostgreSQL${name.isNotEmpty ? ' ($name)' : ''}: $e',
+          cause: e,
+          stackTrace: st,
+        ),
+        st,
+      );
     }
   }
 
@@ -174,16 +181,19 @@ class PostgresConnection {
     );
   }
 
-  Future<bool> testConnection() async {
+  /// Tests connectivity and returns a result with an optional error message.
+  Future<({bool ok, String? error})> testConnection() async {
     try {
       await connect();
       if (_conn != null) {
         await _conn!.execute('SELECT 1');
-        return true;
+        return (ok: true, error: null);
       }
-      return false;
-    } catch (_) {
-      return false;
+      return (ok: false, error: 'Connection could not be established.');
+    } on PostgresConnectionException catch (e) {
+      return (ok: false, error: e.message);
+    } catch (e) {
+      return (ok: false, error: e.toString());
     } finally {
       await disconnect();
     }
@@ -769,8 +779,16 @@ class PostgresSequenceDetails {
 }
 
 class PostgresConnectionException implements Exception {
-  PostgresConnectionException(this.message);
+  PostgresConnectionException(
+    this.message, {
+    this.cause,
+    this.stackTrace,
+  });
+
   final String message;
+  final Object? cause;
+  final StackTrace? stackTrace;
+
   @override
   String toString() => message;
 }
