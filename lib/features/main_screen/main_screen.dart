@@ -16,6 +16,7 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
+import 'package:querya_desktop/features/connections/new_connection_url_dialog.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
 import 'package:querya_desktop/features/main_screen/querya_window_title_bar.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -139,6 +140,15 @@ class _MainScreenState extends State<MainScreen> {
     await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
   }
 
+  Future<void> _onNewDatabaseConnectionFromUrl() async {
+    await Future.delayed(const Duration(milliseconds: 100));
+    if (!mounted) return;
+    final row = await showNewConnectionUrlDialog(context);
+    if (!mounted || row == null) return;
+    await LocalDb.instance.addConnection(row);
+    await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
+  }
+
   @override
   material.Widget build(material.BuildContext context) {
     final wb = context.workbench;
@@ -154,6 +164,7 @@ class _MainScreenState extends State<MainScreen> {
               builder: (context, workspace, _) {
                 return QueryaWindowTitleBar(
                   onNewDatabaseConnection: _onNewDatabaseConnectionFromMenu,
+                  onNewDatabaseConnectionFromUrl: _onNewDatabaseConnectionFromUrl,
                   activeConnection: workspace.activeConnection,
                   isReadOnly: workspace.isReadOnly,
                   onReadOnlyChanged: () {
