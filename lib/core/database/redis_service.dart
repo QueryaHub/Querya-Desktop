@@ -23,14 +23,7 @@ class RedisService {
       existing.disconnect(); // fire-and-forget; disconnect is safe
     }
 
-    final conn = RedisConnection(
-      id: id,
-      name: row.name,
-      host: row.host ?? 'localhost',
-      port: row.port ?? 6379,
-      username: row.username,
-      password: row.password,
-    );
+    final conn = RedisConnection.fromConnectionRow(row);
     _connections[id] = conn;
     return conn;
   }

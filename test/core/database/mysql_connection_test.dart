@@ -2,6 +2,27 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/mysql_connection.dart';
 
 void main() {
+  group('MysqlConnection SSL URI parsing', () {
+    test('enables secure when ssl certificate params are present', () {
+      expect(
+        MysqlConnection.connectionStringRequiresSsl(
+          'mysql://user:pass@db.example.com:3306/mydb?sslrootcert=%2Fca.pem',
+        ),
+        isTrue,
+      );
+    });
+
+    test('certificate params enable secure even when ssl-mode=disable', () {
+      expect(
+        MysqlConnection.connectionStringRequiresSsl(
+          'mysql://localhost/db?ssl-mode=disable&sslrootcert=%2Fca.pem',
+          fallbackSsl: true,
+        ),
+        isTrue,
+      );
+    });
+  });
+
   group('replaceDatabaseInMysqlConnectionString', () {
     test('replaces path segment', () {
       expect(
