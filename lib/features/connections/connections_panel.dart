@@ -353,7 +353,6 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
       _expandedConnections.clear();
     });
     await disconnectAllExternalServices();
-    await SqliteService.instance.disconnectAll();
   }
 
   Future<void> disconnectOthers(ConnectionRow keepConn) async {
