@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_log_paths.dart';

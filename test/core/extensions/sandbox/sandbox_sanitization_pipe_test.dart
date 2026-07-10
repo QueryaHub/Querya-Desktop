@@ -55,7 +55,7 @@ void main() {
     test('redacts JWT, URI passwords, PEM keys, and assignments', () {
       const jwt =
           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjMifQ.signature';
-      final pem = '''
+      const pem = '''
 -----BEGIN PRIVATE KEY-----
 MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7
 -----END PRIVATE KEY-----
