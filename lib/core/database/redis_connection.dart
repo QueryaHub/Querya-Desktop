@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:redis/redis.dart' as redis;
 
 /// Redis connection using the Dart redis package (no Java/JRE).
@@ -333,7 +334,9 @@ class RedisConnectionTestFake extends RedisConnection {
     _command = null;
     try {
       await c?.close();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('RedisConnection.disconnect: $e');
+    }
   }
 
   @override
