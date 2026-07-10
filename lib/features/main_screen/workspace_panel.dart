@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart' as material
     show
         Alignment,
+        Align,
         Axis,
+        Column,
         Container,
+        ConstrainedBox,
         EdgeInsets,
         BoxDecoration,
         GestureDetector,
@@ -261,7 +264,11 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
                 index: _editorTabIndex,
                 children: const [
                   QueryEditorTab(),
-                  _PlaceholderTab(message: 'Query history'),
+                  _ComingSoonTab(
+                    title: 'Query History',
+                    description:
+                        'Browse recently executed SQL queries and re-run them from one place. Coming in a future release.',
+                  ),
                 ],
               ),
             ),
@@ -282,8 +289,16 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
                 index: _outputTabIndex,
                 children: const [
                   ResultsTab(),
-                  _PlaceholderTab(message: 'Messages'),
-                  _PlaceholderTab(message: 'Notifications'),
+                  _ComingSoonTab(
+                    title: 'Messages',
+                    description:
+                        'Connection logs and query execution messages will appear here. Coming in a future release.',
+                  ),
+                  _ComingSoonTab(
+                    title: 'Notifications',
+                    description:
+                        'System alerts and background task notifications will appear here. Coming in a future release.',
+                  ),
                 ],
               ),
             ),
@@ -427,13 +442,42 @@ class _RunButton extends StatelessWidget {
   }
 }
 
-class _PlaceholderTab extends StatelessWidget {
-  const _PlaceholderTab({required this.message});
+class _ComingSoonTab extends StatelessWidget {
+  const _ComingSoonTab({
+    required this.title,
+    required this.description,
+  });
 
-  final String message;
+  final String title;
+  final String description;
 
   @override
   Widget build(BuildContext context) {
-    return material.Center(child: Text(message).muted());
+    final theme = Theme.of(context);
+    return material.Center(
+      child: material.Padding(
+        padding: const material.EdgeInsets.all(32),
+        child: material.ConstrainedBox(
+          constraints: const material.BoxConstraints(maxWidth: 420),
+          child: material.Column(
+            mainAxisSize: material.MainAxisSize.min,
+            children: [
+              material.Icon(
+                material.Icons.hourglass_empty_rounded,
+                size: 36,
+                color: theme.colorScheme.mutedForeground,
+              ),
+              const material.SizedBox(height: 16),
+              Text(title).semiBold(),
+              const material.SizedBox(height: 8),
+              material.Align(
+                alignment: material.Alignment.center,
+                child: Text(description).muted().small(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
