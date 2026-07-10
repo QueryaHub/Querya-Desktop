@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
@@ -42,6 +43,9 @@ class _PostgresConnectionFormContentState
   final _usernameController = material.TextEditingController(text: 'postgres');
   final _passwordController = material.TextEditingController();
   final _connectionStringController = material.TextEditingController();
+  final _sslRootCertController = material.TextEditingController();
+  final _sslCertController = material.TextEditingController();
+  final _sslKeyController = material.TextEditingController();
 
   bool _useSSL = false;
   bool _showPassword = false;
@@ -64,6 +68,10 @@ class _PostgresConnectionFormContentState
     ]) {
       _formValidNotifier.listenTo(c);
     }
+    _connectionStringController.addListener(_populateSslFieldsFromUri);
+    _sslRootCertController.addListener(_syncUriSslParams);
+    _sslCertController.addListener(_syncUriSslParams);
+    _sslKeyController.addListener(_syncUriSslParams);
     _formValidNotifier.seed();
   }
 
@@ -80,6 +88,119 @@ class _PostgresConnectionFormContentState
   bool _looksLikePostgresUri(String s) {
     final t = s.trim().toLowerCase();
     return t.startsWith('postgres://') || t.startsWith('postgresql://');
+  }
+
+  void _populateSslFieldsFromUri() {
+    final uriText = _connectionStringController.text.trim();
+    if (uriText.isEmpty) return;
+    final parsed = Uri.tryParse(uriText);
+    if (parsed == null) return;
+    _sslRootCertController.text = parsed.queryParameters['sslrootcert'] ?? '';
+    _sslCertController.text = parsed.queryParameters['sslcert'] ?? '';
+    _sslKeyController.text = parsed.queryParameters['sslkey'] ?? '';
+  }
+
+  void _setOrRemoveSslParam(
+    Map<String, String> params,
+    String key,
+    material.TextEditingController controller,
+  ) {
+    final value = controller.text.trim();
+    if (value.isEmpty) {
+      params.remove(key);
+    } else {
+      params[key] = value;
+    }
+  }
+
+  void _syncUriSslParams() {
+    final uriText = _connectionStringController.text.trim();
+    if (uriText.isEmpty) return;
+    final parsed = Uri.tryParse(uriText);
+    if (parsed == null) return;
+    final params = Map<String, String>.from(parsed.queryParameters);
+    _setOrRemoveSslParam(params, 'sslrootcert', _sslRootCertController);
+    _setOrRemoveSslParam(params, 'sslcert', _sslCertController);
+    _setOrRemoveSslParam(params, 'sslkey', _sslKeyController);
+    final newUri = Uri(
+      scheme: parsed.scheme,
+      userInfo: parsed.userInfo.isEmpty ? null : parsed.userInfo,
+      host: parsed.host,
+      port: parsed.hasPort ? parsed.port : null,
+      path: parsed.path.isEmpty ? null : parsed.path,
+      queryParameters: params.isEmpty ? null : params,
+      fragment: parsed.fragment.isEmpty ? null : parsed.fragment,
+    );
+    _connectionStringController.text = newUri.toString();
+    _formValidNotifier.seed();
+  }
+
+  Future<void> _pickCertificateFile(
+    material.TextEditingController controller,
+  ) async {
+    const typeGroup = XTypeGroup(
+      label: 'PEM files',
+      extensions: ['pem', 'crt', 'key', 'cer'],
+    );
+    final file = await openFile(acceptedTypeGroups: const [typeGroup]);
+    if (file == null) return;
+    controller.text = file.path;
+    _syncUriSslParams();
+  }
+
+  String _buildConnectionUri({
+    required String host,
+    required int port,
+    String? username,
+    String? password,
+    String? database,
+    String? sslRootCert,
+    String? sslCert,
+    String? sslKey,
+  }) {
+    final userInfoParts = <String>[
+      if (username != null && username.isNotEmpty) Uri.encodeComponent(username),
+      if (password != null && password.isNotEmpty) Uri.encodeComponent(password),
+    ];
+    final queryParams = <String, String>{
+      if (sslRootCert != null && sslRootCert.isNotEmpty)
+        'sslrootcert': sslRootCert,
+      if (sslCert != null && sslCert.isNotEmpty) 'sslcert': sslCert,
+      if (sslKey != null && sslKey.isNotEmpty) 'sslkey': sslKey,
+    };
+    return Uri(
+      scheme: 'postgresql',
+      userInfo: userInfoParts.join(':'),
+      host: host,
+      port: port,
+      path: database == null || database.isEmpty ? '' : '/$database',
+      queryParameters: queryParams.isEmpty ? null : queryParams,
+    ).toString();
+  }
+
+  String _effectiveConnectionUri() {
+    final uri = _connectionStringController.text.trim();
+    if (uri.isNotEmpty) return uri;
+    final sslRootCert = _sslRootCertController.text.trim();
+    final sslCert = _sslCertController.text.trim();
+    final sslKey = _sslKeyController.text.trim();
+    if (sslRootCert.isEmpty && sslCert.isEmpty && sslKey.isEmpty) return '';
+    return _buildConnectionUri(
+      host: _hostController.text.trim(),
+      port: int.tryParse(_portController.text.trim()) ?? 5432,
+      username: _usernameController.text.trim(),
+      password: _passwordController.text,
+      database: _databaseController.text.trim(),
+      sslRootCert: sslRootCert,
+      sslCert: sslCert,
+      sslKey: sslKey,
+    );
+  }
+
+  bool _hasSslCertificateFields() {
+    return _sslRootCertController.text.trim().isNotEmpty ||
+        _sslCertController.text.trim().isNotEmpty ||
+        _sslKeyController.text.trim().isNotEmpty;
   }
 
   void _showTestResult(String result) {
@@ -108,13 +229,14 @@ class _PostgresConnectionFormContentState
       _testResult = null;
     });
     try {
-      final uri = _connectionStringController.text.trim();
+      final uri = _effectiveConnectionUri();
+      final hasUri = uri.isNotEmpty;
       final conn = PostgresConnection(
         id: 0,
         name: _nameController.text.trim().isEmpty
             ? 'test'
             : _nameController.text.trim(),
-        host: uri.isNotEmpty ? 'localhost' : _hostController.text.trim(),
+        host: hasUri ? 'localhost' : _hostController.text.trim(),
         port: int.tryParse(_portController.text.trim()) ?? 5432,
         database: _databaseController.text.trim().isEmpty
             ? null
@@ -124,8 +246,8 @@ class _PostgresConnectionFormContentState
             : _usernameController.text.trim(),
         password:
             _passwordController.text.isEmpty ? null : _passwordController.text,
-        useSSL: _useSSL,
-        connectionString: uri.isEmpty ? null : uri,
+        useSSL: _useSSL || _hasSslCertificateFields(),
+        connectionString: hasUri ? uri : null,
       );
       final result = await conn.testConnection();
       if (mounted) {
@@ -144,12 +266,16 @@ class _PostgresConnectionFormContentState
     final host = _hostController.text.trim();
     final port = int.tryParse(_portController.text.trim()) ?? 5432;
     final database = _databaseController.text.trim();
-    final uri = _connectionStringController.text.trim();
+
+    _syncUriSslParams();
+    final effectiveUri = _effectiveConnectionUri();
+    final hasSslCerts = _hasSslCertificateFields();
+    final effectiveUseSSL = _useSSL || hasSslCerts;
 
     String? uriHost;
     int? uriPort;
-    if (uri.isNotEmpty) {
-      final parsedUri = Uri.tryParse(uri);
+    if (effectiveUri.isNotEmpty) {
+      final parsedUri = Uri.tryParse(effectiveUri);
       if (parsedUri != null && parsedUri.host.isNotEmpty) {
         uriHost = parsedUri.host;
         uriPort = parsedUri.hasPort ? parsedUri.port : null;
@@ -160,32 +286,67 @@ class _PostgresConnectionFormContentState
     final effectivePort = uriPort ?? port;
     final displayName = name.isNotEmpty
         ? name
-        : (uri.isNotEmpty
+        : (effectiveUri.isNotEmpty
             ? 'PostgreSQL: $effectiveHost:$effectivePort'
             : 'PostgreSQL $host:$port/$database');
     final row = ConnectionRow(
       type: 'postgresql',
       name: displayName,
-      host: uriHost ?? (uri.isEmpty ? host : null),
-      port: uriPort ?? (uri.isEmpty ? port : null),
+      host: uriHost ?? (effectiveUri.isEmpty ? host : null),
+      port: uriPort ?? (effectiveUri.isEmpty ? port : null),
       username: _usernameController.text.trim().isEmpty
           ? null
           : _usernameController.text.trim(),
       password:
           _passwordController.text.isEmpty ? null : _passwordController.text,
       databaseName:
-          uri.isNotEmpty ? null : (database.isEmpty ? null : database),
-      useSSL: _useSSL,
-      connectionString: uri.isEmpty ? null : uri,
+          effectiveUri.isNotEmpty ? null : (database.isEmpty ? null : database),
+      useSSL: effectiveUseSSL,
+      connectionString: effectiveUri.isEmpty ? null : effectiveUri,
       folderId: widget.folderId,
       createdAt: DateTime.now().toUtc().toIso8601String(),
     );
     material.Navigator.of(context).pop(row);
   }
 
+  material.Widget _buildSslFileField({
+    required String label,
+    required material.TextEditingController controller,
+  }) {
+    return material.Column(
+      crossAxisAlignment: material.CrossAxisAlignment.stretch,
+      mainAxisSize: material.MainAxisSize.min,
+      children: [
+        Text(label).xSmall().muted(),
+        const Gap(4),
+        material.Row(
+              children: [
+                material.Expanded(
+                  child: TextField(
+                    key: Key(label),
+                    controller: controller,
+                    placeholder: const Text('/path/to/file.pem'),
+                    onChanged: (_) => _syncUriSslParams(),
+                  ),
+                ),
+            const Gap(8),
+            GhostButton(
+              onPressed: () => _pickCertificateFile(controller),
+              child: const Icon(material.Icons.folder_open_rounded),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   @override
   void dispose() {
     _dismissTimer?.cancel();
+    _connectionStringController.removeListener(_populateSslFieldsFromUri);
+    _sslRootCertController.removeListener(_syncUriSslParams);
+    _sslCertController.removeListener(_syncUriSslParams);
+    _sslKeyController.removeListener(_syncUriSslParams);
     for (final c in [
       _nameController,
       _hostController,
@@ -204,6 +365,9 @@ class _PostgresConnectionFormContentState
     _usernameController.dispose();
     _passwordController.dispose();
     _connectionStringController.dispose();
+    _sslRootCertController.dispose();
+    _sslCertController.dispose();
+    _sslKeyController.dispose();
     super.dispose();
   }
 
@@ -394,6 +558,32 @@ class _PostgresConnectionFormContentState
                         const Text('Use SSL/TLS').small(),
                       ],
                     ),
+                    if (_useSSL) ...[
+                      const Gap(16),
+                      const Text('SSL Certificates (optional)')
+                          .small()
+                          .semiBold(),
+                      const Gap(4),
+                      const Text(
+                        'Root CA, client certificate, and client key are '
+                        'appended to the connection URI.',
+                      ).muted().small(),
+                      const Gap(8),
+                      _buildSslFileField(
+                        label: 'Root CA / SSL Root Certificate',
+                        controller: _sslRootCertController,
+                      ),
+                      const Gap(8),
+                      _buildSslFileField(
+                        label: 'SSL Client Certificate',
+                        controller: _sslCertController,
+                      ),
+                      const Gap(8),
+                      _buildSslFileField(
+                        label: 'SSL Client Key',
+                        controller: _sslKeyController,
+                      ),
+                    ],
                   ],
                 ),
               ),
