@@ -13,7 +13,6 @@ import 'package:flutter/material.dart' as material
         Icons,
         MouseRegion,
         AnimatedContainer,
-        AnimatedScale,
         SystemMouseCursors,
         SizedBox,
         SingleChildScrollView,
@@ -407,27 +406,22 @@ class _TabButtonState extends State<_TabButton> {
   }
 }
 
-class _RunButton extends StatefulWidget {
+class _RunButton extends StatelessWidget {
   const _RunButton();
 
   static const _noConnectionTooltip =
       'Select an active database connection to execute queries';
 
   @override
-  State<_RunButton> createState() => _RunButtonState();
-}
-
-class _RunButtonState extends State<_RunButton> {
-  @override
   Widget build(BuildContext context) {
-    return material.Tooltip(
-      message: _RunButton._noConnectionTooltip,
-      waitDuration: const Duration(milliseconds: 450),
+    return const material.Tooltip(
+      message: _noConnectionTooltip,
+      waitDuration: Duration(milliseconds: 450),
       child: OutlineButton(
-        key: const Key('workspace_run_button'),
+        key: Key('workspace_run_button'),
         onPressed: null,
-        leading: const material.Icon(material.Icons.play_arrow, size: 18),
-        child: const Text('Execute/Refresh (F5)'),
+        leading: material.Icon(material.Icons.play_arrow, size: 18),
+        child: Text('Execute/Refresh (F5)'),
       ),
     );
   }
