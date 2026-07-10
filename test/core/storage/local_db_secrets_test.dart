@@ -116,5 +116,44 @@ void main() {
       expect(s.password, isNull);
       expect(s.connectionString, isNull);
     });
+
+    test('updateConnection atomically updates SQLite row and secure-store secrets', () async {
+      const initialRow = ConnectionRow(
+        type: 'postgres',
+        name: 'PG_Init',
+        host: 'localhost',
+        port: 5432,
+        username: 'admin',
+        password: 'old-secret-password',
+        createdAt: '2026-01-01T00:00:00Z',
+      );
+      final id = await LocalDb.instance.addConnection(initialRow);
+
+      final updatedRow = ConnectionRow(
+        id: id,
+        type: 'postgres',
+        name: 'PG_Updated',
+        host: 'db.example.com',
+        port: 5433,
+        username: 'root',
+        password: 'new-secret-password',
+        connectionString: 'postgres://root:new-secret-password@db.example.com:5433/mydb',
+        createdAt: '2026-01-01T00:00:00Z',
+      );
+      await LocalDb.instance.updateConnection(updatedRow);
+
+      final list = await LocalDb.instance.getConnections();
+      final loaded = list.singleWhere((c) => c.id == id);
+      expect(loaded.name, 'PG_Updated');
+      expect(loaded.host, 'db.example.com');
+      expect(loaded.port, 5433);
+      expect(loaded.username, 'root');
+      expect(loaded.password, 'new-secret-password');
+      expect(loaded.connectionString, 'postgres://root:new-secret-password@db.example.com:5433/mydb');
+
+      final secrets = await ConnectionSecretsStore.readForConnection(id);
+      expect(secrets.password, 'new-secret-password');
+      expect(secrets.connectionString, 'postgres://root:new-secret-password@db.example.com:5433/mydb');
+    });
   });
 }

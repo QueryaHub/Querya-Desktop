@@ -5,6 +5,8 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/connections/driver_manager_dialog.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
+import 'package:querya_desktop/features/extensions/presentation/pages/extension_manager_dialog.dart';
+import 'package:querya_desktop/features/help/about_dialog.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
@@ -13,6 +15,7 @@ class QueryaWindowTitleBar extends StatelessWidget {
   const QueryaWindowTitleBar({
     super.key,
     required this.onNewDatabaseConnection,
+    required this.onNewDatabaseConnectionFromUrl,
     this.activeConnection,
     this.onConnect,
     this.onReconnect,
@@ -24,6 +27,7 @@ class QueryaWindowTitleBar extends StatelessWidget {
   });
 
   final Future<void> Function() onNewDatabaseConnection;
+  final Future<void> Function() onNewDatabaseConnectionFromUrl;
   final ConnectionRow? activeConnection;
   final VoidCallback? onConnect;
   final VoidCallback? onReconnect;
@@ -134,6 +138,15 @@ class QueryaWindowTitleBar extends StatelessWidget {
                               onPressed: (ctx) => showPreferencesDialog(ctx),
                               child: const Text('Preferences…'),
                             ),
+                            const MenuDivider(),
+                            MenuButton(
+                              leading: const material.Icon(
+                                material.Icons.extension_rounded,
+                                size: 18,
+                              ),
+                              onPressed: (ctx) => showExtensionManagerDialog(ctx),
+                              child: const Text('Extensions…'),
+                            ),
                           ],
                           child: const Text('Edit'),
                         ),
@@ -152,7 +165,7 @@ class QueryaWindowTitleBar extends StatelessWidget {
                               leading: const material.Icon(
                                   material.Icons.link_rounded,
                                   size: 18),
-                              onPressed: (_) {},
+                              onPressed: (_) => onNewDatabaseConnectionFromUrl(),
                               child: const Text('New Connection from URL'),
                             ),
                             MenuButton(
@@ -214,9 +227,10 @@ class QueryaWindowTitleBar extends StatelessWidget {
                         MenuButton(
                           subMenu: [
                             MenuButton(
-                                onPressed: (_) {}, child: const Text('About')),
+                                onPressed: (ctx) => showAboutDialog(ctx),
+                                child: const Text('About')),
                             MenuButton(
-                                onPressed: (_) {},
+                                onPressed: (_) => openQueryaDocumentation(),
                                 child: const Text('Documentation')),
                           ],
                           child: const Text('Help'),
