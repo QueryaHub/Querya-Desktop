@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/extensions/extension_support.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/extensions/models/extension_type.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -29,6 +30,7 @@ class ExtensionCard extends material.StatelessWidget {
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context).colorScheme;
     final radius = Theme.of(context).radiusMd;
+    final isPreview = ExtensionSupport.isPreviewOnlyManifest(manifest);
     
     return material.Container(
       padding: const material.EdgeInsets.all(16),
@@ -51,6 +53,10 @@ class ExtensionCard extends material.StatelessWidget {
                     material.Expanded(
                       child: Text(manifest.name).large().semiBold(),
                     ),
+                    if (isPreview) ...[
+                      const material.SizedBox(width: 8),
+                      _buildPreviewBadge(theme),
+                    ],
                   ],
                 ),
                 const material.SizedBox(height: 4),
@@ -130,6 +136,14 @@ class ExtensionCard extends material.StatelessWidget {
                   onPressed: onUninstall,
                   child: const Text('Uninstall'),
                 )
+              else if (isPreview)
+                material.Tooltip(
+                  message: ExtensionSupport.databaseDriverPreviewNotice,
+                  child: OutlineButton(
+                    onPressed: null,
+                    child: const Text('Preview'),
+                  ),
+                )
               else
                 PrimaryButton(
                   onPressed: onInstall,
@@ -156,6 +170,25 @@ class ExtensionCard extends material.StatelessWidget {
             : material.Icons.extension_rounded,
         size: 24,
         color: theme.mutedForeground,
+      ),
+    );
+  }
+
+  material.Widget _buildPreviewBadge(ColorScheme theme) {
+    return material.Container(
+      padding: const material.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: material.BoxDecoration(
+        color: theme.muted,
+        borderRadius: material.BorderRadius.circular(6),
+        border: material.Border.all(color: theme.border),
+      ),
+      child: material.Text(
+        'Preview',
+        style: material.TextStyle(
+          fontSize: 11,
+          fontWeight: material.FontWeight.w600,
+          color: theme.mutedForeground,
+        ),
       ),
     );
   }
