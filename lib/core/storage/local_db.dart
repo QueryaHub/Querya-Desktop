@@ -359,23 +359,51 @@ class LocalDb {
 
   /// Inserts a row and returns the SQLite row id.
   /// Password and connection string are stored in the OS secure store, not in SQLite.
+  ///
+  /// If writing secrets fails, the SQLite row is rolled back and the error is
+  /// rethrown so callers can surface a Keychain / libsecret failure.
   Future<int> addConnection(ConnectionRow row) async {
     final db = await _open();
     final id = await db.insert('connections', row.toPersistenceMap());
-    await ConnectionSecretsStore.writeForConnection(
-      id,
-      password: row.password,
-      connectionString: row.connectionString,
-    );
+    try {
+      await ConnectionSecretsStore.writeForConnection(
+        id,
+        password: row.password,
+        connectionString: row.connectionString,
+      );
+    } catch (e) {
+      try {
+        await ConnectionSecretsStore.deleteForConnection(id);
+      } catch (_) {
+        // Best-effort cleanup of any partial secret writes.
+      }
+      await db.delete('connections', where: 'id = ?', whereArgs: [id]);
+      rethrow;
+    }
     return id;
   }
 
-  /// Atomically updates an existing connection row in SQLite and its secrets in the secure store.
+  /// Updates an existing connection row in SQLite and its secrets in the secure store.
+  ///
+  /// If writing secrets fails, the previous SQLite row and previous secrets are
+  /// restored (best effort) and the error is rethrown.
   Future<void> updateConnection(ConnectionRow row) async {
     if (row.id == null) {
       throw ArgumentError('ConnectionRow.id cannot be null when calling updateConnection');
     }
     final db = await _open();
+    final previousMaps = await db.query(
+      'connections',
+      where: 'id = ?',
+      whereArgs: [row.id],
+    );
+    if (previousMaps.isEmpty) {
+      throw ArgumentError('No connection found with id ${row.id}');
+    }
+    final previousRow = ConnectionRow.fromMap(previousMaps.first);
+    final previousSecrets =
+        await ConnectionSecretsStore.readForConnection(row.id!);
+
     await db.transaction((txn) async {
       final count = await txn.update(
         'connections',
@@ -387,15 +415,41 @@ class LocalDb {
         throw ArgumentError('No connection found with id ${row.id}');
       }
     });
-    await ConnectionSecretsStore.writeForConnection(
-      row.id!,
-      password: row.password,
-      connectionString: row.connectionString,
-    );
+
+    try {
+      await ConnectionSecretsStore.writeForConnection(
+        row.id!,
+        password: row.password,
+        connectionString: row.connectionString,
+      );
+    } catch (e) {
+      await db.update(
+        'connections',
+        previousRow.toPersistenceMap(),
+        where: 'id = ?',
+        whereArgs: [row.id],
+      );
+      try {
+        await ConnectionSecretsStore.writeForConnection(
+          row.id!,
+          password: previousSecrets.password,
+          connectionString: previousSecrets.connectionString,
+        );
+      } catch (_) {
+        // Best-effort restore of previous secrets; surface the original error.
+      }
+      rethrow;
+    }
   }
 
+  /// Deletes a connection. SQLite deletion always proceeds even if the secure
+  /// store delete fails (e.g. missing key or unavailable libsecret daemon).
   Future<void> removeConnection(int id) async {
-    await ConnectionSecretsStore.deleteForConnection(id);
+    try {
+      await ConnectionSecretsStore.deleteForConnection(id);
+    } catch (_) {
+      // Do not block removing the connection metadata when the OS store fails.
+    }
     final db = await _open();
     await db.delete('connections', where: 'id = ?', whereArgs: [id]);
   }
