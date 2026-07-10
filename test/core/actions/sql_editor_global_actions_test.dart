@@ -9,7 +9,7 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 
 import '../../support/querya_theme_test_shell.dart';
 
-ConnectionRow _postgresConnection() => ConnectionRow(
+ConnectionRow _postgresConnection() => const ConnectionRow(
       id: 1,
       type: 'postgresql',
       name: 'Local PG',
@@ -24,7 +24,7 @@ void main() {
       expect(isSqlCapableConnection(_postgresConnection()), isTrue);
       expect(
         isSqlCapableConnection(
-          ConnectionRow(
+          const ConnectionRow(
             id: 2,
             type: 'redis',
             name: 'Redis',
@@ -80,7 +80,7 @@ void main() {
         child: material.ScaffoldMessenger(
           child: material.Scaffold(
             body: SqlEditorGlobalActions(
-              activeConnection: ConnectionRow(
+              activeConnection: const ConnectionRow(
                 id: 3,
                 type: 'mongodb',
                 name: 'Mongo',
