@@ -10,10 +10,10 @@ import 'package:querya_desktop/core/extensions/sandbox/sandbox_process_runner.da
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_scratch_directory.dart';
 
 class _FakeProcess implements Process {
-  _FakeProcess({this.pid = 4242});
+  _FakeProcess();
 
   @override
-  final int pid;
+  int get pid => 4242;
 
   final _exit = Completer<int>();
   var killed = false;

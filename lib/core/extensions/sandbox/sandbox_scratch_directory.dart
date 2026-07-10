@@ -28,7 +28,7 @@ class SandboxScratchDirectory {
   }) async {
     final sanitized = _sanitizePluginId(pluginId);
     final unique = token ??
-        '${DateTime.now().microsecondsSinceEpoch}_${pid}';
+        '${DateTime.now().microsecondsSinceEpoch}_$pid';
     final base = baseDirectory ?? Directory.systemTemp;
     final dir = Directory(
       p.join(base.path, rootSegment, '${sanitized}_$unique'),
