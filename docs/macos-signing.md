@@ -99,7 +99,7 @@ Go to **Settings → Secrets and variables → Actions → New repository secret
 - Applies entitlements from `macos/Runner/Release.entitlements`.
 - Submits the app to Apple **notarytool**, waits for approval.
 - **Staples** the notarization ticket to the `.app` so it works offline.
-- The final zip is then produced from the signed/stapled bundle.
+- The final zip is then produced from the signed/stapled bundle. The signing step uses `macos/Runner/ReleaseSigned.entitlements` (hardened runtime, no sandbox), while the default `macos/Runner/Release.entitlements` is left untouched for unsigned builds.
 
 If the secrets are **not** set, the step is skipped and the zip is built exactly as before (unsigned). This keeps the release workflow safe for forks and local testing.
 
@@ -124,12 +124,12 @@ If all three commands report success, the app should open with a normal double-c
 
 ## Entitlements
 
-`macos/Runner/Release.entitlements` has been updated for a **Developer ID, non-App-Store** distribution:
+Two entitlement files are kept side by side:
 
-- **App Sandbox is disabled** — the app is a database client that needs to connect to arbitrary hosts, read user-selected files, and manage extensions in `~/.querya`.
-- **Hardened Runtime** exceptions for Flutter/Dart are enabled (`allow-jit`, `allow-unsigned-executable-memory`, `disable-library-validation`).
+- `macos/Runner/Release.entitlements` — the original Flutter default, kept as-is for **unsigned** builds.
+- `macos/Runner/ReleaseSigned.entitlements` — used only when the CI signs the app. It disables the **App Sandbox** (the app needs arbitrary network, file picker, and `~/.querya` access) and enables **Hardened Runtime** exceptions for Flutter/Dart (`allow-jit`, `allow-unsigned-executable-memory`, `disable-library-validation`).
 
-If you later add plugins that require microphone, camera, or other protected resources, add the corresponding hardened-runtime and/or sandbox entitlements to this file and re-sign.
+If you later add plugins that require microphone, camera, or other protected resources, add the corresponding hardened-runtime and/or sandbox entitlements to `ReleaseSigned.entitlements` and re-sign.
 
 ---
 
