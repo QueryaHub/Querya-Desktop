@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/postgres_connection.dart';
+import 'package:querya_desktop/core/storage/local_db.dart';
 
 void main() {
   group('PostgresConnection initial state', () {
@@ -498,6 +499,77 @@ void main() {
             (e) => e.message,
             'message',
             contains('sslmode'),
+          ),
+        ),
+      );
+    });
+  });
+
+  group('PostgresConnection SSL certificates', () {
+    test('stores optional sslRootCert, sslCert, sslKey parameters', () {
+      final conn = PostgresConnection(
+        id: 1,
+        name: 'test',
+        host: 'localhost',
+        sslRootCert: '/path/to/ca.pem',
+        sslCert: '/path/to/client.crt',
+        sslKey: '/path/to/client.key',
+      );
+      expect(conn.sslRootCert, '/path/to/ca.pem');
+      expect(conn.sslCert, '/path/to/client.crt');
+      expect(conn.sslKey, '/path/to/client.key');
+    });
+
+    test('extracts sslrootcert, sslcert, sslkey from connectionString in fromConnectionRow', () {
+      const row = ConnectionRow(
+        id: 10,
+        type: 'postgresql',
+        name: 'ssl_row',
+        host: 'db.example.com',
+        port: 5432,
+        connectionString:
+            'postgresql://user:password@db.example.com:5432/mydb?sslrootcert=%2Fca.crt&sslcert=%2Fclient.crt&sslkey=%2Fclient.key',
+        createdAt: '2026-07-10T12:00:00Z',
+      );
+      final conn = PostgresConnection.fromConnectionRow(row);
+      expect(conn.sslRootCert, '/ca.crt');
+      expect(conn.sslCert, '/client.crt');
+      expect(conn.sslKey, '/client.key');
+    });
+
+    test('connectToDatabase preserves SSL certificate parameters', () async {
+      final conn = PostgresConnection(
+        id: 1,
+        name: 'test',
+        host: 'localhost',
+        sslRootCert: '/path/to/ca.pem',
+        sslCert: '/path/to/client.crt',
+        sslKey: '/path/to/client.key',
+      );
+      final dbConn = await conn.connectToDatabase('newdb');
+      expect(dbConn.database, 'newdb');
+      expect(dbConn.sslRootCert, '/path/to/ca.pem');
+      expect(dbConn.sslCert, '/path/to/client.crt');
+      expect(dbConn.sslKey, '/path/to/client.key');
+    });
+
+    test('uses SSL certificates when connecting via host/port fields', () async {
+      final conn = PostgresConnection(
+        id: 1,
+        name: 'test',
+        host: 'localhost',
+        port: 5433,
+        sslRootCert: '/nonexistent/ca.pem',
+        sslCert: '/nonexistent/client.crt',
+        sslKey: '/nonexistent/client.key',
+      );
+      expect(
+        conn.connect,
+        throwsA(
+          isA<PostgresConnectionException>().having(
+            (e) => e.message,
+            'message',
+            contains('/nonexistent'),
           ),
         ),
       );

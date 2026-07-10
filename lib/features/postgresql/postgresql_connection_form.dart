@@ -248,6 +248,15 @@ class _PostgresConnectionFormContentState
             _passwordController.text.isEmpty ? null : _passwordController.text,
         useSSL: _useSSL || _hasSslCertificateFields(),
         connectionString: hasUri ? uri : null,
+        sslRootCert: _sslRootCertController.text.trim().isEmpty
+            ? null
+            : _sslRootCertController.text.trim(),
+        sslCert: _sslCertController.text.trim().isEmpty
+            ? null
+            : _sslCertController.text.trim(),
+        sslKey: _sslKeyController.text.trim().isEmpty
+            ? null
+            : _sslKeyController.text.trim(),
       );
       final result = await conn.testConnection();
       if (mounted) {
