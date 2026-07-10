@@ -145,16 +145,29 @@ class _PostgresConnectionFormContentState
     final port = int.tryParse(_portController.text.trim()) ?? 5432;
     final database = _databaseController.text.trim();
     final uri = _connectionStringController.text.trim();
+
+    String? uriHost;
+    int? uriPort;
+    if (uri.isNotEmpty) {
+      final parsedUri = Uri.tryParse(uri);
+      if (parsedUri != null && parsedUri.host.isNotEmpty) {
+        uriHost = parsedUri.host;
+        uriPort = parsedUri.hasPort ? parsedUri.port : null;
+      }
+    }
+
+    final effectiveHost = uriHost ?? host;
+    final effectivePort = uriPort ?? port;
     final displayName = name.isNotEmpty
         ? name
         : (uri.isNotEmpty
-            ? 'PostgreSQL (URI)'
+            ? 'PostgreSQL: $effectiveHost:$effectivePort'
             : 'PostgreSQL $host:$port/$database');
     final row = ConnectionRow(
       type: 'postgresql',
       name: displayName,
-      host: uri.isNotEmpty ? null : host,
-      port: uri.isNotEmpty ? null : port,
+      host: uriHost ?? (uri.isEmpty ? host : null),
+      port: uriPort ?? (uri.isEmpty ? port : null),
       username: _usernameController.text.trim().isEmpty
           ? null
           : _usernameController.text.trim(),

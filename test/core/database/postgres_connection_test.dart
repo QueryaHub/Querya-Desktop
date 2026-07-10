@@ -433,6 +433,18 @@ void main() {
       expect(ex.message, 'connection refused');
       expect(ex.toString(), 'connection refused');
     });
+
+    test('can store cause and stack trace', () {
+      final cause = StateError('root');
+      final trace = StackTrace.current;
+      final ex = PostgresConnectionException(
+        'connection refused',
+        cause: cause,
+        stackTrace: trace,
+      );
+      expect(ex.cause, cause);
+      expect(ex.stackTrace, trace);
+    });
   });
 
   group('replaceDatabaseInConnectionString', () {
@@ -468,6 +480,27 @@ void main() {
       expect(result.ok, false);
       expect(result.error, isNotNull);
       expect(result.error, contains('sslmode'));
+    });
+  });
+
+  group('PostgresConnection.connect', () {
+    test('throws PostgresConnectionException on invalid sslmode', () async {
+      final conn = PostgresConnection(
+        id: 1,
+        name: 'test',
+        host: 'localhost',
+        connectionString: 'postgresql://localhost/db?sslmode=invalid',
+      );
+      expect(
+        conn.connect,
+        throwsA(
+          isA<PostgresConnectionException>().having(
+            (e) => e.message,
+            'message',
+            contains('sslmode'),
+          ),
+        ),
+      );
     });
   });
 }
