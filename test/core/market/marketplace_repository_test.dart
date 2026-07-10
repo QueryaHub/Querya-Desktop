@@ -103,15 +103,15 @@ void main() {
 
     test('install accepts database driver with valid process sandbox', () async {
       final repo = MockMarketplaceRepository();
-      final manifest = ExtensionManifest(
+      const manifest = ExtensionManifest(
         id: 'test.sandboxed-driver',
         name: 'Sandboxed Driver',
         version: '1.0.0',
         publisher: 'Test',
         type: ExtensionType.databaseDriver,
-        engines: const {'querya_desktop': '*'},
+        engines: {'querya_desktop': '*'},
         main: 'bin/driver',
-        sandbox: const SandboxCapabilities(
+        sandbox: SandboxCapabilities(
           engine: SandboxEngine.process,
           network: NetworkPermission(
             mode: NetworkPermissionMode.connectionHostOnly,
