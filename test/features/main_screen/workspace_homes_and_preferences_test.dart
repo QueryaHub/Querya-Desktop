@@ -116,6 +116,8 @@ void main() {
 
       expect(find.text('Driver Manager'), findsOneWidget);
       expect(find.textContaining('built-in Dart'), findsWidgets);
+      expect(find.text('SQLite'), findsOneWidget);
+      expect(find.textContaining('sqflite_common_ffi'), findsOneWidget);
     });
   });
 
