@@ -72,6 +72,34 @@ void main() {
       );
     });
 
+    test('install rejects theme requesting excessive sandbox permissions',
+        () async {
+      final repo = MockMarketplaceRepository();
+      final manifest = ExtensionManifest.fromJson(const {
+        'id': 'test.greedy-theme',
+        'name': 'Greedy Theme',
+        'version': '1.0.0',
+        'publisher': 'Test',
+        'type': 'theme',
+        'engines': {'querya_desktop': '*'},
+        'sandbox': {
+          'engine': 'process',
+          'permissions': {
+            'network': {'mode': 'connection_host_only'},
+          },
+        },
+      });
+
+      expect(
+        () => repo.install(manifest),
+        throwsA(isA<MarketplaceException>().having(
+          (e) => e.message,
+          'message',
+          contains('sandbox permissions beyond the security policy'),
+        )),
+      );
+    });
+
     test('install theme creates theme.json in extension directory', () async {
       final repo = MockMarketplaceRepository();
       final trending = await repo.getTrending();
