@@ -195,11 +195,11 @@ void main() {
         packageInfoProvider: () async => _packageInfo('0.4.9'),
       );
 
-      final asset = UpdateAsset(
+      const asset = UpdateAsset(
         name: fileName,
-        downloadUrl: 'https://example.com/$fileName',
+        downloadUrl: 'https://example.com/Querya-Desktop-0.5.0-linux.zip',
       );
-      final manifest = UpdateManifest(
+      const manifest = UpdateManifest(
         version: '0.5.0',
         changelog: '',
         assets: [asset],
@@ -238,11 +238,11 @@ void main() {
         packageInfoProvider: () async => _packageInfo('0.4.9'),
       );
 
-      final asset = UpdateAsset(
+      const asset = UpdateAsset(
         name: fileName,
-        downloadUrl: 'https://example.com/$fileName',
+        downloadUrl: 'https://example.com/Querya-Desktop-0.5.0-linux.zip',
       );
-      final manifest = UpdateManifest(
+      const manifest = UpdateManifest(
         version: '0.5.0',
         changelog: '',
         assets: [asset],
