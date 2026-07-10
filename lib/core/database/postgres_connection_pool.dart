@@ -87,10 +87,23 @@ class PostgresConnectionPool {
 
     _evictIfNeededBeforeNewSlot();
 
-    final conn = await createAndConnect(row, database: database, mode: mode);
-    entry = _PoolEntry(conn)..refs = 1;
-    _pool[k] = entry;
-    return PgLease._(this, k, conn);
+    try {
+      final conn = await createAndConnect(row, database: database, mode: mode);
+      entry = _PoolEntry(conn)..refs = 1;
+      _pool[k] = entry;
+      return PgLease._(this, k, conn);
+    } on PostgresConnectionException {
+      rethrow;
+    } catch (e, st) {
+      Error.throwWithStackTrace(
+        PostgresConnectionException(
+          'Failed to acquire PostgreSQL connection for database "$database": $e',
+          cause: e,
+          stackTrace: st,
+        ),
+        st,
+      );
+    }
   }
 
   /// Drops idle LRU slots until there is room for one more key.
