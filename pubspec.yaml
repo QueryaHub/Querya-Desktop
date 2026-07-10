@@ -23,8 +23,7 @@ dependencies:
   redis: ^4.0.0
   postgres: ^3.5.6
   fl_chart: ^0.69.0
-  mysql_client:
-    path: third_party/mysql_client
+  mysql_client: ^0.0.27
   flutter_secure_storage: ^9.2.4
   file_selector: ^1.1.0
   syntax_highlight: ^0.5.0
@@ -40,6 +39,9 @@ dev_dependencies:
   path_provider_platform_interface: ^2.1.2
 
 dependency_overrides:
+  # Patched mysql_client: optional SecurityContext for client TLS certificates.
+  mysql_client:
+    path: third_party/mysql_client
   # Patched ToastLayer (fixes InheritedNotifier crash on resize / hot reload).
   shadcn_flutter:
     path: third_party/shadcn_flutter
