@@ -176,6 +176,10 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
         manifest: manifest,
         installDir: extDir,
       );
+      await ExtensionSupport.ensureDriverExecutables(
+        manifest: manifest,
+        installDir: extDir,
+      );
 
       // Step 4: Write/Update manifest.json in the extension directory
       final manifestFile = File(p.join(extDir.path, 'manifest.json'));
