@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:file_selector/file_selector.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
+import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/database/sqlite_service.dart';
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
@@ -59,7 +60,18 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
     SqlWorkspaceSettingsRevision.listenable.addListener(_appSettingsListener);
     material.WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_loadWorkspaceSettings());
+      _registerSqlEditorCommands();
     });
+  }
+
+  void _registerSqlEditorCommands() {
+    if (!mounted) return;
+    SqlEditorCommandBridge.instance.register(
+      connectionId: widget.connectionRow.id,
+      onNew: () => _sqlController.clear(),
+      onOpen: () => unawaited(_openSqlFile()),
+      onSave: () => unawaited(_saveSqlFile()),
+    );
   }
 
   @override
@@ -100,6 +112,8 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
 
   @override
   void dispose() {
+    SqlEditorCommandBridge.instance
+        .unregister(connectionId: widget.connectionRow.id);
     SqlWorkspaceSettingsRevision.listenable
         .removeListener(_appSettingsListener);
     _topFraction.dispose();

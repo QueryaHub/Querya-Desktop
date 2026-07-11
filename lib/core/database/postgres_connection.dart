@@ -1,3 +1,6 @@
+import 'dart:io' show SecurityContext;
+
+import 'package:flutter/foundation.dart';
 import 'package:postgres/postgres.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 
@@ -43,6 +46,9 @@ class PostgresConnection {
     this.database,
     this.useSSL = false,
     this.connectionString,
+    this.sslRootCert,
+    this.sslCert,
+    this.sslKey,
   });
 
   /// Builds a connection from a saved [ConnectionRow] (host/port or URI).
@@ -50,6 +56,18 @@ class PostgresConnection {
     ConnectionRow row, {
     String? database,
   }) {
+    String? rootCert;
+    String? clientCert;
+    String? clientKey;
+    if (row.connectionString != null &&
+        row.connectionString!.trim().isNotEmpty) {
+      final uri = Uri.tryParse(row.connectionString!.trim());
+      if (uri != null) {
+        rootCert = uri.queryParameters['sslrootcert'];
+        clientCert = uri.queryParameters['sslcert'];
+        clientKey = uri.queryParameters['sslkey'];
+      }
+    }
     return PostgresConnection(
       id: row.id ?? 0,
       name: row.name,
@@ -60,6 +78,9 @@ class PostgresConnection {
       database: database ?? row.databaseName ?? 'postgres',
       useSSL: row.useSSL,
       connectionString: row.connectionString,
+      sslRootCert: rootCert,
+      sslCert: clientCert,
+      sslKey: clientKey,
     );
   }
 
@@ -72,6 +93,9 @@ class PostgresConnection {
   final String? database;
   final bool useSSL;
   final String? connectionString;
+  final String? sslRootCert;
+  final String? sslCert;
+  final String? sslKey;
 
   Connection? _conn;
   bool _isConnected = false;
@@ -92,10 +116,28 @@ class PostgresConnection {
   }
 
   ConnectionSettings _buildSettings() {
+    SecurityContext? securityContext;
+    if ((sslRootCert != null && sslRootCert!.trim().isNotEmpty) ||
+        (sslCert != null && sslCert!.trim().isNotEmpty) ||
+        (sslKey != null && sslKey!.trim().isNotEmpty)) {
+      securityContext = SecurityContext();
+      if (sslCert != null && sslCert!.trim().isNotEmpty) {
+        securityContext.useCertificateChain(sslCert!.trim());
+      }
+      if (sslKey != null && sslKey!.trim().isNotEmpty) {
+        securityContext.usePrivateKey(sslKey!.trim());
+      }
+      if (sslRootCert != null && sslRootCert!.trim().isNotEmpty) {
+        securityContext.setTrustedCertificates(sslRootCert!.trim());
+      }
+    }
     return ConnectionSettings(
-      sslMode: useSSL ? SslMode.require : SslMode.disable,
+      sslMode: (useSSL || securityContext != null)
+          ? SslMode.require
+          : SslMode.disable,
       connectTimeout: const Duration(seconds: 10),
       queryTimeout: const Duration(seconds: 30),
+      securityContext: securityContext,
     );
   }
 
@@ -126,7 +168,7 @@ class PostgresConnection {
             encoding: parsed.encoding,
             replicationMode: parsed.replicationMode,
             queryTimeout: parsed.queryTimeout ?? const Duration(seconds: 30),
-            securityContext: parsed.securityContext,
+            securityContext: parsed.securityContext ?? _buildSettings().securityContext,
             sslMode: sslMode,
           ),
         );
@@ -157,7 +199,9 @@ class PostgresConnection {
     _conn = null;
     try {
       await c?.close();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('PostgresConnection.disconnect: $e');
+    }
   }
 
   /// Drops the TCP session immediately (kills pending client I/O). Used when
@@ -168,7 +212,9 @@ class PostgresConnection {
     _conn = null;
     try {
       await c?.close(force: true);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('PostgresConnection.forceClose: $e');
+    }
   }
 
   /// Session-level default for transactions (browse vs SQL editor).
@@ -219,7 +265,8 @@ class PostgresConnection {
       );
       if (r.isEmpty) return null;
       return r.first[0] as bool;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('PostgresConnection.inOpenTransaction: $e');
       return null;
     }
   }
@@ -379,14 +426,18 @@ class PostgresConnection {
         "SELECT extract(epoch from (now() - pg_postmaster_start_time()))::bigint",
       );
       stats['uptime_seconds'] = uptime.first[0];
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('PostgresConnection.getServerStats uptime: $e');
+    }
 
     try {
       final dbSize = await _conn!.execute(
         "SELECT pg_database_size(current_database())",
       );
       stats['current_db_size'] = dbSize.first[0];
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('PostgresConnection.getServerStats database size: $e');
+    }
 
     return stats;
   }
@@ -407,6 +458,9 @@ class PostgresConnection {
       database: dbName,
       useSSL: useSSL,
       connectionString: newCs,
+      sslRootCert: sslRootCert,
+      sslCert: sslCert,
+      sslKey: sslKey,
     );
   }
 

@@ -1,4 +1,6 @@
 import 'dart:async';
+
+import 'package:querya_desktop/core/database/connection_pool_lock.dart';
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 
@@ -59,6 +61,7 @@ class SqliteConnectionPool {
   final int maxEntries;
 
   final Map<String, _PoolEntry> _pool = {};
+  final PoolEntryLock<SqliteConnection> _creationLock = PoolEntryLock();
 
   String keyFor(int? id, SqliteSessionMode mode) =>
       '${id ?? 0}::${mode.name}';
@@ -80,12 +83,22 @@ class SqliteConnectionPool {
       return SqliteLease._(this, k, entry.connection);
     }
 
-    _evictIfNeededBeforeNewSlot();
+    await _creationLock.createIfAbsent(k, () async {
+      _evictIfNeededBeforeNewSlot();
+      final conn = await createAndConnect(row, mode: mode);
+      _pool[k] = _PoolEntry(conn);
+      return conn;
+    });
 
-    final conn = await createAndConnect(row, mode: mode);
-    entry = _PoolEntry(conn)..refs = 1;
-    _pool[k] = entry;
-    return SqliteLease._(this, k, conn);
+    entry = _pool[k]!;
+    entry.touch();
+    entry.idleTimer?.cancel();
+    entry.idleTimer = null;
+    entry.refs++;
+    if (!entry.connection.isConnected) {
+      await entry.connection.connect();
+    }
+    return SqliteLease._(this, k, entry.connection);
   }
 
   void _evictIfNeededBeforeNewSlot() {

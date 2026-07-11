@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:mongo_dart/mongo_dart.dart';
+import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
 
 /// MongoDB connection configuration and state.
 class MongoConnection {
@@ -119,7 +121,7 @@ class MongoConnection {
     }
 
     try {
-      final uri = buildConnectionUri();
+      final uri = await _effectiveMongoUri();
       _db = await Db.create(uri);
       await _db!.open();
       _isConnected = true;
@@ -130,6 +132,34 @@ class MongoConnection {
     }
   }
 
+  Future<String> _effectiveMongoUri() async {
+    final base = buildConnectionUri();
+    final parsed = Uri.parse(base);
+    final paths = extractSslCertificatePaths(parsed);
+    final params = Map<String, String>.from(parsed.queryParameters);
+    params.remove(kSslRootCertParam);
+    params.remove(kSslCertParam);
+    params.remove(kSslKeyParam);
+
+    if (paths.rootCert != null && paths.rootCert!.trim().isNotEmpty) {
+      params[kMongoTlsCaFileParam] = paths.rootCert!.trim();
+    }
+    final clientPem = await resolveMongoTlsCertificateKeyFile(
+      clientCert: paths.clientCert,
+      clientKey: paths.clientKey,
+    );
+    if (clientPem != null) {
+      params[kMongoTlsCertificateKeyFileParam] = clientPem;
+    }
+    if (useSSL || paths.hasAny) {
+      params['ssl'] = 'true';
+    }
+
+    return parsed
+        .replace(queryParameters: params.isEmpty ? null : params)
+        .toString();
+  }
+
   /// Disconnects from MongoDB server.
   Future<void> disconnect() async {
     _isConnected = false;
@@ -137,8 +167,8 @@ class MongoConnection {
     _db = null;
     try {
       await db?.close();
-    } catch (_) {
-      // Connection may already be closed — ignore.
+    } catch (e) {
+      debugPrint('MongoConnection.disconnect: $e');
     }
   }
 

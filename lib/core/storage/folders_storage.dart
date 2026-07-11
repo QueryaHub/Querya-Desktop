@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'local_db.dart';
@@ -25,7 +26,8 @@ class FoldersStorage {
     try {
       await _migrateFromLegacyIfNeeded();
       _folders = await LocalDb.instance.getFolders();
-    } catch (_) {
+    } catch (e) {
+      debugPrint('FoldersStorage.load: $e');
       _folders = [];
     }
     _loaded = true;
@@ -56,7 +58,9 @@ class FoldersStorage {
         }
       }
       await file.delete();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('FoldersStorage._migrateFromLegacyIfNeeded: $e');
+    }
   }
 
   Future<void> save(List<String> folders) async {

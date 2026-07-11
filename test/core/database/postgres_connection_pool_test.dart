@@ -123,6 +123,61 @@ void main() {
     });
   });
 
+  group('PostgresConnectionPool concurrent acquire', () {
+    test('only one factory call for the same key when racing', () async {
+      int factoryCalls = 0;
+      Future<PostgresConnection> factory(
+        ConnectionRow row, {
+        required String database,
+        required PgSessionMode mode,
+      }) async {
+        factoryCalls++;
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        final c = FakePostgresConnection();
+        await c.connect();
+        return c;
+      }
+
+      final pool = PostgresConnectionPool(createAndConnect: factory);
+      final r = _row();
+      final f1 = pool.acquire(r, database: 'postgres');
+      final f2 = pool.acquire(r, database: 'postgres');
+      final l1 = await f1;
+      final l2 = await f2;
+
+      expect(identical(l1.connection, l2.connection), isTrue);
+      expect(factoryCalls, 1);
+      l1.release();
+      l2.release();
+    });
+
+    test('different keys are created concurrently', () async {
+      int factoryCalls = 0;
+      Future<PostgresConnection> factory(
+        ConnectionRow row, {
+        required String database,
+        required PgSessionMode mode,
+      }) async {
+        factoryCalls++;
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+        final c = FakePostgresConnection(id: row.id ?? 0);
+        await c.connect();
+        return c;
+      }
+
+      final pool = PostgresConnectionPool(createAndConnect: factory);
+      final f1 = pool.acquire(_row(id: 1), database: 'postgres');
+      final f2 = pool.acquire(_row(id: 2), database: 'postgres');
+      final l1 = await f1;
+      final l2 = await f2;
+
+      expect(identical(l1.connection, l2.connection), isFalse);
+      expect(factoryCalls, 2);
+      l1.release();
+      l2.release();
+    });
+  });
+
   group('PostgresConnectionPool refcount & reuse', () {
     test('second acquire reuses same connection without new factory', () async {
       FakePostgresConnection? sole;

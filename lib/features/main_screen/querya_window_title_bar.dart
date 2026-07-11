@@ -7,6 +7,9 @@ import 'package:querya_desktop/features/connections/driver_manager_dialog.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/extensions/presentation/pages/extension_manager_dialog.dart';
 import 'package:querya_desktop/features/help/about_dialog.dart';
+import 'package:querya_desktop/features/updater/update_available_badge.dart';
+import 'package:querya_desktop/features/updater/update_controller.dart';
+import 'package:querya_desktop/features/updater/update_dialog.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
@@ -230,6 +233,10 @@ class QueryaWindowTitleBar extends StatelessWidget {
                                 onPressed: (ctx) => showAboutDialog(ctx),
                                 child: const Text('About')),
                             MenuButton(
+                              onPressed: (ctx) => showUpdateDialog(ctx),
+                              child: const Text('Check for Updates…'),
+                            ),
+                            MenuButton(
                                 onPressed: (_) => openQueryaDocumentation(),
                                 child: const Text('Documentation')),
                           ],
@@ -244,6 +251,7 @@ class QueryaWindowTitleBar extends StatelessWidget {
             Row(
               mainAxisSize: material.MainAxisSize.min,
               children: [
+                UpdateAvailableBadge(controller: UpdateController.instance),
                 MinimizeWindowButton(colors: buttonColors),
                 MaximizeWindowButton(colors: buttonColors),
                 CloseWindowButton(colors: closeButtonColors),

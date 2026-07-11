@@ -155,5 +155,81 @@ void main() {
       expect(secrets.password, 'new-secret-password');
       expect(secrets.connectionString, 'postgres://root:new-secret-password@db.example.com:5433/mydb');
     });
+
+    test('removeConnection still deletes SQLite row when secure-store delete fails', () async {
+      const row = ConnectionRow(
+        type: 'redis',
+        name: 'R3',
+        host: '127.0.0.1',
+        port: 6379,
+        password: 'x',
+        createdAt: '2026-01-01T00:00:00Z',
+      );
+      final id = await LocalDb.instance.addConnection(row);
+      testMemorySecrets.failNextDelete = StateError('libsecret unavailable');
+
+      await LocalDb.instance.removeConnection(id);
+
+      final list = await LocalDb.instance.getConnections();
+      expect(list.where((c) => c.id == id), isEmpty);
+    });
+
+    test('addConnection rolls back SQLite row when secure-store write fails', () async {
+      testMemorySecrets.failNextWrite = StateError('keychain write failed');
+      const row = ConnectionRow(
+        type: 'redis',
+        name: 'R4',
+        host: '127.0.0.1',
+        port: 6379,
+        password: 'secret',
+        createdAt: '2026-01-01T00:00:00Z',
+      );
+
+      await expectLater(
+        LocalDb.instance.addConnection(row),
+        throwsA(isA<StateError>()),
+      );
+
+      final list = await LocalDb.instance.getConnections();
+      expect(list.where((c) => c.name == 'R4'), isEmpty);
+    });
+
+    test('updateConnection rolls back SQLite and secrets when secure-store write fails', () async {
+      const initialRow = ConnectionRow(
+        type: 'postgres',
+        name: 'PG_Before',
+        host: 'localhost',
+        port: 5432,
+        username: 'admin',
+        password: 'old-password',
+        createdAt: '2026-01-01T00:00:00Z',
+      );
+      final id = await LocalDb.instance.addConnection(initialRow);
+
+      testMemorySecrets.failNextWrite = StateError('keychain write failed');
+      final updatedRow = ConnectionRow(
+        id: id,
+        type: 'postgres',
+        name: 'PG_After',
+        host: 'db.example.com',
+        port: 5433,
+        username: 'root',
+        password: 'new-password',
+        createdAt: '2026-01-01T00:00:00Z',
+      );
+
+      await expectLater(
+        LocalDb.instance.updateConnection(updatedRow),
+        throwsA(isA<StateError>()),
+      );
+
+      final list = await LocalDb.instance.getConnections();
+      final loaded = list.singleWhere((c) => c.id == id);
+      expect(loaded.name, 'PG_Before');
+      expect(loaded.host, 'localhost');
+      expect(loaded.port, 5432);
+      expect(loaded.username, 'admin');
+      expect(loaded.password, 'old-password');
+    });
   });
 }

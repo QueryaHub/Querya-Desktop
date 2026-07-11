@@ -5,6 +5,7 @@ import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/features/settings/preferences_appearance_section.dart';
 import 'package:querya_desktop/features/settings/preferences_controls.dart';
+import 'package:querya_desktop/features/settings/preferences_extensions_section.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -30,6 +31,7 @@ class _PreferencesDialogContent extends material.StatefulWidget {
 class _PreferencesDialogContentState
     extends material.State<_PreferencesDialogContent> {
   bool _loading = true;
+  bool _checkUpdatesOnStartup = true;
   int? _pgTimeout;
   int? _mysqlTimeout;
   int _maxRows = kDefaultSqlResultMaxRows;
@@ -43,6 +45,7 @@ class _PreferencesDialogContentState
   }
 
   Future<void> _load() async {
+    final startup = await AppSettings.instance.getCheckForUpdatesOnStartup();
     final pg = await AppSettings.instance.getPostgresSqlStmtTimeoutSeconds();
     final my = await AppSettings.instance.getMysqlSqlStmtTimeoutSeconds();
     final rows = await AppSettings.instance.getSqlResultMaxRows();
@@ -50,6 +53,7 @@ class _PreferencesDialogContentState
     final font = await AppSettings.instance.getSqlEditorFontSize();
     if (!mounted) return;
     setState(() {
+      _checkUpdatesOnStartup = startup;
       _pgTimeout = pg;
       _mysqlTimeout = my;
       _maxRows = rows;
@@ -57,6 +61,11 @@ class _PreferencesDialogContentState
       _fontSize = font;
       _loading = false;
     });
+  }
+
+  Future<void> _setCheckUpdatesOnStartup(bool enabled) async {
+    setState(() => _checkUpdatesOnStartup = enabled);
+    await AppSettings.instance.setCheckForUpdatesOnStartup(enabled);
   }
 
   Future<void> _setPg(int? v) async {
@@ -138,7 +147,32 @@ class _PreferencesDialogContentState
                             crossAxisAlignment:
                                 material.CrossAxisAlignment.start,
                             children: [
+                              const Text('General')
+                                  .semiBold()
+                                  .small()
+                                  .foreground(),
+                              const material.SizedBox(height: 8),
+                              material.CheckboxListTile(
+                                contentPadding: material.EdgeInsets.zero,
+                                controlAffinity:
+                                    material.ListTileControlAffinity.leading,
+                                title: const Text(
+                                  'Automatically check for updates on startup',
+                                ).small(),
+                                subtitle: const Text(
+                                  'Queries GitHub Releases silently when Querya starts.',
+                                ).muted().xSmall(),
+                                value: _checkUpdatesOnStartup,
+                                onChanged: (v) {
+                                  if (v != null) {
+                                    unawaited(_setCheckUpdatesOnStartup(v));
+                                  }
+                                },
+                              ),
+                              const material.SizedBox(height: 24),
                               const PreferencesAppearanceSection(),
+                              const material.SizedBox(height: 24),
+                              const PreferencesExtensionsSection(),
                               const material.SizedBox(height: 24),
                               const Text('SQL — PostgreSQL')
                                   .semiBold()

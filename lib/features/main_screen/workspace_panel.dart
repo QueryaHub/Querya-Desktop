@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart' as material
     show
         Alignment,
+        Align,
         Axis,
+        Column,
         Container,
+        ConstrainedBox,
         EdgeInsets,
         BoxDecoration,
         GestureDetector,
@@ -13,18 +16,19 @@ import 'package:flutter/material.dart' as material
         Icons,
         MouseRegion,
         AnimatedContainer,
-        AnimatedScale,
         SystemMouseCursors,
         SizedBox,
         SingleChildScrollView,
         Row,
         MainAxisSize,
         Widget,
-        BoxConstraints;
+        BoxConstraints,
+        Tooltip;
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/motion/querya_cross_fade_stack.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
+import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -39,6 +43,8 @@ import 'package:querya_desktop/features/postgresql/postgres_workspace_home.dart'
 import 'package:querya_desktop/features/redis/redis_explorer_view.dart';
 import 'package:querya_desktop/features/redis/redis_view.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart' show SqliteObjectKind;
+import 'package:querya_desktop/features/extensions/extension_sql_workspace.dart';
+import 'package:querya_desktop/features/extensions/extension_table_view.dart';
 import 'package:querya_desktop/features/sqlite/sqlite_table_view.dart';
 import 'package:querya_desktop/features/sqlite/sqlite_workspace_home.dart';
 import 'query_editor_tab.dart';
@@ -60,6 +66,7 @@ class WorkspacePanel extends StatefulWidget {
     this.mysqlSqlTabRequestToken = 0,
     this.selectedSqliteObject,
     this.sqliteSqlTabRequestToken = 0,
+    this.selectedExtensionObject,
     this.isReadOnly = false,
     this.onRequestNewConnection,
   });
@@ -115,6 +122,12 @@ class WorkspacePanel extends StatefulWidget {
 
   /// Incremented by [MainScreen] to switch the SQLite home view to the SQL tab.
   final int sqliteSqlTabRequestToken;
+
+  /// When set, the user selected a table/view in an extension driver tree.
+  final ({
+    String database,
+    String name,
+  })? selectedExtensionObject;
 
   /// Empty-state hero: primary CTA to add a connection.
   final void Function()? onRequestNewConnection;
@@ -231,6 +244,24 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
                 isView: sq.kind == SqliteObjectKind.view,
               );
         break;
+      default:
+        if (ExtensionDriverCatalog.isExtensionDriverConnection(activeConn)) {
+          final obj = widget.selectedExtensionObject;
+          driverWorkspace = obj == null
+              ? ExtensionSqlWorkspace(
+                  key: ValueKey('ext_sql_${activeConn.id}'),
+                  connectionRow: activeConn,
+                )
+              : ExtensionTableView(
+                  key: ValueKey(
+                    'ext_table_${activeConn.id}_${obj.database}_${obj.name}',
+                  ),
+                  connectionRow: activeConn,
+                  database: obj.database,
+                  tableName: obj.name,
+                );
+        }
+        break;
     }
 
     if (driverWorkspace != null) {
@@ -261,7 +292,11 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
                 index: _editorTabIndex,
                 children: const [
                   QueryEditorTab(),
-                  _PlaceholderTab(message: 'Query history'),
+                  _ComingSoonTab(
+                    title: 'Query History',
+                    description:
+                        'Browse recently executed SQL queries and re-run them from one place. Coming in a future release.',
+                  ),
                 ],
               ),
             ),
@@ -282,8 +317,16 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
                 index: _outputTabIndex,
                 children: const [
                   ResultsTab(),
-                  _PlaceholderTab(message: 'Messages'),
-                  _PlaceholderTab(message: 'Notifications'),
+                  _ComingSoonTab(
+                    title: 'Messages',
+                    description:
+                        'Connection logs and query execution messages will appear here. Coming in a future release.',
+                  ),
+                  _ComingSoonTab(
+                    title: 'Notifications',
+                    description:
+                        'System alerts and background task notifications will appear here. Coming in a future release.',
+                  ),
                 ],
               ),
             ),
@@ -406,43 +449,64 @@ class _TabButtonState extends State<_TabButton> {
   }
 }
 
-class _RunButton extends StatefulWidget {
+class _RunButton extends StatelessWidget {
   const _RunButton();
 
-  @override
-  State<_RunButton> createState() => _RunButtonState();
-}
-
-class _RunButtonState extends State<_RunButton> {
-  bool _hovered = false;
+  static const _noConnectionTooltip =
+      'Select an active database connection to execute queries';
 
   @override
   Widget build(BuildContext context) {
-    return material.MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: material.SystemMouseCursors.click,
-      child: material.AnimatedScale(
-        scale: _hovered ? 1.03 : 1.0,
-        duration: context.motionDuration(QueryaMotion.fast),
-        curve: context.motionCurve(QueryaMotion.enter),
-        child: OutlineButton(
-          onPressed: () {},
-          leading: const material.Icon(material.Icons.play_arrow, size: 18),
-          child: const Text('Execute/Refresh (F5)'),
+    return const material.Tooltip(
+      message: _noConnectionTooltip,
+      waitDuration: Duration(milliseconds: 450),
+      child: OutlineButton(
+        key: Key('workspace_run_button'),
+        onPressed: null,
+        leading: material.Icon(material.Icons.play_arrow, size: 18),
+        child: Text('Execute/Refresh (F5)'),
+      ),
+    );
+  }
+}
+
+class _ComingSoonTab extends StatelessWidget {
+  const _ComingSoonTab({
+    required this.title,
+    required this.description,
+  });
+
+  final String title;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return material.Center(
+      child: material.Padding(
+        padding: const material.EdgeInsets.all(32),
+        child: material.ConstrainedBox(
+          constraints: const material.BoxConstraints(maxWidth: 420),
+          child: material.Column(
+            mainAxisSize: material.MainAxisSize.min,
+            children: [
+              material.Icon(
+                material.Icons.hourglass_empty_rounded,
+                size: 36,
+                color: theme.colorScheme.mutedForeground,
+              ),
+              const material.SizedBox(height: 16),
+              Text(title).semiBold(),
+              const material.SizedBox(height: 8),
+              material.Align(
+                alignment: material.Alignment.center,
+                child: Text(description).muted().small(),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _PlaceholderTab extends StatelessWidget {
-  const _PlaceholderTab({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return material.Center(child: Text(message).muted());
-  }
-}

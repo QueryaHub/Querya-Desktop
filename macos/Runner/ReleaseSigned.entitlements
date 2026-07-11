@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+		This entitlements file is used only when the CI signs the app with a
+		Developer ID certificate. It intentionally disables the App Sandbox so
+		the SQL/NoSQL client can connect to arbitrary hosts, read user-selected
+		database files, and manage extensions in ~/.querya without
+		sandbox-related restrictions.
+	-->
+
+	<!-- Dart / Flutter runtime exceptions required for the hardened runtime. -->
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+	<true/>
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+</dict>
+</plist>

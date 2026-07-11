@@ -42,7 +42,8 @@ void main() {
       expect(find.text('v1.0.0'), findsOneWidget);
       expect(find.text('Full support for ClickHouse databases.'), findsOneWidget);
       expect(find.text('clickhouse'), findsOneWidget);
-      expect(find.text('Install'), findsOneWidget);
+      expect(find.text('Preview'), findsNWidgets(2));
+      expect(find.text('Install'), findsNothing);
     });
 
     testWidgets('renders progress bar when isInstalling is true', (tester) async {
@@ -112,23 +113,15 @@ void main() {
       expect(find.text('Extensions'), findsOneWidget);
       expect(find.text('Installed (0)'), findsOneWidget);
       expect(find.text('Marketplace'), findsOneWidget);
+      expect(find.text('Install from file…'), findsOneWidget);
 
       // Switch to Marketplace tab
       await tester.tap(find.text('Marketplace'));
       await tester.pumpAndSettle();
 
       expect(find.text('ClickHouse Driver'), findsOneWidget);
-      expect(find.text('Redis Driver'), findsOneWidget);
-
-      // Search filtering
-      final finder = find.byType(TextField);
-      expect(finder, findsOneWidget);
-      
-      await tester.enterText(finder, 'Nord');
-      await tester.pumpAndSettle();
-
-      expect(find.text('Nord Theme'), findsOneWidget);
-      expect(find.text('ClickHouse Driver'), findsNothing);
+      expect(find.textContaining('preview listings only'), findsOneWidget);
+      expect(find.text('Preview'), findsWidgets);
     });
   });
 }

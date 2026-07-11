@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/theme/querya_material_theme.dart';
@@ -215,7 +218,10 @@ class ThemeController extends ChangeNotifier {
   }
 
   /// Watches extensions directory and debounces [loadAvailableThemes].
-  Future<void> startThemeFolderWatcher() async {
+  Future<void> startThemeFolderWatcher({bool forceWatch = false}) async {
+    if (!forceWatch && Platform.environment.containsKey('FLUTTER_TEST')) {
+      return;
+    }
     _themeFolderWatcher ??= ThemeFolderWatcher(
       themesDirectory: ExtensionPaths.extensionsDirectory,
       onThemesChanged: loadAvailableThemes,
@@ -226,6 +232,12 @@ class ThemeController extends ChangeNotifier {
   /// Stops the themes folder watcher (used in tests and app teardown).
   Future<void> stopThemeFolderWatcher() async {
     await _themeFolderWatcher?.stop();
+  }
+
+  @override
+  void dispose() {
+    unawaited(stopThemeFolderWatcher());
+    super.dispose();
   }
 
   void _invalidateThemeCache() {

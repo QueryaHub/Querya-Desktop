@@ -4,6 +4,7 @@ version: 0.4.10+2
 
 
 
+
 environment:
   sdk: ^3.5.0
 
@@ -30,6 +31,7 @@ dependencies:
   archive: ^4.0.9
   url_launcher: ^6.3.1
   package_info_plus: ^8.3.0
+  flutter_svg: ^2.3.0
 
 dev_dependencies:
   flutter_test:
@@ -39,6 +41,9 @@ dev_dependencies:
   path_provider_platform_interface: ^2.1.2
 
 dependency_overrides:
+  # Patched mysql_client: optional SecurityContext for client TLS certificates.
+  mysql_client:
+    path: third_party/mysql_client
   # Patched ToastLayer (fixes InheritedNotifier crash on resize / hot reload).
   shadcn_flutter:
     path: third_party/shadcn_flutter

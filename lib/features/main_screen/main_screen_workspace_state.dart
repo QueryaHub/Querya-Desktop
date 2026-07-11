@@ -19,6 +19,7 @@ class MainScreenWorkspaceState {
     this.mysqlSqlTabRequestToken = 0,
     this.selectedSqliteObject,
     this.sqliteSqlTabRequestToken = 0,
+    this.selectedExtensionObject,
     this.isReadOnly = false,
   });
 
@@ -54,6 +55,12 @@ class MainScreenWorkspaceState {
     SqliteObjectKind kind
   })? selectedSqliteObject;
   final int sqliteSqlTabRequestToken;
+
+  /// Table/view selected in the sidebar tree of an extension driver connection.
+  final ({
+    String database,
+    String name,
+  })? selectedExtensionObject;
   final bool isReadOnly;
 
   static const empty = MainScreenWorkspaceState();
@@ -71,6 +78,7 @@ class MainScreenWorkspaceState {
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
       selectedSqliteObject: selectedSqliteObject,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
+      selectedExtensionObject: selectedExtensionObject,
       isReadOnly: !isReadOnly,
     );
   }
@@ -88,6 +96,7 @@ class MainScreenWorkspaceState {
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
       selectedSqliteObject: null,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
+      selectedExtensionObject: null,
       isReadOnly: false,
     );
   }
@@ -166,6 +175,31 @@ class MainScreenWorkspaceState {
         kind: kind,
       ),
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
+      isReadOnly: isReadOnly,
+    );
+  }
+
+  MainScreenWorkspaceState selectExtensionObject(
+    ConnectionRow connection,
+    String database,
+    String name,
+  ) {
+    return MainScreenWorkspaceState(
+      activeConnection: connection,
+      activeRedisDb: null,
+      activeMongoDB: null,
+      selectedPostgresObject: null,
+      postgresSqlTabRequestToken: postgresSqlTabRequestToken,
+      postgresSqlEditorContext: null,
+      postgresSqlEditorContextToken: 0,
+      selectedMysqlObject: null,
+      mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
+      selectedSqliteObject: null,
+      sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
+      selectedExtensionObject: (
+        database: database,
+        name: name,
+      ),
       isReadOnly: isReadOnly,
     );
   }
@@ -313,6 +347,8 @@ class MainScreenWorkspaceState {
         mysqlSqlTabRequestToken == other.mysqlSqlTabRequestToken &&
         _sqliteEquals(selectedSqliteObject, other.selectedSqliteObject) &&
         sqliteSqlTabRequestToken == other.sqliteSqlTabRequestToken &&
+        _extensionEquals(
+            selectedExtensionObject, other.selectedExtensionObject) &&
         isReadOnly == other.isReadOnly;
   }
 
@@ -354,8 +390,23 @@ class MainScreenWorkspaceState {
                 selectedSqliteObject!.kind,
               ),
         sqliteSqlTabRequestToken,
+        selectedExtensionObject == null
+            ? 0
+            : Object.hash(
+                selectedExtensionObject!.database,
+                selectedExtensionObject!.name,
+              ),
         isReadOnly,
       );
+}
+
+bool _extensionEquals(
+  ({String database, String name})? a,
+  ({String database, String name})? b,
+) {
+  if (identical(a, b)) return true;
+  if (a == null || b == null) return false;
+  return a.database == b.database && a.name == b.name;
 }
 
 bool _pgEquals(
