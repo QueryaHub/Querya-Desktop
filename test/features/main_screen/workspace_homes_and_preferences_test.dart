@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:querya_desktop/core/extensions/extension_paths.dart';
+import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/features/connections/driver_manager_dialog.dart';
@@ -87,6 +89,22 @@ void main() {
   });
 
   group('Driver Manager dialog', () {
+    late Directory extDir;
+
+    setUp(() async {
+      extDir = await Directory.systemTemp.createTemp('querya_drv_mgr_');
+      ExtensionPaths.mockExtensionsDirectory = extDir;
+      await LocalExtensionRegistry.instance.reload();
+    });
+
+    tearDown(() async {
+      ExtensionPaths.mockExtensionsDirectory = null;
+      await LocalExtensionRegistry.instance.reload();
+      if (await extDir.exists()) {
+        await extDir.delete(recursive: true);
+      }
+    });
+
     testWidgets('showDriverManagerDialog shows built-in drivers copy',
         (tester) async {
       await tester.binding.setSurfaceSize(const material.Size(900, 1200));
@@ -111,11 +129,10 @@ void main() {
       );
 
       await tester.tap(find.text('open-drivers'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
 
       expect(find.text('Driver Manager'), findsOneWidget);
-      expect(find.textContaining('built-in Dart'), findsWidgets);
+      expect(find.textContaining('Built-in Dart'), findsWidgets);
       expect(find.text('SQLite'), findsOneWidget);
       expect(find.textContaining('sqflite_common_ffi'), findsOneWidget);
     });
