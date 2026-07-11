@@ -43,6 +43,7 @@ class SandboxWatchdog {
   Timer? _timer;
   var _running = false;
   var _pingInFlight = false;
+  var _ownsClient = false;
   SandboxWatchdogStopReason? _lastReason;
   StreamSubscription<int>? _exitSub;
 
@@ -55,6 +56,7 @@ class SandboxWatchdog {
     stop(reason: SandboxWatchdogStopReason.stopped, notify: false);
     _handle = handle;
     _client = client;
+    _ownsClient = client == null;
     _running = true;
     _lastReason = null;
 
@@ -91,8 +93,9 @@ class SandboxWatchdog {
     unawaited(_exitSub?.cancel());
     _exitSub = null;
     final client = _client;
+    final ownsClient = _ownsClient;
     _client = null;
-    if (client != null) {
+    if (client != null && ownsClient) {
       unawaited(client.close());
     }
     _handle = null;
@@ -132,11 +135,14 @@ class SandboxWatchdog {
     if (handle == null) {
       throw StateError('SandboxWatchdog has no handle');
     }
-    _client ??= JsonRpcStdioClient(
-      stdout: handle.process.stdout,
-      stdin: handle.process.stdin,
-      requestTimeout: pongTimeout,
-    );
+    if (_client == null) {
+      _client = JsonRpcStdioClient(
+        stdout: handle.process.stdout,
+        stdin: handle.process.stdin,
+        requestTimeout: pongTimeout,
+      );
+      _ownsClient = true;
+    }
     return _client!.sendRequest('system.ping');
   }
 

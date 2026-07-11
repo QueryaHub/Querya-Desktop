@@ -245,4 +245,62 @@ void main() {
     );
     await sub.cancel();
   });
+
+  test('shutdown with enableWatchdog: true sends system.shutdown RPC before killing process',
+      () async {
+    final process = _FakeProcess();
+    var shutdownReceived = false;
+    final sub = process.stdinLines.listen((line) {
+      final req = jsonDecode(line) as Map<String, dynamic>;
+      if (req['method'] == 'system.handshake') {
+        process.reply({
+          'jsonrpc': '2.0',
+          'id': req['id'] as int,
+          'result': {'ok': true},
+        });
+      } else if (req['method'] == 'system.ping') {
+        process.reply({
+          'jsonrpc': '2.0',
+          'id': req['id'] as int,
+          'result': 'pong',
+        });
+      } else if (req['method'] == 'system.shutdown') {
+        shutdownReceived = true;
+        process.reply({
+          'jsonrpc': '2.0',
+          'id': req['id'] as int,
+          'result': {'ok': true},
+        });
+        process.completeExit(0);
+      }
+    });
+
+    final runner = SandboxProcessRunner(
+      platformOverride: 'windows',
+      scratchBaseDirectory: tempBase,
+      processStarter: (
+        exe,
+        args, {
+        String? workingDirectory,
+        Map<String, String>? environment,
+        bool includeParentEnvironment = true,
+        bool runInShell = false,
+        ProcessStartMode mode = ProcessStartMode.normal,
+      }) async =>
+          process,
+    );
+
+    final bridge = PluginRpcBridge(
+      processRunner: runner,
+      enableWatchdog: true,
+      enableStderrPipe: false,
+    );
+
+    await bridge.start(manifest: testManifest, pluginExecutable: '/opt/driver');
+    await bridge.shutdown();
+
+    expect(shutdownReceived, isTrue);
+    expect(bridge.isStarted, isFalse);
+    await sub.cancel();
+  });
 }
