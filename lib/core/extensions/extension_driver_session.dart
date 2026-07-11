@@ -296,19 +296,6 @@ class ExtensionDriverSession {
     }
   }
 
-  Future<ExtensionManifest> _resolveManifest(String extensionId) async {
-    await LocalExtensionRegistry.instance.load();
-    final match = LocalExtensionRegistry.instance.manifests
-        .where((m) => m.id == extensionId)
-        .toList();
-    if (match.isEmpty) {
-      throw StateError(
-        'Extension "$extensionId" is not installed. Reinstall the package.',
-      );
-    }
-    return match.first;
-  }
-
   Map<String, Object?> _decodeOptions(String? raw) {
     if (raw == null || raw.trim().isEmpty) return {};
     try {
