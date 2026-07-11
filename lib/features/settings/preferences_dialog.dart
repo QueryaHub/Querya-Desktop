@@ -5,6 +5,7 @@ import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/features/settings/preferences_appearance_section.dart';
 import 'package:querya_desktop/features/settings/preferences_controls.dart';
+import 'package:querya_desktop/features/settings/preferences_extensions_section.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -170,6 +171,8 @@ class _PreferencesDialogContentState
                               ),
                               const material.SizedBox(height: 24),
                               const PreferencesAppearanceSection(),
+                              const material.SizedBox(height: 24),
+                              const PreferencesExtensionsSection(),
                               const material.SizedBox(height: 24),
                               const Text('SQL — PostgreSQL')
                                   .semiBold()
