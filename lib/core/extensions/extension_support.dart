@@ -18,9 +18,9 @@ class ExtensionSupport {
   static const databaseDriverPreviewNotice =
       'Database drivers in the Marketplace are preview listings only until they '
       'declare a policy-compliant OS process sandbox. '
-      'Querya connects using built-in Dart drivers (PostgreSQL, MySQL, SQLite, '
-      'Redis, MongoDB). Sandboxed external drivers install when '
-      '`sandbox.engine` is `process` and passes SandboxPolicy.';
+      'Installed sandboxed drivers (`sandbox.engine: process`) appear in New '
+      'Connection after Registration. Built-in Dart drivers (PostgreSQL, MySQL, '
+      'SQLite, Redis, MongoDB) remain available without an extension.';
 
   static const databaseDriverMissingEntryMessage =
       'Driver package is missing its main entry file. Installation aborted.';

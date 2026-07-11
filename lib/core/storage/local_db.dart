@@ -6,7 +6,7 @@ import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const _dbName = 'querya.db';
-const _dbVersion = 6;
+const _dbVersion = 7;
 
 /// Fallback when [recordSqlQueryHistory] is called without `maxEntries`.
 /// Keep in sync with [kDefaultSqlHistoryMaxEntries] in `app_settings.dart`.
@@ -84,6 +84,8 @@ class LocalDb {
         auth_source TEXT,
         use_ssl INTEGER NOT NULL DEFAULT 0,
         connection_string TEXT,
+        extension_id TEXT,
+        driver_options TEXT,
         folder_id INTEGER REFERENCES folders(id) ON DELETE CASCADE,
         sort_order INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL
@@ -188,6 +190,10 @@ class LocalDb {
         CREATE INDEX idx_sql_query_history_lookup
         ON sql_query_history (connection_id, recorded_at DESC)
       ''');
+    }
+    if (oldVersion < 7) {
+      await db.execute('ALTER TABLE connections ADD COLUMN extension_id TEXT');
+      await db.execute('ALTER TABLE connections ADD COLUMN driver_options TEXT');
     }
   }
 
@@ -500,6 +506,8 @@ class ConnectionRow {
     this.authSource,
     this.useSSL = false,
     this.connectionString,
+    this.extensionId,
+    this.driverOptions,
     this.folderId,
     this.sortOrder = 0,
     required this.createdAt,
@@ -516,9 +524,20 @@ class ConnectionRow {
   final String? authSource;
   final bool useSSL;
   final String? connectionString;
+
+  /// Package id of an installed extension driver (null for built-ins).
+  final String? extensionId;
+
+  /// Non-secret driver-specific form values as JSON text.
+  final String? driverOptions;
+
   final int? folderId;
   final int sortOrder;
   final String createdAt;
+
+  /// True when this row is backed by an installed extension driver.
+  bool get isExtensionDriver =>
+      extensionId != null && extensionId!.trim().isNotEmpty;
 
   Map<String, Object?> toMap() => {
         'type': type,
@@ -531,6 +550,8 @@ class ConnectionRow {
         'auth_source': authSource,
         'use_ssl': useSSL ? 1 : 0,
         'connection_string': connectionString,
+        'extension_id': extensionId,
+        'driver_options': driverOptions,
         'folder_id': folderId,
         'sort_order': sortOrder,
         'created_at': createdAt,
@@ -548,6 +569,8 @@ class ConnectionRow {
         'auth_source': authSource,
         'use_ssl': useSSL ? 1 : 0,
         'connection_string': null,
+        'extension_id': extensionId,
+        'driver_options': driverOptions,
         'folder_id': folderId,
         'sort_order': sortOrder,
         'created_at': createdAt,
@@ -565,6 +588,8 @@ class ConnectionRow {
         authSource: m['auth_source'] as String?,
         useSSL: _sqliteInt(m['use_ssl']) == 1,
         connectionString: m['connection_string'] as String?,
+        extensionId: m['extension_id'] as String?,
+        driverOptions: m['driver_options'] as String?,
         folderId: _sqliteInt(m['folder_id']),
         sortOrder: _sqliteInt(m['sort_order']) ?? 0,
         createdAt: m['created_at'] as String,

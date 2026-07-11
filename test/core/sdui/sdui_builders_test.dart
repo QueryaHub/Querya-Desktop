@@ -45,6 +45,41 @@ void main() {
       expect(schema.fields[4].options, hasLength(2));
       expect(schema.fields[5].type, SduiFieldType.filePicker);
     });
+
+    test('accepts extension-style key and boolean aliases', () {
+      final schema = SduiFormSchema.fromJson(const {
+        'type': 'form',
+        'id': 'clickhouse_connection_form',
+        'fields': [
+          {
+            'key': 'host',
+            'label': 'Host',
+            'type': 'text',
+            'required': true,
+            'defaultValue': 'localhost',
+          },
+          {
+            'key': 'port',
+            'label': 'Port',
+            'type': 'number',
+            'defaultValue': 8123,
+          },
+          {
+            'key': 'safe_mode',
+            'label': 'Safe Mode',
+            'type': 'boolean',
+            'defaultValue': true,
+          },
+        ],
+      });
+
+      expect(schema.fields, hasLength(3));
+      expect(schema.fields[0].id, 'host');
+      expect(schema.fields[0].defaultValue, 'localhost');
+      expect(schema.fields[1].id, 'port');
+      expect(schema.fields[2].id, 'safe_mode');
+      expect(schema.fields[2].type, SduiFieldType.checkbox);
+    });
   });
 
   group('SduiFormBuilder', () {

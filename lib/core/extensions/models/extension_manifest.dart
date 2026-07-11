@@ -1,4 +1,5 @@
 import '../../theme/theme_definition.dart';
+import 'extension_contributions.dart';
 import 'extension_type.dart';
 import 'sandbox_capabilities.dart';
 
@@ -27,6 +28,12 @@ class ExtensionManifest {
   /// manifest has no `sandbox` block (e.g. plain themes).
   final SandboxCapabilities? sandbox;
 
+  /// Capability flags from `capabilities` in manifest.json.
+  final ExtensionCapabilities? capabilities;
+
+  /// Extension points from `contributions` in manifest.json.
+  final ExtensionContributions? contributions;
+
   const ExtensionManifest({
     required this.id,
     required this.name,
@@ -46,7 +53,13 @@ class ExtensionManifest {
     this.preview,
     this.tags = const [],
     this.sandbox,
+    this.capabilities,
+    this.contributions,
   });
+
+  /// Drivers contributed by this package (empty when none).
+  Iterable<DriverContribution> get contributedDrivers =>
+      contributions?.drivers ?? const [];
 
   /// Maps a registry [ThemeDefinition] into marketplace field names.
   factory ExtensionManifest.fromThemeDefinition(
@@ -76,12 +89,15 @@ class ExtensionManifest {
     );
   }
 
-  factory ExtensionManifest.fromJson(Map<String, dynamic> json, {String? installPath}) {
+  factory ExtensionManifest.fromJson(Map<String, dynamic> json,
+      {String? installPath}) {
     return ExtensionManifest(
       id: json['id'] as String,
       name: json['name'] as String,
       version: json['version'] as String? ?? '0.0.0',
-      publisher: json['publisher'] as String? ?? json['author'] as String? ?? 'Unknown',
+      publisher: json['publisher'] as String? ??
+          json['author'] as String? ??
+          'Unknown',
       type: ExtensionType.fromString(json['type'] as String? ?? ''),
       engines: Map<String, String>.from(json['engines'] as Map? ?? {}),
       main: json['main'] as String?,
@@ -89,16 +105,43 @@ class ExtensionManifest {
       description: json['description'] as String?,
       installPath: installPath,
       downloadUrl: json['downloadUrl'] as String?,
-      sha256Checksum: json['sha256Checksum'] as String? ?? json['sha256'] as String?,
+      sha256Checksum:
+          json['sha256Checksum'] as String? ?? json['sha256'] as String?,
       author: json['author'] as String?,
       homepage: json['homepage'] as String?,
       license: json['license'] as String?,
       preview: json['preview'] as String?,
       tags: List<String>.from(json['tags'] as List? ?? []),
       sandbox: json['sandbox'] is Map<String, dynamic>
-          ? SandboxCapabilities.fromJson(json['sandbox'] as Map<String, dynamic>)
-          : null,
+          ? SandboxCapabilities.fromJson(
+              json['sandbox'] as Map<String, dynamic>)
+          : (json['sandbox'] is Map
+              ? SandboxCapabilities.fromJson(
+                  Map<String, dynamic>.from(json['sandbox'] as Map))
+              : null),
+      capabilities: _parseCapabilities(json['capabilities']),
+      contributions: _parseContributions(json['contributions']),
     );
+  }
+
+  static ExtensionCapabilities? _parseCapabilities(Object? raw) {
+    if (raw is Map<String, dynamic>) {
+      return ExtensionCapabilities.fromJson(raw);
+    }
+    if (raw is Map) {
+      return ExtensionCapabilities.fromJson(Map<String, dynamic>.from(raw));
+    }
+    return null;
+  }
+
+  static ExtensionContributions? _parseContributions(Object? raw) {
+    if (raw is Map<String, dynamic>) {
+      return ExtensionContributions.fromJson(raw);
+    }
+    if (raw is Map) {
+      return ExtensionContributions.fromJson(Map<String, dynamic>.from(raw));
+    }
+    return null;
   }
 
   Map<String, dynamic> toJson() {
@@ -120,6 +163,10 @@ class ExtensionManifest {
       if (preview != null) 'preview': preview,
       if (tags.isNotEmpty) 'tags': tags,
       if (sandbox != null) 'sandbox': sandbox!.toJson(),
+      if (capabilities != null && !capabilities!.isEmpty)
+        'capabilities': capabilities!.toJson(),
+      if (contributions != null && !contributions!.isEmpty)
+        'contributions': contributions!.toJson(),
     };
   }
 }

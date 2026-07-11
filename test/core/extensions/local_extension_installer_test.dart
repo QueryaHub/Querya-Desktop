@@ -186,5 +186,61 @@ void main() {
       );
       expect(installed.id, 'test.sha-ok');
     });
+
+    test('preserves contributions and capabilities in installed manifest',
+        () async {
+      final archive = Archive()
+        ..addFile(_jsonFile('manifest.json', {
+          'id': 'test.clickhouse',
+          'name': 'CH',
+          'version': '1.0.0',
+          'publisher': 'Test',
+          'type': 'database_driver',
+          'engines': {'querya_desktop': '*'},
+          'main': 'bin/driver',
+          'capabilities': {
+            'databaseDriver': true,
+            'sduiForms': true,
+          },
+          'sandbox': {
+            'engine': 'process',
+            'permissions': {
+              'network': {'mode': 'connection_host_only', 'allow_ssl': true},
+              'filesystem': {'scratch_mb': 100, 'access': 'scratch_only'},
+              'resources': {'memory_mb': 256, 'max_open_files': 64},
+            },
+          },
+          'contributions': {
+            'drivers': [
+              {
+                'driverId': 'clickhouse',
+                'displayName': 'ClickHouse',
+                'defaultPort': 8123,
+                'connectionFormSchema': 'assets/connection_form.json',
+              }
+            ]
+          },
+        }))
+        ..addFile(ArchiveFile('bin/driver', 4, utf8.encode('stub')));
+
+      final zip = await _writeZip(tempDir, archive, 'ch.zip');
+      final installed =
+          await LocalExtensionInstaller().installFromArchive(zip);
+
+      expect(installed.contributedDrivers, hasLength(1));
+      expect(installed.contributedDrivers.first.driverId, 'clickhouse');
+      expect(installed.capabilities?.databaseDriver, isTrue);
+
+      final onDisk = await File(
+        p.join(tempDir.path, 'test.clickhouse', 'manifest.json'),
+      ).readAsString();
+      final decoded = jsonDecode(onDisk) as Map<String, dynamic>;
+      expect(decoded['contributions'], isA<Map>());
+      expect(decoded['capabilities'], isA<Map>());
+      expect(
+        (decoded['contributions'] as Map)['drivers'],
+        isA<List>(),
+      );
+    });
   });
 }

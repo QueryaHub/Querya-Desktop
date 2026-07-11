@@ -11,6 +11,7 @@ enum SduiFieldType {
   final String value;
 
   static SduiFieldType fromString(String? value) {
+    if (value == 'boolean') return SduiFieldType.checkbox;
     return SduiFieldType.values.firstWhere(
       (t) => t.value == value,
       orElse: () => SduiFieldType.text,
@@ -66,10 +67,11 @@ class SduiFormField {
       }
     }
 
+    final fieldId = '${json['id'] ?? json['key'] ?? json['name'] ?? ''}';
     return SduiFormField(
-      id: '${json['id'] ?? json['name'] ?? ''}',
+      id: fieldId,
       type: SduiFieldType.fromString(json['type'] as String?),
-      label: '${json['label'] ?? json['id'] ?? ''}',
+      label: '${json['label'] ?? fieldId}',
       required: json['required'] == true,
       placeholder: json['placeholder'] as String?,
       defaultValue: json['default'] ?? json['defaultValue'],
