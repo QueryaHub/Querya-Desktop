@@ -81,6 +81,27 @@ MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7
       const line = 'INFO connected to host=db.example port=5432';
       expect(SandboxSanitizer.sanitize(line), line);
     });
+
+    test('redacts OPENSSH and RSA multiline private keys and various URI protocols', () {
+      const openssh = '''
+-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+QyNTUxOQAAACBA1m7X8J9H6P8Q9J8H6P8Q9J8H6P8Q9J8H6P8Q9J8H6Q==
+-----END OPENSSH PRIVATE KEY-----
+''';
+      final input = [
+        'mysql://root:secret_pass123@localhost:3306/prod_db',
+        'mongodb+srv://admin:cluster_secret@cluster0.mongodb.net/app',
+        openssh,
+      ].join('\n');
+
+      final out = SandboxSanitizer.sanitize(input);
+      expect(out, isNot(contains('secret_pass123')));
+      expect(out, isNot(contains('cluster_secret')));
+      expect(out, isNot(contains('BEGIN OPENSSH PRIVATE KEY')));
+      expect(out, contains('mysql://root:${SandboxSanitizer.redactionToken}@'));
+      expect(out, contains('mongodb+srv://admin:${SandboxSanitizer.redactionToken}@'));
+    });
   });
 
   group('SandboxRotatingLog', () {
@@ -208,6 +229,44 @@ MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7
       final auditBody =
           await (await SandboxLogPaths.securityAuditLogFile()).readAsString();
       expect(auditBody, contains('secret_leak_blocked'));
+
+      await handle.dispose();
+    });
+
+    test('handles malformed UTF-8 stream data cleanly without crashing', () async {
+      final process = _FakeProcess();
+      final scratch = await SandboxScratchDirectory.create(
+        pluginId: 'pipe.malformed',
+        baseDirectory: temp,
+        token: '2',
+      );
+      final handle = SandboxProcessHandle(
+        pluginId: 'pipe.malformed',
+        process: process,
+        scratch: scratch,
+        launchCommand: const SandboxLaunchCommand(
+          executable: '/bin/true',
+          arguments: [],
+          platform: 'linux',
+          usesOsSandbox: false,
+        ),
+      );
+
+      final lines = <String>[];
+      final pipe = await SandboxStderrPipe.attach(
+        handle,
+        onSanitizedLine: lines.add,
+      );
+
+      // Emit malformed/invalid UTF-8 bytes mixed with valid text
+      process._stderrController.add([0xFF, 0xFE, 0x80, 0x0A]);
+      process.emitStderr('valid line\n');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await pipe.close();
+
+      expect(lines, hasLength(2));
+      expect(lines[0], contains(''));
+      expect(lines[1], 'valid line');
 
       await handle.dispose();
     });

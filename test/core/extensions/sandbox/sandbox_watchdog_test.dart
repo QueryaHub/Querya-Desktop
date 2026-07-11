@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/extensions/rpc/json_rpc_stdio_client.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_auto_recovery.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_launch_command.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_process_runner.dart';
@@ -13,6 +14,7 @@ class _FakeProcess implements Process {
       : _stdoutController = StreamController<List<int>>.broadcast(),
         _stdinController = StreamController<List<int>>() {
     stdin = IOSink(_stdinController.sink);
+    _stdinController.stream.listen((_) {});
   }
 
   final StreamController<List<int>> _stdoutController;
@@ -222,6 +224,34 @@ void main() {
       expect(process.killed, isFalse);
       expect(watchdog.lastStopReason, SandboxWatchdogStopReason.stopped);
 
+      await handle.dispose();
+    });
+
+    test('stop does not close externally passed RPC client (_ownsClient = false)', () async {
+      final process = _FakeProcess();
+      final handle = await _handle(process, tempBase);
+      final client = JsonRpcStdioClient(
+        stdout: process.stdout,
+        stdin: process.stdin,
+        requestTimeout: const Duration(milliseconds: 10),
+      );
+
+      final watchdog = SandboxWatchdog(
+        pingInterval: const Duration(hours: 1),
+        ping: () async => 'pong',
+      );
+
+      watchdog.start(handle, client: client);
+      watchdog.stop();
+
+      // Because client was passed from outside (e.g. PluginRpcBridge), watchdog does not own it.
+      // We verify it remains open: sendRequest throws TimeoutException (after 10ms) instead of StateError('closed').
+      await expectLater(
+        client.sendRequest('test'),
+        throwsA(isA<TimeoutException>()),
+      );
+
+      await client.close();
       await handle.dispose();
     });
   });
