@@ -113,6 +113,7 @@ void main() {
       expect(find.text('Extensions'), findsOneWidget);
       expect(find.text('Installed (0)'), findsOneWidget);
       expect(find.text('Marketplace'), findsOneWidget);
+      expect(find.text('Install from file…'), findsOneWidget);
 
       // Switch to Marketplace tab
       await tester.tap(find.text('Marketplace'));
