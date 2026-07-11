@@ -234,6 +234,14 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
                 isView: sq.kind == SqliteObjectKind.view,
               );
         break;
+      default:
+        if (activeConn.isExtensionDriver) {
+          driverWorkspace = _ExtensionDriverWorkspacePlaceholder(
+            key: ValueKey('ext_home_${activeConn.id}'),
+            connection: activeConn,
+          );
+        }
+        break;
     }
 
     if (driverWorkspace != null) {
@@ -474,6 +482,48 @@ class _ComingSoonTab extends StatelessWidget {
                 alignment: material.Alignment.center,
                 child: Text(description).muted().small(),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Placeholder until extension drivers get a full SQL workspace (follow-up).
+class _ExtensionDriverWorkspacePlaceholder extends StatelessWidget {
+  const _ExtensionDriverWorkspacePlaceholder({
+    super.key,
+    required this.connection,
+  });
+
+  final ConnectionRow connection;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return material.Center(
+      child: material.Padding(
+        padding: const material.EdgeInsets.all(32),
+        child: material.ConstrainedBox(
+          constraints: const material.BoxConstraints(maxWidth: 480),
+          child: material.Column(
+            mainAxisSize: material.MainAxisSize.min,
+            children: [
+              material.Icon(
+                material.Icons.extension_rounded,
+                size: 40,
+                color: theme.colorScheme.mutedForeground,
+              ),
+              const material.SizedBox(height: 16),
+              Text(connection.name).semiBold().large(),
+              const material.SizedBox(height: 8),
+              Text(
+                'Extension driver (${connection.type}'
+                '${connection.extensionId != null ? ' · ${connection.extensionId}' : ''}). '
+                'Expand the connection in the sidebar to browse the schema tree. '
+                'A query workspace for external drivers is coming soon.',
+              ).muted().small(),
             ],
           ),
         ),
