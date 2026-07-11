@@ -242,5 +242,34 @@ void main() {
         isA<List>(),
       );
     });
+
+    test('marks database driver bin entry executable after install', () async {
+      final archive = Archive()
+        ..addFile(_jsonFile('manifest.json', {
+          'id': 'test.driver-exec',
+          'name': 'Driver',
+          'version': '1.0.0',
+          'publisher': 'Test',
+          'type': 'database_driver',
+          'engines': {'querya_desktop': '*'},
+          'main': 'bin/driver',
+          'sandbox': {
+            'engine': 'process',
+            'permissions': {
+              'network': {'mode': 'connection_host_only', 'allow_ssl': true},
+              'filesystem': {'scratch_mb': 100, 'access': 'scratch_only'},
+              'resources': {'memory_mb': 256, 'max_open_files': 64},
+            },
+          },
+        }))
+        ..addFile(ArchiveFile('bin/driver', 4, utf8.encode('stub')));
+
+      final zip = await _writeZip(tempDir, archive, 'driver-exec.zip');
+      await LocalExtensionInstaller().installFromArchive(zip);
+
+      final entry = File(p.join(tempDir.path, 'test.driver-exec', 'bin', 'driver'));
+      final mode = await entry.stat().then((s) => s.mode);
+      expect(mode & 0x111, isNot(0));
+    });
   });
 }

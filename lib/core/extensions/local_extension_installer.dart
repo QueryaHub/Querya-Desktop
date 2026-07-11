@@ -115,6 +115,10 @@ class LocalExtensionInstaller {
         manifest: manifest,
         installDir: extDir,
       );
+      await ExtensionSupport.ensureDriverExecutables(
+        manifest: manifest,
+        installDir: extDir,
+      );
 
       // Ensure canonical manifest on disk (pretty-printed, with install metadata).
       final manifestFile = File(p.join(extDir.path, 'manifest.json'));
