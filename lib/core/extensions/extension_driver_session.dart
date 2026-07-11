@@ -3,10 +3,13 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
+import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
+import 'package:querya_desktop/core/extensions/extension_support.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/extensions/rpc/plugin_rpc_bridge.dart';
 import 'package:querya_desktop/core/sdui/sdui_tree_schema.dart';
+import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 
 /// Owns [PluginRpcBridge] sessions for extension-backed connections.
@@ -29,9 +32,10 @@ class ExtensionDriverSession {
     if (id == null) {
       throw StateError('ConnectionRow.id is required for extension drivers');
     }
-    final extensionId = row.extensionId?.trim();
-    if (extensionId == null || extensionId.isEmpty) {
-      throw StateError('ConnectionRow.extensionId is required');
+    if (!ExtensionDriverCatalog.isExtensionDriverConnection(row)) {
+      throw StateError(
+        'Connection "${row.name}" is not backed by an installed extension driver',
+      );
     }
 
     final existing = _bridges[id];
@@ -39,18 +43,81 @@ class ExtensionDriverSession {
       return existing;
     }
 
-    final manifest = await _resolveManifest(extensionId);
+    final manifest = await _resolveManifestForRow(row);
+    final hydrated = await _hydrateSecrets(row);
+    final bridge = await _startBridge(manifest);
+
+    try {
+      await _injectAndConnect(bridge, connectionId: id, row: hydrated);
+    } catch (e) {
+      try {
+        await bridge.shutdown();
+      } catch (_) {}
+      rethrow;
+    }
+
+    _bridges[id] = bridge;
+    _manifests[id] = manifest;
+    return bridge;
+  }
+
+  /// One-shot connectivity check: spawns a temporary plugin process,
+  /// connects, and tears everything down. Returns the reported server version.
+  Future<String> testConnection({
+    required ExtensionManifest manifest,
+    required ConnectionRow row,
+  }) async {
+    // Ephemeral positive id — never stored, only used for this RPC round-trip.
+    final tempId =
+        DateTime.now().millisecondsSinceEpoch & 0x7fffffff | 0x40000000;
+    final bridge = await _startBridge(manifest);
+    try {
+      final result = await _injectAndConnect(
+        bridge,
+        connectionId: tempId,
+        row: row,
+      );
+      String version = '';
+      if (result is Map) {
+        version = '${result['serverVersion'] ?? ''}';
+      }
+      try {
+        await bridge.sendRequest('db.disconnect', {'connectionId': tempId});
+      } catch (_) {}
+      return version;
+    } finally {
+      try {
+        await bridge.shutdown();
+      } catch (_) {}
+    }
+  }
+
+  Future<PluginRpcBridge> _startBridge(ExtensionManifest manifest) async {
     final root = manifest.installPath;
     if (root == null || root.isEmpty) {
-      throw StateError('Extension "$extensionId" has no install path');
+      throw StateError('Extension "${manifest.id}" has no install path');
     }
     final main = manifest.main?.trim();
     if (main == null || main.isEmpty) {
-      throw StateError('Extension "$extensionId" is missing main entry');
+      throw StateError('Extension "${manifest.id}" is missing main entry');
     }
     final executable = p.join(root, main);
-    if (!File(executable).existsSync()) {
+    final entryFile = File(executable);
+    if (!entryFile.existsSync()) {
       throw StateError('Driver entry not found: $executable');
+    }
+    final canExecute = await entryFile
+        .stat()
+        .then((s) => s.mode & 0x111 != 0, onError: (_) => true);
+    if (!canExecute) {
+      try {
+        await ExtensionSupport.markExecutableIfExists(entryFile);
+      } catch (e) {
+        throw StateError(
+          'Driver entry is not executable: $executable. '
+          'Reinstall the extension package ($e).',
+        );
+      }
     }
 
     final bridge = bridgeFactory?.call() ?? PluginRpcBridge();
@@ -63,30 +130,125 @@ class ExtensionDriverSession {
         'pluginId': manifest.id,
       },
     );
+    return bridge;
+  }
 
+  Future<Object?> _injectAndConnect(
+    PluginRpcBridge bridge, {
+    required int connectionId,
+    required ConnectionRow row,
+  }) async {
     final options = _decodeOptions(row.driverOptions);
+    final safeMode = options.remove('safe_mode') ?? options.remove('safeMode');
+    options.remove('sslMode');
+
     await bridge.injectCredentials({
-      'connectionId': id,
+      'connectionId': connectionId,
       if (row.password != null && row.password!.isNotEmpty)
         'password': row.password,
-      ...options,
     });
 
-    final connectParams = <String, Object?>{
-      'connectionId': id,
-      if (row.host != null) 'host': row.host,
-      if (row.port != null) 'port': row.port,
-      if (row.username != null) 'user': row.username,
-      if (row.databaseName != null) 'database': row.databaseName,
-      if (options.containsKey('safe_mode')) 'safeMode': options['safe_mode'],
-      if (options.containsKey('safeMode')) 'safeMode': options['safeMode'],
-      ...options,
-    };
-    await bridge.connect(connectParams);
+    return bridge.connect(
+      buildExtensionConnectParams(
+        connectionId: connectionId,
+        row: row,
+        options: options,
+        safeMode: safeMode,
+      ),
+    );
+  }
 
-    _bridges[id] = bridge;
-    _manifests[id] = manifest;
-    return bridge;
+  /// Builds `db.connect` params including HTTPS when [ConnectionRow.useSSL] is set.
+  static Map<String, Object?> buildExtensionConnectParams({
+    required int connectionId,
+    required ConnectionRow row,
+    Map<String, Object?> options = const {},
+    Object? safeMode,
+  }) {
+    final host = row.host?.trim();
+    final port = row.port ?? 8123;
+    final database = row.databaseName?.trim().isNotEmpty == true
+        ? row.databaseName!.trim()
+        : 'default';
+
+    final params = <String, Object?>{
+      'connectionId': connectionId,
+      if (row.username != null && row.username!.isNotEmpty) 'user': row.username,
+      'database': database,
+      ...options,
+      if (safeMode != null) 'safeMode': safeMode,
+    };
+
+    if (host != null && host.isNotEmpty) {
+      final scheme = row.useSSL ? 'https' : 'http';
+      params['connectionString'] = '$scheme://$host:$port/$database';
+    } else {
+      if (row.port != null) params['port'] = row.port;
+      if (host != null && host.isNotEmpty) params['host'] = host;
+    }
+
+    return params;
+  }
+
+  Future<ConnectionRow> _hydrateSecrets(ConnectionRow row) async {
+    final id = row.id;
+    if (id == null) return row;
+    if ((row.password != null && row.password!.isNotEmpty) ||
+        (row.connectionString != null && row.connectionString!.isNotEmpty)) {
+      return row;
+    }
+    final secrets = await ConnectionSecretsStore.readForConnection(id);
+    if (secrets.password == null && secrets.connectionString == null) {
+      return row;
+    }
+    return ConnectionRow(
+      id: row.id,
+      type: row.type,
+      name: row.name,
+      host: row.host,
+      port: row.port,
+      username: row.username,
+      password: secrets.password ?? row.password,
+      databaseName: row.databaseName,
+      authSource: row.authSource,
+      useSSL: row.useSSL,
+      connectionString: secrets.connectionString ?? row.connectionString,
+      extensionId: row.extensionId,
+      driverOptions: row.driverOptions,
+      folderId: row.folderId,
+      sortOrder: row.sortOrder,
+      createdAt: row.createdAt,
+    );
+  }
+
+  Future<ExtensionManifest> _resolveManifestForRow(ConnectionRow row) async {
+    await LocalExtensionRegistry.instance.load();
+    final manifest = ExtensionDriverCatalog.manifestForConnection(row);
+    if (manifest != null) return manifest;
+    final extId = row.extensionId?.trim();
+    if (extId != null && extId.isNotEmpty) {
+      throw StateError(
+        'Extension "$extId" is not installed. Reinstall the package.',
+      );
+    }
+    throw StateError(
+      'No extension driver is installed for connection type "${row.type}".',
+    );
+  }
+
+  /// Executes SQL through the plugin (`db.query`) and returns the raw result.
+  Future<ExtensionQueryResult> query(
+    ConnectionRow row,
+    String sql, {
+    int? limit,
+  }) async {
+    final bridge = await ensureConnected(row);
+    final result = await bridge.sendRequest('db.query', {
+      'connectionId': row.id,
+      'sql': sql,
+      if (limit != null) 'limit': limit,
+    });
+    return ExtensionQueryResult.fromRpc(result);
   }
 
   Future<SduiTreeSchema> getSchemaTree(ConnectionRow row) async {
@@ -204,5 +366,75 @@ class ExtensionDriverSession {
       ];
     }
     return const [];
+  }
+}
+
+/// Normalized tabular result of `db.query` from an extension driver.
+class ExtensionQueryResult {
+  const ExtensionQueryResult({
+    this.columns = const [],
+    this.rows = const [],
+    this.message,
+    this.elapsedMs,
+    this.queryId,
+  });
+
+  /// Column names in order.
+  final List<String> columns;
+
+  /// Row values converted to display strings (`NULL` for null).
+  final List<List<String>> rows;
+
+  /// Status message for non-tabular commands.
+  final String? message;
+  final int? elapsedMs;
+  final String? queryId;
+
+  factory ExtensionQueryResult.fromRpc(Object? raw) {
+    if (raw is! Map) return const ExtensionQueryResult();
+    final map = raw is Map<String, dynamic>
+        ? raw
+        : Map<String, dynamic>.from(raw);
+
+    final columns = <String>[];
+    final columnsRaw = map['columns'];
+    if (columnsRaw is List) {
+      for (final col in columnsRaw) {
+        if (col is Map) {
+          columns.add('${col['name'] ?? col['label'] ?? ''}');
+        } else if (col != null) {
+          columns.add('$col');
+        }
+      }
+    }
+
+    final rows = <List<String>>[];
+    final rowsRaw = map['rows'];
+    if (rowsRaw is List) {
+      for (final row in rowsRaw) {
+        if (row is List) {
+          rows.add([
+            for (final cell in row) cell == null ? 'NULL' : '$cell',
+          ]);
+        }
+      }
+    }
+
+    int? elapsedMs;
+    final stats = map['statistics'];
+    if (stats is Map) {
+      final elapsed = stats['elapsedMs'] ?? stats['elapsed_ms'];
+      if (elapsed is num) elapsedMs = elapsed.toInt();
+    }
+    final execTime = map['executionTimeMs'];
+    if (elapsedMs == null && execTime is num) elapsedMs = execTime.toInt();
+
+    return ExtensionQueryResult(
+      columns: columns,
+      rows: rows,
+      message: map['message'] as String?,
+      elapsedMs: elapsedMs,
+      queryId: map['queryId']?.toString(),
+    );
   }
 }

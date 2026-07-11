@@ -1,3 +1,7 @@
+import 'dart:io';
+
+import 'package:path/path.dart' as p;
+
 import '../../theme/theme_definition.dart';
 import 'extension_contributions.dart';
 import 'extension_type.dart';
@@ -60,6 +64,17 @@ class ExtensionManifest {
   /// Drivers contributed by this package (empty when none).
   Iterable<DriverContribution> get contributedDrivers =>
       contributions?.drivers ?? const [];
+
+  /// Absolute path to the packaged icon, or null when missing on disk.
+  String? get resolvedIconPath {
+    final rel = icon?.trim();
+    final root = installPath;
+    if (rel == null || rel.isEmpty || root == null || root.isEmpty) {
+      return null;
+    }
+    final path = p.join(root, rel);
+    return File(path).existsSync() ? path : null;
+  }
 
   /// Maps a registry [ThemeDefinition] into marketplace field names.
   factory ExtensionManifest.fromThemeDefinition(

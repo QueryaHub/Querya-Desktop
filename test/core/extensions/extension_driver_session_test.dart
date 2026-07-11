@@ -27,5 +27,28 @@ void main() {
       expect(withExt.isExtensionDriver, isTrue);
       expect(builtIn.isExtensionDriver, isFalse);
     });
+
+    test('buildExtensionConnectParams uses https when useSSL is true', () {
+      const row = ConnectionRow(
+        type: 'clickhouse',
+        name: 'CH',
+        host: 'db.local',
+        port: 8443,
+        username: 'default',
+        databaseName: 'analytics',
+        useSSL: true,
+        createdAt: '2026-01-01T00:00:00Z',
+      );
+
+      final params = ExtensionDriverSession.buildExtensionConnectParams(
+        connectionId: 42,
+        row: row,
+        safeMode: true,
+      );
+
+      expect(params['connectionString'], 'https://db.local:8443/analytics');
+      expect(params['user'], 'default');
+      expect(params['safeMode'], isTrue);
+    });
   });
 }

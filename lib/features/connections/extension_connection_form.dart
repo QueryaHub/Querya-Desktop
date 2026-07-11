@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart' as material;
 import 'package:path/path.dart' as p;
+import 'package:querya_desktop/core/extensions/extension_driver_session.dart';
 import 'package:querya_desktop/core/extensions/models/extension_contributions.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
@@ -55,6 +56,9 @@ class _ExtensionConnectionFormContentState
   SduiFormSchema? _schema;
   String? _loadError;
   var _loading = true;
+  var _testing = false;
+  String? _testMessage;
+  bool _testSucceeded = false;
 
   @override
   void initState() {
@@ -109,6 +113,58 @@ class _ExtensionConnectionFormContentState
       folderId: widget.folderId,
     );
     material.Navigator.of(context).pop(row);
+  }
+
+  Future<void> _testConnection() async {
+    final schema = _schema;
+    if (schema == null) return;
+
+    final formState = _formKey.currentState;
+    if (formState == null) return;
+
+    final values = formState.collectValues();
+    if (values == null) {
+      if (!mounted) return;
+      setState(() {
+        _testMessage = 'Fill in all required fields before testing.';
+        _testSucceeded = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _testing = true;
+      _testMessage = null;
+      _testSucceeded = false;
+    });
+
+    try {
+      final row = connectionRowFromExtensionForm(
+        manifest: widget.manifest,
+        driver: widget.driver,
+        name: 'connection-test',
+        values: values,
+      );
+      final version = await ExtensionDriverSession.instance.testConnection(
+        manifest: widget.manifest,
+        row: row,
+      );
+      if (!mounted) return;
+      setState(() {
+        _testing = false;
+        _testSucceeded = true;
+        _testMessage = version.isEmpty
+            ? 'Connection successful.'
+            : 'Connection successful — server version $version.';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _testing = false;
+        _testSucceeded = false;
+        _testMessage = 'Connection failed: $e';
+      });
+    }
   }
 
   @override
@@ -169,6 +225,18 @@ class _ExtensionConnectionFormContentState
                       Text(_loadError!).muted().small()
                     else if (_schema != null)
                       SduiFormBuilder(key: _formKey, schema: _schema!),
+                    if (_testMessage != null) ...[
+                      const material.SizedBox(height: 12),
+                      material.SelectableText(
+                        _testMessage!,
+                        style: material.TextStyle(
+                          fontSize: 12,
+                          color: _testSucceeded
+                              ? material.Colors.green
+                              : theme.destructive,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -186,8 +254,25 @@ class _ExtensionConnectionFormContentState
                 ),
               ),
               child: material.Row(
-                mainAxisAlignment: material.MainAxisAlignment.end,
                 children: [
+                  OutlineButton(
+                    onPressed:
+                        _schema == null || _testing ? null : _testConnection,
+                    leading: _testing
+                        ? const material.SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: material.CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const material.Icon(
+                            material.Icons.bolt_rounded,
+                            size: 16,
+                          ),
+                    child: const Text('Test Connection'),
+                  ),
+                  const Spacer(),
                   GhostButton(
                     onPressed: () => material.Navigator.of(context).pop(),
                     child: const Text('Cancel'),
@@ -237,7 +322,15 @@ ConnectionRow connectionRowFromExtensionForm({
   required Map<String, Object?> values,
   int? folderId,
 }) {
-  final known = {'host', 'port', 'username', 'password', 'database', 'databaseName'};
+  final known = {
+    'host',
+    'port',
+    'username',
+    'password',
+    'database',
+    'databaseName',
+    'sslMode',
+  };
   final host = values['host']?.toString().trim();
   final portRaw = values['port'];
   int? port;

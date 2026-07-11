@@ -3,6 +3,7 @@ import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/features/connections/connection_type_choice.dart';
+import 'package:querya_desktop/features/connections/driver_icon.dart';
 import 'package:querya_desktop/features/connections/new_connection_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -11,6 +12,7 @@ typedef _DriverInfo = ({
   String label,
   material.IconData icon,
   String? iconAsset,
+  String? iconFile,
   String description,
   String badge,
 });
@@ -37,6 +39,7 @@ List<_DriverInfo> _buildDriverList() {
           label: choice.label,
           icon: choice.icon,
           iconAsset: choice.iconAsset,
+          iconFile: null,
           description: switch (choice.type) {
             ConnectionType.postgresql =>
               'PostgreSQL — built-in Dart driver (`postgres`).',
@@ -57,6 +60,7 @@ List<_DriverInfo> _buildDriverList() {
       label: choice.label,
       icon: choice.icon,
       iconAsset: null,
+      iconFile: choice.iconFile,
       description:
           'Extension · ${choice.manifest.id} · driverId=${choice.driver.driverId}',
       badge: 'Extension',
@@ -175,13 +179,19 @@ class _DriverRow extends material.StatelessWidget {
           material.SizedBox(
             width: 40,
             height: 40,
-            child: info.iconAsset != null
-                ? material.Image.asset(
-                    info.iconAsset!,
-                    fit: material.BoxFit.contain,
-                    filterQuality: material.FilterQuality.medium,
+            child: info.iconFile != null
+                ? DriverIconImage(
+                    path: info.iconFile!,
+                    size: 40,
+                    fallbackIcon: info.icon,
                   )
-                : material.Icon(info.icon, size: 40, color: theme.primary),
+                : info.iconAsset != null
+                    ? material.Image.asset(
+                        info.iconAsset!,
+                        fit: material.BoxFit.contain,
+                        filterQuality: material.FilterQuality.medium,
+                      )
+                    : material.Icon(info.icon, size: 40, color: theme.primary),
           ),
           const material.SizedBox(width: 16),
           material.Expanded(

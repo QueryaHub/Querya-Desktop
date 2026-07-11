@@ -10,6 +10,9 @@ sealed class ConnectionTypeChoice {
   String get label;
   material.IconData get icon;
   String? get iconAsset;
+
+  /// Absolute path to an icon file shipped by an extension package.
+  String? get iconFile => null;
 }
 
 /// One of the five built-in Dart drivers.
@@ -54,6 +57,9 @@ final class ExtensionDriverChoice extends ConnectionTypeChoice {
 
   @override
   String? get iconAsset => null;
+
+  @override
+  String? get iconFile => manifest.resolvedIconPath;
 
   @override
   bool operator ==(Object other) =>
