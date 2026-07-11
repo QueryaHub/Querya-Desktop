@@ -12,6 +12,8 @@ import 'package:flutter/material.dart' as material
         BuildContext,
         Widget,
         RepaintBoundary;
+import 'package:querya_desktop/core/actions/sql_editor_global_actions.dart';
+import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -123,6 +125,33 @@ class _MainScreenState extends State<MainScreen> {
     _workspace.value = _workspace.value.openSqliteSqlWorkspace(connection);
   }
 
+  void _onExtensionObjectSelected(
+    ConnectionRow connection,
+    String database,
+    String name,
+  ) {
+    _workspace.value = _workspace.value.selectExtensionObject(
+      connection,
+      database,
+      name,
+    );
+  }
+
+  void _openSqlWorkspaceForConnection(ConnectionRow connection) {
+    switch (connection.type) {
+      case 'postgresql':
+        _onPostgresOpenSqlWorkspace(connection);
+      case 'mysql':
+        _onMysqlOpenSqlWorkspace(connection);
+      case 'sqlite':
+        _onSqliteOpenSqlWorkspace(connection);
+      default:
+        if (ExtensionDriverCatalog.isExtensionDriverConnection(connection)) {
+          _workspace.value = _workspace.value.selectConnection(connection);
+        }
+    }
+  }
+
   Future<void> _openNewConnectionFromHero() async {
     final row = await promptCreateConnection(context);
     if (!mounted || row == null) return;
@@ -152,17 +181,20 @@ class _MainScreenState extends State<MainScreen> {
   @override
   material.Widget build(material.BuildContext context) {
     final wb = context.workbench;
-    return material.Scaffold(
-      backgroundColor: wb.canvas,
-      body: WindowBorder(
-        color: wb.borderSubtle.withValues(alpha: 0.35),
-        width: 1,
-        child: Column(
-          children: [
-            ValueListenableBuilder<MainScreenWorkspaceState>(
-              valueListenable: _workspace,
-              builder: (context, workspace, _) {
-                return QueryaWindowTitleBar(
+    return ValueListenableBuilder<MainScreenWorkspaceState>(
+      valueListenable: _workspace,
+      builder: (context, workspace, _) {
+        return SqlEditorGlobalActions(
+          activeConnection: workspace.activeConnection,
+          onOpenSqlWorkspace: _openSqlWorkspaceForConnection,
+          child: material.Scaffold(
+            backgroundColor: wb.canvas,
+            body: WindowBorder(
+              color: wb.borderSubtle.withValues(alpha: 0.35),
+              width: 1,
+              child: Column(
+                children: [
+                  QueryaWindowTitleBar(
                   onNewDatabaseConnection: _onNewDatabaseConnectionFromMenu,
                   onNewDatabaseConnectionFromUrl: _onNewDatabaseConnectionFromUrl,
                   activeConnection: workspace.activeConnection,
@@ -197,29 +229,31 @@ class _MainScreenState extends State<MainScreen> {
                       _connectionsPanelKey.currentState?.disconnectOthers(active);
                     }
                   },
-                );
-              },
-            ),
-            Divider(height: 1, color: wb.borderSubtle.withValues(alpha: 0.22)),
-            Expanded(
-              child: _MainContentSplit(
-                connectionsPanelKey: _connectionsPanelKey,
-                workspace: _workspace,
-                onConnectionSelected: _onConnectionSelected,
-                onPostgresObjectSelected: _onPostgresObjectSelected,
-                onMysqlObjectSelected: _onMysqlObjectSelected,
-                onSqliteObjectSelected: _onSqliteObjectSelected,
-                onRedisDatabaseSelected: _onRedisDatabaseSelected,
-                onMongoDBDatabaseSelected: _onMongoDBDatabaseSelected,
-                onPostgresOpenSqlWorkspace: _onPostgresOpenSqlWorkspace,
-                onMysqlOpenSqlWorkspace: _onMysqlOpenSqlWorkspace,
-                onSqliteOpenSqlWorkspace: _onSqliteOpenSqlWorkspace,
-                onRequestNewConnection: _openNewConnectionFromHero,
+                ),
+                  Divider(height: 1, color: wb.borderSubtle.withValues(alpha: 0.22)),
+                  Expanded(
+                    child: _MainContentSplit(
+                      connectionsPanelKey: _connectionsPanelKey,
+                      workspace: _workspace,
+                      onConnectionSelected: _onConnectionSelected,
+                      onPostgresObjectSelected: _onPostgresObjectSelected,
+                      onMysqlObjectSelected: _onMysqlObjectSelected,
+                      onSqliteObjectSelected: _onSqliteObjectSelected,
+                      onExtensionObjectSelected: _onExtensionObjectSelected,
+                      onRedisDatabaseSelected: _onRedisDatabaseSelected,
+                      onMongoDBDatabaseSelected: _onMongoDBDatabaseSelected,
+                      onPostgresOpenSqlWorkspace: _onPostgresOpenSqlWorkspace,
+                      onMysqlOpenSqlWorkspace: _onMysqlOpenSqlWorkspace,
+                      onSqliteOpenSqlWorkspace: _onSqliteOpenSqlWorkspace,
+                      onRequestNewConnection: _openNewConnectionFromHero,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -233,6 +267,7 @@ class _MainContentSplit extends StatefulWidget {
     required this.onPostgresObjectSelected,
     required this.onMysqlObjectSelected,
     required this.onSqliteObjectSelected,
+    required this.onExtensionObjectSelected,
     required this.onRedisDatabaseSelected,
     required this.onMongoDBDatabaseSelected,
     required this.onPostgresOpenSqlWorkspace,
@@ -262,6 +297,11 @@ class _MainContentSplit extends StatefulWidget {
     String name,
     SqliteObjectKind kind,
   ) onSqliteObjectSelected;
+  final void Function(
+    ConnectionRow,
+    String database,
+    String name,
+  ) onExtensionObjectSelected;
   final void Function(ConnectionRow, int) onRedisDatabaseSelected;
   final void Function(ConnectionRow, String) onMongoDBDatabaseSelected;
   final OnPostgresOpenSqlWorkspace onPostgresOpenSqlWorkspace;
@@ -318,6 +358,7 @@ class _MainContentSplitState extends State<_MainContentSplit> {
                   onMysqlOpenSqlWorkspace: widget.onMysqlOpenSqlWorkspace,
                   onSqliteObjectSelected: widget.onSqliteObjectSelected,
                   onSqliteOpenSqlWorkspace: widget.onSqliteOpenSqlWorkspace,
+                  onExtensionObjectSelected: widget.onExtensionObjectSelected,
                 ),
               ),
             ),
@@ -351,6 +392,7 @@ class _MainContentSplitState extends State<_MainContentSplit> {
                       mysqlSqlTabRequestToken: ws.mysqlSqlTabRequestToken,
                       selectedSqliteObject: ws.selectedSqliteObject,
                       sqliteSqlTabRequestToken: ws.sqliteSqlTabRequestToken,
+                      selectedExtensionObject: ws.selectedExtensionObject,
                       isReadOnly: ws.isReadOnly,
                       onRequestNewConnection: widget.onRequestNewConnection,
                     );
@@ -379,6 +421,7 @@ class _ConnectionsPanelSlot extends StatefulWidget {
     required this.onPostgresOpenSqlWorkspace,
     required this.onMysqlOpenSqlWorkspace,
     required this.onSqliteOpenSqlWorkspace,
+    required this.onExtensionObjectSelected,
   });
 
   final GlobalKey<ConnectionsPanelState> connectionsPanelKey;
@@ -407,6 +450,11 @@ class _ConnectionsPanelSlot extends StatefulWidget {
   final OnPostgresOpenSqlWorkspace onPostgresOpenSqlWorkspace;
   final void Function(ConnectionRow) onMysqlOpenSqlWorkspace;
   final void Function(ConnectionRow) onSqliteOpenSqlWorkspace;
+  final void Function(
+    ConnectionRow,
+    String database,
+    String name,
+  ) onExtensionObjectSelected;
 
   @override
   State<_ConnectionsPanelSlot> createState() => _ConnectionsPanelSlotState();
@@ -449,6 +497,7 @@ class _ConnectionsPanelSlotState extends State<_ConnectionsPanelSlot> {
       onMysqlOpenSqlWorkspace: widget.onMysqlOpenSqlWorkspace,
       onSqliteObjectSelected: widget.onSqliteObjectSelected,
       onSqliteOpenSqlWorkspace: widget.onSqliteOpenSqlWorkspace,
+      onExtensionObjectSelected: widget.onExtensionObjectSelected,
     );
   }
 }

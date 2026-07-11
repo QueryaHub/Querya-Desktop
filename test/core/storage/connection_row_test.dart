@@ -216,5 +216,35 @@ void main() {
       );
       expect(row.toMap()['database_name'], 'appdb');
     });
+
+    test('extension driver fields round-trip', () {
+      const row = ConnectionRow(
+        type: 'clickhouse',
+        name: 'CH Local',
+        host: 'localhost',
+        port: 8123,
+        username: 'default',
+        password: 'secret',
+        extensionId: 'queryahub.clickhouse-driver',
+        driverOptions: '{"sslMode":"prefer","safe_mode":true}',
+        useSSL: true,
+        createdAt: '2026-01-01T00:00:00Z',
+      );
+
+      expect(row.isExtensionDriver, isTrue);
+      final map = row.toPersistenceMap();
+      expect(map['extension_id'], 'queryahub.clickhouse-driver');
+      expect(map['driver_options'], contains('sslMode'));
+      expect(map['password'], isNull);
+
+      final restored = ConnectionRow.fromMap({
+        ...map,
+        'id': 7,
+        'password': 'secret',
+      });
+      expect(restored.extensionId, 'queryahub.clickhouse-driver');
+      expect(restored.type, 'clickhouse');
+      expect(restored.isExtensionDriver, isTrue);
+    });
   });
 }

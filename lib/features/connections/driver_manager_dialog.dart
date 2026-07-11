@@ -1,39 +1,27 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
+import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
+import 'package:querya_desktop/features/connections/connection_type_choice.dart';
+import 'package:querya_desktop/features/connections/driver_icon.dart';
+import 'package:querya_desktop/features/connections/new_connection_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-
-import 'new_connection_dialog.dart';
 
 /// One row in the driver list.
 typedef _DriverInfo = ({
-  ConnectionType type,
+  String label,
+  material.IconData icon,
+  String? iconAsset,
+  String? iconFile,
   String description,
+  String badge,
 });
 
-/// Built-in drivers (Dart packages). No separate JDBC/JAR install is required to connect.
-final _driverInfoList = <_DriverInfo>[
-  (
-    type: ConnectionType.postgresql,
-    description:
-        'PostgreSQL — built-in Dart driver (`postgres`). Use Connection → New Database Connection.',
-  ),
-  (
-    type: ConnectionType.mysql,
-    description: 'MySQL / MariaDB — built-in Dart driver (`mysql_client`).',
-  ),
-  (
-    type: ConnectionType.redis,
-    description: 'Redis — built-in Dart client (`redis`).',
-  ),
-  (
-    type: ConnectionType.mongodb,
-    description: 'MongoDB — built-in Dart driver (`mongo_dart`).',
-  ),
-];
-
-/// Shows built-in database drivers shipped with the app.
-void showDriverManagerDialog(BuildContext context) {
-  showAppDialog<void>(
+/// Shows built-in and installed extension database drivers.
+Future<void> showDriverManagerDialog(material.BuildContext context) async {
+  await LocalExtensionRegistry.instance.load();
+  if (!context.mounted) return;
+  return showAppDialog<void>(
     context: context,
     builder: (context) => material.Dialog(
       backgroundColor: material.Colors.transparent,
@@ -43,6 +31,44 @@ void showDriverManagerDialog(BuildContext context) {
   );
 }
 
+List<_DriverInfo> _buildDriverList() {
+  final list = <_DriverInfo>[
+    for (final choice in ExtensionDriverCatalog.builtInChoices)
+      if (choice is BuiltInConnectionType)
+        (
+          label: choice.label,
+          icon: choice.icon,
+          iconAsset: choice.iconAsset,
+          iconFile: null,
+          description: switch (choice.type) {
+            ConnectionType.postgresql =>
+              'PostgreSQL — built-in Dart driver (`postgres`).',
+            ConnectionType.mysql =>
+              'MySQL / MariaDB — built-in Dart driver (`mysql_client`).',
+            ConnectionType.sqlite =>
+              'SQLite — built-in Dart driver (`sqflite_common_ffi`).',
+            ConnectionType.redis => 'Redis — built-in Dart client (`redis`).',
+            ConnectionType.mongodb =>
+              'MongoDB — built-in Dart driver (`mongo_dart`).',
+          },
+          badge: 'Built-in',
+        ),
+  ];
+
+  for (final choice in ExtensionDriverCatalog.extensionChoices()) {
+    list.add((
+      label: choice.label,
+      icon: choice.icon,
+      iconAsset: null,
+      iconFile: choice.iconFile,
+      description:
+          'Extension · ${choice.manifest.id} · driverId=${choice.driver.driverId}',
+      badge: 'Extension',
+    ));
+  }
+  return list;
+}
+
 class _DriverManagerDialogContent extends material.StatelessWidget {
   const _DriverManagerDialogContent();
 
@@ -50,6 +76,7 @@ class _DriverManagerDialogContent extends material.StatelessWidget {
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context).colorScheme;
     final radius = Theme.of(context).radiusXxl;
+    final drivers = _buildDriverList();
     return material.Container(
       constraints: WindowLayout.dialogConstraints(
         context,
@@ -75,7 +102,8 @@ class _DriverManagerDialogContent extends material.StatelessWidget {
                   const Text('Driver Manager').large().semiBold(),
                   const material.SizedBox(height: 6),
                   const Text(
-                    'Querya connects using built-in Dart drivers. Add a server under Connection → New Database Connection.',
+                    'Built-in Dart drivers and installed sandboxed extension drivers. '
+                    'Add a server under Connection → New Database Connection.',
                   ).muted().small(),
                 ],
               ),
@@ -93,18 +121,14 @@ class _DriverManagerDialogContent extends material.StatelessWidget {
                 child: material.ListView.separated(
                   shrinkWrap: true,
                   padding: const material.EdgeInsets.symmetric(vertical: 8),
-                  itemCount: _driverInfoList.length,
+                  itemCount: drivers.length,
                   separatorBuilder: (_, __) => material.Divider(
                     height: 1,
                     color: theme.border.withValues(alpha: 0.3),
                   ),
                   itemBuilder: (context, index) {
-                    final info = _driverInfoList[index];
-                    return _DriverRow(
-                      type: info.type,
-                      description: info.description,
-                      theme: theme,
-                    );
+                    final info = drivers[index];
+                    return _DriverRow(info: info, theme: theme);
                   },
                 ),
               ),
@@ -137,13 +161,11 @@ class _DriverManagerDialogContent extends material.StatelessWidget {
 
 class _DriverRow extends material.StatelessWidget {
   const _DriverRow({
-    required this.type,
-    required this.description,
+    required this.info,
     required this.theme,
   });
 
-  final ConnectionType type;
-  final String description;
+  final _DriverInfo info;
   final ColorScheme theme;
 
   @override
@@ -157,13 +179,19 @@ class _DriverRow extends material.StatelessWidget {
           material.SizedBox(
             width: 40,
             height: 40,
-            child: type.iconAsset != null
-                ? material.Image.asset(
-                    type.iconAsset!,
-                    fit: material.BoxFit.contain,
-                    filterQuality: material.FilterQuality.medium,
+            child: info.iconFile != null
+                ? DriverIconImage(
+                    path: info.iconFile!,
+                    size: 40,
+                    fallbackIcon: info.icon,
                   )
-                : material.Icon(type.icon, size: 40, color: theme.primary),
+                : info.iconAsset != null
+                    ? material.Image.asset(
+                        info.iconAsset!,
+                        fit: material.BoxFit.contain,
+                        filterQuality: material.FilterQuality.medium,
+                      )
+                    : material.Icon(info.icon, size: 40, color: theme.primary),
           ),
           const material.SizedBox(width: 16),
           material.Expanded(
@@ -171,9 +199,9 @@ class _DriverRow extends material.StatelessWidget {
               crossAxisAlignment: material.CrossAxisAlignment.start,
               mainAxisSize: material.MainAxisSize.min,
               children: [
-                Text(type.label).semiBold().small(),
+                Text(info.label).semiBold().small(),
                 const material.SizedBox(height: 2),
-                Text(description).muted().xSmall(),
+                Text(info.description).muted().xSmall(),
               ],
             ),
           ),
@@ -189,7 +217,7 @@ class _DriverRow extends material.StatelessWidget {
               ),
             ),
             child: Text(
-              'Built-in',
+              info.badge,
               style: material.TextStyle(
                 fontSize: 11,
                 fontWeight: material.FontWeight.w600,

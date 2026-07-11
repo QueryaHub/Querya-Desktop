@@ -1,3 +1,8 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
 import 'package:redis/redis.dart' as redis;
 
 /// Redis connection using the Dart redis package (no Java/JRE).
@@ -9,7 +14,48 @@ class RedisConnection {
     this.port = 6379,
     this.username,
     this.password,
+    this.useSSL = false,
+    this.connectionString,
   });
+
+  factory RedisConnection.fromConnectionRow(ConnectionRow row) {
+    final uriText = row.connectionString?.trim();
+    if (uriText != null && uriText.isNotEmpty) {
+      final parsed = Uri.parse(uriText);
+      final info = parsed.userInfo;
+      String? user;
+      String? pass;
+      if (info.isNotEmpty) {
+        final colon = info.indexOf(':');
+        if (colon >= 0) {
+          user = Uri.decodeComponent(info.substring(0, colon));
+          pass = Uri.decodeComponent(info.substring(colon + 1));
+        } else {
+          user = Uri.decodeComponent(info);
+        }
+      }
+      return RedisConnection(
+        id: row.id ?? 0,
+        name: row.name,
+        host: parsed.host.isEmpty ? (row.host ?? 'localhost') : parsed.host,
+        port: parsed.hasPort ? parsed.port : (row.port ?? 6379),
+        username: user ?? row.username,
+        password: pass ?? row.password,
+        useSSL: row.useSSL || parsed.scheme == 'rediss',
+        connectionString: uriText,
+      );
+    }
+    return RedisConnection(
+      id: row.id ?? 0,
+      name: row.name,
+      host: row.host ?? 'localhost',
+      port: row.port ?? 6379,
+      username: row.username,
+      password: row.password,
+      useSSL: row.useSSL,
+      connectionString: row.connectionString,
+    );
+  }
 
   final int id;
   final String name;
@@ -17,6 +63,8 @@ class RedisConnection {
   final int port;
   final String? username;
   final String? password;
+  final bool useSSL;
+  final String? connectionString;
 
   redis.RedisConnection? _conn;
   redis.Command? _command;
@@ -27,7 +75,19 @@ class RedisConnection {
   Future<void> connect() async {
     if (_isConnected && _command != null) return;
     _conn = redis.RedisConnection();
-    _command = await _conn!.connect(host, port);
+    final sslPaths = extractSslCertificatePathsFromString(connectionString);
+    final secure = useSSL || sslPaths.hasAny;
+    if (secure) {
+      final context = buildSecurityContext(sslPaths);
+      final socket = await SecureSocket.connect(
+        host,
+        port,
+        context: context,
+      );
+      _command = await _conn!.connectWithSocket(socket);
+    } else {
+      _command = await _conn!.connect(host, port);
+    }
     if (password != null && password!.isNotEmpty) {
       if (username != null && username!.trim().isNotEmpty) {
         await _command!.send_object(['AUTH', username!.trim(), password!]);
@@ -52,8 +112,8 @@ class RedisConnection {
     _conn = null;
     try {
       await c?.close();
-    } catch (_) {
-      // Connection may already be closed — ignore.
+    } catch (e) {
+      debugPrint('RedisConnection.disconnect: $e');
     }
   }
 
@@ -69,7 +129,8 @@ class RedisConnection {
     try {
       await connect();
       return true;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('RedisConnection.testConnection: $e');
       return false;
     } finally {
       await disconnect();
@@ -104,7 +165,8 @@ class RedisConnection {
       if (result is List && result.length >= 2) {
         return int.tryParse(result[1].toString()) ?? 16;
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('RedisConnection.getMaxDatabases: $e');
       // Some Redis instances don't allow CONFIG; fall back.
     }
     return 16;
@@ -307,7 +369,12 @@ class RedisConnectionTestFake extends RedisConnection {
     this.firstScanKeys = const ['alpha', 'beta'],
     this.secondScanKeys = const <String>[],
     this.dbSizeResult = 2,
-  }) : super(id: -1, name: 'test-fake', host: 'localhost', port: 6379);
+  }) : super(
+          id: -1,
+          name: 'test-fake',
+          host: 'localhost',
+          port: 6379,
+        );
 
   final List<String> firstScanKeys;
   final List<String> secondScanKeys;
@@ -333,7 +400,9 @@ class RedisConnectionTestFake extends RedisConnection {
     _command = null;
     try {
       await c?.close();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('RedisConnection.disconnect: $e');
+    }
   }
 
   @override

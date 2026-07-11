@@ -6,7 +6,7 @@ import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const _dbName = 'querya.db';
-const _dbVersion = 6;
+const _dbVersion = 7;
 
 /// Fallback when [recordSqlQueryHistory] is called without `maxEntries`.
 /// Keep in sync with [kDefaultSqlHistoryMaxEntries] in `app_settings.dart`.
@@ -84,6 +84,8 @@ class LocalDb {
         auth_source TEXT,
         use_ssl INTEGER NOT NULL DEFAULT 0,
         connection_string TEXT,
+        extension_id TEXT,
+        driver_options TEXT,
         folder_id INTEGER REFERENCES folders(id) ON DELETE CASCADE,
         sort_order INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL
@@ -188,6 +190,10 @@ class LocalDb {
         CREATE INDEX idx_sql_query_history_lookup
         ON sql_query_history (connection_id, recorded_at DESC)
       ''');
+    }
+    if (oldVersion < 7) {
+      await db.execute('ALTER TABLE connections ADD COLUMN extension_id TEXT');
+      await db.execute('ALTER TABLE connections ADD COLUMN driver_options TEXT');
     }
   }
 
@@ -359,23 +365,51 @@ class LocalDb {
 
   /// Inserts a row and returns the SQLite row id.
   /// Password and connection string are stored in the OS secure store, not in SQLite.
+  ///
+  /// If writing secrets fails, the SQLite row is rolled back and the error is
+  /// rethrown so callers can surface a Keychain / libsecret failure.
   Future<int> addConnection(ConnectionRow row) async {
     final db = await _open();
     final id = await db.insert('connections', row.toPersistenceMap());
-    await ConnectionSecretsStore.writeForConnection(
-      id,
-      password: row.password,
-      connectionString: row.connectionString,
-    );
+    try {
+      await ConnectionSecretsStore.writeForConnection(
+        id,
+        password: row.password,
+        connectionString: row.connectionString,
+      );
+    } catch (e) {
+      try {
+        await ConnectionSecretsStore.deleteForConnection(id);
+      } catch (_) {
+        // Best-effort cleanup of any partial secret writes.
+      }
+      await db.delete('connections', where: 'id = ?', whereArgs: [id]);
+      rethrow;
+    }
     return id;
   }
 
-  /// Atomically updates an existing connection row in SQLite and its secrets in the secure store.
+  /// Updates an existing connection row in SQLite and its secrets in the secure store.
+  ///
+  /// If writing secrets fails, the previous SQLite row and previous secrets are
+  /// restored (best effort) and the error is rethrown.
   Future<void> updateConnection(ConnectionRow row) async {
     if (row.id == null) {
       throw ArgumentError('ConnectionRow.id cannot be null when calling updateConnection');
     }
     final db = await _open();
+    final previousMaps = await db.query(
+      'connections',
+      where: 'id = ?',
+      whereArgs: [row.id],
+    );
+    if (previousMaps.isEmpty) {
+      throw ArgumentError('No connection found with id ${row.id}');
+    }
+    final previousRow = ConnectionRow.fromMap(previousMaps.first);
+    final previousSecrets =
+        await ConnectionSecretsStore.readForConnection(row.id!);
+
     await db.transaction((txn) async {
       final count = await txn.update(
         'connections',
@@ -387,15 +421,41 @@ class LocalDb {
         throw ArgumentError('No connection found with id ${row.id}');
       }
     });
-    await ConnectionSecretsStore.writeForConnection(
-      row.id!,
-      password: row.password,
-      connectionString: row.connectionString,
-    );
+
+    try {
+      await ConnectionSecretsStore.writeForConnection(
+        row.id!,
+        password: row.password,
+        connectionString: row.connectionString,
+      );
+    } catch (e) {
+      await db.update(
+        'connections',
+        previousRow.toPersistenceMap(),
+        where: 'id = ?',
+        whereArgs: [row.id],
+      );
+      try {
+        await ConnectionSecretsStore.writeForConnection(
+          row.id!,
+          password: previousSecrets.password,
+          connectionString: previousSecrets.connectionString,
+        );
+      } catch (_) {
+        // Best-effort restore of previous secrets; surface the original error.
+      }
+      rethrow;
+    }
   }
 
+  /// Deletes a connection. SQLite deletion always proceeds even if the secure
+  /// store delete fails (e.g. missing key or unavailable libsecret daemon).
   Future<void> removeConnection(int id) async {
-    await ConnectionSecretsStore.deleteForConnection(id);
+    try {
+      await ConnectionSecretsStore.deleteForConnection(id);
+    } catch (_) {
+      // Do not block removing the connection metadata when the OS store fails.
+    }
     final db = await _open();
     await db.delete('connections', where: 'id = ?', whereArgs: [id]);
   }
@@ -446,6 +506,8 @@ class ConnectionRow {
     this.authSource,
     this.useSSL = false,
     this.connectionString,
+    this.extensionId,
+    this.driverOptions,
     this.folderId,
     this.sortOrder = 0,
     required this.createdAt,
@@ -462,9 +524,20 @@ class ConnectionRow {
   final String? authSource;
   final bool useSSL;
   final String? connectionString;
+
+  /// Package id of an installed extension driver (null for built-ins).
+  final String? extensionId;
+
+  /// Non-secret driver-specific form values as JSON text.
+  final String? driverOptions;
+
   final int? folderId;
   final int sortOrder;
   final String createdAt;
+
+  /// True when this row is backed by an installed extension driver.
+  bool get isExtensionDriver =>
+      extensionId != null && extensionId!.trim().isNotEmpty;
 
   Map<String, Object?> toMap() => {
         'type': type,
@@ -477,6 +550,8 @@ class ConnectionRow {
         'auth_source': authSource,
         'use_ssl': useSSL ? 1 : 0,
         'connection_string': connectionString,
+        'extension_id': extensionId,
+        'driver_options': driverOptions,
         'folder_id': folderId,
         'sort_order': sortOrder,
         'created_at': createdAt,
@@ -494,6 +569,8 @@ class ConnectionRow {
         'auth_source': authSource,
         'use_ssl': useSSL ? 1 : 0,
         'connection_string': null,
+        'extension_id': extensionId,
+        'driver_options': driverOptions,
         'folder_id': folderId,
         'sort_order': sortOrder,
         'created_at': createdAt,
@@ -511,6 +588,8 @@ class ConnectionRow {
         authSource: m['auth_source'] as String?,
         useSSL: _sqliteInt(m['use_ssl']) == 1,
         connectionString: m['connection_string'] as String?,
+        extensionId: m['extension_id'] as String?,
+        driverOptions: m['driver_options'] as String?,
         folderId: _sqliteInt(m['folder_id']),
         sortOrder: _sqliteInt(m['sort_order']) ?? 0,
         createdAt: m['created_at'] as String,

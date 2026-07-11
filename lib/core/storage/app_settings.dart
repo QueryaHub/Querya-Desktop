@@ -4,6 +4,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import '../motion/querya_motion_scope.dart';
 import '../theme/querya_theme_preset.dart';
+import '../updater/update_manifest.dart';
 import 'local_db.dart';
 
 /// Default cap on rows shown in SQL workspace result grids (full result may be larger).
@@ -113,6 +114,9 @@ abstract final class AppSettingsKeys {
   static const themeAnimationEnabled = 'theme_animation_enabled';
   static const uiScale = 'ui_scale';
   static const motionLevel = 'motion_level';
+  static const updateChannel = 'update_channel';
+  static const checkForUpdatesOnStartup = 'check_for_updates_on_startup';
+  static const updateDismissedVersion = 'update_dismissed_version';
 }
 
 /// Bumps [listenable] when any preference is persisted (theme, legacy listeners).
@@ -548,6 +552,65 @@ class AppSettings {
       QueryaMotionLevel.full => 'full',
     };
     await LocalDb.instance.setAppSetting(AppSettingsKeys.motionLevel, stored);
+    AppSettingsRevision.bump();
+  }
+
+  /// Update distribution channel (`stable` hides pre-releases).
+  Future<UpdateChannel> getUpdateChannel() async {
+    final v =
+        await LocalDb.instance.getAppSetting(AppSettingsKeys.updateChannel);
+    return switch (v) {
+      'dev' => UpdateChannel.dev,
+      _ => UpdateChannel.stable,
+    };
+  }
+
+  Future<void> setUpdateChannel(UpdateChannel channel) async {
+    final stored = switch (channel) {
+      UpdateChannel.dev => 'dev',
+      UpdateChannel.stable => 'stable',
+    };
+    await LocalDb.instance.setAppSetting(AppSettingsKeys.updateChannel, stored);
+    AppSettingsRevision.bump();
+  }
+
+  /// Whether to poll GitHub Releases silently when the app starts.
+  Future<bool> getCheckForUpdatesOnStartup() async {
+    final v = await LocalDb.instance.getAppSetting(
+      AppSettingsKeys.checkForUpdatesOnStartup,
+    );
+    if (v == null || v.isEmpty) return true;
+    return v == 'true' || v == '1';
+  }
+
+  Future<void> setCheckForUpdatesOnStartup(bool enabled) async {
+    await LocalDb.instance.setAppSetting(
+      AppSettingsKeys.checkForUpdatesOnStartup,
+      enabled ? 'true' : 'false',
+    );
+    AppSettingsRevision.bump();
+  }
+
+  /// Version the user dismissed via "Remind me later" (badge hidden until newer).
+  Future<String?> getUpdateDismissedVersion() async {
+    final v = await LocalDb.instance.getAppSetting(
+      AppSettingsKeys.updateDismissedVersion,
+    );
+    if (v == null || v.isEmpty) return null;
+    return v;
+  }
+
+  Future<void> setUpdateDismissedVersion(String? version) async {
+    if (version == null || version.isEmpty) {
+      await LocalDb.instance.deleteAppSetting(
+        AppSettingsKeys.updateDismissedVersion,
+      );
+    } else {
+      await LocalDb.instance.setAppSetting(
+        AppSettingsKeys.updateDismissedVersion,
+        version,
+      );
+    }
     AppSettingsRevision.bump();
   }
 }

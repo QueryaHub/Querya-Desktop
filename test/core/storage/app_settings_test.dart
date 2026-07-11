@@ -5,6 +5,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme_preset.dart';
+import 'package:querya_desktop/core/updater/update_manifest.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// path_provider has no implementation in plain `flutter test`; LocalDb needs a path.
@@ -70,6 +71,10 @@ void main() {
     await LocalDb.instance
         .deleteAppSetting(AppSettingsKeys.sqlHistoryMaxEntries);
     await AppSettings.instance.clearThemeSettings();
+    await LocalDb.instance.deleteAppSetting(AppSettingsKeys.updateChannel);
+    await LocalDb.instance.deleteAppSetting(
+      AppSettingsKeys.checkForUpdatesOnStartup,
+    );
   });
 
   group('AppSettings', () {
@@ -352,6 +357,18 @@ void main() {
       expect(SqlWorkspaceSettingsRevision.listenable.value, before);
       expect(sqlCalls, 0);
       SqlWorkspaceSettingsRevision.listenable.removeListener(listener);
+    });
+
+    test('update channel defaults to stable and roundtrips dev', () async {
+      expect(await AppSettings.instance.getUpdateChannel(), UpdateChannel.stable);
+      await AppSettings.instance.setUpdateChannel(UpdateChannel.dev);
+      expect(await AppSettings.instance.getUpdateChannel(), UpdateChannel.dev);
+    });
+
+    test('check for updates on startup defaults to true', () async {
+      expect(await AppSettings.instance.getCheckForUpdatesOnStartup(), isTrue);
+      await AppSettings.instance.setCheckForUpdatesOnStartup(false);
+      expect(await AppSettings.instance.getCheckForUpdatesOnStartup(), isFalse);
     });
   });
 }

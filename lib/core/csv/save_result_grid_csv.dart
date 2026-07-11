@@ -16,13 +16,12 @@ enum SaveResultGridCsvOutcome {
   error,
 }
 
-/// Opens a platform save dialog and writes [columns]/[rows] as CSV.
+/// Opens a platform save dialog and streams [columns]/[rows] as CSV to disk.
 Future<SaveResultGridCsvOutcome> saveResultGridCsvFile({
   required List<String> columns,
   required List<List<String>> rows,
   String? suggestedName,
 }) async {
-  final csv = resultGridAsCsv(columns, rows);
   final name = suggestedName ??
       'querya_results_${DateTime.now().toIso8601String().replaceAll(':', '-')}.csv';
   final location = await getSaveLocation(
@@ -35,10 +34,21 @@ Future<SaveResultGridCsvOutcome> saveResultGridCsvFile({
   if (path == null || path.isEmpty) {
     return SaveResultGridCsvOutcome.cancelled;
   }
+  IOSink? sink;
   try {
-    await File(path).writeAsString(csv);
+    sink = File(path).openWrite();
+    await writeResultGridCsv(
+      sink,
+      columns: columns,
+      rows: rows,
+    );
+    await sink.close();
+    sink = null;
     return SaveResultGridCsvOutcome.written;
   } on Object {
+    try {
+      await sink?.close();
+    } catch (_) {}
     return SaveResultGridCsvOutcome.error;
   }
 }

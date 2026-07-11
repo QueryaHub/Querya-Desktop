@@ -156,6 +156,57 @@ jobs:
       - name: Build macOS (release)
         run: flutter build macos --release
 
+      - name: Sign and notarize macOS app
+        if: ${{ secrets.MACOS_SIGN_IDENTITY != '' && secrets.MACOS_NOTARY_KEY != '' }}
+        env:
+          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+          MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          APP="build/macos/Build/Products/Release/querya_desktop.app"
+          test -d "$APP"
+
+          KEYCHAIN="$RUNNER_TEMP/build.keychain"
+          security create-keychain -p "$MACOS_KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 1200 "$KEYCHAIN"
+          security default-keychain -s "$KEYCHAIN"
+          security unlock-keychain -p "$MACOS_KEYCHAIN_PASSWORD" "$KEYCHAIN"
+
+          echo "$MACOS_CERTIFICATE_P12" | base64 --decode -o "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$KEYCHAIN" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MACOS_KEYCHAIN_PASSWORD" "$KEYCHAIN"
+
+          # Sign nested code from the inside out (avoids --deep pitfalls).
+          find "$APP/Contents/Frameworks" -type f \( -name "*.dylib" -o -name "*.so" \) -exec \
+            codesign --force --timestamp --options runtime --sign "$MACOS_SIGN_IDENTITY" {} +
+          find "$APP/Contents/Frameworks" -type d -name "*.framework" -exec \
+            codesign --force --timestamp --options runtime --sign "$MACOS_SIGN_IDENTITY" {} +
+          find "$APP/Contents/MacOS" -maxdepth 1 -type f -exec \
+            codesign --force --timestamp --options runtime --sign "$MACOS_SIGN_IDENTITY" {} +
+
+          # Sign the main app bundle with hardened runtime and signed entitlements.
+          codesign --force --timestamp --options runtime \
+            --entitlements macos/Runner/ReleaseSigned.entitlements \
+            --sign "$MACOS_SIGN_IDENTITY" "$APP"
+
+          codesign --verify --deep --strict --verbose=2 "$APP"
+
+          NOTARY_KEY="$RUNNER_TEMP/notary_key.p8"
+          echo -n "$MACOS_NOTARY_KEY" | base64 --decode -o "$NOTARY_KEY"
+          ditto -c -k --keepParent "$APP" "$RUNNER_TEMP/notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" \
+            --key "$NOTARY_KEY" \
+            --key-id "$MACOS_NOTARY_KEY_ID" \
+            --issuer "$MACOS_NOTARY_ISSUER_ID" \
+            --wait
+          xcrun stapler staple "$APP"
+          rm "$NOTARY_KEY"
+
       - name: Zip macOS .app
         run: |
           APP="build/macos/Build/Products/Release/querya_desktop.app"
@@ -204,7 +255,7 @@ jobs:
             echo "### Downloads"
             echo "- **Linux**: \`Querya-Desktop-${VERSION}-linux.zip\`"
             echo "- **Windows**: \`Querya-Desktop-${VERSION}-windows.zip\`"
-            echo "- **macOS**: \`Querya-Desktop-${VERSION}-macos.zip\` (unsigned \`.app\` in zip; right-click → Open on first launch)"
+            echo "- **macOS**: \`Querya-Desktop-${VERSION}-macos.zip\` (signed, notarized and stapled \`.app\` when Apple Developer secrets are configured; otherwise unsigned)"
             echo ""
             echo "Verify checksums: \`SHA256SUMS.txt\`"
             echo ""

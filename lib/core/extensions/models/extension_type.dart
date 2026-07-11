@@ -1,6 +1,9 @@
 enum ExtensionType {
   databaseDriver('database_driver'),
   theme('theme'),
+
+  /// Level-1 embedded scripts: SDUI transformers, SQL formatters, parsers.
+  script('script'),
   unknown('unknown');
 
   final String value;

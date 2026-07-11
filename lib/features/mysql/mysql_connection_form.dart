@@ -4,7 +4,9 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/mysql_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
 import 'package:querya_desktop/shared/widgets/form_validity_notifier.dart';
+import 'package:querya_desktop/shared/widgets/ssl_certificate_fields.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Shows MySQL / MariaDB connection form dialog.
@@ -42,6 +44,9 @@ class _MysqlConnectionFormContentState
   final _usernameController = material.TextEditingController(text: 'root');
   final _passwordController = material.TextEditingController();
   final _connectionStringController = material.TextEditingController();
+  final _sslRootCertController = material.TextEditingController();
+  final _sslCertController = material.TextEditingController();
+  final _sslKeyController = material.TextEditingController();
 
   bool _useSSL = true;
   bool _showPassword = false;
@@ -64,7 +69,72 @@ class _MysqlConnectionFormContentState
     ]) {
       _formValidNotifier.listenTo(c);
     }
+    _connectionStringController.addListener(_populateSslFieldsFromUri);
+    _sslRootCertController.addListener(_syncUriSslParams);
+    _sslCertController.addListener(_syncUriSslParams);
+    _sslKeyController.addListener(_syncUriSslParams);
     _formValidNotifier.seed();
+  }
+
+  void _populateSslFieldsFromUri() {
+    populateSslControllersFromUri(
+      _connectionStringController.text,
+      rootCertController: _sslRootCertController,
+      clientCertController: _sslCertController,
+      clientKeyController: _sslKeyController,
+    );
+  }
+
+  void _syncUriSslParams() {
+    syncSslControllersIntoUri(
+      _connectionStringController,
+      rootCertController: _sslRootCertController,
+      clientCertController: _sslCertController,
+      clientKeyController: _sslKeyController,
+    );
+    _formValidNotifier.seed();
+  }
+
+  bool _hasSslCertificateFields() {
+    return hasSslCertificateControllerValues(
+      rootCertController: _sslRootCertController,
+      clientCertController: _sslCertController,
+      clientKeyController: _sslKeyController,
+    );
+  }
+
+  String _buildConnectionUri() {
+    final paths = sslPathsFromControllers(
+      rootCertController: _sslRootCertController,
+      clientCertController: _sslCertController,
+      clientKeyController: _sslKeyController,
+    );
+    final user = _usernameController.text.trim();
+    final pass = _passwordController.text;
+    final db = _databaseController.text.trim();
+    final userInfoParts = <String>[
+      if (user.isNotEmpty) Uri.encodeComponent(user),
+      if (pass.isNotEmpty) Uri.encodeComponent(pass),
+    ];
+    final params = <String, String>{
+      ...sslCertificateQueryParams(paths),
+      if (!_useSSL) 'ssl-mode': 'disable',
+    };
+    return Uri(
+      scheme: 'mysql',
+      userInfo: userInfoParts.isEmpty ? null : userInfoParts.join(':'),
+      host: _hostController.text.trim(),
+      port: int.tryParse(_portController.text.trim()) ?? 3306,
+      path: db.isEmpty ? null : '/$db',
+      queryParameters: params.isEmpty ? null : params,
+    ).toString();
+  }
+
+  String _effectiveConnectionUri() {
+    final uri = _connectionStringController.text.trim();
+    if (uri.isNotEmpty) return uri;
+    if (!_hasSslCertificateFields()) return '';
+    return _buildConnectionUri();
   }
 
   bool _looksLikeMysqlUri(String s) {
@@ -107,7 +177,7 @@ class _MysqlConnectionFormContentState
       _testResult = null;
     });
     try {
-      final uri = _connectionStringController.text.trim();
+      final uri = _effectiveConnectionUri();
       final dbText = _databaseController.text.trim();
       final conn = MysqlConnection(
         id: 0,
@@ -122,7 +192,7 @@ class _MysqlConnectionFormContentState
             : _usernameController.text.trim(),
         password:
             _passwordController.text.isEmpty ? null : _passwordController.text,
-        useSSL: _useSSL,
+        useSSL: _useSSL || _hasSslCertificateFields(),
         connectionString: uri.isEmpty ? null : uri,
       );
       final ok = await conn.testConnection();
@@ -134,11 +204,12 @@ class _MysqlConnectionFormContentState
 
   void _save() {
     if (!_formValidNotifier.value) return;
+    _syncUriSslParams();
     final name = _nameController.text.trim();
     final host = _hostController.text.trim();
     final port = int.tryParse(_portController.text.trim()) ?? 3306;
     final database = _databaseController.text.trim();
-    final uri = _connectionStringController.text.trim();
+    final uri = _effectiveConnectionUri();
     final displayName = name.isNotEmpty
         ? name
         : (uri.isNotEmpty
@@ -156,7 +227,7 @@ class _MysqlConnectionFormContentState
           _passwordController.text.isEmpty ? null : _passwordController.text,
       databaseName:
           uri.isNotEmpty ? null : (database.isEmpty ? null : database),
-      useSSL: _useSSL,
+      useSSL: _useSSL || _hasSslCertificateFields(),
       connectionString: uri.isEmpty ? null : uri,
       folderId: widget.folderId,
       createdAt: DateTime.now().toUtc().toIso8601String(),
@@ -167,6 +238,10 @@ class _MysqlConnectionFormContentState
   @override
   void dispose() {
     _dismissTimer?.cancel();
+    _connectionStringController.removeListener(_populateSslFieldsFromUri);
+    _sslRootCertController.removeListener(_syncUriSslParams);
+    _sslCertController.removeListener(_syncUriSslParams);
+    _sslKeyController.removeListener(_syncUriSslParams);
     for (final c in [
       _nameController,
       _hostController,
@@ -185,6 +260,9 @@ class _MysqlConnectionFormContentState
     _usernameController.dispose();
     _passwordController.dispose();
     _connectionStringController.dispose();
+    _sslRootCertController.dispose();
+    _sslCertController.dispose();
+    _sslKeyController.dispose();
     super.dispose();
   }
 
@@ -261,7 +339,8 @@ class _MysqlConnectionFormContentState
                     ).muted().small(),
                     const Gap(4),
                     const Text(
-                      'Query params: ssl-mode (disable, require), database.',
+                      'Query params: ssl-mode (disable, require), database, '
+                      'sslrootcert, sslcert, sslkey.',
                     ).muted().small(),
                     const Gap(8),
                     TextField(
@@ -364,6 +443,15 @@ class _MysqlConnectionFormContentState
                         const Text('Use SSL/TLS').small(),
                       ],
                     ),
+                    if (_useSSL) ...[
+                      const Gap(16),
+                      SslCertificateFields(
+                        rootCertController: _sslRootCertController,
+                        clientCertController: _sslCertController,
+                        clientKeyController: _sslKeyController,
+                        onChanged: _syncUriSslParams,
+                      ),
+                    ],
                   ],
                 ),
               ),
