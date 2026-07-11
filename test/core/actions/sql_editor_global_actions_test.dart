@@ -109,7 +109,7 @@ void main() {
 
     expect(
       find.text(
-        'Select a PostgreSQL, MySQL, or SQLite connection to edit SQL files.',
+        'Select a SQL-capable connection (PostgreSQL, MySQL, SQLite, or an installed driver) to edit SQL files.',
       ),
       findsOneWidget,
     );
