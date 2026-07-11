@@ -18,9 +18,9 @@ class ExtensionSupport {
   static const databaseDriverPreviewNotice =
       'Database drivers in the Marketplace are preview listings only until they '
       'declare a policy-compliant OS process sandbox. '
-      'Querya connects using built-in Dart drivers (PostgreSQL, MySQL, SQLite, '
-      'Redis, MongoDB). Sandboxed external drivers install when '
-      '`sandbox.engine` is `process` and passes SandboxPolicy.';
+      'Installed sandboxed drivers (`sandbox.engine: process`) appear in New '
+      'Connection after Registration. Built-in Dart drivers (PostgreSQL, MySQL, '
+      'SQLite, Redis, MongoDB) remain available without an extension.';
 
   static const databaseDriverMissingEntryMessage =
       'Driver package is missing its main entry file. Installation aborted.';
@@ -63,4 +63,51 @@ class ExtensionSupport {
       );
     }
   }
+
+  /// Ensures the driver main entry (and other files under `bin/`) are executable.
+  ///
+  /// Zip extraction does not preserve Unix mode bits; without this, sandbox
+  /// launch fails with exit code 1 / "Permission denied".
+  static Future<void> ensureDriverExecutables({
+    required ExtensionManifest manifest,
+    required Directory installDir,
+  }) async {
+    if (manifest.type != ExtensionType.databaseDriver) return;
+
+    final main = manifest.main?.trim();
+    if (main != null && main.isNotEmpty) {
+      await _markExecutableIfExists(File(p.join(installDir.path, main)));
+    }
+
+    final binDir = Directory(p.join(installDir.path, 'bin'));
+    if (await binDir.exists()) {
+      await for (final entity in binDir.list()) {
+        if (entity is File) {
+          await _markExecutableIfExists(entity);
+        }
+      }
+    }
+  }
+
+  static Future<void> _markExecutableIfExists(File file) async {
+    if (!await file.exists()) return;
+    if (Platform.isWindows) return;
+    try {
+      final result = await Process.run('chmod', ['+x', file.path]);
+      if (result.exitCode != 0) {
+        throw MarketplaceException(
+          'Failed to mark "${file.path}" as executable: ${result.stderr}',
+        );
+      }
+    } on Object catch (e) {
+      if (e is MarketplaceException) rethrow;
+      throw MarketplaceException(
+        'Failed to mark "${file.path}" as executable: $e',
+      );
+    }
+  }
+
+  /// Ensures a single driver entry is executable (no-op on Windows).
+  static Future<void> markExecutableIfExists(File file) =>
+      _markExecutableIfExists(file);
 }

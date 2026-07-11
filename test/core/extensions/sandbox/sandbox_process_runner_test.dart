@@ -330,6 +330,14 @@ void main() {
     });
   });
 
+  group('SandboxProcessRunner.detectBwrapAvailability', () {
+    test('returns a bool without throwing on linux', () async {
+      if (!Platform.isLinux) return;
+      final available = await SandboxProcessRunner.detectBwrapAvailability();
+      expect(available, isA<bool>());
+    });
+  });
+
   group('SandboxProcessRunner integration (bwrap)', () {
     test('linux bwrap launch path creates scratch and dispose cleans it',
         () async {

@@ -20,7 +20,7 @@ class SqlEditorGlobalActions extends StatelessWidget {
   final Widget child;
 
   static const _noSqlConnectionMessage =
-      'Select a PostgreSQL, MySQL, or SQLite connection to edit SQL files.';
+      'Select a SQL-capable connection (PostgreSQL, MySQL, SQLite, or an installed driver) to edit SQL files.';
 
   @override
   Widget build(BuildContext context) {
