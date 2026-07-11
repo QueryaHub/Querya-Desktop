@@ -160,6 +160,17 @@ void main() {
       expect(schema.roots.single.id, 'databases');
       expect(schema.roots.single.expandable, isTrue);
     });
+
+    test('maps node_type snake_case into meta nodeType', () {
+      final node = SduiTreeNode.fromJson(const {
+        'id': 'table.default.customers',
+        'label': 'customers',
+        'node_type': 'table',
+        'has_children': true,
+      });
+      expect(node.meta['nodeType'], 'table');
+      expect(node.expandable, isTrue);
+    });
   });
 
   group('SduiTreeBuilder', () {
@@ -200,6 +211,36 @@ void main() {
 
       expect(fetches, 1);
       expect(find.text('analytics'), findsOneWidget);
+    });
+
+    testWidgets('selects table nodes by id prefix when meta is empty',
+        (tester) async {
+      SduiTreeNode? selected;
+      final schema = SduiTreeSchema.fromJson(const {
+        'roots': [
+          {
+            'id': 'table.default.customers',
+            'label': 'customers',
+            'has_children': true,
+          },
+        ],
+      });
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: SduiTreeBuilder(
+              schema: schema,
+              onNodeSelected: (node) => selected = node,
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('customers'));
+      await tester.pumpAndSettle();
+
+      expect(selected?.id, 'table.default.customers');
     });
   });
 }

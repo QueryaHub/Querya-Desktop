@@ -43,16 +43,25 @@ class SduiTreeNode {
         }
       }
     }
-    final metaRaw = json['meta'];
+    final metaRaw = json['meta'] ?? json['metadata'];
     final meta = <String, Object?>{};
     if (metaRaw is Map) {
       meta.addAll(metaRaw.map((k, v) => MapEntry('$k', v)));
+    }
+    if (json['nodeType'] != null && !meta.containsKey('nodeType')) {
+      meta['nodeType'] = json['nodeType'];
+    }
+    if (json['node_type'] != null && !meta.containsKey('nodeType')) {
+      meta['nodeType'] = json['node_type'];
     }
 
     return SduiTreeNode(
       id: '${json['id'] ?? ''}',
       label: '${json['label'] ?? json['name'] ?? json['id'] ?? ''}',
-      expandable: json['expandable'] == true || json['lazy'] == true,
+      expandable: json['expandable'] == true ||
+          json['lazy'] == true ||
+          json['hasChildren'] == true ||
+          json['has_children'] == true,
       children: children,
       icon: json['icon'] as String?,
       meta: meta,
@@ -67,7 +76,8 @@ class SduiTreeSchema {
   final List<SduiTreeNode> roots;
 
   factory SduiTreeSchema.fromJson(Map<String, dynamic> json) {
-    final rootsRaw = json['roots'] ?? json['children'] ?? json['nodes'];
+    final rootsRaw =
+        json['roots'] ?? json['rootNodes'] ?? json['children'] ?? json['nodes'];
     final roots = <SduiTreeNode>[];
     if (rootsRaw is List) {
       for (final item in rootsRaw) {

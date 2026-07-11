@@ -7,6 +7,7 @@ import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/features/connections/connection_type_choice.dart';
+import 'package:querya_desktop/features/connections/driver_icon.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Database type for built-in new connections.
@@ -363,7 +364,20 @@ class _FilterDropdowns extends StatelessWidget {
               QueryaDropdownItem<ConnectionTypeChoice?>(
                 value: type,
                 label: type.label,
-                leading: material.Icon(type.icon, size: 18),
+                leading: type.iconFile != null
+                    ? DriverIconImage(
+                        path: type.iconFile!,
+                        size: 18,
+                        fallbackIcon: type.icon,
+                      )
+                    : type.iconAsset != null
+                        ? material.Image.asset(
+                            type.iconAsset!,
+                            width: 18,
+                            height: 18,
+                            fit: material.BoxFit.contain,
+                          )
+                        : material.Icon(type.icon, size: 18),
               ),
           ],
           onSelected: onTypeChanged,
@@ -448,14 +462,20 @@ class _DbTypeCardState extends material.State<_DbTypeCard> {
                   child: material.SizedBox(
                     width: 52,
                     height: 52,
-                    child: widget.choice.iconAsset != null
-                        ? material.Image.asset(
-                            widget.choice.iconAsset!,
-                            fit: material.BoxFit.contain,
-                            filterQuality: material.FilterQuality.medium,
+                    child: widget.choice.iconFile != null
+                        ? DriverIconImage(
+                            path: widget.choice.iconFile!,
+                            size: 52,
+                            fallbackIcon: widget.choice.icon,
                           )
-                        : material.Icon(widget.choice.icon,
-                            size: 52, color: t.primary),
+                        : widget.choice.iconAsset != null
+                            ? material.Image.asset(
+                                widget.choice.iconAsset!,
+                                fit: material.BoxFit.contain,
+                                filterQuality: material.FilterQuality.medium,
+                              )
+                            : material.Icon(widget.choice.icon,
+                                size: 52, color: t.primary),
                   ),
                 ),
               ),

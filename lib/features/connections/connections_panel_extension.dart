@@ -9,6 +9,7 @@ class _ExtensionConnectionTile extends StatefulWidget {
     this.iconAsset,
     required this.onRemove,
     this.onTap,
+    this.onObjectSelected,
     this.isExpanded = false,
     this.onExpandedChanged,
   });
@@ -19,6 +20,13 @@ class _ExtensionConnectionTile extends StatefulWidget {
   final String? iconAsset;
   final VoidCallback onRemove;
   final VoidCallback? onTap;
+
+  /// Fires when a table/view node is clicked in the schema tree.
+  final void Function(
+    ConnectionRow connection,
+    String database,
+    String name,
+  )? onObjectSelected;
   final bool isExpanded;
   final ValueChanged<bool>? onExpandedChanged;
 
@@ -31,33 +39,49 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
   bool _loading = false;
   String? _error;
   SduiTreeSchema? _schema;
+  String? _iconFilePath;
 
   @override
   void initState() {
     super.initState();
+    _resolveIconFile();
     if (widget.isExpanded) {
       _loadTree();
+    }
+  }
+
+  Future<void> _resolveIconFile() async {
+    await LocalExtensionRegistry.instance.load();
+    if (!mounted) return;
+    final path =
+        ExtensionDriverCatalog.iconFileForConnection(widget.connection);
+    if (path != null) {
+      setState(() => _iconFilePath = path);
     }
   }
 
   @override
   void didUpdateWidget(_ExtensionConnectionTile oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.connection.extensionId != oldWidget.connection.extensionId ||
+        widget.connection.type != oldWidget.connection.type) {
+      _resolveIconFile();
+    }
     if (widget.isExpanded && !oldWidget.isExpanded) {
       if (_schema == null && !_loading) {
         _loadTree();
       }
-    } else if (!widget.isExpanded && oldWidget.isExpanded) {
-      setState(() {
-        _schema = null;
-        _loading = false;
-        _error = null;
-      });
     }
   }
 
   void _toggle() {
-    widget.onExpandedChanged?.call(!widget.isExpanded);
+    final next = !widget.isExpanded;
+    widget.onExpandedChanged?.call(next);
+    if (next) {
+      // Opening the schema tree should activate this connection in the workspace
+      // (SQL editor / table view), same as clicking the connection row.
+      widget.onTap?.call();
+    }
   }
 
   Future<void> _loadTree() async {
@@ -88,121 +112,219 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
         .expandTreeNode(widget.connection, nodeId);
   }
 
+  /// Node ids follow `<kind>.<database>.<name>` (e.g. `table.analytics.events`).
+  void _onNodeSelected(SduiTreeNode node) {
+    final callback = widget.onObjectSelected;
+    if (callback == null) return;
+    final parts = node.id.split('.');
+    if (parts.length < 3) return;
+    final kind = parts[0];
+    if (kind != 'table' && kind != 'view') return;
+    final database = parts[1];
+    final name = parts.sublist(2).join('.');
+    if (database.isEmpty || name.isEmpty) return;
+    callback(widget.connection, database, name);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final iconWidget = widget.iconAsset != null
-        ? material.Image.asset(
-            widget.iconAsset!,
-            width: 16,
-            height: 16,
-            fit: material.BoxFit.contain,
-            errorBuilder: (_, __, ___) => material.Icon(
-              widget.icon,
-              size: 16,
-              color: theme.colorScheme.primary,
-            ),
-          )
-        : material.Icon(
-            widget.icon,
-            size: 16,
-            color: theme.colorScheme.primary,
-          );
+    final material.Widget iconWidget;
+    if (_iconFilePath != null) {
+      iconWidget = DriverIconImage(
+        path: _iconFilePath!,
+        size: 16,
+        fallbackIcon: widget.icon,
+      );
+    } else if (widget.iconAsset != null) {
+      iconWidget = material.Image.asset(
+        widget.iconAsset!,
+        width: 16,
+        height: 16,
+        fit: material.BoxFit.contain,
+        errorBuilder: (_, __, ___) => material.Icon(
+          widget.icon,
+          size: 16,
+          color: theme.colorScheme.primary,
+        ),
+      );
+    } else {
+      iconWidget = material.Icon(
+        widget.icon,
+        size: 16,
+        color: theme.colorScheme.primary,
+      );
+    }
 
     return material.Padding(
-      padding: const material.EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const material.EdgeInsets.only(bottom: 2),
       child: material.Column(
-        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        crossAxisAlignment: material.CrossAxisAlignment.start,
+        mainAxisSize: material.MainAxisSize.min,
         children: [
-          _sidebarConnectionShell(
-            context: context,
-            isSelected: widget.isSelected,
-            onTap: widget.onTap,
-            child: material.Padding(
-              padding: const material.EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 6,
-              ),
-              child: material.Row(
-                children: [
-                  material.GestureDetector(
-                    onTap: _toggle,
-                    behavior: material.HitTestBehavior.opaque,
+          material.Row(
+            children: [
+              material.MouseRegion(
+                cursor: material.SystemMouseCursors.click,
+                child: material.InkWell(
+                  onTap: _toggle,
+                  borderRadius: material.BorderRadius.circular(4),
+                  child: material.Padding(
+                    padding: const material.EdgeInsets.all(2),
                     child: material.AnimatedRotation(
                       turns: widget.isExpanded ? 0.25 : 0,
-                      duration: const Duration(milliseconds: 150),
+                      duration: context.motionDuration(QueryaMotion.fast),
+                      curve: context.motionCurve(QueryaMotion.standardCurve),
                       child: material.Icon(
                         material.Icons.chevron_right_rounded,
-                        size: 18,
+                        size: 16,
                         color: theme.colorScheme.mutedForeground,
                       ),
                     ),
                   ),
-                  const Gap(4),
-                  iconWidget,
-                  const Gap(8),
-                  material.Expanded(
-                    child: material.Text(
-                      widget.connection.name,
-                      overflow: material.TextOverflow.ellipsis,
-                      style: material.TextStyle(
-                        fontSize: 13,
-                        fontWeight: widget.isSelected
-                            ? material.FontWeight.w600
-                            : material.FontWeight.w500,
-                        color: theme.colorScheme.foreground,
-                      ),
-                    ),
-                  ),
-                  material.Tooltip(
-                    message: 'Remove',
-                    child: material.InkWell(
-                      onTap: widget.onRemove,
-                      borderRadius: material.BorderRadius.circular(6),
-                      child: material.Padding(
-                        padding: const material.EdgeInsets.all(4),
-                        child: material.Icon(
-                          material.Icons.close_rounded,
-                          size: 14,
-                          color: theme.colorScheme.mutedForeground,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
+              material.Expanded(
+                child: _sidebarConnectionShell(
+                  context: context,
+                  isSelected: widget.isSelected,
+                  onTap: widget.onTap,
+                  child: material.Padding(
+                    padding: const material.EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 6,
+                    ),
+                    child: material.Row(
+                      children: [
+                        iconWidget,
+                        const Gap(8),
+                        material.Expanded(
+                          child: material.Column(
+                            crossAxisAlignment:
+                                material.CrossAxisAlignment.start,
+                            mainAxisSize: material.MainAxisSize.min,
+                            children: [
+                              material.Text(
+                                widget.connection.name,
+                                overflow: material.TextOverflow.ellipsis,
+                                maxLines: 1,
+                                style: material.TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: widget.isSelected
+                                      ? material.FontWeight.w600
+                                      : material.FontWeight.w500,
+                                  color: theme.colorScheme.foreground,
+                                ),
+                              ),
+                              if (widget.connection.host != null)
+                                material.Text(
+                                  '${widget.connection.host}:${widget.connection.port ?? ''}',
+                                  overflow: material.TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                  style: material.TextStyle(
+                                    fontSize: 11,
+                                    color: theme.colorScheme.mutedForeground,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        material.Tooltip(
+                          message: 'Remove',
+                          child: material.InkWell(
+                            onTap: widget.onRemove,
+                            borderRadius: material.BorderRadius.circular(6),
+                            child: material.Padding(
+                              padding: const material.EdgeInsets.all(4),
+                              child: material.Icon(
+                                material.Icons.close_rounded,
+                                size: 14,
+                                color: theme.colorScheme.mutedForeground,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          QueryaAnimatedExpand(
+            expanded: widget.isExpanded,
+            child: material.Column(
+              crossAxisAlignment: material.CrossAxisAlignment.stretch,
+              mainAxisSize: material.MainAxisSize.min,
+              children: [
+                if (_loading)
+                  material.Padding(
+                    padding: const material.EdgeInsets.only(
+                      left: 28,
+                      top: 4,
+                      bottom: 4,
+                    ),
+                    child: material.Row(
+                      children: [
+                        const material.SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: material.CircularProgressIndicator(
+                            strokeWidth: 1.5,
+                          ),
+                        ),
+                        const Gap(8),
+                        const Text('Loading...').muted().xSmall(),
+                      ],
+                    ),
+                  )
+                else if (_error != null)
+                  material.Padding(
+                    padding: const material.EdgeInsets.only(
+                      left: 28,
+                      top: 4,
+                      bottom: 8,
+                    ),
+                    child: material.Column(
+                      crossAxisAlignment: material.CrossAxisAlignment.start,
+                      children: [
+                        material.SelectableText(
+                          _error!,
+                          style: material.TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.destructive,
+                          ),
+                        ),
+                        const material.SizedBox(height: 6),
+                        GhostButton(
+                          onPressed: _loadTree,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  )
+                else if (_schema != null)
+                  material.Padding(
+                    padding: const material.EdgeInsets.only(left: 20),
+                    child: _schema!.roots.isEmpty
+                        ? material.Padding(
+                            padding:
+                                const material.EdgeInsets.fromLTRB(0, 8, 8, 8),
+                            child: const Text(
+                              'No databases found on this server.',
+                            ).muted().small(),
+                          )
+                        : SduiTreeBuilder(
+                            schema: _schema!,
+                            fetchChildren: _fetchChildren,
+                            onNodeSelected: _onNodeSelected,
+                            maxHeight: kConnectionTreeMaxVisibleRows *
+                                kConnectionTreeRowExtent,
+                          ),
+                  ),
+              ],
             ),
           ),
-          if (widget.isExpanded) ...[
-            if (_loading)
-              const material.Padding(
-                padding: material.EdgeInsets.fromLTRB(36, 8, 8, 8),
-                child: material.SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: material.CircularProgressIndicator(strokeWidth: 2),
-                ),
-              )
-            else if (_error != null)
-              material.Padding(
-                padding: const material.EdgeInsets.fromLTRB(28, 4, 8, 8),
-                child: material.SelectableText(
-                  _error!,
-                  style: material.TextStyle(
-                    fontSize: 11,
-                    color: theme.colorScheme.destructive,
-                  ),
-                ),
-              )
-            else if (_schema != null)
-              material.Padding(
-                padding: const material.EdgeInsets.only(left: 20),
-                child: SduiTreeBuilder(
-                  schema: _schema!,
-                  fetchChildren: _fetchChildren,
-                ),
-              ),
-          ],
         ],
       ),
     );
