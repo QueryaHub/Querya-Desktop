@@ -1,12 +1,16 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
+import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
+import 'package:querya_desktop/features/connections/connection_type_choice.dart';
+import 'package:querya_desktop/features/connections/driver_icon.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
-/// Database type for new connection.
+/// Database type for built-in new connections.
 enum ConnectionType {
   postgresql,
   mysql,
@@ -40,25 +44,20 @@ extension ConnectionTypeX on ConnectionType {
         ConnectionType.sqlite => null,
       };
   bool get isSql =>
-      this == ConnectionType.postgresql || this == ConnectionType.mysql || this == ConnectionType.sqlite;
+      this == ConnectionType.postgresql ||
+      this == ConnectionType.mysql ||
+      this == ConnectionType.sqlite;
 }
-
-const _sqlTypes = [ConnectionType.postgresql, ConnectionType.mysql, ConnectionType.sqlite];
-const _noSqlTypes = [ConnectionType.redis, ConnectionType.mongodb];
-const _allTypes = [
-  ConnectionType.postgresql,
-  ConnectionType.mysql,
-  ConnectionType.sqlite,
-  ConnectionType.redis,
-  ConnectionType.mongodb
-];
 
 enum _Category { all, sql, nosql }
 
-/// Shows a dialog to choose database type (PostgreSQL, MySQL, Redis, MongoDB).
-/// Returns the selected type or null if cancelled.
-Future<ConnectionType?> showNewConnectionDialog(BuildContext context) {
-  return showAppDialog<ConnectionType>(
+/// Shows a dialog to choose database type (built-in + installed extension drivers).
+Future<ConnectionTypeChoice?> showNewConnectionDialog(
+  material.BuildContext context,
+) async {
+  await LocalExtensionRegistry.instance.load();
+  if (!context.mounted) return null;
+  return showAppDialog<ConnectionTypeChoice>(
     context: context,
     builder: (context) => material.Dialog(
       backgroundColor: material.Colors.transparent,
@@ -79,7 +78,7 @@ class _NewConnectionDialogContent extends material.StatefulWidget {
 class _NewConnectionDialogContentState
     extends material.State<_NewConnectionDialogContent> {
   _Category _category = _Category.all;
-  ConnectionType? _selectedType;
+  ConnectionTypeChoice? _selected;
   final _searchController = material.TextEditingController();
   String _searchQuery = '';
 
@@ -89,18 +88,30 @@ class _NewConnectionDialogContentState
     super.dispose();
   }
 
-  List<ConnectionType> get _categoryTypes => switch (_category) {
-        _Category.all => _allTypes,
-        _Category.sql => _sqlTypes,
-        _Category.nosql => _noSqlTypes,
+  List<ConnectionTypeChoice> get _categoryTypes => switch (_category) {
+        _Category.all => ExtensionDriverCatalog.allChoices(),
+        _Category.sql => ExtensionDriverCatalog.sqlChoices(),
+        _Category.nosql => ExtensionDriverCatalog.noSqlChoices(),
       };
 
-  List<ConnectionType> get _filteredTypes {
+  List<ConnectionTypeChoice> get _filteredTypes {
     if (_searchQuery.trim().isEmpty) return _categoryTypes;
     final q = _searchQuery.trim().toLowerCase();
     return _categoryTypes
         .where((t) => t.label.toLowerCase().contains(q))
         .toList();
+  }
+
+  bool _sameChoice(ConnectionTypeChoice? a, ConnectionTypeChoice? b) {
+    if (identical(a, b)) return true;
+    if (a == null || b == null) return false;
+    return switch ((a, b)) {
+      (BuiltInConnectionType a, BuiltInConnectionType b) => a.type == b.type,
+      (ExtensionDriverChoice a, ExtensionDriverChoice b) =>
+        a.manifest.id == b.manifest.id &&
+            a.driver.driverId == b.driver.driverId,
+      _ => false,
+    };
   }
 
   @override
@@ -167,9 +178,10 @@ class _NewConnectionDialogContentState
                               placeholder: const Text('Search...'),
                               onChanged: (v) => setState(() {
                                 _searchQuery = v;
-                                if (_selectedType != null &&
-                                    !_filteredTypes.contains(_selectedType)) {
-                                  _selectedType = null;
+                                if (_selected != null &&
+                                    !_filteredTypes.any(
+                                        (t) => _sameChoice(t, _selected))) {
+                                  _selected = null;
                                 }
                               }),
                             ),
@@ -181,19 +193,20 @@ class _NewConnectionDialogContentState
                     _FilterDropdowns(
                       stackVertically: stackFilters,
                       category: _category,
-                      selectedType: _selectedType,
+                      selected: _selected,
                       filteredTypes: _filteredTypes,
                       onCategoryChanged: (category) {
                         setState(() {
                           _category = category;
-                          if (_selectedType != null &&
-                              !_categoryTypes.contains(_selectedType)) {
-                            _selectedType = null;
+                          if (_selected != null &&
+                              !_categoryTypes.any(
+                                  (t) => _sameChoice(t, _selected))) {
+                            _selected = null;
                           }
                         });
                       },
                       onTypeChanged: (type) =>
-                          setState(() => _selectedType = type),
+                          setState(() => _selected = type),
                     ),
                   ],
                 ),
@@ -234,11 +247,11 @@ class _NewConnectionDialogContentState
                               children: [
                                 for (final t in _filteredTypes)
                                   _DbTypeCard(
-                                    type: t,
+                                    choice: t,
                                     theme: theme,
-                                    selected: _selectedType == t,
+                                    selected: _sameChoice(_selected, t),
                                     onTap: () =>
-                                        setState(() => _selectedType = t),
+                                        setState(() => _selected = t),
                                   ),
                               ],
                             ),
@@ -266,10 +279,10 @@ class _NewConnectionDialogContentState
                     ),
                     const material.SizedBox(width: 12),
                     PrimaryButton(
-                      onPressed: _selectedType == null
+                      onPressed: _selected == null
                           ? null
                           : () =>
-                              material.Navigator.of(context).pop(_selectedType),
+                              material.Navigator.of(context).pop(_selected),
                       child: const Text('Next'),
                     ),
                   ],
@@ -287,7 +300,7 @@ class _FilterDropdowns extends StatelessWidget {
   const _FilterDropdowns({
     required this.stackVertically,
     required this.category,
-    required this.selectedType,
+    required this.selected,
     required this.filteredTypes,
     required this.onCategoryChanged,
     required this.onTypeChanged,
@@ -295,10 +308,10 @@ class _FilterDropdowns extends StatelessWidget {
 
   final bool stackVertically;
   final _Category category;
-  final ConnectionType? selectedType;
-  final List<ConnectionType> filteredTypes;
+  final ConnectionTypeChoice? selected;
+  final List<ConnectionTypeChoice> filteredTypes;
   final void Function(_Category category) onCategoryChanged;
-  final void Function(ConnectionType? type) onTypeChanged;
+  final void Function(ConnectionTypeChoice? type) onTypeChanged;
 
   static const _categoryItems = [
     QueryaDropdownItem(
@@ -341,17 +354,30 @@ class _FilterDropdowns extends StatelessWidget {
       children: [
         const Text('Database type').small().muted(),
         const material.SizedBox(height: 4),
-        QueryaDropdown<ConnectionType?>(
-          value: selectedType,
+        QueryaDropdown<ConnectionTypeChoice?>(
+          value: selected,
           hint: filteredTypes.isEmpty ? 'No matches' : 'Select database…',
           enabled: filteredTypes.isNotEmpty,
           expandToParent: true,
           items: [
             for (final type in filteredTypes)
-              QueryaDropdownItem<ConnectionType?>(
+              QueryaDropdownItem<ConnectionTypeChoice?>(
                 value: type,
                 label: type.label,
-                leading: material.Icon(type.icon, size: 18),
+                leading: type.iconFile != null
+                    ? DriverIconImage(
+                        path: type.iconFile!,
+                        size: 18,
+                        fallbackIcon: type.icon,
+                      )
+                    : type.iconAsset != null
+                        ? material.Image.asset(
+                            type.iconAsset!,
+                            width: 18,
+                            height: 18,
+                            fit: material.BoxFit.contain,
+                          )
+                        : material.Icon(type.icon, size: 18),
               ),
           ],
           onSelected: onTypeChanged,
@@ -383,13 +409,13 @@ class _FilterDropdowns extends StatelessWidget {
 
 class _DbTypeCard extends material.StatefulWidget {
   const _DbTypeCard({
-    required this.type,
+    required this.choice,
     required this.theme,
     required this.selected,
     required this.onTap,
   });
 
-  final ConnectionType type;
+  final ConnectionTypeChoice choice;
   final ColorScheme theme;
   final bool selected;
   final VoidCallback onTap;
@@ -436,14 +462,20 @@ class _DbTypeCardState extends material.State<_DbTypeCard> {
                   child: material.SizedBox(
                     width: 52,
                     height: 52,
-                    child: widget.type.iconAsset != null
-                        ? material.Image.asset(
-                            widget.type.iconAsset!,
-                            fit: material.BoxFit.contain,
-                            filterQuality: material.FilterQuality.medium,
+                    child: widget.choice.iconFile != null
+                        ? DriverIconImage(
+                            path: widget.choice.iconFile!,
+                            size: 52,
+                            fallbackIcon: widget.choice.icon,
                           )
-                        : material.Icon(widget.type.icon,
-                            size: 52, color: t.primary),
+                        : widget.choice.iconAsset != null
+                            ? material.Image.asset(
+                                widget.choice.iconAsset!,
+                                fit: material.BoxFit.contain,
+                                filterQuality: material.FilterQuality.medium,
+                              )
+                            : material.Icon(widget.choice.icon,
+                                size: 52, color: t.primary),
                   ),
                 ),
               ),
@@ -460,7 +492,7 @@ class _DbTypeCardState extends material.State<_DbTypeCard> {
                           maxWidth: math.max(48.0, lc.maxWidth),
                         ),
                         child: material.Text(
-                          widget.type.label,
+                          widget.choice.label,
                           textAlign: material.TextAlign.center,
                           maxLines: 2,
                           overflow: material.TextOverflow.ellipsis,

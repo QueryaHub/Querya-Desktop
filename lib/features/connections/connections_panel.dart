@@ -59,6 +59,11 @@ import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/database/redis_info.dart';
 import 'package:querya_desktop/core/database/sqlite_service.dart';
+import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
+import 'package:querya_desktop/core/extensions/extension_driver_session.dart';
+import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
+import 'package:querya_desktop/core/sdui/sdui_tree_builder.dart';
+import 'package:querya_desktop/core/sdui/sdui_tree_schema.dart';
 import 'package:querya_desktop/core/storage/folders_storage.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
@@ -66,6 +71,7 @@ import 'package:querya_desktop/core/motion/querya_animated_expand.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
+import 'package:querya_desktop/features/connections/driver_icon.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/core/database/redis_service.dart';
 import 'package:querya_desktop/app/app_shutdown.dart';
@@ -82,6 +88,7 @@ part 'connections_panel_postgres_connection.dart';
 part 'connections_panel_mysql.dart';
 part 'connections_panel_pg_tree.dart';
 part 'connections_panel_sqlite.dart';
+part 'connections_panel_extension.dart';
 
 /// Opens the PostgreSQL SQL tab; optional tree fields seed the editor for the
 /// row that was right-clicked (left-click is not required).
@@ -155,6 +162,7 @@ class ConnectionsPanel extends StatefulWidget {
     this.onMysqlOpenSqlWorkspace,
     this.onSqliteObjectSelected,
     this.onSqliteOpenSqlWorkspace,
+    this.onExtensionObjectSelected,
 
     /// When true, [initState] does not call [_loadData]. Widget tests that seed
     /// SQLite in setUp should call [ConnectionsPanelState.reloadConnectionsFromDb]
@@ -209,6 +217,13 @@ class ConnectionsPanel extends StatefulWidget {
 
   /// Opens the SQLite workspace home and switches to the SQL tab.
   final void Function(ConnectionRow connection)? onSqliteOpenSqlWorkspace;
+
+  /// Fires when a table/view node is clicked in an extension driver tree.
+  final void Function(
+    ConnectionRow connection,
+    String database,
+    String name,
+  )? onExtensionObjectSelected;
 
   final bool skipInitialDbLoadForTest;
 
@@ -303,6 +318,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
 
   Future<void> _removeConnection(int id) async {
     await MongoService.instance.disconnectByConnectionId(id);
+    await ExtensionDriverSession.instance.disconnect(id);
     SqliteService.instance.interrupt(
       ConnectionRow(id: id, type: 'sqlite', name: '', createdAt: ''),
       mode: SqliteSessionMode.readOnly,
@@ -346,6 +362,9 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     } else if (conn.type == 'mongodb') {
       await MongoService.instance.disconnectByConnectionId(id);
     }
+    if (ExtensionDriverCatalog.isExtensionDriverConnection(conn)) {
+      await ExtensionDriverSession.instance.disconnect(id);
+    }
   }
 
   Future<void> disconnectAll() async {
@@ -384,7 +403,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
       'mysql' => material.Icons.table_chart_rounded,
       'redis' => material.Icons.memory_rounded,
       'sqlite' => material.Icons.folder_open_rounded,
-      _ => material.Icons.settings_ethernet_rounded,
+      _ => material.Icons.extension_rounded,
     };
   }
 
@@ -473,6 +492,18 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         onTap: () => widget.onConnectionSelected?.call(conn),
         onSqliteObjectSelected: widget.onSqliteObjectSelected,
         onSqliteOpenSqlWorkspace: widget.onSqliteOpenSqlWorkspace,
+        isExpanded: isExpanded,
+        onExpandedChanged: handleExpandedChanged,
+      );
+    } else if (ExtensionDriverCatalog.isExtensionDriverConnection(conn)) {
+      return _ExtensionConnectionTile(
+        connection: conn,
+        isSelected: isSelected,
+        icon: _iconForType(conn.type),
+        iconAsset: _iconAssetForType(conn.type),
+        onRemove: () => _removeConnection(conn.id!),
+        onTap: () => widget.onConnectionSelected?.call(conn),
+        onObjectSelected: widget.onExtensionObjectSelected,
         isExpanded: isExpanded,
         onExpandedChanged: handleExpandedChanged,
       );

@@ -45,6 +45,41 @@ void main() {
       expect(schema.fields[4].options, hasLength(2));
       expect(schema.fields[5].type, SduiFieldType.filePicker);
     });
+
+    test('accepts extension-style key and boolean aliases', () {
+      final schema = SduiFormSchema.fromJson(const {
+        'type': 'form',
+        'id': 'clickhouse_connection_form',
+        'fields': [
+          {
+            'key': 'host',
+            'label': 'Host',
+            'type': 'text',
+            'required': true,
+            'defaultValue': 'localhost',
+          },
+          {
+            'key': 'port',
+            'label': 'Port',
+            'type': 'number',
+            'defaultValue': 8123,
+          },
+          {
+            'key': 'safe_mode',
+            'label': 'Safe Mode',
+            'type': 'boolean',
+            'defaultValue': true,
+          },
+        ],
+      });
+
+      expect(schema.fields, hasLength(3));
+      expect(schema.fields[0].id, 'host');
+      expect(schema.fields[0].defaultValue, 'localhost');
+      expect(schema.fields[1].id, 'port');
+      expect(schema.fields[2].id, 'safe_mode');
+      expect(schema.fields[2].type, SduiFieldType.checkbox);
+    });
   });
 
   group('SduiFormBuilder', () {
@@ -125,6 +160,17 @@ void main() {
       expect(schema.roots.single.id, 'databases');
       expect(schema.roots.single.expandable, isTrue);
     });
+
+    test('maps node_type snake_case into meta nodeType', () {
+      final node = SduiTreeNode.fromJson(const {
+        'id': 'table.default.customers',
+        'label': 'customers',
+        'node_type': 'table',
+        'has_children': true,
+      });
+      expect(node.meta['nodeType'], 'table');
+      expect(node.expandable, isTrue);
+    });
   });
 
   group('SduiTreeBuilder', () {
@@ -165,6 +211,36 @@ void main() {
 
       expect(fetches, 1);
       expect(find.text('analytics'), findsOneWidget);
+    });
+
+    testWidgets('selects table nodes by id prefix when meta is empty',
+        (tester) async {
+      SduiTreeNode? selected;
+      final schema = SduiTreeSchema.fromJson(const {
+        'roots': [
+          {
+            'id': 'table.default.customers',
+            'label': 'customers',
+            'has_children': true,
+          },
+        ],
+      });
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: SduiTreeBuilder(
+              schema: schema,
+              onNodeSelected: (node) => selected = node,
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('customers'));
+      await tester.pumpAndSettle();
+
+      expect(selected?.id, 'table.default.customers');
     });
   });
 }

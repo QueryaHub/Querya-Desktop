@@ -120,7 +120,14 @@ class SandboxProcessRunner {
       baseDirectory: scratchBaseDirectory,
     );
 
-    final usesBwrap = bwrapAvailable ?? await _detectBwrap();
+    final detected = bwrapAvailable ?? await detectBwrapAvailability();
+    final usesBwrap = detected;
+    if (bwrapAvailable == null && !usesBwrap) {
+      debugPrint(
+        'SandboxProcessRunner: bubblewrap unavailable or cannot set up user '
+        'namespaces on this system; launching $pluginId without OS sandbox.',
+      );
+    }
     final command = SandboxLaunchCommand.build(
       pluginExecutable: pluginExecutable,
       pluginArguments: pluginArguments,
@@ -170,12 +177,30 @@ class SandboxProcessRunner {
     }
   }
 
-  static Future<bool> _detectBwrap() async {
+  /// Whether [bwrap] is installed and can run a trivial command on this host.
+  ///
+  /// Some kernels/sessions deny user-namespace uid maps even when `which bwrap`
+  /// succeeds; in that case we fall back to direct plugin execution.
+  static Future<bool> detectBwrapAvailability() async {
     if (!Platform.isLinux) return false;
     try {
-      final result = await Process.run('which', ['bwrap']);
-      return result.exitCode == 0;
-    } catch (_) {
+      final which = await Process.run('which', ['bwrap']);
+      if (which.exitCode != 0) return false;
+
+      final probe = await Process.run(
+        'bwrap',
+        const ['--ro-bind', '/', '/', '/bin/true'],
+      );
+      if (probe.exitCode != 0) {
+        final detail = '${probe.stderr}'.trim();
+        if (detail.isNotEmpty) {
+          debugPrint('SandboxProcessRunner: bwrap probe failed: $detail');
+        }
+        return false;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('SandboxProcessRunner: bwrap probe error: $e');
       return false;
     }
   }

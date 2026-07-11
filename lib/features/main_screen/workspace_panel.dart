@@ -28,6 +28,7 @@ import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/motion/querya_cross_fade_stack.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
+import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -42,6 +43,8 @@ import 'package:querya_desktop/features/postgresql/postgres_workspace_home.dart'
 import 'package:querya_desktop/features/redis/redis_explorer_view.dart';
 import 'package:querya_desktop/features/redis/redis_view.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart' show SqliteObjectKind;
+import 'package:querya_desktop/features/extensions/extension_sql_workspace.dart';
+import 'package:querya_desktop/features/extensions/extension_table_view.dart';
 import 'package:querya_desktop/features/sqlite/sqlite_table_view.dart';
 import 'package:querya_desktop/features/sqlite/sqlite_workspace_home.dart';
 import 'query_editor_tab.dart';
@@ -63,6 +66,7 @@ class WorkspacePanel extends StatefulWidget {
     this.mysqlSqlTabRequestToken = 0,
     this.selectedSqliteObject,
     this.sqliteSqlTabRequestToken = 0,
+    this.selectedExtensionObject,
     this.isReadOnly = false,
     this.onRequestNewConnection,
   });
@@ -118,6 +122,12 @@ class WorkspacePanel extends StatefulWidget {
 
   /// Incremented by [MainScreen] to switch the SQLite home view to the SQL tab.
   final int sqliteSqlTabRequestToken;
+
+  /// When set, the user selected a table/view in an extension driver tree.
+  final ({
+    String database,
+    String name,
+  })? selectedExtensionObject;
 
   /// Empty-state hero: primary CTA to add a connection.
   final void Function()? onRequestNewConnection;
@@ -233,6 +243,24 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
                 tableName: sq.name,
                 isView: sq.kind == SqliteObjectKind.view,
               );
+        break;
+      default:
+        if (ExtensionDriverCatalog.isExtensionDriverConnection(activeConn)) {
+          final obj = widget.selectedExtensionObject;
+          driverWorkspace = obj == null
+              ? ExtensionSqlWorkspace(
+                  key: ValueKey('ext_sql_${activeConn.id}'),
+                  connectionRow: activeConn,
+                )
+              : ExtensionTableView(
+                  key: ValueKey(
+                    'ext_table_${activeConn.id}_${obj.database}_${obj.name}',
+                  ),
+                  connectionRow: activeConn,
+                  database: obj.database,
+                  tableName: obj.name,
+                );
+        }
         break;
     }
 
@@ -481,3 +509,4 @@ class _ComingSoonTab extends StatelessWidget {
     );
   }
 }
+
