@@ -1,5 +1,7 @@
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/extensions/extension_support.dart';
+import 'package:querya_desktop/core/extensions/local_extension_installer.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
@@ -32,6 +34,8 @@ class _ExtensionManagerContentState extends material.State<_ExtensionManagerCont
   List<ExtensionManifest> _marketplace = [];
   bool _loading = true;
   final Map<String, double> _installingProgress = {};
+  bool _sideloading = false;
+  String? _sideloadError;
 
   @override
   void initState() {
@@ -99,6 +103,39 @@ class _ExtensionManagerContentState extends material.State<_ExtensionManagerCont
       setState(() {
         _installed = LocalExtensionRegistry.instance.manifests;
       });
+    }
+  }
+
+  Future<void> _installFromLocalFile() async {
+    setState(() {
+      _sideloading = true;
+      _sideloadError = null;
+    });
+    try {
+      final file = await openFile(
+        acceptedTypeGroups: const [
+          XTypeGroup(
+            label: 'Querya extension',
+            extensions: ['zip', 'qext'],
+          ),
+        ],
+      );
+      if (file == null) return;
+      await LocalExtensionInstaller().installFromPath(file.path);
+      await LocalExtensionRegistry.instance.reload();
+      if (!mounted) return;
+      setState(() {
+        _installed = LocalExtensionRegistry.instance.manifests;
+        _tabIndex = 0;
+      });
+    } on MarketplaceException catch (e) {
+      if (mounted) setState(() => _sideloadError = e.message);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _sideloadError = 'Failed to install extension: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _sideloading = false);
     }
   }
 
@@ -208,30 +245,65 @@ class _ExtensionManagerContentState extends material.State<_ExtensionManagerCont
         child: material.CircularProgressIndicator(),
       );
     }
-    if (_installed.isEmpty) {
-      return const material.Center(
-        child: material.Padding(
-          padding: material.EdgeInsets.all(32.0),
-          child: Text('No extensions installed yet. Explore the Marketplace tab to get started!'),
+    return material.Column(
+      crossAxisAlignment: material.CrossAxisAlignment.stretch,
+      children: [
+        material.Padding(
+          padding: const material.EdgeInsets.fromLTRB(24, 16, 24, 0),
+          child: material.Row(
+            children: [
+              OutlineButton(
+                onPressed: _sideloading ? null : _installFromLocalFile,
+                child: Text(
+                  _sideloading ? 'Installing…' : 'Install from file…',
+                ),
+              ),
+              const material.SizedBox(width: 12),
+              material.Expanded(
+                child: const Text(
+                  'Install a local .zip or .qext package without the Marketplace.',
+                ).muted().small(),
+              ),
+            ],
+          ),
         ),
-      );
-    }
-    return material.ListView.separated(
-      padding: const material.EdgeInsets.all(24),
-      itemCount: _installed.length,
-      separatorBuilder: (_, __) => const material.SizedBox(height: 16),
-      itemBuilder: (ctx, i) {
-        final manifest = _installed[i];
-        final isInstalling = _installingProgress.containsKey(manifest.id);
-        final progress = _installingProgress[manifest.id];
-        return ExtensionCard(
-          manifest: manifest,
-          isInstalled: true,
-          isInstalling: isInstalling,
-          installProgress: progress,
-          onUninstall: () => _uninstallExtension(manifest),
-        );
-      },
+        if (_sideloadError != null)
+          material.Padding(
+            padding: const material.EdgeInsets.fromLTRB(24, 8, 24, 0),
+            child: Text(_sideloadError!).small(),
+          ),
+        material.Expanded(
+          child: _installed.isEmpty
+              ? const material.Center(
+                  child: material.Padding(
+                    padding: material.EdgeInsets.all(32.0),
+                    child: Text(
+                      'No extensions installed yet. Use Install from file… '
+                      'or explore the Marketplace tab.',
+                    ),
+                  ),
+                )
+              : material.ListView.separated(
+                  padding: const material.EdgeInsets.all(24),
+                  itemCount: _installed.length,
+                  separatorBuilder: (_, __) =>
+                      const material.SizedBox(height: 16),
+                  itemBuilder: (ctx, i) {
+                    final manifest = _installed[i];
+                    final isInstalling =
+                        _installingProgress.containsKey(manifest.id);
+                    final progress = _installingProgress[manifest.id];
+                    return ExtensionCard(
+                      manifest: manifest,
+                      isInstalled: true,
+                      isInstalling: isInstalling,
+                      installProgress: progress,
+                      onUninstall: () => _uninstallExtension(manifest),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 
