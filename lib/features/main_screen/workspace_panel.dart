@@ -33,6 +33,7 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
+import 'package:querya_desktop/features/mysql/mysql_routine_view.dart';
 import 'package:querya_desktop/features/mysql/mysql_table_view.dart';
 import 'package:querya_desktop/features/mysql/mysql_workspace_home.dart';
 import 'package:querya_desktop/features/mongodb/mongo_explorer_view.dart';
@@ -183,22 +184,35 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
         break;
       case 'mysql':
         final my = widget.selectedMysqlObject;
-        driverWorkspace = my == null
-            ? MysqlWorkspaceHome(
-                key: ValueKey('mysql_home_${activeConn.id}'),
-                connectionRow: activeConn,
-                sqlTabRequestToken: widget.mysqlSqlTabRequestToken,
-                isReadOnly: widget.isReadOnly,
-              )
-            : MysqlTableView(
-                key: ValueKey(
-                  'mysql_${activeConn.id}_${my.database}_${my.name}_${my.kind}',
-                ),
-                connectionRow: activeConn,
-                database: my.database,
-                tableName: my.name,
-                isView: my.kind == MysqlObjectKind.view,
-              );
+        if (my == null) {
+          driverWorkspace = MysqlWorkspaceHome(
+            key: ValueKey('mysql_home_${activeConn.id}'),
+            connectionRow: activeConn,
+            sqlTabRequestToken: widget.mysqlSqlTabRequestToken,
+            isReadOnly: widget.isReadOnly,
+          );
+        } else if (my.kind == MysqlObjectKind.procedure ||
+            my.kind == MysqlObjectKind.function) {
+          driverWorkspace = MysqlRoutineView(
+            key: ValueKey(
+              'mysql_${activeConn.id}_${my.database}_${my.name}_${my.kind}',
+            ),
+            connectionRow: activeConn,
+            database: my.database,
+            routineName: my.name,
+            isFunction: my.kind == MysqlObjectKind.function,
+          );
+        } else {
+          driverWorkspace = MysqlTableView(
+            key: ValueKey(
+              'mysql_${activeConn.id}_${my.database}_${my.name}_${my.kind}',
+            ),
+            connectionRow: activeConn,
+            database: my.database,
+            tableName: my.name,
+            isView: my.kind == MysqlObjectKind.view,
+          );
+        }
         break;
       case 'mongodb':
         final mongoDb = widget.selectedMongoDb;
