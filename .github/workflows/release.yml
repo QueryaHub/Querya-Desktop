@@ -157,7 +157,6 @@ jobs:
         run: flutter build macos --release
 
       - name: Sign and notarize macOS app
-        if: ${{ secrets.MACOS_SIGN_IDENTITY != '' && secrets.MACOS_NOTARY_KEY != '' }}
         env:
           MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
           MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
@@ -168,6 +167,10 @@ jobs:
           MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
         run: |
           set -euo pipefail
+          if [ -z "${MACOS_SIGN_IDENTITY:-}" ] || [ -z "${MACOS_NOTARY_KEY:-}" ]; then
+            echo "Skipping macOS signing/notarization — secrets not configured."
+            exit 0
+          fi
           APP="build/macos/Build/Products/Release/querya_desktop.app"
           test -d "$APP"
 
