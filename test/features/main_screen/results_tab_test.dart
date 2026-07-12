@@ -97,5 +97,46 @@ void main() {
           tester.widgetList(find.byType(material.Row)).length;
       expect(dataRowWidgets, lessThan(80));
     });
+
+    testWidgets(
+        'recalculates column widths when updated with different columns without throwing RangeError',
+        (tester) async {
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: const material.SizedBox(
+            height: 400,
+            width: 600,
+            child: VirtualResultGrid(
+              columns: ['id', 'name'],
+              rows: [
+                ['1', 'Alpha'],
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Now update the grid with 5 columns instead of 2
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: const material.SizedBox(
+            height: 400,
+            width: 600,
+            child: VirtualResultGrid(
+              columns: ['id', 'name', 'email', 'status', 'created_at'],
+              rows: [
+                ['1', 'Alpha', 'alpha@example.com', 'active', '2026-07-13'],
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('email'), findsOneWidget);
+      expect(find.text('created_at'), findsOneWidget);
+    });
   });
 }
