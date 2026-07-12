@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/motion/querya_cross_fade_stack.dart';
+import 'package:querya_desktop/core/motion/querya_motion.dart';
+import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/core/storage/local_db.dart' show ConnectionRow;
+import 'package:querya_desktop/features/sqlite/sqlite_overview_tab.dart';
 import 'package:querya_desktop/features/sqlite/sqlite_sql_workspace.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -20,6 +24,37 @@ class SqliteWorkspaceHome extends material.StatefulWidget {
 }
 
 class _SqliteWorkspaceHomeState extends material.State<SqliteWorkspaceHome> {
+  int _tab = 0;
+  int _lastAppliedSqlTabToken = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _lastAppliedSqlTabToken = widget.sqlTabRequestToken;
+  }
+
+  @override
+  void didUpdateWidget(covariant SqliteWorkspaceHome oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.connectionRow.id != widget.connectionRow.id) {
+      _lastAppliedSqlTabToken = widget.sqlTabRequestToken;
+      return;
+    }
+    final t = widget.sqlTabRequestToken;
+    if (t > _lastAppliedSqlTabToken) {
+      _lastAppliedSqlTabToken = t;
+      material.WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() => _tab = 1);
+      });
+    }
+  }
+
+  void _selectTab(int i) {
+    if (i == _tab) return;
+    setState(() => _tab = i);
+  }
+
   @override
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context);
@@ -44,23 +79,54 @@ class _SqliteWorkspaceHomeState extends material.State<SqliteWorkspaceHome> {
                 ),
               ],
               const Spacer(),
-              material.Container(
-                padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: material.BoxDecoration(
-                  color: theme.colorScheme.background,
-                  borderRadius: material.BorderRadius.circular(6),
-                ),
-                child: const Text('SQL').small().semiBold(),
-              ),
+              ...List.generate(2, (i) {
+                final labels = ['Overview', 'SQL'];
+                final selected = _tab == i;
+                return material.Padding(
+                  padding: const material.EdgeInsets.only(left: 6),
+                  child: material.MouseRegion(
+                    cursor: material.SystemMouseCursors.click,
+                    child: material.GestureDetector(
+                      onTap: () => _selectTab(i),
+                      child: material.AnimatedContainer(
+                        duration: context.motionDuration(QueryaMotion.fast),
+                        curve: context.motionCurve(QueryaMotion.enter),
+                        padding: const material.EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: material.BoxDecoration(
+                          color: selected
+                              ? theme.colorScheme.background
+                              : material.Colors.transparent,
+                          borderRadius: material.BorderRadius.circular(6),
+                        ),
+                        child: selected
+                            ? Text(labels[i]).small().semiBold()
+                            : Text(labels[i]).small().muted(),
+                      ),
+                    ),
+                  ),
+                );
+              }),
             ],
           ),
         ),
         const Divider(height: 1),
         Expanded(
-          child: SqliteSqlWorkspace(
-            key: ValueKey('sqlite_sql_${widget.connectionRow.id}'),
-            connectionRow: widget.connectionRow,
-            isReadOnly: widget.isReadOnly,
+          child: QueryaCrossFadeStack(
+            index: _tab,
+            children: [
+              SqliteOverviewTab(
+                key: ValueKey('sqlite_overview_${widget.connectionRow.id}'),
+                connectionRow: widget.connectionRow,
+              ),
+              SqliteSqlWorkspace(
+                key: ValueKey('sqlite_sql_${widget.connectionRow.id}'),
+                connectionRow: widget.connectionRow,
+                isReadOnly: widget.isReadOnly,
+              ),
+            ],
           ),
         ),
       ],

@@ -300,6 +300,14 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
     } catch (_) {}
   }
 
+  Future<void> _runTxCommand(String sql) async {
+    _sqlController.value = material.TextEditingValue(
+      text: sql,
+      selection: material.TextSelection.collapsed(offset: sql.length),
+    );
+    await _execute();
+  }
+
   @override
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context);
@@ -357,6 +365,9 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
                           );
                         }
                       : null,
+                  onBegin: _running ? null : () => _runTxCommand('START TRANSACTION;'),
+                  onCommit: _running ? null : () => _runTxCommand('COMMIT;'),
+                  onRollback: _running ? null : () => _runTxCommand('ROLLBACK;'),
                 ),
                 const Divider(height: 1),
                 Expanded(
@@ -409,6 +420,9 @@ class _MysqlSqlToolbar extends material.StatelessWidget {
     required this.onQueryTimeoutChanged,
     required this.onOpenPreferences,
     this.onOpenHistory,
+    required this.onBegin,
+    required this.onCommit,
+    required this.onRollback,
   });
 
   final Future<void> Function()? onExecute;
@@ -417,6 +431,9 @@ class _MysqlSqlToolbar extends material.StatelessWidget {
   final void Function(int?) onQueryTimeoutChanged;
   final VoidCallback onOpenPreferences;
   final VoidCallback? onOpenHistory;
+  final VoidCallback? onBegin;
+  final VoidCallback? onCommit;
+  final VoidCallback? onRollback;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -489,6 +506,18 @@ class _MysqlSqlToolbar extends material.StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+              OutlineButton(
+                onPressed: onBegin,
+                child: const Text('Begin'),
+              ),
+              OutlineButton(
+                onPressed: onCommit,
+                child: const Text('Commit'),
+              ),
+              OutlineButton(
+                onPressed: onRollback,
+                child: const Text('Rollback'),
               ),
             ],
           ),
