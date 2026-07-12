@@ -190,6 +190,53 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     unawaited(_fetch());
   }
 
+  Future<void> _showDdlDialog() async {
+    final conn = _connection;
+    if (conn == null || !conn.isConnected) return;
+    material.showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const material.Center(
+        child: material.CircularProgressIndicator(),
+      ),
+    );
+    try {
+      final ddl = await conn.getObjectDdl(widget.tableName);
+      if (!mounted) return;
+      material.Navigator.of(context).pop();
+      await material.showDialog<void>(
+        context: context,
+        builder: (ctx) => material.AlertDialog(
+          title: material.Text(
+              '${widget.isView ? "View" : "Table"} DDL · ${widget.tableName}'),
+          content: material.SizedBox(
+            width: 600,
+            height: 400,
+            child: material.SingleChildScrollView(
+              child: material.SelectableText(
+                ddl,
+                style: const material.TextStyle(
+                    fontFamily: 'monospace', fontSize: 13),
+              ),
+            ),
+          ),
+          actions: [
+            material.TextButton(
+              onPressed: () => material.Navigator.of(ctx).pop(),
+              child: const material.Text('Close'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      material.Navigator.of(context).pop();
+      material.ScaffoldMessenger.of(context).showSnackBar(
+        material.SnackBar(content: material.Text('Failed to fetch DDL: $e')),
+      );
+    }
+  }
+
   String _paginationLabel() {
     if (_columnNames.isEmpty && _rows.isEmpty) return '';
     final start = _offset + 1;
@@ -241,7 +288,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
       decoration: material.BoxDecoration(
         border: material.Border(
           right: material.BorderSide(
-            color: cs.border.withValues(alpha: 0.15),
+            color: cs.border.withValues(alpha: 0.22),
             width: 1,
           ),
         ),
@@ -249,7 +296,6 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
       child: material.Text(
         name,
         overflow: material.TextOverflow.ellipsis,
-        maxLines: 1,
         style: material.TextStyle(
           fontSize: 12,
           fontWeight: material.FontWeight.w600,
@@ -260,7 +306,6 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
   }
 
   material.Widget _dataCell(ColorScheme cs, String value) {
-    final isNull = value == 'NULL';
     return material.Container(
       width: 150,
       padding: const material.EdgeInsets.symmetric(horizontal: 10),
@@ -273,15 +318,16 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
           ),
         ),
       ),
-      child: material.Text(
+      child: material.SelectableText(
         value,
+        maxLines: 1,
         style: material.TextStyle(
           fontSize: 12,
-          color: isNull ? cs.mutedForeground.withValues(alpha: 0.5) : cs.foreground,
-          fontStyle: isNull ? material.FontStyle.italic : material.FontStyle.normal,
+          fontFamily: 'monospace',
+          color: value == 'NULL'
+              ? cs.mutedForeground.withValues(alpha: 0.7)
+              : cs.foreground,
         ),
-        overflow: material.TextOverflow.ellipsis,
-        maxLines: 1,
       ),
     );
   }
@@ -293,8 +339,19 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     if (_loading && _columnNames.isEmpty) {
       return material.Container(
         color: cs.background,
-        child: const material.Center(
-          child: material.CircularProgressIndicator(),
+        child: material.Center(
+          child: material.Row(
+            mainAxisSize: material.MainAxisSize.min,
+            children: [
+              const material.SizedBox(
+                width: 16,
+                height: 16,
+                child: material.CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const Gap(12),
+              const Text('Loading table data...').muted().small(),
+            ],
+          ),
         ),
       );
     }
@@ -384,6 +441,12 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
                   ),
                 ),
                 const Gap(8),
+                OutlineButton(
+                  size: ButtonSize.small,
+                  onPressed: _loading ? null : () => unawaited(_showDdlDialog()),
+                  child: const Text('DDL'),
+                ),
+                const Gap(6),
                 OutlineButton(
                   onPressed: _loading ? null : () => unawaited(_fetch()),
                   child: const Text('Refresh'),

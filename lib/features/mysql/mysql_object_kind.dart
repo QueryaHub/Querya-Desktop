@@ -2,4 +2,6 @@
 enum MysqlObjectKind {
   table,
   view,
+  procedure,
+  function,
 }

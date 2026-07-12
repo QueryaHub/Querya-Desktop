@@ -155,6 +155,42 @@ class SqliteConnection {
     return rows.map((r) => r['name'] as String).toList();
   }
 
+  /// Returns the DDL (`sql`) of a table or view from sqlite_master.
+  Future<String> getObjectDdl(String objectName) async {
+    final rows = await execute(
+      "SELECT sql FROM sqlite_master WHERE name = :name",
+      [objectName],
+    );
+    if (rows.isEmpty) return '-- No definition found for $objectName';
+    return (rows.first['sql'] as String?) ?? '-- Empty definition';
+  }
+
+  /// Returns database overview info (`page_count`, `page_size`, `journal_mode`, version, etc.).
+  Future<Map<String, dynamic>> databaseOverview() async {
+    final verRows = await execute('SELECT sqlite_version() AS ver');
+    final ver = (verRows.isNotEmpty ? verRows.first['ver'] : '') ?? '';
+
+    final pcRows = await execute('PRAGMA page_count');
+    final pc = (pcRows.isNotEmpty ? pcRows.first.values.first : 0) ?? 0;
+
+    final psRows = await execute('PRAGMA page_size');
+    final ps = (psRows.isNotEmpty ? psRows.first.values.first : 0) ?? 0;
+
+    final jmRows = await execute('PRAGMA journal_mode');
+    final jm = (jmRows.isNotEmpty ? jmRows.first.values.first : '') ?? '';
+
+    final tblCountRows = await execute("SELECT count(*) AS c FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
+    final tblCount = (tblCountRows.isNotEmpty ? tblCountRows.first['c'] : 0) ?? 0;
+
+    return {
+      'version': ver,
+      'page_count': pc,
+      'page_size': ps,
+      'journal_mode': jm,
+      'table_count': tblCount,
+    };
+  }
+
   /// Helper to quote SQLite identifiers safely.
   static String quoteIdentifier(String id) {
     return '"${id.replaceAll('"', '""')}"';

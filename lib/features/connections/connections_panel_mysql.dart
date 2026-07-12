@@ -371,10 +371,17 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
   bool _loading = false;
   List<String> _tables = [];
   List<String> _views = [];
+  List<String> _procedures = [];
+  List<String> _functions = [];
 
   void _toggle() {
     setState(() => _expanded = !_expanded);
-    if (_expanded && _tables.isEmpty && _views.isEmpty && !_loading) {
+    if (_expanded &&
+        _tables.isEmpty &&
+        _views.isEmpty &&
+        _procedures.isEmpty &&
+        _functions.isEmpty &&
+        !_loading) {
       _loadTables();
     }
   }
@@ -394,10 +401,16 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
           await lease.connection.listTables(schema: widget.databaseName);
       final views =
           await lease.connection.listViews(schema: widget.databaseName);
+      final procs =
+          await lease.connection.listProcedures(schema: widget.databaseName);
+      final funcs =
+          await lease.connection.listFunctions(schema: widget.databaseName);
       if (!mounted) return;
       setState(() {
         _tables = tables;
         _views = views;
+        _procedures = procs;
+        _functions = funcs;
         _loading = false;
       });
     } catch (e) {
@@ -468,7 +481,10 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
                       ],
                     ),
                   ),
-                if (_tables.isNotEmpty || _views.isNotEmpty)
+                if (_tables.isNotEmpty ||
+                    _views.isNotEmpty ||
+                    _procedures.isNotEmpty ||
+                    _functions.isNotEmpty)
                   material.Padding(
                     padding: const material.EdgeInsets.only(left: 16),
                     child: material.Column(
@@ -510,6 +526,44 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
                                       widget.databaseName,
                                       name,
                                       MysqlObjectKind.view,
+                                    ),
+                          ),
+                        if (_procedures.isNotEmpty)
+                          _MysqlObjectGroup(
+                            connection: widget.connection,
+                            databaseName: widget.databaseName,
+                            objectKind: MysqlObjectKind.procedure,
+                            onRefresh: _loadTables,
+                            label: 'Procedures',
+                            icon: material.Icons.functions_rounded,
+                            itemIcon: material.Icons.code_rounded,
+                            items: _procedures,
+                            onItemTap: widget.onMysqlObjectSelected == null
+                                ? null
+                                : (name) => widget.onMysqlObjectSelected!(
+                                      widget.connection,
+                                      widget.databaseName,
+                                      name,
+                                      MysqlObjectKind.procedure,
+                                    ),
+                          ),
+                        if (_functions.isNotEmpty)
+                          _MysqlObjectGroup(
+                            connection: widget.connection,
+                            databaseName: widget.databaseName,
+                            objectKind: MysqlObjectKind.function,
+                            onRefresh: _loadTables,
+                            label: 'Functions',
+                            icon: material.Icons.functions_rounded,
+                            itemIcon: material.Icons.code_rounded,
+                            items: _functions,
+                            onItemTap: widget.onMysqlObjectSelected == null
+                                ? null
+                                : (name) => widget.onMysqlObjectSelected!(
+                                      widget.connection,
+                                      widget.databaseName,
+                                      name,
+                                      MysqlObjectKind.function,
                                     ),
                           ),
                       ],
