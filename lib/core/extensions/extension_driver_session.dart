@@ -6,7 +6,10 @@ import 'package:path/path.dart' as p;
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
 import 'package:querya_desktop/core/extensions/extension_support.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
+import 'package:querya_desktop/core/extensions/models/extension_driver_capabilities.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
+import 'package:querya_desktop/core/extensions/models/extension_object_metadata.dart';
+import 'package:querya_desktop/core/extensions/models/extension_server_stats.dart';
 import 'package:querya_desktop/core/extensions/rpc/plugin_rpc_bridge.dart';
 import 'package:querya_desktop/core/sdui/sdui_tree_schema.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
@@ -269,6 +272,68 @@ class ExtensionDriverSession {
       'nodeId': nodeId,
     });
     return _nodesFromResult(result);
+  }
+
+  Future<ExtensionDriverCapabilities> getCapabilities(ConnectionRow row) async {
+    final bridge = await ensureConnected(row);
+    try {
+      final result = await bridge.sendRequest('db.getCapabilities', {
+        'connectionId': row.id,
+      });
+      return ExtensionDriverCapabilities.fromRpc(result);
+    } catch (e) {
+      debugPrint('ExtensionDriverSession getCapabilities fallback ($e)');
+      return const ExtensionDriverCapabilities();
+    }
+  }
+
+  Future<ExtensionServerStats> getServerStats(ConnectionRow row) async {
+    final bridge = await ensureConnected(row);
+    try {
+      final result = await bridge.sendRequest('db.getServerStats', {
+        'connectionId': row.id,
+      });
+      return ExtensionServerStats.fromRpc(result);
+    } catch (e) {
+      debugPrint('ExtensionDriverSession getServerStats fallback ($e)');
+      return const ExtensionServerStats();
+    }
+  }
+
+  Future<ExtensionObjectMetadata> getObjectMetadata(
+    ConnectionRow row, {
+    required String nodeId,
+    required String nodeType,
+  }) async {
+    final bridge = await ensureConnected(row);
+    try {
+      final result = await bridge.sendRequest('db.getObjectMetadata', {
+        'connectionId': row.id,
+        'nodeId': nodeId,
+        'nodeType': nodeType,
+      });
+      return ExtensionObjectMetadata.fromRpc(result);
+    } catch (e) {
+      debugPrint('ExtensionDriverSession getObjectMetadata fallback ($e)');
+      return ExtensionObjectMetadata(nodeId: nodeId, nodeType: nodeType);
+    }
+  }
+
+  Future<bool> cancelQuery(ConnectionRow row, {required String queryId}) async {
+    final bridge = await ensureConnected(row);
+    try {
+      final result = await bridge.sendRequest('db.cancelQuery', {
+        'connectionId': row.id,
+        'queryId': queryId,
+      });
+      if (result is Map) {
+        return result['success'] == true || result['cancelled'] == true;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('ExtensionDriverSession cancelQuery failed ($e)');
+      return false;
+    }
   }
 
   Future<void> disconnect(int connectionId) async {
