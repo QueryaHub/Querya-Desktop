@@ -461,3 +461,18 @@ class MysqlConnection {
     return out;
   }
 }
+
+class MysqlConnectionException implements Exception {
+  MysqlConnectionException(
+    this.message, {
+    this.cause,
+    this.stackTrace,
+  });
+
+  final String message;
+  final Object? cause;
+  final StackTrace? stackTrace;
+
+  @override
+  String toString() => message;
+}
