@@ -379,7 +379,7 @@ class _SqliteOverviewTabState extends material.State<SqliteOverviewTab> {
             material.Padding(
               padding: const material.EdgeInsets.symmetric(vertical: 24),
               child: material.Center(
-                child: Text('No user tables in database.').muted().small(),
+                child: const Text('No user tables in database.').muted().small(),
               ),
             )
           else
