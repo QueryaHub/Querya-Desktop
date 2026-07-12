@@ -3,12 +3,13 @@ import 'dart:async' show unawaited;
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/extensions/extension_driver_session.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/extensions/extension_table_toolbar.dart';
 import 'package:querya_desktop/features/main_screen/results_tab.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 const _defaultPageSize = 200;
 
-/// Paginated data browser for extension driver tables and views.
+/// Paginated data browser for extension driver tables and views with async count and toolbar.
 class ExtensionTableView extends material.StatefulWidget {
   const ExtensionTableView({
     super.key,
@@ -38,13 +39,21 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
   int? _totalRows;
   String? _statusLine;
 
+  bool _filterActive = false;
+  final _filterController = material.TextEditingController();
+
   String get _qualifiedName =>
       '`${widget.database}`.`${widget.tableName}`';
+
+  String get _whereClause {
+    final text = _filterController.text.trim();
+    return text.isEmpty ? '' : ' WHERE $text';
+  }
 
   @override
   void initState() {
     super.initState();
-    unawaited(_loadPage());
+    unawaited(_loadPage(refreshCount: true));
   }
 
   @override
@@ -54,7 +63,68 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
         oldWidget.database != widget.database ||
         oldWidget.tableName != widget.tableName) {
       _offset = 0;
-      unawaited(_loadPage());
+      _totalRows = null;
+      _filterController.clear();
+      _filterActive = false;
+      unawaited(_loadPage(refreshCount: true));
+    }
+  }
+
+  @override
+  void dispose() {
+    _filterController.dispose();
+    super.dispose();
+  }
+
+  void _updateStatusLine() {
+    final total = _totalRows;
+    final shownFrom = _rows.isEmpty ? 0 : _offset + 1;
+    final shownTo = _offset + _rows.length;
+    if (total == null) {
+      _statusLine = _loading
+          ? 'Loading data...'
+          : 'Showing $shownTo row(s) (Calculating count...).';
+    } else {
+      _statusLine = 'Rows $shownFrom–$shownTo of $total.';
+    }
+  }
+
+  Future<void> _fetchCountAsync({required bool refresh}) async {
+    if (!refresh && _totalRows != null) return;
+    try {
+      final countQuery =
+          'SELECT count(*) AS cnt FROM $_qualifiedName$_whereClause';
+      final countResult = await ExtensionDriverSession.instance.query(
+        widget.connectionRow,
+        countQuery,
+      );
+      if (countResult.rows.isNotEmpty && countResult.rows.first.isNotEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _totalRows = int.tryParse(countResult.rows.first.first);
+          _updateStatusLine();
+        });
+        return;
+      }
+    } catch (_) {
+      // Fallback for drivers that only support count() without asterisk
+      try {
+        final fallbackQuery =
+            'SELECT count() AS cnt FROM $_qualifiedName$_whereClause';
+        final countResult = await ExtensionDriverSession.instance.query(
+          widget.connectionRow,
+          fallbackQuery,
+        );
+        if (countResult.rows.isNotEmpty && countResult.rows.first.isNotEmpty) {
+          if (!mounted) return;
+          setState(() {
+            _totalRows = int.tryParse(countResult.rows.first.first);
+            _updateStatusLine();
+          });
+        }
+      } catch (_) {
+        // Ignore count errors on stream or schema tables that do not support count queries
+      }
     }
   }
 
@@ -63,22 +133,14 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
     setState(() {
       _loading = true;
       _error = null;
+      if (refreshCount) _totalRows = null;
+      _updateStatusLine();
     });
 
     try {
-      if (refreshCount || _totalRows == null) {
-        final countResult = await ExtensionDriverSession.instance.query(
-          widget.connectionRow,
-          'SELECT count() AS cnt FROM $_qualifiedName',
-        );
-        if (countResult.rows.isNotEmpty && countResult.rows.first.isNotEmpty) {
-          _totalRows = int.tryParse(countResult.rows.first.first);
-        }
-      }
-
       final dataResult = await ExtensionDriverSession.instance.query(
         widget.connectionRow,
-        'SELECT * FROM $_qualifiedName LIMIT ${widget.pageSize} OFFSET $_offset',
+        'SELECT * FROM $_qualifiedName$_whereClause LIMIT ${widget.pageSize} OFFSET $_offset',
       );
 
       if (!mounted) return;
@@ -86,19 +148,85 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
         _columns = dataResult.columns;
         _rows = dataResult.rows;
         _loading = false;
-        final total = _totalRows;
-        final shownFrom = _rows.isEmpty ? 0 : _offset + 1;
-        final shownTo = _offset + _rows.length;
-        _statusLine = total == null
-            ? 'Showing $shownTo row(s).'
-            : 'Rows $shownFrom–$shownTo of $total.';
+        _updateStatusLine();
       });
+
+      unawaited(_fetchCountAsync(refresh: refreshCount || _totalRows == null));
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _error = e.toString();
         _loading = false;
+        _updateStatusLine();
       });
+    }
+  }
+
+  void _applyFilter() {
+    _offset = 0;
+    _totalRows = null;
+    unawaited(_loadPage(refreshCount: true));
+  }
+
+  void _clearFilter() {
+    _filterController.clear();
+    _offset = 0;
+    _totalRows = null;
+    unawaited(_loadPage(refreshCount: true));
+  }
+
+  Future<void> _openDdlDialog() async {
+    material.showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const material.Center(
+        child: material.CircularProgressIndicator(),
+      ),
+    );
+
+    try {
+      final meta = await ExtensionDriverSession.instance.getObjectMetadata(
+        widget.connectionRow,
+        nodeId: widget.tableName,
+        nodeType: widget.isView ? 'view' : 'table',
+      );
+      if (!mounted) return;
+      material.Navigator.of(context).pop();
+
+      final ddlText = meta.ddl?.trim().isNotEmpty == true
+          ? meta.ddl!
+          : '-- No DDL metadata returned by extension driver for ${widget.tableName}\nSELECT * FROM $_qualifiedName LIMIT 10;';
+
+      await material.showDialog<void>(
+        context: context,
+        builder: (ctx) => material.AlertDialog(
+          title: material.Text(
+              '${widget.isView ? "View" : "Table"} DDL · ${widget.tableName}'),
+          content: material.SizedBox(
+            width: 600,
+            height: 400,
+            child: material.SingleChildScrollView(
+              child: material.SelectableText(
+                ddlText,
+                style: const material.TextStyle(
+                    fontFamily: 'monospace', fontSize: 13),
+              ),
+            ),
+          ),
+          actions: [
+            material.TextButton(
+              onPressed: () => material.Navigator.of(ctx).pop(),
+              child: const material.Text('Close'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      material.Navigator.of(context).pop();
+      material.ScaffoldMessenger.of(context).showSnackBar(
+        material.SnackBar(content: material.Text('Failed to fetch DDL: $e')),
+      );
     }
   }
 
@@ -124,64 +252,84 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context);
     final kind = widget.isView ? 'View' : 'Table';
 
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
-        material.Container(
-          padding: const material.EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 10,
-          ),
-          decoration: material.BoxDecoration(
-            color: theme.colorScheme.muted.withValues(alpha: 0.5),
-            border: material.Border(
-              bottom: material.BorderSide(
-                color: theme.colorScheme.border.withValues(alpha: 0.3),
+        ExtensionTableToolbar(
+          title: '$kind · ${widget.database}.${widget.tableName}',
+          paginationLabel: _statusLine ?? 'Loading...',
+          tableIcon: widget.isView
+              ? material.Icons.view_list_rounded
+              : material.Icons.table_chart_outlined,
+          loading: _loading,
+          canGoPrevious: _canGoBack && !_loading,
+          canGoNext: _canGoForward && !_loading,
+          filterActive: _filterActive || _filterController.text.isNotEmpty,
+          filterText: _filterController.text,
+          onToggleFilter: () {
+            setState(() {
+              _filterActive = !_filterActive;
+            });
+          },
+          onOpenDdl: _openDdlDialog,
+          onGoPrevious: _previousPage,
+          onGoNext: _nextPage,
+          onRefresh: () => _loadPage(refreshCount: true),
+        ),
+        if (_filterActive)
+          material.Container(
+            padding: const material.EdgeInsets.symmetric(
+                horizontal: 16, vertical: 8),
+            decoration: material.BoxDecoration(
+              color: Theme.of(context).colorScheme.muted.withValues(alpha: 0.3),
+              border: material.Border(
+                bottom: material.BorderSide(
+                  color:
+                      Theme.of(context).colorScheme.border.withValues(alpha: 0.3),
+                ),
               ),
             ),
+            child: material.Row(
+              children: [
+                const material.Text('WHERE ').semiBold().small(),
+                const Gap(8),
+                material.Expanded(
+                  child: material.TextField(
+                    controller: _filterController,
+                    decoration: const material.InputDecoration(
+                      hintText: "e.g. id > 100 AND status = 'active'",
+                      isDense: true,
+                      border: material.OutlineInputBorder(),
+                    ),
+                    onSubmitted: (_) => _applyFilter(),
+                  ),
+                ),
+                const Gap(8),
+                OutlineButton(
+                  size: ButtonSize.small,
+                  onPressed: _applyFilter,
+                  child: const Text('Apply'),
+                ),
+                if (_filterController.text.isNotEmpty) ...[
+                  const Gap(6),
+                  GhostButton(
+                    size: ButtonSize.small,
+                    onPressed: _clearFilter,
+                    child: const Text('Clear'),
+                  ),
+                ],
+              ],
+            ),
           ),
-          child: material.Row(
-            children: [
-              material.Expanded(
-                child: Text('$kind · ${widget.database}.${widget.tableName}')
-                    .semiBold()
-                    .small(),
-              ),
-              OutlineButton(
-                size: ButtonSize.small,
-                onPressed: _loading ? null : () => _loadPage(refreshCount: true),
-                child: const Text('Refresh'),
-              ),
-              const Gap(8),
-              OutlineButton(
-                size: ButtonSize.small,
-                onPressed: _canGoBack && !_loading ? _previousPage : null,
-                child: const Text('Previous'),
-              ),
-              const Gap(8),
-              OutlineButton(
-                size: ButtonSize.small,
-                onPressed: _canGoForward && !_loading ? _nextPage : null,
-                child: const Text('Next'),
-              ),
-            ],
-          ),
-        ),
-        if (_statusLine != null)
-          material.Padding(
-            padding: const material.EdgeInsets.fromLTRB(12, 8, 12, 0),
-            child: Text(_statusLine!).muted().xSmall(),
-          ),
-        const Divider(height: 1),
         material.Expanded(
           child: ResultsTab(
             columns: _columns,
             rows: _rows,
             errorMessage: _error,
             isLoading: _loading,
+            statusLine: _statusLine,
           ),
         ),
       ],
