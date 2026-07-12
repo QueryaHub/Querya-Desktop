@@ -83,12 +83,27 @@ class SqliteConnectionPool {
       return SqliteLease._(this, k, entry.connection);
     }
 
-    await _creationLock.createIfAbsent(k, () async {
-      _evictIfNeededBeforeNewSlot();
-      final conn = await createAndConnect(row, mode: mode);
-      _pool[k] = _PoolEntry(conn);
-      return conn;
-    });
+    try {
+      await _creationLock.createIfAbsent(k, () async {
+        _evictIfNeededBeforeNewSlot();
+        final conn = await createAndConnect(row, mode: mode);
+        _pool[k] = _PoolEntry(conn);
+        return conn;
+      });
+    } on StateError {
+      rethrow;
+    } on SqliteConnectionException {
+      rethrow;
+    } catch (e, st) {
+      Error.throwWithStackTrace(
+        SqliteConnectionException(
+          'Failed to acquire SQLite connection: $e',
+          cause: e,
+          stackTrace: st,
+        ),
+        st,
+      );
+    }
 
     entry = _pool[k]!;
     entry.touch();
@@ -105,13 +120,20 @@ class SqliteConnectionPool {
     while (_pool.length >= maxEntries) {
       final idle = _pool.entries.where((e) => e.value.refs == 0).toList();
       if (idle.isEmpty) {
-        break;
+        throw StateError(
+          'SQLite connection pool exhausted: $maxEntries slots in use.',
+        );
       }
       idle.sort((a, b) => a.value.lastUsed.compareTo(b.value.lastUsed));
-      final oldestKey = idle.first.key;
-      final oldestEntry = _pool.remove(oldestKey);
-      oldestEntry?.connection.disconnect();
+      _removeEntryClosing(idle.first.key);
     }
+  }
+
+  void _removeEntryClosing(String k) {
+    final entry = _pool.remove(k);
+    if (entry == null) return;
+    entry.idleTimer?.cancel();
+    unawaited(entry.connection.forceClose());
   }
 
   void _release(String key) {
@@ -122,10 +144,11 @@ class SqliteConnectionPool {
       entry.refs = 0;
       entry.idleTimer?.cancel();
       entry.idleTimer = Timer(idleDisposeDelay, () {
-        if (_pool[key] == entry && entry.refs == 0) {
-          _pool.remove(key);
-          entry.connection.disconnect();
-        }
+        final e = _pool[key];
+        if (e == null || e.refs > 0) return;
+        e.idleTimer = null;
+        unawaited(e.connection.disconnect());
+        _pool.remove(key);
       });
     }
   }
@@ -135,11 +158,7 @@ class SqliteConnectionPool {
     SqliteSessionMode mode = SqliteSessionMode.readOnly,
   }) {
     final k = keyFor(row.id, mode);
-    final entry = _pool.remove(k);
-    if (entry != null) {
-      entry.idleTimer?.cancel();
-      entry.connection.forceClose();
-    }
+    _removeEntryClosing(k);
   }
 
   Future<void> disconnectAll() async {
@@ -147,7 +166,7 @@ class SqliteConnectionPool {
     _pool.clear();
     for (final entry in entries) {
       entry.idleTimer?.cancel();
-      await entry.connection.disconnect();
+      await entry.connection.forceClose();
     }
   }
 }

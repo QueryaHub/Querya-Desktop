@@ -75,12 +75,28 @@ class MysqlConnectionPool {
       return MysqlLease._(this, k, entry.connection);
     }
 
-    await _creationLock.createIfAbsent(k, () async {
-      _evictIfNeededBeforeNewSlot();
-      final conn = await createAndConnect(row, database: database, mode: mode);
-      _pool[k] = _PoolEntry(conn);
-      return conn;
-    });
+    try {
+      await _creationLock.createIfAbsent(k, () async {
+        _evictIfNeededBeforeNewSlot();
+        final conn =
+            await createAndConnect(row, database: database, mode: mode);
+        _pool[k] = _PoolEntry(conn);
+        return conn;
+      });
+    } on StateError {
+      rethrow;
+    } on MysqlConnectionException {
+      rethrow;
+    } catch (e, st) {
+      Error.throwWithStackTrace(
+        MysqlConnectionException(
+          'Failed to acquire MySQL connection for database "$database": $e',
+          cause: e,
+          stackTrace: st,
+        ),
+        st,
+      );
+    }
 
     entry = _pool[k]!;
     entry.touch();
