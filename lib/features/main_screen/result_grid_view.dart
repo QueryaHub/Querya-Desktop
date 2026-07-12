@@ -63,10 +63,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_widthsNeedUpdate) {
-      _columnWidths = _computeColumnWidths();
-      _widthsNeedUpdate = false;
-    }
+    _widthsNeedUpdate = true;
   }
 
   @override
@@ -106,6 +103,10 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
 
   @override
   material.Widget build(material.BuildContext context) {
+    if (_widthsNeedUpdate) {
+      _columnWidths = _computeColumnWidths();
+      _widthsNeedUpdate = false;
+    }
     final cs = Theme.of(context).colorScheme;
     final colCount = widget.columns.length;
     final rowHeight = _scaledRowHeight(context);
