@@ -353,6 +353,34 @@ class MysqlConnection {
     return rs.rows.map((r) => r.colAt(0)!).toList();
   }
 
+  /// Lists stored procedures in [schema] (database name).
+  Future<List<String>> listProcedures({required String schema}) async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to MySQL');
+    }
+    final rs = await execute(
+      'SELECT ROUTINE_NAME FROM information_schema.ROUTINES '
+      "WHERE ROUTINE_SCHEMA = :schema AND ROUTINE_TYPE = 'PROCEDURE' "
+      'ORDER BY ROUTINE_NAME',
+      {'schema': schema},
+    );
+    return rs.rows.map((r) => r.colAt(0)!).toList();
+  }
+
+  /// Lists stored functions in [schema] (database name).
+  Future<List<String>> listFunctions({required String schema}) async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to MySQL');
+    }
+    final rs = await execute(
+      'SELECT ROUTINE_NAME FROM information_schema.ROUTINES '
+      "WHERE ROUTINE_SCHEMA = :schema AND ROUTINE_TYPE = 'FUNCTION' "
+      'ORDER BY ROUTINE_NAME',
+      {'schema': schema},
+    );
+    return rs.rows.map((r) => r.colAt(0)!).toList();
+  }
+
   Future<String> serverVersion() async {
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to MySQL');
