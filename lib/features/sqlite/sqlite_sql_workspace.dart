@@ -200,6 +200,14 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
           ),
         );
       }
+    } on TimeoutException catch (e) {
+      unawaited(_lease?.connection.forceClose());
+      if (mounted) {
+        setState(() {
+          _error = 'Query timed out: ${e.message ?? e}';
+          _running = false;
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
