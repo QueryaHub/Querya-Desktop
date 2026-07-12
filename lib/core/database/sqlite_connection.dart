@@ -114,11 +114,32 @@ class SqliteConnection {
       throw StateError('Database connection is read-only');
     }
 
-    if (isReadOnlyQuery || hasReturning) {
-      return await _db!.rawQuery(sql, arguments);
-    } else {
-      await _db!.execute(sql, arguments);
-      return [];
+    try {
+      if (isReadOnlyQuery || hasReturning) {
+        return await _db!.rawQuery(sql, arguments);
+      } else {
+        await _db!.execute(sql, arguments);
+        return [];
+      }
+    } on TimeoutException {
+      unawaited(forceClose());
+      rethrow;
+    }
+  }
+
+  /// Runs [execute] with an application-level [timeout].
+  Future<List<Map<String, Object?>>> executeWithTimeout(
+    String sql, {
+    Duration? timeout,
+    List<Object?>? arguments,
+  }) async {
+    final f = execute(sql, arguments);
+    if (timeout == null) return f;
+    try {
+      return await f.timeout(timeout);
+    } on TimeoutException {
+      unawaited(forceClose());
+      rethrow;
     }
   }
 
