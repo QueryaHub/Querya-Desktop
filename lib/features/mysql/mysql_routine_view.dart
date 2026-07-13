@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/mysql_service.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/widgets/virtual_selectable_text_view.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Displays MySQL routine DDL (`SHOW CREATE PROCEDURE` / `SHOW CREATE FUNCTION`).
@@ -165,23 +166,18 @@ class _MysqlRoutineViewState extends material.State<MysqlRoutineView> {
           )
         else if (_error != null)
           material.Expanded(
-            child: material.Center(
-              child: material.SelectableText(
-                _error!,
-                style: material.TextStyle(color: cs.destructive, fontSize: 13),
-              ),
+            child: VirtualSelectableTextView(
+              text: _error!,
+              style: material.TextStyle(color: cs.destructive, fontSize: 13),
             ),
           )
         else
           material.Expanded(
-            child: material.SingleChildScrollView(
-              padding: const material.EdgeInsets.all(16),
-              child: material.SelectableText(
-                _ddlText ?? '',
-                style: const material.TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 13,
-                ),
+            child: VirtualSelectableTextView(
+              text: _ddlText ?? '',
+              style: const material.TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 13,
               ),
             ),
           ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/widgets/virtual_selectable_text_view.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Shows [pg_get_functiondef] for each overload of a PostgreSQL function.
@@ -243,8 +244,9 @@ class _PostgresRoutineViewState extends material.State<PostgresRoutineView> {
                             color: cs.border.withValues(alpha: 0.4),
                           ),
                         ),
-                        child: material.SelectableText(
-                          _overloads[i].definition,
+                        child: VirtualSelectableTextView(
+                          text: _overloads[i].definition,
+                          padding: material.EdgeInsets.zero,
                           style: material.TextStyle(
                             fontFamily: 'monospace',
                             fontSize: 12,

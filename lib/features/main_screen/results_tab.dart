@@ -1,6 +1,7 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/widgets/virtual_selectable_text_view.dart';
 import 'package:querya_desktop/features/main_screen/result_grid_view.dart';
 import 'package:querya_desktop/shared/services/data_export_service.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -32,15 +33,12 @@ class ResultsTab extends StatelessWidget {
       );
     }
     if (errorMessage != null && errorMessage!.isNotEmpty) {
-      return material.SingleChildScrollView(
-        padding: const material.EdgeInsets.all(16),
-        child: material.SelectableText(
-          errorMessage!,
-          style: material.TextStyle(
-            fontFamily: 'monospace',
-            fontSize: 12,
-            color: Theme.of(context).colorScheme.destructive,
-          ),
+      return VirtualSelectableTextView(
+        text: errorMessage!,
+        style: material.TextStyle(
+          fontFamily: 'monospace',
+          fontSize: 12,
+          color: Theme.of(context).colorScheme.destructive,
         ),
       );
     }
