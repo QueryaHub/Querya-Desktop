@@ -207,10 +207,10 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
         n++;
       }
 
-      final outRows = await compute(
-        convertMysqlResultRowsToStrings,
-        MysqlResultConvertJob(rowValues: rawRows),
-      );
+      final job = MysqlResultConvertJob(rowValues: rawRows);
+      final outRows = rawRows.length > 500
+          ? await compute(convertMysqlResultRowsToStrings, job)
+          : convertMysqlResultRowsToStrings(job);
 
       int? affected;
       if (cols.isEmpty && outRows.isEmpty) {
