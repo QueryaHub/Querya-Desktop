@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:file_selector/file_selector.dart';
+import 'package:querya_desktop/features/sqlite/sqlite_result_utils.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/database/sqlite_service.dart';
@@ -167,13 +169,14 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       final truncated = results.length > cap;
       final limitCount = truncated ? cap : results.length;
 
-      final rawRows = results.take(limitCount).toList();
-      final outRows = rawRows.map((row) {
-        return cols.map((col) {
-          final val = row[col];
-          return val == null ? 'NULL' : val.toString();
-        }).toList();
+      final rawRows = results.take(limitCount).map((row) {
+        return cols.map((col) => row[col]).toList();
       }).toList();
+
+      final job = SqliteResultConvertJob(rowValues: rawRows);
+      final outRows = rawRows.length > 500
+          ? await compute(convertSqliteResultRowsToStrings, job)
+          : convertSqliteResultRowsToStrings(job);
 
       setState(() {
         _columns = cols;
