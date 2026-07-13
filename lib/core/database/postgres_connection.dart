@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' show SecurityContext;
 
 import 'package:flutter/foundation.dart';
@@ -252,7 +253,27 @@ class PostgresConnection {
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to PostgreSQL');
     }
-    return _conn!.execute(sql, timeout: timeout);
+    try {
+      return await _conn!.execute(sql, timeout: timeout);
+    } on TimeoutException {
+      unawaited(forceClose());
+      rethrow;
+    }
+  }
+
+  /// Runs [execute] with an application-level [timeout] (in addition to driver timeout).
+  Future<Result> executeWithTimeout(
+    String sql, {
+    Duration? timeout,
+  }) async {
+    final f = execute(sql, timeout: timeout);
+    if (timeout == null) return f;
+    try {
+      return await f.timeout(timeout);
+    } on TimeoutException {
+      unawaited(forceClose());
+      rethrow;
+    }
   }
 
   /// Whether the session has an open transaction (PostgreSQL 13+).

@@ -270,7 +270,12 @@ class MysqlConnection {
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to MySQL');
     }
-    return _conn!.execute(sql, params, iterable);
+    try {
+      return await _conn!.execute(sql, params, iterable);
+    } on TimeoutException {
+      unawaited(forceClose());
+      rethrow;
+    }
   }
 
   /// Runs [execute] with an application-level [timeout] (driver limits still apply).
@@ -282,7 +287,12 @@ class MysqlConnection {
   }) async {
     final f = execute(sql, params, iterable);
     if (timeout == null) return f;
-    return f.timeout(timeout);
+    try {
+      return await f.timeout(timeout);
+    } on TimeoutException {
+      unawaited(forceClose());
+      rethrow;
+    }
   }
 
   /// Lists user-visible databases (excludes typical system schemas).
