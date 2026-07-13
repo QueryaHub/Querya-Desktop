@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:file_selector/file_selector.dart';
+import 'package:querya_desktop/features/postgresql/postgres_result_utils.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:postgres/postgres.dart' as pg;
@@ -348,14 +350,19 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         );
       }
 
-      final outRows = <List<String>>[];
+      final rawRows = <List<Object?>>[];
       var n = 0;
       final cap = _resultMaxRows;
       for (final row in result) {
         if (n >= cap) break;
-        outRows.add(row.map(_cellText).toList());
+        rawRows.add(row.toList());
         n++;
       }
+
+      final job = PostgresResultConvertJob(rowValues: rawRows);
+      final outRows = rawRows.length > 500
+          ? await compute(convertPostgresResultRowsToStrings, job)
+          : convertPostgresResultRowsToStrings(job);
 
       setState(() {
         _columns = cols;
@@ -408,11 +415,6 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     } finally {
       await _refreshTxStatus();
     }
-  }
-
-  static String _cellText(Object? v) {
-    if (v == null) return 'NULL';
-    return v.toString();
   }
 
   Future<void> _openSqlFile() async {
