@@ -248,6 +248,14 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         _statusLine = 'OK: $cmd';
         _running = false;
       });
+    } on TimeoutException catch (e) {
+      unawaited(_lease?.connection.forceClose());
+      if (mounted) {
+        setState(() {
+          _error = 'Query timed out: ${e.message ?? e}';
+          _running = false;
+        });
+      }
     } on pg.ServerException catch (e) {
       if (mounted) {
         setState(() {
@@ -374,6 +382,14 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
             maxEntries: _historyMaxEntries,
           ),
         );
+      }
+    } on TimeoutException catch (e) {
+      unawaited(_lease?.connection.forceClose());
+      if (mounted) {
+        setState(() {
+          _error = 'Query timed out: ${e.message ?? e}';
+          _running = false;
+        });
       }
     } on pg.ServerException catch (e) {
       if (mounted) {

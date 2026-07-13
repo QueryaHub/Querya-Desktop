@@ -244,6 +244,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
         );
       }
     } on TimeoutException catch (e) {
+      unawaited(_lease?.connection.forceClose());
       if (mounted) {
         setState(() {
           _error = e.toString();
