@@ -536,26 +536,29 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
                                   final displayRowNum = _customSqlActive
                                       ? rowIdx + 1
                                       : _offset + rowIdx + 1;
-                                  return material.Container(
-                                    height: rowHeight,
-                                    decoration: material.BoxDecoration(
-                                      color: isEven
-                                          ? material.Colors.transparent
-                                          : cs.muted.withValues(alpha: 0.12),
-                                      border: material.Border(
-                                        bottom: material.BorderSide(
-                                          color:
-                                              cs.border.withValues(alpha: 0.15),
+                                  return material.RepaintBoundary(
+                                    child: material.Container(
+                                      height: rowHeight,
+                                      decoration: material.BoxDecoration(
+                                        color: isEven
+                                            ? material.Colors.transparent
+                                            : cs.muted.withValues(alpha: 0.12),
+                                        border: material.Border(
+                                          bottom: material.BorderSide(
+                                            color: cs.border
+                                                .withValues(alpha: 0.15),
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                    child: material.Row(
-                                      children: [
-                                        _rowNumberCell(cs, '$displayRowNum'),
-                                        for (var c = 0; c < colCount; c++)
-                                          _dataCell(
-                                              cs, row.length > c ? row[c] : ''),
-                                      ],
+                                      child: material.Row(
+                                        children: [
+                                          _rowNumberCell(cs, '$displayRowNum'),
+                                          for (var c = 0; c < colCount; c++)
+                                            _dataCell(
+                                                cs,
+                                                row.length > c ? row[c] : ''),
+                                        ],
+                                      ),
                                     ),
                                   );
                                 },

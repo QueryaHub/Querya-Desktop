@@ -251,7 +251,7 @@ class ExtensionDriverSession {
       'sql': sql,
       if (limit != null) 'limit': limit,
     });
-    return ExtensionQueryResult.fromRpc(result);
+    return compute(_parseExtensionQueryResultRpc, result);
   }
 
   Future<SduiTreeSchema> getSchemaTree(ConnectionRow row) async {
@@ -489,4 +489,8 @@ class ExtensionQueryResult {
       queryId: map['queryId']?.toString(),
     );
   }
+}
+
+ExtensionQueryResult _parseExtensionQueryResultRpc(Object? raw) {
+  return ExtensionQueryResult.fromRpc(raw);
 }
