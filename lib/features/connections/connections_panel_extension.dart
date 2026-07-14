@@ -119,7 +119,15 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
     final parts = node.id.split('.');
     if (parts.length < 3) return;
     final kind = parts[0];
-    if (kind != 'table' && kind != 'view') return;
+    const tableLikeKinds = {
+      'table',
+      'view',
+      'dict',
+      'dictionary',
+      'materialized-view',
+      'mv'
+    };
+    if (!tableLikeKinds.contains(kind)) return;
     final database = parts[1];
     final name = parts.sublist(2).join('.');
     if (database.isEmpty || name.isEmpty) return;

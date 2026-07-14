@@ -9,6 +9,7 @@
 library;
 
 export 'app_dialog.dart';
+export 'export_menu_button.dart';
 export 'querya_dropdown.dart'
     show
         QueryaDropdown,

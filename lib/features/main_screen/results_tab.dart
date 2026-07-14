@@ -16,6 +16,7 @@ class ResultsTab extends StatelessWidget {
     this.isLoading = false,
     this.affectedRows,
     this.statusLine,
+    this.showExportToolbar = true,
   });
 
   final List<String> columns;
@@ -24,6 +25,7 @@ class ResultsTab extends StatelessWidget {
   final bool isLoading;
   final int? affectedRows;
   final String? statusLine;
+  final bool showExportToolbar;
 
   @override
   Widget build(BuildContext context) {
@@ -65,52 +67,38 @@ class ResultsTab extends StatelessWidget {
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
-        material.Padding(
-          padding: const material.EdgeInsets.fromLTRB(8, 6, 8, 4),
-          child: material.Align(
-            alignment: material.Alignment.centerRight,
-            child: material.Wrap(
-              alignment: material.WrapAlignment.end,
-              spacing: 8,
-              runSpacing: 6,
+        if (showExportToolbar && columns.isNotEmpty)
+          material.Container(
+            padding: const material.EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 6,
+            ),
+            decoration: material.BoxDecoration(
+              color: Theme.of(context).colorScheme.card,
+              border: material.Border(
+                bottom: material.BorderSide(
+                  color: Theme.of(context).colorScheme.border.withValues(alpha: 0.5),
+                ),
+              ),
+            ),
+            child: material.Row(
               children: [
-                OutlineButton(
-                  size: ButtonSize.small,
-                  onPressed: () {
-                    unawaited(() async {
-                      await DataExportService.copyToClipboard(
-                        DataExportFormat.csv,
-                        columns: columns,
-                        rows: rows,
-                      );
-                    }());
-                  },
-                  leading: const material.Icon(
-                    material.Icons.copy_rounded,
-                    size: 14,
-                  ),
-                  child: const Text('Copy as CSV'),
+                material.Icon(
+                  material.Icons.table_rows_rounded,
+                  size: 14,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
-                OutlineButton(
-                  size: ButtonSize.small,
-                  onPressed: () {
-                    unawaited(() async {
-                      await DataExportService.copyToClipboard(
-                        DataExportFormat.json,
-                        columns: columns,
-                        rows: rows,
-                      );
-                    }());
-                  },
-                  leading: const material.Icon(
-                    material.Icons.copy_rounded,
-                    size: 14,
-                  ),
-                  child: const Text('Copy as JSON'),
-                ),
-                _ExportMenuButton(
-                  label: 'Copy formatted ▾',
-                  icon: material.Icons.copy_all_rounded,
+                const Gap(6),
+                Text(
+                  statusLine ??
+                      (affectedRows != null
+                          ? 'Rows affected: $affectedRows'
+                          : '${rows.length} rows returned'),
+                ).small().semiBold(),
+                const material.Spacer(),
+                ExportMenuButton(
+                  label: 'Copy ▾',
+                  icon: material.Icons.copy_rounded,
                   isSave: false,
                   onSelected: (format) {
                     unawaited(() async {
@@ -122,8 +110,9 @@ class ResultsTab extends StatelessWidget {
                     }());
                   },
                 ),
-                _ExportMenuButton(
-                  label: 'Save to file ▾',
+                const Gap(6),
+                ExportMenuButton(
+                  label: 'Save ▾',
                   icon: material.Icons.save_alt_rounded,
                   isSave: true,
                   onSelected: (format) {
@@ -143,7 +132,6 @@ class ResultsTab extends StatelessWidget {
               ],
             ),
           ),
-        ),
         material.Expanded(
           child: VirtualResultGrid(columns: columns, rows: rows),
         ),
@@ -170,87 +158,3 @@ Future<void> _showSaveFileErrorDialog(material.BuildContext context) {
   );
 }
 
-class _ExportMenuButton extends StatelessWidget {
-  const _ExportMenuButton({
-    required this.label,
-    required this.icon,
-    required this.onSelected,
-    required this.isSave,
-  });
-
-  final String label;
-  final material.IconData icon;
-  final material.ValueChanged<DataExportFormat> onSelected;
-  final bool isSave;
-
-  @override
-  Widget build(BuildContext context) {
-    return material.PopupMenuButton<DataExportFormat>(
-      tooltip: label,
-      onSelected: onSelected,
-      itemBuilder: (context) => [
-        material.PopupMenuItem(
-          value: DataExportFormat.csv,
-          child: material.Row(
-            children: [
-              const material.Icon(
-                  material.Icons.table_chart_outlined, size: 16),
-              const material.SizedBox(width: 8),
-              material.Text(isSave ? 'CSV (.csv)' : 'Copy as CSV'),
-            ],
-          ),
-        ),
-        material.PopupMenuItem(
-          value: DataExportFormat.json,
-          child: material.Row(
-            children: [
-              const material.Icon(
-                  material.Icons.data_object_rounded, size: 16),
-              const material.SizedBox(width: 8),
-              material.Text(isSave ? 'JSON (.json)' : 'Copy as JSON'),
-            ],
-          ),
-        ),
-        material.PopupMenuItem(
-          value: DataExportFormat.markdown,
-          child: material.Row(
-            children: [
-              const material.Icon(material.Icons.code_rounded, size: 16),
-              const material.SizedBox(width: 8),
-              material.Text(isSave ? 'Markdown Table (.md)' : 'Copy as Markdown Table'),
-            ],
-          ),
-        ),
-        material.PopupMenuItem(
-          value: DataExportFormat.sqlDump,
-          child: material.Row(
-            children: [
-              const material.Icon(material.Icons.storage_rounded, size: 16),
-              const material.SizedBox(width: 8),
-              material.Text(isSave ? 'SQL INSERT Dump (.sql)' : 'Copy as SQL Dump'),
-            ],
-          ),
-        ),
-      ],
-      child: material.Container(
-        padding: const material.EdgeInsets.symmetric(
-            horizontal: 10, vertical: 6),
-        decoration: material.BoxDecoration(
-          border: material.Border.all(
-            color: Theme.of(context).colorScheme.border,
-          ),
-          borderRadius: material.BorderRadius.circular(6),
-        ),
-        child: material.Row(
-          mainAxisSize: material.MainAxisSize.min,
-          children: [
-            material.Icon(icon,
-                size: 14, color: Theme.of(context).colorScheme.foreground),
-            const material.SizedBox(width: 6),
-            Text(label).small(),
-          ],
-        ),
-      ),
-    );
-  }
-}

@@ -115,9 +115,19 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     return material.RepaintBoundary(
       child: material.LayoutBuilder(
         builder: (context, constraints) {
-          final tableWidth = _tableWidth > constraints.maxWidth
-              ? _tableWidth
-              : constraints.maxWidth;
+          final availableWidth = constraints.maxWidth;
+          var displayWidths = _columnWidths;
+          var tableWidth = _tableWidth;
+          if (tableWidth < availableWidth && _columnWidths.isNotEmpty) {
+            final extraPerCol =
+                (availableWidth - tableWidth) / _columnWidths.length;
+            displayWidths = [for (final w in _columnWidths) w + extraPerCol];
+            tableWidth = availableWidth;
+          } else if (tableWidth > availableWidth) {
+            tableWidth = _tableWidth;
+          } else {
+            tableWidth = availableWidth;
+          }
 
           return material.Scrollbar(
             controller: _horizontalController,
@@ -133,7 +143,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
                   children: [
                     _HeaderRow(
                       columns: widget.columns,
-                      columnWidths: _columnWidths,
+                      columnWidths: displayWidths,
                       height: headerHeight,
                       colorScheme: cs,
                     ),
@@ -151,7 +161,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
                             return _DataRow(
                               key: ValueKey('result-row-$rowIndex'),
                               row: row,
-                              columnWidths: _columnWidths,
+                              columnWidths: displayWidths,
                               columnCount: colCount,
                               height: rowHeight,
                               colorScheme: cs,
