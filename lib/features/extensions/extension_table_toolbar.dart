@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/shared/services/data_export_service.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
-/// Standard toolbar for [ExtensionTableView] with title, pagination chip, DDL inspection, custom filter toggle, and navigation.
+/// Standard toolbar for [ExtensionTableView] with title, pagination chip, DDL inspection, custom filter toggle, export/save actions, and navigation.
 class ExtensionTableToolbar extends material.StatelessWidget {
   const ExtensionTableToolbar({
     super.key,
@@ -19,6 +20,8 @@ class ExtensionTableToolbar extends material.StatelessWidget {
     required this.onGoNext,
     required this.onRefresh,
     this.onCancelQuery,
+    this.onCopyFormat,
+    this.onSaveFormat,
   });
 
   final String title;
@@ -35,6 +38,8 @@ class ExtensionTableToolbar extends material.StatelessWidget {
   final VoidCallback onGoNext;
   final VoidCallback onRefresh;
   final VoidCallback? onCancelQuery;
+  final material.ValueChanged<DataExportFormat>? onCopyFormat;
+  final material.ValueChanged<DataExportFormat>? onSaveFormat;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -120,6 +125,24 @@ class ExtensionTableToolbar extends material.StatelessWidget {
                           ),
                           child: Text(isFiltered ? 'Filter (active)' : 'Filter'),
                         ),
+                        if (onCopyFormat != null) ...[
+                          const Gap(4),
+                          ExportMenuButton(
+                            label: 'Copy ▾',
+                            icon: material.Icons.copy_rounded,
+                            isSave: false,
+                            onSelected: onCopyFormat!,
+                          ),
+                        ],
+                        if (onSaveFormat != null) ...[
+                          const Gap(4),
+                          ExportMenuButton(
+                            label: 'Save ▾',
+                            icon: material.Icons.save_alt_rounded,
+                            isSave: true,
+                            onSelected: onSaveFormat!,
+                          ),
+                        ],
                         if (loading && onCancelQuery != null) ...[
                           const Gap(4),
                           OutlineButton(

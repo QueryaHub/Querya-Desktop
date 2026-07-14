@@ -5,6 +5,7 @@ import 'package:querya_desktop/core/extensions/extension_driver_session.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/extensions/extension_table_toolbar.dart';
 import 'package:querya_desktop/features/main_screen/results_tab.dart';
+import 'package:querya_desktop/shared/services/data_export_service.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 const _defaultPageSize = 200;
@@ -277,6 +278,28 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
           onGoPrevious: _previousPage,
           onGoNext: _nextPage,
           onRefresh: () => _loadPage(refreshCount: true),
+          onCopyFormat: (format) {
+            unawaited(() async {
+              await DataExportService.copyToClipboard(
+                format,
+                columns: _columns,
+                rows: _rows,
+              );
+            }());
+          },
+          onSaveFormat: (format) {
+            unawaited(() async {
+              final outcome = await DataExportService.saveToFile(
+                format,
+                columns: _columns,
+                rows: _rows,
+              );
+              if (!context.mounted) return;
+              if (outcome == SaveExportOutcome.error) {
+                await _showSaveFileErrorDialog(context);
+              }
+            }());
+          },
         ),
         if (_filterActive)
           material.Container(
@@ -330,9 +353,28 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
             errorMessage: _error,
             isLoading: _loading,
             statusLine: _statusLine,
+            showExportToolbar: false,
           ),
         ),
       ],
     );
   }
+}
+
+Future<void> _showSaveFileErrorDialog(material.BuildContext context) {
+  return material.showDialog<void>(
+    context: context,
+    builder: (ctx) => material.AlertDialog(
+      title: const material.Text('Could not save file'),
+      content: const material.Text(
+        'The file could not be saved. Please check folder permissions or disk space.',
+      ),
+      actions: [
+        material.TextButton(
+          onPressed: () => material.Navigator.of(ctx).pop(),
+          child: const material.Text('OK'),
+        ),
+      ],
+    ),
+  );
 }

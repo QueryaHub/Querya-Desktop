@@ -46,6 +46,7 @@ import 'package:querya_desktop/features/redis/redis_view.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart' show SqliteObjectKind;
 import 'package:querya_desktop/features/extensions/extension_sql_workspace.dart';
 import 'package:querya_desktop/features/extensions/extension_table_view.dart';
+import 'package:querya_desktop/features/extensions/extension_workspace_home.dart';
 import 'package:querya_desktop/features/sqlite/sqlite_table_view.dart';
 import 'package:querya_desktop/features/sqlite/sqlite_workspace_home.dart';
 import 'query_editor_tab.dart';
@@ -68,6 +69,7 @@ class WorkspacePanel extends StatefulWidget {
     this.selectedSqliteObject,
     this.sqliteSqlTabRequestToken = 0,
     this.selectedExtensionObject,
+    this.extensionSqlTabRequestToken = 0,
     this.isReadOnly = false,
     this.onRequestNewConnection,
   });
@@ -129,6 +131,9 @@ class WorkspacePanel extends StatefulWidget {
     String database,
     String name,
   })? selectedExtensionObject;
+
+  /// Incremented by [MainScreen] to switch the Extension home view to the SQL tab.
+  final int extensionSqlTabRequestToken;
 
   /// Empty-state hero: primary CTA to add a connection.
   final void Function()? onRequestNewConnection;
@@ -262,9 +267,10 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
         if (ExtensionDriverCatalog.isExtensionDriverConnection(activeConn)) {
           final obj = widget.selectedExtensionObject;
           driverWorkspace = obj == null
-              ? ExtensionSqlWorkspace(
-                  key: ValueKey('ext_sql_${activeConn.id}'),
+              ? ExtensionWorkspaceHome(
+                  key: ValueKey('ext_home_${activeConn.id}'),
                   connectionRow: activeConn,
+                  sqlTabRequestToken: widget.extensionSqlTabRequestToken,
                 )
               : ExtensionTableView(
                   key: ValueKey(
