@@ -242,27 +242,29 @@ class _DataRow extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    return material.Container(
-      height: height,
-      decoration: material.BoxDecoration(
-        color: striped
-            ? colorScheme.muted.withValues(alpha: 0.12)
-            : material.Colors.transparent,
-        border: material.Border(
-          bottom: material.BorderSide(
-            color: colorScheme.border.withValues(alpha: 0.15),
+    return material.RepaintBoundary(
+      child: material.Container(
+        height: height,
+        decoration: material.BoxDecoration(
+          color: striped
+              ? colorScheme.muted.withValues(alpha: 0.12)
+              : material.Colors.transparent,
+          border: material.Border(
+            bottom: material.BorderSide(
+              color: colorScheme.border.withValues(alpha: 0.15),
+            ),
           ),
         ),
-      ),
-      child: material.Row(
-        children: [
-          for (var c = 0; c < columnCount; c++)
-            _GridCell(
-              text: c < row.length ? row[c] : '',
-              width: columnWidths[c],
-              colorScheme: colorScheme,
-            ),
-        ],
+        child: material.Row(
+          children: [
+            for (var c = 0; c < columnCount; c++)
+              _GridCell(
+                text: c < row.length ? row[c] : '',
+                width: columnWidths[c],
+                colorScheme: colorScheme,
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -316,13 +318,19 @@ class _GridCell extends material.StatelessWidget {
 
     if (isHeader) return cell;
 
+    final interactiveCell = material.GestureDetector(
+      onSecondaryTap: () => Clipboard.setData(ClipboardData(text: text)),
+      child: cell,
+    );
+
+    if (text.length < ResultGridMetrics.tooltipMinLength) {
+      return interactiveCell;
+    }
+
     return material.Tooltip(
-      message: text.length >= ResultGridMetrics.tooltipMinLength ? text : '',
+      message: text,
       waitDuration: const Duration(milliseconds: 400),
-      child: material.GestureDetector(
-        onSecondaryTap: () => Clipboard.setData(ClipboardData(text: text)),
-        child: cell,
-      ),
+      child: interactiveCell,
     );
   }
 }
