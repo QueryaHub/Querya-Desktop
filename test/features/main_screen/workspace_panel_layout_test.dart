@@ -8,8 +8,7 @@ import '../../support/layout_overflow.dart';
 import '../../support/querya_theme_test_shell.dart';
 
 void main() {
-  /// Type must not be postgresql/mysql/mongodb/redis so [WorkspacePanel] uses the
-  /// default Query/Output split (includes resize handle). Not a real DB driver.
+  /// Not a real DB driver; exercises the honest unsupported state.
   const stubSplitWorkspaceConnection = ConnectionRow(
     id: 1,
     type: '_layout_test_split',
@@ -45,7 +44,8 @@ void main() {
       });
     }
 
-    testWidgets('resize splitter does not overflow', (tester) async {
+    testWidgets('unsupported connection state does not overflow',
+        (tester) async {
       await expectNoLayoutOverflow(() async {
         await pumpWidgetWithSurfaceSize(
           tester,
@@ -59,21 +59,12 @@ void main() {
         );
       });
 
-      final handle = find.byKey(const Key('workspace_panel_resize_handle'));
-      expect(handle, findsOneWidget);
-
-      await expectNoLayoutOverflow(() async {
-        await tester.drag(handle, const Offset(0, 80));
-        await tester.pumpAndSettle();
-      });
-
-      await expectNoLayoutOverflow(() async {
-        await tester.drag(handle, const Offset(0, -120));
-        await tester.pumpAndSettle();
-      });
+      expect(find.text('Unsupported connection type'), findsOneWidget);
+      expect(find.textContaining('_layout_test_split'), findsOneWidget);
     });
 
-    testWidgets('Execute button hidden when no active connection', (tester) async {
+    testWidgets('Execute button hidden when no active connection',
+        (tester) async {
       await pumpWidgetWithSurfaceSize(
         tester,
         const material.Size(800, 600),
@@ -88,7 +79,7 @@ void main() {
       expect(find.text('Execute/Refresh (F5)'), findsNothing);
     });
 
-    testWidgets('Execute button is disabled when execute is unavailable',
+    testWidgets('dead query controls are absent for unsupported connections',
         (tester) async {
       await pumpWidgetWithSurfaceSize(
         tester,
@@ -102,17 +93,9 @@ void main() {
         ),
       );
 
-      final buttonFinder = find.byKey(const Key('workspace_run_button'));
-      expect(buttonFinder, findsOneWidget);
-      final button = tester.widget<OutlineButton>(buttonFinder);
-      expect(button.onPressed, isNull);
-      expect(
-        find.text(
-          'Select an active database connection to execute queries',
-        ),
-        findsNothing,
-      );
-      expect(find.byType(material.Tooltip), findsWidgets);
+      expect(find.byKey(const Key('workspace_run_button')), findsNothing);
+      expect(find.text('Query History'), findsNothing);
+      expect(find.textContaining('Coming in a future release'), findsNothing);
     });
   });
 }

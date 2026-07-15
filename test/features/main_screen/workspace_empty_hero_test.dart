@@ -7,26 +7,39 @@ import '../../support/querya_theme_test_shell.dart';
 
 void main() {
   testWidgets('WorkspaceEmptyHero renders with theme tokens', (tester) async {
-    var tapped = false;
+    var newTapped = false;
+    var urlTapped = false;
+    var sqliteTapped = false;
     await tester.pumpWidget(
       queryaThemeTestShell(
         child: material.SizedBox(
           width: 900,
           height: 700,
-          child: WorkspaceEmptyHero(onNewConnection: () => tapped = true),
+          child: WorkspaceEmptyHero(
+            onNewConnection: () => newTapped = true,
+            onNewConnectionFromUrl: () => urlTapped = true,
+            onOpenSqlite: () => sqliteTapped = true,
+          ),
         ),
       ),
     );
     await tester.pump();
 
     expect(find.text('New connection'), findsOneWidget);
-    expect(find.textContaining('SELECT'), findsOneWidget);
+    expect(find.text('New from URL'), findsOneWidget);
+    expect(find.text('Open SQLite file'), findsOneWidget);
+    expect(find.text('Start working with your data'), findsOneWidget);
+    expect(find.textContaining('dark interface'), findsNothing);
 
     await tester.tap(find.text('New connection'));
-    expect(tapped, isTrue);
+    await tester.tap(find.text('New from URL'));
+    await tester.tap(find.text('Open SQLite file'));
+    expect(newTapped, isTrue);
+    expect(urlTapped, isTrue);
+    expect(sqliteTapped, isTrue);
   });
 
-  testWidgets('WorkspaceEmptyHero mock uses workbench surface color',
+  testWidgets('WorkspaceEmptyHero quick start uses workbench surface color',
       (tester) async {
     const surface = material.Color(0xFFABCDEF);
     final theme = QueryaTheme.darkDefault.copyWith(
