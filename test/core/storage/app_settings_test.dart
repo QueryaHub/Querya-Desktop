@@ -70,6 +70,8 @@ void main() {
         .deleteAppSetting(AppSettingsKeys.sqlEditorFontSizePoints);
     await LocalDb.instance
         .deleteAppSetting(AppSettingsKeys.sqlHistoryMaxEntries);
+    await LocalDb.instance
+        .deleteAppSetting(AppSettingsKeys.connectionsPanelWidth);
     await AppSettings.instance.clearThemeSettings();
     await LocalDb.instance.deleteAppSetting(AppSettingsKeys.updateChannel);
     await LocalDb.instance.deleteAppSetting(
@@ -204,6 +206,28 @@ void main() {
 
       await AppSettings.instance.setSqlHistoryMaxEntries(180);
       expect(await AppSettings.instance.getSqlHistoryMaxEntries(), 200);
+    });
+
+    test('connections panel width defaults, persists, and clamps', () async {
+      expect(
+        await AppSettings.instance.getConnectionsPanelWidth(),
+        kDefaultConnectionsPanelWidth,
+      );
+
+      await AppSettings.instance.setConnectionsPanelWidth(340);
+      expect(await AppSettings.instance.getConnectionsPanelWidth(), 340);
+
+      await AppSettings.instance.setConnectionsPanelWidth(50);
+      expect(
+        await AppSettings.instance.getConnectionsPanelWidth(),
+        kMinConnectionsPanelWidth,
+      );
+
+      await AppSettings.instance.setConnectionsPanelWidth(900);
+      expect(
+        await AppSettings.instance.getConnectionsPanelWidth(),
+        kMaxConnectionsPanelWidth,
+      );
     });
   });
 
@@ -360,7 +384,8 @@ void main() {
     });
 
     test('update channel defaults to stable and roundtrips dev', () async {
-      expect(await AppSettings.instance.getUpdateChannel(), UpdateChannel.stable);
+      expect(
+          await AppSettings.instance.getUpdateChannel(), UpdateChannel.stable);
       await AppSettings.instance.setUpdateChannel(UpdateChannel.dev);
       expect(await AppSettings.instance.getUpdateChannel(), UpdateChannel.dev);
     });

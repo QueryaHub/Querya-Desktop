@@ -1,33 +1,15 @@
 import 'package:flutter/material.dart' as material
     show
         Alignment,
-        Align,
-        Axis,
-        Column,
         Container,
-        ConstrainedBox,
         EdgeInsets,
-        BoxDecoration,
-        GestureDetector,
         Padding,
-        BorderRadius,
         Center,
         Icon,
         Icons,
-        MouseRegion,
-        AnimatedContainer,
-        SystemMouseCursors,
         SizedBox,
-        SingleChildScrollView,
-        Row,
-        MainAxisSize,
         Widget,
-        BoxConstraints,
-        Tooltip;
-import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
-import 'package:querya_desktop/core/motion/querya_cross_fade_stack.dart';
-import 'package:querya_desktop/core/motion/querya_motion.dart';
-import 'package:querya_desktop/core/motion/querya_motion_context.dart';
+        Column;
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -43,17 +25,15 @@ import 'package:querya_desktop/features/postgresql/postgres_object_workspace.dar
 import 'package:querya_desktop/features/postgresql/postgres_workspace_home.dart';
 import 'package:querya_desktop/features/redis/redis_explorer_view.dart';
 import 'package:querya_desktop/features/redis/redis_view.dart';
-import 'package:querya_desktop/features/connections/connections_panel.dart' show SqliteObjectKind;
-import 'package:querya_desktop/features/extensions/extension_sql_workspace.dart';
+import 'package:querya_desktop/features/connections/connections_panel.dart'
+    show SqliteObjectKind;
 import 'package:querya_desktop/features/extensions/extension_table_view.dart';
 import 'package:querya_desktop/features/extensions/extension_workspace_home.dart';
 import 'package:querya_desktop/features/sqlite/sqlite_table_view.dart';
 import 'package:querya_desktop/features/sqlite/sqlite_workspace_home.dart';
-import 'query_editor_tab.dart';
-import 'results_tab.dart';
 import 'workspace_empty_hero.dart';
 
-/// Main workspace: top = Query Editor / Query History, bottom = Data Output / Messages (pgAdmin-style). Uses shadcn layout.
+/// Main workspace for the currently selected connection.
 class WorkspacePanel extends StatefulWidget {
   const WorkspacePanel({
     super.key,
@@ -72,6 +52,8 @@ class WorkspacePanel extends StatefulWidget {
     this.extensionSqlTabRequestToken = 0,
     this.isReadOnly = false,
     this.onRequestNewConnection,
+    this.onRequestNewConnectionFromUrl,
+    this.onRequestOpenSqlite,
   });
 
   /// Currently selected connection from the sidebar.
@@ -118,10 +100,7 @@ class WorkspacePanel extends StatefulWidget {
   final int mysqlSqlTabRequestToken;
 
   /// When set, the user selected a SQLite table or view in the sidebar tree.
-  final ({
-    String name,
-    SqliteObjectKind kind
-  })? selectedSqliteObject;
+  final ({String name, SqliteObjectKind kind})? selectedSqliteObject;
 
   /// Incremented by [MainScreen] to switch the SQLite home view to the SQL tab.
   final int sqliteSqlTabRequestToken;
@@ -137,22 +116,14 @@ class WorkspacePanel extends StatefulWidget {
 
   /// Empty-state hero: primary CTA to add a connection.
   final void Function()? onRequestNewConnection;
+  final void Function()? onRequestNewConnectionFromUrl;
+  final void Function()? onRequestOpenSqlite;
 
   @override
   State<WorkspacePanel> createState() => _WorkspacePanelState();
 }
 
 class _WorkspacePanelState extends State<WorkspacePanel> {
-  int _editorTabIndex = 0;
-  int _outputTabIndex = 0;
-  final ValueNotifier<double> _topFraction = ValueNotifier(0.7);
-
-  @override
-  void dispose() {
-    _topFraction.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -164,6 +135,8 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
         alignment: material.Alignment.topCenter,
         child: WorkspaceEmptyHero(
           onNewConnection: widget.onRequestNewConnection ?? () {},
+          onNewConnectionFromUrl: widget.onRequestNewConnectionFromUrl,
+          onOpenSqlite: widget.onRequestOpenSqlite,
         ),
       );
     }
@@ -271,6 +244,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
                   key: ValueKey('ext_home_${activeConn.id}'),
                   connectionRow: activeConn,
                   sqlTabRequestToken: widget.extensionSqlTabRequestToken,
+                  isReadOnly: widget.isReadOnly,
                 )
               : ExtensionTableView(
                   key: ValueKey(
@@ -293,235 +267,23 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
 
     return material.Container(
       color: theme.colorScheme.background,
-      child: VerticalSplitPane(
-        fraction: _topFraction,
-        handleKey: const Key('workspace_panel_resize_handle'),
-        top: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _SectionBar(
-              title: 'Query',
-              tabs: const ['Query Editor', 'Query History'],
-              index: _editorTabIndex,
-              onTabChanged: (v) => setState(() => _editorTabIndex = v),
-              trailing: const _RunButton(),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: QueryaCrossFadeStack(
-                index: _editorTabIndex,
-                children: const [
-                  QueryEditorTab(),
-                  _ComingSoonTab(
-                    title: 'Query History',
-                    description:
-                        'Browse recently executed SQL queries and re-run them from one place. Coming in a future release.',
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        bottom: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _SectionBar(
-              title: 'Output',
-              tabs: const ['Data Output', 'Messages', 'Notifications'],
-              index: _outputTabIndex,
-              onTabChanged: (v) => setState(() => _outputTabIndex = v),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: QueryaCrossFadeStack(
-                index: _outputTabIndex,
-                children: const [
-                  ResultsTab(),
-                  _ComingSoonTab(
-                    title: 'Messages',
-                    description:
-                        'Connection logs and query execution messages will appear here. Coming in a future release.',
-                  ),
-                  _ComingSoonTab(
-                    title: 'Notifications',
-                    description:
-                        'System alerts and background task notifications will appear here. Coming in a future release.',
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SectionBar extends StatelessWidget {
-  const _SectionBar({
-    required this.title,
-    required this.tabs,
-    required this.index,
-    required this.onTabChanged,
-    this.trailing,
-  });
-
-  final String title;
-  final List<String> tabs;
-  final int index;
-  final ValueChanged<int> onTabChanged;
-  final Widget? trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return material.Container(
-      constraints: const material.BoxConstraints(minHeight: 44),
-      padding: const material.EdgeInsets.symmetric(horizontal: 12),
-      decoration: material.BoxDecoration(
-        color: theme.colorScheme.muted.withValues(alpha: 0.6),
-      ),
-      child: Row(
-        children: [
-          material.Padding(
-            padding: const material.EdgeInsets.only(right: 16),
-            child: Text(title).semiBold().small(),
-          ),
-          Expanded(
-            child: material.SingleChildScrollView(
-              scrollDirection: material.Axis.horizontal,
-              child: material.Row(
-                mainAxisSize: material.MainAxisSize.min,
-                children: [
-                  ...List.generate(tabs.length, (i) {
-                    return _TabButton(
-                      label: tabs[i],
-                      selected: index == i,
-                      onTap: () => onTabChanged(i),
-                      theme: theme,
-                    );
-                  }),
-                ],
-              ),
-            ),
-          ),
-          if (trailing != null) trailing!,
-        ],
-      ),
-    );
-  }
-}
-
-class _TabButton extends StatefulWidget {
-  const _TabButton({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    required this.theme,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  final ThemeData theme;
-
-  @override
-  State<_TabButton> createState() => _TabButtonState();
-}
-
-class _TabButtonState extends State<_TabButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = widget.theme;
-    final isSelected = widget.selected;
-    final bgColor = isSelected
-        ? theme.colorScheme.background
-        : _hovered
-            ? theme.colorScheme.muted.withValues(alpha: 0.5)
-            : Colors.transparent;
-
-    return material.Padding(
-      padding: const material.EdgeInsets.only(right: 4),
-      child: material.MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        cursor: material.SystemMouseCursors.click,
-        child: material.GestureDetector(
-          onTap: widget.onTap,
-          child: material.AnimatedContainer(
-            duration: context.motionDuration(QueryaMotion.fast),
-            curve: context.motionCurve(QueryaMotion.enter),
-            padding: const material.EdgeInsets.symmetric(
-                horizontal: 12, vertical: 8),
-            decoration: material.BoxDecoration(
-              color: bgColor,
-              borderRadius: material.BorderRadius.circular(6),
-            ),
-            child: isSelected
-                ? Text(widget.label).semiBold().small()
-                : Text(widget.label).muted().small(),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RunButton extends StatelessWidget {
-  const _RunButton();
-
-  static const _noConnectionTooltip =
-      'Select an active database connection to execute queries';
-
-  @override
-  Widget build(BuildContext context) {
-    return const material.Tooltip(
-      message: _noConnectionTooltip,
-      waitDuration: Duration(milliseconds: 450),
-      child: OutlineButton(
-        key: Key('workspace_run_button'),
-        onPressed: null,
-        leading: material.Icon(material.Icons.play_arrow, size: 18),
-        child: Text('Execute/Refresh (F5)'),
-      ),
-    );
-  }
-}
-
-class _ComingSoonTab extends StatelessWidget {
-  const _ComingSoonTab({
-    required this.title,
-    required this.description,
-  });
-
-  final String title;
-  final String description;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return material.Center(
-      child: material.Padding(
-        padding: const material.EdgeInsets.all(32),
-        child: material.ConstrainedBox(
-          constraints: const material.BoxConstraints(maxWidth: 420),
+      child: material.Center(
+        child: material.Padding(
+          padding: const material.EdgeInsets.all(32),
           child: material.Column(
-            mainAxisSize: material.MainAxisSize.min,
+            mainAxisSize: MainAxisSize.min,
             children: [
               material.Icon(
-                material.Icons.hourglass_empty_rounded,
+                material.Icons.error_outline_rounded,
                 size: 36,
                 color: theme.colorScheme.mutedForeground,
               ),
-              const material.SizedBox(height: 16),
-              Text(title).semiBold(),
-              const material.SizedBox(height: 8),
-              material.Align(
-                alignment: material.Alignment.center,
-                child: Text(description).muted().small(),
-              ),
+              const material.SizedBox(height: 12),
+              const Text('Unsupported connection type').semiBold(),
+              const material.SizedBox(height: 6),
+              Text(
+                'No workspace is registered for “${activeConn.type}”.',
+              ).muted().small(),
             ],
           ),
         ),
@@ -529,4 +291,3 @@ class _ComingSoonTab extends StatelessWidget {
     );
   }
 }
-

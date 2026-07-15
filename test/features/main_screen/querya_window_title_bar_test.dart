@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
@@ -97,5 +95,23 @@ void main() {
       ),
     );
     expect(background, _customSurface);
+  });
+
+  testWidgets('read-only state is persistently visible in title bar',
+      (tester) async {
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: const material.SizedBox(
+          width: 1000,
+          child: QueryaReadOnlyBadge(),
+        ),
+      ),
+    );
+
+    expect(
+      find.byKey(const Key('title_bar_read_only_badge')),
+      findsOneWidget,
+    );
+    expect(find.text('Read-only'), findsWidgets);
   });
 }

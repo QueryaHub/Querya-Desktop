@@ -1,119 +1,151 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/window_layout.dart';
-import 'package:querya_desktop/core/theme/querya_editor_theme.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
-import 'package:querya_desktop/core/theme/querya_typography.dart';
-import 'package:querya_desktop/core/theme/querya_workbench_theme.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
-/// Marketing-style empty workspace: badge, copy, mock window, primary CTA.
+/// Task-oriented empty workspace shown before a connection is selected.
 class WorkspaceEmptyHero extends StatelessWidget {
   const WorkspaceEmptyHero({
     super.key,
     required this.onNewConnection,
+    this.onNewConnectionFromUrl,
+    this.onOpenSqlite,
   });
 
   final VoidCallback onNewConnection;
+  final VoidCallback? onNewConnectionFromUrl;
+  final VoidCallback? onOpenSqlite;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final workbench = context.workbench;
-    final editorTheme = context.editorTheme;
+    final wb = context.workbench;
+
     return material.LayoutBuilder(
-      builder: (context, c) {
-        final vw = c.maxWidth;
-        final padH = WindowLayout.heroHorizontalPadding(vw);
-        final padV = vw < WindowLayout.compactWindowWidth ? 24.0 : 32.0;
-        final maxContent = WindowLayout.heroContentMaxWidth(vw);
-        final mockH = WindowLayout.heroMockWindowHeight(maxContent);
-        final compact = vw < WindowLayout.compactWindowWidth;
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < WindowLayout.compactWindowWidth;
+        final horizontal =
+            WindowLayout.heroHorizontalPadding(constraints.maxWidth);
+
         return material.SingleChildScrollView(
-          padding:
-              material.EdgeInsets.symmetric(horizontal: padH, vertical: padV),
+          padding: material.EdgeInsets.symmetric(
+            horizontal: horizontal,
+            vertical: compact ? 24 : 48,
+          ),
           child: material.Align(
             alignment: material.Alignment.topCenter,
             child: material.ConstrainedBox(
-              constraints: material.BoxConstraints(maxWidth: maxContent),
+              constraints: const material.BoxConstraints(maxWidth: 720),
               child: material.Column(
-                crossAxisAlignment: material.CrossAxisAlignment.center,
+                crossAxisAlignment: material.CrossAxisAlignment.stretch,
                 children: [
-                  _HeroBadge(colorScheme: cs, compact: compact),
-                  material.SizedBox(height: compact ? 16 : 20),
-                  material.Padding(
-                    padding: const material.EdgeInsets.symmetric(horizontal: 4),
-                    child: material.Text(
-                      'A lightweight desktop client for every database you ship',
-                      textAlign: material.TextAlign.center,
-                      style: material.TextStyle(
-                        fontSize: 20,
-                        fontWeight: material.FontWeight.w600,
-                        color: cs.foreground,
-                      ),
-                    ),
+                  material.Icon(
+                    material.Icons.storage_rounded,
+                    size: compact ? 38 : 46,
+                    color: cs.primary,
                   ),
-                  material.SizedBox(height: compact ? 10 : 12),
-                  material.Padding(
-                    padding: const material.EdgeInsets.symmetric(horizontal: 4),
-                    child: material.Text(
-                      'Connect to PostgreSQL, MySQL, Redis and MongoDB from a single '
-                      'focused app with a calm dark interface.',
-                      textAlign: material.TextAlign.center,
-                      style: material.TextStyle(
-                        fontSize: 14,
-                        height: 1.4,
-                        color: cs.mutedForeground,
-                      ),
-                    ),
-                  ),
-                  const material.SizedBox(height: 10),
-                  Text(
-                    'BUILT WITH FLUTTER · CROSS-PLATFORM',
+                  material.SizedBox(height: compact ? 14 : 18),
+                  material.Text(
+                    'Start working with your data',
                     textAlign: material.TextAlign.center,
                     style: material.TextStyle(
-                      fontFamily: QueryaTypography.mono,
-                      fontSize: compact ? 9 : 10,
-                      letterSpacing: 0.6,
-                      color: cs.mutedForeground.withValues(alpha: 0.85),
+                      color: cs.foreground,
+                      fontSize: compact ? 22 : 28,
+                      fontWeight: material.FontWeight.w600,
                     ),
                   ),
-                  material.SizedBox(height: compact ? 20 : 28),
-                  _MockAppWindow(
-                    colorScheme: cs,
-                    workbench: workbench,
-                    editorTheme: editorTheme,
-                    height: mockH,
-                    compact: compact,
+                  const material.SizedBox(height: 8),
+                  material.Text(
+                    'Connect to a database or open a local SQLite file.',
+                    textAlign: material.TextAlign.center,
+                    style: material.TextStyle(
+                      color: cs.mutedForeground,
+                      fontSize: compact ? 13 : 14,
+                    ),
                   ),
-                  material.SizedBox(height: compact ? 20 : 28),
+                  material.SizedBox(height: compact ? 24 : 32),
                   material.Wrap(
                     alignment: material.WrapAlignment.center,
-                    spacing: 12,
-                    runSpacing: 12,
+                    spacing: 10,
+                    runSpacing: 10,
                     children: [
                       PrimaryButton(
+                        key: const Key('empty_new_connection'),
                         onPressed: onNewConnection,
-                        leading: material.Icon(
+                        leading: const material.Icon(
                           material.Icons.add_link_rounded,
-                          size: compact ? 16 : 18,
+                          size: 18,
                         ),
                         child: const Text('New connection'),
                       ),
+                      if (onNewConnectionFromUrl != null)
+                        OutlineButton(
+                          key: const Key('empty_new_from_url'),
+                          onPressed: onNewConnectionFromUrl,
+                          leading: const material.Icon(
+                            material.Icons.link_rounded,
+                            size: 18,
+                          ),
+                          child: const Text('New from URL'),
+                        ),
+                      if (onOpenSqlite != null)
+                        OutlineButton(
+                          key: const Key('empty_open_sqlite'),
+                          onPressed: onOpenSqlite,
+                          leading: const material.Icon(
+                            material.Icons.folder_open_rounded,
+                            size: 18,
+                          ),
+                          child: const Text('Open SQLite file'),
+                        ),
                     ],
                   ),
-                  material.SizedBox(height: compact ? 14 : 18),
-                  material.Padding(
-                    padding: const material.EdgeInsets.symmetric(horizontal: 8),
-                    child: material.Text(
-                      'You can also use Connection → New Database Connection. '
-                      'Passwords are kept in your OS secure store (see docs/security.md). '
-                      'Quick start: docs/user-guide.md.',
-                      textAlign: material.TextAlign.center,
-                      style: material.TextStyle(
-                        fontSize: 12,
-                        height: 1.35,
-                        color: cs.mutedForeground.withValues(alpha: 0.9),
+                  material.SizedBox(height: compact ? 28 : 40),
+                  material.Container(
+                    padding: material.EdgeInsets.all(compact ? 16 : 20),
+                    decoration: material.BoxDecoration(
+                      color: wb.surface,
+                      borderRadius: material.BorderRadius.circular(12),
+                      border: material.Border.all(
+                        color: wb.borderSubtle.withValues(alpha: 0.55),
                       ),
+                    ),
+                    child: material.Column(
+                      crossAxisAlignment: material.CrossAxisAlignment.start,
+                      children: [
+                        material.Text(
+                          'Quick start',
+                          style: material.TextStyle(
+                            color: cs.foreground,
+                            fontSize: 14,
+                            fontWeight: material.FontWeight.w600,
+                          ),
+                        ),
+                        const material.SizedBox(height: 12),
+                        _QuickStartRow(
+                          icon: material.Icons.dns_rounded,
+                          title: 'Server databases',
+                          description:
+                              'PostgreSQL, MySQL, MongoDB, Redis and extension drivers',
+                          color: cs.primary,
+                        ),
+                        const material.SizedBox(height: 12),
+                        _QuickStartRow(
+                          icon: material.Icons.insert_drive_file_rounded,
+                          title: 'Local database',
+                          description:
+                              'Open an existing SQLite file or create a connection',
+                          color: cs.primary,
+                        ),
+                        const material.SizedBox(height: 12),
+                        _QuickStartRow(
+                          icon: material.Icons.security_rounded,
+                          title: 'Credentials stay protected',
+                          description:
+                              'Passwords are stored in your operating system secure store',
+                          color: cs.primary,
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -126,222 +158,52 @@ class WorkspaceEmptyHero extends StatelessWidget {
   }
 }
 
-class _HeroBadge extends StatelessWidget {
-  const _HeroBadge({required this.colorScheme, this.compact = false});
-
-  final ColorScheme colorScheme;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    return material.Container(
-      padding: material.EdgeInsets.symmetric(
-        horizontal: compact ? 10 : 12,
-        vertical: compact ? 5 : 6,
-      ),
-      decoration: material.BoxDecoration(
-        color: colorScheme.background,
-        borderRadius: material.BorderRadius.circular(999),
-        border: material.Border.all(
-          color: colorScheme.primary.withValues(alpha: 0.45),
-        ),
-      ),
-      child: material.Row(
-        mainAxisSize: material.MainAxisSize.max,
-        children: [
-          material.Icon(
-            material.Icons.auto_awesome_rounded,
-            size: compact ? 12 : 14,
-            color: colorScheme.primary,
-          ),
-          material.SizedBox(width: compact ? 6 : 8),
-          material.Expanded(
-            child: material.Text(
-              'One app for SQL and NoSQL',
-              maxLines: 2,
-              overflow: material.TextOverflow.ellipsis,
-              style: material.TextStyle(
-                fontSize: compact ? 11 : 12,
-                color: colorScheme.foreground.withValues(alpha: 0.92),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MockAppWindow extends StatelessWidget {
-  const _MockAppWindow({
-    required this.colorScheme,
-    required this.workbench,
-    required this.editorTheme,
-    required this.height,
-    this.compact = false,
+class _QuickStartRow extends StatelessWidget {
+  const _QuickStartRow({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.color,
   });
 
-  final ColorScheme colorScheme;
-  final QueryaWorkbenchTheme workbench;
-  final QueryaEditorTheme editorTheme;
-  final double height;
-  final bool compact;
+  final material.IconData icon;
+  final String title;
+  final String description;
+  final material.Color color;
 
   @override
   Widget build(BuildContext context) {
-    final glow = colorScheme.primary.withValues(alpha: 0.14);
-    final sidebarW = compact ? 58.0 : 72.0;
-    final blur = compact ? 28.0 : 40.0;
-    final radius = compact ? 12.0 : 16.0;
-    return material.Container(
-      decoration: material.BoxDecoration(
-        borderRadius: material.BorderRadius.circular(radius),
-        boxShadow: [
-          material.BoxShadow(
-            color: glow,
-            blurRadius: blur,
-            spreadRadius: -4,
-            offset: material.Offset(0, compact ? 12 : 18),
-          ),
-        ],
-      ),
-      child: material.Container(
-        height: height,
-        decoration: material.BoxDecoration(
-          color: workbench.surface,
-          borderRadius: material.BorderRadius.circular(radius),
-          border: material.Border.all(
-            color: colorScheme.border.withValues(alpha: 0.5),
-          ),
-        ),
-        clipBehavior: material.Clip.antiAlias,
-        child: material.Column(
-          crossAxisAlignment: material.CrossAxisAlignment.stretch,
-          children: [
-            material.Container(
-              padding: material.EdgeInsets.symmetric(
-                horizontal: compact ? 10 : 12,
-                vertical: compact ? 8 : 10,
-              ),
-              decoration: material.BoxDecoration(
-                border: material.Border(
-                  bottom: material.BorderSide(
-                    color: colorScheme.border.withValues(alpha: 0.35),
-                  ),
+    final cs = Theme.of(context).colorScheme;
+    return material.Row(
+      crossAxisAlignment: material.CrossAxisAlignment.start,
+      children: [
+        material.Icon(icon, size: 18, color: color),
+        const material.SizedBox(width: 12),
+        material.Expanded(
+          child: material.Column(
+            crossAxisAlignment: material.CrossAxisAlignment.start,
+            children: [
+              material.Text(
+                title,
+                style: material.TextStyle(
+                  color: cs.foreground,
+                  fontSize: 13,
+                  fontWeight: material.FontWeight.w500,
                 ),
               ),
-              child: material.Row(
-                children: [
-                  _trafficDot(workbench.destructive),
-                  const material.SizedBox(width: 6),
-                  _trafficDot(workbench.warning),
-                  const material.SizedBox(width: 6),
-                  _trafficDot(workbench.success),
-                ],
+              const material.SizedBox(height: 2),
+              material.Text(
+                description,
+                style: material.TextStyle(
+                  color: cs.mutedForeground,
+                  fontSize: 12,
+                  height: 1.35,
+                ),
               ),
-            ),
-            material.Expanded(
-              child: material.Row(
-                crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                children: [
-                  material.Container(
-                    width: sidebarW,
-                    padding: material.EdgeInsets.fromLTRB(
-                      compact ? 8 : 10,
-                      compact ? 8 : 10,
-                      compact ? 6 : 8,
-                      compact ? 8 : 10,
-                    ),
-                    color: workbench.sidebarBackground,
-                    child: material.Column(
-                      crossAxisAlignment: material.CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'SERVERS',
-                          style: material.TextStyle(
-                            fontFamily: QueryaTypography.mono,
-                            fontSize: compact ? 8 : 9,
-                            letterSpacing: 0.5,
-                            color: colorScheme.mutedForeground,
-                          ),
-                        ),
-                        material.SizedBox(height: compact ? 8 : 10),
-                        material.Container(
-                          padding: material.EdgeInsets.symmetric(
-                            horizontal: compact ? 6 : 8,
-                            vertical: compact ? 4 : 6,
-                          ),
-                          decoration: material.BoxDecoration(
-                            color: colorScheme.primary.withValues(alpha: 0.2),
-                            borderRadius:
-                                material.BorderRadius.circular(compact ? 6 : 8),
-                          ),
-                          child: material.Text(
-                            'analytics-prod',
-                            maxLines: 1,
-                            overflow: material.TextOverflow.ellipsis,
-                            style: material.TextStyle(
-                              fontSize: compact ? 9 : 10,
-                              color: colorScheme.foreground,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  material.Expanded(
-                    child: material.Container(
-                      margin: material.EdgeInsets.all(compact ? 8 : 10),
-                      padding: material.EdgeInsets.all(compact ? 8 : 10),
-                      decoration: material.BoxDecoration(
-                        color: workbench.editorBackground,
-                        borderRadius: material.BorderRadius.circular(8),
-                        border: material.Border.all(
-                          color: colorScheme.border.withValues(alpha: 0.25),
-                        ),
-                      ),
-                      child: material.Column(
-                        crossAxisAlignment: material.CrossAxisAlignment.start,
-                        children: [
-                          material.Text(
-                            'SELECT …',
-                            style: material.TextStyle(
-                              fontFamily: QueryaTypography.mono,
-                              fontSize: compact ? 9 : 11,
-                              height: 1.45,
-                              color: colorScheme.primary,
-                            ),
-                          ),
-                          material.Text(
-                            "  interval '1 day'",
-                            style: material.TextStyle(
-                              fontFamily: QueryaTypography.mono,
-                              fontSize: compact ? 9 : 11,
-                              height: 1.45,
-                              color: editorTheme.string,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
+      ],
     );
   }
-}
-
-material.Widget _trafficDot(Color c) {
-  return material.Container(
-    width: 10,
-    height: 10,
-    decoration: material.BoxDecoration(
-      color: c,
-      shape: material.BoxShape.circle,
-    ),
-  );
 }

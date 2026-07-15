@@ -36,6 +36,11 @@ const double kMaxUiScale = 2.0;
 /// Slider step — 1% increments when Shift is held (fine control).
 const double kUiScaleStep = 0.01;
 
+/// Persisted width of the connections sidebar in logical pixels.
+const double kDefaultConnectionsPanelWidth = 260;
+const double kMinConnectionsPanelWidth = 180;
+const double kMaxConnectionsPanelWidth = 500;
+
 /// Fixed tick marks on the interface scale slider (75% … 200%).
 const List<double> kUiScalePresets = [
   0.75,
@@ -113,6 +118,7 @@ abstract final class AppSettingsKeys {
   static const themeSelectedPath = 'theme_selected_path';
   static const themeAnimationEnabled = 'theme_animation_enabled';
   static const uiScale = 'ui_scale';
+  static const connectionsPanelWidth = 'connections_panel_width';
   static const motionLevel = 'motion_level';
   static const updateChannel = 'update_channel';
   static const checkForUpdatesOnStartup = 'check_for_updates_on_startup';
@@ -240,6 +246,25 @@ class AppSettings {
     await LocalDb.instance.setAppSetting(
       AppSettingsKeys.uiScale,
       normalized.toStringAsFixed(2),
+    );
+  }
+
+  Future<double> getConnectionsPanelWidth() async {
+    final value = await LocalDb.instance.getAppSetting(
+      AppSettingsKeys.connectionsPanelWidth,
+    );
+    final parsed = value == null ? null : double.tryParse(value);
+    return (parsed ?? kDefaultConnectionsPanelWidth)
+        .clamp(kMinConnectionsPanelWidth, kMaxConnectionsPanelWidth)
+        .toDouble();
+  }
+
+  Future<void> setConnectionsPanelWidth(double width) async {
+    final normalized =
+        width.clamp(kMinConnectionsPanelWidth, kMaxConnectionsPanelWidth);
+    await LocalDb.instance.setAppSetting(
+      AppSettingsKeys.connectionsPanelWidth,
+      normalized.toStringAsFixed(1),
     );
   }
 

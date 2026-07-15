@@ -1,6 +1,5 @@
 import 'package:bitsdojo_window/bitsdojo_window.dart';
-import 'package:flutter/material.dart' as material
-    show BuildContext, Container, Icon, Icons, MainAxisSize, Widget;
+import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/connections/driver_manager_dialog.dart';
@@ -87,7 +86,7 @@ class QueryaWindowTitleBar extends StatelessWidget {
                   children: [
                     const SizedBox(width: 16),
                     material.Icon(
-                      material.Icons.search_rounded,
+                      material.Icons.storage_rounded,
                       size: 18,
                       color: wb.accent,
                     ),
@@ -103,7 +102,9 @@ class QueryaWindowTitleBar extends StatelessWidget {
                             MenuButton(
                                 onPressed: (ctx) {
                                   Actions.maybeInvoke(
-                                    FocusManager.instance.primaryFocus?.context ?? ctx,
+                                    FocusManager
+                                            .instance.primaryFocus?.context ??
+                                        ctx,
                                     const NewSqlIntent(),
                                   );
                                 },
@@ -111,7 +112,9 @@ class QueryaWindowTitleBar extends StatelessWidget {
                             MenuButton(
                                 onPressed: (ctx) {
                                   Actions.maybeInvoke(
-                                    FocusManager.instance.primaryFocus?.context ?? ctx,
+                                    FocusManager
+                                            .instance.primaryFocus?.context ??
+                                        ctx,
                                     const OpenSqlIntent(),
                                   );
                                 },
@@ -119,7 +122,9 @@ class QueryaWindowTitleBar extends StatelessWidget {
                             MenuButton(
                                 onPressed: (ctx) {
                                   Actions.maybeInvoke(
-                                    FocusManager.instance.primaryFocus?.context ?? ctx,
+                                    FocusManager
+                                            .instance.primaryFocus?.context ??
+                                        ctx,
                                     const SaveSqlIntent(),
                                   );
                                 },
@@ -147,7 +152,8 @@ class QueryaWindowTitleBar extends StatelessWidget {
                                 material.Icons.extension_rounded,
                                 size: 18,
                               ),
-                              onPressed: (ctx) => showExtensionManagerDialog(ctx),
+                              onPressed: (ctx) =>
+                                  showExtensionManagerDialog(ctx),
                               child: const Text('Extensions…'),
                             ),
                           ],
@@ -168,7 +174,8 @@ class QueryaWindowTitleBar extends StatelessWidget {
                               leading: const material.Icon(
                                   material.Icons.link_rounded,
                                   size: 18),
-                              onPressed: (_) => onNewDatabaseConnectionFromUrl(),
+                              onPressed: (_) =>
+                                  onNewDatabaseConnectionFromUrl(),
                               child: const Text('New Connection from URL'),
                             ),
                             MenuButton(
@@ -251,6 +258,8 @@ class QueryaWindowTitleBar extends StatelessWidget {
             Row(
               mainAxisSize: material.MainAxisSize.min,
               children: [
+                if (activeConnection != null && isReadOnly)
+                  const QueryaReadOnlyBadge(),
                 UpdateAvailableBadge(controller: UpdateController.instance),
                 MinimizeWindowButton(colors: buttonColors),
                 MaximizeWindowButton(colors: buttonColors),
@@ -258,6 +267,56 @@ class QueryaWindowTitleBar extends StatelessWidget {
               ],
             )
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Persistent title-bar indicator for a read-only workspace.
+class QueryaReadOnlyBadge extends StatelessWidget {
+  const QueryaReadOnlyBadge({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final warning = context.workbench.warning;
+    return material.Tooltip(
+      message: 'Read-only mode',
+      child: material.Semantics(
+        label: 'Read-only mode',
+        child: material.Container(
+          key: const Key('title_bar_read_only_badge'),
+          margin: const material.EdgeInsets.only(right: 8),
+          padding: const material.EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: 4,
+          ),
+          decoration: material.BoxDecoration(
+            color: warning.withValues(alpha: 0.14),
+            borderRadius: material.BorderRadius.circular(6),
+            border: material.Border.all(
+              color: warning.withValues(alpha: 0.4),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: material.MainAxisSize.min,
+            children: [
+              material.Icon(
+                material.Icons.lock_outline_rounded,
+                size: 13,
+                color: warning,
+              ),
+              const Gap(5),
+              Text(
+                'Read-only',
+                style: material.TextStyle(
+                  color: warning,
+                  fontSize: 11,
+                  fontWeight: material.FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
