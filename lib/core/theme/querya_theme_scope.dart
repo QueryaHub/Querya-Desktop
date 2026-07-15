@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import 'querya_editor_theme.dart';
+import 'querya_semantic_palette.dart';
 import 'querya_theme.dart';
 import 'querya_workbench_theme.dart';
 
@@ -36,4 +37,7 @@ extension QueryaThemeContext on BuildContext {
   QueryaWorkbenchTheme get workbench => queryaTheme.workbench;
 
   QueryaEditorTheme get editorTheme => queryaTheme.editor;
+
+  QueryaSemanticPalette get semanticPalette =>
+      QueryaSemanticPalette.fromTheme(queryaTheme);
 }

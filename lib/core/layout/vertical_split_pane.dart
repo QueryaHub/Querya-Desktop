@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/layout/querya_split_handle.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// Holds top/bottom panes for [VerticalSplitPane] [ValueListenableBuilder.child].
@@ -40,15 +41,24 @@ class VerticalSplitPane extends StatelessWidget {
           valueListenable: fraction,
           builder: (context, value, panes) {
             final pair = panes! as SplitPanePair;
-            final topFlex = (value * 100).round().clamp(20, 80).toInt();
+            final topFlex = (value * 100)
+                .round()
+                .clamp(
+                  (minFraction * 100).round(),
+                  (maxFraction * 100).round(),
+                )
+                .toInt();
             final bottomFlex = 100 - topFlex;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(flex: topFlex, child: pair.top),
-                _VerticalSplitHandle(
+                QueryaSplitHandle(
                   key: handleKey,
-                  onDrag: (dy) {
+                  axis: material.Axis.vertical,
+                  semanticsLabel: 'Resize query and output panes',
+                  semanticsValue: '${(value * 100).round()}% top pane',
+                  onDragDelta: (dy) {
                     if (totalHeight <= 0) return;
                     fraction.value = (fraction.value + dy / totalHeight)
                         .clamp(minFraction, maxFraction);
@@ -61,28 +71,6 @@ class VerticalSplitPane extends StatelessWidget {
           child: SplitPanePair(top: top, bottom: bottom),
         );
       },
-    );
-  }
-}
-
-class _VerticalSplitHandle extends StatelessWidget {
-  const _VerticalSplitHandle({super.key, required this.onDrag});
-
-  final void Function(double dy) onDrag;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context).colorScheme;
-    return material.MouseRegion(
-      cursor: material.SystemMouseCursors.resizeRow,
-      child: material.GestureDetector(
-        behavior: material.HitTestBehavior.opaque,
-        onVerticalDragUpdate: (e) => onDrag(e.delta.dy),
-        child: material.Container(
-          height: 6,
-          color: theme.border.withValues(alpha: 0.15),
-        ),
-      ),
     );
   }
 }
