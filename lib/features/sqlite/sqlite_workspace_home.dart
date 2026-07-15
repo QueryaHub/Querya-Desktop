@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/motion/querya_cross_fade_stack.dart';
-import 'package:querya_desktop/core/motion/querya_motion.dart';
-import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/core/storage/local_db.dart' show ConnectionRow;
 import 'package:querya_desktop/features/sqlite/sqlite_overview_tab.dart';
 import 'package:querya_desktop/features/sqlite/sqlite_sql_workspace.dart';
@@ -20,7 +18,8 @@ class SqliteWorkspaceHome extends material.StatefulWidget {
   final bool isReadOnly;
 
   @override
-  material.State<SqliteWorkspaceHome> createState() => _SqliteWorkspaceHomeState();
+  material.State<SqliteWorkspaceHome> createState() =>
+      _SqliteWorkspaceHomeState();
 }
 
 class _SqliteWorkspaceHomeState extends material.State<SqliteWorkspaceHome> {
@@ -79,36 +78,11 @@ class _SqliteWorkspaceHomeState extends material.State<SqliteWorkspaceHome> {
                 ),
               ],
               const Spacer(),
-              ...List.generate(2, (i) {
-                final labels = ['Overview', 'SQL'];
-                final selected = _tab == i;
-                return material.Padding(
-                  padding: const material.EdgeInsets.only(left: 6),
-                  child: material.MouseRegion(
-                    cursor: material.SystemMouseCursors.click,
-                    child: material.GestureDetector(
-                      onTap: () => _selectTab(i),
-                      child: material.AnimatedContainer(
-                        duration: context.motionDuration(QueryaMotion.fast),
-                        curve: context.motionCurve(QueryaMotion.enter),
-                        padding: const material.EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: material.BoxDecoration(
-                          color: selected
-                              ? theme.colorScheme.background
-                              : material.Colors.transparent,
-                          borderRadius: material.BorderRadius.circular(6),
-                        ),
-                        child: selected
-                            ? Text(labels[i]).small().semiBold()
-                            : Text(labels[i]).small().muted(),
-                      ),
-                    ),
-                  ),
-                );
-              }),
+              QueryaTabStrip(
+                labels: const ['Overview', 'SQL'],
+                selectedIndex: _tab,
+                onSelected: _selectTab,
+              ),
             ],
           ),
         ),

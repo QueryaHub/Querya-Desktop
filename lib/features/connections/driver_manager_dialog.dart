@@ -179,19 +179,12 @@ class _DriverRow extends material.StatelessWidget {
           material.SizedBox(
             width: 40,
             height: 40,
-            child: info.iconFile != null
-                ? DriverIconImage(
-                    path: info.iconFile!,
-                    size: 40,
-                    fallbackIcon: info.icon,
-                  )
-                : info.iconAsset != null
-                    ? material.Image.asset(
-                        info.iconAsset!,
-                        fit: material.BoxFit.contain,
-                        filterQuality: material.FilterQuality.medium,
-                      )
-                    : material.Icon(info.icon, size: 40, color: theme.primary),
+            child: DriverIcon(
+              filePath: info.iconFile,
+              assetPath: info.iconAsset,
+              size: 40,
+              fallbackIcon: info.icon,
+            ),
           ),
           const material.SizedBox(width: 16),
           material.Expanded(

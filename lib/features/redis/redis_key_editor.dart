@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/redis_connection.dart';
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
@@ -245,6 +246,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   material.Widget build(material.BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final shadcnCs = shadcn.Theme.of(context).colorScheme;
+    final palette = context.semanticPalette;
 
     if (_loading) {
       return material.Center(
@@ -294,15 +296,20 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
           material.Container(
             padding: const material.EdgeInsets.symmetric(
                 horizontal: 16, vertical: 8),
-            color: const Color(0xFF66BB6A).withValues(alpha: 0.1),
+            color: palette.success.withValues(alpha: 0.1),
             child: Row(
               children: [
-                const material.Icon(material.Icons.check_circle_rounded,
-                    size: 16, color: Color(0xFF66BB6A)),
+                material.Icon(
+                  material.Icons.check_circle_rounded,
+                  size: 16,
+                  color: palette.success,
+                ),
                 const Gap(8),
-                Text(_success!,
-                    style: const material.TextStyle(
-                        color: Color(0xFF66BB6A), fontSize: 13)),
+                Text(
+                  _success!,
+                  style:
+                      material.TextStyle(color: palette.success, fontSize: 13),
+                ),
               ],
             ),
           ),
@@ -418,10 +425,10 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
             child: material.InkWell(
               onTap: _deleteKey,
               borderRadius: material.BorderRadius.circular(4),
-              child: const material.Padding(
-                padding: material.EdgeInsets.all(4),
+              child: material.Padding(
+                padding: const material.EdgeInsets.all(4),
                 child: material.Icon(material.Icons.delete_rounded,
-                    size: 16, color: Color(0xFFEF5350)),
+                    size: 16, color: context.semanticPalette.destructive),
               ),
             ),
           ),
@@ -729,19 +736,20 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   // ─── Helpers ────────────────────────────────────────────────────────────
 
   Color _typeColor(String type) {
+    final palette = context.semanticPalette;
     switch (type) {
       case 'string':
-        return const Color(0xFF42A5F5);
+        return palette.type1;
       case 'hash':
-        return const Color(0xFFAB47BC);
+        return palette.type4;
       case 'list':
-        return const Color(0xFF66BB6A);
+        return palette.type2;
       case 'set':
-        return const Color(0xFFFFA726);
+        return palette.type3;
       case 'zset':
-        return const Color(0xFFEF5350);
+        return palette.type5;
       default:
-        return const Color(0xFF90A4AE);
+        return palette.muted;
     }
   }
 
@@ -888,10 +896,10 @@ class _FieldRow extends StatelessWidget {
           material.InkWell(
             onTap: onDelete,
             borderRadius: material.BorderRadius.circular(4),
-            child: const material.Padding(
-              padding: material.EdgeInsets.all(4),
+            child: material.Padding(
+              padding: const material.EdgeInsets.all(4),
               child: material.Icon(material.Icons.close_rounded,
-                  size: 14, color: Color(0xFFEF5350)),
+                  size: 14, color: context.semanticPalette.destructive),
             ),
           ),
         ],
@@ -992,10 +1000,10 @@ class _MemberRow extends StatelessWidget {
           material.InkWell(
             onTap: onDelete,
             borderRadius: material.BorderRadius.circular(4),
-            child: const material.Padding(
-              padding: material.EdgeInsets.all(4),
+            child: material.Padding(
+              padding: const material.EdgeInsets.all(4),
               child: material.Icon(material.Icons.close_rounded,
-                  size: 14, color: Color(0xFFEF5350)),
+                  size: 14, color: context.semanticPalette.destructive),
             ),
           ),
         ],
@@ -1062,10 +1070,10 @@ class _ScoredMemberRow extends StatelessWidget {
           material.InkWell(
             onTap: onDelete,
             borderRadius: material.BorderRadius.circular(4),
-            child: const material.Padding(
-              padding: material.EdgeInsets.all(4),
+            child: material.Padding(
+              padding: const material.EdgeInsets.all(4),
               child: material.Icon(material.Icons.close_rounded,
-                  size: 14, color: Color(0xFFEF5350)),
+                  size: 14, color: context.semanticPalette.destructive),
             ),
           ),
         ],

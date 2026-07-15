@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
-import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/features/redis/redis_keys_view.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+
+import '../../support/querya_theme_test_shell.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -17,11 +17,8 @@ void main() {
     await fake.connect();
 
     await tester.pumpWidget(
-      ShadcnApp(
-        theme: AppTheme.dark,
-        darkTheme: AppTheme.dark,
-        themeMode: ThemeMode.dark,
-        home: material.Scaffold(
+      queryaThemeTestShell(
+        child: material.Scaffold(
           body: material.SizedBox(
             width: 800,
             height: 600,
@@ -53,11 +50,8 @@ void main() {
     await fake.connect();
 
     await tester.pumpWidget(
-      ShadcnApp(
-        theme: AppTheme.dark,
-        darkTheme: AppTheme.dark,
-        themeMode: ThemeMode.dark,
-        home: material.SizedBox(
+      queryaThemeTestShell(
+        child: material.SizedBox(
           width: 400,
           height: 400,
           child: RedisKeysView(

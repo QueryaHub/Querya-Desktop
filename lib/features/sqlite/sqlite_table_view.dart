@@ -121,7 +121,8 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     try {
       if (refreshCount) {
         try {
-          final countRs = await conn.execute('SELECT COUNT(*) FROM ${_qualifiedFrom()}');
+          final countRs =
+              await conn.execute('SELECT COUNT(*) FROM ${_qualifiedFrom()}');
           if (countRs.isNotEmpty) {
             _totalRowCount = countRs.first.values.first as int?;
           }
@@ -231,8 +232,10 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     } catch (e) {
       if (!mounted) return;
       material.Navigator.of(context).pop();
-      material.ScaffoldMessenger.of(context).showSnackBar(
-        material.SnackBar(content: material.Text('Failed to fetch DDL: $e')),
+      showAppToast(
+        context: context,
+        message: 'Failed to fetch DDL: $e',
+        variant: AppToastVariant.error,
       );
     }
   }
@@ -273,7 +276,8 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
         text,
         style: material.TextStyle(
           fontSize: 11,
-          fontWeight: isHeader ? material.FontWeight.w600 : material.FontWeight.w400,
+          fontWeight:
+              isHeader ? material.FontWeight.w600 : material.FontWeight.w400,
           color: isHeader ? cs.foreground : cs.mutedForeground,
         ),
       ),
@@ -443,7 +447,8 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
                 const Gap(8),
                 OutlineButton(
                   size: ButtonSize.small,
-                  onPressed: _loading ? null : () => unawaited(_showDdlDialog()),
+                  onPressed:
+                      _loading ? null : () => unawaited(_showDdlDialog()),
                   child: const Text('DDL'),
                 ),
                 const Gap(6),
@@ -453,12 +458,15 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
                 ),
                 const Gap(6),
                 GhostButton(
-                  onPressed: (!_canGoPrevious || _loading) ? null : _goToPreviousPage,
-                  child: const Icon(material.Icons.chevron_left_rounded, size: 20),
+                  onPressed:
+                      (!_canGoPrevious || _loading) ? null : _goToPreviousPage,
+                  child:
+                      const Icon(material.Icons.chevron_left_rounded, size: 20),
                 ),
                 GhostButton(
                   onPressed: (!_canGoNext || _loading) ? null : _goToNextPage,
-                  child: const Icon(material.Icons.chevron_right_rounded, size: 20),
+                  child: const Icon(material.Icons.chevron_right_rounded,
+                      size: 20),
                 ),
               ],
             ),
@@ -524,8 +532,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
                                         children: [
                                           _rowNumberCell(cs, '$displayRowNum'),
                                           for (var c = 0; c < colCount; c++)
-                                            _dataCell(
-                                                cs,
+                                            _dataCell(cs,
                                                 row.length > c ? row[c] : ''),
                                         ],
                                       ),

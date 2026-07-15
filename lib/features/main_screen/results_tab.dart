@@ -77,7 +77,10 @@ class ResultsTab extends StatelessWidget {
               color: Theme.of(context).colorScheme.card,
               border: material.Border(
                 bottom: material.BorderSide(
-                  color: Theme.of(context).colorScheme.border.withValues(alpha: 0.5),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .border
+                      .withValues(alpha: 0.5),
                 ),
               ),
             ),
@@ -141,7 +144,7 @@ class ResultsTab extends StatelessWidget {
 }
 
 Future<void> _showSaveFileErrorDialog(material.BuildContext context) {
-  return material.showDialog<void>(
+  return showAppDialog<void>(
     context: context,
     builder: (ctx) => material.AlertDialog(
       title: const material.Text('Could not save file'),
@@ -157,4 +160,3 @@ Future<void> _showSaveFileErrorDialog(material.BuildContext context) {
     ),
   );
 }
-

@@ -4,6 +4,7 @@ import 'package:querya_desktop/core/actions/sql_connection_types.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/shared/widgets/app_toast.dart';
 
 /// Fallback [Actions] for File → New/Open/Save when focus is outside a SQL
 /// workspace (title bar, table view, MongoDB/Redis, empty workspace).
@@ -95,8 +96,6 @@ class SqlEditorGlobalActions extends StatelessWidget {
   }
 
   static void _showHint(material.BuildContext context, String message) {
-    material.ScaffoldMessenger.of(context).showSnackBar(
-      material.SnackBar(content: material.Text(message)),
-    );
+    showAppToast(context: context, message: message);
   }
 }

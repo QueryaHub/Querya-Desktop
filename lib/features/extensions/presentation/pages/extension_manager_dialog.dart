@@ -28,7 +28,8 @@ class _ExtensionManagerContent extends material.StatefulWidget {
       _ExtensionManagerContentState();
 }
 
-class _ExtensionManagerContentState extends material.State<_ExtensionManagerContent> {
+class _ExtensionManagerContentState
+    extends material.State<_ExtensionManagerContent> {
   int _tabIndex = 0;
   List<ExtensionManifest> _installed = [];
   List<ExtensionManifest> _marketplace = [];
@@ -90,8 +91,10 @@ class _ExtensionManagerContentState extends material.State<_ExtensionManagerCont
         final message = e is MarketplaceException
             ? e.message
             : 'Failed to install "${manifest.name}".';
-        material.ScaffoldMessenger.of(context).showSnackBar(
-          material.SnackBar(content: material.Text(message)),
+        showAppToast(
+          context: context,
+          message: message,
+          variant: AppToastVariant.error,
         );
       }
     }
@@ -176,9 +179,13 @@ class _ExtensionManagerContentState extends material.State<_ExtensionManagerCont
                         child: material.Column(
                           crossAxisAlignment: material.CrossAxisAlignment.start,
                           children: [
-                            const Text('Extensions').large().semiBold().foreground(),
+                            const Text('Extensions')
+                                .large()
+                                .semiBold()
+                                .foreground(),
                             const material.SizedBox(height: 6),
-                            const Text('Manage local and marketplace extensions')
+                            const Text(
+                                    'Manage local and marketplace extensions')
                                 .muted()
                                 .small(),
                           ],
@@ -233,7 +240,8 @@ class _ExtensionManagerContentState extends material.State<_ExtensionManagerCont
         displayLabel,
         style: material.TextStyle(
           color: isSelected ? Theme.of(context).colorScheme.primary : null,
-          fontWeight: isSelected ? material.FontWeight.w600 : material.FontWeight.w400,
+          fontWeight:
+              isSelected ? material.FontWeight.w600 : material.FontWeight.w400,
         ),
       ),
     );
@@ -336,9 +344,10 @@ class _ExtensionManagerContentState extends material.State<_ExtensionManagerCont
                 ),
                 const material.SizedBox(width: 10),
                 material.Expanded(
-                  child: const Text(ExtensionSupport.databaseDriverPreviewNotice)
-                      .muted()
-                      .small(),
+                  child:
+                      const Text(ExtensionSupport.databaseDriverPreviewNotice)
+                          .muted()
+                          .small(),
                 ),
               ],
             ),
@@ -347,7 +356,8 @@ class _ExtensionManagerContentState extends material.State<_ExtensionManagerCont
         material.Padding(
           padding: const material.EdgeInsets.fromLTRB(24, 16, 24, 8),
           child: TextField(
-            placeholder: const material.Text('Search extensions by name, tag, or description...'),
+            placeholder: const material.Text(
+                'Search extensions by name, tag, or description...'),
             onChanged: _onSearchChanged,
             features: const [
               InputFeature.leading(
@@ -370,11 +380,14 @@ class _ExtensionManagerContentState extends material.State<_ExtensionManagerCont
               : material.ListView.separated(
                   padding: const material.EdgeInsets.all(24),
                   itemCount: _marketplace.length,
-                  separatorBuilder: (_, __) => const material.SizedBox(height: 16),
+                  separatorBuilder: (_, __) =>
+                      const material.SizedBox(height: 16),
                   itemBuilder: (ctx, i) {
                     final manifest = _marketplace[i];
-                    final isInstalled = _installed.any((e) => e.id == manifest.id);
-                    final isInstalling = _installingProgress.containsKey(manifest.id);
+                    final isInstalled =
+                        _installed.any((e) => e.id == manifest.id);
+                    final isInstalling =
+                        _installingProgress.containsKey(manifest.id);
                     final progress = _installingProgress[manifest.id];
                     return ExtensionCard(
                       manifest: manifest,

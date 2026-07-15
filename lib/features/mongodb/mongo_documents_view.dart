@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
@@ -477,13 +478,13 @@ class _DocumentCardState extends State<_DocumentCard> {
                       const Gap(8),
                       _SmallActionButton(
                         icon: material.Icons.edit_rounded,
-                        color: const Color(0xFF42A5F5),
+                        color: context.semanticPalette.action,
                         onTap: widget.onView,
                       ),
                       const Gap(4),
                       _SmallActionButton(
                         icon: material.Icons.delete_rounded,
-                        color: const Color(0xFFEF5350),
+                        color: context.semanticPalette.destructive,
                         onTap: widget.onDelete,
                       ),
                     ],

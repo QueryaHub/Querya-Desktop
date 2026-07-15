@@ -2,8 +2,6 @@ import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/motion/querya_cross_fade_stack.dart';
-import 'package:querya_desktop/core/motion/querya_motion.dart';
-import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/mysql/mysql_sql_workspace.dart';
 import 'package:querya_desktop/features/mysql/mysql_stats_view.dart';
@@ -85,36 +83,11 @@ class _MysqlWorkspaceHomeState extends material.State<MysqlWorkspaceHome> {
                 ),
               ],
               const Spacer(),
-              ...List.generate(2, (i) {
-                final labels = ['Server', 'SQL'];
-                final selected = _tab == i;
-                return material.Padding(
-                  padding: const material.EdgeInsets.only(left: 6),
-                  child: material.MouseRegion(
-                    cursor: material.SystemMouseCursors.click,
-                    child: material.GestureDetector(
-                      onTap: () => unawaited(_selectTab(i)),
-                      child: material.AnimatedContainer(
-                        duration: context.motionDuration(QueryaMotion.fast),
-                        curve: context.motionCurve(QueryaMotion.enter),
-                        padding: const material.EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: material.BoxDecoration(
-                          color: selected
-                              ? theme.colorScheme.background
-                              : material.Colors.transparent,
-                          borderRadius: material.BorderRadius.circular(6),
-                        ),
-                        child: selected
-                            ? Text(labels[i]).small().semiBold()
-                            : Text(labels[i]).small().muted(),
-                      ),
-                    ),
-                  ),
-                );
-              }),
+              QueryaTabStrip(
+                labels: const ['Server', 'SQL'],
+                selectedIndex: _tab,
+                onSelected: (index) => unawaited(_selectTab(index)),
+              ),
             ],
           ),
         ),
