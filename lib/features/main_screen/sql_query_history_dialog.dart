@@ -85,7 +85,7 @@ class _SqlQueryHistoryDialogContentState
   }
 
   Future<void> _confirmClear() async {
-    final ok = await material.showDialog<bool>(
+    final ok = await showAppDialog<bool>(
       context: context,
       builder: (ctx) => material.AlertDialog(
         title: const material.Text('Clear query history?'),

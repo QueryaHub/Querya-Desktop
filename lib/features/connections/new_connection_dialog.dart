@@ -199,14 +199,13 @@ class _NewConnectionDialogContentState
                         setState(() {
                           _category = category;
                           if (_selected != null &&
-                              !_categoryTypes.any(
-                                  (t) => _sameChoice(t, _selected))) {
+                              !_categoryTypes
+                                  .any((t) => _sameChoice(t, _selected))) {
                             _selected = null;
                           }
                         });
                       },
-                      onTypeChanged: (type) =>
-                          setState(() => _selected = type),
+                      onTypeChanged: (type) => setState(() => _selected = type),
                     ),
                   ],
                 ),
@@ -250,8 +249,7 @@ class _NewConnectionDialogContentState
                                     choice: t,
                                     theme: theme,
                                     selected: _sameChoice(_selected, t),
-                                    onTap: () =>
-                                        setState(() => _selected = t),
+                                    onTap: () => setState(() => _selected = t),
                                   ),
                               ],
                             ),
@@ -281,8 +279,7 @@ class _NewConnectionDialogContentState
                     PrimaryButton(
                       onPressed: _selected == null
                           ? null
-                          : () =>
-                              material.Navigator.of(context).pop(_selected),
+                          : () => material.Navigator.of(context).pop(_selected),
                       child: const Text('Next'),
                     ),
                   ],
@@ -364,20 +361,12 @@ class _FilterDropdowns extends StatelessWidget {
               QueryaDropdownItem<ConnectionTypeChoice?>(
                 value: type,
                 label: type.label,
-                leading: type.iconFile != null
-                    ? DriverIconImage(
-                        path: type.iconFile!,
-                        size: 18,
-                        fallbackIcon: type.icon,
-                      )
-                    : type.iconAsset != null
-                        ? material.Image.asset(
-                            type.iconAsset!,
-                            width: 18,
-                            height: 18,
-                            fit: material.BoxFit.contain,
-                          )
-                        : material.Icon(type.icon, size: 18),
+                leading: DriverIcon(
+                  filePath: type.iconFile,
+                  assetPath: type.iconAsset,
+                  size: 18,
+                  fallbackIcon: type.icon,
+                ),
               ),
           ],
           onSelected: onTypeChanged,
@@ -462,20 +451,12 @@ class _DbTypeCardState extends material.State<_DbTypeCard> {
                   child: material.SizedBox(
                     width: 52,
                     height: 52,
-                    child: widget.choice.iconFile != null
-                        ? DriverIconImage(
-                            path: widget.choice.iconFile!,
-                            size: 52,
-                            fallbackIcon: widget.choice.icon,
-                          )
-                        : widget.choice.iconAsset != null
-                            ? material.Image.asset(
-                                widget.choice.iconAsset!,
-                                fit: material.BoxFit.contain,
-                                filterQuality: material.FilterQuality.medium,
-                              )
-                            : material.Icon(widget.choice.icon,
-                                size: 52, color: t.primary),
+                    child: DriverIcon(
+                      filePath: widget.choice.iconFile,
+                      assetPath: widget.choice.iconAsset,
+                      size: 52,
+                      fallbackIcon: widget.choice.icon,
+                    ),
                   ),
                 ),
               ),

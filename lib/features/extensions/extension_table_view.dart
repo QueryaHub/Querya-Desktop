@@ -28,7 +28,8 @@ class ExtensionTableView extends material.StatefulWidget {
   final int pageSize;
 
   @override
-  material.State<ExtensionTableView> createState() => _ExtensionTableViewState();
+  material.State<ExtensionTableView> createState() =>
+      _ExtensionTableViewState();
 }
 
 class _ExtensionTableViewState extends material.State<ExtensionTableView> {
@@ -43,8 +44,7 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
   bool _filterActive = false;
   final _filterController = material.TextEditingController();
 
-  String get _qualifiedName =>
-      '`${widget.database}`.`${widget.tableName}`';
+  String get _qualifiedName => '`${widget.database}`.`${widget.tableName}`';
 
   String get _whereClause {
     final text = _filterController.text.trim();
@@ -225,8 +225,10 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
     } catch (e) {
       if (!mounted) return;
       material.Navigator.of(context).pop();
-      material.ScaffoldMessenger.of(context).showSnackBar(
-        material.SnackBar(content: material.Text('Failed to fetch DDL: $e')),
+      showAppToast(
+        context: context,
+        message: 'Failed to fetch DDL: $e',
+        variant: AppToastVariant.error,
       );
     }
   }
@@ -309,8 +311,10 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
               color: Theme.of(context).colorScheme.muted.withValues(alpha: 0.3),
               border: material.Border(
                 bottom: material.BorderSide(
-                  color:
-                      Theme.of(context).colorScheme.border.withValues(alpha: 0.3),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .border
+                      .withValues(alpha: 0.3),
                 ),
               ),
             ),
@@ -362,7 +366,7 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
 }
 
 Future<void> _showSaveFileErrorDialog(material.BuildContext context) {
-  return material.showDialog<void>(
+  return showAppDialog<void>(
     context: context,
     builder: (ctx) => material.AlertDialog(
       title: const material.Text('Could not save file'),

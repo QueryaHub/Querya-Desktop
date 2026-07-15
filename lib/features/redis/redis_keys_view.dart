@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/redis_connection.dart';
+import 'package:querya_desktop/core/theme/querya_semantic_palette.dart';
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
@@ -199,6 +201,7 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
                         keyInfo: _keys[i],
                         colorScheme: cs,
                         shadcnCs: shadcnCs,
+                        palette: context.semanticPalette,
                         onTap: () =>
                             widget.onKeyTap?.call(_keys[i].name, _keys[i].type),
                         onDelete: () => _deleteKey(_keys[i]),
@@ -323,6 +326,7 @@ class _KeyTile extends material.StatelessWidget {
     required this.keyInfo,
     required this.colorScheme,
     required this.shadcnCs,
+    required this.palette,
     required this.onTap,
     required this.onDelete,
   });
@@ -330,23 +334,24 @@ class _KeyTile extends material.StatelessWidget {
   final _KeyInfo keyInfo;
   final ColorScheme colorScheme;
   final shadcn.ColorScheme shadcnCs;
+  final QueryaSemanticPalette palette;
   final material.VoidCallback onTap;
   final material.VoidCallback onDelete;
 
-  static Color _typeColor(String type, shadcn.ColorScheme scs) {
+  static Color _typeColor(String type, QueryaSemanticPalette palette) {
     switch (type) {
       case 'string':
-        return const material.Color(0xFF42A5F5);
+        return palette.type1;
       case 'hash':
-        return const material.Color(0xFFAB47BC);
+        return palette.type4;
       case 'list':
-        return const material.Color(0xFF66BB6A);
+        return palette.type2;
       case 'set':
-        return const material.Color(0xFFFFA726);
+        return palette.type3;
       case 'zset':
-        return const material.Color(0xFFEF5350);
+        return palette.type5;
       default:
-        return scs.mutedForeground;
+        return palette.muted;
     }
   }
 
@@ -380,7 +385,7 @@ class _KeyTile extends material.StatelessWidget {
   material.Widget build(material.BuildContext context) {
     final cs = colorScheme;
     final ki = keyInfo;
-    final typeCol = _typeColor(ki.type, shadcnCs);
+    final typeCol = _typeColor(ki.type, palette);
 
     return material.Material(
       color: cs.card,
@@ -447,8 +452,11 @@ class _KeyTile extends material.StatelessWidget {
               const Gap(4),
               material.IconButton(
                 onPressed: onDelete,
-                icon: const material.Icon(material.Icons.delete_rounded,
-                    size: 15, color: material.Color(0xFFEF5350)),
+                icon: material.Icon(
+                  material.Icons.delete_rounded,
+                  size: 15,
+                  color: palette.destructive,
+                ),
                 padding: const material.EdgeInsets.all(4),
                 constraints:
                     const material.BoxConstraints(minWidth: 28, minHeight: 28),

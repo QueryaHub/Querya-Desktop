@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
@@ -376,7 +377,7 @@ class _DatabaseRow extends StatelessWidget {
               _ActionButton(
                 label: 'View',
                 icon: material.Icons.visibility_rounded,
-                color: const Color(0xFF4CAF50),
+                color: context.semanticPalette.success,
                 onTap: onView,
               ),
               const Gap(16),
@@ -399,7 +400,7 @@ class _DatabaseRow extends StatelessWidget {
               _ActionButton(
                 label: 'Del',
                 icon: material.Icons.delete_rounded,
-                color: const Color(0xFFEF5350),
+                color: context.semanticPalette.destructive,
                 onTap: onDrop,
               ),
             ],
@@ -446,18 +447,18 @@ class _ActionButton extends StatelessWidget {
           padding:
               const material.EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: material.BoxDecoration(
-            color: color.withValues(alpha: 0.8),
+            color: color.withValues(alpha: 0.14),
             borderRadius: material.BorderRadius.circular(6),
           ),
           child: Row(
             mainAxisSize: material.MainAxisSize.min,
             children: [
-              material.Icon(icon, size: 14, color: Colors.white),
+              material.Icon(icon, size: 14, color: color),
               const Gap(5),
               Text(
                 label,
-                style: const material.TextStyle(
-                  color: Colors.white,
+                style: material.TextStyle(
+                  color: color,
                   fontSize: 12,
                   fontWeight: material.FontWeight.w500,
                 ),

@@ -113,6 +113,9 @@ void main() {
       ),
       findsOneWidget,
     );
+
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('OpenSqlIntent delegates to active sql editor bridge',
