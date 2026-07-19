@@ -16,6 +16,7 @@ void main() {
             onNewConnection: () {},
             onNewConnectionFromUrl: () {},
             onOpenSqlite: () {},
+            recentConnections: const [],
           ),
         ),
       ),

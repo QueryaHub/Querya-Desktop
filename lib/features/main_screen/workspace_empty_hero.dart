@@ -1,25 +1,100 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/window_layout.dart';
+import 'package:querya_desktop/core/storage/app_settings.dart';
+import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
+import 'package:querya_desktop/features/connections/driver_icon.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Task-oriented empty workspace shown before a connection is selected.
-class WorkspaceEmptyHero extends StatelessWidget {
+class WorkspaceEmptyHero extends StatefulWidget {
   const WorkspaceEmptyHero({
     super.key,
     required this.onNewConnection,
     this.onNewConnectionFromUrl,
     this.onOpenSqlite,
+    this.onOpenConnection,
+    this.recentConnections,
   });
 
   final VoidCallback onNewConnection;
   final VoidCallback? onNewConnectionFromUrl;
   final VoidCallback? onOpenSqlite;
+  final ValueChanged<ConnectionRow>? onOpenConnection;
+
+  /// When provided (e.g. in tests), skips loading recent connections from storage.
+  final List<ConnectionRow>? recentConnections;
+
+  @override
+  State<WorkspaceEmptyHero> createState() => _WorkspaceEmptyHeroState();
+}
+
+class _WorkspaceEmptyHeroState extends State<WorkspaceEmptyHero> {
+  List<ConnectionRow> _recent = const [];
+  var _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final injected = widget.recentConnections;
+    if (injected != null) {
+      _recent = injected;
+      _loaded = true;
+    } else {
+      unawaited(_loadRecent());
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant WorkspaceEmptyHero oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final injected = widget.recentConnections;
+    if (injected != null) {
+      _recent = injected;
+      _loaded = true;
+    } else if (oldWidget.recentConnections != null) {
+      unawaited(_loadRecent());
+    }
+  }
+
+  Future<void> _loadRecent() async {
+    final recentIds = await AppSettings.instance.getRecentConnectionIds();
+    final all = await LocalDb.instance.getConnections();
+    final byId = <int, ConnectionRow>{
+      for (final conn in all)
+        if (conn.id != null) conn.id!: conn,
+    };
+
+    final ordered = <ConnectionRow>[];
+    for (final id in recentIds) {
+      final conn = byId.remove(id);
+      if (conn != null) ordered.add(conn);
+      if (ordered.length >= kMaxRecentConnections) break;
+    }
+
+    if (ordered.length < kMaxRecentConnections) {
+      final remaining = byId.values.toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      for (final conn in remaining) {
+        ordered.add(conn);
+        if (ordered.length >= kMaxRecentConnections) break;
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _recent = ordered;
+      _loaded = true;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final wb = context.workbench;
+    final showRecent = _loaded && _recent.isNotEmpty;
 
     return material.LayoutBuilder(
       builder: (context, constraints) {
@@ -71,27 +146,27 @@ class WorkspaceEmptyHero extends StatelessWidget {
                     children: [
                       PrimaryButton(
                         key: const Key('empty_new_connection'),
-                        onPressed: onNewConnection,
+                        onPressed: widget.onNewConnection,
                         leading: const material.Icon(
                           material.Icons.add_link_rounded,
                           size: 18,
                         ),
                         child: const Text('New connection'),
                       ),
-                      if (onNewConnectionFromUrl != null)
+                      if (widget.onNewConnectionFromUrl != null)
                         OutlineButton(
                           key: const Key('empty_new_from_url'),
-                          onPressed: onNewConnectionFromUrl,
+                          onPressed: widget.onNewConnectionFromUrl,
                           leading: const material.Icon(
                             material.Icons.link_rounded,
                             size: 18,
                           ),
                           child: const Text('New from URL'),
                         ),
-                      if (onOpenSqlite != null)
+                      if (widget.onOpenSqlite != null)
                         OutlineButton(
                           key: const Key('empty_open_sqlite'),
-                          onPressed: onOpenSqlite,
+                          onPressed: widget.onOpenSqlite,
                           leading: const material.Icon(
                             material.Icons.folder_open_rounded,
                             size: 18,
@@ -101,59 +176,195 @@ class WorkspaceEmptyHero extends StatelessWidget {
                     ],
                   ),
                   material.SizedBox(height: compact ? 28 : 40),
-                  material.Container(
-                    padding: material.EdgeInsets.all(compact ? 16 : 20),
-                    decoration: material.BoxDecoration(
-                      color: wb.surface,
-                      borderRadius: material.BorderRadius.circular(12),
-                      border: material.Border.all(
-                        color: wb.borderSubtle.withValues(alpha: 0.55),
+                  if (showRecent)
+                    _RecentConnectionsSection(
+                      connections: _recent,
+                      onOpenConnection: widget.onOpenConnection,
+                      compact: compact,
+                    )
+                  else
+                    material.Container(
+                      padding: material.EdgeInsets.all(compact ? 16 : 20),
+                      decoration: material.BoxDecoration(
+                        color: wb.surface,
+                        borderRadius: material.BorderRadius.circular(12),
+                        border: material.Border.all(
+                          color: wb.borderSubtle.withValues(alpha: 0.55),
+                        ),
+                      ),
+                      child: material.Column(
+                        crossAxisAlignment: material.CrossAxisAlignment.start,
+                        children: [
+                          material.Text(
+                            'Quick start',
+                            style: material.TextStyle(
+                              color: cs.foreground,
+                              fontSize: 14,
+                              fontWeight: material.FontWeight.w600,
+                            ),
+                          ),
+                          const material.SizedBox(height: 12),
+                          _QuickStartRow(
+                            icon: material.Icons.dns_rounded,
+                            title: 'Server databases',
+                            description:
+                                'PostgreSQL, MySQL, MongoDB, Redis and extension drivers',
+                            color: cs.primary,
+                          ),
+                          const material.SizedBox(height: 12),
+                          _QuickStartRow(
+                            icon: material.Icons.insert_drive_file_rounded,
+                            title: 'Local database',
+                            description:
+                                'Open an existing SQLite file or create a connection',
+                            color: cs.primary,
+                          ),
+                          const material.SizedBox(height: 12),
+                          _QuickStartRow(
+                            icon: material.Icons.security_rounded,
+                            title: 'Credentials stay protected',
+                            description:
+                                'Passwords are stored in your operating system secure store',
+                            color: cs.primary,
+                          ),
+                        ],
                       ),
                     ),
-                    child: material.Column(
-                      crossAxisAlignment: material.CrossAxisAlignment.start,
-                      children: [
-                        material.Text(
-                          'Quick start',
-                          style: material.TextStyle(
-                            color: cs.foreground,
-                            fontSize: 14,
-                            fontWeight: material.FontWeight.w600,
-                          ),
-                        ),
-                        const material.SizedBox(height: 12),
-                        _QuickStartRow(
-                          icon: material.Icons.dns_rounded,
-                          title: 'Server databases',
-                          description:
-                              'PostgreSQL, MySQL, MongoDB, Redis and extension drivers',
-                          color: cs.primary,
-                        ),
-                        const material.SizedBox(height: 12),
-                        _QuickStartRow(
-                          icon: material.Icons.insert_drive_file_rounded,
-                          title: 'Local database',
-                          description:
-                              'Open an existing SQLite file or create a connection',
-                          color: cs.primary,
-                        ),
-                        const material.SizedBox(height: 12),
-                        _QuickStartRow(
-                          icon: material.Icons.security_rounded,
-                          title: 'Credentials stay protected',
-                          description:
-                              'Passwords are stored in your operating system secure store',
-                          color: cs.primary,
-                        ),
-                      ],
-                    ),
-                  ),
                 ],
               ),
             ),
           ),
         );
       },
+    );
+  }
+}
+
+class _RecentConnectionsSection extends StatelessWidget {
+  const _RecentConnectionsSection({
+    required this.connections,
+    required this.onOpenConnection,
+    required this.compact,
+  });
+
+  final List<ConnectionRow> connections;
+  final ValueChanged<ConnectionRow>? onOpenConnection;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final wb = context.workbench;
+
+    return material.Container(
+      padding: material.EdgeInsets.all(compact ? 12 : 16),
+      decoration: material.BoxDecoration(
+        color: wb.surface,
+        borderRadius: material.BorderRadius.circular(12),
+        border: material.Border.all(
+          color: wb.borderSubtle.withValues(alpha: 0.55),
+        ),
+      ),
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.start,
+        children: [
+          material.Text(
+            'Recent connections',
+            style: material.TextStyle(
+              color: cs.foreground,
+              fontSize: 14,
+              fontWeight: material.FontWeight.w600,
+            ),
+          ),
+          const material.SizedBox(height: 8),
+          for (var i = 0; i < connections.length; i++) ...[
+            if (i > 0) const material.SizedBox(height: 4),
+            _RecentConnectionRow(
+              connection: connections[i],
+              onTap: onOpenConnection == null
+                  ? null
+                  : () => onOpenConnection!(connections[i]),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RecentConnectionRow extends StatelessWidget {
+  const _RecentConnectionRow({
+    required this.connection,
+    required this.onTap,
+  });
+
+  final ConnectionRow connection;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final subtitle = _connectionSubtitle(connection);
+
+    return material.Material(
+      color: material.Colors.transparent,
+      child: material.InkWell(
+        key: Key('empty_recent_${connection.id ?? connection.name}'),
+        borderRadius: material.BorderRadius.circular(8),
+        onTap: onTap,
+        child: material.Padding(
+          padding: const material.EdgeInsets.symmetric(
+            horizontal: 10,
+            vertical: 10,
+          ),
+          child: material.Row(
+            children: [
+              DriverIcon(
+                size: 20,
+                fallbackIcon: _iconForType(connection.type),
+                assetPath: _iconAssetForType(connection.type),
+              ),
+              const material.SizedBox(width: 12),
+              material.Expanded(
+                child: material.Column(
+                  crossAxisAlignment: material.CrossAxisAlignment.start,
+                  children: [
+                    material.Text(
+                      connection.name.isEmpty
+                          ? connection.type
+                          : connection.name,
+                      maxLines: 1,
+                      overflow: material.TextOverflow.ellipsis,
+                      style: material.TextStyle(
+                        color: cs.foreground,
+                        fontSize: 13,
+                        fontWeight: material.FontWeight.w500,
+                      ),
+                    ),
+                    if (subtitle.isNotEmpty) ...[
+                      const material.SizedBox(height: 2),
+                      material.Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: material.TextOverflow.ellipsis,
+                        style: material.TextStyle(
+                          color: cs.mutedForeground,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              material.Icon(
+                material.Icons.chevron_right_rounded,
+                size: 18,
+                color: cs.mutedForeground,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -206,4 +417,38 @@ class _QuickStartRow extends StatelessWidget {
       ],
     );
   }
+}
+
+material.IconData _iconForType(String type) {
+  return switch (type) {
+    'mongodb' => material.Icons.eco_rounded,
+    'postgresql' => material.Icons.storage_rounded,
+    'mysql' => material.Icons.table_chart_rounded,
+    'redis' => material.Icons.memory_rounded,
+    'sqlite' => material.Icons.folder_open_rounded,
+    _ => material.Icons.extension_rounded,
+  };
+}
+
+String? _iconAssetForType(String type) {
+  return switch (type) {
+    'postgresql' => 'assets/images/postgresql_icon.png',
+    'mysql' => 'assets/images/mysql_icon.png',
+    'redis' => 'assets/images/redis_icon.png',
+    'mongodb' => 'assets/images/mongodb_icon.png',
+    _ => null,
+  };
+}
+
+String _connectionSubtitle(ConnectionRow connection) {
+  if (connection.type == 'sqlite') {
+    final path = connection.databaseName ?? connection.connectionString;
+    return path?.trim().isNotEmpty == true ? path!.trim() : 'SQLite';
+  }
+  final host = connection.host?.trim();
+  if (host == null || host.isEmpty) {
+    return connection.type;
+  }
+  final port = connection.port;
+  return port != null ? '$host:$port' : host;
 }

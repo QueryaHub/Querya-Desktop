@@ -54,6 +54,7 @@ class WorkspacePanel extends StatefulWidget {
     this.onRequestNewConnection,
     this.onRequestNewConnectionFromUrl,
     this.onRequestOpenSqlite,
+    this.onOpenConnection,
   });
 
   /// Currently selected connection from the sidebar.
@@ -118,6 +119,7 @@ class WorkspacePanel extends StatefulWidget {
   final void Function()? onRequestNewConnection;
   final void Function()? onRequestNewConnectionFromUrl;
   final void Function()? onRequestOpenSqlite;
+  final void Function(ConnectionRow connection)? onOpenConnection;
 
   @override
   State<WorkspacePanel> createState() => _WorkspacePanelState();
@@ -137,6 +139,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
           onNewConnection: widget.onRequestNewConnection ?? () {},
           onNewConnectionFromUrl: widget.onRequestNewConnectionFromUrl,
           onOpenSqlite: widget.onRequestOpenSqlite,
+          onOpenConnection: widget.onOpenConnection,
         ),
       );
     }
