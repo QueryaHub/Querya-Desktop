@@ -194,18 +194,18 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
   Future<void> _showDdlDialog() async {
     final conn = _connection;
     if (conn == null || !conn.isConnected) return;
-    material.showDialog<void>(
+    unawaited(showAppDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (_) => const material.Center(
         child: material.CircularProgressIndicator(),
       ),
-    );
+    ));
     try {
       final ddl = await conn.getObjectDdl(widget.tableName);
       if (!mounted) return;
       material.Navigator.of(context).pop();
-      await material.showDialog<void>(
+      await showAppDialog<void>(
         context: context,
         builder: (ctx) => material.AlertDialog(
           title: material.Text(
