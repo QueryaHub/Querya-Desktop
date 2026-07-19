@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart' as material;
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Simple color picker dialog for the theme editor.
 Future<Color?> showThemeColorPickerDialog({
@@ -8,7 +8,7 @@ Future<Color?> showThemeColorPickerDialog({
 }) async {
   var picked = ColorDerivative.fromColor(initial);
 
-  return material.showDialog<Color>(
+  return showAppDialog<Color>(
     context: context,
     builder: (dialogContext) {
       return material.AlertDialog(

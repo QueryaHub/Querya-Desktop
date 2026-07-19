@@ -44,6 +44,10 @@ class _MainScreenState extends State<MainScreen> {
 
   void _onConnectionSelected(ConnectionRow connection) {
     _workspace.value = _workspace.value.selectConnection(connection);
+    final id = connection.id;
+    if (id != null) {
+      unawaited(AppSettings.instance.recordRecentConnection(id));
+    }
   }
 
   void _onPostgresObjectSelected(
@@ -264,6 +268,7 @@ class _MainScreenState extends State<MainScreen> {
                         onRequestNewConnectionFromUrl:
                             _onNewDatabaseConnectionFromUrl,
                         onRequestOpenSqlite: _openSqliteFromHero,
+                        onOpenConnection: _onConnectionSelected,
                       ),
                     ),
                   ],
@@ -295,6 +300,7 @@ class _MainContentSplit extends StatefulWidget {
     required this.onRequestNewConnection,
     required this.onRequestNewConnectionFromUrl,
     required this.onRequestOpenSqlite,
+    required this.onOpenConnection,
   });
 
   final GlobalKey<ConnectionsPanelState> connectionsPanelKey;
@@ -331,6 +337,7 @@ class _MainContentSplit extends StatefulWidget {
   final VoidCallback onRequestNewConnection;
   final VoidCallback onRequestNewConnectionFromUrl;
   final VoidCallback onRequestOpenSqlite;
+  final void Function(ConnectionRow) onOpenConnection;
 
   @override
   State<_MainContentSplit> createState() => _MainContentSplitState();
@@ -442,6 +449,7 @@ class _MainContentSplitState extends State<_MainContentSplit> {
                       onRequestNewConnectionFromUrl:
                           widget.onRequestNewConnectionFromUrl,
                       onRequestOpenSqlite: widget.onRequestOpenSqlite,
+                      onOpenConnection: widget.onOpenConnection,
                     );
                   },
                 ),
