@@ -177,13 +177,13 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
   }
 
   Future<void> _openDdlDialog() async {
-    material.showDialog<void>(
+    unawaited(showAppDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => const material.Center(
         child: material.CircularProgressIndicator(),
       ),
-    );
+    ));
 
     try {
       final meta = await ExtensionDriverSession.instance.getObjectMetadata(
@@ -198,7 +198,7 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
           ? meta.ddl!
           : '-- No DDL metadata returned by extension driver for ${widget.tableName}\nSELECT * FROM $_qualifiedName LIMIT 10;';
 
-      await material.showDialog<void>(
+      await showAppDialog<void>(
         context: context,
         builder: (ctx) => material.AlertDialog(
           title: material.Text(
