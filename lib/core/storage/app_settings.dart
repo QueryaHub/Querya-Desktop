@@ -41,6 +41,9 @@ const double kDefaultConnectionsPanelWidth = 260;
 const double kMinConnectionsPanelWidth = 180;
 const double kMaxConnectionsPanelWidth = 500;
 
+/// How many recently selected connections to surface on the empty workspace.
+const int kMaxRecentConnections = 5;
+
 /// Fixed tick marks on the interface scale slider (75% … 200%).
 const List<double> kUiScalePresets = [
   0.75,
@@ -119,6 +122,7 @@ abstract final class AppSettingsKeys {
   static const themeAnimationEnabled = 'theme_animation_enabled';
   static const uiScale = 'ui_scale';
   static const connectionsPanelWidth = 'connections_panel_width';
+  static const recentConnectionIds = 'recent_connection_ids';
   static const motionLevel = 'motion_level';
   static const updateChannel = 'update_channel';
   static const checkForUpdatesOnStartup = 'check_for_updates_on_startup';
@@ -265,6 +269,46 @@ class AppSettings {
     await LocalDb.instance.setAppSetting(
       AppSettingsKeys.connectionsPanelWidth,
       normalized.toStringAsFixed(1),
+    );
+  }
+
+  /// Most recently selected connection ids (newest first).
+  Future<List<int>> getRecentConnectionIds() async {
+    final raw = await LocalDb.instance.getAppSetting(
+      AppSettingsKeys.recentConnectionIds,
+    );
+    if (raw == null || raw.isEmpty) return const [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const [];
+      final ids = <int>[];
+      for (final item in decoded) {
+        final id = item is int ? item : int.tryParse('$item');
+        if (id != null && id > 0 && !ids.contains(id)) {
+          ids.add(id);
+        }
+        if (ids.length >= kMaxRecentConnections) break;
+      }
+      return ids;
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Records [connectionId] as the most recently selected connection.
+  Future<void> recordRecentConnection(int connectionId) async {
+    if (connectionId <= 0) return;
+    final current = await getRecentConnectionIds();
+    final next = <int>[
+      connectionId,
+      ...current.where((id) => id != connectionId),
+    ];
+    if (next.length > kMaxRecentConnections) {
+      next.removeRange(kMaxRecentConnections, next.length);
+    }
+    await LocalDb.instance.setAppSetting(
+      AppSettingsKeys.recentConnectionIds,
+      jsonEncode(next),
     );
   }
 

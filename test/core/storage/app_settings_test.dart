@@ -229,6 +229,26 @@ void main() {
         kMaxConnectionsPanelWidth,
       );
     });
+
+    test('recent connections record newest first and cap length', () async {
+      expect(await AppSettings.instance.getRecentConnectionIds(), isEmpty);
+
+      await AppSettings.instance.recordRecentConnection(1);
+      await AppSettings.instance.recordRecentConnection(2);
+      await AppSettings.instance.recordRecentConnection(3);
+      expect(await AppSettings.instance.getRecentConnectionIds(), [3, 2, 1]);
+
+      await AppSettings.instance.recordRecentConnection(1);
+      expect(await AppSettings.instance.getRecentConnectionIds(), [1, 3, 2]);
+
+      for (var id = 10; id < 10 + kMaxRecentConnections; id++) {
+        await AppSettings.instance.recordRecentConnection(id);
+      }
+      final ids = await AppSettings.instance.getRecentConnectionIds();
+      expect(ids.length, kMaxRecentConnections);
+      expect(ids.first, 10 + kMaxRecentConnections - 1);
+      expect(ids.contains(1), isFalse);
+    });
   });
 
   group('theme settings', () {
