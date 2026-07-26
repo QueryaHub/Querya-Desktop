@@ -15,10 +15,10 @@ void main() {
       (tester) async {
     await tester.pumpWidget(
       wrap(
-        shadcn.ShadcnLayer(
+        const shadcn.ShadcnLayer(
           theme: shadcn.ThemeData.dark(),
           enableThemeAnimation: false,
-          child: const SizedBox(width: 8, height: 8),
+          child: SizedBox(width: 8, height: 8),
         ),
       ),
     );
@@ -29,12 +29,12 @@ void main() {
   testWidgets('ShadcnLayer uses provided duration and curve', (tester) async {
     await tester.pumpWidget(
       wrap(
-        shadcn.ShadcnLayer(
+        const shadcn.ShadcnLayer(
           theme: shadcn.ThemeData.dark(),
           enableThemeAnimation: true,
           themeAnimationDuration: QueryaMotion.slow,
           themeAnimationCurve: QueryaMotion.emphasized,
-          child: const SizedBox(width: 8, height: 8),
+          child: SizedBox(width: 8, height: 8),
         ),
       ),
     );
