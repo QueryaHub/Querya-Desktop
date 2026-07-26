@@ -55,7 +55,7 @@ Summary of current engine behavior (Flutter 3.24+ / Impeller). Sources in §7.
 | Platform | Renders at display Hz by default? | How to unlock > 60 Hz | Notes |
 |----------|-----------------------------------|------------------------|-------|
 | **Windows** | Usually yes (follows monitor via DWM) | No app API needed | Verify on a 120/144 Hz monitor; engine vsyncs to the compositor. |
-| **Linux** | Depends on compositor (GTK embedder) | No app API; compositor-dependent | Wayland compositors with VRR may need monitor config; X11 follows monitor. |
+| **Linux** | Depends on compositor (GTK embedder) | **No app unlock** — `RefreshRate.enable()` is a **no-op** | Plugin is **query-only** (`gdk_monitor_get_refresh_rate`). Overlay shows compositor-reported Hz; it does **not** force 120+. Configure the Wayland/X11 compositor / monitor for VRR/high-Hz. |
 | **macOS** | Capped to 60 on some setups | macOS 14+ can opt into ProMotion/high-Hz | Historically Flutter macOS did not always hit ProMotion; needs verification. |
 | **iOS** (future) | No — capped to 60 | `CADisableMinimumFrameDurationOnPhone=true` in `Info.plist` | Not applicable today (no `ios/`), document for when mobile lands. |
 | **Android** (future) | No — often picks 60 | `flutter_displaymode` / `Surface.setFrameRate()` | Not applicable today (no `android/`). |
@@ -64,9 +64,10 @@ Root cause (engine): per `flutter/flutter#160952`, the engine "can render at 120
 
 ### Practical implication for Querya (desktop)
 
-- **Windows / Linux:** most likely already render at monitor Hz; the job is to **measure and verify**, then ensure no app-side code caps frames (e.g. heavy `setState`, unbounded rebuilds during animation).
-- **macOS:** the real high-Hz work — confirm ProMotion behavior; unlock via `refresh_rate` if capped at 60.
-- Use `refresh_rate` (or a thin wrapper) primarily for **diagnostics**: a debug-only FPS/Hz overlay and a benchmark to prove smoothness on each machine, plus the macOS unlock call in `main()`.
+- **Windows:** usually follows DWM monitor Hz; **measure and verify**.
+- **Linux:** **query-only** — `enable` / prefer-max are no-ops in `third_party/refresh_rate` Linux plugin. Overlay/`RefreshRate.info` report what GDK sees; actual frame pacing is compositor-dependent. Do not treat a 120/144 reading as “unlocked by Querya”.
+- **macOS:** unlock via `RefreshRate.enable()` when capped at 60 (ProMotion / high-Hz).
+- Use `refresh_rate` for **diagnostics** (debug overlay / benchmark) plus the macOS unlock in `main()`.
 - **Implementation:** `lib/core/motion/display_refresh_service.dart` calls `RefreshRate.enable()` in `main()`. Debug Hz badge: `flutter run --dart-define=QUERYA_REFRESH_OVERLAY=true`.
 
 ---
@@ -174,7 +175,7 @@ The table below shows the measured refresh rates and frame times on target monit
 | Platform | Monitor Target | Before 0.4.4 | After 0.4.4 | Frame Build/Raster Time (Max) | Status |
 |----------|----------------|--------------|-------------|--------------------------------|--------|
 | **Windows 11 (DWM)** | 120 Hz | 120 Hz | 120 Hz | 4.2 ms / 2.8 ms (under 8.3ms) | verified |
-| **Linux (Ubuntu X11)** | 144 Hz | 144 Hz | 144 Hz | 3.5 ms / 3.0 ms (under 6.9ms) | verified |
+| **Linux (Ubuntu X11)** | 144 Hz | 144 Hz | 144 Hz | 3.5 ms / 3.0 ms (under 6.9ms) | verified (compositor Hz; query-only) |
 | **macOS 14+ (ProMotion)** | 120 Hz | 60 Hz | 120 Hz | 4.8 ms / 3.2 ms (under 8.3ms) | verified (unlocked) |
 
 *Note: macOS ProMotion requires `RefreshRate.enable()` called in `main()` to bypass the default 60 Hz cap.*
