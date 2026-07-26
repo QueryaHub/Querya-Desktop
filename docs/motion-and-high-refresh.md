@@ -138,7 +138,11 @@ Suggested order: A1 → A2 → A3 in parallel with A4; then A5; A6 closes the mi
 
 ---
 
-## 7. Review rule — no magic UI durations
+## 7. Theme morph cost
+
+`AnimatedQueryaTheme` / `ShadcnAnimatedTheme` notify **app-wide** theme dependents on every animation tick. That is acceptable only as an **opt-in** Preference (`themeAnimationEnabled`, default **false**) and only when Motion is Full. Motion Off / preference off must snap. Do not enable theme animation by default without a profiled 120 Hz pass ([perf-baseline.md](perf-baseline.md) §14).
+
+## 8. Review rule — no magic UI durations
 
 When reviewing PRs that touch animation:
 
@@ -157,7 +161,7 @@ When reviewing PRs that touch animation:
 
 Checklist for 120 Hz verification: [perf-baseline.md](perf-baseline.md) § Fluid shell.
 
-## 8. References
+## 9. References
 
 - Flutter engine — high refresh rate gap: `flutter/flutter#160952`, `#90675` (ProMotion scrolling), `#94508` (`CADisableMinimumFrameDurationOnPhone` default).
 - `refresh_rate` package (query/unlock/overlay/benchmark, all platforms): https://pub.dev/packages/refresh_rate
@@ -168,7 +172,7 @@ Checklist for 120 Hz verification: [perf-baseline.md](perf-baseline.md) § Fluid
 
 ---
 
-## 9. Measured results (0.4.4)
+## 10. Measured results (0.4.4)
 
 The table below shows the measured refresh rates and frame times on target monitors before and after the 0.4.4 implementation (using a profile build, measured with DevTools and `QUERYA_REFRESH_OVERLAY=true`):
 

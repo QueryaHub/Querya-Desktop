@@ -37,4 +37,6 @@ Repeat on a **120 Hz** display (budget **≤ 8.3 ms** build+raster). Prefer prof
 12. **Results modes**: idle → run (spinner) → grid; force an error — mode keys morph; scrolling the grid must not fade rows.
 13. **Dialog / dropdown**: open/close `showAppDialog` and a `QueryaDropdown` — enter fade-slide, exit uses exit curve; Motion Off snaps.
 14. **Theme cross-fade**: Preferences → enable Animate theme + Motion Full; switch dark/light — shadcn + `AnimatedQueryaTheme` lerp. Repeat with Motion Off (snap).
-15. **Split settle**: drag the connections sidebar handle and the SQL/results vertical split with a fling — mid-drag stays 1:1; release may soft-settle. Focus the handle — ring uses motion tokens (not mid-drag animation). Expect **layout** of editor/results each tick (constraint/flex); paint is isolated via `RepaintBoundary` on panes — do not add mid-drag springs to “fix” that cost.
+    **Cost note:** theme morph rebuilds app-wide InheritedTheme dependents every tick — keep **Animate theme** **off by default** (`ThemeController`); only enable for demos/profile. Never ship it default-on without a 120 Hz timeline.
+15. **Split settle**: drag the connections sidebar handle and the SQL/results vertical split with a fling — mid-drag stays 1:1; release may soft-settle. Focus the handle — ring uses motion tokens (not mid-drag animation).
+
