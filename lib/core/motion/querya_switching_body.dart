@@ -74,11 +74,16 @@ class _SwitchingLayer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final curve = active ? inCurve : outCurve;
+    // Isolate paint; pause child tickers when inactive (opacity anim still runs).
+    final content = TickerMode(
+      enabled: active,
+      child: RepaintBoundary(child: child),
+    );
     Widget layer = AnimatedOpacity(
       opacity: active ? 1 : 0,
       duration: duration,
       curve: curve,
-      child: child,
+      child: content,
     );
 
     if (slide != Offset.zero) {
