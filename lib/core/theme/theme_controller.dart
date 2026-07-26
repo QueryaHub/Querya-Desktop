@@ -90,7 +90,10 @@ class ThemeController extends ChangeNotifier {
 
   ThemeMode get themeMode => _themeMode;
 
-  /// When true, [QueryaApp] enables ShadcnAnimatedTheme transitions.
+  /// Preference toggle for theme cross-fades.
+  ///
+  /// [QueryaApp] still gates animation with [QueryaThemeMotion] (motion level /
+  /// OS disableAnimations). When those disallow motion, themes snap.
   bool get themeAnimationEnabled => _themeAnimationEnabled;
 
   QueryaThemePreset get preset => _preset;
