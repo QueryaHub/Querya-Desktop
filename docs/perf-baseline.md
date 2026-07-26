@@ -19,6 +19,7 @@ To verify that the motion system conforms to the budget and does not cause jank 
    - 120 Hz budget: **8.3 ms** per frame
    - 144 Hz budget: **6.9 ms** per frame
 6. **Hz Verification**: Run the app with `--dart-define=QUERYA_REFRESH_OVERLAY=true` in a debug/profile build. The floating overlay must show the correct target Hz.
+   - **Linux:** overlay is **query-only** (`RefreshRate.enable` is a no-op). Confirm the compositor/monitor is actually driving that Hz (Wayland/X11 settings); Querya cannot unlock a higher rate.
 7. **Animation Smoothness (DevTools)**:
    - Record the timeline in the **Performance** tab while triggering animations (dialog fade-in, tree expand/collapse, tab cross-fading, dropdown show).
    - Ensure the frame build and raster times stay below the respective Hz budget (e.g., < 8.3 ms on a 120 Hz monitor).
@@ -38,3 +39,4 @@ Repeat on a **120 Hz** display (budget **≤ 8.3 ms** build+raster). Prefer prof
 14. **Theme cross-fade**: Preferences → enable Animate theme + Motion Full; switch dark/light — shadcn + `AnimatedQueryaTheme` lerp. Repeat with Motion Off (snap).
     **Cost note:** theme morph rebuilds app-wide InheritedTheme dependents every tick — keep **Animate theme** **off by default** (`ThemeController`); only enable for demos/profile. Never ship it default-on without a 120 Hz timeline.
 15. **Split settle**: drag the connections sidebar handle and the SQL/results vertical split with a fling — mid-drag stays 1:1; release may soft-settle. Focus the handle — ring uses motion tokens (not mid-drag animation).
+
