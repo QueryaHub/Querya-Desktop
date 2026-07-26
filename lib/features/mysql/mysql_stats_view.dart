@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/motion/ticker_gated_polling.dart';
 import 'package:querya_desktop/core/util/deep_collection_equals.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -108,22 +109,33 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
     }
   }
 
+  Future<void> _onPollTick() async {
+    final conn = _lease?.connection;
+    if (conn == null || !conn.isConnected) return;
+    try {
+      final stats = await conn.serverStats();
+      if (!mounted) return;
+      if (!replaceIfChanged(_stats, stats, (v) => _stats = v)) return;
+      setState(() {});
+    } catch (_) {}
+  }
+
   void _startTimer() {
     _timer?.cancel();
-    _timer = Timer.periodic(_pollInterval, (_) async {
-      final conn = _lease?.connection;
-      if (conn == null || !conn.isConnected) return;
-      try {
-        final stats = await conn.serverStats();
-        if (!mounted) return;
-        if (!replaceIfChanged(_stats, stats, (v) => _stats = v)) return;
-        setState(() {});
-      } catch (_) {}
-    });
+    _timer = Timer.periodic(_pollInterval, (_) => unawaited(_onPollTick()));
   }
 
   @override
   material.Widget build(material.BuildContext context) {
+    final conn = _lease?.connection;
+    _timer = syncTickerGatedPeriodicTimer(
+      context: context,
+      timer: _timer,
+      shouldRun: conn != null && conn.isConnected && !_loading,
+      interval: _pollInterval,
+      onTick: () => unawaited(_onPollTick()),
+    );
+
     final cs = Theme.of(context).colorScheme;
     final width = material.MediaQuery.sizeOf(context).width;
 
