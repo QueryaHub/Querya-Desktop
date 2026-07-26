@@ -25,3 +25,15 @@ To verify that the motion system conforms to the budget and does not cause jank 
 8. **Reduced Motion**:
    - Turn on "Reduce Motion" in your OS settings or select **Preferences → Appearance → Motion → Off** (or **Reduced** for 50% speed).
    - Verify that transitions complete instantly (**0 ms** for Off) or are appropriately shortened.
+
+## Fluid shell scenarios @ 120 Hz (0.4.11+ / #342)
+
+Repeat on a **120 Hz** display (budget **≤ 8.3 ms** build+raster). Prefer profile/release.
+
+9. **Empty ↔ connected**: open a connection from the empty hero, then disconnect back to empty — `QueryaSwitchingBody` morph; editor/workspace state should not remount-jank.
+10. **Tab strip**: switch Server / SQL / History quickly — sliding pill should redirect without brick-wall jumps.
+11. **Hero quick-start ↔ recent**: with and without recent connections — FadeSlide + stagger first paint only.
+12. **Results modes**: idle → run (spinner) → grid; force an error — mode keys morph; scrolling the grid must not fade rows.
+13. **Dialog / dropdown**: open/close `showAppDialog` and a `QueryaDropdown` — enter fade-slide, exit uses exit curve; Motion Off snaps.
+14. **Theme cross-fade**: Preferences → enable Animate theme + Motion Full; switch dark/light — shadcn + `AnimatedQueryaTheme` lerp. Repeat with Motion Off (snap).
+15. **Split settle**: drag the connections sidebar handle and the SQL/results vertical split with a fling — mid-drag stays 1:1; release may soft-settle. Focus the handle — ring uses motion tokens (not mid-drag animation).
