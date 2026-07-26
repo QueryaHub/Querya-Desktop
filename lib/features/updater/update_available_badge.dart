@@ -1,6 +1,5 @@
 import 'dart:async' show unawaited;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
