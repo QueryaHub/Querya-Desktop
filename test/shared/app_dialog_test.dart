@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
@@ -81,6 +83,23 @@ void main() {
     expect(find.byType(FadeTransition), findsWidgets);
     expect(find.byType(SlideTransition), findsWidgets);
     expect(find.byType(ScaleTransition), findsNothing);
+  });
+
+  testWidgets('backdrop keeps static blur sigma; opacity carries enter',
+      (tester) async {
+    final ctx = await pumpHost(tester);
+
+    showAppDialog<void>(
+      context: ctx,
+      builder: (c) => const SimpleDialog(title: Text('Blur')),
+    );
+    // Mid-enter: blur must stay sigma 8 (not sigma * t).
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 40));
+
+    final filter = tester.widget<BackdropFilter>(find.byType(BackdropFilter));
+    expect(filter.filter, ImageFilter.blur(sigmaX: 8, sigmaY: 8));
+    expect(find.byType(Opacity), findsWidgets);
   });
 
   testWidgets('enter uses standard duration under full motion', (tester) async {
