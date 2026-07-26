@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/extensions/extension_driver_session.dart';
 import 'package:querya_desktop/core/extensions/models/extension_server_stats.dart';
+import 'package:querya_desktop/core/motion/ticker_gated_polling.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/util/deep_collection_equals.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -97,21 +98,31 @@ class _ExtensionStatsViewState extends material.State<ExtensionStatsView> {
     }
   }
 
+  Future<void> _onPollTick() async {
+    try {
+      final stats = await ExtensionDriverSession.instance
+          .getServerStats(widget.connectionRow);
+      if (!mounted) return;
+      if (!replaceIfChanged(_stats, stats, (v) => _stats = v)) return;
+      setState(() {});
+    } catch (_) {}
+  }
+
   void _startTimer() {
     _timer?.cancel();
-    _timer = Timer.periodic(_pollInterval, (_) async {
-      try {
-        final stats = await ExtensionDriverSession.instance
-            .getServerStats(widget.connectionRow);
-        if (!mounted) return;
-        if (!replaceIfChanged(_stats, stats, (v) => _stats = v)) return;
-        setState(() {});
-      } catch (_) {}
-    });
+    _timer = Timer.periodic(_pollInterval, (_) => unawaited(_onPollTick()));
   }
 
   @override
   material.Widget build(material.BuildContext context) {
+    _timer = syncTickerGatedPeriodicTimer(
+      context: context,
+      timer: _timer,
+      shouldRun: !_loading && _error == null,
+      interval: _pollInterval,
+      onTick: () => unawaited(_onPollTick()),
+    );
+
     final cs = Theme.of(context).colorScheme;
     final width = MediaQuery.sizeOf(context).width;
 
