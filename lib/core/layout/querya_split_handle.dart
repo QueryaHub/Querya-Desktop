@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
+import 'package:querya_desktop/core/motion/querya_motion.dart';
+import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// Accessible split-pane handle that supports mouse dragging and arrow keys.
+///
+/// Mid-drag updates are 1:1 via [onDragDelta]. [onDragEnd] receives velocity for
+/// optional spring settle (callers should not animate mid-drag).
 class QueryaSplitHandle extends material.StatefulWidget {
   const QueryaSplitHandle({
     super.key,
@@ -20,7 +25,9 @@ class QueryaSplitHandle extends material.StatefulWidget {
   final String semanticsLabel;
   final String? semanticsValue;
   final double keyboardStep;
-  final material.VoidCallback? onDragEnd;
+
+  /// Called when a pointer drag ends (not keyboard). Use velocity for settle.
+  final material.ValueChanged<material.DragEndDetails>? onDragEnd;
 
   @override
   material.State<QueryaSplitHandle> createState() => _QueryaSplitHandleState();
@@ -61,6 +68,9 @@ class _QueryaSplitHandleState extends material.State<QueryaSplitHandle> {
   material.Widget build(material.BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final horizontal = widget.axis == material.Axis.horizontal;
+    final duration = context.motionDuration(QueryaMotion.fast);
+    final curve = context.motionCurve(QueryaMotion.enter);
+
     return material.Focus(
       focusNode: _focusNode,
       onFocusChange: (value) => setState(() => _focused = value),
@@ -85,14 +95,14 @@ class _QueryaSplitHandleState extends material.State<QueryaSplitHandle> {
             onHorizontalDragUpdate: horizontal
                 ? (event) => widget.onDragDelta(event.delta.dx)
                 : null,
-            onHorizontalDragEnd:
-                horizontal ? (_) => widget.onDragEnd?.call() : null,
+            onHorizontalDragEnd: horizontal ? widget.onDragEnd : null,
             onVerticalDragUpdate: horizontal
                 ? null
                 : (event) => widget.onDragDelta(event.delta.dy),
-            onVerticalDragEnd:
-                horizontal ? null : (_) => widget.onDragEnd?.call(),
-            child: material.Container(
+            onVerticalDragEnd: horizontal ? null : widget.onDragEnd,
+            child: material.AnimatedContainer(
+              duration: duration,
+              curve: curve,
               width: horizontal ? 6 : null,
               height: horizontal ? null : 6,
               decoration: material.BoxDecoration(

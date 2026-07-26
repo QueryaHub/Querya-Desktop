@@ -137,7 +137,19 @@ Suggested order: A1 → A2 → A3 in parallel with A4; then A5; A6 closes the mi
 
 ---
 
-## 7. References
+## 7. Review rule — no magic UI durations
+
+When reviewing PRs that touch animation:
+
+1. Reject bare `Duration(milliseconds: …)` / ad-hoc `Curves.*` in product UI unless
+   wired through `QueryaMotion` (or documented physics constants in `QueryaSpring`).
+2. Require Full / Reduced / Off + OS `disableAnimations` coverage for new transitions.
+3. Split / resize: no spring or lag mid-drag; settle only on release / focus chrome.
+4. Never stagger or fade virtualized result rows while scrolling.
+
+Checklist for 120 Hz verification: [perf-baseline.md](perf-baseline.md) § Fluid shell.
+
+## 8. References
 
 - Flutter engine — high refresh rate gap: `flutter/flutter#160952`, `#90675` (ProMotion scrolling), `#94508` (`CADisableMinimumFrameDurationOnPhone` default).
 - `refresh_rate` package (query/unlock/overlay/benchmark, all platforms): https://pub.dev/packages/refresh_rate
@@ -148,7 +160,7 @@ Suggested order: A1 → A2 → A3 in parallel with A4; then A5; A6 closes the mi
 
 ---
 
-## 8. Measured results (0.4.4)
+## 9. Measured results (0.4.4)
 
 The table below shows the measured refresh rates and frame times on target monitors before and after the 0.4.4 implementation (using a profile build, measured with DevTools and `QUERYA_REFRESH_OVERLAY=true`):
 

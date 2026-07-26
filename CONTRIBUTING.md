@@ -77,6 +77,21 @@ CI pins a **stable** Flutter version in
 version locally to avoid "works on my machine" drift. When bumping the pin, run
 `flutter test` and a release smoke build before merging.
 
+## UI motion (review rule)
+
+For animated UI, **do not invent magic `Duration(...)` / raw curves** in widgets.
+
+- Use `QueryaMotion` tokens (`fast` / `standard` / `slow`) via
+  `context.motionDuration` / `context.motionCurve` (or `QueryaMotion.effective*`).
+- Interactive Fluid motion: `QueryaSpring` / `QueryaSpringController` when
+  `QueryaSpring.springsEnabled` (Full motion only).
+- Honor Preferences Motion Full / Reduced / Off and OS `disableAnimations`.
+- Mid-drag layout (split panes) stays 1:1; spring settle only on drag-end.
+- Do not animate virtualized grid rows on scroll.
+
+See [docs/motion-and-high-refresh.md](docs/motion-and-high-refresh.md) and
+[docs/perf-baseline.md](docs/perf-baseline.md) (Fluid @ 120 Hz checklist).
+
 ## Tests
 
 Widget tests that use SQLite or `path_provider` follow patterns in
