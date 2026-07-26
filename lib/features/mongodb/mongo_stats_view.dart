@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/motion/ticker_gated_polling.dart';
 import 'package:querya_desktop/core/util/deep_collection_equals.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
@@ -174,7 +175,7 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     _timer?.cancel();
     final interval = _autoRefreshInterval;
     if (interval == null) return;
-    _timer = Timer.periodic(interval, (_) => _pollTick());
+    _timer = Timer.periodic(interval, (_) => unawaited(_pollTick()));
   }
 
   String _formatClock(DateTime t) {
@@ -184,6 +185,20 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
 
   @override
   material.Widget build(material.BuildContext context) {
+    final interval = _autoRefreshInterval;
+    if (interval != null) {
+      _timer = syncTickerGatedPeriodicTimer(
+        context: context,
+        timer: _timer,
+        shouldRun: !_loading && _connection != null,
+        interval: interval,
+        onTick: () => unawaited(_pollTick()),
+      );
+    } else {
+      _timer?.cancel();
+      _timer = null;
+    }
+
     final cs = Theme.of(context).colorScheme;
     final width = MediaQuery.sizeOf(context).width;
 
