@@ -17,6 +17,7 @@ class QueryaSplitHandle extends material.StatefulWidget {
     this.semanticsValue,
     this.keyboardStep = 10,
     this.onDragEnd,
+    this.onDiscreteResize,
   });
 
   /// Direction in which the handle moves.
@@ -28,6 +29,11 @@ class QueryaSplitHandle extends material.StatefulWidget {
 
   /// Called when a pointer drag ends (not keyboard). Use velocity for settle.
   final material.ValueChanged<material.DragEndDetails>? onDragEnd;
+
+  /// Called after a keyboard / semantics step (not mid-pointer-drag).
+  ///
+  /// Use to persist layout when the user resizes without a drag-end event.
+  final material.VoidCallback? onDiscreteResize;
 
   @override
   material.State<QueryaSplitHandle> createState() => _QueryaSplitHandleState();
@@ -60,8 +66,13 @@ class _QueryaSplitHandleState extends material.State<QueryaSplitHandle> {
             _ => null,
           };
     if (delta == null) return material.KeyEventResult.ignored;
-    widget.onDragDelta(delta);
+    _applyDiscrete(delta);
     return material.KeyEventResult.handled;
+  }
+
+  void _applyDiscrete(double delta) {
+    widget.onDragDelta(delta);
+    widget.onDiscreteResize?.call();
   }
 
   @override
@@ -82,8 +93,8 @@ class _QueryaSplitHandleState extends material.State<QueryaSplitHandle> {
         decreasedValue: widget.semanticsValue,
         focusable: true,
         focused: _focused,
-        onIncrease: () => widget.onDragDelta(widget.keyboardStep),
-        onDecrease: () => widget.onDragDelta(-widget.keyboardStep),
+        onIncrease: () => _applyDiscrete(widget.keyboardStep),
+        onDecrease: () => _applyDiscrete(-widget.keyboardStep),
         child: material.MouseRegion(
           cursor: horizontal
               ? material.SystemMouseCursors.resizeColumn

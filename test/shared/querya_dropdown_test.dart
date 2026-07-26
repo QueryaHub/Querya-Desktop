@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/motion/querya_motion.dart';
+import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
 import 'package:querya_desktop/shared/widgets/querya_dropdown.dart';
 
 import '../support/querya_theme_test_shell.dart';
@@ -96,6 +98,50 @@ void main() {
       expect(find.byType(material.AnimatedScale), findsNothing);
       await tester.pumpAndSettle();
       expect(find.text('Beta'), findsOneWidget);
+    });
+
+    testWidgets('item pick delays MenuAnchor close for exit fade-slide',
+        (tester) async {
+      var selected = 'a';
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: QueryaMotionScope(
+            level: QueryaMotionLevel.full,
+            child: material.Scaffold(
+              body: material.StatefulBuilder(
+                builder: (context, setState) {
+                  return QueryaDropdown<String>(
+                    value: selected,
+                    items: const [
+                      QueryaDropdownItem(value: 'a', label: 'Alpha'),
+                      QueryaDropdownItem(value: 'b', label: 'Beta'),
+                    ],
+                    onSelected: (v) => setState(() => selected = v ?? selected),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.text('Alpha'));
+      await tester.pumpAndSettle();
+      expect(find.text('Beta'), findsOneWidget);
+
+      await tester.tap(find.text('Beta'));
+      // Exit starts; overlay still mounted mid-standard duration.
+      await tester.pump();
+      expect(find.text('Beta'), findsWidgets);
+      expect(find.byType(material.AnimatedOpacity), findsWidgets);
+
+      await tester.pump(QueryaMotion.standard);
+      await tester.pump(); // close() after delay
+      await tester.pumpAndSettle();
+      // Menu closed; trigger shows selection.
+      expect(find.text('Beta'), findsOneWidget);
+      expect(find.text('Alpha'), findsNothing);
     });
 
     testWidgets('menu anchor constrains width to trigger', (tester) async {
