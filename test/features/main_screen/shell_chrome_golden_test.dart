@@ -45,7 +45,9 @@ void main() {
         ),
       ),
     );
+    // Wait for post-frame indicator layout + spring settle.
     await tester.pump();
+    await tester.pumpAndSettle();
 
     await expectLater(
       find.byType(QueryaTabStrip),
