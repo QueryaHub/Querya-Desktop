@@ -113,7 +113,10 @@ class _VerticalSplitPaneState extends State<VerticalSplitPane>
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(flex: topFlex, child: pair.top),
+                Expanded(
+                  flex: topFlex,
+                  child: material.RepaintBoundary(child: pair.top),
+                ),
                 QueryaSplitHandle(
                   key: widget.handleKey,
                   axis: material.Axis.vertical,
@@ -136,7 +139,10 @@ class _VerticalSplitPaneState extends State<VerticalSplitPane>
                     );
                   },
                 ),
-                Expanded(flex: bottomFlex, child: pair.bottom),
+                Expanded(
+                  flex: bottomFlex,
+                  child: material.RepaintBoundary(child: pair.bottom),
+                ),
               ],
             );
           },
