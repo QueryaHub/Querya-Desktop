@@ -54,6 +54,7 @@ void main() {
   testWidgets('horizontal split handle responds to Left and Right',
       (tester) async {
     var totalDelta = 0.0;
+    var discreteCount = 0;
     await tester.pumpWidget(
       queryaThemeTestShell(
         child: material.SizedBox(
@@ -66,6 +67,7 @@ void main() {
                 axis: material.Axis.horizontal,
                 semanticsLabel: 'Resize connections and workspace panes',
                 onDragDelta: (delta) => totalDelta += delta,
+                onDiscreteResize: () => discreteCount++,
               ),
               const material.Expanded(child: material.SizedBox()),
             ],
@@ -80,8 +82,46 @@ void main() {
     await tester.tap(handle);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     expect(totalDelta, 10);
+    expect(discreteCount, 1);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
     expect(totalDelta, 0);
+    expect(discreteCount, 2);
+  });
+
+  testWidgets('semantics increase/decrease call onDiscreteResize',
+      (tester) async {
+    var discreteCount = 0;
+    var totalDelta = 0.0;
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.SizedBox(
+          width: 400,
+          height: 200,
+          child: material.Row(
+            children: [
+              const material.Expanded(child: material.SizedBox()),
+              QueryaSplitHandle(
+                axis: material.Axis.horizontal,
+                semanticsLabel: 'Resize connections and workspace panes',
+                onDragDelta: (delta) => totalDelta += delta,
+                onDiscreteResize: () => discreteCount++,
+              ),
+              const material.Expanded(child: material.SizedBox()),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final semantics = find.semantics.byLabel(
+      'Resize connections and workspace panes',
+    );
+    tester.semantics.increase(semantics);
+    expect(totalDelta, 10);
+    expect(discreteCount, 1);
+    tester.semantics.decrease(semantics);
+    expect(totalDelta, 0);
+    expect(discreteCount, 2);
   });
 
   testWidgets('focus ring uses motion-aware AnimatedContainer', (tester) async {
