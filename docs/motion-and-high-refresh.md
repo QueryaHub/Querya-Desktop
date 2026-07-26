@@ -142,10 +142,17 @@ Suggested order: A1 → A2 → A3 in parallel with A4; then A5; A6 closes the mi
 When reviewing PRs that touch animation:
 
 1. Reject bare `Duration(milliseconds: …)` / ad-hoc `Curves.*` in product UI unless
-   wired through `QueryaMotion` (or documented physics constants in `QueryaSpring`).
+   wired through `QueryaMotion` (or documented physics / choreography constants).
 2. Require Full / Reduced / Off + OS `disableAnimations` coverage for new transitions.
 3. Split / resize: no spring or lag mid-drag; settle only on release / focus chrome.
 4. Never stagger or fade virtualized result rows while scrolling.
+
+**Allowed named non-token durations** (named + documented — not magic literals at call sites):
+
+| Constant | Value | Where |
+|----------|-------|--------|
+| `kQueryaStaggerStep` | 30 ms | `QueryaStagger` first-paint choreography |
+| `kUpdateBadgePulsePeriod` | 1400 ms | Update title-bar chip pulse (chrome; see #363) |
 
 Checklist for 120 Hz verification: [perf-baseline.md](perf-baseline.md) § Fluid shell.
 
