@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.11] - Unreleased
+
+Universal UI standard for drivers/extensions, shell UX hardening, Fluid QueryaMotion morphing, virtual grid/pool reliability, and performance follow-ups. Candidate release from `dev` after syncing `main` (#346).
+
+### Added
+
+- **SDUI / extension RPC expand (#323)** — `getCapabilities`, `getServerStats`, `getObjectMetadata`, and `cancelQuery` on the plugin bridge for richer driver UIs.
+- **ExtensionTableView (#324)** — table toolbar, custom SQL filter, and async row-count for sandboxed drivers.
+- **Universal data export (#326)** — CSV, JSON, Markdown, and SQL dump from ResultsTab / table toolbars.
+- **MySQL / SQLite UI parity (#325)** — align workspace chrome and flows with the Obsidian UI standard.
+- **Shell UX (#339)** — semantic palette, shared toast, keyboard-operable tab strip, empty-workspace hero + recent connections, resizable connections sidebar, shared dialogs/widgets.
+- **Fluid QueryaMotion (#342)** — spring primitives, workspace empty↔connected morph, sliding tab indicator, hero/recent stagger, ResultsTab mode morph, dialog/dropdown fade-slide, theme morph gated by motion level, split drag-end settle + motion guardrails.
+- **Perf follow-ups (#356 / #357–#366)** — isolate tab-strip rebuilds; SwitchingBody/CrossFade `RepaintBoundary` + `TickerMode`; static dialog blur; vertical-split paint isolation; ticker-gated stats polling; badge pulse lifecycle; ResultsTab morph paint scope; document theme morph cost, stagger/badge duration constants, and Linux query-only refresh_rate.
+
+### Fixed
+
+- **Virtual result grid (#331)** — synchronize column width recalculation in `VirtualResultGrid`.
+- **Connection pools (#332)** — eviction and exception wrapping in SQLite and MySQL pools.
+- **Query timeout (#333)** — force-close connection on `TimeoutException`.
+- **Large result mapping (#334)** — optimize SQL result set mapping and DDL rendering; RPC parse on compute isolate where applicable.
+- **Sidebar width persist (#354)** — keyboard/semantics resize + dispose flush; dropdown exit delay for fade-slide.
+
+### Changed
+
+- **CI / release hygiene** — merge `main` into `dev` (includes release workflow secrets-if fix #321); pubspec set to **0.4.11+1** (not the misleading 0.4.12 CI bumps from `main`).
+
 ## [0.4.10] - 2026-07-11
 
 Sandboxed extension runtime, SDUI, and first end-to-end external database drivers (Registration + Activation), plus in-app updates and connection reliability fixes.
