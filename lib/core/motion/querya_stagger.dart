@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'querya_motion.dart';
 import 'querya_motion_context.dart';
 
+/// Default per-child delay for [QueryaStagger] (physics/choreography constant,
+/// not a surface morph token — see docs/motion-and-high-refresh.md).
+const Duration kQueryaStaggerStep = Duration(milliseconds: 30);
+
 /// Staggered fade-in for a fixed list — **first paint only**, capped at [maxStaggered].
 ///
 /// Do not wrap virtualized / scrolling grids; use for history lists, recent
@@ -12,7 +16,7 @@ class QueryaStagger extends StatefulWidget {
     super.key,
     required this.children,
     this.maxStaggered = 8,
-    this.step = const Duration(milliseconds: 30),
+    this.step = kQueryaStaggerStep,
   });
 
   final List<Widget> children;
