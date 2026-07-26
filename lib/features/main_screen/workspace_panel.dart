@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material
     show
+        Align,
         Alignment,
         Container,
         EdgeInsets,
@@ -7,10 +8,12 @@ import 'package:flutter/material.dart' as material
         Center,
         Icon,
         Icons,
+        MainAxisSize,
         SizedBox,
         Widget,
         Column;
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
+import 'package:querya_desktop/core/motion/querya_switching_body.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -126,24 +129,48 @@ class WorkspacePanel extends StatefulWidget {
 }
 
 class _WorkspacePanelState extends State<WorkspacePanel> {
+  /// Keeps the last connected workspace mounted so empty↔active can cross-fade.
+  material.Widget? _cachedActiveBody;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     final activeConn = widget.activeConnection;
+
+    final empty = material.Align(
+      alignment: material.Alignment.topCenter,
+      child: WorkspaceEmptyHero(
+        onNewConnection: widget.onRequestNewConnection ?? () {},
+        onNewConnectionFromUrl: widget.onRequestNewConnectionFromUrl,
+        onOpenSqlite: widget.onRequestOpenSqlite,
+        onOpenConnection: widget.onOpenConnection,
+      ),
+    );
+
+    final material.Widget activeBody;
     if (activeConn == null) {
-      return material.Container(
-        color: theme.colorScheme.background,
-        alignment: material.Alignment.topCenter,
-        child: WorkspaceEmptyHero(
-          onNewConnection: widget.onRequestNewConnection ?? () {},
-          onNewConnectionFromUrl: widget.onRequestNewConnectionFromUrl,
-          onOpenSqlite: widget.onRequestOpenSqlite,
-          onOpenConnection: widget.onOpenConnection,
-        ),
-      );
+      activeBody = _cachedActiveBody ?? const material.SizedBox.expand();
+    } else {
+      activeBody = _buildActiveConnectionBody(theme, activeConn);
+      _cachedActiveBody = activeBody;
     }
 
+    return material.Container(
+      color: theme.colorScheme.background,
+      child: QueryaSwitchingBody(
+        index: activeConn == null ? 0 : 1,
+        children: [
+          empty,
+          material.SizedBox.expand(child: activeBody),
+        ],
+      ),
+    );
+  }
+
+  material.Widget _buildActiveConnectionBody(
+    ThemeData theme,
+    ConnectionRow activeConn,
+  ) {
     material.Widget? driverWorkspace;
     switch (activeConn.type) {
       case 'postgresql':
@@ -262,33 +289,27 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
     }
 
     if (driverWorkspace != null) {
-      return material.Container(
-        color: theme.colorScheme.background,
-        child: material.SizedBox.expand(child: driverWorkspace),
-      );
+      return driverWorkspace;
     }
 
-    return material.Container(
-      color: theme.colorScheme.background,
-      child: material.Center(
-        child: material.Padding(
-          padding: const material.EdgeInsets.all(32),
-          child: material.Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              material.Icon(
-                material.Icons.error_outline_rounded,
-                size: 36,
-                color: theme.colorScheme.mutedForeground,
-              ),
-              const material.SizedBox(height: 12),
-              const Text('Unsupported connection type').semiBold(),
-              const material.SizedBox(height: 6),
-              Text(
-                'No workspace is registered for “${activeConn.type}”.',
-              ).muted().small(),
-            ],
-          ),
+    return material.Center(
+      child: material.Padding(
+        padding: const material.EdgeInsets.all(32),
+        child: material.Column(
+          mainAxisSize: material.MainAxisSize.min,
+          children: [
+            material.Icon(
+              material.Icons.error_outline_rounded,
+              size: 36,
+              color: theme.colorScheme.mutedForeground,
+            ),
+            const material.SizedBox(height: 12),
+            const Text('Unsupported connection type').semiBold(),
+            const material.SizedBox(height: 6),
+            Text(
+              'No workspace is registered for “${activeConn.type}”.',
+            ).muted().small(),
+          ],
         ),
       ),
     );
