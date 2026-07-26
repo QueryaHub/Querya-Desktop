@@ -35,7 +35,10 @@ class QueryaCrossFadeStack extends StatelessWidget {
                     opacity: index == i ? 1 : 0,
                     duration: duration,
                     curve: curve,
-                    child: children[i],
+                    child: TickerMode(
+                      enabled: index == i,
+                      child: RepaintBoundary(child: children[i]),
+                    ),
                   ),
                 ),
               ),
