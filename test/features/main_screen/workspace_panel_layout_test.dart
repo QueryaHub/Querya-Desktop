@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/motion/querya_switching_body.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/main_screen/workspace_panel.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -96,6 +97,48 @@ void main() {
       expect(find.byKey(const Key('workspace_run_button')), findsNothing);
       expect(find.text('Query History'), findsNothing);
       expect(find.textContaining('Coming in a future release'), findsNothing);
+    });
+
+    testWidgets('empty↔connected morph uses QueryaSwitchingBody',
+        (tester) async {
+      await pumpWidgetWithSurfaceSize(
+        tester,
+        const material.Size(800, 600),
+        queryaThemeTestShell(
+          child: const material.SizedBox.expand(
+            child: WorkspacePanel(),
+          ),
+        ),
+      );
+      expect(find.byType(QueryaSwitchingBody), findsOneWidget);
+
+      await pumpWidgetWithSurfaceSize(
+        tester,
+        const material.Size(800, 600),
+        queryaThemeTestShell(
+          child: const material.SizedBox.expand(
+            child: WorkspacePanel(
+              activeConnection: stubSplitWorkspaceConnection,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.byType(QueryaSwitchingBody), findsOneWidget);
+      expect(find.text('Unsupported connection type'), findsOneWidget);
+
+      // Back to empty — keep-alive stack stays mounted.
+      await pumpWidgetWithSurfaceSize(
+        tester,
+        const material.Size(800, 600),
+        queryaThemeTestShell(
+          child: const material.SizedBox.expand(
+            child: WorkspacePanel(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(QueryaSwitchingBody), findsOneWidget);
     });
   });
 }
