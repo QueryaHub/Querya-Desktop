@@ -17,6 +17,7 @@ import 'package:querya_desktop/features/connections/connection_creation_flow.dar
 import 'package:querya_desktop/features/connections/new_connection_url_dialog.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
 import 'package:querya_desktop/features/connections/sqlite_connection_form.dart';
+import 'package:querya_desktop/features/main_screen/connections_panel_width_persist.dart';
 import 'package:querya_desktop/features/main_screen/querya_window_title_bar.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
@@ -354,12 +355,16 @@ class _MainContentSplitState extends State<_MainContentSplit>
   final ValueNotifier<double> _leftPanelWidth =
       ValueNotifier(kDefaultConnectionsPanelWidth);
   late final QueryaDragSettleController _widthSettle;
+  late final ConnectionsPanelWidthPersist _widthPersist;
   VoidCallback? _persistWhenSettled;
   double _lastMaxWidth = 1200;
 
   @override
   void initState() {
     super.initState();
+    _widthPersist = ConnectionsPanelWidthPersist(
+      write: AppSettings.instance.setConnectionsPanelWidth,
+    );
     _widthSettle = QueryaDragSettleController(
       vsync: this,
       value: kDefaultConnectionsPanelWidth,
@@ -387,6 +392,7 @@ class _MainContentSplitState extends State<_MainContentSplit>
   }
 
   void _schedulePersistAfterSettle() {
+    _widthPersist.markDirty();
     final pending = _persistWhenSettled;
     if (pending != null) {
       _widthSettle.removeListener(pending);
@@ -395,9 +401,7 @@ class _MainContentSplitState extends State<_MainContentSplit>
       if (_widthSettle.isSettling) return;
       _widthSettle.removeListener(listener);
       _persistWhenSettled = null;
-      unawaited(
-        AppSettings.instance.setConnectionsPanelWidth(_leftPanelWidth.value),
-      );
+      unawaited(_widthPersist.persist(_leftPanelWidth.value));
     }
 
     _persistWhenSettled = listener;
@@ -413,7 +417,9 @@ class _MainContentSplitState extends State<_MainContentSplit>
     final pending = _persistWhenSettled;
     if (pending != null) {
       _widthSettle.removeListener(pending);
+      _persistWhenSettled = null;
     }
+    _widthPersist.disposeFlush(_leftPanelWidth.value);
     _widthSettle.removeListener(_onWidthSettle);
     _widthSettle.dispose();
     _leftPanelWidth.dispose();
@@ -473,7 +479,10 @@ class _MainContentSplitState extends State<_MainContentSplit>
                   ),
                 );
               },
+              onDiscreteResize: () => _widthPersist
+                  .onDiscreteResize(() => _leftPanelWidth.value),
               onDragEnd: (details) {
+                _widthPersist.cancelDiscreteTimer();
                 final velocity = details.primaryVelocity ??
                     details.velocity.pixelsPerSecond.dx;
                 _widthSettle.settle(

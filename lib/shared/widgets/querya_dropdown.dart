@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/ui_scale.dart';
@@ -26,6 +28,10 @@ class QueryaDropdownItem<T> {
 /// Stable dropdown built on [material.MenuAnchor] (no Overlay portal).
 ///
 /// Visual metrics: [QueryaDropdownTokens]. Colors from shadcn [ColorScheme].
+///
+/// **Exit motion:** item pick and trigger-toggle delay [MenuController.close]
+/// so fade-slide can run. Outside-tap / focus-loss closes via [MenuAnchor]
+/// immediately (overlay removed) — that path snaps.
 class QueryaDropdown<T> extends material.StatefulWidget {
   const QueryaDropdown({
     super.key,
@@ -63,6 +69,7 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
   List<material.Widget>? _cachedMenuChildren;
   List<QueryaDropdownItem<T>>? _cachedMenuItems;
   T? _cachedMenuValue;
+  var _closingWithExit = false;
 
   @override
   void initState() {
@@ -74,6 +81,22 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
   void dispose() {
     _menuOpen.dispose();
     super.dispose();
+  }
+
+  /// Plays exit fade-slide, then removes the [MenuAnchor] overlay.
+  Future<void> _closeWithExit() async {
+    if (!_controller.isOpen || _closingWithExit) return;
+    _closingWithExit = true;
+    _menuOpen.value = false;
+    final duration = context.motionDuration(QueryaMotion.standard);
+    if (duration > QueryaMotion.instant) {
+      await Future<void>.delayed(duration);
+    }
+    if (!mounted) return;
+    if (_controller.isOpen) {
+      _controller.close();
+    }
+    _closingWithExit = false;
   }
 
   @override
@@ -136,7 +159,7 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
       colorScheme: cs,
       onPick: () {
         widget.onSelected(item.value);
-        _controller.close();
+        unawaited(_closeWithExit());
       },
     );
   }
@@ -208,7 +231,7 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
         onTap: widget.enabled
             ? () {
                 if (controller.isOpen) {
-                  controller.close();
+                  unawaited(_closeWithExit());
                 } else {
                   controller.open();
                 }
@@ -239,8 +262,15 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
 
     final anchor = material.MenuAnchor(
       controller: _controller,
-      onOpen: () => _menuOpen.value = true,
-      onClose: () => _menuOpen.value = false,
+      onOpen: () {
+        _closingWithExit = false;
+        _menuOpen.value = true;
+      },
+      onClose: () {
+        // Outside-tap / focus loss: overlay already gone — snap state only.
+        _closingWithExit = false;
+        _menuOpen.value = false;
+      },
       crossAxisUnconstrained: false,
       alignmentOffset: material.Offset(
         widget.alignmentOffset.dx,
@@ -301,6 +331,10 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
   }
 }
 
+/// Enter/exit fade-slide for menu body while the overlay stays mounted.
+///
+/// Exit only runs when the parent delays [MenuController.close] (item pick /
+/// trigger). Outside-tap removes the overlay immediately (snap).
 class _QueryaDropdownMenuEnter extends material.StatelessWidget {
   const _QueryaDropdownMenuEnter({
     required this.openNotifier,
@@ -394,6 +428,8 @@ class _QueryaDropdownMenuItemState<T>
       onEnter: widget.enabled ? (_) => setState(() => _hovered = true) : null,
       onExit: widget.enabled ? (_) => setState(() => _hovered = false) : null,
       child: material.MenuItemButton(
+        // Keep overlay mounted so parent can play exit fade-slide before close.
+        closeOnActivate: false,
         style: material.MenuItemButton.styleFrom(
           minimumSize: material.Size(double.infinity, itemHeight),
           padding: material.EdgeInsets.zero,
