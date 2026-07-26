@@ -113,14 +113,13 @@ void main() {
       ),
     );
 
-    final node = tester.getSemantics(
-      find.bySemanticsLabel('Resize connections and workspace panes'),
+    final semantics = find.semantics.byLabel(
+      'Resize connections and workspace panes',
     );
-    final owner = tester.binding.pipelineOwner.semanticsOwner!;
-    owner.performAction(node.id, SemanticsAction.increase);
+    tester.semantics.increase(semantics);
     expect(totalDelta, 10);
     expect(discreteCount, 1);
-    owner.performAction(node.id, SemanticsAction.decrease);
+    tester.semantics.decrease(semantics);
     expect(totalDelta, 0);
     expect(discreteCount, 2);
   });
