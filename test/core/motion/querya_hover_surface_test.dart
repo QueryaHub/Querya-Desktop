@@ -111,8 +111,8 @@ void main() {
   testWidgets('uses theme fallback hovered color when unset', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
-        theme: const ThemeData(
-          colorScheme: ColorScheme.light(primary: Colors.teal),
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
         ),
         home: const QueryaMotionScope(
           level: QueryaMotionLevel.full,
