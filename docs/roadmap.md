@@ -12,9 +12,7 @@ Living document for planned work. Not a commitment order; adjust as priorities c
 - **Shipped in 0.4.4:** UI motion polish + high refresh rate (90/120/144 Hz), memory and security fixes — [planned-0.4.4.md](planned-0.4.4.md), [motion-and-high-refresh.md](motion-and-high-refresh.md), epic [#170](https://github.com/QueryaHub/Querya-Desktop/issues/170), milestone [0.4.4](https://github.com/QueryaHub/Querya-Desktop/milestone/3).
 - **Shipped in 0.4.6:** SQLite Database Connector — [planned-0.4.6.md](planned-0.4.6.md), milestone [0.4.6](https://github.com/QueryaHub/Querya-Desktop/milestones).
 - **Planned 0.4.7:** Local Extension Discovery — `ExtensionManifest`, сканирование локальных папок и миграция тем на формат расширений ([planned-0.4.7.md](planned-0.4.7.md)).
-- **Planned 0.4.8:** Extension Manager UI — Вкладка или боковая панель для просмотра и включения/выключения локальных расширений.
-- **Planned 0.4.9:** RPC Protocol Bridge — Транспортный слой (`json_rpc_2` + `Process.start`) для будущих плагинов баз данных.
-- **Planned 0.4.10:** Server-Driven UI (SDUI) — Динамические компоненты (формы, деревья), рендерящиеся из JSON-схем, присылаемых расширениями.
+- **Shipped in 0.4.10:** Sandboxed extension runtime (Block E), Plugin RPC bridge (Block C), SDUI form/tree builders, local `.zip`/`.qext` install, and Registration/Activation for external database drivers (e.g. ClickHouse) — see [CHANGELOG.md](../CHANGELOG.md).
 - **Planned 0.5.0:** Marketplace Launch — Запуск Маркетплейса (клиентская часть). Скачивание, валидация `sha256` и установка тем из сети. База под другие расширения (ДБ драйверы) полностью готова!
 - **Optional:** Preferences → **Animate theme changes** (off by default).
 - **Later:** P2 Mongo/Redis token colors; `re_editor` if perf gap; LSP epic per
