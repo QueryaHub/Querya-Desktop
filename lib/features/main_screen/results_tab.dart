@@ -1,12 +1,17 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/motion/querya_fade_slide.dart';
 import 'package:querya_desktop/core/widgets/virtual_selectable_text_view.dart';
 import 'package:querya_desktop/features/main_screen/result_grid_view.dart';
 import 'package:querya_desktop/shared/services/data_export_service.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Query output: grid, loading, error, or placeholder.
+///
+/// Mode changes (idle / loading / error / status / grid) morph via
+/// [QueryaFadeSlide]. Keys are per **mode**, not per row — so grid data updates
+/// and scroll rebuilds do not re-trigger the transition.
 class ResultsTab extends StatelessWidget {
   const ResultsTab({
     super.key,
@@ -29,24 +34,37 @@ class ResultsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return QueryaFadeSlide(
+      alignment: material.Alignment.center,
+      offset: const material.Offset(0, 0.015),
+      child: _buildBody(context),
+    );
+  }
+
+  material.Widget _buildBody(material.BuildContext context) {
     if (isLoading) {
       return const material.Center(
+        key: material.ValueKey('results_mode_loading'),
         child: material.CircularProgressIndicator(),
       );
     }
     if (errorMessage != null && errorMessage!.isNotEmpty) {
-      return VirtualSelectableTextView(
-        text: errorMessage!,
-        style: material.TextStyle(
-          fontFamily: 'monospace',
-          fontSize: 12,
-          color: Theme.of(context).colorScheme.destructive,
+      return material.KeyedSubtree(
+        key: const material.ValueKey('results_mode_error'),
+        child: VirtualSelectableTextView(
+          text: errorMessage!,
+          style: material.TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 12,
+            color: Theme.of(context).colorScheme.destructive,
+          ),
         ),
       );
     }
     if (columns.isEmpty && rows.isEmpty) {
       if (statusLine != null) {
         return material.Padding(
+          key: const material.ValueKey('results_mode_status'),
           padding: const material.EdgeInsets.all(16),
           child: Align(
             alignment: material.Alignment.topLeft,
@@ -56,15 +74,18 @@ class ResultsTab extends StatelessWidget {
       }
       if (affectedRows != null) {
         return material.Center(
+          key: const material.ValueKey('results_mode_affected'),
           child: Text('Rows affected: $affectedRows').muted(),
         );
       }
       return material.Center(
+        key: const material.ValueKey('results_mode_idle'),
         child: const Text('Run a query to see results here.').muted(),
       );
     }
 
     return material.Column(
+      key: const material.ValueKey('results_mode_grid'),
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
         if (showExportToolbar && columns.isNotEmpty)
