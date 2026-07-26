@@ -251,6 +251,41 @@ void main() {
     );
   });
 
+  testWidgets('inactive layer disables TickerMode and uses RepaintBoundary',
+      (tester) async {
+    await tester.pumpWidget(
+      wrap(
+        const QueryaSwitchingBody(
+          index: 0,
+          children: [
+            Text('active'),
+            Text('inactive'),
+          ],
+        ),
+      ),
+    );
+
+    final tickers = tester
+        .widgetList<TickerMode>(
+          find.descendant(
+            of: find.byType(QueryaSwitchingBody),
+            matching: find.byType(TickerMode),
+          ),
+        )
+        .toList();
+    expect(tickers.length, 2);
+    expect(tickers.first.enabled, isTrue);
+    expect(tickers.last.enabled, isFalse);
+
+    expect(
+      find.descendant(
+        of: find.byType(QueryaSwitchingBody),
+        matching: find.byType(RepaintBoundary),
+      ),
+      findsNWidgets(2),
+    );
+  });
+
   testWidgets('ExcludeSemantics excludes inactive child', (tester) async {
     await tester.pumpWidget(
       wrap(
