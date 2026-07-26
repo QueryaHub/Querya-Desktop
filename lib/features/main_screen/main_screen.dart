@@ -6,7 +6,9 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:querya_desktop/core/actions/sql_editor_global_actions.dart';
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
+import 'package:querya_desktop/core/layout/querya_drag_settle.dart';
 import 'package:querya_desktop/core/layout/querya_split_handle.dart';
+import 'package:querya_desktop/core/motion/querya_spring.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
@@ -343,28 +345,77 @@ class _MainContentSplit extends StatefulWidget {
   State<_MainContentSplit> createState() => _MainContentSplitState();
 }
 
-class _MainContentSplitState extends State<_MainContentSplit> {
+class _MainContentSplitState extends State<_MainContentSplit>
+    with SingleTickerProviderStateMixin {
   static const double _minLeftWidth = 180;
   static const double _maxLeftWidth = 500;
   static const double _minWorkspaceWidth = 64;
   static const double _resizeHandleWidth = 6;
   final ValueNotifier<double> _leftPanelWidth =
       ValueNotifier(kDefaultConnectionsPanelWidth);
+  late final QueryaDragSettleController _widthSettle;
+  VoidCallback? _persistWhenSettled;
+  double _lastMaxWidth = 1200;
 
   @override
   void initState() {
     super.initState();
+    _widthSettle = QueryaDragSettleController(
+      vsync: this,
+      value: kDefaultConnectionsPanelWidth,
+      maxSettleVelocity: 1200,
+    );
+    _widthSettle.addListener(_onWidthSettle);
     unawaited(_restoreConnectionsPanelWidth());
   }
 
   Future<void> _restoreConnectionsPanelWidth() async {
     final width = await AppSettings.instance.getConnectionsPanelWidth();
     if (!mounted) return;
-    _leftPanelWidth.value = width;
+    final clamped = _clampLeftWidth(width, _lastMaxWidth);
+    _widthSettle.jumpTo(clamped);
+    _leftPanelWidth.value = clamped;
+  }
+
+  void _onWidthSettle() {
+    final clamped = _clampLeftWidth(_widthSettle.value, _lastMaxWidth);
+    _leftPanelWidth.value = clamped;
+    if (!_widthSettle.isSettling &&
+        (clamped - _widthSettle.value).abs() > 0.5) {
+      _widthSettle.jumpTo(clamped);
+    }
+  }
+
+  void _schedulePersistAfterSettle() {
+    final pending = _persistWhenSettled;
+    if (pending != null) {
+      _widthSettle.removeListener(pending);
+    }
+    void listener() {
+      if (_widthSettle.isSettling) return;
+      _widthSettle.removeListener(listener);
+      _persistWhenSettled = null;
+      unawaited(
+        AppSettings.instance.setConnectionsPanelWidth(_leftPanelWidth.value),
+      );
+    }
+
+    _persistWhenSettled = listener;
+    if (_widthSettle.isSettling) {
+      _widthSettle.addListener(listener);
+    } else {
+      listener();
+    }
   }
 
   @override
   void dispose() {
+    final pending = _persistWhenSettled;
+    if (pending != null) {
+      _widthSettle.removeListener(pending);
+    }
+    _widthSettle.removeListener(_onWidthSettle);
+    _widthSettle.dispose();
     _leftPanelWidth.dispose();
     super.dispose();
   }
@@ -380,6 +431,7 @@ class _MainContentSplitState extends State<_MainContentSplit> {
   material.Widget build(material.BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        _lastMaxWidth = constraints.maxWidth;
         return Row(
           children: [
             ValueListenableBuilder<double>(
@@ -414,16 +466,22 @@ class _MainContentSplitState extends State<_MainContentSplit> {
                     _resizeHandleWidth -
                     _minWorkspaceWidth;
                 if (ml <= 0) return;
-                _leftPanelWidth.value = _clampLeftWidth(
-                  _leftPanelWidth.value + dx,
-                  constraints.maxWidth,
+                _widthSettle.dragTo(
+                  _clampLeftWidth(
+                    _widthSettle.value + dx,
+                    constraints.maxWidth,
+                  ),
                 );
               },
-              onDragEnd: () => unawaited(
-                AppSettings.instance.setConnectionsPanelWidth(
-                  _leftPanelWidth.value,
-                ),
-              ),
+              onDragEnd: (details) {
+                final velocity = details.primaryVelocity ??
+                    details.velocity.pixelsPerSecond.dx;
+                _widthSettle.settle(
+                  velocity: velocity,
+                  useSprings: QueryaSpring.springsEnabled(context),
+                );
+                _schedulePersistAfterSettle();
+              },
             ),
             Expanded(
               child: material.RepaintBoundary(
