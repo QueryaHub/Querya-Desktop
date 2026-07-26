@@ -257,7 +257,8 @@ class _PreferencesAppearanceSectionState
         ),
         const material.SizedBox(height: 4),
         const PreferencesHint(
-          'Smooth transitions when switching dark/light or presets. Off by default for stability.',
+          'Smooth transitions when switching dark/light or presets. Off by default '
+          'for stability. Also requires Motion Full or Reduced (Off snaps themes).',
         ),
         const material.SizedBox(height: 12),
         PreferencesFieldRow(

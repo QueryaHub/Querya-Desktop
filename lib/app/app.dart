@@ -2,7 +2,8 @@ import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/layout/ui_scale_controller.dart';
 import 'package:querya_desktop/core/motion/querya_motion_controller.dart';
 import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
-import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
+import 'package:querya_desktop/core/motion/querya_theme_motion.dart';
+import 'package:querya_desktop/core/theme/animated_querya_theme.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
@@ -32,6 +33,26 @@ class QueryaApp extends StatelessWidget {
               listenable: motionController,
               builder: (context, _) {
                 final motionLevel = motionController.level;
+                final disableAnimations =
+                    MediaQuery.maybeOf(context)?.disableAnimations ??
+                        WidgetsBinding.instance.platformDispatcher
+                            .accessibilityFeatures.disableAnimations;
+                final themeDuration = QueryaThemeMotion.duration(
+                  preferenceEnabled: themeController.themeAnimationEnabled,
+                  level: motionLevel,
+                  disableAnimations: disableAnimations,
+                );
+                final themeCurve = QueryaThemeMotion.curve(
+                  preferenceEnabled: themeController.themeAnimationEnabled,
+                  level: motionLevel,
+                  disableAnimations: disableAnimations,
+                );
+                final themeAnimEnabled = QueryaThemeMotion.enabled(
+                  preferenceEnabled: themeController.themeAnimationEnabled,
+                  level: motionLevel,
+                  disableAnimations: disableAnimations,
+                );
+
                 return ShadcnApp(
                   title: 'Querya',
                   theme: themeController.lightShadcnTheme,
@@ -39,7 +60,9 @@ class QueryaApp extends StatelessWidget {
                   themeMode: themeController.themeMode,
                   materialTheme: themeController.materialThemeFor(colorScheme),
                   debugShowCheckedModeBanner: false,
-                  enableThemeAnimation: themeController.themeAnimationEnabled,
+                  enableThemeAnimation: themeAnimEnabled,
+                  themeAnimationDuration: themeDuration,
+                  themeAnimationCurve: themeCurve,
                   enableScrollInterception: false,
                   // Above navigator so dialogs/overlays (SQL editor, Preferences) see tokens.
                   builder: (context, child) {
@@ -55,8 +78,10 @@ class QueryaApp extends StatelessWidget {
                                 scale,
                           ),
                         ),
-                        child: QueryaThemeScope(
+                        child: AnimatedQueryaTheme(
                           data: queryaTheme,
+                          duration: themeDuration,
+                          curve: themeCurve,
                           child: QueryaMotionScope(
                             level: motionLevel,
                             child: child ?? const SizedBox.shrink(),
