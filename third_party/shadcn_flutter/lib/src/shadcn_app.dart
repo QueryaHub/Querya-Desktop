@@ -65,6 +65,8 @@ class ShadcnApp extends StatefulWidget {
     this.tooltipHandler,
     this.menuHandler,
     this.enableThemeAnimation = true,
+    this.themeAnimationDuration,
+    this.themeAnimationCurve = Curves.linear,
   })  : routeInformationProvider = null,
         routeInformationParser = null,
         routerDelegate = null,
@@ -117,6 +119,8 @@ class ShadcnApp extends StatefulWidget {
     this.tooltipHandler,
     this.menuHandler,
     this.enableThemeAnimation = true,
+    this.themeAnimationDuration,
+    this.themeAnimationCurve = Curves.linear,
   })  : assert(routerDelegate != null || routerConfig != null),
         navigatorObservers = null,
         navigatorKey = null,
@@ -271,6 +275,13 @@ class ShadcnApp extends StatefulWidget {
 
   /// Whether to animate theme changes.
   final bool enableThemeAnimation;
+
+  /// Duration for [ShadcnAnimatedTheme]. When null, uses [kDefaultDuration].
+  /// Ignored when [enableThemeAnimation] is false (instant).
+  final Duration? themeAnimationDuration;
+
+  /// Curve for theme transitions.
+  final Curve themeAnimationCurve;
 
   @override
   State<ShadcnApp> createState() => _ShadcnAppState();
@@ -434,6 +445,8 @@ class _ShadcnAppState extends State<ShadcnApp> {
       menuHandler: widget.menuHandler,
       themeMode: widget.themeMode,
       enableThemeAnimation: widget.enableThemeAnimation,
+      themeAnimationDuration: widget.themeAnimationDuration,
+      themeAnimationCurve: widget.themeAnimationCurve,
       child: child,
     );
   }
@@ -613,6 +626,12 @@ class ShadcnLayer extends StatelessWidget {
   /// Whether to animate theme changes.
   final bool enableThemeAnimation;
 
+  /// Duration for theme animation when [enableThemeAnimation] is true.
+  final Duration? themeAnimationDuration;
+
+  /// Curve for theme animation.
+  final Curve themeAnimationCurve;
+
   /// Creates a shadcn layer.
   const ShadcnLayer({
     super.key,
@@ -630,6 +649,8 @@ class ShadcnLayer extends StatelessWidget {
     this.tooltipHandler,
     this.menuHandler,
     this.enableThemeAnimation = true,
+    this.themeAnimationDuration,
+    this.themeAnimationCurve = Curves.linear,
   });
 
   @override
@@ -643,6 +664,9 @@ class ShadcnLayer extends StatelessWidget {
                 platformBrightness == Brightness.dark)
         ? appScaling.scale(darkTheme ?? theme)
         : appScaling.scale(theme);
+    final themeDuration = enableThemeAnimation
+        ? (themeAnimationDuration ?? kDefaultDuration)
+        : Duration.zero;
     return OverlayManagerLayer(
       menuHandler: menuHandler ??
           (mobileMode
@@ -657,7 +681,8 @@ class ShadcnLayer extends StatelessWidget {
               ? const FixedTooltipOverlayHandler()
               : const PopoverOverlayHandler()),
       child: ShadcnAnimatedTheme(
-        duration: kDefaultDuration,
+        duration: themeDuration,
+        curve: themeAnimationCurve,
         data: scaledTheme,
         child: Builder(builder: (context) {
           var theme = Theme.of(context);
