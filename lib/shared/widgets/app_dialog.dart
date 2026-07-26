@@ -101,23 +101,25 @@ class _BlurredDialogScaffoldState extends State<_BlurredDialogScaffold> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Backdrop: animates blur sigma and dim alpha directly (no FadeTransition).
+          // Backdrop: static blur; only opacity/dim animate (blur sigma is expensive).
           Positioned.fill(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: widget.barrierDismissible ? widget.onDismiss : null,
               child: AnimatedBuilder(
                 animation: curved,
-                builder: (ctx, _) {
-                  final t = curved.value;
-                  return ClipRect(
-                    child: BackdropFilter(
-                      filter:
-                          ImageFilter.blur(sigmaX: 8.0 * t, sigmaY: 8.0 * t),
-                      child: Container(
-                        color: Colors.black.withValues(alpha: 0.32 * t),
-                      ),
+                child: ClipRect(
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                    child: const ColoredBox(
+                      color: Color(0x52000000), // black @ 0.32
                     ),
+                  ),
+                ),
+                builder: (ctx, child) {
+                  return Opacity(
+                    opacity: curved.value.clamp(0.0, 1.0),
+                    child: child,
                   );
                 },
               ),
