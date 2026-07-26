@@ -71,6 +71,33 @@ void main() {
       expect(picked, 2);
     });
 
+    testWidgets('menu enter uses fade-slide (AnimatedSlide + opacity)',
+        (tester) async {
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: QueryaDropdown<String>(
+              value: 'a',
+              items: const [
+                QueryaDropdownItem(value: 'a', label: 'Alpha'),
+                QueryaDropdownItem(value: 'b', label: 'Beta'),
+              ],
+              onSelected: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.text('Alpha'));
+      await tester.pump(); // menu open, enter animation mid-flight
+      expect(find.byType(material.AnimatedSlide), findsWidgets);
+      expect(find.byType(material.AnimatedOpacity), findsWidgets);
+      expect(find.byType(material.AnimatedScale), findsNothing);
+      await tester.pumpAndSettle();
+      expect(find.text('Beta'), findsOneWidget);
+    });
+
     testWidgets('menu anchor constrains width to trigger', (tester) async {
       await tester.pumpWidget(
         queryaThemeTestShell(

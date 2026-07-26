@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
+import 'package:querya_desktop/core/motion/querya_spring.dart';
 
 /// Shows a modal dialog with a frosted, dimmed backdrop over the app.
 ///
 /// Use instead of [showDialog] so every overlay has consistent blur.
+/// Enter: fade + slight slide; exit uses [QueryaMotion.exit] via reverseCurve.
 Future<T?> showAppDialog<T>({
   required BuildContext context,
   required WidgetBuilder builder,
@@ -34,7 +36,7 @@ Future<T?> showAppDialog<T>({
   );
 }
 
-class _BlurredDialogScaffold extends StatelessWidget {
+class _BlurredDialogScaffold extends StatefulWidget {
   const _BlurredDialogScaffold({
     required this.barrierDismissible,
     required this.onDismiss,
@@ -48,21 +50,62 @@ class _BlurredDialogScaffold extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
-    final curved = animation.drive(
-      CurveTween(curve: context.motionCurve(QueryaMotion.enter)),
+  State<_BlurredDialogScaffold> createState() => _BlurredDialogScaffoldState();
+}
+
+class _BlurredDialogScaffoldState extends State<_BlurredDialogScaffold> {
+  CurvedAnimation? _curved;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _rebuildCurved();
+  }
+
+  @override
+  void didUpdateWidget(covariant _BlurredDialogScaffold oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.animation != widget.animation) {
+      _rebuildCurved();
+    }
+  }
+
+  void _rebuildCurved() {
+    _curved?.dispose();
+    final useSpring = QueryaSpring.springsEnabled(context);
+    _curved = CurvedAnimation(
+      parent: widget.animation,
+      curve: context.motionCurve(
+        useSpring ? QueryaMotion.emphasized : QueryaMotion.enter,
+      ),
+      reverseCurve: context.motionCurve(QueryaMotion.exit),
     );
+  }
+
+  @override
+  void dispose() {
+    _curved?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final curved = _curved!;
+    final slide = Tween<Offset>(
+      begin: const Offset(0, 0.03),
+      end: Offset.zero,
+    ).animate(curved);
+
     return Material(
       type: MaterialType.transparency,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // ── Backdrop: animates blur sigma and dim alpha directly, without
-          //    being wrapped in a FadeTransition, so blur starts immediately.
+          // Backdrop: animates blur sigma and dim alpha directly (no FadeTransition).
           Positioned.fill(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: barrierDismissible ? onDismiss : null,
+              onTap: widget.barrierDismissible ? widget.onDismiss : null,
               child: AnimatedBuilder(
                 animation: curved,
                 builder: (ctx, _) {
@@ -80,18 +123,14 @@ class _BlurredDialogScaffold extends StatelessWidget {
               ),
             ),
           ),
-          // ── Dialog card: fades + scales up, independently of the backdrop.
+          // Dialog card: fade-slide enter; exit uses reverseCurve (QueryaMotion.exit).
           Center(
-            child: AnimatedBuilder(
-              animation: curved,
-              builder: (ctx, inner) => FadeTransition(
-                opacity: curved,
-                child: ScaleTransition(
-                  scale: Tween<double>(begin: 0.92, end: 1.0).animate(curved),
-                  child: inner,
-                ),
+            child: FadeTransition(
+              opacity: curved,
+              child: SlideTransition(
+                position: slide,
+                child: widget.child,
               ),
-              child: child,
             ),
           ),
         ],
