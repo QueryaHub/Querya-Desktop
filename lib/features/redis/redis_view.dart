@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/motion/ticker_gated_polling.dart';
 import 'package:querya_desktop/core/util/deep_collection_equals.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/database/redis_info.dart';
@@ -147,23 +148,34 @@ class _RedisViewState extends material.State<RedisView> {
     setState(() => _loading = false);
   }
 
+  Future<void> _onPollTick() async {
+    final c = _connection;
+    if (c == null || !c.isConnected) return;
+    try {
+      final raw = await c.info();
+      final info = parseRedisInfo(raw);
+      if (!mounted) return;
+      if (!replaceIfChanged(_info, info, (v) => _info = v)) return;
+      setState(() {});
+    } catch (_) {}
+  }
+
   void _startTimer() {
     _timer?.cancel();
-    _timer = Timer.periodic(_pollInterval, (_) async {
-      final c = _connection;
-      if (c == null || !c.isConnected) return;
-      try {
-        final raw = await c.info();
-        final info = parseRedisInfo(raw);
-        if (!mounted) return;
-        if (!replaceIfChanged(_info, info, (v) => _info = v)) return;
-        setState(() {});
-      } catch (_) {}
-    });
+    _timer = Timer.periodic(_pollInterval, (_) => unawaited(_onPollTick()));
   }
 
   @override
   material.Widget build(material.BuildContext context) {
+    final c = _connection;
+    _timer = syncTickerGatedPeriodicTimer(
+      context: context,
+      timer: _timer,
+      shouldRun: c != null && c.isConnected && !_loading,
+      interval: _pollInterval,
+      onTick: () => unawaited(_onPollTick()),
+    );
+
     final cs = Theme.of(context).colorScheme;
     final width = MediaQuery.sizeOf(context).width;
 
