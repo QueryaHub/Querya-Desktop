@@ -37,7 +37,7 @@ class ResultsTab extends StatelessWidget {
     return QueryaFadeSlide(
       alignment: material.Alignment.center,
       offset: const material.Offset(0, 0.015),
-      child: _buildBody(context),
+      child: material.RepaintBoundary(child: _buildBody(context)),
     );
   }
 
