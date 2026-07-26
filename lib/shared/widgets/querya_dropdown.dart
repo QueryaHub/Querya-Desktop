@@ -313,13 +313,14 @@ class _QueryaDropdownMenuEnter extends material.StatelessWidget {
   @override
   material.Widget build(material.BuildContext context) {
     final duration = context.motionDuration(QueryaMotion.standard);
-    final curve = context.motionCurve(QueryaMotion.enter);
+    final enter = context.motionCurve(QueryaMotion.enter);
+    final exit = context.motionCurve(QueryaMotion.exit);
     return material.ValueListenableBuilder<bool>(
       valueListenable: openNotifier,
       builder: (context, open, _) {
-        return material.AnimatedScale(
-          scale: open ? 1 : 0.96,
-          alignment: material.Alignment.topCenter,
+        final curve = open ? enter : exit;
+        return material.AnimatedSlide(
+          offset: open ? material.Offset.zero : const material.Offset(0, -0.04),
           duration: duration,
           curve: curve,
           child: material.AnimatedOpacity(
