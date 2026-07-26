@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/motion/querya_fade_slide.dart';
+import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
+import 'package:querya_desktop/core/motion/querya_stagger.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/features/main_screen/workspace_empty_hero.dart';
@@ -7,12 +10,35 @@ import 'package:querya_desktop/features/main_screen/workspace_empty_hero.dart';
 import '../../support/querya_theme_test_shell.dart';
 
 void main() {
+  const recent = ConnectionRow(
+    id: 7,
+    type: 'postgresql',
+    name: 'Prod DB',
+    host: 'db.example.com',
+    port: 5432,
+    createdAt: '2026-01-01T00:00:00Z',
+  );
+
+  material.Widget heroShell({
+    required material.Widget child,
+    QueryaMotionLevel level = QueryaMotionLevel.full,
+    QueryaTheme? theme,
+  }) {
+    return queryaThemeTestShell(
+      data: theme ?? QueryaTheme.darkDefault,
+      child: QueryaMotionScope(
+        level: level,
+        child: child,
+      ),
+    );
+  }
+
   testWidgets('WorkspaceEmptyHero renders with theme tokens', (tester) async {
     var newTapped = false;
     var urlTapped = false;
     var sqliteTapped = false;
     await tester.pumpWidget(
-      queryaThemeTestShell(
+      heroShell(
         child: material.SizedBox(
           width: 900,
           height: 700,
@@ -33,6 +59,11 @@ void main() {
     expect(find.text('Start working with your data'), findsOneWidget);
     expect(find.textContaining('dark interface'), findsNothing);
     expect(find.text('Quick start'), findsOneWidget);
+    expect(find.byType(QueryaFadeSlide), findsOneWidget);
+    expect(
+      find.byKey(const material.ValueKey('empty_quick_start')),
+      findsOneWidget,
+    );
 
     await tester.tap(find.text('New connection'));
     await tester.tap(find.text('New from URL'));
@@ -44,17 +75,9 @@ void main() {
 
   testWidgets('WorkspaceEmptyHero opens a recent connection', (tester) async {
     ConnectionRow? opened;
-    const recent = ConnectionRow(
-      id: 7,
-      type: 'postgresql',
-      name: 'Prod DB',
-      host: 'db.example.com',
-      port: 5432,
-      createdAt: '2026-01-01T00:00:00Z',
-    );
 
     await tester.pumpWidget(
-      queryaThemeTestShell(
+      heroShell(
         child: material.SizedBox(
           width: 900,
           height: 700,
@@ -66,12 +89,17 @@ void main() {
         ),
       ),
     );
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.text('Recent connections'), findsOneWidget);
     expect(find.text('Prod DB'), findsOneWidget);
     expect(find.text('db.example.com:5432'), findsOneWidget);
     expect(find.text('Quick start'), findsNothing);
+    expect(find.byType(QueryaStagger), findsOneWidget);
+    expect(
+      find.byKey(const material.ValueKey('empty_recent_section')),
+      findsOneWidget,
+    );
 
     await tester.tap(find.text('Prod DB'));
     expect(opened?.id, 7);
@@ -85,8 +113,8 @@ void main() {
     );
 
     await tester.pumpWidget(
-      queryaThemeTestShell(
-        data: theme,
+      heroShell(
+        theme: theme,
         child: material.SizedBox(
           width: 900,
           height: 700,
@@ -110,4 +138,124 @@ void main() {
         );
     expect(container.decoration, isNotNull);
   });
+
+  testWidgets('morphs quick start into recent list with FadeSlide',
+      (tester) async {
+    await tester.pumpWidget(
+      heroShell(
+        child: const material.SizedBox(
+          width: 900,
+          height: 700,
+          child: WorkspaceEmptyHero(
+            onNewConnection: _noop,
+            recentConnections: [],
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Quick start'), findsOneWidget);
+
+    await tester.pumpWidget(
+      heroShell(
+        child: material.SizedBox(
+          width: 900,
+          height: 700,
+          child: WorkspaceEmptyHero(
+            onNewConnection: _noop,
+            recentConnections: const [recent],
+            onOpenConnection: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 40));
+    // During transition both panels may briefly coexist in AnimatedSwitcher.
+    expect(find.text('Recent connections'), findsOneWidget);
+
+    await tester.pumpAndSettle();
+    expect(find.text('Quick start'), findsNothing);
+    expect(find.text('Prod DB'), findsOneWidget);
+  });
+
+  testWidgets('motion off snaps quick start → recent without overlap',
+      (tester) async {
+    await tester.pumpWidget(
+      heroShell(
+        level: QueryaMotionLevel.off,
+        child: const material.SizedBox(
+          width: 900,
+          height: 700,
+          child: WorkspaceEmptyHero(
+            onNewConnection: _noop,
+            recentConnections: [],
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.pumpWidget(
+      heroShell(
+        level: QueryaMotionLevel.off,
+        child: const material.SizedBox(
+          width: 900,
+          height: 700,
+          child: WorkspaceEmptyHero(
+            onNewConnection: _noop,
+            recentConnections: [recent],
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Quick start'), findsNothing);
+    expect(find.text('Recent connections'), findsOneWidget);
+  });
+
+  testWidgets('recent list staggers on first paint then reaches full opacity',
+      (tester) async {
+    const second = ConnectionRow(
+      id: 8,
+      type: 'mysql',
+      name: 'Analytics',
+      host: 'mysql.local',
+      port: 3306,
+      createdAt: '2026-01-02T00:00:00Z',
+    );
+
+    await tester.pumpWidget(
+      heroShell(
+        child: const material.SizedBox(
+          width: 900,
+          height: 700,
+          child: WorkspaceEmptyHero(
+            onNewConnection: _noop,
+            recentConnections: [recent, second],
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 30));
+
+    double opacityOf(String label) {
+      return tester
+          .widget<material.Opacity>(
+            find
+                .ancestor(
+                  of: find.text(label),
+                  matching: find.byType(material.Opacity),
+                )
+                .first,
+          )
+          .opacity;
+    }
+
+    expect(opacityOf('Prod DB'), greaterThanOrEqualTo(opacityOf('Analytics')));
+    await tester.pumpAndSettle();
+    expect(opacityOf('Prod DB'), 1.0);
+    expect(opacityOf('Analytics'), 1.0);
+  });
 }
+
+void _noop() {}

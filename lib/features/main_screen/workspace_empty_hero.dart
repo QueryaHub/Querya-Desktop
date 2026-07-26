@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/window_layout.dart';
+import 'package:querya_desktop/core/motion/querya_fade_slide.dart';
+import 'package:querya_desktop/core/motion/querya_stagger.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
@@ -176,60 +178,26 @@ class _WorkspaceEmptyHeroState extends State<WorkspaceEmptyHero> {
                     ],
                   ),
                   material.SizedBox(height: compact ? 28 : 40),
-                  if (showRecent)
-                    _RecentConnectionsSection(
-                      connections: _recent,
-                      onOpenConnection: widget.onOpenConnection,
-                      compact: compact,
-                    )
-                  else
-                    material.Container(
-                      padding: material.EdgeInsets.all(compact ? 16 : 20),
-                      decoration: material.BoxDecoration(
-                        color: wb.surface,
-                        borderRadius: material.BorderRadius.circular(12),
-                        border: material.Border.all(
-                          color: wb.borderSubtle.withValues(alpha: 0.55),
-                        ),
-                      ),
-                      child: material.Column(
-                        crossAxisAlignment: material.CrossAxisAlignment.start,
-                        children: [
-                          material.Text(
-                            'Quick start',
-                            style: material.TextStyle(
-                              color: cs.foreground,
-                              fontSize: 14,
-                              fontWeight: material.FontWeight.w600,
-                            ),
+                  QueryaFadeSlide(
+                    alignment: material.Alignment.topCenter,
+                    offset: const material.Offset(0, 0.03),
+                    child: showRecent
+                        ? _RecentConnectionsSection(
+                            key: const material.ValueKey('empty_recent_section'),
+                            connections: _recent,
+                            onOpenConnection: widget.onOpenConnection,
+                            compact: compact,
+                          )
+                        : _QuickStartSection(
+                            key: const material.ValueKey('empty_quick_start'),
+                            compact: compact,
+                            surface: wb.surface,
+                            borderColor:
+                                wb.borderSubtle.withValues(alpha: 0.55),
+                            foreground: cs.foreground,
+                            primary: cs.primary,
                           ),
-                          const material.SizedBox(height: 12),
-                          _QuickStartRow(
-                            icon: material.Icons.dns_rounded,
-                            title: 'Server databases',
-                            description:
-                                'PostgreSQL, MySQL, MongoDB, Redis and extension drivers',
-                            color: cs.primary,
-                          ),
-                          const material.SizedBox(height: 12),
-                          _QuickStartRow(
-                            icon: material.Icons.insert_drive_file_rounded,
-                            title: 'Local database',
-                            description:
-                                'Open an existing SQLite file or create a connection',
-                            color: cs.primary,
-                          ),
-                          const material.SizedBox(height: 12),
-                          _QuickStartRow(
-                            icon: material.Icons.security_rounded,
-                            title: 'Credentials stay protected',
-                            description:
-                                'Passwords are stored in your operating system secure store',
-                            color: cs.primary,
-                          ),
-                        ],
-                      ),
-                    ),
+                  ),
                 ],
               ),
             ),
@@ -240,8 +208,75 @@ class _WorkspaceEmptyHeroState extends State<WorkspaceEmptyHero> {
   }
 }
 
+class _QuickStartSection extends StatelessWidget {
+  const _QuickStartSection({
+    super.key,
+    required this.compact,
+    required this.surface,
+    required this.borderColor,
+    required this.foreground,
+    required this.primary,
+  });
+
+  final bool compact;
+  final material.Color surface;
+  final material.Color borderColor;
+  final material.Color foreground;
+  final material.Color primary;
+
+  @override
+  Widget build(BuildContext context) {
+    return material.Container(
+      padding: material.EdgeInsets.all(compact ? 16 : 20),
+      decoration: material.BoxDecoration(
+        color: surface,
+        borderRadius: material.BorderRadius.circular(12),
+        border: material.Border.all(color: borderColor),
+      ),
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.start,
+        children: [
+          material.Text(
+            'Quick start',
+            style: material.TextStyle(
+              color: foreground,
+              fontSize: 14,
+              fontWeight: material.FontWeight.w600,
+            ),
+          ),
+          const material.SizedBox(height: 12),
+          _QuickStartRow(
+            icon: material.Icons.dns_rounded,
+            title: 'Server databases',
+            description:
+                'PostgreSQL, MySQL, MongoDB, Redis and extension drivers',
+            color: primary,
+          ),
+          const material.SizedBox(height: 12),
+          _QuickStartRow(
+            icon: material.Icons.insert_drive_file_rounded,
+            title: 'Local database',
+            description:
+                'Open an existing SQLite file or create a connection',
+            color: primary,
+          ),
+          const material.SizedBox(height: 12),
+          _QuickStartRow(
+            icon: material.Icons.security_rounded,
+            title: 'Credentials stay protected',
+            description:
+                'Passwords are stored in your operating system secure store',
+            color: primary,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _RecentConnectionsSection extends StatelessWidget {
   const _RecentConnectionsSection({
+    super.key,
     required this.connections,
     required this.onOpenConnection,
     required this.compact,
@@ -277,15 +312,20 @@ class _RecentConnectionsSection extends StatelessWidget {
             ),
           ),
           const material.SizedBox(height: 8),
-          for (var i = 0; i < connections.length; i++) ...[
-            if (i > 0) const material.SizedBox(height: 4),
-            _RecentConnectionRow(
-              connection: connections[i],
-              onTap: onOpenConnection == null
-                  ? null
-                  : () => onOpenConnection!(connections[i]),
-            ),
-          ],
+          QueryaStagger(
+            children: [
+              for (var i = 0; i < connections.length; i++)
+                material.Padding(
+                  padding: material.EdgeInsets.only(top: i == 0 ? 0 : 4),
+                  child: _RecentConnectionRow(
+                    connection: connections[i],
+                    onTap: onOpenConnection == null
+                        ? null
+                        : () => onOpenConnection!(connections[i]),
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
     );
