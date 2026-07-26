@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.11] - Unreleased
+
+Universal UI standard for drivers/extensions, shell UX hardening, Fluid QueryaMotion morphing, virtual grid/pool reliability, and performance follow-ups. Candidate release from `dev` after syncing `main` (#346).
+
+### Added
+
+- **SDUI / extension RPC expand (#323)** — `getCapabilities`, `getServerStats`, `getObjectMetadata`, and `cancelQuery` on the plugin bridge for richer driver UIs.
+- **ExtensionTableView (#324)** — table toolbar, custom SQL filter, and async row-count for sandboxed drivers.
+- **Universal data export (#326)** — CSV, JSON, Markdown, and SQL dump from ResultsTab / table toolbars.
+- **MySQL / SQLite UI parity (#325)** — align workspace chrome and flows with the Obsidian UI standard.
+- **Shell UX (#339)** — semantic palette, shared toast, keyboard-operable tab strip, empty-workspace hero + recent connections, resizable connections sidebar, shared dialogs/widgets.
+- **Fluid QueryaMotion (#342)** — spring primitives, workspace empty↔connected morph, sliding tab indicator, hero/recent stagger, ResultsTab mode morph, dialog/dropdown fade-slide, theme morph gated by motion level, split drag-end settle + motion guardrails.
+- **Perf follow-ups (#356 / #357–#366)** — isolate tab-strip rebuilds; SwitchingBody/CrossFade `RepaintBoundary` + `TickerMode`; static dialog blur; vertical-split paint isolation; ticker-gated stats polling; badge pulse lifecycle; ResultsTab morph paint scope; document theme morph cost, stagger/badge duration constants, and Linux query-only refresh_rate.
+
+### Fixed
+
+- **Virtual result grid (#331)** — synchronize column width recalculation in `VirtualResultGrid`.
+- **Connection pools (#332)** — eviction and exception wrapping in SQLite and MySQL pools.
+- **Query timeout (#333)** — force-close connection on `TimeoutException`.
+- **Large result mapping (#334)** — optimize SQL result set mapping and DDL rendering; RPC parse on compute isolate where applicable.
+- **Sidebar width persist (#354)** — keyboard/semantics resize + dispose flush; dropdown exit delay for fade-slide.
+
+### Changed
+
+- **CI / release hygiene** — merge `main` into `dev` (includes release workflow secrets-if fix #321); pubspec set to **0.4.11+1** (not the misleading 0.4.12 CI bumps from `main`).
+
+## [0.4.10] - 2026-07-11
+
+Sandboxed extension runtime, SDUI, and first end-to-end external database drivers (Registration + Activation), plus in-app updates and connection reliability fixes.
+
+### Added
+
+- **Extension sandbox runtime (Block E, #300–#305)** — parse `sandbox` capabilities from manifests; launch plugins via `SandboxProcessRunner` (bwrap / sandbox-exec / Windows soft-start); Zero-Trust `system.injectCredentials` over Stdio; watchdog + auto-recovery; stderr sanitization, rotating logs, and security audit; Level-1 embedded runtime stubs and lifted preview gate for policy-compliant `process` drivers.
+- **Plugin RPC bridge (Block C, #312)** — `PluginRpcBridge` over NDJSON JSON-RPC (`system.handshake` / `ping` / `shutdown`, `db.connect`).
+- **SDUI builders (#314)** — `SduiFormBuilder` and `SduiTreeBuilder` render connection forms and schema trees from extension JSON schemas (`key` / `boolean` aliases supported).
+- **Local extension install (#316)** — install `.zip` / `.qext` packages from Preferences and Extension Manager with the same SandboxPolicy checks as the Marketplace.
+- **Driver Registration + Activation (#318 / #319)** — parse `contributions.drivers` / `capabilities`; list installed drivers in New Connection and Driver Manager; SDUI connection form; `ExtensionDriverSession` for connect + schema tree; SQL workspace / table view for sandboxed drivers; Docker ClickHouse service for local testing.
+- **In-app updates (#280–#282)** — updater service, Check for Updates UI / badge / startup settings, and platform installer helpers.
+- **SSL certificate pickers for MySQL, MongoDB, and Redis (#278)** — optional client certificate paths on those connection forms.
+- **SQLite in Driver Manager (#270)** — built-in SQLite listed alongside other Dart drivers.
+
+### Fixed
+
+- **Secrets / shutdown / reliability** — atomic LocalDb + secure-store updates (#276); disconnect SQLite on app shutdown (#271); log remaining silent catches in database drivers (#272); harden MySQL custom SELECT validation (#274); stream large CSV exports on an isolate (#277).
+- **UI / menus** — disabled Run (F5) when no SQL-capable connection (#266); coming-soon placeholders for unfinished workspace tabs (#267); global File → New/Open/Save SQL for active SQL editors (#268).
+- **Marketplace** — database drivers without a valid process sandbox stay preview-only listings (#269).
+- **Sandbox launch** — mark driver binaries executable after zip install; fall back when bubblewrap user namespaces are unavailable.
+
 ## [0.4.9] - 2026-07-10
 
 PostgreSQL connection reliability and TLS improvements, plus menu and URI import polish.
