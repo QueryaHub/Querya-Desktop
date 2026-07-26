@@ -3,9 +3,13 @@ import 'package:refresh_rate/refresh_rate.dart';
 
 /// Desktop display refresh-rate unlock and diagnostics (UI-A4 / #174).
 ///
-/// Calls [RefreshRate.enable] once at startup (macOS 14+ ProMotion unlock;
-/// query on Windows/Linux). Debug overlay: run with
-/// `--dart-define=QUERYA_REFRESH_OVERLAY=true`.
+/// Calls [RefreshRate.enable] once at startup:
+/// - **macOS 14+:** ProMotion / high-Hz unlock
+/// - **Windows:** typically follows DWM (enable is effectively a no-op unlock)
+/// - **Linux:** **query-only** — enable is a no-op; [RefreshRate.info] / overlay
+///   report GDK monitor refresh (compositor decides actual pacing)
+///
+/// Debug overlay: `flutter run --dart-define=QUERYA_REFRESH_OVERLAY=true`.
 abstract final class DisplayRefreshService {
   static const bool _overlayFromEnvironment = bool.fromEnvironment(
     'QUERYA_REFRESH_OVERLAY',
