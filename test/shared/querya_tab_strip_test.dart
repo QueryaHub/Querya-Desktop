@@ -238,6 +238,25 @@ void main() {
     expect(selected, 1);
   });
 
+  testWidgets('indicator uses RepaintBoundary and stays under Stack',
+      (tester) async {
+    await pumpSettledStrip(
+      tester,
+      selected: 0,
+      onSelected: (_) {},
+    );
+
+    expect(
+      find.descendant(
+        of: find.byKey(const material.ValueKey('querya_tab_indicator')),
+        matching: find.byType(material.RepaintBoundary),
+      ),
+      findsOneWidget,
+    );
+    final stack = tester.widget<material.Stack>(find.byType(material.Stack));
+    expect(stack.children.length, 2);
+  });
+
   testWidgets('OS disableAnimations snaps indicator', (tester) async {
     var selected = 0;
     await tester.pumpWidget(

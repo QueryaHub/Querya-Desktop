@@ -11,6 +11,8 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 ///
 /// Selection uses a sliding pill indicator (spring when [QueryaSpring.springsEnabled])
 /// so tab changes feel continuous / redirectable.
+///
+/// Spring ticks rebuild only the pill ([_TabStripIndicator]), not the tab row.
 class QueryaTabStrip extends material.StatefulWidget {
   const QueryaTabStrip({
     super.key,
@@ -158,98 +160,151 @@ class _QueryaTabStripState extends material.State<QueryaTabStrip>
     final colors = Theme.of(context).colorScheme;
     _scheduleIndicatorSync();
 
-    return material.KeyedSubtree(
-      key: _stripKey,
-      child: material.ListenableBuilder(
-        listenable: material.Listenable.merge([
-          _indicatorLeft,
-          _indicatorWidth,
-        ]),
-        builder: (context, _) {
-          return material.Stack(
-            alignment: material.Alignment.centerLeft,
-            children: [
-              if (_indicatorReady && _indicatorWidth.value > 0)
-                material.Positioned(
-                  key: const material.ValueKey('querya_tab_indicator'),
-                  left: _indicatorLeft.value,
-                  width: _indicatorWidth.value,
-                  top: 0,
-                  bottom: 0,
-                  child: material.IgnorePointer(
-                    child: material.DecoratedBox(
-                      decoration: material.BoxDecoration(
-                        color: colors.background,
-                        borderRadius: material.BorderRadius.circular(6),
+    final tabs = material.Row(
+      mainAxisSize: material.MainAxisSize.min,
+      children: List.generate(widget.labels.length, (index) {
+        final selected = widget.selectedIndex == index;
+        final focused = _focused[index];
+        final label = widget.labels[index];
+        return material.Padding(
+          padding: material.EdgeInsets.only(left: index == 0 ? 0 : 6),
+          child: material.KeyedSubtree(
+            key: _tabKeys[index],
+            child: material.Focus(
+              focusNode: _focusNodes[index],
+              onFocusChange: (value) =>
+                  setState(() => _focused[index] = value),
+              onKeyEvent: (_, event) => _onKeyEvent(index, event),
+              child: material.Semantics(
+                button: true,
+                selected: selected,
+                label: label,
+                onTap: () => _selectAndFocus(index),
+                child: material.ExcludeSemantics(
+                  child: material.MouseRegion(
+                    cursor: material.SystemMouseCursors.click,
+                    child: material.GestureDetector(
+                      excludeFromSemantics: true,
+                      behavior: material.HitTestBehavior.opaque,
+                      onTap: () => _selectAndFocus(index),
+                      child: material.AnimatedContainer(
+                        key: material.ValueKey('querya_tab_$label'),
+                        duration: context.motionDuration(QueryaMotion.fast),
+                        curve: context.motionCurve(QueryaMotion.enter),
+                        padding: const material.EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: material.BoxDecoration(
+                          color: material.Colors.transparent,
+                          borderRadius: material.BorderRadius.circular(6),
+                          border: material.Border.all(
+                            color: focused
+                                ? colors.ring
+                                : material.Colors.transparent,
+                            width: 2,
+                          ),
+                        ),
+                        child: selected
+                            ? Text(label).small().semiBold()
+                            : Text(label).small().muted(),
                       ),
                     ),
                   ),
                 ),
-              material.Row(
-                mainAxisSize: material.MainAxisSize.min,
-                children: List.generate(widget.labels.length, (index) {
-                  final selected = widget.selectedIndex == index;
-                  final focused = _focused[index];
-                  final label = widget.labels[index];
-                  return material.Padding(
-                    padding:
-                        material.EdgeInsets.only(left: index == 0 ? 0 : 6),
-                    child: material.KeyedSubtree(
-                      key: _tabKeys[index],
-                      child: material.Focus(
-                        focusNode: _focusNodes[index],
-                        onFocusChange: (value) =>
-                            setState(() => _focused[index] = value),
-                        onKeyEvent: (_, event) => _onKeyEvent(index, event),
-                        child: material.Semantics(
-                          button: true,
-                          selected: selected,
-                          label: label,
-                          onTap: () => _selectAndFocus(index),
-                          child: material.ExcludeSemantics(
-                            child: material.MouseRegion(
-                              cursor: material.SystemMouseCursors.click,
-                              child: material.GestureDetector(
-                                excludeFromSemantics: true,
-                                behavior: material.HitTestBehavior.opaque,
-                                onTap: () => _selectAndFocus(index),
-                                child: material.AnimatedContainer(
-                                  key: material.ValueKey('querya_tab_$label'),
-                                  duration: context
-                                      .motionDuration(QueryaMotion.fast),
-                                  curve: context
-                                      .motionCurve(QueryaMotion.enter),
-                                  padding: const material.EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 8,
-                                  ),
-                                  decoration: material.BoxDecoration(
-                                    color: material.Colors.transparent,
-                                    borderRadius:
-                                        material.BorderRadius.circular(6),
-                                    border: material.Border.all(
-                                      color: focused
-                                          ? colors.ring
-                                          : material.Colors.transparent,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  child: selected
-                                      ? Text(label).small().semiBold()
-                                      : Text(label).small().muted(),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }),
               ),
-            ],
-          );
-        },
+            ),
+          ),
+        );
+      }),
+    );
+
+    return material.KeyedSubtree(
+      key: _stripKey,
+      child: material.Stack(
+        alignment: material.Alignment.centerLeft,
+        children: [
+          if (_indicatorReady)
+            _TabStripIndicator(
+              left: _indicatorLeft,
+              width: _indicatorWidth,
+              color: colors.background,
+            ),
+          tabs,
+        ],
+      ),
+    );
+  }
+}
+
+/// Sliding pill; listens to springs so the tab [Row] is not rebuilt per tick.
+class _TabStripIndicator extends material.StatefulWidget {
+  const _TabStripIndicator({
+    required this.left,
+    required this.width,
+    required this.color,
+  });
+
+  final QueryaSpringController left;
+  final QueryaSpringController width;
+  final material.Color color;
+
+  @override
+  material.State<_TabStripIndicator> createState() =>
+      _TabStripIndicatorState();
+}
+
+class _TabStripIndicatorState extends material.State<_TabStripIndicator> {
+  @override
+  void initState() {
+    super.initState();
+    widget.left.addListener(_onTick);
+    widget.width.addListener(_onTick);
+  }
+
+  @override
+  void didUpdateWidget(covariant _TabStripIndicator oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.left != widget.left) {
+      oldWidget.left.removeListener(_onTick);
+      widget.left.addListener(_onTick);
+    }
+    if (oldWidget.width != widget.width) {
+      oldWidget.width.removeListener(_onTick);
+      widget.width.addListener(_onTick);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.left.removeListener(_onTick);
+    widget.width.removeListener(_onTick);
+    super.dispose();
+  }
+
+  void _onTick() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    final w = widget.width.value;
+    if (w <= 0) return const material.SizedBox.shrink();
+    return material.Positioned(
+      key: const material.ValueKey('querya_tab_indicator'),
+      left: widget.left.value,
+      width: w,
+      top: 0,
+      bottom: 0,
+      child: material.RepaintBoundary(
+        child: material.IgnorePointer(
+          child: material.DecoratedBox(
+            decoration: material.BoxDecoration(
+              color: widget.color,
+              borderRadius: material.BorderRadius.circular(6),
+            ),
+          ),
+        ),
       ),
     );
   }
