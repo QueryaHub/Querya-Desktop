@@ -2,7 +2,7 @@
 # AUR package — installs the official Release portable Linux zip under /opt.
 # Bump pkgver/pkgrel when a new GitHub Release is published.
 pkgname=querya-desktop
-pkgver=0.4.11
+pkgver=0.4.11-a
 pkgrel=1
 pkgdesc="Multi-database desktop client (PostgreSQL, MySQL, Redis, MongoDB, SQLite)"
 arch=('x86_64')
