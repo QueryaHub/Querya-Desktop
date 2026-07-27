@@ -11,6 +11,7 @@ import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_policy.dart';
 import 'package:querya_desktop/core/market/marketplace_repository.dart';
 import 'package:querya_desktop/core/security/archive_path_guard.dart';
+import 'package:querya_desktop/core/security/safe_zip_extractor.dart';
 
 /// Installs an extension package from a local `.zip` / `.qext` archive (issue #316).
 ///
@@ -43,7 +44,12 @@ class LocalExtensionInstaller {
     }
 
     onProgress?.call(0.1);
-    final bytes = await archiveFile.readAsBytes();
+    late final List<int> bytes;
+    try {
+      bytes = await SafeZipExtractor.readBoundedBytes(archiveFile);
+    } on SafeZipException catch (error) {
+      throw MarketplaceException(error.message);
+    }
 
     if (expectedSha256 != null && expectedSha256.trim().isNotEmpty) {
       final actual = sha256.convert(bytes).toString().toLowerCase();
@@ -57,7 +63,12 @@ class LocalExtensionInstaller {
     }
 
     onProgress?.call(0.25);
-    final archive = ZipDecoder().decodeBytes(bytes);
+    late final Archive archive;
+    try {
+      archive = SafeZipExtractor.decodeBytes(bytes);
+    } on SafeZipException catch (error) {
+      throw MarketplaceException(error.message);
+    }
     if (archive.isEmpty) {
       throw MarketplaceException('Extension archive is empty.');
     }
