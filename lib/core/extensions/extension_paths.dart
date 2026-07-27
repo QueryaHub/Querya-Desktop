@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+import 'package:querya_desktop/core/storage/app_data_root.dart';
 
 /// Centralizes extension file locations.
 abstract final class ExtensionPaths {
@@ -11,15 +11,20 @@ abstract final class ExtensionPaths {
   @visibleForTesting
   static Directory? mockExtensionsDirectory;
 
-  /// Returns `~/.querya/extensions` on Linux/Mac, or equivalent `USERPROFILE\.querya\extensions` on Windows.
-  /// Falls back to application support directory if HOME is unavailable.
+  /// Portable: `{QueryaData}/extensions`.
+  /// Otherwise: `~/.querya/extensions` (or app-support fallback if HOME is missing).
   static Future<Directory> extensionsDirectory() async {
     if (mockExtensionsDirectory != null) {
       return mockExtensionsDirectory!;
     }
-    final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+    final portable = await AppDataRoot.resolvePortableRoot();
+    if (portable != null) {
+      return Directory(p.join(portable.path, _extensionsSegment));
+    }
+    final home =
+        Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
     if (home == null || home.isEmpty) {
-      final support = await getApplicationSupportDirectory();
+      final support = await AppDataRoot.applicationSupportDirectory();
       return Directory(p.join(support.path, _extensionsSegment));
     }
     return Directory(p.join(home, '.querya', _extensionsSegment));
