@@ -37,3 +37,16 @@ Marketplace downloads, local extension sideload (`.zip` / `.qext`), and in-app u
 
 Archives exceeding these bounds fail closed before files are written to disk. Path traversal checks remain in `archive_path_guard.dart`.
 
+## Extension driver OS sandbox
+
+Process-sandbox database drivers launch inside OS-level isolation when available:
+
+| Platform | Wrapper | When unavailable |
+|----------|---------|------------------|
+| Linux | `bwrap` (bubblewrap) | User must confirm **Run without OS sandbox** |
+| macOS | `sandbox-exec` (Seatbelt) | N/A — always wrapped |
+| Windows | AppContainer (planned) | User must confirm until native helper ships |
+
+Querya refuses **silent** unsandboxed launch. `SandboxProcessRunner` throws `SandboxOsIsolationUnavailableException` until the user approves via the consent dialog registered from the main window.
+
+**Linux:** install `bubblewrap` and ensure unprivileged user namespaces are enabled if you want OS sandbox without manual confirmation.
