@@ -95,11 +95,16 @@ void main() {
           'SELECT * FROM users\nLIMIT 5000;;');
     });
 
-    test('does not append LIMIT if LIMIT already exists', () {
+    test('does not append LIMIT if LIMIT already within cap', () {
       expect(injectSqlLimit('SELECT * FROM users LIMIT 10', 5000),
           'SELECT * FROM users LIMIT 10');
       expect(injectSqlLimit('SELECT * FROM users limit 10;', 5000),
           'SELECT * FROM users limit 10;');
+    });
+
+    test('clamps oversized LIMIT', () {
+      expect(injectSqlLimit('SELECT * FROM users LIMIT 999999', 5000),
+          'SELECT * FROM users LIMIT 5000');
     });
 
     test('does not modify non-select/non-read queries', () {

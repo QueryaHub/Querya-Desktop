@@ -25,7 +25,7 @@ void main() {
       );
     });
 
-    test('does not append LIMIT if LIMIT already exists', () {
+    test('does not append LIMIT if LIMIT already exists and within cap', () {
       expect(
         injectSqlLimit('SELECT * FROM users LIMIT 10', 5000),
         'SELECT * FROM users LIMIT 10',
@@ -33,6 +33,41 @@ void main() {
       expect(
         injectSqlLimit('SELECT * FROM users limit 10;', 5000),
         'SELECT * FROM users limit 10;',
+      );
+    });
+
+    test('clamps LIMIT larger than cap', () {
+      expect(
+        injectSqlLimit('SELECT * FROM users LIMIT 999999', 5000),
+        'SELECT * FROM users LIMIT 5000',
+      );
+      expect(
+        injectSqlLimit('SELECT * FROM users LIMIT 100000 OFFSET 20;', 1000),
+        'SELECT * FROM users LIMIT 1000 OFFSET 20;',
+      );
+    });
+
+    test('replaces LIMIT ALL with cap', () {
+      expect(
+        injectSqlLimit('SELECT * FROM users LIMIT ALL', 5000),
+        'SELECT * FROM users LIMIT 5000',
+      );
+    });
+
+    test('clamps FETCH FIRST n ROWS ONLY', () {
+      expect(
+        injectSqlLimit(
+          'SELECT * FROM users FETCH FIRST 100000 ROWS ONLY',
+          5000,
+        ),
+        'SELECT * FROM users FETCH FIRST 5000 ROWS ONLY',
+      );
+      expect(
+        injectSqlLimit(
+          'SELECT * FROM users FETCH FIRST 10 ROWS ONLY',
+          5000,
+        ),
+        'SELECT * FROM users FETCH FIRST 10 ROWS ONLY',
       );
     });
 
