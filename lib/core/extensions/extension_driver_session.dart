@@ -158,7 +158,7 @@ class ExtensionDriverSession {
     } on SandboxOsIsolationUnavailableException catch (error) {
       final approved =
           await UnsandboxedLaunchConsentGate.instance.request(error);
-      if (!approved) throw error;
+      if (!approved) rethrow;
       await bridge.start(
         manifest: manifest,
         pluginExecutable: pluginExecutable,
