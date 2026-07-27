@@ -15,6 +15,18 @@ abstract final class AppDataRoot {
   static const envPortable = 'QUERYA_PORTABLE';
   static const sidecarDirName = 'QueryaData';
 
+  /// Current Linux GTK / XDG application id.
+  static const linuxApplicationId = 'com.queryahub.querya_desktop';
+
+  /// Current macOS bundle identifier.
+  static const macBundleId = 'com.queryahub.queryaDesktop';
+
+  /// Previous placeholder ids (pre-#385) used for one-shot support-dir migration.
+  static const legacyLinuxApplicationId = 'com.example.querya_desktop';
+  static const legacyMacBundleId = 'com.example.queryaDesktop';
+  static const legacyWindowsCompany = 'com.example';
+  static const legacyWindowsProduct = 'querya_desktop';
+
   @visibleForTesting
   static String? mockPortableRootPath;
 
@@ -25,10 +37,14 @@ abstract final class AppDataRoot {
   static Map<String, String>? mockEnvironment;
 
   @visibleForTesting
+  static List<Directory>? mockLegacySupportCandidates;
+
+  @visibleForTesting
   static void resetMocks() {
     mockPortableRootPath = null;
     mockInstallDirectory = null;
     mockEnvironment = null;
+    mockLegacySupportCandidates = null;
   }
 
   static Map<String, String> get _env =>
@@ -85,9 +101,97 @@ abstract final class AppDataRoot {
       (await resolvePortableRoot()) != null;
 
   /// Application-support equivalent: portable root or [getApplicationSupportDirectory].
+  ///
+  /// When not portable, copies data once from legacy `com.example.*` support
+  /// paths if the new location has no `querya.db` yet.
   static Future<Directory> applicationSupportDirectory() async {
     final portable = await resolvePortableRoot();
     if (portable != null) return portable;
-    return getApplicationSupportDirectory();
+
+    final support = await getApplicationSupportDirectory();
+    await migrateLegacySupportIfNeeded(newSupport: support);
+    return support;
+  }
+
+  /// One-shot copy from [legacySupportCandidates] into [newSupport].
+  @visibleForTesting
+  static Future<bool> migrateLegacySupportIfNeeded({
+    required Directory newSupport,
+    List<Directory>? legacyCandidates,
+  }) async {
+    final newDb = File(p.join(newSupport.path, 'querya_desktop', 'querya.db'));
+    if (await newDb.exists()) return false;
+
+    final candidates = legacyCandidates ??
+        mockLegacySupportCandidates ??
+        await legacySupportCandidates();
+
+    for (final legacy in candidates) {
+      if (p.equals(legacy.path, newSupport.path)) continue;
+      final legacyDb =
+          File(p.join(legacy.path, 'querya_desktop', 'querya.db'));
+      if (!await legacyDb.exists()) continue;
+      await _copyDirectory(legacy, newSupport);
+      debugPrint(
+        'AppDataRoot: migrated profile data from ${legacy.path} → ${newSupport.path}',
+      );
+      return true;
+    }
+    return false;
+  }
+
+  @visibleForTesting
+  static Future<List<Directory>> legacySupportCandidates() async {
+    final home = _env['HOME'] ?? _env['USERPROFILE'];
+    if (home == null || home.isEmpty) return const [];
+
+    if (Platform.isLinux) {
+      final xdg = _env['XDG_DATA_HOME'];
+      final base =
+          (xdg != null && xdg.isNotEmpty) ? xdg : p.join(home, '.local', 'share');
+      return [Directory(p.join(base, legacyLinuxApplicationId))];
+    }
+    if (Platform.isMacOS) {
+      return [
+        Directory(
+          p.join(home, 'Library', 'Application Support', legacyMacBundleId),
+        ),
+        // Older docs incorrectly used the Linux-style id on macOS.
+        Directory(
+          p.join(
+            home,
+            'Library',
+            'Application Support',
+            legacyLinuxApplicationId,
+          ),
+        ),
+      ];
+    }
+    if (Platform.isWindows) {
+      final appData =
+          _env['APPDATA'] ?? p.join(home, 'AppData', 'Roaming');
+      return [
+        Directory(
+          p.join(appData, legacyWindowsCompany, legacyWindowsProduct),
+        ),
+      ];
+    }
+    return const [];
+  }
+
+  static Future<void> _copyDirectory(Directory from, Directory to) async {
+    if (!await to.exists()) {
+      await to.create(recursive: true);
+    }
+    await for (final entity in from.list(recursive: true, followLinks: false)) {
+      final relative = p.relative(entity.path, from: from.path);
+      final destPath = p.join(to.path, relative);
+      if (entity is Directory) {
+        await Directory(destPath).create(recursive: true);
+      } else if (entity is File) {
+        await File(destPath).parent.create(recursive: true);
+        await entity.copy(destPath);
+      }
+    }
   }
 }

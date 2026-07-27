@@ -77,14 +77,19 @@ Querya loads themes from the **application support** directory (see
 | `assets/themes/` (bundled) | Built-in themes shipped with the app (e.g. Cyberpunk Neon) |
 
 `{appSupport}` is normally the OS-specific support folder for Querya Desktop
-(`com.example.querya_desktop`). In portable mode it is the `QueryaData/`
-sidecar next to the binary — see [packaging.md](packaging.md). Typical OS examples:
+(`com.queryahub.querya_desktop` / `com.queryahub.queryaDesktop`). In portable
+mode it is the `QueryaData/` sidecar next to the binary — see
+[packaging.md](packaging.md). Typical OS examples:
 
 | OS | Example path |
 |----|----------------|
-| Linux | `~/.local/share/com.example.querya_desktop/themes` |
-| macOS | `~/Library/Application Support/com.example.querya_desktop/themes` |
-| Windows | `%APPDATA%\com.example.querya_desktop\themes` |
+| Linux | `~/.local/share/com.queryahub.querya_desktop/themes` |
+| macOS | `~/Library/Application Support/com.queryahub.queryaDesktop/themes` |
+| Windows | `%APPDATA%\QueryaHub\Querya Desktop\themes` |
+
+On first launch after the bundle-id change, Querya copies an existing profile
+from the legacy `com.example.*` support path when the new location has no
+`querya.db` yet.
 
 **Workflow:** copy or import a theme file into `themes/`. A **file watcher** (0.4.3+)
 debounces changes under `themes/` and refreshes the registry automatically; use
