@@ -1,7 +1,7 @@
-import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
+import 'package:querya_desktop/core/database/result_row_string_convert.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/postgresql/postgres_sql_editor_dialog.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_privileges_dialog.dart';
@@ -187,11 +187,12 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         (i) => result.schema.columns[i].columnName ?? 'col_$i',
       );
 
-      final rawRows = result.map((row) {
-        return List<dynamic>.generate(row.length, (i) => row[i]);
-      }).toList();
+      final rawRows = <List<Object?>>[
+        for (final row in result)
+          List<Object?>.generate(row.length, (i) => row[i]),
+      ];
 
-      final stringRows = await compute(convertResultRowsToStrings, rawRows);
+      final stringRows = await convertResultRowsToStringsYielding(rawRows);
 
       if (!mounted) return;
       setState(() {
@@ -235,11 +236,12 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         (i) => result.schema.columns[i].columnName ?? 'col_$i',
       );
 
-      final rawRows = result.map((row) {
-        return List<dynamic>.generate(row.length, (i) => row[i]);
-      }).toList();
+      final rawRows = <List<Object?>>[
+        for (final row in result)
+          List<Object?>.generate(row.length, (i) => row[i]),
+      ];
 
-      final stringRows = await compute(convertResultRowsToStrings, rawRows);
+      final stringRows = await convertResultRowsToStringsYielding(rawRows);
 
       if (!mounted) return;
       setState(() {
