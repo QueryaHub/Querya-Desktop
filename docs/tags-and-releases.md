@@ -37,16 +37,19 @@
 
 Профиль по умолчанию всё равно в OS app-support; USB-style data → [packaging.md](packaging.md) (`QUERYA_PORTABLE` / `QueryaData/`).
 
-### Installable channel (partial)
+### Installable channel
 
 | Artifact | Notes |
 |----------|--------|
+| `Querya-Desktop-X.Y.Z-linux.AppImage` | [`scripts/linux/build_appimage.sh`](../scripts/linux/build_appimage.sh) (`chmod +x` then run) |
 | `Querya-Desktop-X.Y.Z-linux.deb` | Debian/Ubuntu — [`scripts/linux/build_deb.sh`](../scripts/linux/build_deb.sh) |
-| AppImage / Windows setup / rpm / Flatpak | Sibling packaging PRs / [#386](https://github.com/QueryaHub/Querya-Desktop/issues/386) |
+| `Querya-Desktop-X.Y.Z-windows-setup.exe` | Inno Setup (`packaging/windows/querya.iss`) |
 
 ```bash
 sudo apt install ./Querya-Desktop-X.Y.Z-linux.deb
 ```
+
+RPM / Flatpak / AUR: [#386](https://github.com/QueryaHub/Querya-Desktop/issues/386) / epic [#379](https://github.com/QueryaHub/Querya-Desktop/issues/379).
 
 ## Changelog в GitHub Release
 

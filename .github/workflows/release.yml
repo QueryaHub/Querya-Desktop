@@ -74,16 +74,32 @@ jobs:
       - name: Build Windows (release)
         run: flutter build windows --release
 
-      - name: Zip Windows artifact
+      - name: Zip Windows artifact (portable)
         run: |
           $v = "${{ steps.version.outputs.version }}"
           $dir = "build\windows\x64\runner\Release"
           Compress-Archive -Path "$dir\*" -DestinationPath "Querya-Desktop-$v-windows.zip"
 
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build Windows setup.exe (installable)
+        shell: pwsh
+        run: |
+          $v = "${{ steps.version.outputs.version }}"
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (!(Test-Path $iscc)) { throw "ISCC not found at $iscc" }
+          & $iscc "/DMyAppVersion=$v" "packaging\windows\querya.iss"
+          $setup = "dist-windows\Querya-Desktop-$v-windows-setup.exe"
+          if (!(Test-Path $setup)) { throw "Setup not produced: $setup" }
+          Copy-Item $setup "Querya-Desktop-$v-windows-setup.exe"
+
       - uses: actions/upload-artifact@v4
         with:
           name: bundle-windows
-          path: Querya-Desktop-${{ steps.version.outputs.version }}-windows.zip
+          path: |
+            Querya-Desktop-${{ steps.version.outputs.version }}-windows.zip
+            Querya-Desktop-${{ steps.version.outputs.version }}-windows-setup.exe
           if-no-files-found: error
 
   build-linux:
@@ -124,6 +140,9 @@ jobs:
           cd build/linux/x64/release/bundle
           zip -r "${GITHUB_WORKSPACE}/Querya-Desktop-${{ steps.version.outputs.version }}-linux.zip" .
 
+      - name: Build Linux AppImage (installable)
+        run: ./scripts/linux/build_appimage.sh
+
       - name: Build Linux .deb (Debian/Ubuntu)
         run: ./scripts/linux/build_deb.sh
 
@@ -132,6 +151,7 @@ jobs:
           name: bundle-linux
           path: |
             Querya-Desktop-${{ steps.version.outputs.version }}-linux.zip
+            Querya-Desktop-${{ steps.version.outputs.version }}-linux.AppImage
             Querya-Desktop-${{ steps.version.outputs.version }}-linux.deb
           if-no-files-found: error
 
@@ -249,7 +269,9 @@ jobs:
           find artifacts \( -name '*.zip' -o -name '*.AppImage' -o -name '*.deb' -o -name '*-windows-setup.exe' \) \
             -exec mv -t dist/ {} +
           test "$(find dist -name '*.zip' | wc -l)" -eq 3
+          test "$(find dist -name '*.AppImage' | wc -l)" -eq 1
           test "$(find dist -name '*.deb' | wc -l)" -eq 1
+          test "$(find dist -name '*-windows-setup.exe' | wc -l)" -eq 1
           cd dist
           sha256sum *.* | tee SHA256SUMS.txt
 
@@ -272,13 +294,9 @@ jobs:
             echo "Optional USB-style profile: set \`QUERYA_PORTABLE=1\` or create a \`QueryaData/\` folder next to the binary (see docs/packaging.md)."
             echo ""
             echo "#### Installable"
+            echo "- **Linux AppImage**: \`Querya-Desktop-${VERSION}-linux.AppImage\` (\`chmod +x\` then run)"
             echo "- **Linux .deb** (Debian/Ubuntu): \`Querya-Desktop-${VERSION}-linux.deb\` — \`sudo apt install ./Querya-Desktop-${VERSION}-linux.deb\`"
-            if [[ -f "dist/Querya-Desktop-${VERSION}-linux.AppImage" ]]; then
-              echo "- **Linux AppImage**: \`Querya-Desktop-${VERSION}-linux.AppImage\`"
-            fi
-            if [[ -f "dist/Querya-Desktop-${VERSION}-windows-setup.exe" ]]; then
-              echo "- **Windows setup**: \`Querya-Desktop-${VERSION}-windows-setup.exe\`"
-            fi
+            echo "- **Windows setup**: \`Querya-Desktop-${VERSION}-windows-setup.exe\` (Inno Setup)"
             echo ""
             echo "RPM / Flatpak / AUR — follow-ups on #386."
             echo ""
