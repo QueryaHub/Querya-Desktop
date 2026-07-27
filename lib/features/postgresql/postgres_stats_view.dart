@@ -104,11 +104,25 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
 
   Future<void> _fetch() async {
     final c = _connection;
-    if (c == null || !c.isConnected) return;
+    if (c == null || !c.isConnected) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Not connected';
+        _loading = false;
+      });
+      return;
+    }
     try {
       final stats = await c.serverStats();
       if (!mounted) return;
-      if (!replaceIfChanged(_stats, stats, (v) => _stats = v)) return;
+      if (!replaceIfChanged(_stats, stats, (v) => _stats = v)) {
+        if (_loading) {
+          setState(() {
+            _loading = false;
+          });
+        }
+        return;
+      }
       setState(() {
         _loading = false;
       });
