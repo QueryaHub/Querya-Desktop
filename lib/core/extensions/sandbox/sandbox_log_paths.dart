@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+import 'package:querya_desktop/core/storage/app_data_root.dart';
 
 /// Resolves sandbox log directories (Block E §6).
 abstract final class SandboxLogPaths {
@@ -13,11 +13,18 @@ abstract final class SandboxLogPaths {
   @visibleForTesting
   static Directory? mockLogsDirectory;
 
-  /// `~/.local/share/Querya/logs` (or application support fallback / test mock).
+  /// Portable: `{QueryaData}/logs`.
+  /// Otherwise: `~/.local/share/Querya/logs` (or OS equivalents / app-support fallback).
   static Future<Directory> logsDirectory() async {
     if (mockLogsDirectory != null) return mockLogsDirectory!;
 
-    final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+    final portable = await AppDataRoot.resolvePortableRoot();
+    if (portable != null) {
+      return Directory(p.join(portable.path, logsSegment));
+    }
+
+    final home =
+        Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
     if (home != null && home.isNotEmpty) {
       if (Platform.isLinux) {
         final xdg = Platform.environment['XDG_DATA_HOME'];
@@ -32,12 +39,13 @@ abstract final class SandboxLogPaths {
         );
       }
       if (Platform.isWindows) {
-        final appData = Platform.environment['APPDATA'] ?? p.join(home, 'AppData', 'Roaming');
+        final appData =
+            Platform.environment['APPDATA'] ?? p.join(home, 'AppData', 'Roaming');
         return Directory(p.join(appData, 'Querya', logsSegment));
       }
     }
 
-    final support = await getApplicationSupportDirectory();
+    final support = await AppDataRoot.applicationSupportDirectory();
     return Directory(p.join(support.path, logsSegment));
   }
 

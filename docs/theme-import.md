@@ -76,8 +76,9 @@ Querya loads themes from the **application support** directory (see
 | `{appSupport}/themes/imported/` | Legacy import subdirectory (still scanned) |
 | `assets/themes/` (bundled) | Built-in themes shipped with the app (e.g. Cyberpunk Neon) |
 
-`{appSupport}` is the OS-specific support folder for Querya Desktop
-(`com.example.querya_desktop`). Typical examples:
+`{appSupport}` is normally the OS-specific support folder for Querya Desktop
+(`com.example.querya_desktop`). In portable mode it is the `QueryaData/`
+sidecar next to the binary — see [packaging.md](packaging.md). Typical OS examples:
 
 | OS | Example path |
 |----|----------------|
