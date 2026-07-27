@@ -22,8 +22,24 @@
 
 ## Что внутри релиза
 
-- Имена архивов: `Querya-Desktop-X.Y.Z-linux.zip`, `Querya-Desktop-X.Y.Z-windows.zip`, `Querya-Desktop-X.Y.Z-macos.zip` (внутри неподписанный `.app`).
-- Версия для имён и тега — **semver из pubspec**; build `+N` попадает в текст релиза как **полный pubspec version**.
+### Portable channel (сегодня)
+
+Эти zip — **portable / relocatable bundles** (запуск из папки без установщика). Имена **не** меняем на `*-portable.zip`, чтобы не ломать in-app updater (`*-{linux,windows,macos}.zip`).
+
+| Artifact | Contents |
+|----------|----------|
+| `Querya-Desktop-X.Y.Z-linux.zip` | Flutter linux `bundle/` (`querya_desktop`, `lib/`, `data/`) |
+| `Querya-Desktop-X.Y.Z-windows.zip` | `querya_desktop.exe` + DLLs/data |
+| `Querya-Desktop-X.Y.Z-macos.zip` | `querya_desktop.app` (signed/notarized when secrets are set) |
+| `SHA256SUMS.txt` | Checksums of **all** files attached to the Release |
+
+Версия в именах — **semver из pubspec**; build `+N` попадает в текст релиза как **полный pubspec version**.
+
+Профиль по умолчанию всё равно в OS app-support; USB-style data → [packaging.md](packaging.md) (`QUERYA_PORTABLE` / `QueryaData/`).
+
+### Installable channel (planned)
+
+Отдельные артефакты (AppImage, Windows setup, deb/rpm/Flatpak) — epic [#379](https://github.com/QueryaHub/Querya-Desktop/issues/379). Пока в Release публикуются только portable zip выше.
 
 ## Changelog в GitHub Release
 
@@ -62,4 +78,5 @@ git-cliff --latest --strip header
 
 ## Платформы
 
-- **Поставка через CI:** Windows, Linux и macOS (см. `release.yml`); macOS-сборка **без** подписи и notarize — для установки может понадобиться «Открыть» через контекстное меню при первом запуске.
+- **Поставка через CI:** Windows, Linux и macOS (см. `release.yml`); macOS подписывается и notarize’ится, если настроены Apple secrets — иначе unsigned `.app` (может понадобиться «Открыть» через контекстное меню).
+- Каналы загрузки и portable data: [packaging.md](packaging.md).
