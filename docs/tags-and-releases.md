@@ -43,13 +43,17 @@
 |----------|--------|
 | `Querya-Desktop-X.Y.Z-linux.AppImage` | [`scripts/linux/build_appimage.sh`](../scripts/linux/build_appimage.sh) (`chmod +x` then run) |
 | `Querya-Desktop-X.Y.Z-linux.deb` | Debian/Ubuntu — [`scripts/linux/build_deb.sh`](../scripts/linux/build_deb.sh) |
+| `Querya-Desktop-X.Y.Z-linux.rpm` | Fedora/RHEL — [`scripts/linux/build_rpm.sh`](../scripts/linux/build_rpm.sh) |
+| `Querya-Desktop-X.Y.Z-linux.flatpak` | Distro-agnostic — [`scripts/linux/build_flatpak.sh`](../scripts/linux/build_flatpak.sh) |
 | `Querya-Desktop-X.Y.Z-windows-setup.exe` | Inno Setup (`packaging/windows/querya.iss`) |
 
 ```bash
 sudo apt install ./Querya-Desktop-X.Y.Z-linux.deb
+sudo dnf install ./Querya-Desktop-X.Y.Z-linux.rpm
+flatpak install --user ./Querya-Desktop-X.Y.Z-linux.flatpak
 ```
 
-RPM / Flatpak / AUR: [#386](https://github.com/QueryaHub/Querya-Desktop/issues/386) / epic [#379](https://github.com/QueryaHub/Querya-Desktop/issues/379).
+**Arch (AUR):** community PKGBUILD — [`packaging/linux/aur/`](../packaging/linux/aur/) (installs the Release portable zip under `/opt`).
 
 ## Changelog в GitHub Release
 

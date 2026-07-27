@@ -1,0 +1,29 @@
+# Flatpak manifest for Querya Desktop (Flutter GTK bundle).
+# Built by scripts/linux/build_flatpak.sh — bundle/ is copied next to this file at build time.
+app-id: com.queryahub.querya_desktop
+runtime: org.gnome.Platform
+runtime-version: '48'
+sdk: org.gnome.Sdk
+command: querya_desktop
+
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  - --filesystem=home
+  - --talk-name=org.freedesktop.secrets
+
+modules:
+  - name: querya-desktop
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 querya_desktop /app/bin/querya_desktop
+      - cp -a lib /app/
+      - cp -a data /app/
+      - install -Dm644 com.queryahub.querya_desktop.desktop /app/share/applications/com.queryahub.querya_desktop.desktop
+      - install -Dm644 com.queryahub.querya_desktop.png /app/share/icons/hicolor/512x512/apps/com.queryahub.querya_desktop.png
+    sources:
+      - type: dir
+        path: bundle

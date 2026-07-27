@@ -70,7 +70,7 @@ Verify the 0.4.4 motion tokens, smooth animations, and high refresh rate support
 - [x] After merge to `main`, confirm any **Auto Version Bump** still yields a **0.4.11+…** product version (do not ship as 0.4.12).
 - [x] **Tag** `0.4.11` is placed on the **commit that includes all fixes** you want in binaries (a tag does not auto-include later commits; see [CONTRIBUTING.md](../CONTRIBUTING.md)).
 - [x] Run the **Release** workflow from GitHub Actions (see [tags-and-releases.md](tags-and-releases.md)).
-- [ ] Verify **portable** zips (`*-linux.zip`, `*-windows.zip`, `*-macos.zip`), **installable** artifacts (`*.AppImage`, `*.deb`, `*-windows-setup.exe`), and `SHA256SUMS.txt` on the GitHub Release.
+- [ ] Verify **portable** zips (`*-linux.zip`, `*-windows.zip`, `*-macos.zip`), **installable** artifacts (`*.AppImage`, `*.deb`, `*.rpm`, `*.flatpak`, `*-windows-setup.exe`), and `SHA256SUMS.txt` on the GitHub Release.
 
 ## Docs
 

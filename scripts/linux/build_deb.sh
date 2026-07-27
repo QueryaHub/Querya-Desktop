@@ -8,8 +8,6 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BUNDLE="${1:-$ROOT/build/linux/x64/release/bundle}"
 BINARY_NAME="querya_desktop"
-# Keep in sync with linux/CMakeLists.txt APPLICATION_ID (and #385 when merged).
-APP_ID="${QUERYA_LINUX_APP_ID:-com.queryahub.querya_desktop}"
 ICON_SRC="$ROOT/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png"
 
 if [[ ! -d "$BUNDLE" ]]; then
@@ -51,18 +49,8 @@ if [[ -f "$ICON_SRC" ]]; then
   cp "$ICON_SRC" "$PKG/usr/share/icons/hicolor/512x512/apps/${BINARY_NAME}.png"
 fi
 
-cat > "$PKG/usr/share/applications/${BINARY_NAME}.desktop" <<EOF
-[Desktop Entry]
-Type=Application
-Name=Querya Desktop
-Comment=Multi-database desktop client
-Exec=${BINARY_NAME}
-Icon=${BINARY_NAME}
-Categories=Development;Database;
-Terminal=false
-StartupWMClass=querya_desktop
-X-Querya-AppId=${APP_ID}
-EOF
+cp "$ROOT/packaging/linux/querya_desktop.desktop" \
+  "$PKG/usr/share/applications/${BINARY_NAME}.desktop"
 
 # Rough installed size in KiB for the control file.
 INSTALLED_SIZE="$(du -sk "$PKG" | awk '{print $1}')"
