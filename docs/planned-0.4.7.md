@@ -1,5 +1,7 @@
 # Milestone 0.4.7: Local Extension Discovery & Manifests
 
+**Status:** ✅ **shipped** (Git tag / release **0.4.7**).
+
 **Theme**: Подготовка фундамента для расширений с фокусом на "локальное обнаружение". Мы создаем базовые модели `ExtensionManifest`, папку `~/.querya/extensions/` и мигрируем существующие локальные темы так, чтобы приложение видело их как полноценные "расширения". Сетевых запросов и RPC пока нет.
 
 | ID | Scope | Summary |

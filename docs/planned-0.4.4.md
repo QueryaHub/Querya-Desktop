@@ -1,9 +1,10 @@
 # Planned release 0.4.4 — UI motion polish and high refresh rate
 
 
-**Status:** planning (GitHub milestone [**0.4.4**](https://github.com/QueryaHub/Querya-Desktop/milestone/3), epic **#170**).  
-**Depends on:** **0.4.3** theme follow-ups (shipped).
-**Design doc:** [motion-and-high-refresh.md](motion-and-high-refresh.md) — research, current-state audit, and per-platform Hz behavior.
+**Status:** ✅ **shipped** (GitHub milestone [**0.4.4**](https://github.com/QueryaHub/Querya-Desktop/milestone/3), epic **#170**).  
+**Depends on:** **0.4.3** theme follow-ups (shipped).  
+**Design doc:** [motion-and-high-refresh.md](motion-and-high-refresh.md) — research, current-state audit, and per-platform Hz behavior.  
+**Follow-up on `dev`:** Fluid morphing wave (#342) + perf audit (#356) land in **0.4.11**.
 
 Theme: make every animation **smooth and pleasant** through one motion system, and make the app render at the display's **native refresh rate (90/120/144 Hz)** on Linux, Windows, and macOS instead of being capped at 60.
 
