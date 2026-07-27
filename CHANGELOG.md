@@ -7,9 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.11-a] - 2026-07-27
+
+Post-0.4.11 patch: security review hardening (#395–#402) and remaining Linux distro packages (#386).
+
 ### Added
 
 - **Linux distro packaging (#386)** — `.rpm`, Flatpak (`.flatpak` bundle + manifest), and AUR PKGBUILD; Release CI publishes rpm + Flatpak alongside existing `.deb` / AppImage — see [packaging.md](docs/packaging.md).
+
+### Security
+
+- **Theme remote install localhost (#399)** — `ThemeRemoteInstallService` defaults `allowLocalhostInDebug` to `kDebugMode`.
+- **Archive path guard (#401)** — zip extraction uses `p.isWithin()` bounds checks (`archive_path_guard.dart`).
+- **Marketplace SHA256 (#396)** — `HttpMarketplaceRepository` requires manifest checksum before install.
+- **Marketplace download URLs (#397)** — HTTPS allowlist / SSRF policy (`MarketplaceDownloadPolicy`).
+- **Safe zip extraction (#398)** — shared zip-bomb limits via `SafeZipExtractor` (extensions, updater, themes).
+- **Remote theme SHA256 (#400)** — remote theme install requires checksum when provided by metadata.
+- **Sandbox OS consent (#395)** — fail-closed unsandboxed driver launch without OS wrapper (bubblewrap / consent dialog).
+- **Sideload integrity UX (#402)** — local `.zip`/`.qext` install dialog with security notice and optional SHA256.
 
 ## [0.4.11] - 2026-07-27
 
