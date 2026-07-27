@@ -140,5 +140,47 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(QueryaSwitchingBody), findsOneWidget);
     });
+
+    testWidgets('Execute button hidden when no active connection', (tester) async {
+      await pumpWidgetWithSurfaceSize(
+        tester,
+        const material.Size(800, 600),
+        queryaThemeTestShell(
+          child: const material.SizedBox.expand(
+            child: WorkspacePanel(),
+          ),
+        ),
+      );
+
+      expect(find.byKey(const Key('workspace_run_button')), findsNothing);
+      expect(find.text('Execute/Refresh (F5)'), findsNothing);
+    });
+
+    testWidgets('Execute button is disabled when execute is unavailable',
+        (tester) async {
+      await pumpWidgetWithSurfaceSize(
+        tester,
+        const material.Size(800, 600),
+        queryaThemeTestShell(
+          child: const material.SizedBox.expand(
+            child: WorkspacePanel(
+              activeConnection: stubSplitWorkspaceConnection,
+            ),
+          ),
+        ),
+      );
+
+      final buttonFinder = find.byKey(const Key('workspace_run_button'));
+      expect(buttonFinder, findsOneWidget);
+      final button = tester.widget<OutlineButton>(buttonFinder);
+      expect(button.onPressed, isNull);
+      expect(
+        find.text(
+          'Select an active database connection to execute queries',
+        ),
+        findsNothing,
+      );
+      expect(find.byType(material.Tooltip), findsWidgets);
+    });
   });
 }
