@@ -33,6 +33,8 @@ void main() {
     PathProviderPlatform.instance = _FakePathProvider(osSupport.path);
     AppDataRoot.resetMocks();
     AppDataRoot.mockInstallDirectory = installDir.path;
+    // Avoid touching the developer's real ~/.local/share/com.example.* tree.
+    AppDataRoot.mockLegacySupportCandidates = const [];
     ExtensionPaths.mockExtensionsDirectory = null;
     SandboxLogPaths.mockLogsDirectory = null;
   });
@@ -100,6 +102,40 @@ void main() {
 
       final logs = await SandboxLogPaths.logsDirectory();
       expect(logs.path, p.join(portable.path, 'logs'));
+    });
+
+    test('migrates legacy support dir when new location has no querya.db',
+        () async {
+      final legacy = Directory(p.join(tempDir.path, 'legacy_support'));
+      final next = Directory(p.join(tempDir.path, 'new_support'));
+      await Directory(p.join(legacy.path, 'querya_desktop'))
+          .create(recursive: true);
+      await File(p.join(legacy.path, 'querya_desktop', 'querya.db'))
+          .writeAsString('legacy-db');
+      await Directory(p.join(legacy.path, 'themes')).create(recursive: true);
+      await File(p.join(legacy.path, 'themes', 'a.json')).writeAsString('{}');
+
+      final migrated = await AppDataRoot.migrateLegacySupportIfNeeded(
+        newSupport: next,
+        legacyCandidates: [legacy],
+      );
+
+      expect(migrated, isTrue);
+      expect(
+        await File(p.join(next.path, 'querya_desktop', 'querya.db'))
+            .readAsString(),
+        'legacy-db',
+      );
+      expect(
+        await File(p.join(next.path, 'themes', 'a.json')).exists(),
+        isTrue,
+      );
+
+      final again = await AppDataRoot.migrateLegacySupportIfNeeded(
+        newSupport: next,
+        legacyCandidates: [legacy],
+      );
+      expect(again, isFalse);
     });
   });
 }

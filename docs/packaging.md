@@ -38,8 +38,19 @@ Connection passwords remain in the **OS keyring** (`flutter_secure_storage` /
 libsecret / Credential Manager / Keychain). Portable mode does **not** move
 secrets into `QueryaData` in v1.
 
+## Bundle / application IDs
+
+| Platform | ID |
+|----------|----|
+| Linux (`APPLICATION_ID`) | `com.queryahub.querya_desktop` |
+| macOS (bundle id) | `com.queryahub.queryaDesktop` |
+| Windows (Company / Product) | `QueryaHub` / `Querya Desktop` |
+
+Legacy `com.example.*` support directories are migrated once into the new paths
+(see `AppDataRoot.migrateLegacySupportIfNeeded`).
+
 ## Related code
 
-- `lib/core/storage/app_data_root.dart` — detection and support-dir redirect
+- `lib/core/storage/app_data_root.dart` — portable detection, support-dir redirect, id migration
 - Updater packaging context: `lib/core/updater/installers/update_install_context.dart`
 - Release workflow: `.github/workflows/release.yml`
