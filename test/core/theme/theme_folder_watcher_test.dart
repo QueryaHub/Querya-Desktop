@@ -80,7 +80,7 @@ void main() {
       var refreshCount = 0;
       final watcher = ThemeFolderWatcher(
         themesDirectory: () async => themesDir,
-        onThemesChanged: () async {
+        onThemesChanged: ({required bool structuralChange}) async {
           refreshCount++;
         },
         debounce: const Duration(milliseconds: 80),
@@ -104,7 +104,7 @@ void main() {
       var refreshCount = 0;
       final watcher = ThemeFolderWatcher(
         themesDirectory: () async => themesDir,
-        onThemesChanged: () async {
+        onThemesChanged: ({required bool structuralChange}) async {
           refreshCount++;
           if (!refreshGate.isCompleted) {
             refreshGate.complete();
@@ -132,7 +132,7 @@ void main() {
       var refreshCount = 0;
       final watcher = ThemeFolderWatcher(
         themesDirectory: () async => themesDir,
-        onThemesChanged: () async {
+        onThemesChanged: ({required bool structuralChange}) async {
           refreshCount++;
         },
         debounce: const Duration(milliseconds: 80),
