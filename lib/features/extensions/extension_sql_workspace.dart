@@ -50,6 +50,7 @@ class _ExtensionSqlWorkspaceState
   String? _statusLine;
 
   int _historyMaxEntries = kDefaultSqlHistoryMaxEntries;
+  int _resultMaxRows = kDefaultSqlResultMaxRows;
   double _editorFontSize = kDefaultSqlEditorFontSize;
 
   static const _previewRowLimit = 200;
@@ -89,10 +90,12 @@ class _ExtensionSqlWorkspaceState
 
   Future<void> _loadWorkspaceSettings() async {
     final hist = await AppSettings.instance.getSqlHistoryMaxEntries();
+    final rows = await AppSettings.instance.getSqlResultMaxRows();
     final font = await AppSettings.instance.getSqlEditorFontSize();
     if (!mounted) return;
     setState(() {
       _historyMaxEntries = hist;
+      _resultMaxRows = rows;
       _editorFontSize = font;
     });
   }
@@ -124,8 +127,11 @@ class _ExtensionSqlWorkspaceState
     });
 
     try {
-      final result = await ExtensionDriverSession.instance
-          .query(widget.connectionRow, userSql);
+      final result = await ExtensionDriverSession.instance.query(
+        widget.connectionRow,
+        userSql,
+        limit: _resultMaxRows,
+      );
       if (!mounted) return;
 
       setState(() {
@@ -136,7 +142,10 @@ class _ExtensionSqlWorkspaceState
         } else {
           final elapsed =
               result.elapsedMs != null ? ' in ${result.elapsedMs}ms' : '';
-          _statusLine = '${result.rows.length} row(s)$elapsed.';
+          final capped = result.rows.length >= _resultMaxRows;
+          _statusLine = capped
+              ? 'Showing first $_resultMaxRows row(s)$elapsed (result capped).'
+              : '${result.rows.length} row(s)$elapsed.';
         }
         _running = false;
       });

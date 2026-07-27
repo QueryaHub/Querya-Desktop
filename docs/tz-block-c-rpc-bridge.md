@@ -46,7 +46,15 @@ final result = await rpcClient.sendRequest('db.connect', credentialsMap);
 
 ---
 
-## 4. Контракт Ошибок (Error Mapping)
-Плагин должен возвращать ошибки согласно спецификации JSON-RPC. RPC Bridge должен уметь парсить эти ошибки и превращать их в понятные Dart-exceptions:
-- Ошибка подключения (Timeout, Wrong Password) -> Показывается в UI в красном Snackbar.
-- Синтаксическая ошибка SQL -> Выделяется красным в SQL редакторе.
+## 5. Лимиты полезной нагрузки (NDJSON)
+
+Каждый ответ — **одна JSON-строка** на `stdout` (newline-delimited). Хост (`JsonRpcStdioClient`) применяет:
+
+| Лимит | Значение по умолчанию | Поведение |
+|-------|----------------------|-----------|
+| Макс. длина одной строки ответа | **32 MiB** UTF-8 | Fail closed: `JsonRpcPayloadTooLargeException`, все pending RPC завершаются ошибкой |
+| Декод больших строк | **> 64 KiB** | `jsonDecode` уходит в isolate |
+
+Для `db.query` хост всегда передаёт `params.limit` (Preferences → Max rows in results), чтобы драйвер обрезал результат **до** сериализации. Драйверы обязаны уважать `limit`.
+
+Чанкованный / бинарный framing для очень больших выборок — follow-up; до него bound + `limit` обязательны.

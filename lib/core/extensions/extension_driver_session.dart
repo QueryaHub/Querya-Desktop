@@ -14,6 +14,7 @@ import 'package:querya_desktop/core/extensions/rpc/plugin_rpc_bridge.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_os_isolation.dart';
 import 'package:querya_desktop/core/extensions/sandbox/unsandboxed_launch_consent_gate.dart';
 import 'package:querya_desktop/core/sdui/sdui_tree_schema.dart';
+import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 
@@ -276,16 +277,21 @@ class ExtensionDriverSession {
   }
 
   /// Executes SQL through the plugin (`db.query`) and returns the raw result.
+  ///
+  /// When [limit] is omitted, Preferences **Max rows in results** is sent so
+  /// drivers can bound the NDJSON response before it hits the host.
   Future<ExtensionQueryResult> query(
     ConnectionRow row,
     String sql, {
     int? limit,
   }) async {
     final bridge = await ensureConnected(row);
+    final effectiveLimit =
+        limit ?? await AppSettings.instance.getSqlResultMaxRows();
     final result = await bridge.sendRequest('db.query', {
       'connectionId': row.id,
       'sql': sql,
-      if (limit != null) 'limit': limit,
+      'limit': effectiveLimit,
     });
     return compute(_parseExtensionQueryResultRpc, result);
   }
