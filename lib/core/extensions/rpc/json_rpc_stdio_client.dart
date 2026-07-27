@@ -1,30 +1,48 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
+
+import 'package:querya_desktop/core/extensions/rpc/json_rpc_payload_limits.dart';
 
 /// Minimal JSON-RPC 2.0 client over newline-delimited JSON on stdio.
 ///
 /// Enough for Block E credential injection and later Block C methods without
 /// pulling `json_rpc_2` yet. One JSON object per line on stdin/stdout.
+///
+/// Incoming lines are bounded by [maxLineBytes] (see
+/// [kDefaultJsonRpcMaxLineBytes]); oversized payloads fail closed.
 class JsonRpcStdioClient {
   JsonRpcStdioClient({
     required Stream<List<int>> stdout,
     required IOSink stdin,
     this.requestTimeout = const Duration(seconds: 10),
+    this.maxLineBytes = kDefaultJsonRpcMaxLineBytes,
   })  : _stdin = stdin,
-        _lines = utf8.decoder.bind(stdout).transform(const LineSplitter()) {
-    _subscription = _lines.listen(_onLine, onError: _onError, onDone: _onDone);
+        _lines = stdout.transform(
+          boundedUtf8LineSplitter(maxLineBytes: maxLineBytes),
+        ) {
+    _subscription = _lines.listen(
+      _onLine,
+      onError: _onError,
+      onDone: _onDone,
+      cancelOnError: false,
+    );
   }
 
   final IOSink _stdin;
   final Stream<String> _lines;
   final Duration requestTimeout;
+  final int maxLineBytes;
 
   final Map<int, Completer<Object?>> _pending = {};
   var _nextId = 1;
   var _closed = false;
   StreamSubscription<String>? _subscription;
   Object? _fatalError;
+
+  /// Serializes async line handling so large-line isolate decode stays ordered.
+  Future<void> _lineChain = Future<void>.value();
 
   /// Sends a JSON-RPC request and waits for the matching response.
   Future<Object?> sendRequest(
@@ -82,12 +100,21 @@ class JsonRpcStdioClient {
   }
 
   void _onLine(String line) {
+    _lineChain = _lineChain.then((_) => _handleLine(line));
+  }
+
+  Future<void> _handleLine(String line) async {
     if (line.trim().isEmpty) return;
     late final Map<String, dynamic> message;
     try {
-      final decoded = jsonDecode(line);
-      if (decoded is! Map<String, dynamic>) return;
-      message = decoded;
+      final Object decoded;
+      if (line.length > kJsonRpcOffIsolateDecodeThresholdBytes) {
+        decoded = await Isolate.run(() => jsonDecode(line));
+      } else {
+        decoded = jsonDecode(line);
+      }
+      if (decoded is! Map) return;
+      message = Map<String, dynamic>.from(decoded);
     } catch (_) {
       return;
     }
