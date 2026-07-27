@@ -10,6 +10,16 @@ abstract class WindowLayout {
   static const double narrowWindowWidth = 720;
   static const double compactWindowWidth = 520;
 
+  /// Logical sizes for connection credential forms (Postgres/MySQL/Redis/…).
+  static const double connectionFormMaxWidth = 700;
+  static const double connectionFormMaxHeight = 760;
+  static const double connectionFormMongoMaxHeight = 820;
+
+  /// Preferences / settings dialog.
+  static const double preferencesDialogMaxWidth = 600;
+  static const double preferencesDialogMinWidth = 420;
+  static const double preferencesDialogMaxHeight = 760;
+
   /// Horizontal inset for modal dialogs (clamped by screen).
   static double dialogHorizontalInset(double screenWidth) {
     return (screenWidth * 0.05).clamp(12.0, 48.0);
@@ -68,7 +78,7 @@ abstract class WindowLayout {
       context,
       screenExtent: mq.width,
       insetTotal: inset,
-      baseMax: 740,
+      baseMax: 860,
       baseMin: 280,
       viewportFactor: 1.0,
     );
@@ -81,9 +91,9 @@ abstract class WindowLayout {
       context,
       screenExtent: mq.height,
       insetTotal: inset,
-      baseMax: 580,
+      baseMax: 680,
       baseMin: 320,
-      viewportFactor: 0.78,
+      viewportFactor: 0.85,
     );
   }
 

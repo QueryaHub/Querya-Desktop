@@ -174,8 +174,8 @@ class _ExtensionConnectionFormContentState
     return material.Container(
       constraints: WindowLayout.dialogConstraints(
         context,
-        maxWidth: 520,
-        minWidth: 400,
+        maxWidth: WindowLayout.connectionFormMaxWidth,
+        minWidth: 440,
       ),
       decoration: material.BoxDecoration(
         color: theme.popover,
