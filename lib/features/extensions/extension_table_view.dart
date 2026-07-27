@@ -177,6 +177,7 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
   }
 
   Future<void> _openDdlDialog() async {
+    final navigator = material.Navigator.of(context, rootNavigator: true);
     unawaited(showAppDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -191,8 +192,8 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
         nodeId: widget.tableName,
         nodeType: widget.isView ? 'view' : 'table',
       );
+      if (navigator.canPop()) navigator.pop();
       if (!mounted) return;
-      material.Navigator.of(context).pop();
 
       final ddlText = meta.ddl?.trim().isNotEmpty == true
           ? meta.ddl!
@@ -223,8 +224,8 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
         ),
       );
     } catch (e) {
+      if (navigator.canPop()) navigator.pop();
       if (!mounted) return;
-      material.Navigator.of(context).pop();
       showAppToast(
         context: context,
         message: 'Failed to fetch DDL: $e',
