@@ -13,6 +13,7 @@ import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/extensions/models/extension_type.dart';
 import 'package:querya_desktop/core/security/archive_path_guard.dart';
+import 'package:querya_desktop/core/security/safe_zip_extractor.dart';
 import 'marketplace_download_policy.dart';
 import 'marketplace_repository.dart';
 
@@ -170,7 +171,12 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
         );
       }
 
-      final bytes = await archiveFile.readAsBytes();
+      late final List<int> bytes;
+      try {
+        bytes = await SafeZipExtractor.readBoundedBytes(archiveFile);
+      } on SafeZipException catch (error) {
+        throw MarketplaceException(error.message);
+      }
       final actualSha256 = sha256.convert(bytes).toString().toLowerCase();
       if (actualSha256 != expectedSha256) {
         throw MarketplaceException(
@@ -181,8 +187,13 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
 
       onProgress?.call(0.85);
 
-      // Step 3: Safe Archive Extraction (Preventing Path Traversal / Zip Bomb - Issue #242)
-      final archive = ZipDecoder().decodeBytes(bytes);
+      // Step 3: Safe Archive Extraction (path traversal + zip bomb limits)
+      final Archive archive;
+      try {
+        archive = SafeZipExtractor.decodeBytes(bytes);
+      } on SafeZipException catch (error) {
+        throw MarketplaceException(error.message);
+      }
 
       final dir = await ExtensionPaths.extensionsDirectory();
       final extDir = Directory(p.join(dir.path, manifest.id));

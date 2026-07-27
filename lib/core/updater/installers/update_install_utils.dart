@@ -4,6 +4,7 @@ import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
 
 import '../../security/archive_path_guard.dart';
+import '../../security/safe_zip_extractor.dart';
 import '../app_updater_service.dart';
 
 /// Safely extracts a zip archive into [destinationDir].
@@ -16,8 +17,12 @@ Future<void> extractZipSecurely({
   }
   await destinationDir.create(recursive: true);
 
-  final bytes = await zipFile.readAsBytes();
-  final archive = ZipDecoder().decodeBytes(bytes);
+  final Archive archive;
+  try {
+    archive = await SafeZipExtractor.readAndDecodeFile(zipFile);
+  } on SafeZipException catch (error) {
+    throw AppUpdaterException(error.message);
+  }
   final root = p.normalize(destinationDir.path);
 
   for (final entry in archive) {
