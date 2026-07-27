@@ -7,6 +7,7 @@ import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/market/marketplace_repository.dart';
 import 'package:querya_desktop/features/extensions/presentation/widgets/extension_card.dart';
+import 'package:querya_desktop/features/extensions/presentation/widgets/extension_sideload_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 void showExtensionManagerDialog(material.BuildContext context) {
@@ -124,7 +125,18 @@ class _ExtensionManagerContentState
         ],
       );
       if (file == null) return;
-      await LocalExtensionInstaller().installFromPath(file.path);
+
+      if (!mounted) return;
+      final request = await showExtensionSideloadDialog(
+        context,
+        archivePath: file.path,
+      );
+      if (request == null) return;
+
+      await LocalExtensionInstaller().installFromPath(
+        request.archivePath,
+        expectedSha256: request.sha256Checksum,
+      );
       await LocalExtensionRegistry.instance.reload();
       if (!mounted) return;
       setState(() {
@@ -269,7 +281,8 @@ class _ExtensionManagerContentState
               const material.SizedBox(width: 12),
               material.Expanded(
                 child: const Text(
-                  'Install a local .zip or .qext package without the Marketplace.',
+                  'Install a local .zip or .qext package. Integrity verification '
+                  'is optional — paste SHA-256 if the publisher provides one.',
                 ).muted().small(),
               ),
             ],

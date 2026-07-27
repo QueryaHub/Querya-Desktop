@@ -50,3 +50,7 @@ Process-sandbox database drivers launch inside OS-level isolation when available
 Querya refuses **silent** unsandboxed launch. `SandboxProcessRunner` throws `SandboxOsIsolationUnavailableException` until the user approves via the consent dialog registered from the main window.
 
 **Linux:** install `bubblewrap` and ensure unprivileged user namespaces are enabled if you want OS sandbox without manual confirmation.
+
+## Local extension sideload (`.zip` / `.qext`)
+
+Installing from a local file does **not** verify integrity unless you paste an optional **SHA-256 checksum** in the install dialog. Marketplace installs always require a manifest checksum (#396). Sideload is intended for trusted local packages and development builds.
