@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 
@@ -27,7 +28,7 @@ class ThemeRemoteInstallService {
     this._registry, {
     Future<RemoteThemeHttpResponse> Function(Uri uri)? httpGet,
     Duration timeout = const Duration(seconds: 30),
-    bool allowLocalhostInDebug = true,
+    bool allowLocalhostInDebug = kDebugMode,
   })  : _httpGet = httpGet ?? _defaultHttpGet,
         _timeout = timeout,
         _allowLocalhostInDebug = allowLocalhostInDebug;
