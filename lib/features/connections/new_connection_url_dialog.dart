@@ -52,8 +52,8 @@ class _NewConnectionUrlDialogContentState
     return material.Container(
       constraints: WindowLayout.dialogConstraints(
         context,
-        maxWidth: 500,
-        minWidth: 380,
+        maxWidth: 580,
+        minWidth: 420,
       ),
       decoration: material.BoxDecoration(
         color: theme.popover,

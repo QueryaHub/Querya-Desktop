@@ -305,8 +305,8 @@ class _MongoConnectionFormContentState
     return material.Container(
       constraints: WindowLayout.dialogConstraints(
         context,
-        maxWidth: 600,
-        maxHeight: 700,
+        maxWidth: WindowLayout.connectionFormMaxWidth,
+        maxHeight: WindowLayout.connectionFormMongoMaxHeight,
       ),
       decoration: material.BoxDecoration(
         color: theme.popover,

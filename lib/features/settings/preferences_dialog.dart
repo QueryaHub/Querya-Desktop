@@ -105,9 +105,9 @@ class _PreferencesDialogContentState
         child: material.Container(
           constraints: WindowLayout.dialogConstraints(
             context,
-            maxWidth: 480,
-            minWidth: 360,
-            maxHeight: 640,
+            maxWidth: WindowLayout.preferencesDialogMaxWidth,
+            minWidth: WindowLayout.preferencesDialogMinWidth,
+            maxHeight: WindowLayout.preferencesDialogMaxHeight,
           ),
           decoration: material.BoxDecoration(
             color: theme.popover,
