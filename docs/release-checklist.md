@@ -1,9 +1,23 @@
-# Pre-release checklist (release **0.4.4**)
+# Pre-release checklist (release **0.4.11**)
 
-Use this before tagging **`0.4.4`** or running the **Release** workflow.
-See [tags-and-releases.md](tags-and-releases.md) and [CHANGELOG.md](../CHANGELOG.md).
+Use this before tagging **`0.4.11`** or running the **Release** workflow.
+See [tags-and-releases.md](tags-and-releases.md), [CHANGELOG.md](../CHANGELOG.md), and epic [#341](https://github.com/QueryaHub/Querya-Desktop/issues/341).  
+Detailed QA track: issue [#344](https://github.com/QueryaHub/Querya-Desktop/issues/344).
 
-## Product smoke (manual)
+## Product smoke (manual) — 0.4.11
+
+- [ ] Fresh profile / empty state: create one connection per supported type (PostgreSQL, MySQL, Redis, MongoDB, SQLite).
+- [ ] Reopen the app: connections still appear; **connect** succeeds (secrets migrated or loaded from secure store).
+- [ ] Remove a connection: it disappears and reconnect is impossible without re-entering credentials.
+- [ ] **Connection → New Database Connection** from the menu saves and shows in the tree.
+- [ ] **Driver Manager** lists built-in drivers + installed sandboxed drivers (no misleading JDBC requirement).
+- [ ] **Empty workspace hero** — quick-start actions + recent connections; connect morphs into workspace without hard-cut jank.
+- [ ] **Export** — CSV / JSON / Markdown / SQL dump from ResultsTab on a small result set.
+- [ ] **Extension table view** — open a sandboxed driver table (or fixture); toolbar filter + export present.
+- [ ] **Updater** — Check for Updates / badge sees Latest Release channel correctly after tag.
+- [ ] **Fluid shell** — tab strip sliding pill; dialog/dropdown fade-slide; Motion Off snaps (see also [perf-baseline.md](perf-baseline.md) Fluid §).
+
+## Regression smoke (prior releases)
 
 - [ ] Fresh profile / empty state: create one connection per supported type (PostgreSQL, MySQL, Redis, MongoDB).
 - [ ] Reopen the app: connections still appear; **connect** succeeds (secrets migrated or loaded from secure store).
@@ -41,8 +55,8 @@ Verify the 0.4.4 motion tokens, smooth animations, and high refresh rate support
 - [ ] **Motion Reduced** — set to **Reduced**, check that animations are visibly faster (durations cut in half).
 - [ ] **Motion Off** — set to **Off**, check that animations complete instantly (0 ms).
 - [ ] **OS Reduced Motion** — enable reduced motion in OS settings. The app should automatically disable animations (acting as Off) regardless of in-app Full/Reduced settings (OS setting wins).
-- [ ] **Hz diagnostics** — start the app with `--dart-define=QUERYA_REFRESH_OVERLAY=true`. The overlay should display the correct target refresh rate of the monitor.
-- [ ] **High refresh rate smoothness** — verify dialog fade+scale, dropdown show, and tree expand/collapse look extremely smooth at high-Hz (90/120/144 Hz) without jank.
+- [ ] **Hz diagnostics** — start the app with `--dart-define=QUERYA_REFRESH_OVERLAY=true`. The overlay should display the monitor refresh rate (**Linux: query-only** — compositor decides Hz; see [motion-and-high-refresh.md](motion-and-high-refresh.md)).
+- [ ] **High refresh rate smoothness** — verify dialog fade-slide, dropdown show, and tree expand/collapse look smooth at high-Hz (90/120/144 Hz) without jank.
 
 ## Automated
 
@@ -52,14 +66,14 @@ Verify the 0.4.4 motion tokens, smooth animations, and high refresh rate support
 
 ## Versioning and release
 
-- [ ] `pubspec.yaml` on **`dev`** is **`0.4.1+7`** before merging to `main` (auto version-bump sets **`0.4.4+8`** on `main`).
-- [ ] After merge, confirm GitHub Action **Auto Version Bump** committed **`0.4.4+…`** on `main`.
-- [ ] **Tag** is placed on the **commit that includes all fixes** you want in binaries (a tag does not auto-include later commits; see [CONTRIBUTING.md](../CONTRIBUTING.md)).
+- [ ] `pubspec.yaml` on the release branch is **`0.4.11+N`** (currently **`0.4.11+1`** on `dev` after #346).
+- [ ] After merge to `main`, confirm any **Auto Version Bump** still yields a **0.4.11+…** product version (do not ship as 0.4.12).
+- [ ] **Tag** `0.4.11` is placed on the **commit that includes all fixes** you want in binaries (a tag does not auto-include later commits; see [CONTRIBUTING.md](../CONTRIBUTING.md)).
 - [ ] Run the **Release** workflow from GitHub Actions (see [tags-and-releases.md](tags-and-releases.md)).
 - [ ] Verify **Linux** and **Windows** zip artifacts and `SHA256SUMS.txt` on the GitHub Release.
 
 ## Docs
 
-- [ ] [CHANGELOG.md](../CHANGELOG.md) has a **`## [X.Y.Z]`** section for the release version (CI copies it into the GitHub Release body).
+- [ ] [CHANGELOG.md](../CHANGELOG.md) has a dated **`## [0.4.11]`** section for the release (CI copies it into the GitHub Release body).
 - [ ] [security.md](security.md) still matches behavior if storage changed.
-- [ ] [roadmap.md](roadmap.md) updated if you are communicating upcoming themes externally.
+- [ ] [roadmap.md](roadmap.md) marks 0.4.7–0.4.10 shipped and 0.4.11 as the packaging/next release.
