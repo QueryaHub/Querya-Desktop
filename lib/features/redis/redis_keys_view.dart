@@ -105,7 +105,7 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
       _keys.addAll(infos);
       _cursor = nextCursor;
       _hasMore = nextCursor != 0;
-      if (typeTtlError != null) _error = typeTtlError;
+      _error = typeTtlError;
     });
   }
 
