@@ -62,6 +62,7 @@ class PluginRpcBridge {
     String? extensionRoot,
     Map<String, String>? environment,
     Map<String, Object?>? handshakeParams,
+    bool allowUnsandboxedLaunch = false,
   }) async {
     if (_started) {
       throw StateError('PluginRpcBridge already started');
@@ -77,6 +78,7 @@ class PluginRpcBridge {
       extensionRoot: extensionRoot ?? manifest.installPath,
       capabilities: capabilities,
       environment: environment,
+      allowUnsandboxedLaunch: allowUnsandboxedLaunch,
     );
 
     _handle = handle;

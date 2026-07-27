@@ -13,6 +13,8 @@ import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:querya_desktop/core/extensions/sandbox/unsandboxed_launch_consent_gate.dart';
+import 'package:querya_desktop/features/extensions/presentation/widgets/unsandboxed_driver_consent_dialog.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
 import 'package:querya_desktop/features/connections/new_connection_url_dialog.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
@@ -40,7 +42,17 @@ class _MainScreenState extends State<MainScreen> {
       ValueNotifier(MainScreenWorkspaceState.empty);
 
   @override
+  void initState() {
+    super.initState();
+    UnsandboxedLaunchConsentGate.instance.handler = (details) {
+      if (!mounted) return Future.value(false);
+      return showUnsandboxedDriverConsentDialog(context, details);
+    };
+  }
+
+  @override
   void dispose() {
+    UnsandboxedLaunchConsentGate.instance.handler = null;
     _workspace.dispose();
     super.dispose();
   }

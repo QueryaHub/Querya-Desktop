@@ -11,6 +11,8 @@ import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/extensions/models/extension_object_metadata.dart';
 import 'package:querya_desktop/core/extensions/models/extension_server_stats.dart';
 import 'package:querya_desktop/core/extensions/rpc/plugin_rpc_bridge.dart';
+import 'package:querya_desktop/core/extensions/sandbox/sandbox_os_isolation.dart';
+import 'package:querya_desktop/core/extensions/sandbox/unsandboxed_launch_consent_gate.dart';
 import 'package:querya_desktop/core/sdui/sdui_tree_schema.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -124,16 +126,50 @@ class ExtensionDriverSession {
     }
 
     final bridge = bridgeFactory?.call() ?? PluginRpcBridge();
-    await bridge.start(
+    await _startBridgeWithConsent(
+      bridge: bridge,
       manifest: manifest,
       pluginExecutable: executable,
       extensionRoot: root,
-      handshakeParams: {
-        'queryaVersion': '2.0.0',
-        'pluginId': manifest.id,
-      },
     );
     return bridge;
+  }
+
+  Future<void> _startBridgeWithConsent({
+    required PluginRpcBridge bridge,
+    required ExtensionManifest manifest,
+    required String pluginExecutable,
+    required String extensionRoot,
+  }) async {
+    const handshakeParams = {
+      'queryaVersion': '2.0.0',
+    };
+
+    try {
+      await bridge.start(
+        manifest: manifest,
+        pluginExecutable: pluginExecutable,
+        extensionRoot: extensionRoot,
+        handshakeParams: {
+          ...handshakeParams,
+          'pluginId': manifest.id,
+        },
+      );
+    } on SandboxOsIsolationUnavailableException catch (error) {
+      final approved =
+          await UnsandboxedLaunchConsentGate.instance.request(error);
+      if (!approved) throw error;
+      await bridge.start(
+        manifest: manifest,
+        pluginExecutable: pluginExecutable,
+        extensionRoot: extensionRoot,
+        allowUnsandboxedLaunch: true,
+        handshakeParams: {
+          ...handshakeParams,
+          'pluginId': manifest.id,
+        },
+      );
+    }
   }
 
   Future<Object?> _injectAndConnect(
