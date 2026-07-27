@@ -19,7 +19,7 @@ Archive _singleFileArchive(String name, List<int> content) {
 }
 
 Future<File> _writeZip(Directory dir, Archive archive, String name) async {
-  final bytes = ZipEncoder().encode(archive)!;
+  final bytes = ZipEncoder().encode(archive);
   final file = File(p.join(dir.path, name));
   await file.writeAsBytes(bytes);
   return file;
@@ -41,7 +41,7 @@ void main() {
 
     test('decodes a small valid archive', () {
       final archive = _singleFileArchive('hello.txt', utf8.encode('hello'));
-      final zipBytes = ZipEncoder().encode(archive)!;
+      final zipBytes = ZipEncoder().encode(archive);
 
       final decoded = SafeZipExtractor.decodeBytes(zipBytes, limits: _tightLimits);
       expect(decoded.length, 1);
@@ -67,7 +67,7 @@ void main() {
       for (var i = 0; i < 6; i++) {
         archive.addFile(ArchiveFile('file$i.txt', 1, [i]));
       }
-      final zipBytes = ZipEncoder().encode(archive)!;
+      final zipBytes = ZipEncoder().encode(archive);
 
       expect(
         () => SafeZipExtractor.decodeBytes(zipBytes, limits: _tightLimits),
@@ -90,7 +90,7 @@ void main() {
       final archive = Archive()
         ..addFile(ArchiveFile('a.bin', 4000, List<int>.filled(4000, 1)))
         ..addFile(ArchiveFile('b.bin', 4000, List<int>.filled(4000, 2)));
-      final zipBytes = ZipEncoder().encode(archive)!;
+      final zipBytes = ZipEncoder().encode(archive);
 
       expect(
         () => SafeZipExtractor.decodeBytes(zipBytes, limits: limits),
@@ -112,7 +112,7 @@ void main() {
       );
       final payload = List<int>.filled(5000, 0);
       final archive = _singleFileArchive('bomb.bin', payload);
-      final zipBytes = ZipEncoder().encode(archive)!;
+      final zipBytes = ZipEncoder().encode(archive);
 
       expect(
         () => SafeZipExtractor.decodeBytes(zipBytes, limits: limits),
