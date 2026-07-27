@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/motion/querya_switching_body.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/main_screen/workspace_panel.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import '../../support/layout_overflow.dart';
 import '../../support/querya_theme_test_shell.dart';
@@ -76,7 +75,7 @@ void main() {
         ),
       );
 
-      expect(find.byKey(const Key('workspace_run_button')), findsNothing);
+      expect(find.byKey(const material.Key('workspace_run_button')), findsNothing);
       expect(find.text('Execute/Refresh (F5)'), findsNothing);
     });
 
@@ -94,7 +93,7 @@ void main() {
         ),
       );
 
-      expect(find.byKey(const Key('workspace_run_button')), findsNothing);
+      expect(find.byKey(const material.Key('workspace_run_button')), findsNothing);
       expect(find.text('Query History'), findsNothing);
       expect(find.textContaining('Coming in a future release'), findsNothing);
     });
@@ -139,48 +138,6 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.byType(QueryaSwitchingBody), findsOneWidget);
-    });
-
-    testWidgets('Execute button hidden when no active connection', (tester) async {
-      await pumpWidgetWithSurfaceSize(
-        tester,
-        const material.Size(800, 600),
-        queryaThemeTestShell(
-          child: const material.SizedBox.expand(
-            child: WorkspacePanel(),
-          ),
-        ),
-      );
-
-      expect(find.byKey(const Key('workspace_run_button')), findsNothing);
-      expect(find.text('Execute/Refresh (F5)'), findsNothing);
-    });
-
-    testWidgets('Execute button is disabled when execute is unavailable',
-        (tester) async {
-      await pumpWidgetWithSurfaceSize(
-        tester,
-        const material.Size(800, 600),
-        queryaThemeTestShell(
-          child: const material.SizedBox.expand(
-            child: WorkspacePanel(
-              activeConnection: stubSplitWorkspaceConnection,
-            ),
-          ),
-        ),
-      );
-
-      final buttonFinder = find.byKey(const Key('workspace_run_button'));
-      expect(buttonFinder, findsOneWidget);
-      final button = tester.widget<OutlineButton>(buttonFinder);
-      expect(button.onPressed, isNull);
-      expect(
-        find.text(
-          'Select an active database connection to execute queries',
-        ),
-        findsNothing,
-      );
-      expect(find.byType(material.Tooltip), findsWidgets);
     });
   });
 }
