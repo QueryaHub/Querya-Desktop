@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:querya_desktop/core/storage/app_data_root.dart';
 
 import 'local_db.dart';
 
@@ -38,7 +38,7 @@ class FoldersStorage {
     if (_migrationChecked) return;
     _migrationChecked = true;
     try {
-      final dir = await getApplicationSupportDirectory();
+      final dir = await AppDataRoot.applicationSupportDirectory();
       final sub = Directory('${dir.path}/querya_desktop');
       final file = File('${sub.path}/$_legacyFileName');
       if (!await file.exists()) return;

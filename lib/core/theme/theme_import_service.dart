@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+import 'package:querya_desktop/core/storage/app_data_root.dart';
 
 import 'parser/vscode_theme_manifest.dart';
 import 'theme_definition.dart';
@@ -88,7 +88,7 @@ abstract final class ThemeImportService {
   }
 
   static Future<File> _storedThemeFile() async {
-    final support = await getApplicationSupportDirectory();
+    final support = await AppDataRoot.applicationSupportDirectory();
     return File(p.join(support.path, 'themes', storedFileName));
   }
 }

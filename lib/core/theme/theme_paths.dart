@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+import 'package:querya_desktop/core/storage/app_data_root.dart';
 
 /// Centralizes theme file locations under app support and legacy paths.
 abstract final class ThemePaths {
@@ -10,7 +10,7 @@ abstract final class ThemePaths {
 
   /// App support `themes/` directory. Does not create the directory.
   static Future<Directory> userThemesDirectory() async {
-    final support = await getApplicationSupportDirectory();
+    final support = await AppDataRoot.applicationSupportDirectory();
     return Directory(p.join(support.path, _themesSegment));
   }
 
