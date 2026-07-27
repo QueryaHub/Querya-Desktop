@@ -11,6 +11,7 @@ import 'package:querya_desktop/core/extensions/sandbox/sandbox_policy.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/extensions/models/extension_type.dart';
+import 'package:querya_desktop/core/security/archive_path_guard.dart';
 import 'marketplace_repository.dart';
 
 /// HTTP implementation of [MarketplaceRepository] connecting to MarketApi backend.
@@ -152,12 +153,12 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
       for (final file in archive) {
         final filename = file.name;
         // Check for Path Traversal attempts
-        if (filename.contains('..') || filename.startsWith('/') || filename.startsWith('\\')) {
+        if (!isArchiveEntryNameSafe(filename)) {
           throw MarketplaceException('Security violation: Path traversal detected in archive entry "$filename"');
         }
 
         final targetPath = p.normalize(p.join(extDirPath, filename));
-        if (!targetPath.startsWith(extDirPath)) {
+        if (!isArchiveExtractPathWithinRoot(extDirPath, targetPath)) {
           throw MarketplaceException('Security violation: Extraction path out of bounds "$filename"');
         }
 
