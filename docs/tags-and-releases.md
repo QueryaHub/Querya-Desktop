@@ -22,8 +22,19 @@
 
 ## Что внутри релиза
 
-- Имена архивов: `Querya-Desktop-X.Y.Z-linux.zip`, `Querya-Desktop-X.Y.Z-windows.zip`, `Querya-Desktop-X.Y.Z-macos.zip` (внутри неподписанный `.app`).
-- Версия для имён и тега — **semver из pubspec**; build `+N` попадает в текст релиза как **полный pubspec version**.
+### Portable
+
+- `Querya-Desktop-X.Y.Z-linux.zip`, `…-windows.zip`, `…-macos.zip` (Flutter bundles / `.app`)
+
+### Installable (Linux)
+
+- `Querya-Desktop-X.Y.Z-linux.AppImage` — built by [`scripts/linux/build_appimage.sh`](../scripts/linux/build_appimage.sh) in Release CI (`chmod +x` then run)
+
+Also attached: `SHA256SUMS.txt` (all artifacts).
+
+Версия для имён и тега — **semver из pubspec**; build `+N` попадает в текст релиза как **полный pubspec version**.
+
+Другие installable форматы (Windows setup, deb/rpm/Flatpak): epic [#379](https://github.com/QueryaHub/Querya-Desktop/issues/379).
 
 ## Changelog в GitHub Release
 
