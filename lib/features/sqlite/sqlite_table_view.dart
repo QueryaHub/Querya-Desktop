@@ -194,6 +194,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
   Future<void> _showDdlDialog() async {
     final conn = _connection;
     if (conn == null || !conn.isConnected) return;
+    final navigator = material.Navigator.of(context, rootNavigator: true);
     unawaited(showAppDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -203,8 +204,8 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     ));
     try {
       final ddl = await conn.getObjectDdl(widget.tableName);
+      if (navigator.canPop()) navigator.pop();
       if (!mounted) return;
-      material.Navigator.of(context).pop();
       await showAppDialog<void>(
         context: context,
         builder: (ctx) => material.AlertDialog(
@@ -230,8 +231,8 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
         ),
       );
     } catch (e) {
+      if (navigator.canPop()) navigator.pop();
       if (!mounted) return;
-      material.Navigator.of(context).pop();
       showAppToast(
         context: context,
         message: 'Failed to fetch DDL: $e',
