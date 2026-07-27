@@ -75,6 +75,12 @@ class ThemeRemoteInstallService {
     final expectedChecksum = _normalizeSha256(
       sha256Checksum ?? uri.queryParameters['sha256'],
     );
+    if (expectedChecksum == null) {
+      return const ThemeDefinitionImportFailure(
+        'SHA256 checksum is required for remote theme install. '
+        'Add ?sha256= to the URL or pass sha256Checksum.',
+      );
+    }
 
     File? tempFile;
     try {
@@ -92,7 +98,7 @@ class ThemeRemoteInstallService {
       }
 
       final actualChecksum = sha256.convert(utf8.encode(body)).toString();
-      if (expectedChecksum != null && expectedChecksum != actualChecksum) {
+      if (expectedChecksum != actualChecksum) {
         return const ThemeDefinitionImportFailure(
           'Checksum mismatch. Theme was not installed.',
         );

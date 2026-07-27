@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
@@ -25,6 +27,8 @@ Future<String> _fixtureAssetLoader(String assetPath) async {
   final fileName = p.basename(assetPath);
   return File(p.join('test/fixtures/themes', fileName)).readAsString();
 }
+
+String _sha256Hex(String body) => sha256.convert(utf8.encode(body)).toString();
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -100,6 +104,7 @@ void main() {
 
       final result = await service.installFromUrl(
         'https://cdn.example.com/themes/querya_custom_dark.json',
+        sha256Checksum: _sha256Hex(raw),
       );
 
       expect(result, isA<ThemeDefinitionImportSuccess>());
@@ -136,18 +141,37 @@ void main() {
       expect(await ExtensionPaths.mockExtensionsDirectory!.list().length, 0);
     });
 
+    test('rejects install when SHA256 checksum is missing', () async {
+      final service = ThemeRemoteInstallService(
+        registry,
+        allowLocalhostInDebug: false,
+      );
+
+      final result = await service.installFromUrl(
+        'https://cdn.example.com/themes/querya_custom_dark.json',
+      );
+
+      expect(result, isA<ThemeDefinitionImportFailure>());
+      expect(
+        (result as ThemeDefinitionImportFailure).message,
+        contains('SHA256 checksum is required'),
+      );
+    });
+
     test('rejects invalid JSON without writing to themes folder', () async {
+      const brokenBody = '{ not valid json';
       final service = ThemeRemoteInstallService(
         registry,
         allowLocalhostInDebug: false,
         httpGet: (_) async => const RemoteThemeHttpResponse(
           statusCode: 200,
-          body: '{ not valid json',
+          body: brokenBody,
         ),
       );
 
       final result = await service.installFromUrl(
         'https://cdn.example.com/themes/broken.json',
+        sha256Checksum: _sha256Hex(brokenBody),
       );
 
       expect(result, isA<ThemeDefinitionImportFailure>());
@@ -219,6 +243,7 @@ void main() {
 
       final result = await service.installFromUrl(
         'https://cdn.example.com/themes/querya_custom_dark.json',
+        sha256Checksum: _sha256Hex(raw),
       );
 
       expect(result, isA<ThemeDefinitionImportSuccess>());
@@ -235,6 +260,7 @@ void main() {
 
       final result = await controller.importRegistryThemeFromUrl(
         'https://cdn.example.com/themes/querya_custom_dark.json',
+        sha256Checksum: _sha256Hex(raw),
         remoteInstallService: ThemeRemoteInstallService(
           registry,
           allowLocalhostInDebug: false,

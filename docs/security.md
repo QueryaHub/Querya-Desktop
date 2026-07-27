@@ -21,3 +21,7 @@ On upgrade from older databases, existing plaintext secrets in SQLite are **migr
 ## Tests
 
 Automated tests use an **in-memory** secrets backend (see `test/flutter_test_config.dart`) so CI does not require a desktop keyring.
+
+## Remote theme install integrity
+
+`ThemeRemoteInstallService` requires a **SHA256 checksum** for every remote theme URL install. Pass `sha256Checksum` to the API or append `?sha256=` to the theme URL. Installs without a checksum fail closed before download. This matches the marketplace extension install policy (#396).
