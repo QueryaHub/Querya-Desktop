@@ -73,6 +73,25 @@ void main() {
   });
 
   group('ThemeRegistryService cache', () {
+    test('skips theme file read when mtime unchanged on refresh', () async {
+      await _copyFixture(
+        'querya_custom_dark.json',
+        File(p.join(themesDir.path, 'querya_custom_dark.json')),
+      );
+
+      final first = await registry.loadThemeDefinitions();
+      expect(first, hasLength(1));
+      final readsAfterCold = registry.themeFileReadCount;
+      expect(readsAfterCold, greaterThan(0));
+
+      final second = await registry.loadThemeDefinitions(
+        reloadExtensions: false,
+      );
+      expect(second, hasLength(1));
+      expect(second.single.id, first.single.id);
+      expect(registry.themeFileReadCount, readsAfterCold);
+    });
+
     test('loads same definition twice with a single parse', () async {
       await _copyFixture(
         'querya_custom_dark.json',

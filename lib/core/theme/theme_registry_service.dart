@@ -48,19 +48,31 @@ class ThemeRegistryService {
   final List<String> _bundledThemeAssetFiles;
   final _ThemeLruCache _themeCache;
   int _themeParseCount = 0;
+  int _themeFileReadCount = 0;
   bool _hasMigratedThemes = false;
+  final Map<String, ThemeDefinition> _definitionScanCache = {};
+  List<ThemeDefinition>? _cachedBuiltinDefinitions;
 
   /// Number of cache misses that performed a full theme parse.
   @visibleForTesting
   int get themeParseCount => _themeParseCount;
 
+  /// Number of theme files read from disk during definition scans.
+  @visibleForTesting
+  int get themeFileReadCount => _themeFileReadCount;
+
   /// Clears parsed theme cache and parse counter.
   void clearCache() {
     _themeCache.clear();
     _themeParseCount = 0;
+    _themeFileReadCount = 0;
+    _definitionScanCache.clear();
+    _cachedBuiltinDefinitions = null;
   }
 
-  Future<List<ThemeDefinition>> loadThemeDefinitions() async {
+  Future<List<ThemeDefinition>> loadThemeDefinitions({
+    bool reloadExtensions = true,
+  }) async {
     final definitions = <ThemeDefinition>[];
 
     await _loadBuiltinAssetDefinitions(definitions);
@@ -68,9 +80,13 @@ class ThemeRegistryService {
     if (!_hasMigratedThemes) {
       await _migrateLegacyThemesToExtensions();
       _hasMigratedThemes = true;
+    } else if (reloadExtensions) {
+      await LocalExtensionRegistry.instance.reload();
+    } else {
+      await LocalExtensionRegistry.instance.load();
     }
 
-    await LocalExtensionRegistry.instance.reload();
+    final seenPaths = <String>{};
     for (final manifest in LocalExtensionRegistry.instance.manifests) {
       if (manifest.type != ExtensionType.theme) continue;
       final installPath = manifest.installPath;
@@ -84,9 +100,16 @@ class ThemeRegistryService {
           ? ThemeSource.imported
           : ThemeSource.filesystem;
 
-      final definition = await _definitionFromFile(file, source, extensionId: manifest.id);
+      final definition = await _definitionFromFile(
+        file,
+        source,
+        extensionId: manifest.id,
+      );
       if (definition != null) {
         definitions.add(definition);
+        if (definition.path != null) {
+          seenPaths.add(definition.path!);
+        }
       }
     }
 
@@ -98,7 +121,14 @@ class ThemeRegistryService {
             definition.source != ThemeSource.legacyImported,
       );
       definitions.add(legacy);
+      if (legacy.path != null) {
+        seenPaths.add(legacy.path!);
+      }
     }
+
+    _definitionScanCache.removeWhere(
+      (path, _) => !_isAssetPath(path) && !seenPaths.contains(path),
+    );
 
     definitions.sort(
       (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
@@ -492,6 +522,12 @@ class ThemeRegistryService {
   }
 
   Future<void> _loadBuiltinAssetDefinitions(List<ThemeDefinition> out) async {
+    if (_cachedBuiltinDefinitions != null) {
+      out.addAll(_cachedBuiltinDefinitions!);
+      return;
+    }
+
+    final builtins = <ThemeDefinition>[];
     for (final fileName in _bundledThemeAssetFiles) {
       final assetPath = BuiltinThemeAssets.assetPath(fileName);
       try {
@@ -511,12 +547,15 @@ class ThemeRegistryService {
           contentHash: hash,
         );
         if (definition != null) {
-          out.add(definition);
+          builtins.add(definition);
+          _definitionScanCache[assetPath] = definition;
         }
       } on Object catch (e) {
         _logScanError(assetPath, e);
       }
     }
+    _cachedBuiltinDefinitions = List.unmodifiable(builtins);
+    out.addAll(_cachedBuiltinDefinitions!);
   }
 
   Future<String?> _readThemeRaw(ThemeDefinition definition) async {
@@ -547,28 +586,25 @@ class ThemeRegistryService {
   }) async {
     try {
       final stat = await file.stat();
+      final cached = _definitionScanCache[file.path];
+      if (cached != null &&
+          cached.lastModified != null &&
+          cached.lastModified == stat.modified &&
+          (extensionId == null || cached.id == extensionId)) {
+        return cached;
+      }
+
+      _themeFileReadCount++;
       final raw = await file.readAsString();
       final hash = _contentHash(raw);
       final json = _decodeRoot(raw);
       if (json == null) {
         _logScanError(file.path, 'Invalid JSON');
+        _definitionScanCache.remove(file.path);
         return null;
       }
 
-      final schema = json['schema']?.toString();
-      if (schema == queryaThemeSchemaV1) {
-        return _definitionFromRaw(
-          json: json,
-          path: file.path,
-          fileBaseName: p.basenameWithoutExtension(file.path),
-          source: source,
-          contentHash: hash,
-          lastModified: stat.modified,
-          extensionId: extensionId,
-        );
-      }
-
-      return _definitionFromRaw(
+      final definition = _definitionFromRaw(
         json: json,
         path: file.path,
         fileBaseName: p.basenameWithoutExtension(file.path),
@@ -577,6 +613,12 @@ class ThemeRegistryService {
         lastModified: stat.modified,
         extensionId: extensionId,
       );
+      if (definition != null) {
+        _definitionScanCache[file.path] = definition;
+      } else {
+        _definitionScanCache.remove(file.path);
+      }
+      return definition;
     } on Object catch (e) {
       _logScanError(file.path, e);
       return null;

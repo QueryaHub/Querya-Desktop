@@ -227,7 +227,8 @@ class ThemeController extends ChangeNotifier {
     }
     _themeFolderWatcher ??= ThemeFolderWatcher(
       themesDirectory: ExtensionPaths.extensionsDirectory,
-      onThemesChanged: loadAvailableThemes,
+      onThemesChanged: ({required bool structuralChange}) =>
+          loadAvailableThemes(reloadExtensions: structuralChange),
     );
     await _themeFolderWatcher!.start();
   }
@@ -296,14 +297,16 @@ class ThemeController extends ChangeNotifier {
     _notifyThemeChanged();
   }
 
-  Future<void> loadAvailableThemes() async {
+  Future<void> loadAvailableThemes({bool reloadExtensions = true}) async {
     if (_isLoadingAvailableThemes) return;
 
     _isLoadingAvailableThemes = true;
     notifyListeners();
 
     try {
-      final scanned = await _registryService.loadThemeDefinitions();
+      final scanned = await _registryService.loadThemeDefinitions(
+        reloadExtensions: reloadExtensions,
+      );
       _availableThemes = _mergeBuiltinThemes(scanned);
       _syncSelectedThemeAfterRefresh();
     } on Object {
