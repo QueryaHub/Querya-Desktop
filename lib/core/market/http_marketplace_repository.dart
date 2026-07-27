@@ -125,21 +125,26 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
 
     try {
       // Step 2: SHA-256 Integrity Verification (Critical Security Check)
-      if (manifest.sha256Checksum != null && manifest.sha256Checksum!.trim().isNotEmpty) {
-        final bytes = await archiveFile.readAsBytes();
-        final actualSha256 = sha256.convert(bytes).toString().toLowerCase();
-        final expectedSha256 = manifest.sha256Checksum!.trim().toLowerCase();
-        if (actualSha256 != expectedSha256) {
-          throw MarketplaceException(
-            'SHA256 checksum mismatch for "${manifest.id}". Expected: $expectedSha256, Actual: $actualSha256. Installation aborted.',
-          );
-        }
+      final expectedSha256 = manifest.sha256Checksum?.trim().toLowerCase();
+      if (expectedSha256 == null || expectedSha256.isEmpty) {
+        throw MarketplaceException(
+          'Extension manifest is missing SHA256 checksum for "${manifest.id}". '
+          'Installation aborted.',
+        );
+      }
+
+      final bytes = await archiveFile.readAsBytes();
+      final actualSha256 = sha256.convert(bytes).toString().toLowerCase();
+      if (actualSha256 != expectedSha256) {
+        throw MarketplaceException(
+          'SHA256 checksum mismatch for "${manifest.id}". '
+          'Expected: $expectedSha256, Actual: $actualSha256. Installation aborted.',
+        );
       }
 
       onProgress?.call(0.85);
 
       // Step 3: Safe Archive Extraction (Preventing Path Traversal / Zip Bomb - Issue #242)
-      final bytes = await archiveFile.readAsBytes();
       final archive = ZipDecoder().decodeBytes(bytes);
 
       final dir = await ExtensionPaths.extensionsDirectory();
