@@ -135,15 +135,20 @@ jobs:
       - name: Build Linux (release)
         run: flutter build linux --release
 
-      - name: Zip Linux artifact
+      - name: Zip Linux artifact (portable)
         run: |
           cd build/linux/x64/release/bundle
           zip -r "${GITHUB_WORKSPACE}/Querya-Desktop-${{ steps.version.outputs.version }}-linux.zip" .
 
+      - name: Build Linux AppImage (installable)
+        run: ./scripts/linux/build_appimage.sh
+
       - uses: actions/upload-artifact@v4
         with:
           name: bundle-linux
-          path: Querya-Desktop-${{ steps.version.outputs.version }}-linux.zip
+          path: |
+            Querya-Desktop-${{ steps.version.outputs.version }}-linux.zip
+            Querya-Desktop-${{ steps.version.outputs.version }}-linux.AppImage
           if-no-files-found: error
 
   build-macos:
@@ -260,6 +265,7 @@ jobs:
           find artifacts \( -name '*.zip' -o -name '*.AppImage' -o -name '*-windows-setup.exe' \) \
             -exec mv -t dist/ {} +
           test "$(find dist -name '*.zip' | wc -l)" -eq 3
+          test "$(find dist -name '*.AppImage' | wc -l)" -eq 1
           test "$(find dist -name '*-windows-setup.exe' | wc -l)" -eq 1
           cd dist
           sha256sum *.* | tee SHA256SUMS.txt
@@ -283,10 +289,8 @@ jobs:
             echo "Optional USB-style profile: set \`QUERYA_PORTABLE=1\` or create a \`QueryaData/\` folder next to the binary (see docs/packaging.md)."
             echo ""
             echo "#### Installable"
+            echo "- **Linux AppImage**: \`Querya-Desktop-${VERSION}-linux.AppImage\` (\`chmod +x\` then run)"
             echo "- **Windows setup**: \`Querya-Desktop-${VERSION}-windows-setup.exe\` (Inno Setup)"
-            if [[ -f "dist/Querya-Desktop-${VERSION}-linux.AppImage" ]]; then
-              echo "- **Linux AppImage**: \`Querya-Desktop-${VERSION}-linux.AppImage\`"
-            fi
             echo ""
             echo "Verify checksums: \`SHA256SUMS.txt\`"
             echo ""
@@ -310,7 +314,6 @@ jobs:
           tag_name: ${{ steps.rel.outputs.tag }}
           name: Querya Desktop ${{ needs.build-windows.outputs.version }}
           body_path: release-notes.md
-          # AppImage may be absent until the Linux AppImage job lands (#382).
           fail_on_unmatched_files: false
           files: |
             dist/*.zip
