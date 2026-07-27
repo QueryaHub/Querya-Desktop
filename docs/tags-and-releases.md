@@ -22,19 +22,28 @@
 
 ## Что внутри релиза
 
-### Portable
+### Portable channel (сегодня)
 
-- `Querya-Desktop-X.Y.Z-linux.zip`, `…-windows.zip`, `…-macos.zip` (Flutter bundles / `.app`)
+Эти zip — **portable / relocatable bundles** (запуск из папки без установщика). Имена **не** меняем на `*-portable.zip`, чтобы не ломать in-app updater (`*-{linux,windows,macos}.zip`).
 
-### Installable (Linux)
+| Artifact | Contents |
+|----------|----------|
+| `Querya-Desktop-X.Y.Z-linux.zip` | Flutter linux `bundle/` (`querya_desktop`, `lib/`, `data/`) |
+| `Querya-Desktop-X.Y.Z-windows.zip` | `querya_desktop.exe` + DLLs/data |
+| `Querya-Desktop-X.Y.Z-macos.zip` | `querya_desktop.app` (signed/notarized when secrets are set) |
+| `SHA256SUMS.txt` | Checksums of **all** files attached to the Release |
 
-- `Querya-Desktop-X.Y.Z-linux.AppImage` — built by [`scripts/linux/build_appimage.sh`](../scripts/linux/build_appimage.sh) in Release CI (`chmod +x` then run)
+Версия в именах — **semver из pubspec**; build `+N` попадает в текст релиза как **полный pubspec version**.
 
-Also attached: `SHA256SUMS.txt` (all artifacts).
+Профиль по умолчанию всё равно в OS app-support; USB-style data → [packaging.md](packaging.md) (`QUERYA_PORTABLE` / `QueryaData/`).
 
-Версия для имён и тега — **semver из pubspec**; build `+N` попадает в текст релиза как **полный pubspec version**.
+### Installable channel
 
-Другие installable форматы (Windows setup, deb/rpm/Flatpak): epic [#379](https://github.com/QueryaHub/Querya-Desktop/issues/379).
+| Artifact | Notes |
+|----------|--------|
+| `Querya-Desktop-X.Y.Z-linux.AppImage` | [`scripts/linux/build_appimage.sh`](../scripts/linux/build_appimage.sh) (`chmod +x` then run) |
+
+Windows setup / deb / rpm / Flatpak — epic [#379](https://github.com/QueryaHub/Querya-Desktop/issues/379).
 
 ## Changelog в GitHub Release
 
@@ -73,4 +82,5 @@ git-cliff --latest --strip header
 
 ## Платформы
 
-- **Поставка через CI:** Windows, Linux и macOS (см. `release.yml`); macOS-сборка **без** подписи и notarize — для установки может понадобиться «Открыть» через контекстное меню при первом запуске.
+- **Поставка через CI:** Windows, Linux и macOS (см. `release.yml`); macOS подписывается и notarize’ится, если настроены Apple secrets — иначе unsigned `.app` (может понадобиться «Открыть» через контекстное меню).
+- Каналы загрузки и portable data: [packaging.md](packaging.md).

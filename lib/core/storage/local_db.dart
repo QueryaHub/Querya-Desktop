@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+import 'package:querya_desktop/core/storage/app_data_root.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -44,7 +44,7 @@ class LocalDb {
     if (_db != null && _db!.isOpen) return _db!;
     await initFfi();
     if (_cachedDbPath == null) {
-      final dir = await getApplicationSupportDirectory();
+      final dir = await AppDataRoot.applicationSupportDirectory();
       final sub = Directory(p.join(dir.path, 'querya_desktop'));
       if (!await sub.exists()) await sub.create(recursive: true);
       _cachedDbPath = p.join(sub.path, _dbName);
