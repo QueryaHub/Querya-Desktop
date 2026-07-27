@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:querya_desktop/core/layout/ui_scale.dart';
@@ -11,6 +12,56 @@ abstract final class ResultGridMetrics {
   static const double maxColumnWidth = 280;
   static const int columnWidthSampleRows = 40;
   static const int tooltipMinLength = 48;
+
+  /// Extra columns built beyond the viewport to reduce scroll flicker.
+  static const int columnOverscan = 2;
+}
+
+/// Inclusive visible column window with spacer widths for off-screen columns.
+@immutable
+class ResultGridColumnWindow {
+  const ResultGridColumnWindow({
+    required this.first,
+    required this.last,
+    required this.leadingWidth,
+    required this.trailingWidth,
+  });
+
+  /// Empty window (no columns).
+  static const empty = ResultGridColumnWindow(
+    first: 0,
+    last: -1,
+    leadingWidth: 0,
+    trailingWidth: 0,
+  );
+
+  /// Inclusive first visible (or overscanned) column index.
+  final int first;
+
+  /// Inclusive last visible (or overscanned) column index.
+  final int last;
+
+  /// Width of columns strictly before [first] (left spacer).
+  final double leadingWidth;
+
+  /// Width of columns strictly after [last] (right spacer).
+  final double trailingWidth;
+
+  bool get isEmpty => last < first;
+
+  int get columnCount => isEmpty ? 0 : last - first + 1;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ResultGridColumnWindow &&
+          first == other.first &&
+          last == other.last &&
+          leadingWidth == other.leadingWidth &&
+          trailingWidth == other.trailingWidth;
+
+  @override
+  int get hashCode => Object.hash(first, last, leadingWidth, trailingWidth);
 }
 
 /// Computes fixed column widths from headers and a sample of [rows].
@@ -38,7 +89,68 @@ List<double> computeResultGridColumnWidths({
   return widths;
 }
 
-/// Virtualized read-only grid for SQL query results.
+/// Prefix sums: `offsets[i]` = sum of widths `[0, i)`.
+@visibleForTesting
+List<double> computeResultGridColumnOffsets(List<double> columnWidths) {
+  final offsets = List<double>.filled(columnWidths.length + 1, 0);
+  for (var i = 0; i < columnWidths.length; i++) {
+    offsets[i + 1] = offsets[i] + columnWidths[i];
+  }
+  return offsets;
+}
+
+/// Visible column range for a horizontal viewport (with overscan).
+@visibleForTesting
+ResultGridColumnWindow computeVisibleColumnWindow({
+  required List<double> columnWidths,
+  required List<double> columnOffsets,
+  required double scrollOffset,
+  required double viewportWidth,
+  int overscanColumns = ResultGridMetrics.columnOverscan,
+}) {
+  final n = columnWidths.length;
+  if (n == 0) return ResultGridColumnWindow.empty;
+  assert(columnOffsets.length == n + 1);
+
+  final total = columnOffsets[n];
+  if (viewportWidth <= 0) {
+    return ResultGridColumnWindow(
+      first: 0,
+      last: n - 1,
+      leadingWidth: 0,
+      trailingWidth: 0,
+    );
+  }
+
+  final start = scrollOffset.clamp(0.0, total);
+  final end = (scrollOffset + viewportWidth).clamp(0.0, total);
+
+  // First column with any pixel past [start].
+  var first = 0;
+  while (first < n && columnOffsets[first + 1] <= start) {
+    first++;
+  }
+  // Last column with any pixel before [end].
+  var last = n - 1;
+  while (last > 0 && columnOffsets[last] >= end) {
+    last--;
+  }
+  if (first > last) {
+    first = last.clamp(0, n - 1);
+  }
+
+  first = (first - overscanColumns).clamp(0, n - 1);
+  last = (last + overscanColumns).clamp(0, n - 1);
+
+  return ResultGridColumnWindow(
+    first: first,
+    last: last,
+    leadingWidth: columnOffsets[first],
+    trailingWidth: total - columnOffsets[last + 1],
+  );
+}
+
+/// Virtualized read-only grid for SQL query results (rows + columns).
 class VirtualResultGrid extends material.StatefulWidget {
   const VirtualResultGrid({
     super.key,
@@ -58,7 +170,15 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   final _verticalController = material.ScrollController();
 
   List<double> _columnWidths = const [];
+  List<double> _columnOffsets = const [0];
   bool _widthsNeedUpdate = true;
+  double _scrollOffset = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _horizontalController.addListener(_onHorizontalScroll);
+  }
 
   @override
   void didChangeDependencies() {
@@ -76,9 +196,17 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
 
   @override
   void dispose() {
+    _horizontalController.removeListener(_onHorizontalScroll);
     _horizontalController.dispose();
     _verticalController.dispose();
     super.dispose();
+  }
+
+  void _onHorizontalScroll() {
+    if (!_horizontalController.hasClients) return;
+    final offset = _horizontalController.offset;
+    if ((offset - _scrollOffset).abs() < 0.5) return;
+    setState(() => _scrollOffset = offset);
   }
 
   List<double> _computeColumnWidths() {
@@ -92,7 +220,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
 
   double get _tableWidth {
     if (_columnWidths.isEmpty) return 0;
-    return _columnWidths.reduce((a, b) => a + b);
+    return _columnOffsets[_columnWidths.length];
   }
 
   double _scaledRowHeight(material.BuildContext context) =>
@@ -101,14 +229,29 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   double _scaledHeaderHeight(material.BuildContext context) =>
       context.scaled(ResultGridMetrics.headerHeight);
 
+  ResultGridColumnWindow _columnWindow(
+    List<double> displayWidths,
+    double viewportWidth,
+  ) {
+    final offsets = identical(displayWidths, _columnWidths)
+        ? _columnOffsets
+        : computeResultGridColumnOffsets(displayWidths);
+    return computeVisibleColumnWindow(
+      columnWidths: displayWidths,
+      columnOffsets: offsets,
+      scrollOffset: _scrollOffset,
+      viewportWidth: viewportWidth,
+    );
+  }
+
   @override
   material.Widget build(material.BuildContext context) {
     if (_widthsNeedUpdate) {
       _columnWidths = _computeColumnWidths();
+      _columnOffsets = computeResultGridColumnOffsets(_columnWidths);
       _widthsNeedUpdate = false;
     }
     final cs = Theme.of(context).colorScheme;
-    final colCount = widget.columns.length;
     final rowHeight = _scaledRowHeight(context);
     final headerHeight = _scaledHeaderHeight(context);
 
@@ -116,6 +259,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
       child: material.LayoutBuilder(
         builder: (context, constraints) {
           final availableWidth = constraints.maxWidth;
+
           var displayWidths = _columnWidths;
           var tableWidth = _tableWidth;
           if (tableWidth < availableWidth && _columnWidths.isNotEmpty) {
@@ -128,6 +272,8 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
           } else {
             tableWidth = availableWidth;
           }
+
+          final window = _columnWindow(displayWidths, availableWidth);
 
           return material.Scrollbar(
             controller: _horizontalController,
@@ -144,6 +290,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
                     _HeaderRow(
                       columns: widget.columns,
                       columnWidths: displayWidths,
+                      window: window,
                       height: headerHeight,
                       colorScheme: cs,
                     ),
@@ -162,7 +309,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
                               key: ValueKey('result-row-$rowIndex'),
                               row: row,
                               columnWidths: displayWidths,
-                              columnCount: colCount,
+                              window: window,
                               height: rowHeight,
                               colorScheme: cs,
                               striped: !isEven,
@@ -186,12 +333,14 @@ class _HeaderRow extends material.StatelessWidget {
   const _HeaderRow({
     required this.columns,
     required this.columnWidths,
+    required this.window,
     required this.height,
     required this.colorScheme,
   });
 
   final List<String> columns;
   final List<double> columnWidths;
+  final ResultGridColumnWindow window;
   final double height;
   final ColorScheme colorScheme;
 
@@ -209,13 +358,17 @@ class _HeaderRow extends material.StatelessWidget {
       ),
       child: material.Row(
         children: [
-          for (var i = 0; i < columns.length; i++)
+          if (window.leadingWidth > 0)
+            material.SizedBox(width: window.leadingWidth),
+          for (var i = window.first; i <= window.last; i++)
             _GridCell(
               text: columns[i],
               width: columnWidths[i],
               isHeader: true,
               colorScheme: colorScheme,
             ),
+          if (window.trailingWidth > 0)
+            material.SizedBox(width: window.trailingWidth),
         ],
       ),
     );
@@ -227,7 +380,7 @@ class _DataRow extends material.StatelessWidget {
     super.key,
     required this.row,
     required this.columnWidths,
-    required this.columnCount,
+    required this.window,
     required this.height,
     required this.colorScheme,
     required this.striped,
@@ -235,7 +388,7 @@ class _DataRow extends material.StatelessWidget {
 
   final List<String> row;
   final List<double> columnWidths;
-  final int columnCount;
+  final ResultGridColumnWindow window;
   final double height;
   final ColorScheme colorScheme;
   final bool striped;
@@ -257,12 +410,16 @@ class _DataRow extends material.StatelessWidget {
         ),
         child: material.Row(
           children: [
-            for (var c = 0; c < columnCount; c++)
+            if (window.leadingWidth > 0)
+              material.SizedBox(width: window.leadingWidth),
+            for (var c = window.first; c <= window.last; c++)
               _GridCell(
                 text: c < row.length ? row[c] : '',
                 width: columnWidths[c],
                 colorScheme: colorScheme,
               ),
+            if (window.trailingWidth > 0)
+              material.SizedBox(width: window.trailingWidth),
           ],
         ),
       ),

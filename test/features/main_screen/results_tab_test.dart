@@ -61,6 +61,53 @@ void main() {
     });
   });
 
+  group('computeVisibleColumnWindow', () {
+    test('returns empty for no columns', () {
+      expect(
+        computeVisibleColumnWindow(
+          columnWidths: const [],
+          columnOffsets: const [0],
+          scrollOffset: 0,
+          viewportWidth: 400,
+        ),
+        ResultGridColumnWindow.empty,
+      );
+    });
+
+    test('keeps far columns out of a narrow viewport', () {
+      final widths = List<double>.filled(80, 120);
+      final offsets = computeResultGridColumnOffsets(widths);
+      final window = computeVisibleColumnWindow(
+        columnWidths: widths,
+        columnOffsets: offsets,
+        scrollOffset: 0,
+        viewportWidth: 400,
+        overscanColumns: 1,
+      );
+      // ~4 visible + 1 overscan on the right → last around 4.
+      expect(window.first, 0);
+      expect(window.last, lessThan(10));
+      expect(window.columnCount, lessThan(12));
+      expect(window.leadingWidth, 0);
+      expect(window.trailingWidth, greaterThan(0));
+    });
+
+    test('shifts window when scrolled horizontally', () {
+      final widths = List<double>.filled(50, 100);
+      final offsets = computeResultGridColumnOffsets(widths);
+      final window = computeVisibleColumnWindow(
+        columnWidths: widths,
+        columnOffsets: offsets,
+        scrollOffset: 2000,
+        viewportWidth: 300,
+        overscanColumns: 0,
+      );
+      expect(window.first, greaterThan(15));
+      expect(window.last, lessThan(30));
+      expect(window.leadingWidth, greaterThan(0));
+    });
+  });
+
   group('ResultsTab', () {
     testWidgets('uses virtualized grid instead of Table', (tester) async {
       final rows = List.generate(
@@ -115,6 +162,38 @@ void main() {
       final dataRowWidgets =
           tester.widgetList(find.byType(material.Row)).length;
       expect(dataRowWidgets, lessThan(80));
+    });
+
+    testWidgets('does not build off-screen columns in a wide grid',
+        (tester) async {
+      final columns = List.generate(80, (i) => 'col_$i');
+      final rows = List.generate(
+        40,
+        (r) => List.generate(80, (c) => 'r${r}_c$c'),
+      );
+
+      await tester.pumpWidget(
+        resultsShell(
+          child: material.SizedBox(
+            height: 400,
+            width: 360,
+            child: VirtualResultGrid(
+              columns: columns,
+              rows: rows,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('col_0'), findsOneWidget);
+      expect(find.text('col_79'), findsNothing);
+      expect(find.text('r0_c0'), findsOneWidget);
+      expect(find.text('r0_c79'), findsNothing);
+
+      // Far fewer Text widgets than rows×cols (40×80=3200).
+      final texts = tester.widgetList(find.byType(material.Text)).length;
+      expect(texts, lessThan(400));
     });
 
     testWidgets(
