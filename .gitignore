@@ -39,5 +39,8 @@ coverage/
 *.so
 *.dll
 *.exe
+Querya-Desktop-*.deb
+Querya-Desktop-*.AppImage
+Querya-Desktop-*.zip
 design-front/
 docker/sqlite/data/
