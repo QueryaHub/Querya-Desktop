@@ -114,9 +114,11 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     try {
       await widget.connection.selectDatabase(widget.database);
       await widget.connection.set(widget.keyName, _stringController.text);
+      if (!mounted) return;
       setState(() => _success = 'Value saved');
       _clearSuccessAfterDelay();
     } catch (e) {
+      if (!mounted) return;
       setState(() => _error = 'Save failed: $e');
     }
   }
@@ -127,6 +129,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       await widget.connection.del(widget.keyName);
       widget.onKeyDeleted?.call();
     } catch (e) {
+      if (!mounted) return;
       setState(() => _error = 'Delete failed: $e');
     }
   }
@@ -140,11 +143,13 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
         await widget.connection.persist(widget.keyName);
       }
       _ttl = await widget.connection.ttl(widget.keyName);
+      if (!mounted) return;
       setState(() {
         _success = seconds > 0 ? 'TTL set to $seconds seconds' : 'TTL removed';
       });
       _clearSuccessAfterDelay();
     } catch (e) {
+      if (!mounted) return;
       setState(() => _error = 'TTL failed: $e');
     }
   }
@@ -156,6 +161,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       await widget.connection.hset(widget.keyName, field, value);
       await _load();
     } catch (e) {
+      if (!mounted) return;
       setState(() => _error = 'HSET failed: $e');
     }
   }
@@ -166,6 +172,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       await widget.connection.hdel(widget.keyName, field);
       await _load();
     } catch (e) {
+      if (!mounted) return;
       setState(() => _error = 'HDEL failed: $e');
     }
   }
@@ -177,6 +184,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       await widget.connection.rpush(widget.keyName, value);
       await _load();
     } catch (e) {
+      if (!mounted) return;
       setState(() => _error = 'RPUSH failed: $e');
     }
   }
@@ -188,6 +196,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       await widget.connection.sadd(widget.keyName, member);
       await _load();
     } catch (e) {
+      if (!mounted) return;
       setState(() => _error = 'SADD failed: $e');
     }
   }
@@ -198,6 +207,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       await widget.connection.srem(widget.keyName, member);
       await _load();
     } catch (e) {
+      if (!mounted) return;
       setState(() => _error = 'SREM failed: $e');
     }
   }
@@ -209,6 +219,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       await widget.connection.zadd(widget.keyName, score, member);
       await _load();
     } catch (e) {
+      if (!mounted) return;
       setState(() => _error = 'ZADD failed: $e');
     }
   }
@@ -219,6 +230,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       await widget.connection.zrem(widget.keyName, member);
       await _load();
     } catch (e) {
+      if (!mounted) return;
       setState(() => _error = 'ZREM failed: $e');
     }
   }

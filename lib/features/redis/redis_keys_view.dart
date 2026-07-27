@@ -78,23 +78,34 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
       count: 100,
     );
 
-    // Fetch type and TTL for each key concurrently
-    final futures = keyNames.map((name) async {
-      try {
-        final type = await widget.connection.keyType(name);
-        final ttl = await widget.connection.ttl(name);
-        return _KeyInfo(name: name, type: type, ttl: ttl);
-      } catch (_) {
-        return _KeyInfo(name: name, type: 'unknown', ttl: -1);
-      }
-    });
-    final infos = await Future.wait(futures);
+    // One pipelined burst of TYPE+TTL (not N× Future.wait round-trips).
+    List<_KeyInfo> infos;
+    String? typeTtlError;
+    try {
+      final metas = await widget.connection.typesAndTtls(keyNames);
+      infos = [
+        for (var i = 0; i < keyNames.length; i++)
+          _KeyInfo(
+            name: keyNames[i],
+            type: metas[i].type,
+            ttl: metas[i].ttl,
+          ),
+      ];
+    } catch (e) {
+      // Still show keys with unknown type/TTL; surface the failure non-blocking.
+      infos = [
+        for (final name in keyNames)
+          _KeyInfo(name: name, type: 'unknown', ttl: -1),
+      ];
+      typeTtlError = 'Failed to load key types/TTLs: $e';
+    }
 
     if (!mounted) return;
     setState(() {
       _keys.addAll(infos);
       _cursor = nextCursor;
       _hasMore = nextCursor != 0;
+      _error = typeTtlError;
     });
   }
 

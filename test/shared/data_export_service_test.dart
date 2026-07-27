@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/shared/services/data_export_service.dart';
 
@@ -63,6 +65,72 @@ void main() {
         rows: rows,
       );
       expect(md, contains('| id | user_name | note |'));
+    });
+
+    test('writeToSink streams CSV/JSON/SQL matching format helpers', () async {
+      Future<String> sinkToString(
+        Future<void> Function(IOSink sink) write,
+      ) async {
+        final path =
+            '${Directory.systemTemp.path}/querya_export_${DateTime.now().microsecondsSinceEpoch}.txt';
+        final out = File(path);
+        final sink = out.openWrite();
+        try {
+          await write(sink);
+        } finally {
+          await sink.close();
+        }
+        final text = await out.readAsString();
+        await out.delete();
+        return text;
+      }
+
+      final csv = await sinkToString(
+        (s) => DataExportService.writeToSink(
+          s,
+          DataExportFormat.csv,
+          columns: columns,
+          rows: rows,
+        ),
+      );
+      expect(csv, DataExportService.formatCsv(columns, rows));
+
+      final jsonStr = await sinkToString(
+        (s) => DataExportService.writeToSink(
+          s,
+          DataExportFormat.json,
+          columns: columns,
+          rows: rows,
+        ),
+      );
+      final decoded = jsonDecode(jsonStr) as List;
+      expect(decoded.length, 2);
+      expect(decoded[0]['id'], '101');
+      expect(decoded[1]['note'], isNull);
+
+      final sql = await sinkToString(
+        (s) => DataExportService.writeToSink(
+          s,
+          DataExportFormat.sqlDump,
+          columns: columns,
+          rows: rows,
+          tableName: 'users',
+        ),
+      );
+      expect(
+        sql,
+        DataExportService.formatSqlInsertDump('users', columns, rows),
+      );
+
+      final md = await sinkToString(
+        (s) => DataExportService.writeToSink(
+          s,
+          DataExportFormat.markdown,
+          columns: columns,
+          rows: rows,
+        ),
+      );
+      expect(md, DataExportService.formatMarkdownTable(columns, rows));
     });
   });
 }

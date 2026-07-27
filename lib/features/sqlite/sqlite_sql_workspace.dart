@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:file_selector/file_selector.dart';
-import 'package:querya_desktop/features/sqlite/sqlite_result_utils.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
+import 'package:querya_desktop/core/database/result_row_string_convert.dart';
 import 'package:querya_desktop/core/database/sqlite_service.dart';
+import 'package:querya_desktop/core/database/sql_limit.dart';
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -156,7 +156,11 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         return;
       }
 
-      final results = await conn.execute(userSql);
+      // Bound SELECT/WITH/VALUES at the engine before materializing rows.
+      // Client-side take() remains as defense for PRAGMA/EXPLAIN and author LIMIT.
+      final cap = _resultMaxRows;
+      final sql = injectSqlLimit(userSql, cap);
+      final results = await conn.execute(sql);
 
       if (!mounted) return;
 
@@ -165,18 +169,16 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         cols.addAll(results.first.keys);
       }
 
-      final cap = _resultMaxRows;
       final truncated = results.length > cap;
       final limitCount = truncated ? cap : results.length;
+      final injectedLimit = sql != userSql;
 
       final rawRows = results.take(limitCount).map((row) {
         return cols.map((col) => row[col]).toList();
       }).toList();
 
-      final job = SqliteResultConvertJob(rowValues: rawRows);
-      final outRows = rawRows.length > 500
-          ? await compute(convertSqliteResultRowsToStrings, job)
-          : convertSqliteResultRowsToStrings(job);
+      // Yielding convert avoids isolate double-copy of the matrix (#421).
+      final outRows = await convertResultRowsToStringsYielding(rawRows);
 
       setState(() {
         _columns = cols;
@@ -184,10 +186,10 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         _affectedRows = null;
         if (cols.isEmpty && outRows.isEmpty) {
           _statusLine = 'Command completed.';
+        } else if (truncated || (injectedLimit && results.length >= cap)) {
+          _statusLine = 'Showing first $cap row(s) (result capped).';
         } else {
-          _statusLine = truncated
-              ? 'Showing first $cap row(s) (result capped).'
-              : '${results.length} row(s).';
+          _statusLine = '${results.length} row(s).';
         }
         _running = false;
       });
@@ -238,7 +240,14 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         text: text,
         selection: material.TextSelection.collapsed(offset: text.length),
       );
-    } catch (_) {}
+    } catch (e) {
+      if (!mounted) return;
+      showAppToast(
+        context: context,
+        message: 'Failed to open SQL file: $e',
+        variant: AppToastVariant.error,
+      );
+    }
   }
 
   Future<void> _saveSqlFile() async {
@@ -253,7 +262,14 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       final path = location?.path;
       if (path == null || path.isEmpty) return;
       await File(path).writeAsString(_sqlController.text);
-    } catch (_) {}
+    } catch (e) {
+      if (!mounted) return;
+      showAppToast(
+        context: context,
+        message: 'Failed to save SQL file: $e',
+        variant: AppToastVariant.error,
+      );
+    }
   }
 
   @override

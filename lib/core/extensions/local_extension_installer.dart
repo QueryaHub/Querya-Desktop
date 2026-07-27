@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
-import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import 'package:querya_desktop/core/extensions/extension_paths.dart';
 import 'package:querya_desktop/core/extensions/extension_support.dart';
@@ -12,6 +11,7 @@ import 'package:querya_desktop/core/extensions/sandbox/sandbox_policy.dart';
 import 'package:querya_desktop/core/market/marketplace_repository.dart';
 import 'package:querya_desktop/core/security/archive_path_guard.dart';
 import 'package:querya_desktop/core/security/safe_zip_extractor.dart';
+import 'package:querya_desktop/core/updater/sha256_checksums.dart';
 
 /// Installs an extension package from a local `.zip` / `.qext` archive (issue #316).
 ///
@@ -44,15 +44,14 @@ class LocalExtensionInstaller {
     }
 
     onProgress?.call(0.1);
-    late final List<int> bytes;
     try {
-      bytes = await SafeZipExtractor.readBoundedBytes(archiveFile);
+      await SafeZipExtractor.ensureCompressedSizeAllowed(archiveFile);
     } on SafeZipException catch (error) {
       throw MarketplaceException(error.message);
     }
 
     if (expectedSha256 != null && expectedSha256.trim().isNotEmpty) {
-      final actual = sha256.convert(bytes).toString().toLowerCase();
+      final actual = (await sha256HexOfFile(archiveFile)).toLowerCase();
       final expected = expectedSha256.trim().toLowerCase();
       if (actual != expected) {
         throw MarketplaceException(
@@ -65,7 +64,7 @@ class LocalExtensionInstaller {
     onProgress?.call(0.25);
     late final Archive archive;
     try {
-      archive = SafeZipExtractor.decodeBytes(bytes);
+      archive = await SafeZipExtractor.readAndDecodeFile(archiveFile);
     } on SafeZipException catch (error) {
       throw MarketplaceException(error.message);
     }
@@ -245,7 +244,8 @@ class LocalExtensionInstaller {
       if (file.isFile) {
         final outFile = File(targetPath);
         await outFile.parent.create(recursive: true);
-        await outFile.writeAsBytes(file.content as List<int>);
+        await outFile.writeAsBytes(file.content);
+        file.clear();
       } else {
         await Directory(targetPath).create(recursive: true);
       }

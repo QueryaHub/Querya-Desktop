@@ -113,7 +113,15 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
 
   Future<void> _fetch({bool refreshCount = false}) async {
     final conn = _connection;
-    if (conn == null || !conn.isConnected) return;
+    if (conn == null || !conn.isConnected) {
+      if (mounted && _loading) {
+        setState(() {
+          _error = 'Not connected';
+          _loading = false;
+        });
+      }
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -194,6 +202,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
   Future<void> _showDdlDialog() async {
     final conn = _connection;
     if (conn == null || !conn.isConnected) return;
+    final navigator = material.Navigator.of(context, rootNavigator: true);
     unawaited(showAppDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -203,8 +212,8 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     ));
     try {
       final ddl = await conn.getObjectDdl(widget.tableName);
+      if (navigator.canPop()) navigator.pop();
       if (!mounted) return;
-      material.Navigator.of(context).pop();
       await showAppDialog<void>(
         context: context,
         builder: (ctx) => material.AlertDialog(
@@ -230,8 +239,8 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
         ),
       );
     } catch (e) {
+      if (navigator.canPop()) navigator.pop();
       if (!mounted) return;
-      material.Navigator.of(context).pop();
       showAppToast(
         context: context,
         message: 'Failed to fetch DDL: $e',
@@ -392,7 +401,27 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     }
 
     if (_columnNames.isEmpty) {
-      return material.Container(color: cs.background);
+      return material.Container(
+        color: cs.background,
+        child: material.Center(
+          child: material.Padding(
+            padding: const material.EdgeInsets.all(32),
+            child: material.Column(
+              mainAxisSize: material.MainAxisSize.min,
+              children: [
+                const Text('No columns returned').muted().small(),
+                const Gap(24),
+                OutlineButton(
+                  onPressed: _connectAndLoad,
+                  leading: const material.Icon(material.Icons.refresh_rounded,
+                      size: 18),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     }
 
     const double rowHeight = 36;
@@ -430,6 +459,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
                   child: material.Text(
                     title,
                     overflow: material.TextOverflow.ellipsis,
+                    maxLines: 1,
                     style: material.TextStyle(
                       fontSize: 13,
                       fontWeight: material.FontWeight.w600,
@@ -437,36 +467,65 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
                     ),
                   ),
                 ),
-                material.Text(
-                  _paginationLabel(),
-                  style: material.TextStyle(
-                    fontSize: 11,
-                    color: cs.mutedForeground,
+                material.Expanded(
+                  flex: 2,
+                  child: material.LayoutBuilder(
+                    builder: (context, constraints) {
+                      return material.SingleChildScrollView(
+                        scrollDirection: material.Axis.horizontal,
+                        child: material.ConstrainedBox(
+                          constraints: material.BoxConstraints(
+                            minWidth: constraints.maxWidth,
+                          ),
+                          child: material.Row(
+                            mainAxisAlignment: material.MainAxisAlignment.end,
+                            mainAxisSize: material.MainAxisSize.min,
+                            children: [
+                              material.Text(
+                                _paginationLabel(),
+                                style: material.TextStyle(
+                                  fontSize: 11,
+                                  color: cs.mutedForeground,
+                                ),
+                              ),
+                              const Gap(8),
+                              OutlineButton(
+                                size: ButtonSize.small,
+                                onPressed: _loading
+                                    ? null
+                                    : () => unawaited(_showDdlDialog()),
+                                child: const Text('DDL'),
+                              ),
+                              const Gap(6),
+                              OutlineButton(
+                                onPressed: _loading
+                                    ? null
+                                    : () => unawaited(_fetch()),
+                                child: const Text('Refresh'),
+                              ),
+                              const Gap(6),
+                              GhostButton(
+                                onPressed: (!_canGoPrevious || _loading)
+                                    ? null
+                                    : _goToPreviousPage,
+                                child: const Icon(
+                                    material.Icons.chevron_left_rounded,
+                                    size: 20),
+                              ),
+                              GhostButton(
+                                onPressed: (!_canGoNext || _loading)
+                                    ? null
+                                    : _goToNextPage,
+                                child: const Icon(
+                                    material.Icons.chevron_right_rounded,
+                                    size: 20),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                ),
-                const Gap(8),
-                OutlineButton(
-                  size: ButtonSize.small,
-                  onPressed:
-                      _loading ? null : () => unawaited(_showDdlDialog()),
-                  child: const Text('DDL'),
-                ),
-                const Gap(6),
-                OutlineButton(
-                  onPressed: _loading ? null : () => unawaited(_fetch()),
-                  child: const Text('Refresh'),
-                ),
-                const Gap(6),
-                GhostButton(
-                  onPressed:
-                      (!_canGoPrevious || _loading) ? null : _goToPreviousPage,
-                  child:
-                      const Icon(material.Icons.chevron_left_rounded, size: 20),
-                ),
-                GhostButton(
-                  onPressed: (!_canGoNext || _loading) ? null : _goToNextPage,
-                  child: const Icon(material.Icons.chevron_right_rounded,
-                      size: 20),
                 ),
               ],
             ),

@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:file_selector/file_selector.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
+import 'package:querya_desktop/core/database/result_row_string_convert.dart';
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -18,7 +18,6 @@ import 'package:querya_desktop/features/main_screen/query_editor_tab.dart';
 import 'package:querya_desktop/features/main_screen/results_tab.dart';
 import 'package:querya_desktop/features/main_screen/sql_editor_chrome.dart';
 import 'package:querya_desktop/features/main_screen/sql_query_history_dialog.dart';
-import 'package:querya_desktop/features/mysql/mysql_result_utils.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Ad-hoc SQL editor + results for MySQL / MariaDB.
@@ -192,7 +191,8 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
         cols.add(c.name.isNotEmpty ? c.name : 'col_${cols.length}');
       }
 
-      final rawRows = <List<Object?>>[];
+      // Convert while streaming — no Object? matrix + isolate double-copy (#421).
+      final outRows = <List<String>>[];
       var n = 0;
       final cap = _resultMaxRows;
       var truncated = false;
@@ -201,16 +201,17 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
           truncated = true;
           break;
         }
-        rawRows.add(
-          List.generate(row.numOfColumns, (i) => row.colAt(i)),
+        outRows.add(
+          List.generate(
+            row.numOfColumns,
+            (i) => resultCellToDisplayString(row.colAt(i)),
+          ),
         );
         n++;
+        if (n % kResultStringConvertYieldEvery == 0) {
+          await Future<void>.delayed(Duration.zero);
+        }
       }
-
-      final job = MysqlResultConvertJob(rowValues: rawRows);
-      final outRows = rawRows.length > 500
-          ? await compute(convertMysqlResultRowsToStrings, job)
-          : convertMysqlResultRowsToStrings(job);
 
       int? affected;
       if (cols.isEmpty && outRows.isEmpty) {
@@ -283,7 +284,14 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
         text: text,
         selection: material.TextSelection.collapsed(offset: text.length),
       );
-    } catch (_) {}
+    } catch (e) {
+      if (!mounted) return;
+      showAppToast(
+        context: context,
+        message: 'Failed to open SQL file: $e',
+        variant: AppToastVariant.error,
+      );
+    }
   }
 
   Future<void> _saveSqlFile() async {
@@ -298,7 +306,14 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       final path = location?.path;
       if (path == null || path.isEmpty) return;
       await File(path).writeAsString(_sqlController.text);
-    } catch (_) {}
+    } catch (e) {
+      if (!mounted) return;
+      showAppToast(
+        context: context,
+        message: 'Failed to save SQL file: $e',
+        variant: AppToastVariant.error,
+      );
+    }
   }
 
   Future<void> _runTxCommand(String sql) async {

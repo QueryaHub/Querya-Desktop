@@ -270,5 +270,82 @@ QyNTUxOQAAACBA1m7X8J9H6P8Q9J8H6P8Q9J8H6P8Q9J8H6P8Q9J8H6Q==
 
       await handle.dispose();
     });
+
+    test('caps carry and drops remainder until newline', () async {
+      final process = _FakeProcess();
+      final scratch = await SandboxScratchDirectory.create(
+        pluginId: 'pipe.cap',
+        baseDirectory: temp,
+        token: '3',
+      );
+      final handle = SandboxProcessHandle(
+        pluginId: 'pipe.cap',
+        process: process,
+        scratch: scratch,
+        launchCommand: const SandboxLaunchCommand(
+          executable: '/bin/true',
+          arguments: [],
+          platform: 'linux',
+          usesOsSandbox: false,
+        ),
+      );
+
+      final lines = <String>[];
+      final pipe = await SandboxStderrPipe.attach(
+        handle,
+        maxCarryChars: 8,
+        onSanitizedLine: lines.add,
+      );
+
+      // No newline: force truncate at 8 chars, then more without newline.
+      process.emitStderr('abcdefghij');
+      process.emitStderr('ignored');
+      process.emitStderr('\nafter\n');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await pipe.close();
+
+      expect(lines, hasLength(2));
+      expect(lines[0], startsWith('abcdefgh'));
+      expect(lines[0], contains('[truncated]'));
+      expect(lines[0], isNot(contains('ij')));
+      expect(lines[1], 'after');
+
+      await handle.dispose();
+    });
+
+    test('drains split lines without rebuilding full carry each chunk', () async {
+      final process = _FakeProcess();
+      final scratch = await SandboxScratchDirectory.create(
+        pluginId: 'pipe.split',
+        baseDirectory: temp,
+        token: '4',
+      );
+      final handle = SandboxProcessHandle(
+        pluginId: 'pipe.split',
+        process: process,
+        scratch: scratch,
+        launchCommand: const SandboxLaunchCommand(
+          executable: '/bin/true',
+          arguments: [],
+          platform: 'linux',
+          usesOsSandbox: false,
+        ),
+      );
+
+      final lines = <String>[];
+      final pipe = await SandboxStderrPipe.attach(
+        handle,
+        onSanitizedLine: lines.add,
+      );
+
+      process.emitStderr('hel');
+      process.emitStderr('lo\nwor');
+      process.emitStderr('ld\n');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await pipe.close();
+
+      expect(lines, ['hello', 'world']);
+      await handle.dispose();
+    });
   });
 }

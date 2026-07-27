@@ -80,7 +80,7 @@ void main() {
       var refreshCount = 0;
       final watcher = ThemeFolderWatcher(
         themesDirectory: () async => themesDir,
-        onThemesChanged: () async {
+        onThemesChanged: ({required bool structuralChange}) async {
           refreshCount++;
         },
         debounce: const Duration(milliseconds: 80),
@@ -104,7 +104,7 @@ void main() {
       var refreshCount = 0;
       final watcher = ThemeFolderWatcher(
         themesDirectory: () async => themesDir,
-        onThemesChanged: () async {
+        onThemesChanged: ({required bool structuralChange}) async {
           refreshCount++;
           if (!refreshGate.isCompleted) {
             refreshGate.complete();
@@ -132,7 +132,7 @@ void main() {
       var refreshCount = 0;
       final watcher = ThemeFolderWatcher(
         themesDirectory: () async => themesDir,
-        onThemesChanged: () async {
+        onThemesChanged: ({required bool structuralChange}) async {
           refreshCount++;
         },
         debounce: const Duration(milliseconds: 80),
@@ -145,6 +145,42 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 200));
 
       expect(refreshCount, 0);
+      await watcher.stop();
+    });
+
+    test('queues refresh while one is in flight and preserves structural',
+        () async {
+      final started = Completer<void>();
+      final release = Completer<void>();
+      final calls = <bool>[];
+
+      final watcher = ThemeFolderWatcher(
+        themesDirectory: () async => themesDir,
+        onThemesChanged: ({required bool structuralChange}) async {
+          calls.add(structuralChange);
+          if (!started.isCompleted) started.complete();
+          await release.future;
+        },
+        debounce: const Duration(milliseconds: 40),
+      );
+
+      await watcher.start();
+      if (!watcher.isStarted) return;
+
+      await File(p.join(themesDir.path, 'a.json')).writeAsString('{}');
+      await started.future.timeout(const Duration(seconds: 2));
+      final callsDuringFlight = calls.length;
+
+      // While first refresh is blocked, enqueue a structural event.
+      await Directory(p.join(themesDir.path, 'new_ext')).create();
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+
+      release.complete();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      expect(calls.length, greaterThan(callsDuringFlight));
+      expect(calls.skip(callsDuringFlight), contains(true));
+
       await watcher.stop();
     });
   });

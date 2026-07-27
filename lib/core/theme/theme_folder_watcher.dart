@@ -8,19 +8,24 @@ import 'package:path/path.dart' as p;
 class ThemeFolderWatcher {
   ThemeFolderWatcher({
     required Future<Directory> Function() themesDirectory,
-    required Future<void> Function() onThemesChanged,
+    required Future<void> Function({required bool structuralChange})
+        onThemesChanged,
     this.debounce = const Duration(milliseconds: 400),
   })  : _themesDirectory = themesDirectory,
         _onThemesChanged = onThemesChanged;
 
   final Future<Directory> Function() _themesDirectory;
-  final Future<void> Function() _onThemesChanged;
+  final Future<void> Function({required bool structuralChange})
+      _onThemesChanged;
   final Duration debounce;
 
   StreamSubscription<FileSystemEvent>? _subscription;
   Timer? _debounceTimer;
   bool _started = false;
   bool _refreshInFlight = false;
+  bool _pendingStructural = false;
+  bool _queuedRefresh = false;
+  bool _queuedStructural = false;
 
   bool get isStarted => _started;
 
@@ -71,27 +76,48 @@ class ThemeFolderWatcher {
     _subscription = null;
     _started = false;
     _refreshInFlight = false;
+    _pendingStructural = false;
+    _queuedRefresh = false;
+    _queuedStructural = false;
     await Future<void>.delayed(const Duration(milliseconds: 150));
   }
 
   void _onFilesystemEvent(FileSystemEvent event) {
     if (!_isRelevantEvent(event)) return;
 
+    if (event is FileSystemCreateEvent ||
+        event is FileSystemDeleteEvent ||
+        event is FileSystemMoveEvent) {
+      _pendingStructural = true;
+    }
+
     _debounceTimer?.cancel();
     _debounceTimer = Timer(debounce, () {
-      unawaited(_triggerRefresh());
+      final structural = _pendingStructural;
+      _pendingStructural = false;
+      unawaited(_triggerRefresh(structuralChange: structural));
     });
   }
 
-  Future<void> _triggerRefresh() async {
-    if (_refreshInFlight) return;
+  Future<void> _triggerRefresh({required bool structuralChange}) async {
+    if (_refreshInFlight) {
+      _queuedRefresh = true;
+      _queuedStructural = _queuedStructural || structuralChange;
+      return;
+    }
     _refreshInFlight = true;
     try {
-      await _onThemesChanged();
+      await _onThemesChanged(structuralChange: structuralChange);
     } on Object catch (error) {
       debugPrint('ThemeFolderWatcher: refresh failed ($error)');
     } finally {
       _refreshInFlight = false;
+      if (_queuedRefresh) {
+        final structural = _queuedStructural;
+        _queuedRefresh = false;
+        _queuedStructural = false;
+        unawaited(_triggerRefresh(structuralChange: structural));
+      }
     }
   }
 

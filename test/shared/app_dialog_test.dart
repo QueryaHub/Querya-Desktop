@@ -1,6 +1,7 @@
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
@@ -64,6 +65,47 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Blocking dialog'), findsOneWidget);
+
+    Navigator.of(ctx, rootNavigator: true).pop();
+    await tester.pumpAndSettle();
+    await future;
+  });
+
+  testWidgets('barrierDismissible true closes dialog on Escape', (tester) async {
+    final ctx = await pumpHost(tester);
+    var completed = false;
+
+    final future = showAppDialog<void>(
+      context: ctx,
+      barrierDismissible: true,
+      builder: (c) => const AlertDialog(title: Text('Escapable')),
+    ).whenComplete(() => completed = true);
+
+    await tester.pumpAndSettle();
+    expect(find.text('Escapable'), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Escapable'), findsNothing);
+    expect(completed, isTrue);
+    await future;
+  });
+
+  testWidgets('barrierDismissible false ignores Escape', (tester) async {
+    final ctx = await pumpHost(tester);
+
+    final future = showAppDialog<void>(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (c) => const AlertDialog(title: Text('No escape')),
+    );
+
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+
+    expect(find.text('No escape'), findsOneWidget);
 
     Navigator.of(ctx, rootNavigator: true).pop();
     await tester.pumpAndSettle();

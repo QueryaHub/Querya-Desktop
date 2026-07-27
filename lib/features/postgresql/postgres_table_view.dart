@@ -1,7 +1,7 @@
-import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
+import 'package:querya_desktop/core/database/result_row_string_convert.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/postgresql/postgres_sql_editor_dialog.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_privileges_dialog.dart';
@@ -156,7 +156,15 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
   /// [refreshCount] runs `COUNT(*)` (e.g. first load or Refresh). Pagination only runs SELECT.
   Future<void> _fetch({bool refreshCount = false}) async {
     final conn = _connection;
-    if (conn == null || !conn.isConnected) return;
+    if (conn == null || !conn.isConnected) {
+      if (mounted && _loading) {
+        setState(() {
+          _error = 'Not connected';
+          _loading = false;
+        });
+      }
+      return;
+    }
     if (_customSqlActive) {
       await _fetchCustom();
       return;
@@ -187,11 +195,12 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         (i) => result.schema.columns[i].columnName ?? 'col_$i',
       );
 
-      final rawRows = result.map((row) {
-        return List<dynamic>.generate(row.length, (i) => row[i]);
-      }).toList();
+      final rawRows = <List<Object?>>[
+        for (final row in result)
+          List<Object?>.generate(row.length, (i) => row[i]),
+      ];
 
-      final stringRows = await compute(convertResultRowsToStrings, rawRows);
+      final stringRows = await convertResultRowsToStringsYielding(rawRows);
 
       if (!mounted) return;
       setState(() {
@@ -218,7 +227,15 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
 
   Future<void> _fetchCustom() async {
     final conn = _connection;
-    if (conn == null || !conn.isConnected) return;
+    if (conn == null || !conn.isConnected) {
+      if (mounted && _loading) {
+        setState(() {
+          _error = 'Not connected';
+          _loading = false;
+        });
+      }
+      return;
+    }
     final sql = _customSql;
     if (sql == null || sql.isEmpty) return;
     if (!mounted) return;
@@ -235,11 +252,12 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         (i) => result.schema.columns[i].columnName ?? 'col_$i',
       );
 
-      final rawRows = result.map((row) {
-        return List<dynamic>.generate(row.length, (i) => row[i]);
-      }).toList();
+      final rawRows = <List<Object?>>[
+        for (final row in result)
+          List<Object?>.generate(row.length, (i) => row[i]),
+      ];
 
-      final stringRows = await compute(convertResultRowsToStrings, rawRows);
+      final stringRows = await convertResultRowsToStringsYielding(rawRows);
 
       if (!mounted) return;
       setState(() {
@@ -445,7 +463,33 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     }
 
     if (_columnNames.isEmpty) {
-      return material.Container(color: cs.background);
+      return material.Container(
+        color: cs.background,
+        child: material.Center(
+          child: material.Padding(
+            padding: const material.EdgeInsets.all(32),
+            child: material.Column(
+              mainAxisSize: material.MainAxisSize.min,
+              children: [
+                const Text('No columns returned').muted().small(),
+                const Gap(24),
+                OutlineButton(
+                  onPressed: () {
+                    if (_customSqlActive) {
+                      _fetchCustom();
+                    } else {
+                      _fetch(refreshCount: true);
+                    }
+                  },
+                  leading: const material.Icon(material.Icons.refresh_rounded,
+                      size: 18),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     }
 
     const double rowHeight = 36;

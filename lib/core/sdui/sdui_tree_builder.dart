@@ -3,6 +3,9 @@ import 'package:querya_desktop/core/sdui/sdui_tree_schema.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Renders a sidebar-style tree from an SDUI schema with lazy expansion.
+///
+/// Visible rows are flattened into a [ListView.builder] so only viewport
+/// rows are built (large schemas no longer create a full widget Column).
 class SduiTreeBuilder extends material.StatefulWidget {
   const SduiTreeBuilder({
     super.key,
@@ -23,12 +26,29 @@ class SduiTreeBuilder extends material.StatefulWidget {
   material.State<SduiTreeBuilder> createState() => SduiTreeBuilderState();
 }
 
+class _VisibleRow {
+  const _VisibleRow.node(this.node, this.depth)
+      : error = null,
+        isError = false;
+
+  const _VisibleRow.error(this.error, this.depth)
+      : node = null,
+        isError = true;
+
+  final SduiTreeNode? node;
+  final int depth;
+  final String? error;
+  final bool isError;
+}
+
 class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
   late List<SduiTreeNode> _roots;
   final Set<String> _loading = {};
   final Set<String> _loaded = {};
   final Set<String> _expanded = {};
   final Map<String, String> _expandErrors = {};
+
+  static const double _rowExtent = 36;
 
   @override
   void initState() {
@@ -104,109 +124,124 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
     ];
   }
 
+  List<_VisibleRow> _flattenVisible() {
+    final out = <_VisibleRow>[];
+    void walk(SduiTreeNode node, int depth) {
+      out.add(_VisibleRow.node(node, depth));
+      if (!_expanded.contains(node.id)) return;
+      final err = _expandErrors[node.id];
+      if (err != null) {
+        out.add(_VisibleRow.error(err, depth));
+      }
+      for (final child in node.children) {
+        walk(child, depth + 1);
+      }
+    }
+
+    for (final root in _roots) {
+      walk(root, 0);
+    }
+    return out;
+  }
+
   @override
   material.Widget build(material.BuildContext context) {
-    final tree = material.Column(
-      crossAxisAlignment: material.CrossAxisAlignment.stretch,
-      mainAxisSize: material.MainAxisSize.min,
-      children: [
-        for (final root in _roots) _buildNode(root, depth: 0),
-      ],
+    final rows = _flattenVisible();
+    final list = material.ListView.builder(
+      shrinkWrap: widget.maxHeight == null,
+      physics: widget.maxHeight == null
+          ? const material.NeverScrollableScrollPhysics()
+          : const material.ClampingScrollPhysics(),
+      itemExtent: _rowExtent,
+      itemCount: rows.length,
+      itemBuilder: (context, index) {
+        final row = rows[index];
+        if (row.isError) {
+          return material.Padding(
+            padding: material.EdgeInsets.only(left: 36.0 + row.depth * 16.0),
+            child: material.Align(
+              alignment: material.Alignment.centerLeft,
+              child: Text(row.error!).muted().xSmall(),
+            ),
+          );
+        }
+        return _buildNodeRow(row.node!, depth: row.depth);
+      },
     );
 
-    if (widget.maxHeight == null) return tree;
+    if (widget.maxHeight == null) return list;
 
     return material.ConstrainedBox(
       constraints: material.BoxConstraints(maxHeight: widget.maxHeight!),
-      child: material.SingleChildScrollView(
-        physics: const material.ClampingScrollPhysics(),
-        child: tree,
-      ),
+      child: list,
     );
   }
 
-  material.Widget _buildNode(SduiTreeNode node, {required int depth}) {
+  material.Widget _buildNodeRow(SduiTreeNode node, {required int depth}) {
     final canExpand = node.expandable || node.hasChildren;
     final isExpanded = _expanded.contains(node.id);
     final isLoading = _loading.contains(node.id);
-    final expandError = _expandErrors[node.id];
     final nodeKind = _resolveNodeKind(node);
     final isBrowsable = nodeKind == 'table' || nodeKind == 'view';
 
-    return material.Column(
-      crossAxisAlignment: material.CrossAxisAlignment.stretch,
-      children: [
-        material.InkWell(
-          onTap: isBrowsable ? () => widget.onNodeSelected?.call(node) : null,
-          child: material.Padding(
-            padding: material.EdgeInsets.only(
-              left: 8.0 + depth * 16.0,
-              right: 8,
-              top: 4,
-              bottom: 4,
-            ),
-            child: material.Row(
-              children: [
-                if (canExpand)
-                  material.SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: material.IconButton(
-                      padding: material.EdgeInsets.zero,
-                      iconSize: 18,
-                      onPressed: () {
-                        if (isExpanded) {
-                          _onCollapse(node);
-                        } else {
-                          _onExpand(node);
-                        }
-                      },
-                      icon: material.Icon(
-                        isExpanded
-                            ? material.Icons.expand_more
-                            : material.Icons.chevron_right,
-                      ),
-                    ),
-                  )
-                else
-                  const material.SizedBox(width: 28),
-                if (isLoading)
-                  const material.SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: material.CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else
-                  material.Icon(
-                    _iconFor(node),
-                    size: 16,
-                  ),
-                const Gap(8),
-                material.Expanded(
-                  child: material.Text(
-                    node.label,
-                    overflow: material.TextOverflow.ellipsis,
-                    maxLines: 1,
-                    style: material.TextStyle(
-                      fontSize: 12,
-                      fontWeight:
-                          isBrowsable ? material.FontWeight.w600 : null,
-                    ),
+    return material.InkWell(
+      onTap: isBrowsable ? () => widget.onNodeSelected?.call(node) : null,
+      child: material.Padding(
+        padding: material.EdgeInsets.only(
+          left: 8.0 + depth * 16.0,
+          right: 8,
+        ),
+        child: material.Row(
+          children: [
+            if (canExpand)
+              material.SizedBox(
+                width: 28,
+                height: 28,
+                child: material.IconButton(
+                  padding: material.EdgeInsets.zero,
+                  iconSize: 18,
+                  onPressed: () {
+                    if (isExpanded) {
+                      _onCollapse(node);
+                    } else {
+                      _onExpand(node);
+                    }
+                  },
+                  icon: material.Icon(
+                    isExpanded
+                        ? material.Icons.expand_more
+                        : material.Icons.chevron_right,
                   ),
                 ),
-              ],
+              )
+            else
+              const material.SizedBox(width: 28),
+            if (isLoading)
+              const material.SizedBox(
+                width: 14,
+                height: 14,
+                child: material.CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              material.Icon(
+                _iconFor(node),
+                size: 16,
+              ),
+            const Gap(8),
+            material.Expanded(
+              child: material.Text(
+                node.label,
+                overflow: material.TextOverflow.ellipsis,
+                maxLines: 1,
+                style: material.TextStyle(
+                  fontSize: 12,
+                  fontWeight: isBrowsable ? material.FontWeight.w600 : null,
+                ),
+              ),
             ),
-          ),
+          ],
         ),
-        if (isExpanded && expandError != null)
-          material.Padding(
-            padding: material.EdgeInsets.only(left: 36.0 + depth * 16.0),
-            child: Text(expandError).muted().xSmall(),
-          ),
-        if (isExpanded)
-          for (final child in node.children)
-            _buildNode(child, depth: depth + 1),
-      ],
+      ),
     );
   }
 

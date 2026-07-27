@@ -285,6 +285,7 @@ class _PgDatabaseNode extends StatefulWidget {
 class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
   bool _expanded = false;
   bool _loading = false;
+  String? _error;
   List<String> _schemas = [];
 
   void _toggle() {
@@ -296,7 +297,10 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
 
   Future<void> _loadSchemas() async {
     if (!mounted) return;
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     PgLease? lease;
     try {
       final c = widget.connection;
@@ -310,10 +314,14 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
       setState(() {
         _schemas = schemas;
         _loading = false;
+        _error = null;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
     } finally {
       lease?.release();
     }
@@ -393,6 +401,31 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
                         ),
                         const Gap(6),
                         const Text('Loading...').muted().xSmall(),
+                      ],
+                    ),
+                  )
+                else if (_error != null)
+                  material.Padding(
+                    padding: const material.EdgeInsets.only(
+                      left: 24,
+                      top: 4,
+                      bottom: 8,
+                    ),
+                    child: material.Column(
+                      crossAxisAlignment: material.CrossAxisAlignment.start,
+                      children: [
+                        material.SelectableText(
+                          _error!,
+                          style: material.TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.destructive,
+                          ),
+                        ),
+                        const material.SizedBox(height: 6),
+                        GhostButton(
+                          onPressed: _loadSchemas,
+                          child: const Text('Retry'),
+                        ),
                       ],
                     ),
                   ),
@@ -597,6 +630,7 @@ class _PgSchemaNode extends StatefulWidget {
 class _PgSchemaNodeState extends State<_PgSchemaNode> {
   bool _expanded = false;
   bool _loading = false;
+  String? _error;
   List<String> _tables = [];
   List<String> _views = [];
   List<String> _matviews = [];
@@ -613,7 +647,10 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
 
   Future<void> _loadObjects() async {
     if (!mounted) return;
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     PgLease? lease;
     try {
       final c = widget.connection;
@@ -642,10 +679,20 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
         _sequences = sequences;
         _loading = false;
         _loaded = true;
+        _error = null;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+        _loaded = false;
+        _tables = [];
+        _views = [];
+        _matviews = [];
+        _functions = [];
+        _sequences = [];
+      });
     } finally {
       lease?.release();
     }
@@ -706,8 +753,33 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
                         const Text('Loading...').muted().xSmall(),
                       ],
                     ),
+                  )
+                else if (_error != null)
+                  material.Padding(
+                    padding: const material.EdgeInsets.only(
+                      left: 24,
+                      top: 4,
+                      bottom: 8,
+                    ),
+                    child: material.Column(
+                      crossAxisAlignment: material.CrossAxisAlignment.start,
+                      children: [
+                        material.SelectableText(
+                          _error!,
+                          style: material.TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.destructive,
+                          ),
+                        ),
+                        const material.SizedBox(height: 6),
+                        GhostButton(
+                          onPressed: _loadObjects,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
                   ),
-                if (_loaded) ...[
+                if (_loaded && _error == null) ...[
                   _PgObjectGroup(
                     connection: widget.connection,
                     databaseName: widget.databaseName,

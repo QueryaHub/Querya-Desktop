@@ -46,9 +46,11 @@ class _GatedRegistryService extends ThemeRegistryService {
   final gate = Completer<void>();
 
   @override
-  Future<List<ThemeDefinition>> loadThemeDefinitions() async {
+  Future<List<ThemeDefinition>> loadThemeDefinitions({
+    bool reloadExtensions = true,
+  }) async {
     await gate.future;
-    return super.loadThemeDefinitions();
+    return super.loadThemeDefinitions(reloadExtensions: reloadExtensions);
   }
 }
 

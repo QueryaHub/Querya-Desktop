@@ -33,4 +33,27 @@ void main() {
     expect(segments, isNotEmpty);
     expect(segments.map((s) => s.text).join(), code);
   });
+
+  test('small SQL buffer highlights inline below isolate threshold', () async {
+    const code = 'SELECT 1;';
+    expect(code.length, lessThan(kSyntaxHighlightIsolateThreshold));
+
+    final config = buildDefaultEditorHighlighterConfig(
+      QueryaTheme.darkDefault.editor,
+    );
+    final segments = await highlightOffMainThread(
+      SyntaxHighlightJob(
+        code: code,
+        language: 'sql',
+        themeConfigJson: config,
+        grammarJson: SyntaxHighlightService.grammarJsonFor(
+          QueryaCodeLanguage.sql,
+        ),
+        wrapperArgb: QueryaTheme.darkDefault.editor.foreground.toARGB32(),
+      ),
+    );
+
+    expect(segments, isNotEmpty);
+    expect(segments.map((s) => s.text).join(), code);
+  });
 }

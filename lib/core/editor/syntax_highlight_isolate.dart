@@ -118,9 +118,14 @@ TextStyle? _styleFromSegment(HighlightSegment s, TextStyle? base) {
   );
 }
 
-/// Runs [syntaxHighlightInIsolate] off the UI thread.
+/// Runs highlighting on a worker isolate when [job.code] is large enough;
+/// otherwise highlights synchronously on the calling isolate (avoids
+/// `compute` overhead for small editors).
 Future<List<HighlightSegment>> highlightOffMainThread(
   SyntaxHighlightJob job,
 ) {
+  if (job.code.length < kSyntaxHighlightIsolateThreshold) {
+    return Future<List<HighlightSegment>>.value(syntaxHighlightInIsolate(job));
+  }
   return compute(syntaxHighlightInIsolate, job);
 }

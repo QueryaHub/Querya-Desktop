@@ -32,9 +32,15 @@ class SandboxSanitizer {
     caseSensitive: false,
   );
 
+  /// Soft bound for regex work on a single line (stderr pipe also caps).
+  static const maxInputChars = 256 * 1024;
+
   /// Sanitizes a single chunk / line of plugin output.
   static String sanitize(String input) {
     if (input.isEmpty) return input;
+    if (input.length > maxInputChars) {
+      input = input.substring(0, maxInputChars);
+    }
     var out = input;
     out = out.replaceAll(_privateKey, redactionToken);
     out = out.replaceAll(_jwt, redactionToken);

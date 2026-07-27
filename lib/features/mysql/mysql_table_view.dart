@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:mysql_client/mysql_client.dart';
 import 'package:querya_desktop/core/database/mysql_connection.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
+import 'package:querya_desktop/core/database/result_row_string_convert.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/mysql/mysql_sql_editor_dialog.dart';
 import 'package:querya_desktop/features/mysql/mysql_table_utils.dart';
@@ -144,22 +145,35 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
     return rs.cols.map((c) => c.name.isNotEmpty ? c.name : 'col').toList();
   }
 
-  List<List<String>> _resultRows(IResultSet rs) {
+  Future<List<List<String>>> _resultRowsAsync(IResultSet rs) async {
     final out = <List<String>>[];
+    var n = 0;
     for (final row in rs.rows) {
       out.add(
         List.generate(
           row.numOfColumns,
-          (i) => row.colAt(i) ?? 'NULL',
+          (i) => resultCellToDisplayString(row.colAt(i)),
         ),
       );
+      n++;
+      if (n % kResultStringConvertYieldEvery == 0) {
+        await Future<void>.delayed(Duration.zero);
+      }
     }
     return out;
   }
 
   Future<void> _fetch({bool refreshCount = false}) async {
     final conn = _connection;
-    if (conn == null || !conn.isConnected) return;
+    if (conn == null || !conn.isConnected) {
+      if (mounted && _loading) {
+        setState(() {
+          _error = 'Not connected';
+          _loading = false;
+        });
+      }
+      return;
+    }
     if (_customSqlActive) {
       await _fetchCustom();
       return;
@@ -186,7 +200,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       if (!mounted) return;
 
       final colNames = _resultColumns(result);
-      final stringRows = _resultRows(result);
+      final stringRows = await _resultRowsAsync(result);
 
       setState(() {
         _columnNames = colNames;
@@ -212,7 +226,15 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
 
   Future<void> _fetchCustom() async {
     final conn = _connection;
-    if (conn == null || !conn.isConnected) return;
+    if (conn == null || !conn.isConnected) {
+      if (mounted && _loading) {
+        setState(() {
+          _error = 'Not connected';
+          _loading = false;
+        });
+      }
+      return;
+    }
     final sql = _customSql;
     if (sql == null || sql.isEmpty) return;
     if (!mounted) return;
@@ -223,9 +245,10 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
     try {
       final result = await conn.execute(sql);
       if (!mounted) return;
+      final stringRows = await _resultRowsAsync(result);
       setState(() {
         _columnNames = _resultColumns(result);
-        _rows = _resultRows(result);
+        _rows = stringRows;
         _rowsOnPage = _rows.length;
         _totalRowCount = null;
         _loading = false;
@@ -398,7 +421,33 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
     }
 
     if (_columnNames.isEmpty) {
-      return material.Container(color: cs.background);
+      return material.Container(
+        color: cs.background,
+        child: material.Center(
+          child: material.Padding(
+            padding: const material.EdgeInsets.all(32),
+            child: material.Column(
+              mainAxisSize: material.MainAxisSize.min,
+              children: [
+                const Text('No columns returned').muted().small(),
+                const Gap(24),
+                OutlineButton(
+                  onPressed: () {
+                    if (_customSqlActive) {
+                      unawaited(_fetchCustom());
+                    } else {
+                      unawaited(_fetch(refreshCount: true));
+                    }
+                  },
+                  leading: const material.Icon(material.Icons.refresh_rounded,
+                      size: 18),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     }
 
     const double rowHeight = 36;
@@ -437,6 +486,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
                   child: material.Text(
                     title,
                     overflow: material.TextOverflow.ellipsis,
+                    maxLines: 1,
                     style: material.TextStyle(
                       fontSize: 13,
                       fontWeight: material.FontWeight.w600,
@@ -444,49 +494,75 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
                     ),
                   ),
                 ),
-                material.Text(
-                  _paginationLabel(),
-                  style: material.TextStyle(
-                    fontSize: 11,
-                    color: cs.mutedForeground,
+                material.Expanded(
+                  flex: 2,
+                  child: material.LayoutBuilder(
+                    builder: (context, constraints) {
+                      return material.SingleChildScrollView(
+                        scrollDirection: material.Axis.horizontal,
+                        child: material.ConstrainedBox(
+                          constraints: material.BoxConstraints(
+                            minWidth: constraints.maxWidth,
+                          ),
+                          child: material.Row(
+                            mainAxisAlignment: material.MainAxisAlignment.end,
+                            mainAxisSize: material.MainAxisSize.min,
+                            children: [
+                              material.Text(
+                                _paginationLabel(),
+                                style: material.TextStyle(
+                                  fontSize: 11,
+                                  color: cs.mutedForeground,
+                                ),
+                              ),
+                              const Gap(8),
+                              OutlineButton(
+                                onPressed: _loading
+                                    ? null
+                                    : () {
+                                        if (_customSqlActive) {
+                                          unawaited(_fetchCustom());
+                                        } else {
+                                          unawaited(_fetch(refreshCount: true));
+                                        }
+                                      },
+                                child: const Text('Refresh'),
+                              ),
+                              const Gap(6),
+                              OutlineButton(
+                                onPressed: _openSqlEditor,
+                                child: const Text('SQL'),
+                              ),
+                              if (_customSqlActive) ...[
+                                const Gap(6),
+                                OutlineButton(
+                                  onPressed: _exitCustomMode,
+                                  child: const Text('Browse'),
+                                ),
+                              ],
+                              const Gap(6),
+                              GhostButton(
+                                onPressed: (!_canGoPrevious || _loading)
+                                    ? null
+                                    : _goToPreviousPage,
+                                child: const Icon(
+                                    material.Icons.chevron_left_rounded,
+                                    size: 20),
+                              ),
+                              GhostButton(
+                                onPressed: (!_canGoNext || _loading)
+                                    ? null
+                                    : _goToNextPage,
+                                child: const Icon(
+                                    material.Icons.chevron_right_rounded,
+                                    size: 20),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                ),
-                const Gap(8),
-                OutlineButton(
-                  onPressed: _loading
-                      ? null
-                      : () {
-                          if (_customSqlActive) {
-                            unawaited(_fetchCustom());
-                          } else {
-                            unawaited(_fetch(refreshCount: true));
-                          }
-                        },
-                  child: const Text('Refresh'),
-                ),
-                const Gap(6),
-                OutlineButton(
-                  onPressed: _openSqlEditor,
-                  child: const Text('SQL'),
-                ),
-                if (_customSqlActive) ...[
-                  const Gap(6),
-                  OutlineButton(
-                    onPressed: _exitCustomMode,
-                    child: const Text('Browse'),
-                  ),
-                ],
-                const Gap(6),
-                GhostButton(
-                  onPressed:
-                      (!_canGoPrevious || _loading) ? null : _goToPreviousPage,
-                  child:
-                      const Icon(material.Icons.chevron_left_rounded, size: 20),
-                ),
-                GhostButton(
-                  onPressed: (!_canGoNext || _loading) ? null : _goToNextPage,
-                  child: const Icon(material.Icons.chevron_right_rounded,
-                      size: 20),
                 ),
               ],
             ),
