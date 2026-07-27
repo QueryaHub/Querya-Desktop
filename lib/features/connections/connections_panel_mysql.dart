@@ -369,6 +369,7 @@ class _MysqlDatabaseNode extends StatefulWidget {
 class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
   bool _expanded = false;
   bool _loading = false;
+  String? _error;
   List<String> _tables = [];
   List<String> _views = [];
   List<String> _procedures = [];
@@ -388,7 +389,10 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
 
   Future<void> _loadTables() async {
     if (!mounted) return;
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     MysqlLease? lease;
     try {
       final c = widget.connection;
@@ -412,10 +416,14 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
         _procedures = procs;
         _functions = funcs;
         _loading = false;
+        _error = null;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
     } finally {
       lease?.release();
     }
@@ -478,6 +486,31 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
                         ),
                         const Gap(6),
                         const Text('Loading...').muted().xSmall(),
+                      ],
+                    ),
+                  )
+                else if (_error != null)
+                  material.Padding(
+                    padding: const material.EdgeInsets.only(
+                      left: 24,
+                      top: 4,
+                      bottom: 8,
+                    ),
+                    child: material.Column(
+                      crossAxisAlignment: material.CrossAxisAlignment.start,
+                      children: [
+                        material.SelectableText(
+                          _error!,
+                          style: material.TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.destructive,
+                          ),
+                        ),
+                        const material.SizedBox(height: 6),
+                        GhostButton(
+                          onPressed: _loadTables,
+                          child: const Text('Retry'),
+                        ),
                       ],
                     ),
                   ),

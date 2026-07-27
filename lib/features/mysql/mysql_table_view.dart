@@ -405,7 +405,33 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
     }
 
     if (_columnNames.isEmpty) {
-      return material.Container(color: cs.background);
+      return material.Container(
+        color: cs.background,
+        child: material.Center(
+          child: material.Padding(
+            padding: const material.EdgeInsets.all(32),
+            child: material.Column(
+              mainAxisSize: material.MainAxisSize.min,
+              children: [
+                const Text('No columns returned').muted().small(),
+                const Gap(24),
+                OutlineButton(
+                  onPressed: () {
+                    if (_customSqlActive) {
+                      unawaited(_fetchCustom());
+                    } else {
+                      unawaited(_fetch(refreshCount: true));
+                    }
+                  },
+                  leading: const material.Icon(material.Icons.refresh_rounded,
+                      size: 18),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     }
 
     const double rowHeight = 36;
@@ -444,6 +470,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
                   child: material.Text(
                     title,
                     overflow: material.TextOverflow.ellipsis,
+                    maxLines: 1,
                     style: material.TextStyle(
                       fontSize: 13,
                       fontWeight: material.FontWeight.w600,
@@ -451,49 +478,75 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
                     ),
                   ),
                 ),
-                material.Text(
-                  _paginationLabel(),
-                  style: material.TextStyle(
-                    fontSize: 11,
-                    color: cs.mutedForeground,
+                material.Expanded(
+                  flex: 2,
+                  child: material.LayoutBuilder(
+                    builder: (context, constraints) {
+                      return material.SingleChildScrollView(
+                        scrollDirection: material.Axis.horizontal,
+                        child: material.ConstrainedBox(
+                          constraints: material.BoxConstraints(
+                            minWidth: constraints.maxWidth,
+                          ),
+                          child: material.Row(
+                            mainAxisAlignment: material.MainAxisAlignment.end,
+                            mainAxisSize: material.MainAxisSize.min,
+                            children: [
+                              material.Text(
+                                _paginationLabel(),
+                                style: material.TextStyle(
+                                  fontSize: 11,
+                                  color: cs.mutedForeground,
+                                ),
+                              ),
+                              const Gap(8),
+                              OutlineButton(
+                                onPressed: _loading
+                                    ? null
+                                    : () {
+                                        if (_customSqlActive) {
+                                          unawaited(_fetchCustom());
+                                        } else {
+                                          unawaited(_fetch(refreshCount: true));
+                                        }
+                                      },
+                                child: const Text('Refresh'),
+                              ),
+                              const Gap(6),
+                              OutlineButton(
+                                onPressed: _openSqlEditor,
+                                child: const Text('SQL'),
+                              ),
+                              if (_customSqlActive) ...[
+                                const Gap(6),
+                                OutlineButton(
+                                  onPressed: _exitCustomMode,
+                                  child: const Text('Browse'),
+                                ),
+                              ],
+                              const Gap(6),
+                              GhostButton(
+                                onPressed: (!_canGoPrevious || _loading)
+                                    ? null
+                                    : _goToPreviousPage,
+                                child: const Icon(
+                                    material.Icons.chevron_left_rounded,
+                                    size: 20),
+                              ),
+                              GhostButton(
+                                onPressed: (!_canGoNext || _loading)
+                                    ? null
+                                    : _goToNextPage,
+                                child: const Icon(
+                                    material.Icons.chevron_right_rounded,
+                                    size: 20),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                ),
-                const Gap(8),
-                OutlineButton(
-                  onPressed: _loading
-                      ? null
-                      : () {
-                          if (_customSqlActive) {
-                            unawaited(_fetchCustom());
-                          } else {
-                            unawaited(_fetch(refreshCount: true));
-                          }
-                        },
-                  child: const Text('Refresh'),
-                ),
-                const Gap(6),
-                OutlineButton(
-                  onPressed: _openSqlEditor,
-                  child: const Text('SQL'),
-                ),
-                if (_customSqlActive) ...[
-                  const Gap(6),
-                  OutlineButton(
-                    onPressed: _exitCustomMode,
-                    child: const Text('Browse'),
-                  ),
-                ],
-                const Gap(6),
-                GhostButton(
-                  onPressed:
-                      (!_canGoPrevious || _loading) ? null : _goToPreviousPage,
-                  child:
-                      const Icon(material.Icons.chevron_left_rounded, size: 20),
-                ),
-                GhostButton(
-                  onPressed: (!_canGoNext || _loading) ? null : _goToNextPage,
-                  child: const Icon(material.Icons.chevron_right_rounded,
-                      size: 20),
                 ),
               ],
             ),

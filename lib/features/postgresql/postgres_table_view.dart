@@ -447,7 +447,33 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     }
 
     if (_columnNames.isEmpty) {
-      return material.Container(color: cs.background);
+      return material.Container(
+        color: cs.background,
+        child: material.Center(
+          child: material.Padding(
+            padding: const material.EdgeInsets.all(32),
+            child: material.Column(
+              mainAxisSize: material.MainAxisSize.min,
+              children: [
+                const Text('No columns returned').muted().small(),
+                const Gap(24),
+                OutlineButton(
+                  onPressed: () {
+                    if (_customSqlActive) {
+                      _fetchCustom();
+                    } else {
+                      _fetch(refreshCount: true);
+                    }
+                  },
+                  leading: const material.Icon(material.Icons.refresh_rounded,
+                      size: 18),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     }
 
     const double rowHeight = 36;
