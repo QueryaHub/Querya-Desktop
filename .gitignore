@@ -45,5 +45,7 @@ docker/sqlite/data/
 
 # Local packaging outputs
 Querya-Desktop-*.deb
+Querya-Desktop-*.rpm
+Querya-Desktop-*.flatpak
 Querya-Desktop-*.AppImage
 Querya-Desktop-*.zip

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Linux distro packaging (#386)** — `.rpm`, Flatpak (`.flatpak` bundle + manifest), and AUR PKGBUILD; Release CI publishes rpm + Flatpak alongside existing `.deb` / AppImage — see [packaging.md](docs/packaging.md).
+
 ## [0.4.11] - 2026-07-27
 
 Universal UI standard for drivers/extensions, shell UX hardening, Fluid QueryaMotion morphing, virtual grid/pool reliability, performance follow-ups, and dual-channel packaging (portable + installable).
