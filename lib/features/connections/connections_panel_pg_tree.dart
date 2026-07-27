@@ -686,6 +686,12 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
       setState(() {
         _error = e.toString();
         _loading = false;
+        _loaded = false;
+        _tables = [];
+        _views = [];
+        _matviews = [];
+        _functions = [];
+        _sequences = [];
       });
     } finally {
       lease?.release();
@@ -773,7 +779,7 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
                       ],
                     ),
                   ),
-                if (_loaded) ...[
+                if (_loaded && _error == null) ...[
                   _PgObjectGroup(
                     connection: widget.connection,
                     databaseName: widget.databaseName,

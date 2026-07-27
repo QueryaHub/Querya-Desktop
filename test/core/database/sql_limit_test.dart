@@ -111,5 +111,33 @@ void main() {
         '-- comment\nSELECT * FROM t\nLIMIT 100',
       );
     });
+
+    test('does not clamp LIMIT text inside string literals', () {
+      expect(
+        injectSqlLimit(
+          "SELECT * FROM t WHERE note = 'Use LIMIT 999999 rows'",
+          5000,
+        ),
+        "SELECT * FROM t WHERE note = 'Use LIMIT 999999 rows'\nLIMIT 5000",
+      );
+      expect(
+        injectSqlLimit(
+          "SELECT * FROM t WHERE note = 'LIMIT 999999' LIMIT 999999",
+          5000,
+        ),
+        "SELECT * FROM t WHERE note = 'LIMIT 999999' LIMIT 5000",
+      );
+    });
+
+    test('does not treat LIMIT inside dollar quotes as a clause', () {
+      expect(
+        injectSqlLimit(
+          r"SELECT $$LIMIT 999999$$ AS x FROM t",
+          100,
+        ),
+        r"SELECT $$LIMIT 999999$$ AS x FROM t"
+        '\nLIMIT 100',
+      );
+    });
   });
 }

@@ -357,6 +357,12 @@ class DataExportService {
       try {
         await sink?.close();
       } catch (_) {}
+      try {
+        final partial = File(path);
+        if (await partial.exists()) {
+          await partial.delete();
+        }
+      } catch (_) {}
       return SaveExportOutcome.error;
     }
   }

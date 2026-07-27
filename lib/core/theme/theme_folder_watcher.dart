@@ -24,6 +24,8 @@ class ThemeFolderWatcher {
   bool _started = false;
   bool _refreshInFlight = false;
   bool _pendingStructural = false;
+  bool _queuedRefresh = false;
+  bool _queuedStructural = false;
 
   bool get isStarted => _started;
 
@@ -75,6 +77,8 @@ class ThemeFolderWatcher {
     _started = false;
     _refreshInFlight = false;
     _pendingStructural = false;
+    _queuedRefresh = false;
+    _queuedStructural = false;
     await Future<void>.delayed(const Duration(milliseconds: 150));
   }
 
@@ -96,7 +100,11 @@ class ThemeFolderWatcher {
   }
 
   Future<void> _triggerRefresh({required bool structuralChange}) async {
-    if (_refreshInFlight) return;
+    if (_refreshInFlight) {
+      _queuedRefresh = true;
+      _queuedStructural = _queuedStructural || structuralChange;
+      return;
+    }
     _refreshInFlight = true;
     try {
       await _onThemesChanged(structuralChange: structuralChange);
@@ -104,6 +112,12 @@ class ThemeFolderWatcher {
       debugPrint('ThemeFolderWatcher: refresh failed ($error)');
     } finally {
       _refreshInFlight = false;
+      if (_queuedRefresh) {
+        final structural = _queuedStructural;
+        _queuedRefresh = false;
+        _queuedStructural = false;
+        unawaited(_triggerRefresh(structuralChange: structural));
+      }
     }
   }
 
