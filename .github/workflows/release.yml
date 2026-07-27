@@ -119,15 +119,20 @@ jobs:
       - name: Build Linux (release)
         run: flutter build linux --release
 
-      - name: Zip Linux artifact
+      - name: Zip Linux artifact (portable)
         run: |
           cd build/linux/x64/release/bundle
           zip -r "${GITHUB_WORKSPACE}/Querya-Desktop-${{ steps.version.outputs.version }}-linux.zip" .
 
+      - name: Build Linux .deb (Debian/Ubuntu)
+        run: ./scripts/linux/build_deb.sh
+
       - uses: actions/upload-artifact@v4
         with:
           name: bundle-linux
-          path: Querya-Desktop-${{ steps.version.outputs.version }}-linux.zip
+          path: |
+            Querya-Desktop-${{ steps.version.outputs.version }}-linux.zip
+            Querya-Desktop-${{ steps.version.outputs.version }}-linux.deb
           if-no-files-found: error
 
   build-macos:
@@ -241,10 +246,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          find artifacts -name '*.zip' -exec mv -t dist/ {} +
+          find artifacts \( -name '*.zip' -o -name '*.AppImage' -o -name '*.deb' -o -name '*-windows-setup.exe' \) \
+            -exec mv -t dist/ {} +
           test "$(find dist -name '*.zip' | wc -l)" -eq 3
+          test "$(find dist -name '*.deb' | wc -l)" -eq 1
           cd dist
-          sha256sum *.zip | tee SHA256SUMS.txt
+          sha256sum *.* | tee SHA256SUMS.txt
 
       - name: Build release notes from CHANGELOG.md
         run: |
@@ -265,7 +272,15 @@ jobs:
             echo "Optional USB-style profile: set \`QUERYA_PORTABLE=1\` or create a \`QueryaData/\` folder next to the binary (see docs/packaging.md)."
             echo ""
             echo "#### Installable"
-            echo "_AppImage / Windows setup / distro packages — tracked in epic #379; not attached to this release yet._"
+            echo "- **Linux .deb** (Debian/Ubuntu): \`Querya-Desktop-${VERSION}-linux.deb\` — \`sudo apt install ./Querya-Desktop-${VERSION}-linux.deb\`"
+            if [[ -f "dist/Querya-Desktop-${VERSION}-linux.AppImage" ]]; then
+              echo "- **Linux AppImage**: \`Querya-Desktop-${VERSION}-linux.AppImage\`"
+            fi
+            if [[ -f "dist/Querya-Desktop-${VERSION}-windows-setup.exe" ]]; then
+              echo "- **Windows setup**: \`Querya-Desktop-${VERSION}-windows-setup.exe\`"
+            fi
+            echo ""
+            echo "RPM / Flatpak / AUR — follow-ups on #386."
             echo ""
             echo "Verify checksums: \`SHA256SUMS.txt\`"
             echo ""
@@ -289,9 +304,12 @@ jobs:
           tag_name: ${{ steps.rel.outputs.tag }}
           name: Querya Desktop ${{ needs.build-windows.outputs.version }}
           body_path: release-notes.md
-          fail_on_unmatched_files: true
+          fail_on_unmatched_files: false
           files: |
             dist/*.zip
+            dist/*.deb
+            dist/*.AppImage
+            dist/*-windows-setup.exe
             dist/SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
