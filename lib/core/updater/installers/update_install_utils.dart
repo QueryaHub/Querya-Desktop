@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
 
+import '../../security/archive_path_guard.dart';
 import '../app_updater_service.dart';
 
 /// Safely extracts a zip archive into [destinationDir].
@@ -21,14 +22,14 @@ Future<void> extractZipSecurely({
 
   for (final entry in archive) {
     final name = entry.name;
-    if (name.contains('..') || name.startsWith('/') || name.startsWith('\\')) {
+    if (!isArchiveEntryNameSafe(name)) {
       throw AppUpdaterException(
         'Security violation: path traversal in archive entry "$name"',
       );
     }
 
     final targetPath = p.normalize(p.join(root, name));
-    if (!targetPath.startsWith(root)) {
+    if (!isArchiveExtractPathWithinRoot(root, targetPath)) {
       throw AppUpdaterException(
         'Security violation: extraction path out of bounds "$name"',
       );

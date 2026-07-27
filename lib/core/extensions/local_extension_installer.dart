@@ -10,6 +10,7 @@ import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_policy.dart';
 import 'package:querya_desktop/core/market/marketplace_repository.dart';
+import 'package:querya_desktop/core/security/archive_path_guard.dart';
 
 /// Installs an extension package from a local `.zip` / `.qext` archive (issue #316).
 ///
@@ -216,9 +217,7 @@ class LocalExtensionInstaller {
       }
       if (filename.isEmpty || filename == '/') continue;
 
-      if (filename.contains('..') ||
-          filename.startsWith('/') ||
-          filename.startsWith('\\')) {
+      if (!isArchiveEntryNameSafe(filename)) {
         throw MarketplaceException(
           'Security violation: Path traversal detected in archive entry '
           '"${file.name}"',
@@ -226,7 +225,7 @@ class LocalExtensionInstaller {
       }
 
       final targetPath = p.normalize(p.join(destPath, filename));
-      if (!targetPath.startsWith(destPath)) {
+      if (!isArchiveExtractPathWithinRoot(destPath, targetPath)) {
         throw MarketplaceException(
           'Security violation: Extraction path out of bounds "${file.name}"',
         );
