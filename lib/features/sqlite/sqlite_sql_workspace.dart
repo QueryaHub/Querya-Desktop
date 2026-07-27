@@ -7,6 +7,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:querya_desktop/features/sqlite/sqlite_result_utils.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
+import 'package:querya_desktop/core/database/sql_limit.dart';
 import 'package:querya_desktop/core/database/sqlite_service.dart';
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
@@ -156,7 +157,11 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         return;
       }
 
-      final results = await conn.execute(userSql);
+      // Bound SELECT/WITH/VALUES at the engine before materializing rows.
+      // Client-side take() remains as defense for PRAGMA/EXPLAIN and author LIMIT.
+      final cap = _resultMaxRows;
+      final sql = injectSqlLimit(userSql, cap);
+      final results = await conn.execute(sql);
 
       if (!mounted) return;
 
@@ -165,9 +170,9 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         cols.addAll(results.first.keys);
       }
 
-      final cap = _resultMaxRows;
       final truncated = results.length > cap;
       final limitCount = truncated ? cap : results.length;
+      final injectedLimit = sql != userSql;
 
       final rawRows = results.take(limitCount).map((row) {
         return cols.map((col) => row[col]).toList();
@@ -184,10 +189,10 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         _affectedRows = null;
         if (cols.isEmpty && outRows.isEmpty) {
           _statusLine = 'Command completed.';
+        } else if (truncated || (injectedLimit && results.length >= cap)) {
+          _statusLine = 'Showing first $cap row(s) (result capped).';
         } else {
-          _statusLine = truncated
-              ? 'Showing first $cap row(s) (result capped).'
-              : '${results.length} row(s).';
+          _statusLine = '${results.length} row(s).';
         }
         _running = false;
       });
