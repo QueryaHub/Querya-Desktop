@@ -46,6 +46,11 @@ High-level feature depth varies by database type. PostgreSQL, MySQL, and SQLite 
 
 ### Result row caps (SQL workspaces)
 
-Preferences → **Max rows in results** caps how many rows the grid loads. For **PostgreSQL** and **SQLite**, ad-hoc `SELECT` / `WITH` / `VALUES` without an author `LIMIT` get a `LIMIT` injected before execution so the engine does not materialize an unbounded result. Queries that already include `LIMIT`, and non-SELECT statements (`INSERT`, `PRAGMA`, …), are left unchanged; the UI may still truncate the displayed grid as a fallback.
+Preferences → **Max rows in results** caps how many rows the grid loads. For **PostgreSQL** and **SQLite**, ad-hoc `SELECT` / `WITH` / `VALUES` are bounded **before** execution:
+
+- No author `LIMIT` → a `LIMIT` equal to the preference is injected.
+- Author `LIMIT` / `LIMIT ALL` / `FETCH FIRST n ROWS ONLY` larger than the preference → clamped down to the preference (OFFSET kept when present).
+
+Queries that already use a smaller `LIMIT`, and non-SELECT statements (`INSERT`, `PRAGMA`, …), are left unchanged. The UI may still truncate the displayed grid as a fallback. **MySQL** SQL workspace streams rows and stops at the cap client-side.
 
 For troubleshooting build/run issues, see the main [README.md](../README.md).

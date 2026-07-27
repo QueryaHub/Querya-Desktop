@@ -15,13 +15,25 @@ String stripLeadingWhitespaceAndLineComments(String sql) {
   }
 }
 
-/// Injects a `LIMIT` clause into a read-only query (`SELECT`, `WITH`, `VALUES`)
-/// when it does not already contain `LIMIT`.
+final _limitAll = RegExp(r'\bLIMIT\s+ALL\b', caseSensitive: false);
+final _limitCount = RegExp(
+  r'\bLIMIT\s+(\d+)(\s+OFFSET\s+\d+)?',
+  caseSensitive: false,
+);
+final _fetchFirst = RegExp(
+  r'\bFETCH\s+(?:FIRST|NEXT)\s+(\d+)\s+ROWS?\s+ONLY\b',
+  caseSensitive: false,
+);
+
+/// Injects or clamps a `LIMIT` on read-only queries (`SELECT`, `WITH`, `VALUES`).
 ///
-/// Existing `LIMIT` is left unchanged (caller may still apply a client-side
-/// display cap). Non-select statements are returned as-is.
+/// - No `LIMIT` / `FETCH … ONLY` → appends `LIMIT [limit]`.
+/// - `LIMIT ALL` → replaced with `LIMIT [limit]`.
+/// - `LIMIT n [OFFSET m]` where `n > limit` → clamped to [limit].
+/// - `FETCH FIRST/NEXT n ROWS ONLY` where `n > limit` → clamped.
+/// - Non-select statements are returned unchanged.
 ///
-/// Trailing semicolons are preserved after the injected clause.
+/// Trailing semicolons are preserved after an injected clause.
 String injectSqlLimit(String sql, int limit) {
   if (limit <= 0) return sql;
 
@@ -36,9 +48,38 @@ String injectSqlLimit(String sql, int limit) {
     return sql;
   }
 
-  // Already bounded by the author (may still exceed UI cap — see clamp issue).
-  final hasLimit = RegExp(r'\bLIMIT\b', caseSensitive: false).hasMatch(sql);
-  if (hasLimit) {
+  if (_limitAll.hasMatch(sql)) {
+    return sql.replaceFirst(_limitAll, 'LIMIT $limit');
+  }
+
+  final limitMatch = _limitCount.firstMatch(sql);
+  if (limitMatch != null) {
+    final existing = int.tryParse(limitMatch.group(1)!);
+    if (existing == null || existing <= limit) {
+      return sql;
+    }
+    final offsetPart = limitMatch.group(2) ?? '';
+    return sql.replaceFirst(
+      limitMatch.group(0)!,
+      'LIMIT $limit$offsetPart',
+    );
+  }
+
+  final fetchMatch = _fetchFirst.firstMatch(sql);
+  if (fetchMatch != null) {
+    final existing = int.tryParse(fetchMatch.group(1)!);
+    if (existing == null || existing <= limit) {
+      return sql;
+    }
+    return sql.replaceFirst(
+      fetchMatch.group(0)!,
+      'FETCH FIRST $limit ROWS ONLY',
+    );
+  }
+
+  if (RegExp(r'\bLIMIT\b', caseSensitive: false).hasMatch(sql) ||
+      RegExp(r'\bFETCH\b', caseSensitive: false).hasMatch(sql)) {
+    // Unrecognized LIMIT/FETCH shape — leave unchanged.
     return sql;
   }
 
