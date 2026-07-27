@@ -20,8 +20,8 @@ UpdateManifest _manifest(List<String> names) {
 void main() {
   group('selectUpdateAsset', () {
     test('Linux AppImage runtime prefers .AppImage then zip', () {
-      final ctx = UpdateInstallContext(
-        environment: const {'APPIMAGE': '/opt/Querya.AppImage'},
+      const ctx = UpdateInstallContext(
+        environment: {'APPIMAGE': '/opt/Querya.AppImage'},
         resolvedExecutable: '/tmp/.mount_Querya/querya_desktop',
       );
       final asset = selectUpdateAsset(
@@ -36,8 +36,8 @@ void main() {
     });
 
     test('Linux portable prefers zip over AppImage', () {
-      final ctx = UpdateInstallContext(
-        environment: const {},
+      const ctx = UpdateInstallContext(
+        environment: {},
         resolvedExecutable: '/home/u/Querya/querya_desktop',
       );
       final asset = selectUpdateAsset(
@@ -52,8 +52,8 @@ void main() {
     });
 
     test('Windows Inno install prefers setup.exe', () {
-      final ctx = UpdateInstallContext(
-        environment: const {},
+      const ctx = UpdateInstallContext(
+        environment: {},
         resolvedExecutable: r'C:\Program Files\Querya\querya_desktop.exe',
       );
       final asset = selectUpdateAsset(
@@ -69,8 +69,8 @@ void main() {
     });
 
     test('Windows portable prefers zip', () {
-      final ctx = UpdateInstallContext(
-        environment: const {},
+      const ctx = UpdateInstallContext(
+        environment: {},
         resolvedExecutable: r'D:\portable\querya_desktop.exe',
       );
       final asset = selectUpdateAsset(
@@ -86,8 +86,8 @@ void main() {
     });
 
     test('macOS uses macos.zip', () {
-      final ctx = UpdateInstallContext(
-        environment: const {},
+      const ctx = UpdateInstallContext(
+        environment: {},
         resolvedExecutable:
             '/Applications/querya_desktop.app/Contents/MacOS/querya_desktop',
       );
