@@ -261,7 +261,7 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
               const Gap(16),
               const Text('No stats available').large().semiBold(),
               const Gap(8),
-              Text('serverStatus returned no data.').muted().small(),
+              const Text('serverStatus returned no data.').muted().small(),
               const Gap(24),
               OutlineButton(
                 onPressed: _load,

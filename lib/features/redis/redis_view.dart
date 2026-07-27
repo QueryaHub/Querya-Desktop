@@ -238,7 +238,7 @@ class _RedisViewState extends material.State<RedisView> {
               const Gap(16),
               const Text('No stats available').large().semiBold(),
               const Gap(8),
-              Text('Redis INFO returned no data.').muted().small(),
+              const Text('Redis INFO returned no data.').muted().small(),
               const Gap(24),
               OutlineButton(
                 onPressed: _load,
