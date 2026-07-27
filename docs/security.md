@@ -37,6 +37,8 @@ Marketplace downloads, local extension sideload (`.zip` / `.qext`), and in-app u
 
 Archives exceeding these bounds fail closed before files are written to disk. Path traversal checks remain in `archive_path_guard.dart`.
 
+SHA-256 verification for marketplace/sideload streams the file (`sha256.bind(file.openRead())`, same helper as the updater) instead of hashing a full in-memory copy. Zip decode uses a file stream (`InputFileStream`) so the compressed payload is not held as a separate `List<int>` alongside the decoded archive; entry contents are cleared after each write.
+
 ## Extension driver OS sandbox
 
 Process-sandbox database drivers launch inside OS-level isolation when available:

@@ -40,7 +40,8 @@ class SafeZipException implements Exception {
 
 /// Bounded zip decode used by marketplace, sideload, and updater paths.
 abstract final class SafeZipExtractor {
-  static Future<List<int>> readBoundedBytes(
+  /// Ensures [file] is within [limits.maxCompressedBytes] before reading.
+  static Future<int> ensureCompressedSizeAllowed(
     File file, {
     ZipDecodeLimits limits = ZipDecodeLimits.standard,
   }) async {
@@ -51,6 +52,18 @@ abstract final class SafeZipExtractor {
         '(${limits.maxCompressedBytes} bytes).',
       );
     }
+    return length;
+  }
+
+  /// Reads the whole file into memory after size check.
+  ///
+  /// Prefer [readAndDecodeFile] (file-stream decode) when you only need an
+  /// [Archive], so compressed bytes are not held as a separate [List].
+  static Future<List<int>> readBoundedBytes(
+    File file, {
+    ZipDecodeLimits limits = ZipDecodeLimits.standard,
+  }) async {
+    await ensureCompressedSizeAllowed(file, limits: limits);
     return file.readAsBytes();
   }
 
@@ -80,12 +93,33 @@ abstract final class SafeZipExtractor {
     return archive;
   }
 
+  /// Decodes [file] via [InputFileStream] (buffered file reads) instead of
+  /// materializing the full compressed payload as a [List] first.
   static Future<Archive> readAndDecodeFile(
     File file, {
     ZipDecodeLimits limits = ZipDecodeLimits.standard,
   }) async {
-    final bytes = await readBoundedBytes(file, limits: limits);
-    return decodeBytes(bytes, limits: limits);
+    final compressedBytes =
+        await ensureCompressedSizeAllowed(file, limits: limits);
+
+    final input = InputFileStream(file.path);
+    try {
+      final Archive archive;
+      try {
+        archive = ZipDecoder().decodeStream(input);
+      } on Object catch (error) {
+        throw SafeZipException('Failed to decode zip archive: $error');
+      }
+
+      _validateArchive(
+        archive,
+        compressedBytes: compressedBytes,
+        limits: limits,
+      );
+      return archive;
+    } finally {
+      await input.close();
+    }
   }
 
   static void _validateArchive(
