@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.4.11-a] - 2026-07-27
+## [0.4.11-b] - 2026-07-27
 
-Post-0.4.11 patch: security review hardening (#395–#402) and remaining Linux distro packages (#386).
+Post-0.4.11 patch that **ships** security + Linux distro packaging (intended for 0.4.11-a), plus performance bounds (#414), UI reliability (#445), and code-review correctness (#463).
+
+> Note: GitHub tag `0.4.11-a` was mistakenly placed on the same commit as `0.4.11`, so those binaries did not include the 0.4.11-a changelog. Treat **0.4.11-b** as the first patch after **0.4.11**.
 
 ### Added
 
@@ -25,6 +27,24 @@ Post-0.4.11 patch: security review hardening (#395–#402) and remaining Linux d
 - **Remote theme SHA256 (#400)** — remote theme install requires checksum when provided by metadata.
 - **Sandbox OS consent (#395)** — fail-closed unsandboxed driver launch without OS wrapper (bubblewrap / consent dialog).
 - **Sideload integrity UX (#402)** — local `.zip`/`.qext` install dialog with security notice and optional SHA256.
+
+### Performance
+
+- **SQL result caps (#415 / #416)** — SQLite injects `LIMIT` before materializing rows; Postgres clamps oversized `LIMIT` / `FETCH`.
+- **Streaming I/O (#417 / #418)** — export writes stream to disk; marketplace SHA256 + zip extract avoid dual full-buffer copies.
+- **RPC / SDUI bounds (#419 / #420)** — NDJSON line size caps; virtualized `SduiTreeBuilder`.
+- **Hot-path yielding (#421 / #422)** — result cell string conversion and MySQL table browse yield to the UI isolate.
+- **Editor / Redis / sandbox / storage (#424–#428)** — syntax-highlight threshold, Redis TYPE/TTL pipeline, bounded stderr, SQL history index/prune, incremental theme mtime scan.
+- **VirtualResultGrid (#423)** — 2D column virtualization for wide result sets.
+
+### Fixed
+
+- **UI reliability (#445 / #446–#457)** — Escape on `showAppDialog`; DDL overlay always pops; stats/table loading clears on early exit; tree error + Retry; empty table state; scrollable toolbars; SQL open/save toasts; title-bar scale; Redis/Mongo empty banners; mounted guards; ResultsTab invariants.
+- **Correctness follow-ups (#463 / #464–#468)** — `injectSqlLimit` skips string/dollar quotes; delete partial export files on failure; PG tree clears stale children on error; theme watcher queues in-flight refresh; Redis keys error banner clears on success.
+
+## [0.4.11-a] - 2026-07-27
+
+Prepared changelog for security (#395–#402) + Linux rpm/Flatpak/AUR (#386). **Tag/binaries were mistargeted** (same commit as `0.4.11`); content ships in **0.4.11-b**.
 
 ## [0.4.11] - 2026-07-27
 
