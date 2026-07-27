@@ -129,6 +129,9 @@ class DataExportService {
   }
 
   /// Copies data in [format] to the system clipboard.
+  ///
+  /// Clipboard still materializes a full string (OS API). Prefer [saveToFile]
+  /// for large grids; this path stays isolate-backed via [formatAsync].
   static Future<void> copyToClipboard(
     DataExportFormat format, {
     required List<String> columns,
@@ -165,7 +168,136 @@ class DataExportService {
     });
   }
 
-  /// Opens a native file save dialog and writes the exported text to disk.
+  /// Streams formatted output to [sink] without assembling one giant [String].
+  static Future<void> writeToSink(
+    IOSink sink,
+    DataExportFormat format, {
+    required List<String> columns,
+    required List<List<String>> rows,
+    String tableName = 'export_table',
+  }) async {
+    switch (format) {
+      case DataExportFormat.csv:
+        await writeResultGridCsv(sink, columns: columns, rows: rows);
+        return;
+      case DataExportFormat.json:
+        await _writeJsonObjectArray(sink, columns: columns, rows: rows);
+        return;
+      case DataExportFormat.markdown:
+        await _writeMarkdownTable(sink, columns: columns, rows: rows);
+        return;
+      case DataExportFormat.sqlDump:
+        await _writeSqlInsertDump(
+          sink,
+          tableName: tableName,
+          columns: columns,
+          rows: rows,
+        );
+        return;
+    }
+  }
+
+  static Future<void> _writeJsonObjectArray(
+    IOSink sink, {
+    required List<String> columns,
+    required List<List<String>> rows,
+  }) async {
+    sink.write('[\n');
+    var written = 0;
+    for (var r = 0; r < rows.length; r++) {
+      final row = rows[r];
+      final obj = <String, Object?>{};
+      for (var i = 0; i < columns.length; i++) {
+        final val = i < row.length ? row[i] : null;
+        obj[columns[i]] = (val == 'NULL' || val == null) ? null : val;
+      }
+      sink.write(const JsonEncoder.withIndent('  ').convert(obj));
+      if (r + 1 < rows.length) sink.write(',');
+      sink.write('\n');
+      written++;
+      if (written % 500 == 0) {
+        await Future<void>.delayed(Duration.zero);
+      }
+    }
+    sink.write(']\n');
+    await sink.flush();
+  }
+
+  static Future<void> _writeMarkdownTable(
+    IOSink sink, {
+    required List<String> columns,
+    required List<List<String>> rows,
+  }) async {
+    if (columns.isEmpty) {
+      await sink.flush();
+      return;
+    }
+
+    String escapeMd(String s) {
+      if (s == 'NULL') return '`NULL`';
+      return s
+          .replaceAll('|', '\\|')
+          .replaceAll('\r\n', ' ')
+          .replaceAll('\n', ' ');
+    }
+
+    sink.write('| ${columns.map(escapeMd).join(' | ')} |\n');
+    sink.write('| ${columns.map((_) => '---').join(' | ')} |\n');
+    var written = 0;
+    for (final row in rows) {
+      final padded = List<String>.generate(
+        columns.length,
+        (i) => i < row.length ? escapeMd(row[i]) : '`NULL`',
+        growable: false,
+      );
+      sink.write('| ${padded.join(' | ')} |\n');
+      written++;
+      if (written % 500 == 0) {
+        await Future<void>.delayed(Duration.zero);
+      }
+    }
+    await sink.flush();
+  }
+
+  static Future<void> _writeSqlInsertDump(
+    IOSink sink, {
+    required String tableName,
+    required List<String> columns,
+    required List<List<String>> rows,
+  }) async {
+    if (columns.isEmpty || rows.isEmpty) {
+      await sink.flush();
+      return;
+    }
+    final safeTable =
+        tableName.trim().isEmpty ? 'export_table' : tableName.trim();
+    final colList = columns
+        .map((c) => c.contains(' ') || c.contains('-') ? '"$c"' : c)
+        .join(', ');
+
+    var written = 0;
+    for (final row in rows) {
+      sink.write('INSERT INTO $safeTable ($colList) VALUES (');
+      for (var i = 0; i < columns.length; i++) {
+        if (i > 0) sink.write(', ');
+        if (i >= row.length || row[i] == 'NULL') {
+          sink.write('NULL');
+        } else {
+          final escaped = row[i].replaceAll("'", "''");
+          sink.write("'$escaped'");
+        }
+      }
+      sink.write(');\n');
+      written++;
+      if (written % 500 == 0) {
+        await Future<void>.delayed(Duration.zero);
+      }
+    }
+    await sink.flush();
+  }
+
+  /// Opens a native file save dialog and **streams** the export to disk
+  /// (no full-document [String] for the file path).
   static Future<SaveExportOutcome> saveToFile(
     DataExportFormat format, {
     required List<String> columns,
@@ -208,16 +340,23 @@ class DataExportService {
       return SaveExportOutcome.cancelled;
     }
 
+    IOSink? sink;
     try {
-      final content = await formatAsync(
+      sink = File(path).openWrite();
+      await writeToSink(
+        sink,
         format,
         columns: columns,
         rows: rows,
         tableName: tableName,
       );
-      await File(path).writeAsString(content);
+      await sink.close();
+      sink = null;
       return SaveExportOutcome.written;
     } on Object {
+      try {
+        await sink?.close();
+      } catch (_) {}
       return SaveExportOutcome.error;
     }
   }
