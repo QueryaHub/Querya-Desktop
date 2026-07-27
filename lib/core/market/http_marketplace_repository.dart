@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:querya_desktop/core/extensions/extension_support.dart';
@@ -12,6 +13,7 @@ import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/extensions/models/extension_type.dart';
 import 'package:querya_desktop/core/security/archive_path_guard.dart';
+import 'marketplace_download_policy.dart';
 import 'marketplace_repository.dart';
 
 /// HTTP implementation of [MarketplaceRepository] connecting to MarketApi backend.
@@ -22,13 +24,46 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
   HttpMarketplaceRepository({
     this.baseUrl = 'http://localhost:8000/api/v1',
     http.Client? client,
-  }) : _client = client ?? http.Client();
+    Iterable<String> extraTrustedDownloadHosts = const [],
+    bool allowLocalhostInDebug = kDebugMode,
+  })  : _client = client ?? http.Client(),
+        _allowLocalhostInDebug = allowLocalhostInDebug,
+        _trustedDownloadHosts = MarketplaceDownloadPolicy.trustedHostsFor(
+          apiBaseUrl: baseUrl,
+          extraTrustedHosts: extraTrustedDownloadHosts,
+        ) {
+    _validateApiBaseUrl();
+  }
 
   final String baseUrl;
   final http.Client _client;
+  final bool _allowLocalhostInDebug;
+  final Set<String> _trustedDownloadHosts;
+
+  void _validateApiBaseUrl() {
+    if (!MarketplaceDownloadPolicy.isAllowedApiBaseUrl(
+      baseUrl,
+      allowLocalhostInDebug: _allowLocalhostInDebug,
+    )) {
+      throw MarketplaceException(
+        'Marketplace API base URL is not allowed: $baseUrl',
+      );
+    }
+  }
+
+  void _validateDownloadUrl(Uri uri) {
+    if (!MarketplaceDownloadPolicy.isAllowedDownloadUrl(
+      uri,
+      trustedHosts: _trustedDownloadHosts,
+      allowLocalhostInDebug: _allowLocalhostInDebug,
+    )) {
+      throw MarketplaceException('Download URL is not allowed: $uri');
+    }
+  }
 
   @override
   Future<List<ExtensionManifest>> getTrending({ExtensionType? type}) async {
+    _validateApiBaseUrl();
     final uri = Uri.parse('$baseUrl/extensions/trending').replace(
       queryParameters: type != null ? {'type': type.value} : null,
     );
@@ -42,6 +77,7 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
 
   @override
   Future<List<ExtensionManifest>> search(String query, {ExtensionType? type}) async {
+    _validateApiBaseUrl();
     final uri = Uri.parse('$baseUrl/extensions/search').replace(
       queryParameters: {
         'q': query.trim(),
@@ -62,6 +98,7 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
     if (uri == null) {
       throw MarketplaceException('Invalid download URL: $url');
     }
+    _validateDownloadUrl(uri);
 
     final request = http.Request('GET', uri);
     final response = await _client.send(request).timeout(const Duration(seconds: 30));

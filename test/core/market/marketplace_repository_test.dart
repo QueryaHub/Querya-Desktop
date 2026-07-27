@@ -355,6 +355,35 @@ void main() {
         )),
       );
     });
+
+    test('download rejects disallowed URLs when release policy is enforced',
+        () async {
+      final repo = HttpMarketplaceRepository(
+        baseUrl: 'https://cdn.example.com/api/v1',
+        extraTrustedDownloadHosts: ['cdn.example.com'],
+        allowLocalhostInDebug: false,
+        client: MockClient((request) async => http.Response('', 200)),
+      );
+
+      expect(
+        () => repo.download('http://cdn.example.com/test.zip'),
+        throwsA(isA<MarketplaceException>().having(
+          (e) => e.message,
+          'message',
+          contains('Download URL is not allowed'),
+        )),
+      );
+
+      expect(
+        () => repo.download('https://127.0.0.1/test.zip'),
+        throwsA(isA<MarketplaceException>()),
+      );
+
+      expect(
+        () => repo.download('file:///tmp/test.zip'),
+        throwsA(isA<MarketplaceException>()),
+      );
+    });
   });
 }
 
