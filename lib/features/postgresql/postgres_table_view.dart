@@ -156,7 +156,15 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
   /// [refreshCount] runs `COUNT(*)` (e.g. first load or Refresh). Pagination only runs SELECT.
   Future<void> _fetch({bool refreshCount = false}) async {
     final conn = _connection;
-    if (conn == null || !conn.isConnected) return;
+    if (conn == null || !conn.isConnected) {
+      if (mounted && _loading) {
+        setState(() {
+          _error = 'Not connected';
+          _loading = false;
+        });
+      }
+      return;
+    }
     if (_customSqlActive) {
       await _fetchCustom();
       return;
@@ -219,7 +227,15 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
 
   Future<void> _fetchCustom() async {
     final conn = _connection;
-    if (conn == null || !conn.isConnected) return;
+    if (conn == null || !conn.isConnected) {
+      if (mounted && _loading) {
+        setState(() {
+          _error = 'Not connected';
+          _loading = false;
+        });
+      }
+      return;
+    }
     final sql = _customSql;
     if (sql == null || sql.isEmpty) return;
     if (!mounted) return;

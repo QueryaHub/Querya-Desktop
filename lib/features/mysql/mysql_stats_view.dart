@@ -94,11 +94,21 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
 
   Future<void> _fetch() async {
     final conn = _lease?.connection;
-    if (conn == null || !conn.isConnected) return;
+    if (conn == null || !conn.isConnected) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Not connected';
+        _loading = false;
+      });
+      return;
+    }
     try {
       final stats = await conn.serverStats();
       if (!mounted) return;
-      if (!replaceIfChanged(_stats, stats, (v) => _stats = v)) return;
+      if (!replaceIfChanged(_stats, stats, (v) => _stats = v)) {
+        if (_loading) setState(() => _loading = false);
+        return;
+      }
       setState(() => _loading = false);
     } catch (e) {
       if (!mounted) return;

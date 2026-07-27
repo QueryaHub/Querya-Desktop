@@ -113,7 +113,15 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
 
   Future<void> _fetch({bool refreshCount = false}) async {
     final conn = _connection;
-    if (conn == null || !conn.isConnected) return;
+    if (conn == null || !conn.isConnected) {
+      if (mounted && _loading) {
+        setState(() {
+          _error = 'Not connected';
+          _loading = false;
+        });
+      }
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
