@@ -10,6 +10,7 @@ import '../storage/app_settings.dart';
 import 'github_releases_client.dart';
 import 'installers/update_install_context.dart';
 import 'sha256_checksums.dart';
+import 'update_asset_selection.dart';
 import 'update_manifest.dart';
 import 'update_platform_installer.dart';
 import 'update_version.dart';
@@ -178,20 +179,15 @@ class AppUpdaterService {
     return context.isManagedPackage;
   }
 
-  /// Picks the platform zip for the current OS from [manifest].
-  UpdateAsset? platformAssetFor(UpdateManifest manifest) {
-    final suffix = switch (Platform.operatingSystem) {
-      'linux' => '-linux.zip',
-      'windows' => '-windows.zip',
-      'macos' => '-macos.zip',
-      _ => null,
-    };
-    if (suffix == null) return null;
-
-    for (final asset in manifest.assets) {
-      if (asset.name.endsWith(suffix)) return asset;
-    }
-    return null;
+  /// Picks the best Release asset for the current packaging context.
+  UpdateAsset? platformAssetFor(
+    UpdateManifest manifest, {
+    UpdateInstallContext? context,
+  }) {
+    return selectUpdateAsset(
+      manifest,
+      context ?? UpdateInstallContext.current(),
+    );
   }
 
   Future<Map<String, String>> _resolveChecksums({
