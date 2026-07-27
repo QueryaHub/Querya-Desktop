@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:archive/archive.dart';
-import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
@@ -14,6 +13,7 @@ import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/extensions/models/extension_type.dart';
 import 'package:querya_desktop/core/security/archive_path_guard.dart';
 import 'package:querya_desktop/core/security/safe_zip_extractor.dart';
+import 'package:querya_desktop/core/updater/sha256_checksums.dart';
 import 'marketplace_download_policy.dart';
 import 'marketplace_repository.dart';
 
@@ -162,7 +162,7 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
     );
 
     try {
-      // Step 2: SHA-256 Integrity Verification (Critical Security Check)
+      // Step 2: SHA-256 Integrity Verification (stream — no full-buffer hash)
       final expectedSha256 = manifest.sha256Checksum?.trim().toLowerCase();
       if (expectedSha256 == null || expectedSha256.isEmpty) {
         throw MarketplaceException(
@@ -171,13 +171,13 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
         );
       }
 
-      late final List<int> bytes;
       try {
-        bytes = await SafeZipExtractor.readBoundedBytes(archiveFile);
+        await SafeZipExtractor.ensureCompressedSizeAllowed(archiveFile);
       } on SafeZipException catch (error) {
         throw MarketplaceException(error.message);
       }
-      final actualSha256 = sha256.convert(bytes).toString().toLowerCase();
+
+      final actualSha256 = (await sha256HexOfFile(archiveFile)).toLowerCase();
       if (actualSha256 != expectedSha256) {
         throw MarketplaceException(
           'SHA256 checksum mismatch for "${manifest.id}". '
@@ -187,10 +187,10 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
 
       onProgress?.call(0.85);
 
-      // Step 3: Safe Archive Extraction (path traversal + zip bomb limits)
+      // Step 3: Safe Archive Extraction (file-stream decode + path/zip-bomb limits)
       final Archive archive;
       try {
-        archive = SafeZipExtractor.decodeBytes(bytes);
+        archive = await SafeZipExtractor.readAndDecodeFile(archiveFile);
       } on SafeZipException catch (error) {
         throw MarketplaceException(error.message);
       }
@@ -218,7 +218,9 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
         if (file.isFile) {
           final outFile = File(targetPath);
           await outFile.create(recursive: true);
-          await outFile.writeAsBytes(file.content as List<int>);
+          final bytes = file.content;
+          await outFile.writeAsBytes(bytes);
+          file.clear();
         } else {
           await Directory(targetPath).create(recursive: true);
         }

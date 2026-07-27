@@ -132,5 +132,18 @@ void main() {
           await SafeZipExtractor.readAndDecodeFile(zipFile, limits: _tightLimits);
       expect(decoded.first.name, 'ok.txt');
     });
+
+    test('ensureCompressedSizeAllowed rejects oversize before decode', () async {
+      final file = File(p.join(tempDir.path, 'big.zip'));
+      await file.writeAsBytes(List<int>.filled(5000, 1));
+
+      expect(
+        () => SafeZipExtractor.ensureCompressedSizeAllowed(
+          file,
+          limits: _tightLimits,
+        ),
+        throwsA(isA<SafeZipException>()),
+      );
+    });
   });
 }
