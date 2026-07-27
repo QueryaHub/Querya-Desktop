@@ -30,6 +30,9 @@ if ! command -v rpmbuild >/dev/null 2>&1; then
 fi
 
 VERSION="$(grep '^version:' "$ROOT/pubspec.yaml" | sed 's/^version: //; s/+.*//')"
+# RPM Version must not contain '-' (it separates Version from Release).
+# Keep artifact filename as the pubspec/marketing version (e.g. 0.4.11-b).
+RPM_VERSION="${VERSION//-/.}"
 OUT="${2:-$ROOT/Querya-Desktop-${VERSION}-linux.rpm}"
 
 WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/querya-rpm.XXXXXX")"
@@ -41,7 +44,7 @@ mkdir -p "$RPM_TOP"/{BUILD,RPMS,SOURCES,SPECS,SRPMS,BUILDROOT}
 
 rpmbuild -bb "$SPEC" \
   --define "_topdir $RPM_TOP" \
-  --define "version $VERSION" \
+  --define "version $RPM_VERSION" \
   --define "querya_bundle $BUNDLE" \
   --define "querya_icon $ICON_SRC" \
   --define "querya_desktop_file $DESKTOP_FILE"
