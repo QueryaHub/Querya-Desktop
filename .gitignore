@@ -44,5 +44,6 @@ design-front/
 docker/sqlite/data/
 
 # Local packaging outputs
+Querya-Desktop-*.deb
 Querya-Desktop-*.AppImage
 Querya-Desktop-*.zip
