@@ -206,6 +206,45 @@ class RedisConnection {
     return result is int ? result : int.tryParse(result.toString()) ?? -1;
   }
 
+  /// Pipelined TYPE + TTL for a SCAN batch.
+  ///
+  /// Writes all commands before awaiting replies (redis-dart FIFO parse
+  /// queue + optional Nagle via [Command.pipe_start]), so a batch of N keys
+  /// costs ~1 RTT instead of ~2N sequential round-trips.
+  Future<List<({String type, int ttl})>> typesAndTtls(List<String> keys) async {
+    if (keys.isEmpty) return const [];
+    if (!isConnected) {
+      throw StateError('Not connected to Redis');
+    }
+
+    final cmd = _command;
+    cmd?.pipe_start();
+    try {
+      final typeFutures = <Future<String>>[
+        for (final key in keys)
+          sendCommand(['TYPE', key]).then(
+            (v) => v?.toString() ?? 'none',
+            onError: (_) => 'unknown',
+          ),
+      ];
+      final ttlFutures = <Future<int>>[
+        for (final key in keys)
+          sendCommand(['TTL', key]).then(
+            (v) => v is int ? v : int.tryParse(v.toString()) ?? -1,
+            onError: (_) => -1,
+          ),
+      ];
+      final types = await Future.wait(typeFutures);
+      final ttls = await Future.wait(ttlFutures);
+      return [
+        for (var i = 0; i < keys.length; i++)
+          (type: types[i], ttl: ttls[i]),
+      ];
+    } finally {
+      cmd?.pipe_end();
+    }
+  }
+
   /// GET (string).
   Future<String?> get(String key) async {
     final result = await sendCommand(['GET', key]);
