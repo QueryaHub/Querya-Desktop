@@ -119,15 +119,20 @@ jobs:
       - name: Build Linux (release)
         run: flutter build linux --release
 
-      - name: Zip Linux artifact
+      - name: Zip Linux artifact (portable)
         run: |
           cd build/linux/x64/release/bundle
           zip -r "${GITHUB_WORKSPACE}/Querya-Desktop-${{ steps.version.outputs.version }}-linux.zip" .
 
+      - name: Build Linux AppImage (installable)
+        run: ./scripts/linux/build_appimage.sh
+
       - uses: actions/upload-artifact@v4
         with:
           name: bundle-linux
-          path: Querya-Desktop-${{ steps.version.outputs.version }}-linux.zip
+          path: |
+            Querya-Desktop-${{ steps.version.outputs.version }}-linux.zip
+            Querya-Desktop-${{ steps.version.outputs.version }}-linux.AppImage
           if-no-files-found: error
 
   build-macos:
@@ -241,10 +246,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          find artifacts -name '*.zip' -exec mv -t dist/ {} +
+          find artifacts \( -name '*.zip' -o -name '*.AppImage' \) -exec mv -t dist/ {} +
           test "$(find dist -name '*.zip' | wc -l)" -eq 3
+          test "$(find dist -name '*.AppImage' | wc -l)" -eq 1
           cd dist
-          sha256sum *.zip | tee SHA256SUMS.txt
+          sha256sum *.zip *.AppImage | tee SHA256SUMS.txt
 
       - name: Build release notes from CHANGELOG.md
         run: |
@@ -256,9 +262,14 @@ jobs:
             echo "---"
             echo ""
             echo "### Downloads"
+            echo ""
+            echo "#### Portable (zip — run from folder)"
             echo "- **Linux**: \`Querya-Desktop-${VERSION}-linux.zip\`"
             echo "- **Windows**: \`Querya-Desktop-${VERSION}-windows.zip\`"
             echo "- **macOS**: \`Querya-Desktop-${VERSION}-macos.zip\` (signed, notarized and stapled \`.app\` when Apple Developer secrets are configured; otherwise unsigned)"
+            echo ""
+            echo "#### Installable"
+            echo "- **Linux AppImage**: \`Querya-Desktop-${VERSION}-linux.AppImage\` (\`chmod +x\` then run)"
             echo ""
             echo "Verify checksums: \`SHA256SUMS.txt\`"
             echo ""
@@ -285,6 +296,7 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             dist/*.zip
+            dist/*.AppImage
             dist/SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
