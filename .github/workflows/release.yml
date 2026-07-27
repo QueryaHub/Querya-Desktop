@@ -146,6 +146,21 @@ jobs:
       - name: Build Linux .deb (Debian/Ubuntu)
         run: ./scripts/linux/build_deb.sh
 
+      - name: Build Linux .rpm (Fedora/RHEL)
+        run: |
+          sudo apt-get install -y rpm
+          ./scripts/linux/build_rpm.sh
+
+      - name: Install Flatpak toolchain
+        run: |
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --if-not-exists --system flathub \
+            https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install -y --system flathub org.gnome.Platform//48 org.gnome.Sdk//48
+
+      - name: Build Linux Flatpak (installable)
+        run: ./scripts/linux/build_flatpak.sh
+
       - uses: actions/upload-artifact@v4
         with:
           name: bundle-linux
@@ -153,6 +168,8 @@ jobs:
             Querya-Desktop-${{ steps.version.outputs.version }}-linux.zip
             Querya-Desktop-${{ steps.version.outputs.version }}-linux.AppImage
             Querya-Desktop-${{ steps.version.outputs.version }}-linux.deb
+            Querya-Desktop-${{ steps.version.outputs.version }}-linux.rpm
+            Querya-Desktop-${{ steps.version.outputs.version }}-linux.flatpak
           if-no-files-found: error
 
   build-macos:
@@ -266,11 +283,13 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          find artifacts \( -name '*.zip' -o -name '*.AppImage' -o -name '*.deb' -o -name '*-windows-setup.exe' \) \
+          find artifacts \( -name '*.zip' -o -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' -o -name '*.flatpak' -o -name '*-windows-setup.exe' \) \
             -exec mv -t dist/ {} +
           test "$(find dist -name '*.zip' | wc -l)" -eq 3
           test "$(find dist -name '*.AppImage' | wc -l)" -eq 1
           test "$(find dist -name '*.deb' | wc -l)" -eq 1
+          test "$(find dist -name '*.rpm' | wc -l)" -eq 1
+          test "$(find dist -name '*.flatpak' | wc -l)" -eq 1
           test "$(find dist -name '*-windows-setup.exe' | wc -l)" -eq 1
           cd dist
           sha256sum *.* | tee SHA256SUMS.txt
@@ -296,9 +315,11 @@ jobs:
             echo "#### Installable"
             echo "- **Linux AppImage**: \`Querya-Desktop-${VERSION}-linux.AppImage\` (\`chmod +x\` then run)"
             echo "- **Linux .deb** (Debian/Ubuntu): \`Querya-Desktop-${VERSION}-linux.deb\` — \`sudo apt install ./Querya-Desktop-${VERSION}-linux.deb\`"
+            echo "- **Linux .rpm** (Fedora/RHEL): \`Querya-Desktop-${VERSION}-linux.rpm\` — \`sudo dnf install ./Querya-Desktop-${VERSION}-linux.rpm\`"
+            echo "- **Linux Flatpak**: \`Querya-Desktop-${VERSION}-linux.flatpak\` — \`flatpak install --user ./Querya-Desktop-${VERSION}-linux.flatpak\`"
             echo "- **Windows setup**: \`Querya-Desktop-${VERSION}-windows-setup.exe\` (Inno Setup)"
             echo ""
-            echo "RPM / Flatpak / AUR — follow-ups on #386."
+            echo "**Arch (AUR):** PKGBUILD in \`packaging/linux/aur/\` (community-maintained)."
             echo ""
             echo "Verify checksums: \`SHA256SUMS.txt\`"
             echo ""
@@ -326,6 +347,8 @@ jobs:
           files: |
             dist/*.zip
             dist/*.deb
+            dist/*.rpm
+            dist/*.flatpak
             dist/*.AppImage
             dist/*-windows-setup.exe
             dist/SHA256SUMS.txt

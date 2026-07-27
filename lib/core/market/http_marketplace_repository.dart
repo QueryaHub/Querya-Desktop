@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:querya_desktop/core/extensions/extension_support.dart';
@@ -11,6 +12,9 @@ import 'package:querya_desktop/core/extensions/sandbox/sandbox_policy.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/extensions/models/extension_type.dart';
+import 'package:querya_desktop/core/security/archive_path_guard.dart';
+import 'package:querya_desktop/core/security/safe_zip_extractor.dart';
+import 'marketplace_download_policy.dart';
 import 'marketplace_repository.dart';
 
 /// HTTP implementation of [MarketplaceRepository] connecting to MarketApi backend.
@@ -21,13 +25,46 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
   HttpMarketplaceRepository({
     this.baseUrl = 'http://localhost:8000/api/v1',
     http.Client? client,
-  }) : _client = client ?? http.Client();
+    Iterable<String> extraTrustedDownloadHosts = const [],
+    bool allowLocalhostInDebug = kDebugMode,
+  })  : _client = client ?? http.Client(),
+        _allowLocalhostInDebug = allowLocalhostInDebug,
+        _trustedDownloadHosts = MarketplaceDownloadPolicy.trustedHostsFor(
+          apiBaseUrl: baseUrl,
+          extraTrustedHosts: extraTrustedDownloadHosts,
+        ) {
+    _validateApiBaseUrl();
+  }
 
   final String baseUrl;
   final http.Client _client;
+  final bool _allowLocalhostInDebug;
+  final Set<String> _trustedDownloadHosts;
+
+  void _validateApiBaseUrl() {
+    if (!MarketplaceDownloadPolicy.isAllowedApiBaseUrl(
+      baseUrl,
+      allowLocalhostInDebug: _allowLocalhostInDebug,
+    )) {
+      throw MarketplaceException(
+        'Marketplace API base URL is not allowed: $baseUrl',
+      );
+    }
+  }
+
+  void _validateDownloadUrl(Uri uri) {
+    if (!MarketplaceDownloadPolicy.isAllowedDownloadUrl(
+      uri,
+      trustedHosts: _trustedDownloadHosts,
+      allowLocalhostInDebug: _allowLocalhostInDebug,
+    )) {
+      throw MarketplaceException('Download URL is not allowed: $uri');
+    }
+  }
 
   @override
   Future<List<ExtensionManifest>> getTrending({ExtensionType? type}) async {
+    _validateApiBaseUrl();
     final uri = Uri.parse('$baseUrl/extensions/trending').replace(
       queryParameters: type != null ? {'type': type.value} : null,
     );
@@ -41,6 +78,7 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
 
   @override
   Future<List<ExtensionManifest>> search(String query, {ExtensionType? type}) async {
+    _validateApiBaseUrl();
     final uri = Uri.parse('$baseUrl/extensions/search').replace(
       queryParameters: {
         'q': query.trim(),
@@ -61,6 +99,7 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
     if (uri == null) {
       throw MarketplaceException('Invalid download URL: $url');
     }
+    _validateDownloadUrl(uri);
 
     final request = http.Request('GET', uri);
     final response = await _client.send(request).timeout(const Duration(seconds: 30));
@@ -124,22 +163,37 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
 
     try {
       // Step 2: SHA-256 Integrity Verification (Critical Security Check)
-      if (manifest.sha256Checksum != null && manifest.sha256Checksum!.trim().isNotEmpty) {
-        final bytes = await archiveFile.readAsBytes();
-        final actualSha256 = sha256.convert(bytes).toString().toLowerCase();
-        final expectedSha256 = manifest.sha256Checksum!.trim().toLowerCase();
-        if (actualSha256 != expectedSha256) {
-          throw MarketplaceException(
-            'SHA256 checksum mismatch for "${manifest.id}". Expected: $expectedSha256, Actual: $actualSha256. Installation aborted.',
-          );
-        }
+      final expectedSha256 = manifest.sha256Checksum?.trim().toLowerCase();
+      if (expectedSha256 == null || expectedSha256.isEmpty) {
+        throw MarketplaceException(
+          'Extension manifest is missing SHA256 checksum for "${manifest.id}". '
+          'Installation aborted.',
+        );
+      }
+
+      late final List<int> bytes;
+      try {
+        bytes = await SafeZipExtractor.readBoundedBytes(archiveFile);
+      } on SafeZipException catch (error) {
+        throw MarketplaceException(error.message);
+      }
+      final actualSha256 = sha256.convert(bytes).toString().toLowerCase();
+      if (actualSha256 != expectedSha256) {
+        throw MarketplaceException(
+          'SHA256 checksum mismatch for "${manifest.id}". '
+          'Expected: $expectedSha256, Actual: $actualSha256. Installation aborted.',
+        );
       }
 
       onProgress?.call(0.85);
 
-      // Step 3: Safe Archive Extraction (Preventing Path Traversal / Zip Bomb - Issue #242)
-      final bytes = await archiveFile.readAsBytes();
-      final archive = ZipDecoder().decodeBytes(bytes);
+      // Step 3: Safe Archive Extraction (path traversal + zip bomb limits)
+      final Archive archive;
+      try {
+        archive = SafeZipExtractor.decodeBytes(bytes);
+      } on SafeZipException catch (error) {
+        throw MarketplaceException(error.message);
+      }
 
       final dir = await ExtensionPaths.extensionsDirectory();
       final extDir = Directory(p.join(dir.path, manifest.id));
@@ -152,12 +206,12 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
       for (final file in archive) {
         final filename = file.name;
         // Check for Path Traversal attempts
-        if (filename.contains('..') || filename.startsWith('/') || filename.startsWith('\\')) {
+        if (!isArchiveEntryNameSafe(filename)) {
           throw MarketplaceException('Security violation: Path traversal detected in archive entry "$filename"');
         }
 
         final targetPath = p.normalize(p.join(extDirPath, filename));
-        if (!targetPath.startsWith(extDirPath)) {
+        if (!isArchiveExtractPathWithinRoot(extDirPath, targetPath)) {
           throw MarketplaceException('Security violation: Extraction path out of bounds "$filename"');
         }
 

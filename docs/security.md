@@ -21,3 +21,36 @@ On upgrade from older databases, existing plaintext secrets in SQLite are **migr
 ## Tests
 
 Automated tests use an **in-memory** secrets backend (see `test/flutter_test_config.dart`) so CI does not require a desktop keyring.
+
+
+## Archive install limits (extensions and updates)
+
+Marketplace downloads, local extension sideload (`.zip` / `.qext`), and in-app updater extraction use `SafeZipExtractor` (`lib/core/security/safe_zip_extractor.dart`) with shared default limits:
+
+| Limit | Default |
+|-------|---------|
+| Max compressed archive size | 100 MiB |
+| Max total uncompressed size | 500 MiB |
+| Max entries | 10 000 |
+| Max single entry uncompressed size | 100 MiB |
+| Max compression ratio (uncompressed ÷ compressed) | 100:1 |
+
+Archives exceeding these bounds fail closed before files are written to disk. Path traversal checks remain in `archive_path_guard.dart`.
+
+## Extension driver OS sandbox
+
+Process-sandbox database drivers launch inside OS-level isolation when available:
+
+| Platform | Wrapper | When unavailable |
+|----------|---------|------------------|
+| Linux | `bwrap` (bubblewrap) | User must confirm **Run without OS sandbox** |
+| macOS | `sandbox-exec` (Seatbelt) | N/A — always wrapped |
+| Windows | AppContainer (planned) | User must confirm until native helper ships |
+
+Querya refuses **silent** unsandboxed launch. `SandboxProcessRunner` throws `SandboxOsIsolationUnavailableException` until the user approves via the consent dialog registered from the main window.
+
+**Linux:** install `bubblewrap` and ensure unprivileged user namespaces are enabled if you want OS sandbox without manual confirmation.
+
+## Local extension sideload (`.zip` / `.qext`)
+
+Installing from a local file does **not** verify integrity unless you paste an optional **SHA-256 checksum** in the install dialog. Marketplace installs always require a manifest checksum (#396). Sideload is intended for trusted local packages and development builds.

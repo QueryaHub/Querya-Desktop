@@ -10,6 +10,8 @@ import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_policy.dart';
 import 'package:querya_desktop/core/market/marketplace_repository.dart';
+import 'package:querya_desktop/core/security/archive_path_guard.dart';
+import 'package:querya_desktop/core/security/safe_zip_extractor.dart';
 
 /// Installs an extension package from a local `.zip` / `.qext` archive (issue #316).
 ///
@@ -42,7 +44,12 @@ class LocalExtensionInstaller {
     }
 
     onProgress?.call(0.1);
-    final bytes = await archiveFile.readAsBytes();
+    late final List<int> bytes;
+    try {
+      bytes = await SafeZipExtractor.readBoundedBytes(archiveFile);
+    } on SafeZipException catch (error) {
+      throw MarketplaceException(error.message);
+    }
 
     if (expectedSha256 != null && expectedSha256.trim().isNotEmpty) {
       final actual = sha256.convert(bytes).toString().toLowerCase();
@@ -56,7 +63,12 @@ class LocalExtensionInstaller {
     }
 
     onProgress?.call(0.25);
-    final archive = ZipDecoder().decodeBytes(bytes);
+    late final Archive archive;
+    try {
+      archive = SafeZipExtractor.decodeBytes(bytes);
+    } on SafeZipException catch (error) {
+      throw MarketplaceException(error.message);
+    }
     if (archive.isEmpty) {
       throw MarketplaceException('Extension archive is empty.');
     }
@@ -216,9 +228,7 @@ class LocalExtensionInstaller {
       }
       if (filename.isEmpty || filename == '/') continue;
 
-      if (filename.contains('..') ||
-          filename.startsWith('/') ||
-          filename.startsWith('\\')) {
+      if (!isArchiveEntryNameSafe(filename)) {
         throw MarketplaceException(
           'Security violation: Path traversal detected in archive entry '
           '"${file.name}"',
@@ -226,7 +236,7 @@ class LocalExtensionInstaller {
       }
 
       final targetPath = p.normalize(p.join(destPath, filename));
-      if (!targetPath.startsWith(destPath)) {
+      if (!isArchiveExtractPathWithinRoot(destPath, targetPath)) {
         throw MarketplaceException(
           'Security violation: Extraction path out of bounds "${file.name}"',
         );

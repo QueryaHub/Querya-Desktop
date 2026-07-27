@@ -1,0 +1,39 @@
+# Maintainer: QueryaHub <https://github.com/QueryaHub/Querya-Desktop>
+# AUR package — installs the official Release portable Linux zip under /opt.
+# Bump pkgver/pkgrel when a new GitHub Release is published.
+pkgname=querya-desktop
+pkgver=0.4.11-a
+pkgrel=1
+pkgdesc="Multi-database desktop client (PostgreSQL, MySQL, Redis, MongoDB, SQLite)"
+arch=('x86_64')
+url="https://github.com/QueryaHub/Querya-Desktop"
+license=('MIT')
+depends=('gtk3' 'libsecret' 'glib2')
+optdepends=(
+  'libappindicator-gtk3: system tray / app indicator'
+)
+source=(
+  "Querya-Desktop-${pkgver}-linux.zip::https://github.com/QueryaHub/Querya-Desktop/releases/download/${pkgver}/Querya-Desktop-${pkgver}-linux.zip"
+  "querya_desktop.desktop"
+)
+sha256sums=('SKIP' 'SKIP')
+
+prepare() {
+  bsdtar -xf "$srcdir/Querya-Desktop-${pkgver}-linux.zip" -C "$srcdir"
+}
+
+package() {
+  install -dm755 "$pkgdir/opt/querya-desktop"
+  cp -a "$srcdir"/{querya_desktop,lib,data} "$pkgdir/opt/querya-desktop/"
+
+  install -dm755 "$pkgdir/usr/bin"
+  ln -s /opt/querya-desktop/querya_desktop "$pkgdir/usr/bin/querya_desktop"
+
+  install -dm755 "$pkgdir/usr/share/applications"
+  install -Dm644 "$srcdir/querya_desktop.desktop" \
+    "$pkgdir/usr/share/applications/querya_desktop.desktop"
+
+  install -dm755 "$pkgdir/usr/share/icons/hicolor/512x512/apps"
+  install -Dm644 "$srcdir/querya_desktop.png" \
+    "$pkgdir/usr/share/icons/hicolor/512x512/apps/querya_desktop.png"
+}

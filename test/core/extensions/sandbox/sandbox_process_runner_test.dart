@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:querya_desktop/core/extensions/models/sandbox_capabilities.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_launch_command.dart';
+import 'package:querya_desktop/core/extensions/sandbox/sandbox_os_isolation.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_process_runner.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_scratch_directory.dart';
 
@@ -259,6 +260,58 @@ void main() {
       await handle.dispose();
     });
 
+    test('refuses unsandboxed launch without explicit consent', () async {
+      final runner = SandboxProcessRunner(
+        platformOverride: 'linux',
+        bwrapAvailable: false,
+        scratchBaseDirectory: tempBase,
+        processStarter: (
+          exe,
+          args, {
+          String? workingDirectory,
+          Map<String, String>? environment,
+          bool includeParentEnvironment = true,
+          bool runInShell = false,
+          ProcessStartMode mode = ProcessStartMode.normal,
+        }) async =>
+            _FakeProcess(),
+      );
+
+      await expectLater(
+        () => runner.start(
+          pluginId: 'test.driver',
+          pluginExecutable: '/bin/driver',
+        ),
+        throwsA(isA<SandboxOsIsolationUnavailableException>()),
+      );
+    });
+
+    test('allows unsandboxed launch when consent flag is set', () async {
+      final runner = SandboxProcessRunner(
+        platformOverride: 'windows',
+        scratchBaseDirectory: tempBase,
+        processStarter: (
+          exe,
+          args, {
+          String? workingDirectory,
+          Map<String, String>? environment,
+          bool includeParentEnvironment = true,
+          bool runInShell = false,
+          ProcessStartMode mode = ProcessStartMode.normal,
+        }) async =>
+            _FakeProcess(),
+      );
+
+      final handle = await runner.start(
+        pluginId: 'win.driver',
+        pluginExecutable: 'driver.exe',
+        allowUnsandboxedLaunch: true,
+      );
+
+      expect(handle.launchCommand.usesOsSandbox, isFalse);
+      await handle.dispose();
+    });
+
     test('start deletes scratch when process spawn fails', () async {
       Directory? observedScratch;
       final runner = SandboxProcessRunner(
@@ -282,6 +335,7 @@ void main() {
         () => runner.start(
           pluginId: 'fail.driver',
           pluginExecutable: 'driver.exe',
+          allowUnsandboxedLaunch: true,
         ),
         throwsA(isA<ProcessException>()),
       );

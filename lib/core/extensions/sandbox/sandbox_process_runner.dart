@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:querya_desktop/core/extensions/models/sandbox_capabilities.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_launch_command.dart';
+import 'package:querya_desktop/core/extensions/sandbox/sandbox_os_isolation.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_scratch_directory.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_secret_guard.dart';
 
@@ -100,6 +101,9 @@ class SandboxProcessRunner {
 
   /// Spawns [pluginExecutable] inside the OS sandbox for [pluginId].
   ///
+  /// When OS sandboxing is unavailable, launch fails unless
+  /// [allowUnsandboxedLaunch] is true (requires explicit user consent in UI).
+  ///
   /// Credentials must never be passed via [pluginArguments] or [environment];
   /// use [SandboxCredentialsInjector] over Stdio JSON-RPC instead.
   Future<SandboxProcessHandle> start({
@@ -109,6 +113,7 @@ class SandboxProcessRunner {
     String? extensionRoot,
     SandboxCapabilities? capabilities,
     Map<String, String>? environment,
+    bool allowUnsandboxedLaunch = false,
   }) async {
     SandboxSecretGuard.assertNoSecrets(
       arguments: pluginArguments,
@@ -125,7 +130,8 @@ class SandboxProcessRunner {
     if (bwrapAvailable == null && !usesBwrap) {
       debugPrint(
         'SandboxProcessRunner: bubblewrap unavailable or cannot set up user '
-        'namespaces on this system; launching $pluginId without OS sandbox.',
+        'namespaces on this system; $pluginId requires consent to launch '
+        'without OS sandbox.',
       );
     }
     final command = SandboxLaunchCommand.build(
@@ -137,6 +143,20 @@ class SandboxProcessRunner {
       platformOverride: platformOverride,
       bwrapAvailable: usesBwrap,
     );
+
+    final isolationIssue =
+        SandboxOsIsolation.exceptionForLaunchCommand(command);
+    if (isolationIssue != null && !allowUnsandboxedLaunch) {
+      await scratch.delete();
+      throw isolationIssue;
+    }
+
+    if (isolationIssue != null) {
+      debugPrint(
+        'SandboxProcessRunner: launching $pluginId without OS sandbox after '
+        'explicit consent (${command.platform}).',
+      );
+    }
 
     // Never forward parent secrets via environment. Only pass an explicit map
     // (credentials go through Stdio JSON-RPC — Block E §5).

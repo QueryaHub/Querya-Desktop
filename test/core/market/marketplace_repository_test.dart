@@ -231,6 +231,67 @@ void main() {
       );
     });
 
+    test('install aborts when SHA256 checksum is missing', () async {
+      final archive = Archive();
+      archive.addFile(ArchiveFile('test.txt', 4, utf8.encode('good')));
+      final zipBytes = ZipEncoder().encode(archive);
+
+      final mockClient = MockClient((request) async {
+        return http.Response.bytes(zipBytes, 200);
+      });
+
+      final repo = HttpMarketplaceRepository(client: mockClient);
+      const manifest = ExtensionManifest(
+        id: 'test.no-sha256',
+        name: 'No SHA256',
+        version: '1.0.0',
+        publisher: 'Test',
+        type: ExtensionType.theme,
+        engines: {'querya_desktop': '*'},
+        downloadUrl: 'http://localhost:8000/test.zip',
+      );
+
+      expect(
+        () => repo.install(manifest),
+        throwsA(isA<MarketplaceException>().having(
+          (e) => e.message,
+          'message',
+          contains('missing SHA256 checksum'),
+        )),
+      );
+    });
+
+    test('install aborts when SHA256 checksum is empty', () async {
+      final archive = Archive();
+      archive.addFile(ArchiveFile('test.txt', 4, utf8.encode('good')));
+      final zipBytes = ZipEncoder().encode(archive);
+
+      final mockClient = MockClient((request) async {
+        return http.Response.bytes(zipBytes, 200);
+      });
+
+      final repo = HttpMarketplaceRepository(client: mockClient);
+      const manifest = ExtensionManifest(
+        id: 'test.empty-sha256',
+        name: 'Empty SHA256',
+        version: '1.0.0',
+        publisher: 'Test',
+        type: ExtensionType.theme,
+        engines: {'querya_desktop': '*'},
+        downloadUrl: 'http://localhost:8000/test.zip',
+        sha256Checksum: '   ',
+      );
+
+      expect(
+        () => repo.install(manifest),
+        throwsA(isA<MarketplaceException>().having(
+          (e) => e.message,
+          'message',
+          contains('missing SHA256 checksum'),
+        )),
+      );
+    });
+
     test('install prevents Path Traversal during archive unpacking (Issue #242)', () async {
       final archive = Archive();
       archive.addFile(ArchiveFile('../evil.txt', 4, utf8.encode('evil')));
@@ -292,6 +353,35 @@ void main() {
           'message',
           contains('preview listings only'),
         )),
+      );
+    });
+
+    test('download rejects disallowed URLs when release policy is enforced',
+        () async {
+      final repo = HttpMarketplaceRepository(
+        baseUrl: 'https://cdn.example.com/api/v1',
+        extraTrustedDownloadHosts: ['cdn.example.com'],
+        allowLocalhostInDebug: false,
+        client: MockClient((request) async => http.Response('', 200)),
+      );
+
+      expect(
+        () => repo.download('http://cdn.example.com/test.zip'),
+        throwsA(isA<MarketplaceException>().having(
+          (e) => e.message,
+          'message',
+          contains('Download URL is not allowed'),
+        )),
+      );
+
+      expect(
+        () => repo.download('https://127.0.0.1/test.zip'),
+        throwsA(isA<MarketplaceException>()),
+      );
+
+      expect(
+        () => repo.download('file:///tmp/test.zip'),
+        throwsA(isA<MarketplaceException>()),
       );
     });
   });

@@ -150,6 +150,7 @@ void main() {
     final handshake = await bridge.start(
       manifest: testManifest,
       pluginExecutable: '/opt/driver',
+      allowUnsandboxedLaunch: true,
     );
     expect(handshake, isA<Map>());
     expect((handshake as Map)['protocolVersion'], '1.0');
@@ -190,7 +191,11 @@ void main() {
     );
 
     await expectLater(
-      bridge.start(manifest: testManifest, pluginExecutable: '/opt/driver'),
+      bridge.start(
+        manifest: testManifest,
+        pluginExecutable: '/opt/driver',
+        allowUnsandboxedLaunch: true,
+      ),
       throwsA(isA<PluginProtocolTimeoutException>()),
     );
     expect(bridge.isStarted, isFalse);
@@ -234,7 +239,11 @@ void main() {
       requestTimeout: const Duration(seconds: 5),
     );
 
-    await bridge.start(manifest: testManifest, pluginExecutable: '/opt/driver');
+    await bridge.start(
+      manifest: testManifest,
+      pluginExecutable: '/opt/driver',
+      allowUnsandboxedLaunch: true,
+    );
     final pending = bridge.connect({'host': 'x'});
     await Future<void>.delayed(const Duration(milliseconds: 20));
     process.completeExit(1);
@@ -296,7 +305,11 @@ void main() {
       enableStderrPipe: false,
     );
 
-    await bridge.start(manifest: testManifest, pluginExecutable: '/opt/driver');
+    await bridge.start(
+      manifest: testManifest,
+      pluginExecutable: '/opt/driver',
+      allowUnsandboxedLaunch: true,
+    );
     await bridge.shutdown();
 
     expect(shutdownReceived, isTrue);
