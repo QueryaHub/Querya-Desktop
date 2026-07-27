@@ -6,7 +6,7 @@ import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const _dbName = 'querya.db';
-const _dbVersion = 7;
+const _dbVersion = 8;
 
 /// Fallback when [recordSqlQueryHistory] is called without `maxEntries`.
 /// Keep in sync with [kDefaultSqlHistoryMaxEntries] in `app_settings.dart`.
@@ -108,7 +108,7 @@ class LocalDb {
     ''');
     await db.execute('''
       CREATE INDEX idx_sql_query_history_lookup
-      ON sql_query_history (connection_id, recorded_at DESC)
+      ON sql_query_history (connection_id, database_name, recorded_at DESC, id DESC)
     ''');
   }
 
@@ -195,6 +195,13 @@ class LocalDb {
       await db.execute('ALTER TABLE connections ADD COLUMN extension_id TEXT');
       await db.execute('ALTER TABLE connections ADD COLUMN driver_options TEXT');
     }
+    if (oldVersion < 8) {
+      await db.execute('DROP INDEX IF EXISTS idx_sql_query_history_lookup');
+      await db.execute('''
+        CREATE INDEX idx_sql_query_history_lookup
+        ON sql_query_history (connection_id, database_name, recorded_at DESC, id DESC)
+      ''');
+    }
   }
 
   Future<String?> getAppSetting(String key) async {
@@ -241,18 +248,57 @@ class LocalDb {
       'sql_text': sql,
       'recorded_at': now,
     });
-    await db.rawDelete(
+    await _pruneSqlQueryHistoryBucket(
+      db,
+      connectionId: connectionId,
+      databaseName: dbKey,
+      maxEntries: maxEntries,
+    );
+  }
+
+  /// Keeps the newest [maxEntries] rows in a (connection, database) bucket.
+  ///
+  /// Selects overflow ids (oldest first), then deletes by primary key — avoids
+  /// nested `DELETE … SELECT … OFFSET` plans as history grows.
+  Future<void> _pruneSqlQueryHistoryBucket(
+    Database db, {
+    required int connectionId,
+    required String? databaseName,
+    required int maxEntries,
+  }) async {
+    final countRows = await db.rawQuery(
       '''
-      DELETE FROM sql_query_history WHERE id IN (
-        SELECT id FROM (
-          SELECT id FROM sql_query_history
-          WHERE connection_id = ? AND database_name IS NOT DISTINCT FROM ?
-          ORDER BY recorded_at DESC, id DESC
-          LIMIT -1 OFFSET ?
-        )
-      )
+      SELECT COUNT(*) AS c FROM sql_query_history
+      WHERE connection_id = ? AND database_name IS NOT DISTINCT FROM ?
       ''',
-      [connectionId, dbKey, maxEntries],
+      [connectionId, databaseName],
+    );
+    final count = _sqliteInt(countRows.first['c']) ?? 0;
+    final excess = count - maxEntries;
+    if (excess <= 0) return;
+
+    final overflow = await db.rawQuery(
+      '''
+      SELECT id FROM sql_query_history
+      WHERE connection_id = ? AND database_name IS NOT DISTINCT FROM ?
+      ORDER BY recorded_at ASC, id ASC
+      LIMIT ?
+      ''',
+      [connectionId, databaseName, excess],
+    );
+    if (overflow.isEmpty) return;
+
+    final ids = <Object>[];
+    for (final row in overflow) {
+      final id = row['id'];
+      if (id != null) ids.add(id);
+    }
+    if (ids.isEmpty) return;
+
+    final placeholders = List.filled(ids.length, '?').join(',');
+    await db.rawDelete(
+      'DELETE FROM sql_query_history WHERE id IN ($placeholders)',
+      ids,
     );
   }
 

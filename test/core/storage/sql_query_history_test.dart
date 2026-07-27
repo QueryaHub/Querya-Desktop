@@ -124,6 +124,24 @@ void main() {
       expect(list.map((e) => e.sqlText), ['q4', 'q3', 'q2']);
     });
 
+    test('history lookup index includes database_name', () async {
+      await LocalDb.instance.getAppSetting('__touch__'); // ensure DB open
+      final dbFile = p.join(tempDir.path, 'querya_desktop', 'querya.db');
+      final raw = await databaseFactoryFfi.openDatabase(
+        dbFile,
+        options: OpenDatabaseOptions(readOnly: true),
+      );
+      try {
+        final rows = await raw.rawQuery(
+          "SELECT sql FROM sqlite_master WHERE type='index' AND name='idx_sql_query_history_lookup'",
+        );
+        expect(rows, isNotEmpty);
+        expect(rows.first['sql'], contains('database_name'));
+      } finally {
+        await raw.close();
+      }
+    });
+
     test('separate buckets for different database_name', () async {
       const row = ConnectionRow(
         type: 'postgres',
