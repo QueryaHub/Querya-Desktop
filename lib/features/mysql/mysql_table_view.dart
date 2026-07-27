@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:mysql_client/mysql_client.dart';
 import 'package:querya_desktop/core/database/mysql_connection.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
+import 'package:querya_desktop/core/database/result_row_string_convert.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/mysql/mysql_sql_editor_dialog.dart';
 import 'package:querya_desktop/features/mysql/mysql_table_utils.dart';
@@ -144,15 +145,20 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
     return rs.cols.map((c) => c.name.isNotEmpty ? c.name : 'col').toList();
   }
 
-  List<List<String>> _resultRows(IResultSet rs) {
+  Future<List<List<String>>> _resultRowsAsync(IResultSet rs) async {
     final out = <List<String>>[];
+    var n = 0;
     for (final row in rs.rows) {
       out.add(
         List.generate(
           row.numOfColumns,
-          (i) => row.colAt(i) ?? 'NULL',
+          (i) => resultCellToDisplayString(row.colAt(i)),
         ),
       );
+      n++;
+      if (n % kResultStringConvertYieldEvery == 0) {
+        await Future<void>.delayed(Duration.zero);
+      }
     }
     return out;
   }
@@ -186,7 +192,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       if (!mounted) return;
 
       final colNames = _resultColumns(result);
-      final stringRows = _resultRows(result);
+      final stringRows = await _resultRowsAsync(result);
 
       setState(() {
         _columnNames = colNames;
@@ -223,9 +229,10 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
     try {
       final result = await conn.execute(sql);
       if (!mounted) return;
+      final stringRows = await _resultRowsAsync(result);
       setState(() {
         _columnNames = _resultColumns(result);
-        _rows = _resultRows(result);
+        _rows = stringRows;
         _rowsOnPage = _rows.length;
         _totalRowCount = null;
         _loading = false;
