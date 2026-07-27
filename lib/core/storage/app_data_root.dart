@@ -142,6 +142,10 @@ abstract final class AppDataRoot {
 
   @visibleForTesting
   static Future<List<Directory>> legacySupportCandidates() async {
+    if (Platform.environment.containsKey('FLUTTER_TEST')) {
+      return mockLegacySupportCandidates ?? const [];
+    }
+
     final home = _env['HOME'] ?? _env['USERPROFILE'];
     if (home == null || home.isEmpty) return const [];
 
