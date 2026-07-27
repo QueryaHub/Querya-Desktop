@@ -249,7 +249,31 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     }
 
     final status = _serverStatus;
-    if (status == null) return material.Container(color: cs.background);
+    if (status == null) {
+      return material.Center(
+        child: material.Padding(
+          padding: const material.EdgeInsets.all(32),
+          child: material.Column(
+            mainAxisSize: material.MainAxisSize.min,
+            children: [
+              material.Icon(material.Icons.error_outline_rounded,
+                  size: 48, color: cs.destructive),
+              const Gap(16),
+              const Text('No stats available').large().semiBold(),
+              const Gap(8),
+              const Text('serverStatus returned no data.').muted().small(),
+              const Gap(24),
+              OutlineButton(
+                onPressed: _load,
+                leading: const material.Icon(material.Icons.refresh_rounded,
+                    size: 18),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return material.Container(
       color: cs.background,

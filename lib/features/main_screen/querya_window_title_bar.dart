@@ -1,5 +1,6 @@
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/connections/driver_manager_dialog.dart';
@@ -75,7 +76,7 @@ class QueryaWindowTitleBar extends StatelessWidget {
     final closeButtonColors = QueryaWindowTitleBar.closeButtonColors(context);
 
     return material.Container(
-      height: 40,
+      height: context.scaled(40),
       color: titleBarBackground(context),
       child: WindowTitleBarBox(
         child: Row(

@@ -237,6 +237,29 @@ void main() {
       expect(find.text('created_at'), findsOneWidget);
     });
 
+    testWidgets('shows error when isLoading is false', (tester) async {
+      await tester.pumpWidget(
+        resultsShell(
+          child: const material.Scaffold(
+            body: ResultsTab(
+              isLoading: false,
+              errorMessage: 'connection refused',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const material.ValueKey('results_mode_error')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('connection refused'), findsOneWidget);
+      expect(
+        find.byKey(const material.ValueKey('results_mode_loading')),
+        findsNothing,
+      );
+    });
+
     testWidgets('shows idle / loading / error / grid mode keys', (tester) async {
       await tester.pumpWidget(
         resultsShell(

@@ -240,7 +240,14 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         text: text,
         selection: material.TextSelection.collapsed(offset: text.length),
       );
-    } catch (_) {}
+    } catch (e) {
+      if (!mounted) return;
+      showAppToast(
+        context: context,
+        message: 'Failed to open SQL file: $e',
+        variant: AppToastVariant.error,
+      );
+    }
   }
 
   Future<void> _saveSqlFile() async {
@@ -255,7 +262,14 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       final path = location?.path;
       if (path == null || path.isEmpty) return;
       await File(path).writeAsString(_sqlController.text);
-    } catch (_) {}
+    } catch (e) {
+      if (!mounted) return;
+      showAppToast(
+        context: context,
+        message: 'Failed to save SQL file: $e',
+        variant: AppToastVariant.error,
+      );
+    }
   }
 
   @override
