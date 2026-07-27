@@ -39,5 +39,6 @@ coverage/
 *.so
 *.dll
 *.exe
+dist-windows/
 design-front/
 docker/sqlite/data/

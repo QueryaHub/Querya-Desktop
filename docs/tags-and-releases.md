@@ -37,9 +37,14 @@
 
 Профиль по умолчанию всё равно в OS app-support; USB-style data → [packaging.md](packaging.md) (`QUERYA_PORTABLE` / `QueryaData/`).
 
-### Installable channel (planned)
+### Installable channel
 
-Отдельные артефакты (AppImage, Windows setup, deb/rpm/Flatpak) — epic [#379](https://github.com/QueryaHub/Querya-Desktop/issues/379). Пока в Release публикуются только portable zip выше.
+| Artifact | Notes |
+|----------|--------|
+| `Querya-Desktop-X.Y.Z-windows-setup.exe` | Inno Setup (`packaging/windows/querya.iss`) |
+| `Querya-Desktop-X.Y.Z-linux.AppImage` | When Linux AppImage CI is merged (#382) |
+
+Другие форматы (deb/rpm/Flatpak): [#386](https://github.com/QueryaHub/Querya-Desktop/issues/386) / epic [#379](https://github.com/QueryaHub/Querya-Desktop/issues/379).
 
 ## Changelog в GitHub Release
 
