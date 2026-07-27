@@ -164,6 +164,32 @@ void main() {
       expect(result, isA<ThemeDefinitionImportFailure>());
     });
 
+    test('rejects localhost URLs when release policy is enforced', () async {
+      final service = ThemeRemoteInstallService(
+        registry,
+        allowLocalhostInDebug: false,
+      );
+      final result = await service.installFromUrl(
+        'https://127.0.0.1/theme.json',
+      );
+      expect(result, isA<ThemeDefinitionImportFailure>());
+      expect(
+        (result as ThemeDefinitionImportFailure).message,
+        contains('Only public HTTPS theme URLs are allowed'),
+      );
+    });
+
+    test('rejects private IPv4 URLs when release policy is enforced', () async {
+      final service = ThemeRemoteInstallService(
+        registry,
+        allowLocalhostInDebug: false,
+      );
+      final result = await service.installFromUrl(
+        'https://192.168.1.10/theme.json',
+      );
+      expect(result, isA<ThemeDefinitionImportFailure>());
+    });
+
     test('reuses existing file when remote content hash matches', () async {
       final raw = await File('test/fixtures/themes/querya_custom_dark.json')
           .readAsString();
