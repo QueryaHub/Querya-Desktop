@@ -10,6 +10,10 @@ import 'package:querya_desktop/core/motion/querya_spring.dart';
 ///
 /// Use instead of [showDialog] so every overlay has consistent blur.
 /// Enter: fade + slight slide; exit uses [QueryaMotion.exit] via reverseCurve.
+///
+/// When [barrierDismissible] is true (default), Escape and backdrop tap dismiss.
+/// Escape is handled by the modal route; backdrop tap by [_BlurredDialogScaffold]
+/// (the route barrier stays transparent under the frosted layer).
 Future<T?> showAppDialog<T>({
   required BuildContext context,
   required WidgetBuilder builder,
@@ -17,7 +21,7 @@ Future<T?> showAppDialog<T>({
 }) {
   return showGeneralDialog<T>(
     context: context,
-    barrierDismissible: false,
+    barrierDismissible: barrierDismissible,
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
     barrierColor: Colors.transparent,
     transitionDuration: context.motionDuration(QueryaMotion.standard),
