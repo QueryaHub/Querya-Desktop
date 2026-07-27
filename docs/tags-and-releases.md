@@ -42,8 +42,9 @@
 | Artifact | Notes |
 |----------|--------|
 | `Querya-Desktop-X.Y.Z-linux.AppImage` | [`scripts/linux/build_appimage.sh`](../scripts/linux/build_appimage.sh) (`chmod +x` then run) |
+| `Querya-Desktop-X.Y.Z-windows-setup.exe` | Inno Setup (`packaging/windows/querya.iss`) |
 
-Windows setup / deb / rpm / Flatpak — epic [#379](https://github.com/QueryaHub/Querya-Desktop/issues/379).
+deb / rpm / Flatpak: [#386](https://github.com/QueryaHub/Querya-Desktop/issues/386) / epic [#379](https://github.com/QueryaHub/Querya-Desktop/issues/379).
 
 ## Changelog в GitHub Release
 

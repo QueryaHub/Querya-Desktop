@@ -74,16 +74,32 @@ jobs:
       - name: Build Windows (release)
         run: flutter build windows --release
 
-      - name: Zip Windows artifact
+      - name: Zip Windows artifact (portable)
         run: |
           $v = "${{ steps.version.outputs.version }}"
           $dir = "build\windows\x64\runner\Release"
           Compress-Archive -Path "$dir\*" -DestinationPath "Querya-Desktop-$v-windows.zip"
 
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build Windows setup.exe (installable)
+        shell: pwsh
+        run: |
+          $v = "${{ steps.version.outputs.version }}"
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (!(Test-Path $iscc)) { throw "ISCC not found at $iscc" }
+          & $iscc "/DMyAppVersion=$v" "packaging\windows\querya.iss"
+          $setup = "dist-windows\Querya-Desktop-$v-windows-setup.exe"
+          if (!(Test-Path $setup)) { throw "Setup not produced: $setup" }
+          Copy-Item $setup "Querya-Desktop-$v-windows-setup.exe"
+
       - uses: actions/upload-artifact@v4
         with:
           name: bundle-windows
-          path: Querya-Desktop-${{ steps.version.outputs.version }}-windows.zip
+          path: |
+            Querya-Desktop-${{ steps.version.outputs.version }}-windows.zip
+            Querya-Desktop-${{ steps.version.outputs.version }}-windows-setup.exe
           if-no-files-found: error
 
   build-linux:
@@ -246,11 +262,13 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          find artifacts \( -name '*.zip' -o -name '*.AppImage' \) -exec mv -t dist/ {} +
+          find artifacts \( -name '*.zip' -o -name '*.AppImage' -o -name '*-windows-setup.exe' \) \
+            -exec mv -t dist/ {} +
           test "$(find dist -name '*.zip' | wc -l)" -eq 3
           test "$(find dist -name '*.AppImage' | wc -l)" -eq 1
+          test "$(find dist -name '*-windows-setup.exe' | wc -l)" -eq 1
           cd dist
-          sha256sum *.zip *.AppImage | tee SHA256SUMS.txt
+          sha256sum *.* | tee SHA256SUMS.txt
 
       - name: Build release notes from CHANGELOG.md
         run: |
@@ -272,6 +290,7 @@ jobs:
             echo ""
             echo "#### Installable"
             echo "- **Linux AppImage**: \`Querya-Desktop-${VERSION}-linux.AppImage\` (\`chmod +x\` then run)"
+            echo "- **Windows setup**: \`Querya-Desktop-${VERSION}-windows-setup.exe\` (Inno Setup)"
             echo ""
             echo "Verify checksums: \`SHA256SUMS.txt\`"
             echo ""
@@ -295,10 +314,11 @@ jobs:
           tag_name: ${{ steps.rel.outputs.tag }}
           name: Querya Desktop ${{ needs.build-windows.outputs.version }}
           body_path: release-notes.md
-          fail_on_unmatched_files: true
+          fail_on_unmatched_files: false
           files: |
             dist/*.zip
             dist/*.AppImage
+            dist/*-windows-setup.exe
             dist/SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
