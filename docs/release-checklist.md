@@ -60,20 +60,20 @@ Verify the 0.4.4 motion tokens, smooth animations, and high refresh rate support
 
 ## Automated
 
-- [ ] `flutter analyze` — clean (on Linux, if the analyzer crashes with **Too many open files**, try `ulimit -n 8192`; see [CONTRIBUTING.md](../CONTRIBUTING.md)).
-- [ ] `flutter test` — all green.
+- [x] `flutter analyze` — clean (on Linux, if the analyzer crashes with **Too many open files**, try `ulimit -n 8192`; see [CONTRIBUTING.md](../CONTRIBUTING.md)).
+- [x] `flutter test` — all green.
 - [ ] CI **Flutter version** in `.github/workflows/*.yml` matches the toolchain you validated (bump intentionally when upgrading stable).
 
 ## Versioning and release
 
-- [ ] `pubspec.yaml` on the release branch is **`0.4.11+N`** (currently **`0.4.11+1`** on `dev` after #346).
-- [ ] After merge to `main`, confirm any **Auto Version Bump** still yields a **0.4.11+…** product version (do not ship as 0.4.12).
-- [ ] **Tag** `0.4.11` is placed on the **commit that includes all fixes** you want in binaries (a tag does not auto-include later commits; see [CONTRIBUTING.md](../CONTRIBUTING.md)).
-- [ ] Run the **Release** workflow from GitHub Actions (see [tags-and-releases.md](tags-and-releases.md)).
-- [ ] Verify **Linux** and **Windows** zip artifacts and `SHA256SUMS.txt` on the GitHub Release.
+- [x] `pubspec.yaml` on the release branch is **`0.4.11+N`** (currently **`0.4.11+1`** on `dev` after #346).
+- [x] After merge to `main`, confirm any **Auto Version Bump** still yields a **0.4.11+…** product version (do not ship as 0.4.12).
+- [x] **Tag** `0.4.11` is placed on the **commit that includes all fixes** you want in binaries (a tag does not auto-include later commits; see [CONTRIBUTING.md](../CONTRIBUTING.md)).
+- [x] Run the **Release** workflow from GitHub Actions (see [tags-and-releases.md](tags-and-releases.md)).
+- [ ] Verify **portable** zips (`*-linux.zip`, `*-windows.zip`, `*-macos.zip`), **installable** artifacts (`*.AppImage`, `*.deb`, `*-windows-setup.exe`), and `SHA256SUMS.txt` on the GitHub Release.
 
 ## Docs
 
-- [ ] [CHANGELOG.md](../CHANGELOG.md) has a dated **`## [0.4.11]`** section for the release (CI copies it into the GitHub Release body).
-- [ ] [security.md](security.md) still matches behavior if storage changed.
-- [ ] [roadmap.md](roadmap.md) marks 0.4.7–0.4.10 shipped and 0.4.11 as the packaging/next release.
+- [x] [CHANGELOG.md](../CHANGELOG.md) has a dated **`## [0.4.11]`** section for the release (CI copies it into the GitHub Release body).
+- [x] [security.md](security.md) still matches behavior if storage changed.
+- [x] [roadmap.md](roadmap.md) marks 0.4.7–0.4.10 shipped and 0.4.11 as the packaging/next release.

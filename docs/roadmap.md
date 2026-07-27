@@ -2,8 +2,8 @@
 
 Living document for planned work. Not a commitment order; adjust as priorities change.
 
-**GitHub Latest Release:** [0.4.10](https://github.com/QueryaHub/Querya-Desktop/releases/tag/0.4.10) (2026-07-11).  
-**Next product release:** **0.4.11** — packaging on `dev` (`pubspec` `0.4.11+1`, draft [CHANGELOG](../CHANGELOG.md) `[0.4.11]`). Epic [#341](https://github.com/QueryaHub/Querya-Desktop/issues/341).
+**GitHub Latest Release:** [0.4.11](https://github.com/QueryaHub/Querya-Desktop/releases/tag/0.4.11) (2026-07-27).  
+**Next product release:** **0.5.0** — live Marketplace download and install — see below.
 
 ## Theme system
 
@@ -23,8 +23,8 @@ Living document for planned work. Not a commitment order; adjust as priorities c
 - **Shipped in 0.4.7:** Local Extension Discovery — `ExtensionManifest`, local folder scan, theme migration to extension format — [planned-0.4.7.md](planned-0.4.7.md).
 - **Shipped in 0.4.8:** Extension Manager UI (+ mock Marketplace) — [planned-0.4.8.md](planned-0.4.8.md).
 - **Shipped in 0.4.9:** PostgreSQL SSL & connection reliability — see [CHANGELOG.md](../CHANGELOG.md).
-- **Shipped in 0.4.10 (Latest):** Sandboxed extension runtime (Block E), Plugin RPC bridge (Block C), SDUI form/tree builders, local `.zip`/`.qext` install, Registration/Activation for external database drivers (e.g. ClickHouse), in-app updater — see [CHANGELOG.md](../CHANGELOG.md).
-- **In packaging — 0.4.11:** Universal UI / SDUI RPC expand, ExtensionTableView, universal export, MySQL/SQLite parity, shell UX (#339), Fluid QueryaMotion (#342) + perf follow-ups (#356), grid/pool/timeout fixes — draft notes in [CHANGELOG.md](../CHANGELOG.md) `[0.4.11]`. Checklist: [release-checklist.md](release-checklist.md). Epic [#341](https://github.com/QueryaHub/Querya-Desktop/issues/341).
+- **Shipped in 0.4.10:** Sandboxed extension runtime (Block E), Plugin RPC bridge (Block C), SDUI form/tree builders, local `.zip`/`.qext` install, Registration/Activation for external database drivers (e.g. ClickHouse), in-app updater — see [CHANGELOG.md](../CHANGELOG.md).
+- **Shipped in 0.4.11 (Latest):** Universal UI / SDUI RPC expand, ExtensionTableView, universal export, MySQL/SQLite parity, shell UX (#339), Fluid QueryaMotion (#342) + perf follow-ups (#356), grid/pool/timeout fixes, dual-channel packaging (portable zip + AppImage / `.deb` / Windows setup) — [CHANGELOG.md](../CHANGELOG.md) `[0.4.11]`, [packaging.md](packaging.md), epic [#379](https://github.com/QueryaHub/Querya-Desktop/issues/379).
 - **Planned 0.5.0:** Marketplace Launch — live download, `sha256` validation, install themes (and later DB drivers) from the network.
 
 ## Query history and favorites
