@@ -22,6 +22,7 @@ On upgrade from older databases, existing plaintext secrets in SQLite are **migr
 
 Automated tests use an **in-memory** secrets backend (see `test/flutter_test_config.dart`) so CI does not require a desktop keyring.
 
+
 ## Archive install limits (extensions and updates)
 
 Marketplace downloads, local extension sideload (`.zip` / `.qext`), and in-app updater extraction use `SafeZipExtractor` (`lib/core/security/safe_zip_extractor.dart`) with shared default limits:
@@ -35,3 +36,4 @@ Marketplace downloads, local extension sideload (`.zip` / `.qext`), and in-app u
 | Max compression ratio (uncompressed ÷ compressed) | 100:1 |
 
 Archives exceeding these bounds fail closed before files are written to disk. Path traversal checks remain in `archive_path_guard.dart`.
+
