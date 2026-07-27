@@ -41,3 +41,7 @@ coverage/
 *.exe
 design-front/
 docker/sqlite/data/
+
+# Local packaging outputs
+Querya-Desktop-*.AppImage
+Querya-Desktop-*.zip
