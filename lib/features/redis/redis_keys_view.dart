@@ -80,6 +80,7 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
 
     // One pipelined burst of TYPE+TTL (not N× Future.wait round-trips).
     List<_KeyInfo> infos;
+    String? typeTtlError;
     try {
       final metas = await widget.connection.typesAndTtls(keyNames);
       infos = [
@@ -90,11 +91,13 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
             ttl: metas[i].ttl,
           ),
       ];
-    } catch (_) {
+    } catch (e) {
+      // Still show keys with unknown type/TTL; surface the failure non-blocking.
       infos = [
         for (final name in keyNames)
           _KeyInfo(name: name, type: 'unknown', ttl: -1),
       ];
+      typeTtlError = 'Failed to load key types/TTLs: $e';
     }
 
     if (!mounted) return;
@@ -102,6 +105,7 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
       _keys.addAll(infos);
       _cursor = nextCursor;
       _hasMore = nextCursor != 0;
+      if (typeTtlError != null) _error = typeTtlError;
     });
   }
 

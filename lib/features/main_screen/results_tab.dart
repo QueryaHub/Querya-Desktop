@@ -9,6 +9,10 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Query output: grid, loading, error, or placeholder.
 ///
+/// Render order in [_buildBody]: **loading** first (only when [isLoading]),
+/// then **error** when [errorMessage] is non-empty (including when
+/// `isLoading` is false), then status / affected / idle / grid content.
+///
 /// Mode changes (idle / loading / error / status / grid) morph via
 /// [QueryaFadeSlide]. Keys are per **mode**, not per row — so grid data updates
 /// and scroll rebuilds do not re-trigger the transition.
