@@ -181,8 +181,8 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
                     padding: const material.EdgeInsets.all(2),
                     child: material.AnimatedRotation(
                       turns: widget.isExpanded ? 0.25 : 0,
-                      duration: context.motionDuration(QueryaMotion.fast),
-                      curve: context.motionCurve(QueryaMotion.standardCurve),
+                      duration: context.motionDuration(QueryaMotion.treeExpand),
+                      curve: context.motionCurve(QueryaMotion.treeExpandCurve),
                       child: material.Icon(
                         QueryaIcons.expandClosed,
                         size: 16,

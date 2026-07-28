@@ -14,11 +14,15 @@ abstract final class QueryaMotion {
   /// Hover, small state changes.
   static const Duration fast = Duration(milliseconds: 120);
 
-  /// Dialogs, menus, expand/collapse.
+  /// Dialogs, menus, general surface transitions.
   static const Duration standard = Duration(milliseconds: 200);
 
   /// Emphasized transitions (theme cross-fade, large surfaces).
   static const Duration slow = Duration(milliseconds: 320);
+
+  /// Connection / SDUI tree expand: chevron rotation **and** height morph share
+  /// this duration so one gesture does not finish on two clocks (#480).
+  static const Duration treeExpand = standard;
 
   /// Elements appearing (decelerate).
   static const Curve enter = Curves.easeOutCubic;
@@ -31,6 +35,9 @@ abstract final class QueryaMotion {
 
   /// Hero / theme transitions.
   static const Curve emphasized = Curves.easeInOutCubicEmphasized;
+
+  /// Curve for [treeExpand] (chevron + [QueryaAnimatedExpand] height).
+  static const Curve treeExpandCurve = enter;
 
   /// Returns [token] adjusted for accessibility and [QueryaMotionScope] level.
   static Duration effectiveDuration(BuildContext context, Duration token) {

@@ -82,7 +82,8 @@ Introduce `lib/core/motion/` with a single source of truth for durations and cur
 |-------|-------|-----|
 | `instant` | 0 ms | reduced-motion / disabled |
 | `fast` | 120 ms | hover, small state changes |
-| `standard` | 200 ms | dialogs, menus, expand/collapse |
+| `standard` | 200 ms | dialogs, menus, general surfaces |
+| `treeExpand` | 200 ms (= `standard`) | connection/SDUI tree: **chevron + height** share one clock (#480) |
 | `slow` | 320 ms | emphasized / large surfaces, theme cross-fade |
 
 ### 4.2 Curve tokens
@@ -91,7 +92,8 @@ Introduce `lib/core/motion/` with a single source of truth for durations and cur
 |-------|-------|-----|
 | `enter` | `easeOutCubic` | elements appearing (decelerate) |
 | `exit` | `easeInCubic` | elements leaving (accelerate) |
-| `standard` | `easeInOutCubic` | move/resize in place |
+| `standardCurve` | `easeInOutCubic` | move/resize in place |
+| `treeExpandCurve` | = `enter` | tree expand chevron + `QueryaAnimatedExpand` |
 | `emphasized` | `Curves.easeInOutCubicEmphasized` | hero / theme transitions |
 
 ### 4.3 Reduced motion / accessibility
@@ -151,6 +153,9 @@ When reviewing PRs that touch animation:
 2. Require Full / Reduced / Off + OS `disableAnimations` coverage for new transitions.
 3. Split / resize: no spring or lag mid-drag; settle only on release / focus chrome.
 4. Never stagger or fade virtualized result rows while scrolling.
+5. Tree expand: chevron `AnimatedRotation` and `QueryaAnimatedExpand` **must** use
+   `QueryaMotion.treeExpand` + `treeExpandCurve` (not `fast`/`standardCurve` mixed
+   with `standard`/`enter`).
 
 **Allowed named non-token durations** (named + documented — not magic literals at call sites):
 

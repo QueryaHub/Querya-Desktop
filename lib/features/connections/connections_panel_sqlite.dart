@@ -169,8 +169,8 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
                       padding: const material.EdgeInsets.all(2),
                       child: material.AnimatedRotation(
                         turns: _expanded ? 0.25 : 0,
-                        duration: context.motionDuration(QueryaMotion.fast),
-                        curve: context.motionCurve(QueryaMotion.standardCurve),
+                        duration: context.motionDuration(QueryaMotion.treeExpand),
+                        curve: context.motionCurve(QueryaMotion.treeExpandCurve),
                         child: material.Icon(
                           QueryaIcons.expandClosed,
                           size: 16,
@@ -362,8 +362,8 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
             label: '${widget.label} (${widget.items.length})',
             leading: material.AnimatedRotation(
               turns: _expanded ? 0.25 : 0,
-              duration: context.motionDuration(QueryaMotion.fast),
-              curve: context.motionCurve(QueryaMotion.standardCurve),
+              duration: context.motionDuration(QueryaMotion.treeExpand),
+              curve: context.motionCurve(QueryaMotion.treeExpandCurve),
               child: material.Icon(
                 QueryaIcons.expandClosed,
                 size: QueryaIconSizes.treeExpand,

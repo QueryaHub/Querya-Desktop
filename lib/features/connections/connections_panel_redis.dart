@@ -174,8 +174,8 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
                       padding: const material.EdgeInsets.all(2),
                       child: material.AnimatedRotation(
                         turns: _expanded ? 0.25 : 0,
-                        duration: context.motionDuration(QueryaMotion.fast),
-                        curve: context.motionCurve(QueryaMotion.standardCurve),
+                        duration: context.motionDuration(QueryaMotion.treeExpand),
+                        curve: context.motionCurve(QueryaMotion.treeExpandCurve),
                         child: material.Icon(
                           material.Icons.chevron_right_rounded,
                           size: 16,

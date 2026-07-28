@@ -10,10 +10,10 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 ///
 /// Visible rows are flattened into a [ListView.builder] so only viewport
 /// rows are built (large schemas no longer create a full widget Column).
-/// Expand chevrons use [QueryaMotion] tokens (same dialect as native trees).
-/// Height morph via [QueryaAnimatedExpand] is not used here: nested expand
-/// widgets conflict with the flat virtualized row list (see issue #480 for
-/// coordinated expand timing across trees).
+/// Expand chevrons and height morph share [QueryaMotion.treeExpand] /
+/// [QueryaMotion.treeExpandCurve]. Height morph via [QueryaAnimatedExpand] is
+/// not used on the flat virtualized row list (nested expand would fight
+/// `ListView` itemExtent); chevron timing still matches native trees.
 class SduiTreeBuilder extends material.StatefulWidget {
   const SduiTreeBuilder({
     super.key,
@@ -233,8 +233,8 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
                     padding: const material.EdgeInsets.all(2),
                     child: material.AnimatedRotation(
                       turns: isExpanded ? 0.25 : 0,
-                      duration: context.motionDuration(QueryaMotion.fast),
-                      curve: context.motionCurve(QueryaMotion.standardCurve),
+                      duration: context.motionDuration(QueryaMotion.treeExpand),
+                      curve: context.motionCurve(QueryaMotion.treeExpandCurve),
                       child: material.Icon(
                         QueryaIcons.expandClosed,
                         size: QueryaIconSizes.treeExpand,

@@ -162,8 +162,8 @@ class _MysqlConnectionTileState extends State<_MysqlConnectionTile> {
                       padding: const material.EdgeInsets.all(2),
                       child: material.AnimatedRotation(
                         turns: _expanded ? 0.25 : 0,
-                        duration: context.motionDuration(QueryaMotion.fast),
-                        curve: context.motionCurve(QueryaMotion.standardCurve),
+                        duration: context.motionDuration(QueryaMotion.treeExpand),
+                        curve: context.motionCurve(QueryaMotion.treeExpandCurve),
                         child: material.Icon(
                           QueryaIcons.expandClosed,
                           size: 16,
@@ -440,8 +440,8 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
             label: widget.databaseName,
             leading: material.AnimatedRotation(
               turns: _expanded ? 0.25 : 0,
-              duration: context.motionDuration(QueryaMotion.fast),
-              curve: context.motionCurve(QueryaMotion.standardCurve),
+              duration: context.motionDuration(QueryaMotion.treeExpand),
+              curve: context.motionCurve(QueryaMotion.treeExpandCurve),
               child: material.Icon(
                 QueryaIcons.expandClosed,
                 size: QueryaIconSizes.treeExpand,
@@ -632,8 +632,8 @@ class _MysqlObjectGroupState extends State<_MysqlObjectGroup> {
             label: '${widget.label} (${widget.items.length})',
             leading: material.AnimatedRotation(
               turns: _expanded ? 0.25 : 0,
-              duration: context.motionDuration(QueryaMotion.fast),
-              curve: context.motionCurve(QueryaMotion.standardCurve),
+              duration: context.motionDuration(QueryaMotion.treeExpand),
+              curve: context.motionCurve(QueryaMotion.treeExpandCurve),
               child: material.Icon(
                 QueryaIcons.expandClosed,
                 size: QueryaIconSizes.treeExpand,
