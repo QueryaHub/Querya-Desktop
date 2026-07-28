@@ -269,6 +269,9 @@ jobs:
     name: Publish GitHub Release
     needs: [build-windows, build-linux, build-macos]
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ needs.build-windows.outputs.version }}
+      release_tag: ${{ steps.rel.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -320,7 +323,7 @@ jobs:
             echo "- **Linux Flatpak**: \`Querya-Desktop-${VERSION}-linux.flatpak\` — \`flatpak install --user ./Querya-Desktop-${VERSION}-linux.flatpak\`"
             echo "- **Windows setup**: \`Querya-Desktop-${VERSION}-windows-setup.exe\` (Inno Setup)"
             echo ""
-            echo "**Arch (AUR):** PKGBUILD in \`packaging/linux/aur/\` (community-maintained)."
+            echo "**Arch (AUR):** \`querya-desktop\` — \`yay -S querya-desktop\` (auto-published when \`AUR_SSH_PRIVATE_KEY\` is configured)."
             echo ""
             echo "Verify checksums: \`SHA256SUMS.txt\`"
             echo ""
@@ -355,3 +358,41 @@ jobs:
             dist/SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-aur:
+    name: Publish AUR (querya-desktop)
+    needs: [publish]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check AUR secret
+        id: aur
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        run: |
+          if [ -n "${AUR_SSH_PRIVATE_KEY}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Wait for release assets
+        if: steps.aur.outputs.enabled == 'true'
+        run: sleep 15
+
+      - uses: actions/checkout@v4
+        if: steps.aur.outputs.enabled == 'true'
+
+      - name: SSH agent
+        if: steps.aur.outputs.enabled == 'true'
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+
+      - name: Publish to AUR
+        if: steps.aur.outputs.enabled == 'true'
+        run: |
+          set -euo pipefail
+          VER="${{ needs.publish.outputs.version }}"
+          TAG="${{ needs.publish.outputs.release_tag }}"
+          chmod +x ./scripts/linux/aur_publish.sh
+          ./scripts/linux/aur_publish.sh "$VER" "$TAG"

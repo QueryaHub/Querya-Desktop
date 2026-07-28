@@ -65,7 +65,7 @@ payload as the portable zip and AppImage.
 | `.deb` | [`scripts/linux/build_deb.sh`](../scripts/linux/build_deb.sh) | `sudo apt install ./Querya-Desktop-{ver}-linux.deb` |
 | `.rpm` | [`scripts/linux/build_rpm.sh`](../scripts/linux/build_rpm.sh) | `sudo dnf install ./Querya-Desktop-{ver}-linux.rpm` |
 | Flatpak | [`scripts/linux/build_flatpak.sh`](../scripts/linux/build_flatpak.sh) | `flatpak install --user ./Querya-Desktop-{ver}-linux.flatpak` |
-| AUR | [`packaging/linux/aur/`](../packaging/linux/aur/) | Community PKGBUILD (Release zip under `/opt`) |
+| AUR | [`packaging/linux/aur/`](../packaging/linux/aur/) | `yay -S querya-desktop` (CI publishes on Release when `AUR_SSH_PRIVATE_KEY` is set) |
 
 **Runtime dependencies (deb/rpm):** GTK 3, libsecret, GLib; app indicator recommended for tray.
 

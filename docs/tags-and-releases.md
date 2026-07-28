@@ -53,7 +53,7 @@ sudo dnf install ./Querya-Desktop-X.Y.Z-linux.rpm
 flatpak install --user ./Querya-Desktop-X.Y.Z-linux.flatpak
 ```
 
-**Arch (AUR):** community PKGBUILD — [`packaging/linux/aur/`](../packaging/linux/aur/) (installs the Release portable zip under `/opt`).
+**Arch (AUR):** `yay -S querya-desktop` — auto-published by Release CI when `AUR_SSH_PRIVATE_KEY` is configured ([`packaging/linux/aur/`](../packaging/linux/aur/)).
 
 ## Changelog в GitHub Release
 
