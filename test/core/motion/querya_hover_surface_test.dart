@@ -155,4 +155,20 @@ void main() {
     );
     expect(region.cursor, SystemMouseCursors.click);
   });
+
+  testWidgets('applies optional border on decoration', (tester) async {
+    await tester.pumpWidget(
+      wrap(
+        QueryaHoverSurface(
+          border: Border.all(color: const Color(0xFF445566), width: 2),
+          child: const SizedBox(width: 40, height: 20),
+        ),
+      ),
+    );
+    final animated =
+        tester.widget<AnimatedContainer>(find.byType(AnimatedContainer));
+    final decoration = animated.decoration! as BoxDecoration;
+    expect(decoration.border, isA<Border>());
+    expect((decoration.border! as Border).top.width, 2);
+  });
 }
