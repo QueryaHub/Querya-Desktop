@@ -4,6 +4,7 @@ import 'package:querya_desktop/core/sdui/sdui_form_builder.dart';
 import 'package:querya_desktop/core/sdui/sdui_form_schema.dart';
 import 'package:querya_desktop/core/sdui/sdui_tree_builder.dart';
 import 'package:querya_desktop/core/sdui/sdui_tree_schema.dart';
+import 'package:querya_desktop/core/ui/querya_icons.dart';
 
 import '../../support/querya_theme_test_shell.dart';
 
@@ -206,7 +207,7 @@ void main() {
       expect(find.text('Databases'), findsOneWidget);
       expect(find.text('analytics'), findsNothing);
 
-      await tester.tap(find.byIcon(material.Icons.chevron_right));
+      await tester.tap(find.byIcon(QueryaIcons.expandClosed));
       await tester.pumpAndSettle();
 
       expect(fetches, 1);

@@ -50,7 +50,7 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
   final Set<String> _expanded = {};
   final Map<String, String> _expandErrors = {};
 
-  static const double _rowExtent = 36;
+  static const double _rowExtent = 28;
 
   @override
   void initState() {
@@ -180,17 +180,27 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
   }
 
   material.Widget _buildNodeRow(SduiTreeNode node, {required int depth}) {
+    final theme = material.Theme.of(context);
+    final muted = theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.85);
+    final primary = theme.colorScheme.primary;
     final canExpand = node.expandable || node.hasChildren;
     final isExpanded = _expanded.contains(node.id);
     final isLoading = _loading.contains(node.id);
     final nodeKind = _resolveNodeKind(node);
     final isBrowsable = nodeKind == 'table' || nodeKind == 'view';
+    final iconSize = canExpand
+        ? QueryaIconSizes.treeGroup
+        : QueryaIconSizes.treeLeaf;
+    final iconColor = isBrowsable
+        ? primary.withValues(alpha: 0.5)
+        : muted;
+    final rowLeft = 8.0 + depth * 16.0 + (canExpand ? 0 : 4.0);
 
     return material.InkWell(
       onTap: isBrowsable ? () => widget.onNodeSelected?.call(node) : null,
       child: material.Padding(
         padding: material.EdgeInsets.only(
-          left: 8.0 + depth * 16.0,
+          left: rowLeft,
           right: 8,
         ),
         child: material.Row(
@@ -201,7 +211,7 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
                 height: 28,
                 child: material.IconButton(
                   padding: material.EdgeInsets.zero,
-                  iconSize: 18,
+                  iconSize: QueryaIconSizes.treeExpand,
                   onPressed: () {
                     if (isExpanded) {
                       _onCollapse(node);
@@ -209,10 +219,14 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
                       _onExpand(node);
                     }
                   },
-                  icon: material.Icon(
-                    isExpanded
-                        ? material.Icons.expand_more
-                        : material.Icons.chevron_right,
+                  icon: material.AnimatedRotation(
+                    turns: isExpanded ? 0.25 : 0,
+                    duration: const Duration(milliseconds: 160),
+                    curve: material.Curves.easeOutCubic,
+                    child: const material.Icon(
+                      QueryaIcons.expandClosed,
+                      size: QueryaIconSizes.treeExpand,
+                    ),
                   ),
                 ),
               )
@@ -230,7 +244,8 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
                   node.icon,
                   expandable: node.expandable,
                 ),
-                size: QueryaIconSizes.sduiNode,
+                size: iconSize,
+                color: iconColor,
               ),
             const Gap(8),
             material.Expanded(
@@ -239,7 +254,8 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
                 overflow: material.TextOverflow.ellipsis,
                 maxLines: 1,
                 style: material.TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
+                  color: isBrowsable ? theme.colorScheme.onSurface : muted,
                   fontWeight: isBrowsable ? material.FontWeight.w600 : null,
                 ),
               ),

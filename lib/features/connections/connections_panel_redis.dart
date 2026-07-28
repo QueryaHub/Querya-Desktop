@@ -258,28 +258,84 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
                       ),
                     ),
                   if (_error != null)
-                    material.Padding(
+                    TreeLoadError(
+                      message: _error!,
                       padding: const material.EdgeInsets.only(
-                          left: 28, top: 4, bottom: 4),
-                      child: material.Text(
-                        'Error',
-                        overflow: material.TextOverflow.ellipsis,
-                        maxLines: 1,
-                        style: material.TextStyle(
-                            fontSize: 11, color: theme.colorScheme.destructive),
+                        left: 28,
+                        top: 4,
+                        bottom: 4,
                       ),
+                      onRetry: _loadDatabases,
                     ),
-                  for (final db in _databases)
-                    _RedisDatabaseNode(
-                      index: db.index,
-                      keys: db.keys,
-                      onTap: () => widget.onDatabaseTap?.call(db.index),
+                  if (_databases.isNotEmpty)
+                    _RedisDatabasesNode(
+                      connection: widget.connection,
+                      databases: _databases,
+                      onRefreshDatabases: () {
+                        setState(() => _databases = []);
+                        _loadDatabases();
+                      },
+                      onDatabaseTap: widget.onDatabaseTap,
                     ),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _RedisDatabasesNode extends material.StatelessWidget {
+  const _RedisDatabasesNode({
+    required this.connection,
+    required this.databases,
+    required this.onRefreshDatabases,
+    this.onDatabaseTap,
+  });
+
+  final ConnectionRow connection;
+  final List<({int index, int keys})> databases;
+  final VoidCallback onRefreshDatabases;
+  final void Function(int database)? onDatabaseTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return material.Padding(
+      padding: const material.EdgeInsets.only(left: 20),
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.start,
+        mainAxisSize: material.MainAxisSize.min,
+        children: [
+          _PgTreeRow(
+            label: 'Databases (${databases.length})',
+            icon: QueryaIcons.databasesFolder,
+            iconSize: QueryaIconSizes.treeConnection,
+            iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
+            textStyle: material.TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.foreground,
+            ),
+            verticalPadding: 4,
+            onTap: null,
+            connection: connection,
+            onContextRefresh: onRefreshDatabases,
+          ),
+          lazyConnectionTreeList(
+            context: context,
+            itemCount: databases.length,
+            itemBuilder: (context, index) {
+              final db = databases[index];
+              return _RedisDatabaseNode(
+                index: db.index,
+                keys: db.keys,
+                onTap: () => onDatabaseTap?.call(db.index),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -300,49 +356,31 @@ class _RedisDatabaseNode extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return material.Padding(
-      padding: const material.EdgeInsets.only(left: 24),
-      child: material.MouseRegion(
-        cursor: material.SystemMouseCursors.click,
-        child: material.InkWell(
-          onTap: onTap,
-          borderRadius: material.BorderRadius.circular(6),
-          child: material.Padding(
-            padding:
-                const material.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-            child: material.Row(
-              children: [
-                material.Icon(
-                  QueryaIcons.databasesFolder,
-                  size: 14,
-                  color: keys > 0
-                      ? theme.colorScheme.primary.withValues(alpha: 0.7)
-                      : theme.colorScheme.mutedForeground
-                          .withValues(alpha: 0.5),
+      padding: const material.EdgeInsets.only(left: 16),
+      child: _PgTreeRow(
+        label: 'db$index',
+        icon: QueryaIcons.database,
+        iconSize: QueryaIconSizes.treeConnection,
+        iconColor: keys > 0
+            ? theme.colorScheme.primary.withValues(alpha: 0.7)
+            : theme.colorScheme.mutedForeground.withValues(alpha: 0.5),
+        trailing: keys > 0
+            ? material.Text(
+                '$keys',
+                style: material.TextStyle(
+                  fontSize: 10,
+                  color: theme.colorScheme.mutedForeground,
                 ),
-                const Gap(8),
-                material.Expanded(
-                  child: material.Text(
-                    'db$index',
-                    overflow: material.TextOverflow.ellipsis,
-                    maxLines: 1,
-                    style: material.TextStyle(
-                      fontSize: 12,
-                      color: keys > 0
-                          ? theme.colorScheme.foreground
-                          : theme.colorScheme.mutedForeground,
-                    ),
-                  ),
-                ),
-                if (keys > 0)
-                  material.Text(
-                    '$keys',
-                    style: material.TextStyle(
-                        fontSize: 10, color: theme.colorScheme.mutedForeground),
-                  ),
-              ],
-            ),
-          ),
+              )
+            : null,
+        textStyle: material.TextStyle(
+          fontSize: 12,
+          color: keys > 0
+              ? theme.colorScheme.foreground
+              : theme.colorScheme.mutedForeground,
         ),
+        verticalPadding: 3,
+        onTap: onTap,
       ),
     );
   }

@@ -657,7 +657,7 @@ class _MysqlObjectGroupState extends State<_MysqlObjectGroup> {
               context: context,
               itemCount: widget.items.length,
               itemExtent: kConnectionTreeRowExtent,
-              padding: const material.EdgeInsets.only(left: 22),
+              padding: const material.EdgeInsets.only(left: 26),
               itemBuilder: (context, index) {
                 final item = widget.items[index];
                 return _PgTreeRow(

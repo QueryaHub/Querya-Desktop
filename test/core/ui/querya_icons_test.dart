@@ -53,8 +53,20 @@ void main() {
         QueryaIcons.database,
       );
       expect(
-        QueryaIcons.sduiNodeIcon('table', expandable: false),
+        QueryaIcons.sduiNodeIcon('table', expandable: true),
         QueryaIcons.tableGroup,
+      );
+      expect(
+        QueryaIcons.sduiNodeIcon('table', expandable: false),
+        QueryaIcons.tableLeaf,
+      );
+      expect(
+        QueryaIcons.sduiNodeIcon('view', expandable: true),
+        QueryaIcons.viewGroup,
+      );
+      expect(
+        QueryaIcons.sduiNodeIcon('view', expandable: false),
+        QueryaIcons.viewLeaf,
       );
       expect(
         QueryaIcons.sduiNodeIcon(null, expandable: true),

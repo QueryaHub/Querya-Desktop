@@ -366,7 +366,7 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
               curve: context.motionCurve(QueryaMotion.standardCurve),
               child: material.Icon(
                 QueryaIcons.expandClosed,
-                size: 13,
+                size: QueryaIconSizes.treeExpand,
                 color: theme.colorScheme.mutedForeground,
               ),
             ),
@@ -387,7 +387,7 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
               context: context,
               itemCount: widget.items.length,
               itemExtent: kConnectionTreeRowExtent,
-              padding: const material.EdgeInsets.only(left: 22),
+              padding: const material.EdgeInsets.only(left: 26),
               itemBuilder: (context, index) {
                 final item = widget.items[index];
                 return _PgTreeRow(
