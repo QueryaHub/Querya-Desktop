@@ -79,8 +79,16 @@ void main() {
     });
   });
 
-  test('tree size tokens are ordered leaf < group < sdui', () {
+  test('tree size tokens are ordered leaf < group < connection < sidebar', () {
     expect(QueryaIconSizes.treeLeaf, lessThan(QueryaIconSizes.treeGroup));
-    expect(QueryaIconSizes.treeGroup, lessThan(QueryaIconSizes.sduiNode));
+    expect(QueryaIconSizes.treeGroup, lessThan(QueryaIconSizes.treeConnection));
+    expect(
+      QueryaIconSizes.treeExpand,
+      lessThan(QueryaIconSizes.sidebarExpand),
+    );
+    expect(
+      QueryaIconSizes.sidebarExpand,
+      QueryaIconSizes.sidebarConnectionIcon,
+    );
   });
 }

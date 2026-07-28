@@ -91,16 +91,20 @@ class _ConnectionTile extends StatelessWidget {
     final iconWidget = iconAsset != null
         ? material.Image.asset(
             iconAsset!,
-            width: 16,
-            height: 16,
+            width: QueryaIconSizes.sidebarConnectionIcon,
+            height: QueryaIconSizes.sidebarConnectionIcon,
             fit: material.BoxFit.contain,
             errorBuilder: (_, __, ___) => material.Icon(
               icon,
-              size: 16,
+              size: QueryaIconSizes.sidebarConnectionIcon,
               color: theme.colorScheme.primary,
             ),
           )
-        : material.Icon(icon, size: 16, color: theme.colorScheme.primary);
+        : material.Icon(
+            icon,
+            size: QueryaIconSizes.sidebarConnectionIcon,
+            color: theme.colorScheme.primary,
+          );
     return ContextMenu(
       items: [
         MenuButton(
@@ -256,14 +260,15 @@ class _FolderTileState extends State<_FolderTile> {
                         duration: context.motionDuration(QueryaMotion.treeExpand),
                         curve: context.motionCurve(QueryaMotion.treeExpandCurve),
                         child: material.Icon(
-                          material.Icons.chevron_right_rounded,
-                          size: 18,
+                          QueryaIcons.expandClosed,
+                          size: QueryaIconSizes.sidebarExpand,
                           color: theme.colorScheme.mutedForeground,
                         ),
                       ),
                       const Gap(2),
-                      material.Icon(material.Icons.folder_rounded,
-                          size: 18, color: theme.colorScheme.primary),
+                      material.Icon(QueryaIcons.folder,
+                          size: QueryaIconSizes.sidebarConnectionIcon,
+                          color: theme.colorScheme.primary),
                       const Gap(8),
                       material.Expanded(
                         child: material.Text(
