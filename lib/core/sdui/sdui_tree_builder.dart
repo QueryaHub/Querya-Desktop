@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/motion/querya_motion.dart';
+import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/core/sdui/sdui_tree_schema.dart';
 import 'package:querya_desktop/core/ui/querya_icon_sizes.dart';
 import 'package:querya_desktop/core/ui/querya_icons.dart';
@@ -8,6 +10,10 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 ///
 /// Visible rows are flattened into a [ListView.builder] so only viewport
 /// rows are built (large schemas no longer create a full widget Column).
+/// Expand chevrons use [QueryaMotion] tokens (same dialect as native trees).
+/// Height morph via [QueryaAnimatedExpand] is not used here: nested expand
+/// widgets conflict with the flat virtualized row list (see issue #480 for
+/// coordinated expand timing across trees).
 class SduiTreeBuilder extends material.StatefulWidget {
   const SduiTreeBuilder({
     super.key,
@@ -110,6 +116,14 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
     setState(() => _expanded.remove(node.id));
   }
 
+  void _toggleExpand(SduiTreeNode node) {
+    if (_expanded.contains(node.id)) {
+      _onCollapse(node);
+    } else {
+      _onExpand(node);
+    }
+  }
+
   List<SduiTreeNode> _replaceNode(
     List<SduiTreeNode> nodes,
     String id,
@@ -180,24 +194,28 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
   }
 
   material.Widget _buildNodeRow(SduiTreeNode node, {required int depth}) {
-    final theme = material.Theme.of(context);
-    final muted = theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.85);
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.mutedForeground;
     final primary = theme.colorScheme.primary;
     final canExpand = node.expandable || node.hasChildren;
     final isExpanded = _expanded.contains(node.id);
     final isLoading = _loading.contains(node.id);
     final nodeKind = _resolveNodeKind(node);
     final isBrowsable = nodeKind == 'table' || nodeKind == 'view';
-    final iconSize = canExpand
-        ? QueryaIconSizes.treeGroup
-        : QueryaIconSizes.treeLeaf;
-    final iconColor = isBrowsable
-        ? primary.withValues(alpha: 0.5)
-        : muted;
+    final iconSize =
+        canExpand ? QueryaIconSizes.treeGroup : QueryaIconSizes.treeLeaf;
+    final iconColor = isBrowsable ? primary.withValues(alpha: 0.5) : muted;
     final rowLeft = 8.0 + depth * 16.0 + (canExpand ? 0 : 4.0);
 
     return material.InkWell(
-      onTap: isBrowsable ? () => widget.onNodeSelected?.call(node) : null,
+      onTap: () {
+        if (isBrowsable) {
+          widget.onNodeSelected?.call(node);
+        } else if (canExpand) {
+          _toggleExpand(node);
+        }
+      },
+      borderRadius: material.BorderRadius.circular(4),
       child: material.Padding(
         padding: material.EdgeInsets.only(
           left: rowLeft,
@@ -206,32 +224,28 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
         child: material.Row(
           children: [
             if (canExpand)
-              material.SizedBox(
-                width: 28,
-                height: 28,
-                child: material.IconButton(
-                  padding: material.EdgeInsets.zero,
-                  iconSize: QueryaIconSizes.treeExpand,
-                  onPressed: () {
-                    if (isExpanded) {
-                      _onCollapse(node);
-                    } else {
-                      _onExpand(node);
-                    }
-                  },
-                  icon: material.AnimatedRotation(
-                    turns: isExpanded ? 0.25 : 0,
-                    duration: const Duration(milliseconds: 160),
-                    curve: material.Curves.easeOutCubic,
-                    child: const material.Icon(
-                      QueryaIcons.expandClosed,
-                      size: QueryaIconSizes.treeExpand,
+              material.MouseRegion(
+                cursor: material.SystemMouseCursors.click,
+                child: material.GestureDetector(
+                  behavior: material.HitTestBehavior.opaque,
+                  onTap: () => _toggleExpand(node),
+                  child: material.Padding(
+                    padding: const material.EdgeInsets.all(2),
+                    child: material.AnimatedRotation(
+                      turns: isExpanded ? 0.25 : 0,
+                      duration: context.motionDuration(QueryaMotion.fast),
+                      curve: context.motionCurve(QueryaMotion.standardCurve),
+                      child: material.Icon(
+                        QueryaIcons.expandClosed,
+                        size: QueryaIconSizes.treeExpand,
+                        color: muted,
+                      ),
                     ),
                   ),
                 ),
               )
             else
-              const material.SizedBox(width: 28),
+              const material.SizedBox(width: QueryaIconSizes.treeExpand + 4),
             if (isLoading)
               const material.SizedBox(
                 width: 14,
@@ -255,7 +269,7 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
                 maxLines: 1,
                 style: material.TextStyle(
                   fontSize: 11,
-                  color: isBrowsable ? theme.colorScheme.onSurface : muted,
+                  color: isBrowsable ? theme.colorScheme.foreground : muted,
                   fontWeight: isBrowsable ? material.FontWeight.w600 : null,
                 ),
               ),
