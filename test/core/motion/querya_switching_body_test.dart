@@ -228,8 +228,7 @@ void main() {
     expect(opacity.duration, QueryaMotion.instant);
   });
 
-  testWidgets('reduced motion disables springs path (fast halved)',
-      (tester) async {
+  testWidgets('halves standard duration when reduced', (tester) async {
     await tester.pumpWidget(
       wrap(
         const QueryaSwitchingBody(
@@ -246,7 +245,7 @@ void main() {
       opacity.duration,
       QueryaMotion.effectiveDuration(
         tester.element(find.byType(QueryaSwitchingBody)),
-        QueryaMotion.fast,
+        QueryaMotion.standard,
       ),
     );
   });

@@ -81,10 +81,11 @@ version locally to avoid "works on my machine" drift. When bumping the pin, run
 
 For animated UI, **do not invent magic `Duration(...)` / raw curves** in widgets.
 
-- Use `QueryaMotion` tokens (`fast` / `standard` / `slow`) via
+- Use `QueryaMotion` tokens (`fast` / `standard` / `slow` / `treeExpand`) via
   `context.motionDuration` / `context.motionCurve` (or `QueryaMotion.effective*`).
-- Interactive Fluid motion: `QueryaSpring` / `QueryaSpringController` when
-  `QueryaSpring.springsEnabled` (Full motion only).
+- **Real springs only:** `QueryaSpring` / `QueryaSpringController` when
+  `QueryaSpring.springsEnabled` (Full motion) — tab indicator, drag settle, etc.
+  Do not use `springsEnabled` just to pick an emphasized cubic for fades/dialogs.
 - Honor Preferences Motion Full / Reduced / Off and OS `disableAnimations`.
 - Mid-drag layout (split panes) stays 1:1; spring settle only on drag-end.
 - Do not animate virtualized grid rows on scroll.

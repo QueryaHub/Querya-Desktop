@@ -112,6 +112,16 @@ Introduce `lib/core/motion/` with a single source of truth for durations and cur
 - **Theme switch**: enable a tasteful `emphasized` cross-fade and consider making it on-by-default.
 - **List/grid item insertion** (results, history): subtle staggered fade-in for first paint only (no per-scroll cost).
 
+### 4.5 Springs vs duration-token cubics (#481)
+
+`QueryaSpring.springsEnabled` (Full motion only) means **real** `SpringSimulation` /
+`QueryaSpringController` — tab strip indicator, split drag settle, and similar
+interruptible physics.
+
+Shell morphs (`QueryaFadeSlide`, `QueryaSwitchingBody`, `showAppDialog`) always use
+duration tokens (`standard` + `enter`/`exit`). Do **not** treat `emphasized` cubic
+as a stand-in for “Fluid spring.”
+
 ---
 
 ## 5. Implementation plan (proposed issues)
@@ -156,6 +166,11 @@ When reviewing PRs that touch animation:
 5. Tree expand: chevron `AnimatedRotation` and `QueryaAnimatedExpand` **must** use
    `QueryaMotion.treeExpand` + `treeExpandCurve` (not `fast`/`standardCurve` mixed
    with `standard`/`enter`).
+6. **Springs vs cubics (#481):** `QueryaSpring.springsEnabled` gates **real**
+   `SpringSimulation` / `QueryaSpringController` only (tab strip indicator, split
+   drag settle). Shell morphs (`QueryaFadeSlide`, `QueryaSwitchingBody`,
+   `showAppDialog`) use duration-token cubics (`standard`/`enter`/`exit`) — do not
+   brand emphasized ease as “spring”.
 
 **Allowed named non-token durations** (named + documented — not magic literals at call sites):
 

@@ -6,8 +6,12 @@ import 'querya_motion_scope.dart';
 /// Spring presets for Fluid UI (interruptible / redirectable motion).
 ///
 /// Tuned toward critically damped motion (~Apple Response 0.3–0.5s feel).
-/// Use with [SpringSimulation] / [AnimationController.animateWith], not fixed
-/// [Duration] curves, when [springsEnabled] is true.
+/// Use **only** with [SpringSimulation] / [AnimationController.animateWith]
+/// when [springsEnabled] is true (tab indicator, drag settle, etc.).
+///
+/// Do **not** branch on [springsEnabled] merely to pick an emphasized cubic
+/// curve for [AnimatedOpacity] / [AnimatedSwitcher] / dialogs — those use
+/// [QueryaMotion] duration tokens instead (#481).
 abstract final class QueryaSpring {
   /// Snappy panels / dialogs / tab indicator (~0.3s Response feel).
   static const SpringDescription snappy = SpringDescription(
