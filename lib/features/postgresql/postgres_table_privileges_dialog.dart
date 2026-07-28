@@ -77,7 +77,6 @@ class _PrivilegesDialogBodyState extends material.State<_PrivilegesDialogBody> {
   @override
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context).colorScheme;
-    final radius = Theme.of(context).radiusXxl;
     final mq = material.MediaQuery.sizeOf(context);
     final hInset = WindowLayout.dialogVerticalInset(mq.height) * 2;
     final wInset = WindowLayout.dialogHorizontalInset(mq.width) * 2;
@@ -103,66 +102,59 @@ class _PrivilegesDialogBodyState extends material.State<_PrivilegesDialogBody> {
       child: material.SizedBox(
         width: dialogWidth,
         height: dialogHeight,
-        child: material.DecoratedBox(
-          decoration: material.BoxDecoration(
-            color: theme.popover,
-            borderRadius: material.BorderRadius.circular(radius),
-            border: material.Border.all(color: theme.muted),
-          ),
-          child: material.ClipRRect(
-            borderRadius: material.BorderRadius.circular(radius),
-            child: material.Column(
-              crossAxisAlignment: material.CrossAxisAlignment.stretch,
-              children: [
-                material.Padding(
-                  padding: const material.EdgeInsets.fromLTRB(20, 16, 20, 8),
-                  child: material.Column(
-                    crossAxisAlignment: material.CrossAxisAlignment.start,
-                    mainAxisSize: material.MainAxisSize.min,
-                    children: [
-                      const Text('Table privileges').large().semiBold(),
-                      const material.SizedBox(height: 4),
-                      material.Text(
-                        '${widget.schema}.${widget.tableName}',
-                        style: material.TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 12,
-                          color: theme.mutedForeground,
-                        ),
-                        maxLines: 2,
-                        overflow: material.TextOverflow.ellipsis,
+        child: QueryaDialogCard(
+          borderColor: theme.muted,
+          child: material.Column(
+            crossAxisAlignment: material.CrossAxisAlignment.stretch,
+            children: [
+              material.Padding(
+                padding: const material.EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: material.Column(
+                  crossAxisAlignment: material.CrossAxisAlignment.start,
+                  mainAxisSize: material.MainAxisSize.min,
+                  children: [
+                    const Text('Table privileges').large().semiBold(),
+                    const material.SizedBox(height: 4),
+                    material.Text(
+                      '${widget.schema}.${widget.tableName}',
+                      style: material.TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        color: theme.mutedForeground,
                       ),
-                      const material.SizedBox(height: 4),
-                      const Text(
-                        'From information_schema.role_table_grants (read-only).',
-                      ).muted().xSmall(),
-                    ],
-                  ),
+                      maxLines: 2,
+                      overflow: material.TextOverflow.ellipsis,
+                    ),
+                    const material.SizedBox(height: 4),
+                    const Text(
+                      'From information_schema.role_table_grants (read-only).',
+                    ).muted().xSmall(),
+                  ],
                 ),
-                const material.Divider(height: 1),
-                material.Expanded(child: _buildListArea(theme)),
-                const material.Divider(height: 1),
-                material.Padding(
-                  padding: const material.EdgeInsets.all(12),
-                  child: material.Row(
-                    mainAxisAlignment: material.MainAxisAlignment.end,
-                    children: [
+              ),
+              const material.Divider(height: 1),
+              material.Expanded(child: _buildListArea(theme)),
+              const material.Divider(height: 1),
+              material.Padding(
+                padding: const material.EdgeInsets.all(12),
+                child: material.Row(
+                  mainAxisAlignment: material.MainAxisAlignment.end,
+                  children: [
+                    OutlineButton(
+                      onPressed: () => material.Navigator.of(context).pop(),
+                      child: const Text('Close'),
+                    ),
+                    if (!_loading && _error == null) ...[
+                      const Gap(8),
                       OutlineButton(
-                        onPressed: () => material.Navigator.of(context).pop(),
-                        child: const Text('Close'),
+                        onPressed: _load,
+                        child: const Text('Reload'),
                       ),
-                      if (!_loading && _error == null) ...[
-                        const Gap(8),
-                        OutlineButton(
-                          onPressed: _load,
-                          child: const Text('Reload'),
-                        ),
-                      ],
                     ],
-                  ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

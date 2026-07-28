@@ -228,89 +228,81 @@ class _UpdateDialogContentState extends material.State<_UpdateDialogContent> {
   @override
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context).colorScheme;
-    final radius = Theme.of(context).radiusXxl;
     final wb = context.workbench;
 
-    return material.Container(
+    return QueryaDialogCard(
       constraints: WindowLayout.dialogConstraints(
         context,
         maxWidth: 520,
         minWidth: 360,
         maxHeight: 640,
       ),
-      decoration: material.BoxDecoration(
-        color: theme.popover,
-        borderRadius: material.BorderRadius.circular(radius),
-        border: material.Border.all(color: theme.muted),
-      ),
-      child: material.ClipRRect(
-        borderRadius: material.BorderRadius.circular(radius),
-        child: material.Column(
-          mainAxisSize: material.MainAxisSize.min,
-          crossAxisAlignment: material.CrossAxisAlignment.stretch,
-          children: [
-            material.Padding(
-              padding: const material.EdgeInsets.fromLTRB(24, 24, 24, 8),
-              child: material.Column(
-                crossAxisAlignment: material.CrossAxisAlignment.start,
-                children: [
-                  material.Row(
-                    children: [
-                      material.Icon(
-                        material.Icons.system_update_alt_rounded,
-                        color: wb.accent,
-                      ),
-                      const material.SizedBox(width: 10),
-                      const Text('Software Update').large().semiBold(),
-                    ],
-                  ),
-                  const material.SizedBox(height: 8),
-                  Text(_subtitle()).muted().small(),
-                ],
-              ),
-            ),
-            material.Flexible(
-              child: material.SingleChildScrollView(
-                padding: const material.EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 8,
+      borderColor: theme.muted,
+      child: material.Column(
+        mainAxisSize: material.MainAxisSize.min,
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
+          material.Padding(
+            padding: const material.EdgeInsets.fromLTRB(24, 24, 24, 8),
+            child: material.Column(
+              crossAxisAlignment: material.CrossAxisAlignment.start,
+              children: [
+                material.Row(
+                  children: [
+                    material.Icon(
+                      material.Icons.system_update_alt_rounded,
+                      color: wb.accent,
+                    ),
+                    const material.SizedBox(width: 10),
+                    const Text('Software Update').large().semiBold(),
+                  ],
                 ),
-                child: material.AnimatedSwitcher(
-                  duration: context.motionDuration(QueryaMotion.standard),
-                  switchInCurve: context.motionCurve(QueryaMotion.enter),
-                  switchOutCurve: context.motionCurve(QueryaMotion.exit),
-                  layoutBuilder: (currentChild, previousChildren) {
-                    return material.Stack(
-                      alignment: material.Alignment.topCenter,
-                      children: [
-                        ...previousChildren,
-                        if (currentChild != null) currentChild,
-                      ],
-                    );
-                  },
-                  child: material.KeyedSubtree(
-                    key: material.ValueKey(_phase),
-                    child: _body(context),
-                  ),
-                ),
-              ),
+                const material.SizedBox(height: 8),
+                Text(_subtitle()).muted().small(),
+              ],
             ),
-            material.Container(
+          ),
+          material.Flexible(
+            child: material.SingleChildScrollView(
               padding: const material.EdgeInsets.symmetric(
                 horizontal: 24,
-                vertical: 16,
+                vertical: 8,
               ),
-              decoration: material.BoxDecoration(
-                border: material.Border(
-                  top: material.BorderSide(
-                    color: theme.border.withValues(alpha: 0.3),
-                  ),
+              child: material.AnimatedSwitcher(
+                duration: context.motionDuration(QueryaMotion.standard),
+                switchInCurve: context.motionCurve(QueryaMotion.enter),
+                switchOutCurve: context.motionCurve(QueryaMotion.exit),
+                layoutBuilder: (currentChild, previousChildren) {
+                  return material.Stack(
+                    alignment: material.Alignment.topCenter,
+                    children: [
+                      ...previousChildren,
+                      if (currentChild != null) currentChild,
+                    ],
+                  );
+                },
+                child: material.KeyedSubtree(
+                  key: material.ValueKey(_phase),
+                  child: _body(context),
                 ),
               ),
-              child: _actions(context),
             ),
-          ],
-        ),
+          ),
+          material.Container(
+            padding: const material.EdgeInsets.symmetric(
+              horizontal: 24,
+              vertical: 16,
+            ),
+            decoration: material.BoxDecoration(
+              border: material.Border(
+                top: material.BorderSide(
+                  color: theme.border.withValues(alpha: 0.3),
+                ),
+              ),
+            ),
+            child: _actions(context),
+          ),
+        ],
       ),
     );
   }

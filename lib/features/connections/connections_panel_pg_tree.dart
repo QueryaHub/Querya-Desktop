@@ -65,6 +65,7 @@ class _PgTreeRow extends material.StatelessWidget {
     this.iconColor,
     this.trailing,
     this.onTap,
+    this.expanded,
     this.verticalPadding = 3,
     required this.textStyle,
     this.connection,
@@ -85,6 +86,9 @@ class _PgTreeRow extends material.StatelessWidget {
   final material.Color? iconColor;
   final material.Widget? trailing;
   final void Function()? onTap;
+
+  /// When non-null, row is an expand control ([Semantics.button] + expanded).
+  final bool? expanded;
   final double verticalPadding;
   final material.TextStyle textStyle;
   final ConnectionRow? connection;
@@ -141,8 +145,16 @@ class _PgTreeRow extends material.StatelessWidget {
         ),
       ),
     );
-    if (connection == null) return row;
-    return ContextMenu(
+    if (connection == null) {
+      return expanded == null
+          ? row
+          : material.Semantics(
+              button: true,
+              expanded: expanded,
+              child: row,
+            );
+    }
+    final menu = ContextMenu(
       items: [
         if (onContextRefresh != null)
           MenuButton(
@@ -194,6 +206,12 @@ class _PgTreeRow extends material.StatelessWidget {
       ],
       child: row,
     );
+    if (expanded == null) return menu;
+    return material.Semantics(
+      button: true,
+      expanded: expanded,
+      child: menu,
+    );
   }
 }
 
@@ -229,6 +247,7 @@ class _PgDatabasesNodeState extends State<_PgDatabasesNode> {
               color: theme.colorScheme.foreground,
             ),
             verticalPadding: 4,
+            expanded: _expanded,
             onTap: () => setState(() => _expanded = !_expanded),
             connection: widget.connection,
             onContextRefresh: widget.onRefreshDatabases,
@@ -356,6 +375,7 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
               color: theme.colorScheme.foreground,
             ),
             verticalPadding: 4,
+            expanded: _expanded,
             onTap: _toggle,
             connection: widget.connection,
             onContextRefresh: _loadSchemas,
@@ -406,6 +426,7 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
                   )
                 else if (_error != null)
                   TreeLoadError(
+                    title: 'Could not load schemas',
                     message: _error!,
                     onRetry: _loadSchemas,
                   ),
@@ -550,6 +571,7 @@ class _PgSchemasNodeState extends State<_PgSchemasNode> {
               fontSize: 11,
               color: theme.colorScheme.mutedForeground,
             ),
+            expanded: _expanded,
             onTap: () => setState(() => _expanded = !_expanded),
             connection: widget.connection,
             onContextRefresh: widget.onRefreshSchemas,
@@ -706,6 +728,7 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
               fontSize: 12,
               color: theme.colorScheme.foreground,
             ),
+            expanded: _expanded,
             onTap: _toggle,
             connection: widget.connection,
             onContextRefresh: _loadObjects,
@@ -736,6 +759,7 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
                   )
                 else if (_error != null)
                   TreeLoadError(
+                    title: 'Could not load objects',
                     message: _error!,
                     onRetry: _loadObjects,
                   ),
@@ -1024,6 +1048,7 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
               fontSize: 11,
               color: theme.colorScheme.mutedForeground,
             ),
+            expanded: _expanded,
             onTap: () => setState(() => _expanded = !_expanded),
             connection: widget.connection,
             onContextRefresh: widget.onRefresh,

@@ -247,41 +247,47 @@ class _FolderTileState extends State<_FolderTile> {
           children: [
             material.MouseRegion(
               cursor: material.SystemMouseCursors.click,
-              child: material.InkWell(
-                onTap: _toggle,
-                borderRadius: material.BorderRadius.circular(6),
-                child: material.Padding(
-                  padding: const material.EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 6),
-                  child: material.Row(
-                    children: [
-                      material.AnimatedRotation(
-                        turns: _expanded ? 0.25 : 0,
-                        duration: context.motionDuration(QueryaMotion.treeExpand),
-                        curve: context.motionCurve(QueryaMotion.treeExpandCurve),
-                        child: material.Icon(
-                          QueryaIcons.expandClosed,
-                          size: QueryaIconSizes.sidebarExpand,
-                          color: theme.colorScheme.mutedForeground,
-                        ),
-                      ),
-                      const Gap(2),
-                      material.Icon(QueryaIcons.folder,
-                          size: QueryaIconSizes.sidebarConnectionIcon,
-                          color: theme.colorScheme.primary),
-                      const Gap(8),
-                      material.Expanded(
-                        child: material.Text(
-                          widget.name,
-                          overflow: material.TextOverflow.ellipsis,
-                          maxLines: 1,
-                          style: material.TextStyle(
-                            fontSize: 13,
-                            color: theme.colorScheme.foreground,
+              child: material.Semantics(
+                button: true,
+                expanded: _expanded,
+                child: material.InkWell(
+                  onTap: _toggle,
+                  borderRadius: material.BorderRadius.circular(6),
+                  child: material.Padding(
+                    padding: const material.EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 6),
+                    child: material.Row(
+                      children: [
+                        material.AnimatedRotation(
+                          turns: _expanded ? 0.25 : 0,
+                          duration:
+                              context.motionDuration(QueryaMotion.treeExpand),
+                          curve:
+                              context.motionCurve(QueryaMotion.treeExpandCurve),
+                          child: material.Icon(
+                            QueryaIcons.expandClosed,
+                            size: QueryaIconSizes.sidebarExpand,
+                            color: theme.colorScheme.mutedForeground,
                           ),
                         ),
-                      ),
-                    ],
+                        const Gap(2),
+                        material.Icon(QueryaIcons.folder,
+                            size: QueryaIconSizes.sidebarConnectionIcon,
+                            color: theme.colorScheme.primary),
+                        const Gap(8),
+                        material.Expanded(
+                          child: material.Text(
+                            widget.name,
+                            overflow: material.TextOverflow.ellipsis,
+                            maxLines: 1,
+                            style: material.TextStyle(
+                              fontSize: 13,
+                              color: theme.colorScheme.foreground,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

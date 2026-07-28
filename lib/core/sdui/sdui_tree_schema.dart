@@ -93,4 +93,5 @@ class SduiTreeSchema {
 }
 
 /// Loads children for an expandable node (`fetchTreeChildren` RPC).
-typedef SduiFetchTreeChildren = Future<List<SduiTreeNode>> Function(String nodeId);
+typedef SduiFetchTreeChildren = Future<List<SduiTreeNode>> Function(
+    String nodeId);

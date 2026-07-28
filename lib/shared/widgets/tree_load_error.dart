@@ -4,10 +4,13 @@ import 'package:querya_desktop/core/ui/querya_icons.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Inline error block for connection tree lazy-load failures.
+///
+/// Always shows the error icon + title row by default (Mongo dialect);
+/// pass [showTitleRow]: false only for ultra-compact one-liners.
 class TreeLoadError extends material.StatelessWidget {
   const TreeLoadError({
     super.key,
-    this.title,
+    this.title = 'Could not load',
     required this.message,
     this.onRetry,
     this.retryLabel = 'Retry',
@@ -17,10 +20,10 @@ class TreeLoadError extends material.StatelessWidget {
       bottom: 8,
     ),
     this.detailFontSize = 11,
-    this.showTitleRow = false,
+    this.showTitleRow = true,
   });
 
-  final String? title;
+  final String title;
   final String message;
   final VoidCallback? onRetry;
   final String retryLabel;
@@ -40,7 +43,7 @@ class TreeLoadError extends material.StatelessWidget {
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
         children: [
-          if (showTitleRow && title != null)
+          if (showTitleRow)
             material.Row(
               crossAxisAlignment: material.CrossAxisAlignment.start,
               children: [
@@ -52,7 +55,7 @@ class TreeLoadError extends material.StatelessWidget {
                 const Gap(6),
                 material.Expanded(
                   child: material.Text(
-                    title!,
+                    title,
                     maxLines: 2,
                     overflow: material.TextOverflow.ellipsis,
                     style: material.TextStyle(
@@ -63,7 +66,7 @@ class TreeLoadError extends material.StatelessWidget {
                 ),
               ],
             ),
-          if (showTitleRow && title != null) const Gap(6),
+          if (showTitleRow) const Gap(6),
           material.SelectableText(
             message,
             style: material.TextStyle(

@@ -163,19 +163,25 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
               children: [
                 material.MouseRegion(
                   cursor: material.SystemMouseCursors.click,
-                  child: material.InkWell(
-                    onTap: _toggle,
-                    borderRadius: material.BorderRadius.circular(4),
-                    child: material.Padding(
-                      padding: const material.EdgeInsets.all(2),
-                      child: material.AnimatedRotation(
-                        turns: _expanded ? 0.25 : 0,
-                        duration: context.motionDuration(QueryaMotion.treeExpand),
-                        curve: context.motionCurve(QueryaMotion.treeExpandCurve),
-                        child: material.Icon(
-                          QueryaIcons.expandClosed,
-                          size: QueryaIconSizes.sidebarExpand,
-                          color: theme.colorScheme.mutedForeground,
+                  child: material.Semantics(
+                    button: true,
+                    expanded: _expanded,
+                    child: material.InkWell(
+                      onTap: _toggle,
+                      borderRadius: material.BorderRadius.circular(4),
+                      child: material.Padding(
+                        padding: const material.EdgeInsets.all(2),
+                        child: material.AnimatedRotation(
+                          turns: _expanded ? 0.25 : 0,
+                          duration:
+                              context.motionDuration(QueryaMotion.treeExpand),
+                          curve:
+                              context.motionCurve(QueryaMotion.treeExpandCurve),
+                          child: material.Icon(
+                            QueryaIcons.expandClosed,
+                            size: QueryaIconSizes.sidebarExpand,
+                            color: theme.colorScheme.mutedForeground,
+                          ),
                         ),
                       ),
                     ),
@@ -253,6 +259,7 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
                     ),
                   if (_error != null)
                     TreeLoadError(
+                      title: 'Could not load objects',
                       message: _error!,
                       padding: const material.EdgeInsets.only(
                         left: 28,
@@ -378,6 +385,7 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
               fontSize: 11,
               color: theme.colorScheme.mutedForeground,
             ),
+            expanded: _expanded,
             onTap: () => setState(() => _expanded = !_expanded),
             connection: widget.connection,
             onContextRefresh: widget.onRefresh,

@@ -129,9 +129,8 @@ class SduiFormBuilderState extends material.State<SduiFormBuilder> {
 
   Future<void> _pickFile(SduiFormField field) async {
     final picker = widget.filePicker;
-    final path = picker != null
-        ? await picker(field)
-        : (await openFile())?.path;
+    final path =
+        picker != null ? await picker(field) : (await openFile())?.path;
     if (path == null || !mounted) return;
     _textControllers[field.id]?.text = path;
     _notifyChanged();
@@ -199,28 +198,52 @@ class SduiFormBuilderState extends material.State<SduiFormBuilder> {
           ),
         );
       case SduiFieldType.select:
+        final options = field.options;
+        final current = _selectValues[field.id] ??
+            (options.isNotEmpty ? options.first.value : '');
         return material.Column(
           crossAxisAlignment: material.CrossAxisAlignment.stretch,
           children: [
             Text(field.label).small().semiBold(),
             const Gap(4),
-            material.DropdownButtonFormField<String>(
-              initialValue: _selectValues[field.id],
-              items: [
-                for (final opt in field.options)
-                  material.DropdownMenuItem(
-                    value: opt.value,
-                    child: material.Text(opt.label),
-                  ),
-              ],
-              onChanged: (v) {
-                setState(() => _selectValues[field.id] = v);
-                _notifyChanged();
-              },
+            material.FormField<String>(
+              initialValue: current,
               validator: field.required
-                  ? (v) =>
-                      (v == null || v.isEmpty) ? '${field.label} is required' : null
+                  ? (v) => (v == null || v.isEmpty)
+                      ? '${field.label} is required'
+                      : null
                   : null,
+              builder: (state) {
+                final value = state.value ?? current;
+                return material.Column(
+                  crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                  children: [
+                    QueryaDropdown<String>(
+                      value: value.isEmpty && options.isNotEmpty
+                          ? options.first.value
+                          : value,
+                      expandToParent: true,
+                      items: [
+                        for (final opt in options)
+                          QueryaDropdownItem<String>(
+                            value: opt.value,
+                            label: opt.label,
+                          ),
+                      ],
+                      onSelected: (v) {
+                        final next = v ?? value;
+                        setState(() => _selectValues[field.id] = next);
+                        state.didChange(next);
+                        _notifyChanged();
+                      },
+                    ),
+                    if (state.hasError) ...[
+                      const Gap(4),
+                      Text(state.errorText!).xSmall().muted(),
+                    ],
+                  ],
+                );
+              },
             ),
           ],
         );

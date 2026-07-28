@@ -11,6 +11,7 @@ library;
 export 'app_dialog.dart';
 export 'app_toast.dart';
 export 'export_menu_button.dart';
+export 'querya_dialog_card.dart';
 export 'querya_tab_strip.dart';
 export 'querya_dropdown.dart'
     show
