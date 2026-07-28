@@ -28,6 +28,79 @@ class PreferencesHint extends StatelessWidget {
   }
 }
 
+/// Leading checkbox + title/subtitle for Preferences (no [ListTile]).
+///
+/// Avoids Flutter 3.44+ asserts when Preferences chrome uses an opaque
+/// [DecoratedBox] above Material ink (#491).
+class PreferencesCheckboxRow extends StatelessWidget {
+  const PreferencesCheckboxRow({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    required this.title,
+    this.subtitle,
+  });
+
+  final bool value;
+  final material.ValueChanged<bool>? onChanged;
+  final material.Widget title;
+  final material.Widget? subtitle;
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    final enabled = onChanged != null;
+    void toggle() {
+      if (enabled) onChanged!(!value);
+    }
+
+    return material.Material(
+      type: material.MaterialType.transparency,
+      child: material.MergeSemantics(
+        child: material.InkWell(
+          onTap: enabled ? toggle : null,
+          borderRadius: material.BorderRadius.circular(6),
+          child: material.Padding(
+            padding: const material.EdgeInsets.symmetric(vertical: 4),
+            child: material.Row(
+              crossAxisAlignment: material.CrossAxisAlignment.start,
+              children: [
+                material.SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: material.Checkbox(
+                    value: value,
+                    onChanged: enabled
+                        ? (v) {
+                            if (v != null) onChanged!(v);
+                          }
+                        : null,
+                    materialTapTargetSize:
+                        material.MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: material.VisualDensity.compact,
+                  ),
+                ),
+                const material.SizedBox(width: 12),
+                material.Expanded(
+                  child: material.Column(
+                    crossAxisAlignment: material.CrossAxisAlignment.start,
+                    children: [
+                      title,
+                      if (subtitle != null) ...[
+                        const material.SizedBox(height: 2),
+                        subtitle!,
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Label + full-width control row for Preferences (uniform dropdown width).
 class PreferencesFieldRow extends StatelessWidget {
   const PreferencesFieldRow({
