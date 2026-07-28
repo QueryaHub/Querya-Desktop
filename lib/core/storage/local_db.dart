@@ -193,7 +193,8 @@ class LocalDb {
     }
     if (oldVersion < 7) {
       await db.execute('ALTER TABLE connections ADD COLUMN extension_id TEXT');
-      await db.execute('ALTER TABLE connections ADD COLUMN driver_options TEXT');
+      await db
+          .execute('ALTER TABLE connections ADD COLUMN driver_options TEXT');
     }
     if (oldVersion < 8) {
       await db.execute('DROP INDEX IF EXISTS idx_sql_query_history_lookup');
@@ -441,7 +442,8 @@ class LocalDb {
   /// restored (best effort) and the error is rethrown.
   Future<void> updateConnection(ConnectionRow row) async {
     if (row.id == null) {
-      throw ArgumentError('ConnectionRow.id cannot be null when calling updateConnection');
+      throw ArgumentError(
+          'ConnectionRow.id cannot be null when calling updateConnection');
     }
     final db = await _open();
     final previousMaps = await db.query(
@@ -640,4 +642,46 @@ class ConnectionRow {
         sortOrder: _sqliteInt(m['sort_order']) ?? 0,
         createdAt: m['created_at'] as String,
       );
+
+  ConnectionRow copyWith({
+    int? id,
+    String? type,
+    String? name,
+    String? host,
+    int? port,
+    String? username,
+    String? password,
+    String? databaseName,
+    String? authSource,
+    bool? useSSL,
+    String? connectionString,
+    String? extensionId,
+    String? driverOptions,
+    int? folderId,
+    int? sortOrder,
+    String? createdAt,
+    bool clearPassword = false,
+    bool clearConnectionString = false,
+  }) {
+    return ConnectionRow(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      name: name ?? this.name,
+      host: host ?? this.host,
+      port: port ?? this.port,
+      username: username ?? this.username,
+      password: clearPassword ? null : (password ?? this.password),
+      databaseName: databaseName ?? this.databaseName,
+      authSource: authSource ?? this.authSource,
+      useSSL: useSSL ?? this.useSSL,
+      connectionString: clearConnectionString
+          ? null
+          : (connectionString ?? this.connectionString),
+      extensionId: extensionId ?? this.extensionId,
+      driverOptions: driverOptions ?? this.driverOptions,
+      folderId: folderId ?? this.folderId,
+      sortOrder: sortOrder ?? this.sortOrder,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
 }

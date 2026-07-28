@@ -75,6 +75,7 @@ class _ConnectionTile extends StatelessWidget {
     required this.icon,
     this.iconAsset,
     required this.onRemove,
+    required this.onEdit,
     this.onTap,
   });
 
@@ -83,6 +84,7 @@ class _ConnectionTile extends StatelessWidget {
   final material.IconData icon;
   final String? iconAsset;
   final VoidCallback onRemove;
+  final VoidCallback onEdit;
   final VoidCallback? onTap;
 
   @override
@@ -107,6 +109,12 @@ class _ConnectionTile extends StatelessWidget {
           );
     return ContextMenu(
       items: [
+        MenuButton(
+          leading: material.Icon(material.Icons.edit_outlined,
+              size: 18, color: theme.colorScheme.mutedForeground),
+          onPressed: (_) => onEdit(),
+          child: const Text('Edit connection…'),
+        ),
         MenuButton(
           leading: material.Icon(material.Icons.delete_outline_rounded,
               size: 18, color: theme.colorScheme.mutedForeground),
@@ -311,6 +319,7 @@ class _FolderTileState extends State<_FolderTile> {
                               conn.type,
                             ),
                             onRemove: () => widget.onRemoveConnection(conn.id!),
+                            onEdit: () {},
                             onTap: () => widget.onConnectionTap?.call(conn),
                           );
                   },
