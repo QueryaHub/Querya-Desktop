@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 
 import 'querya_motion.dart';
 import 'querya_motion_context.dart';
-import 'querya_spring.dart';
 
 /// Fades and optionally slides [child] when the keyed child changes.
 ///
-/// Uses a short spring-like curve when [QueryaSpring.springsEnabled], otherwise
-/// duration tokens. Prefer wrapping content with a stable [Key] on [child].
+/// Uses duration-token cubic curves ([QueryaMotion.standard] / [QueryaMotion.enter]),
+/// not [QueryaSpring] — reserve springs for interruptible physics (tab indicator,
+/// drag settle). Prefer wrapping content with a stable [Key] on [child].
 class QueryaFadeSlide extends StatelessWidget {
   const QueryaFadeSlide({
     super.key,
@@ -24,13 +24,8 @@ class QueryaFadeSlide extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final useSpring = QueryaSpring.springsEnabled(context);
-    final duration = context.motionDuration(
-      useSpring ? QueryaMotion.standard : QueryaMotion.fast,
-    );
-    final curve = context.motionCurve(
-      useSpring ? QueryaMotion.emphasized : QueryaMotion.enter,
-    );
+    final duration = context.motionDuration(QueryaMotion.standard);
+    final curve = context.motionCurve(QueryaMotion.enter);
 
     return AnimatedSwitcher(
       duration: duration,

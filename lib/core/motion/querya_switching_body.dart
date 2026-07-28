@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 
 import 'querya_motion.dart';
 import 'querya_motion_context.dart';
-import 'querya_spring.dart';
 
 /// Keep-alive indexed stack with opacity (+ optional slide) transitions.
 ///
 /// Off-screen children stay mounted (SQL editor state, etc.). Prefer this over
 /// hard `if` swaps for empty↔workspace and similar shell morphs.
+///
+/// Uses duration-token cubics ([QueryaMotion.standard] / enter / exit), not
+/// [QueryaSpring] — springs stay for interruptible physics only.
 class QueryaSwitchingBody extends StatelessWidget {
   const QueryaSwitchingBody({
     super.key,
@@ -26,13 +28,8 @@ class QueryaSwitchingBody extends StatelessWidget {
   Widget build(BuildContext context) {
     assert(children.isNotEmpty, 'QueryaSwitchingBody requires children');
     final safeIndex = index.clamp(0, children.length - 1);
-    final useSpring = QueryaSpring.springsEnabled(context);
-    final duration = context.motionDuration(
-      useSpring ? QueryaMotion.standard : QueryaMotion.fast,
-    );
-    final inCurve = context.motionCurve(
-      useSpring ? QueryaMotion.emphasized : QueryaMotion.enter,
-    );
+    final duration = context.motionDuration(QueryaMotion.standard);
+    final inCurve = context.motionCurve(QueryaMotion.enter);
     final outCurve = context.motionCurve(QueryaMotion.exit);
 
     return Stack(

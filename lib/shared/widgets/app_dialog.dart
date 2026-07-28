@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
-import 'package:querya_desktop/core/motion/querya_spring.dart';
 
 /// Shows a modal dialog with a frosted, dimmed backdrop over the app.
 ///
@@ -76,12 +75,9 @@ class _BlurredDialogScaffoldState extends State<_BlurredDialogScaffold> {
 
   void _rebuildCurved() {
     _curved?.dispose();
-    final useSpring = QueryaSpring.springsEnabled(context);
     _curved = CurvedAnimation(
       parent: widget.animation,
-      curve: context.motionCurve(
-        useSpring ? QueryaMotion.emphasized : QueryaMotion.enter,
-      ),
+      curve: context.motionCurve(QueryaMotion.enter),
       reverseCurve: context.motionCurve(QueryaMotion.exit),
     );
   }

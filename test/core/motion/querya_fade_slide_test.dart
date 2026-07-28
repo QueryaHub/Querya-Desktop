@@ -92,7 +92,7 @@ void main() {
     expect(find.text('a'), findsNothing);
   });
 
-  testWidgets('uses standard duration when springs enabled (full)',
+  testWidgets('uses standard/enter duration tokens (full motion)',
       (tester) async {
     await tester.pumpWidget(
       wrap(
@@ -104,10 +104,10 @@ void main() {
     final switcher =
         tester.widget<AnimatedSwitcher>(find.byType(AnimatedSwitcher));
     expect(switcher.duration, QueryaMotion.standard);
-    expect(switcher.switchInCurve, QueryaMotion.emphasized);
+    expect(switcher.switchInCurve, QueryaMotion.enter);
   });
 
-  testWidgets('uses fast duration when reduced (no springs)', (tester) async {
+  testWidgets('halves standard duration when reduced', (tester) async {
     await tester.pumpWidget(
       wrap(
         const QueryaFadeSlide(
@@ -122,7 +122,7 @@ void main() {
       switcher.duration,
       QueryaMotion.effectiveDuration(
         tester.element(find.byType(QueryaFadeSlide)),
-        QueryaMotion.fast,
+        QueryaMotion.standard,
       ),
     );
     expect(switcher.switchInCurve, QueryaMotion.enter);
