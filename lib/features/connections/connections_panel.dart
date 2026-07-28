@@ -42,7 +42,6 @@ import 'package:flutter/material.dart' as material
         Colors,
         Tooltip,
         Color,
-        SelectableText,
         Padding,
         Widget,
         Navigator,
