@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart' as material;
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
-/// Dialog shell card: [Material] ink host + popover fill (avoids ListTile asserts
-/// under opaque [DecoratedBox] on Flutter 3.44+).
+/// Dialog shell: [Material] popover fill (ListTile ink host) under the same
+/// [Container] constraints as the pre-migration shell.
+///
+/// Re-applies the ambient [DefaultTextStyle] / [IconTheme] after [Material],
+/// which would otherwise inject [ThemeData.textTheme] and bloat dense dialog
+/// chrome (Extension Manager overflow).
 class QueryaDialogCard extends material.StatelessWidget {
   const QueryaDialogCard({
     super.key,
@@ -19,20 +23,32 @@ class QueryaDialogCard extends material.StatelessWidget {
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context).colorScheme;
     final radius = Theme.of(context).radiusXxl;
-    return material.Material(
+    final borderRadius = material.BorderRadius.circular(radius);
+    final textStyle = material.DefaultTextStyle.of(context).style;
+    final iconTheme = material.IconTheme.of(context);
+
+    final card = material.Material(
       color: theme.popover,
       elevation: 0,
       shape: material.RoundedRectangleBorder(
-        borderRadius: material.BorderRadius.circular(radius),
+        borderRadius: borderRadius,
         side: material.BorderSide(color: borderColor ?? theme.border),
       ),
       clipBehavior: material.Clip.antiAlias,
-      child: constraints == null
-          ? child
-          : material.ConstrainedBox(
-              constraints: constraints!,
-              child: child,
-            ),
+      child: material.DefaultTextStyle(
+        style: textStyle,
+        child: material.IconTheme(
+          data: iconTheme,
+          child: child,
+        ),
+      ),
+    );
+
+    if (constraints == null) return card;
+
+    return material.Container(
+      constraints: constraints,
+      child: card,
     );
   }
 }
