@@ -79,11 +79,11 @@ void main() {
   testWidgets('QueryaCrossFadeStack uses exit curve when fading out',
       (WidgetTester tester) async {
     await tester.pumpWidget(
-      MaterialApp(
+      const MaterialApp(
         home: Scaffold(
           body: QueryaCrossFadeStack(
             index: 0,
-            children: const [
+            children: [
               Text('a', key: Key('a')),
               Text('b', key: Key('b')),
             ],

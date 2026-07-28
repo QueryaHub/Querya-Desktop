@@ -6,6 +6,9 @@ abstract final class QueryaTreeTokens {
   static const double indent = 16;
 
   /// Leaf-row icon tint (tables, views, sequences, …).
-  static Color leafIconColor(ColorScheme scheme) =>
-      scheme.primary.withValues(alpha: 0.5);
+  ///
+  /// Takes [primary] (not [ColorScheme]) so both Material and shadcn schemes
+  /// can pass `.primary` without a type clash.
+  static Color leafIconColor(Color primary) =>
+      primary.withValues(alpha: 0.5);
 }

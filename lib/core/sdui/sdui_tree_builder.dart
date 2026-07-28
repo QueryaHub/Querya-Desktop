@@ -208,7 +208,7 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
     final iconSize =
         canExpand ? QueryaIconSizes.treeGroup : QueryaIconSizes.treeLeaf;
     final iconColor = isBrowsable
-        ? QueryaTreeTokens.leafIconColor(theme.colorScheme)
+        ? QueryaTreeTokens.leafIconColor(theme.colorScheme.primary)
         : muted;
     final rowLeft =
         8.0 + depth * QueryaTreeTokens.indent + (canExpand ? 0 : 4.0);

@@ -1045,7 +1045,9 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
                   label: item,
                   icon: widget.itemIcon,
                   iconSize: QueryaIconSizes.treeLeaf,
-                  iconColor: QueryaTreeTokens.leafIconColor(theme.colorScheme),
+                  iconColor: QueryaTreeTokens.leafIconColor(
+                    theme.colorScheme.primary,
+                  ),
                   textStyle: material.TextStyle(
                     fontSize: 11,
                     color: theme.colorScheme.foreground,
