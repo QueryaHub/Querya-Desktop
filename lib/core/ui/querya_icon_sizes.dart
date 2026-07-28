@@ -21,9 +21,6 @@ abstract final class QueryaIconSizes {
   /// Inline tree error indicator.
   static const double treeError = 14;
 
-  /// SDUI explorer tree nodes.
-  static const double sduiNode = 16;
-
   /// Menu / dialog leading icons.
   static const double menuLeading = 18;
 }

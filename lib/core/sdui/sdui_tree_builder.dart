@@ -202,6 +202,7 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
     final isLoading = _loading.contains(node.id);
     final nodeKind = _resolveNodeKind(node);
     final isBrowsable = nodeKind == 'table' || nodeKind == 'view';
+    // Same hierarchy as native trees (#476 / #497) — no separate sduiNode size.
     final iconSize =
         canExpand ? QueryaIconSizes.treeGroup : QueryaIconSizes.treeLeaf;
     final iconColor = isBrowsable ? primary.withValues(alpha: 0.5) : muted;
