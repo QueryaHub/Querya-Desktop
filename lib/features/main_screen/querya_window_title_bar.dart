@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/ui_scale.dart';
@@ -58,6 +60,15 @@ class QueryaWindowTitleBar extends StatelessWidget {
   }
 
   @visibleForTesting
+  static double titleBarLeadingInset({
+    required bool isMacOS,
+    required double Function(double designPx) scale,
+  }) {
+    // macOS traffic lights sit in the transparent titlebar (bitsdojo custom frame).
+    return scale(isMacOS ? 72 : 16);
+  }
+
+  @visibleForTesting
   static WindowButtonColors closeButtonColors(BuildContext context) {
     final wb = context.workbench;
     return WindowButtonColors(
@@ -85,7 +96,12 @@ class QueryaWindowTitleBar extends StatelessWidget {
               child: MoveWindow(
                 child: Row(
                   children: [
-                    const SizedBox(width: 16),
+                    SizedBox(
+                      width: QueryaWindowTitleBar.titleBarLeadingInset(
+                        isMacOS: Platform.isMacOS,
+                        scale: context.scaled,
+                      ),
+                    ),
                     material.Icon(
                       material.Icons.storage_rounded,
                       size: 18,
