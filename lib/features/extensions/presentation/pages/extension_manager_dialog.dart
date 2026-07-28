@@ -6,6 +6,7 @@ import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/market/marketplace_repository.dart';
+import 'package:querya_desktop/core/motion/querya_cross_fade_stack.dart';
 import 'package:querya_desktop/features/extensions/presentation/widgets/extension_card.dart';
 import 'package:querya_desktop/features/extensions/presentation/widgets/extension_sideload_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -214,19 +215,19 @@ class _ExtensionManagerContentState
                 material.Padding(
                   padding: const material.EdgeInsets.symmetric(
                       horizontal: 24.0, vertical: 8.0),
-                  child: material.Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _buildTabButton(0, 'Installed', count: _installed.length),
-                      _buildTabButton(1, 'Marketplace'),
-                      _buildTabButton(2, 'Updates'),
+                  child: QueryaTabStrip(
+                    labels: [
+                      'Installed (${_installed.length})',
+                      'Marketplace',
+                      'Updates',
                     ],
+                    selectedIndex: _tabIndex,
+                    onSelected: (index) => setState(() => _tabIndex = index),
                   ),
                 ),
                 material.Divider(height: 1, color: theme.border),
                 material.Expanded(
-                  child: material.IndexedStack(
+                  child: QueryaCrossFadeStack(
                     index: _tabIndex,
                     children: [
                       _buildInstalledTab(),
@@ -238,22 +239,6 @@ class _ExtensionManagerContentState
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  material.Widget _buildTabButton(int index, String label, {int? count}) {
-    final isSelected = _tabIndex == index;
-    final displayLabel = count != null ? '$label ($count)' : label;
-    return SecondaryButton(
-      onPressed: () => setState(() => _tabIndex = index),
-      child: material.Text(
-        displayLabel,
-        style: material.TextStyle(
-          color: isSelected ? Theme.of(context).colorScheme.primary : null,
-          fontWeight:
-              isSelected ? material.FontWeight.w600 : material.FontWeight.w400,
         ),
       ),
     );
