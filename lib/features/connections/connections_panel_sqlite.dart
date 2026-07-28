@@ -12,6 +12,7 @@ class _SqliteConnectionTile extends StatefulWidget {
     required this.icon,
     this.iconAsset,
     required this.onRemove,
+    required this.onEdit,
     this.onTap,
     this.onSqliteObjectSelected,
     this.onSqliteOpenSqlWorkspace,
@@ -24,6 +25,7 @@ class _SqliteConnectionTile extends StatefulWidget {
   final material.IconData icon;
   final String? iconAsset;
   final VoidCallback onRemove;
+  final VoidCallback onEdit;
   final VoidCallback? onTap;
   final void Function(
     ConnectionRow connection,
@@ -146,6 +148,12 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
                 widget.onSqliteOpenSqlWorkspace!(widget.connection),
             child: const Text('Open in SQL'),
           ),
+        MenuButton(
+          leading: material.Icon(material.Icons.edit_outlined,
+              size: 18, color: theme.colorScheme.mutedForeground),
+          onPressed: (_) => widget.onEdit(),
+          child: const Text('Edit connection…'),
+        ),
         MenuButton(
           leading: material.Icon(material.Icons.delete_outline_rounded,
               size: 18, color: theme.colorScheme.mutedForeground),

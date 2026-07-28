@@ -320,6 +320,31 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     }
   }
 
+  Future<void> _editConnection(ConnectionRow conn) async {
+    final edited = await promptEditConnection(context, conn);
+    if (edited == null || !mounted) return;
+    final toSave = await mergeSecretsForConnectionUpdate(edited);
+    await LocalDb.instance.updateConnection(toSave);
+    await _loadData();
+    if (!mounted) return;
+    ConnectionRow? updated;
+    for (final c in _connections) {
+      if (c.id == conn.id) {
+        updated = c;
+        break;
+      }
+    }
+    if (updated == null) return;
+    final shouldReconnect = _expandedConnections.contains(conn.id) ||
+        widget.selectedConnectionId == conn.id;
+    if (shouldReconnect) {
+      await reconnect(updated);
+    }
+    if (widget.selectedConnectionId == conn.id) {
+      widget.onConnectionSelected?.call(updated);
+    }
+  }
+
   Future<void> _removeConnection(int id) async {
     await MongoService.instance.disconnectByConnectionId(id);
     await ExtensionDriverSession.instance.disconnect(id);
@@ -426,6 +451,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         icon: QueryaIcons.connectionIcon(conn.type),
         iconAsset: QueryaIcons.connectionAsset(conn.type),
         onRemove: () => _removeConnection(conn.id!),
+        onEdit: () => _editConnection(conn),
         onTap: () => widget.onConnectionSelected?.call(conn),
         onPostgresObjectSelected: widget.onPostgresObjectSelected,
         onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
@@ -439,6 +465,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         icon: QueryaIcons.connectionIcon(conn.type),
         iconAsset: QueryaIcons.connectionAsset(conn.type),
         onRemove: () => _removeConnection(conn.id!),
+        onEdit: () => _editConnection(conn),
         onTap: () => widget.onConnectionSelected?.call(conn),
         onMysqlObjectSelected: widget.onMysqlObjectSelected,
         onMysqlOpenSqlWorkspace: widget.onMysqlOpenSqlWorkspace,
@@ -452,6 +479,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         icon: QueryaIcons.connectionIcon(conn.type),
         iconAsset: QueryaIcons.connectionAsset(conn.type),
         onRemove: () => _removeConnection(conn.id!),
+        onEdit: () => _editConnection(conn),
         onTap: () => widget.onConnectionSelected?.call(conn),
         onDatabaseTap: (db) => widget.onRedisDatabaseSelected?.call(conn, db),
         isExpanded: isExpanded,
@@ -464,6 +492,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         icon: QueryaIcons.connectionIcon(conn.type),
         iconAsset: QueryaIcons.connectionAsset(conn.type),
         onRemove: () => _removeConnection(conn.id!),
+        onEdit: () => _editConnection(conn),
         onTap: () => widget.onConnectionSelected?.call(conn),
         onDatabaseTap: (db) => widget.onMongoDBDatabaseSelected?.call(conn, db),
         isExpanded: isExpanded,
@@ -476,6 +505,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         icon: QueryaIcons.connectionIcon(conn.type),
         iconAsset: QueryaIcons.connectionAsset(conn.type),
         onRemove: () => _removeConnection(conn.id!),
+        onEdit: () => _editConnection(conn),
         onTap: () => widget.onConnectionSelected?.call(conn),
         onSqliteObjectSelected: widget.onSqliteObjectSelected,
         onSqliteOpenSqlWorkspace: widget.onSqliteOpenSqlWorkspace,
@@ -489,6 +519,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         icon: QueryaIcons.connectionIcon(conn.type),
         iconAsset: QueryaIcons.connectionAsset(conn.type),
         onRemove: () => _removeConnection(conn.id!),
+        onEdit: () => _editConnection(conn),
         onTap: () => widget.onConnectionSelected?.call(conn),
         onObjectSelected: widget.onExtensionObjectSelected,
         isExpanded: isExpanded,
@@ -501,6 +532,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
       icon: QueryaIcons.connectionIcon(conn.type),
       iconAsset: QueryaIcons.connectionAsset(conn.type),
       onRemove: () => _removeConnection(conn.id!),
+      onEdit: () => _editConnection(conn),
       onTap: () => widget.onConnectionSelected?.call(conn),
     );
   }

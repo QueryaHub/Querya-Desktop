@@ -64,16 +64,15 @@ const _validPostgresSslModes = {
       if (!_validPostgresSslModes.contains(sslMode)) {
         return (
           useSSL: null,
-          error:
-              'Unsupported sslmode "$sslMode" for PostgreSQL. '
+          error: 'Unsupported sslmode "$sslMode" for PostgreSQL. '
               'Supported: disable, require, verify-ca, verify-full.',
         );
       }
       useSSL = sslMode != 'disable';
     }
   } else if (type != 'sqlite') {
-    final sslQuery = uri.queryParameters['sslmode'] ??
-        uri.queryParameters['ssl'];
+    final sslQuery =
+        uri.queryParameters['sslmode'] ?? uri.queryParameters['ssl'];
     if (sslQuery != null) {
       final lowerSsl = sslQuery.toLowerCase();
       if (lowerSsl == 'true' || lowerSsl == 'require') {
@@ -163,8 +162,8 @@ ConnectionRow? _buildConnectionRow(
       databaseName = null;
     }
 
-    authSource = uri.queryParameters['authSource'] ??
-        uri.queryParameters['authsource'];
+    authSource =
+        uri.queryParameters['authSource'] ?? uri.queryParameters['authsource'];
 
     if (type == 'postgresql' || type == 'mysql' || type == 'mongodb') {
       connectionString = url;
@@ -196,7 +195,9 @@ String _connectionName(
   int? defaultPort,
 ) {
   if (type == 'sqlite') {
-    return host == ':memory:' ? 'SQLite (Memory)' : 'SQLite (${host!.split('/').last})';
+    return host == ':memory:'
+        ? 'SQLite (Memory)'
+        : 'SQLite (${host!.split('/').last})';
   }
 
   final cleanHost = host ?? 'localhost';

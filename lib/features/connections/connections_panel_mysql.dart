@@ -9,6 +9,7 @@ class _MysqlConnectionTile extends StatefulWidget {
     required this.icon,
     this.iconAsset,
     required this.onRemove,
+    required this.onEdit,
     this.onTap,
     this.onMysqlObjectSelected,
     this.onMysqlOpenSqlWorkspace,
@@ -21,6 +22,7 @@ class _MysqlConnectionTile extends StatefulWidget {
   final material.IconData icon;
   final String? iconAsset;
   final VoidCallback onRemove;
+  final VoidCallback onEdit;
   final VoidCallback? onTap;
   final void Function(
     ConnectionRow connection,
@@ -139,6 +141,12 @@ class _MysqlConnectionTileState extends State<_MysqlConnectionTile> {
                 widget.onMysqlOpenSqlWorkspace!(widget.connection),
             child: const Text('Open in SQL'),
           ),
+        MenuButton(
+          leading: material.Icon(material.Icons.edit_outlined,
+              size: 18, color: theme.colorScheme.mutedForeground),
+          onPressed: (_) => widget.onEdit(),
+          child: const Text('Edit connection…'),
+        ),
         MenuButton(
           leading: material.Icon(material.Icons.delete_outline_rounded,
               size: 18, color: theme.colorScheme.mutedForeground),

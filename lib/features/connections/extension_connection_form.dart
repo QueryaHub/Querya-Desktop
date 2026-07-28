@@ -18,6 +18,7 @@ Future<ConnectionRow?> showExtensionConnectionForm(
   required ExtensionManifest manifest,
   required DriverContribution driver,
   int? folderId,
+  ConnectionRow? initial,
 }) {
   return showAppDialog<ConnectionRow>(
     context: context,
@@ -28,6 +29,7 @@ Future<ConnectionRow?> showExtensionConnectionForm(
         manifest: manifest,
         driver: driver,
         folderId: folderId,
+        initial: initial,
       ),
     ),
   );
@@ -38,11 +40,13 @@ class _ExtensionConnectionFormContent extends material.StatefulWidget {
     required this.manifest,
     required this.driver,
     this.folderId,
+    this.initial,
   });
 
   final ExtensionManifest manifest;
   final DriverContribution driver;
   final int? folderId;
+  final ConnectionRow? initial;
 
   @override
   material.State<_ExtensionConnectionFormContent> createState() =>
@@ -59,11 +63,21 @@ class _ExtensionConnectionFormContentState
   var _testing = false;
   String? _testMessage;
   bool _testSucceeded = false;
+  late final Map<String, Object?> _initialValues;
+
+  bool get _isEditing => widget.initial != null;
 
   @override
   void initState() {
     super.initState();
-    _nameController.text = widget.driver.displayName;
+    final initial = widget.initial;
+    if (initial != null) {
+      _nameController.text = initial.name;
+      _initialValues = _sduiInitialValuesFromConnection(initial);
+    } else {
+      _nameController.text = widget.driver.displayName;
+      _initialValues = const {};
+    }
     _loadSchema();
   }
 
@@ -111,6 +125,7 @@ class _ExtensionConnectionFormContentState
       name: name,
       values: values,
       folderId: widget.folderId,
+      initial: widget.initial,
     );
     material.Navigator.of(context).pop(row);
   }
@@ -144,6 +159,7 @@ class _ExtensionConnectionFormContentState
         driver: widget.driver,
         name: 'connection-test',
         values: values,
+        initial: widget.initial,
       );
       final version = await ExtensionDriverSession.instance.testConnection(
         manifest: widget.manifest,
@@ -171,6 +187,9 @@ class _ExtensionConnectionFormContentState
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context).colorScheme;
     final radius = Theme.of(context).radiusXxl;
+    final title = _isEditing
+        ? 'Edit ${widget.driver.displayName}'
+        : widget.driver.displayName;
     return material.Container(
       constraints: WindowLayout.dialogConstraints(
         context,
@@ -193,7 +212,7 @@ class _ExtensionConnectionFormContentState
               child: material.Column(
                 crossAxisAlignment: material.CrossAxisAlignment.start,
                 children: [
-                  Text(widget.driver.displayName).large().semiBold(),
+                  Text(title).large().semiBold(),
                   const material.SizedBox(height: 6),
                   Text(
                     'Extension driver · ${widget.manifest.id}',
@@ -224,7 +243,11 @@ class _ExtensionConnectionFormContentState
                     else if (_loadError != null)
                       Text(_loadError!).muted().small()
                     else if (_schema != null)
-                      SduiFormBuilder(key: _formKey, schema: _schema!),
+                      SduiFormBuilder(
+                        key: _formKey,
+                        schema: _schema!,
+                        initialValues: _initialValues,
+                      ),
                     if (_testMessage != null) ...[
                       const material.SizedBox(height: 12),
                       material.SelectableText(
@@ -292,6 +315,54 @@ class _ExtensionConnectionFormContentState
   }
 }
 
+/// Non-secret SDUI seed values from an existing [ConnectionRow] (no passwords).
+Map<String, Object?> _sduiInitialValuesFromConnection(ConnectionRow row) {
+  final values = <String, Object?>{};
+
+  final optionsRaw = row.driverOptions;
+  if (optionsRaw != null && optionsRaw.trim().isNotEmpty) {
+    try {
+      final decoded = jsonDecode(optionsRaw);
+      if (decoded is Map) {
+        for (final entry in decoded.entries) {
+          final key = entry.key.toString();
+          if (_isPasswordKey(key)) continue;
+          values[key] = entry.value;
+        }
+      }
+    } catch (_) {
+      // Ignore malformed driverOptions; host fields still apply.
+    }
+  }
+
+  final host = row.host;
+  if (host != null && host.isNotEmpty) values['host'] = host;
+  if (row.port != null) values['port'] = row.port;
+  final username = row.username;
+  if (username != null && username.isNotEmpty) values['username'] = username;
+  final database = row.databaseName;
+  if (database != null && database.isNotEmpty) {
+    values['database'] = database;
+    values['databaseName'] = database;
+  }
+  values['useSSL'] = row.useSSL;
+  values['ssl'] = row.useSSL;
+  if (row.useSSL) {
+    values.putIfAbsent('sslMode', () => 'require');
+  }
+
+  values.removeWhere((key, _) => _isPasswordKey(key));
+  return values;
+}
+
+bool _isPasswordKey(String key) {
+  final lower = key.toLowerCase();
+  return lower == 'password' ||
+      lower.endsWith('password') ||
+      lower.contains('secret') ||
+      lower.contains('passwd');
+}
+
 /// Loads SDUI form schema from the extension package (file path preferred).
 Future<SduiFormSchema?> loadDriverConnectionFormSchema({
   required ExtensionManifest manifest,
@@ -321,6 +392,7 @@ ConnectionRow connectionRowFromExtensionForm({
   required String name,
   required Map<String, Object?> values,
   int? folderId,
+  ConnectionRow? initial,
 }) {
   final known = {
     'host',
@@ -358,7 +430,8 @@ ConnectionRow connectionRowFromExtensionForm({
   }
 
   return ConnectionRow(
-    type: driver.driverId,
+    id: initial?.id,
+    type: initial?.type ?? driver.driverId,
     name: name,
     host: (host == null || host.isEmpty) ? null : host,
     port: port,
@@ -366,9 +439,10 @@ ConnectionRow connectionRowFromExtensionForm({
     password: (password == null || password.isEmpty) ? null : password,
     databaseName: database,
     useSSL: useSsl,
-    extensionId: manifest.id,
+    extensionId: initial?.extensionId ?? manifest.id,
     driverOptions: options.isEmpty ? null : jsonEncode(options),
-    folderId: folderId,
-    createdAt: DateTime.now().toUtc().toIso8601String(),
+    folderId: initial?.folderId ?? folderId,
+    sortOrder: initial?.sortOrder ?? 0,
+    createdAt: initial?.createdAt ?? DateTime.now().toUtc().toIso8601String(),
   );
 }

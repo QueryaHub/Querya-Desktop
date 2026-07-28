@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
 import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
 import 'package:querya_desktop/shared/widgets/form_validity_notifier.dart';
 import 'package:querya_desktop/shared/widgets/ssl_certificate_fields.dart';
@@ -46,21 +47,26 @@ class MongoConnectionData {
 Future<ConnectionRow?> showMongoConnectionForm(
   BuildContext context, {
   int? folderId,
+  ConnectionRow? initial,
 }) async {
   return showAppDialog<ConnectionRow>(
     context: context,
     builder: (context) => material.Dialog(
       backgroundColor: material.Colors.transparent,
       insetPadding: WindowLayout.dialogSymmetricInsets(context),
-      child: _MongoConnectionFormContent(folderId: folderId),
+      child: _MongoConnectionFormContent(
+        folderId: folderId,
+        initial: initial,
+      ),
     ),
   );
 }
 
 class _MongoConnectionFormContent extends material.StatefulWidget {
-  const _MongoConnectionFormContent({this.folderId});
+  const _MongoConnectionFormContent({this.folderId, this.initial});
 
   final int? folderId;
+  final ConnectionRow? initial;
 
   @override
   material.State<_MongoConnectionFormContent> createState() =>
@@ -89,6 +95,8 @@ class _MongoConnectionFormContentState
   Timer? _dismissTimer;
   late final FormValidityNotifier _formValidNotifier;
 
+  bool get _isEditing => widget.initial != null;
+
   @override
   void initState() {
     super.initState();
@@ -105,6 +113,23 @@ class _MongoConnectionFormContentState
     _sslRootCertController.addListener(_syncUriSslParams);
     _sslCertController.addListener(_syncUriSslParams);
     _sslKeyController.addListener(_syncUriSslParams);
+
+    final initial = widget.initial;
+    if (initial != null) {
+      _nameController.text = initial.name;
+      _hostController.text = initial.host ?? 'localhost';
+      _portController.text = (initial.port ?? 27017).toString();
+      _usernameController.text = initial.username ?? '';
+      _databaseController.text = initial.databaseName ?? '';
+      _authSourceController.text = initial.authSource ?? '';
+      _useSSL = initial.useSSL;
+      final redacted = redactUriPassword(initial.connectionString) ?? '';
+      _connectionStringController.text = redacted;
+      if (redacted.isNotEmpty) {
+        _useConnectionString = true;
+      }
+    }
+
     _formValidNotifier.seed();
   }
 
@@ -279,8 +304,10 @@ class _MongoConnectionFormContentState
     final displayName =
         data.name.isNotEmpty ? data.name : 'MongoDB ${data.host}:${data.port}';
 
+    final initial = widget.initial;
     final row = ConnectionRow(
-      type: 'mongodb',
+      id: initial?.id,
+      type: initial?.type ?? 'mongodb',
       name: displayName,
       host: data.host,
       port: data.port,
@@ -290,8 +317,11 @@ class _MongoConnectionFormContentState
       authSource: data.authSource,
       useSSL: data.useSSL,
       connectionString: data.connectionString,
-      folderId: widget.folderId,
-      createdAt: DateTime.now().toUtc().toIso8601String(),
+      extensionId: initial?.extensionId,
+      driverOptions: initial?.driverOptions,
+      folderId: initial?.folderId ?? widget.folderId,
+      sortOrder: initial?.sortOrder ?? 0,
+      createdAt: initial?.createdAt ?? DateTime.now().toUtc().toIso8601String(),
     );
 
     material.Navigator.of(context).pop(row);
@@ -331,7 +361,11 @@ class _MongoConnectionFormContentState
                         color: theme.primary,
                       ),
                       const Gap(12),
-                      const Text('MongoDB Connection').large().semiBold(),
+                      Text(
+                        _isEditing
+                            ? 'Edit MongoDB Connection'
+                            : 'MongoDB Connection',
+                      ).large().semiBold(),
                     ],
                   ),
                   const Gap(8),
@@ -455,7 +489,11 @@ class _MongoConnectionFormContentState
                         children: [
                           TextField(
                             controller: _passwordController,
-                            placeholder: const Text('Password'),
+                            placeholder: Text(
+                              _isEditing
+                                  ? 'Leave blank to keep existing'
+                                  : 'Password',
+                            ),
                             obscureText: !_showPassword,
                           ),
                           material.Positioned(

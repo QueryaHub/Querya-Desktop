@@ -9,6 +9,7 @@ class _MongoConnectionTile extends StatefulWidget {
     required this.icon,
     this.iconAsset,
     required this.onRemove,
+    required this.onEdit,
     this.onTap,
     this.onDatabaseTap,
     this.isExpanded = false,
@@ -20,6 +21,7 @@ class _MongoConnectionTile extends StatefulWidget {
   final material.IconData icon;
   final String? iconAsset;
   final VoidCallback onRemove;
+  final VoidCallback onEdit;
   final VoidCallback? onTap;
   final void Function(String database)? onDatabaseTap;
   final bool isExpanded;
@@ -171,6 +173,12 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
             _loadDatabases();
           },
           child: const Text('Refresh databases'),
+        ),
+        MenuButton(
+          leading: material.Icon(material.Icons.edit_outlined,
+              size: 18, color: theme.colorScheme.mutedForeground),
+          onPressed: (_) => widget.onEdit(),
+          child: const Text('Edit connection…'),
         ),
         MenuButton(
           leading: material.Icon(material.Icons.delete_outline_rounded,
