@@ -18,4 +18,5 @@ export 'querya_dropdown.dart'
         QueryaDropdownItem,
         QueryaDropdownTokens,
         kPreferencesLabelWidth;
+export 'tree_load_error.dart';
 export 'package:shadcn_flutter/shadcn_flutter.dart';

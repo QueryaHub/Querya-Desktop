@@ -7,6 +7,7 @@ import 'package:querya_desktop/core/motion/querya_stagger.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
+import 'package:querya_desktop/core/ui/querya_icons.dart';
 import 'package:querya_desktop/features/connections/driver_icon.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -361,8 +362,8 @@ class _RecentConnectionRow extends StatelessWidget {
             children: [
               DriverIcon(
                 size: 20,
-                fallbackIcon: _iconForType(connection.type),
-                assetPath: _iconAssetForType(connection.type),
+                fallbackIcon: QueryaIcons.connectionIcon(connection.type),
+                assetPath: QueryaIcons.connectionAsset(connection.type),
               ),
               const material.SizedBox(width: 12),
               material.Expanded(
@@ -457,27 +458,6 @@ class _QuickStartRow extends StatelessWidget {
       ],
     );
   }
-}
-
-material.IconData _iconForType(String type) {
-  return switch (type) {
-    'mongodb' => material.Icons.eco_rounded,
-    'postgresql' => material.Icons.storage_rounded,
-    'mysql' => material.Icons.table_chart_rounded,
-    'redis' => material.Icons.memory_rounded,
-    'sqlite' => material.Icons.folder_open_rounded,
-    _ => material.Icons.extension_rounded,
-  };
-}
-
-String? _iconAssetForType(String type) {
-  return switch (type) {
-    'postgresql' => 'assets/images/postgresql_icon.png',
-    'mysql' => 'assets/images/mysql_icon.png',
-    'redis' => 'assets/images/redis_icon.png',
-    'mongodb' => 'assets/images/mongodb_icon.png',
-    _ => null,
-  };
 }
 
 String _connectionSubtitle(ConnectionRow connection) {

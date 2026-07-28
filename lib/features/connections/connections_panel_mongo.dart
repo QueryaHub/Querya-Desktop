@@ -281,51 +281,18 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
                       ),
                     ),
                   if (_error != null)
-                    material.Padding(
+                    TreeLoadError(
+                      title: 'Could not load databases',
+                      message: _error!,
+                      showTitleRow: true,
+                      detailFontSize: 10,
                       padding: const material.EdgeInsets.only(
-                          left: 28, top: 4, bottom: 4, right: 8),
-                      child: material.ConstrainedBox(
-                        constraints: const material.BoxConstraints(
-                            maxWidth: double.infinity),
-                        child: material.Column(
-                          crossAxisAlignment: material.CrossAxisAlignment.start,
-                          mainAxisSize: material.MainAxisSize.min,
-                          children: [
-                            material.Row(
-                              crossAxisAlignment:
-                                  material.CrossAxisAlignment.start,
-                              children: [
-                                material.Icon(
-                                  material.Icons.error_outline_rounded,
-                                  size: 14,
-                                  color: theme.colorScheme.destructive,
-                                ),
-                                const Gap(6),
-                                material.Expanded(
-                                  child: material.Text(
-                                    'Could not load databases',
-                                    maxLines: 2,
-                                    overflow: material.TextOverflow.ellipsis,
-                                    style: material.TextStyle(
-                                      fontSize: 12,
-                                      color: theme.colorScheme.destructive,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const Gap(6),
-                            material.SelectableText(
-                              _error!,
-                              style: material.TextStyle(
-                                fontSize: 10,
-                                height: 1.35,
-                                color: theme.colorScheme.mutedForeground,
-                              ),
-                            ),
-                          ],
-                        ),
+                        left: 28,
+                        top: 4,
+                        bottom: 4,
+                        right: 8,
                       ),
+                      onRetry: _loadDatabases,
                     ),
                   for (final db in _databases)
                     _MongoDatabaseNode(
@@ -370,8 +337,8 @@ class _MongoDatabaseNode extends StatelessWidget {
       padding: const material.EdgeInsets.only(left: 16, top: 2, bottom: 2),
       child: _PgTreeRow(
         label: name,
-        icon: material.Icons.storage_rounded,
-        iconSize: 13,
+        icon: QueryaIcons.database,
+        iconSize: QueryaIconSizes.treeGroup,
         iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
         textStyle: material.TextStyle(
           fontSize: 12,

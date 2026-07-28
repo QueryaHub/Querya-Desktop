@@ -42,7 +42,6 @@ import 'package:flutter/material.dart' as material
         Colors,
         Tooltip,
         Color,
-        SelectableText,
         Padding,
         Widget,
         Navigator,
@@ -67,6 +66,8 @@ import 'package:querya_desktop/core/sdui/sdui_tree_schema.dart';
 import 'package:querya_desktop/core/storage/folders_storage.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
+import 'package:querya_desktop/core/ui/querya_icon_sizes.dart';
+import 'package:querya_desktop/core/ui/querya_icons.dart';
 import 'package:querya_desktop/core/motion/querya_animated_expand.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
@@ -395,29 +396,6 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     }
   }
 
-  /// Icon for a connection type (matches New Connection dialog).
-  material.IconData _iconForType(String type) {
-    return switch (type) {
-      'mongodb' => material.Icons.eco_rounded,
-      'postgresql' => material.Icons.storage_rounded,
-      'mysql' => material.Icons.table_chart_rounded,
-      'redis' => material.Icons.memory_rounded,
-      'sqlite' => material.Icons.folder_open_rounded,
-      _ => material.Icons.extension_rounded,
-    };
-  }
-
-  /// Asset path for connection type logo (null = use icon).
-  static String? _iconAssetForType(String type) {
-    return switch (type) {
-      'postgresql' => 'assets/images/postgresql_icon.png',
-      'mysql' => 'assets/images/mysql_icon.png',
-      'redis' => 'assets/images/redis_icon.png',
-      'mongodb' => 'assets/images/mongodb_icon.png',
-      _ => null,
-    };
-  }
-
   Widget _buildConnectionTile(ConnectionRow conn) {
     final isSelected = widget.selectedConnectionId != null &&
         widget.selectedConnectionId == conn.id;
@@ -436,8 +414,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
       return _PostgresConnectionTile(
         connection: conn,
         isSelected: isSelected,
-        icon: _iconForType(conn.type),
-        iconAsset: _iconAssetForType(conn.type),
+        icon: QueryaIcons.connectionIcon(conn.type),
+        iconAsset: QueryaIcons.connectionAsset(conn.type),
         onRemove: () => _removeConnection(conn.id!),
         onTap: () => widget.onConnectionSelected?.call(conn),
         onPostgresObjectSelected: widget.onPostgresObjectSelected,
@@ -449,8 +427,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
       return _MysqlConnectionTile(
         connection: conn,
         isSelected: isSelected,
-        icon: _iconForType(conn.type),
-        iconAsset: _iconAssetForType(conn.type),
+        icon: QueryaIcons.connectionIcon(conn.type),
+        iconAsset: QueryaIcons.connectionAsset(conn.type),
         onRemove: () => _removeConnection(conn.id!),
         onTap: () => widget.onConnectionSelected?.call(conn),
         onMysqlObjectSelected: widget.onMysqlObjectSelected,
@@ -462,8 +440,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
       return _RedisConnectionTile(
         connection: conn,
         isSelected: isSelected,
-        icon: _iconForType(conn.type),
-        iconAsset: _iconAssetForType(conn.type),
+        icon: QueryaIcons.connectionIcon(conn.type),
+        iconAsset: QueryaIcons.connectionAsset(conn.type),
         onRemove: () => _removeConnection(conn.id!),
         onTap: () => widget.onConnectionSelected?.call(conn),
         onDatabaseTap: (db) => widget.onRedisDatabaseSelected?.call(conn, db),
@@ -474,8 +452,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
       return _MongoConnectionTile(
         connection: conn,
         isSelected: isSelected,
-        icon: _iconForType(conn.type),
-        iconAsset: _iconAssetForType(conn.type),
+        icon: QueryaIcons.connectionIcon(conn.type),
+        iconAsset: QueryaIcons.connectionAsset(conn.type),
         onRemove: () => _removeConnection(conn.id!),
         onTap: () => widget.onConnectionSelected?.call(conn),
         onDatabaseTap: (db) => widget.onMongoDBDatabaseSelected?.call(conn, db),
@@ -486,8 +464,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
       return _SqliteConnectionTile(
         connection: conn,
         isSelected: isSelected,
-        icon: _iconForType(conn.type),
-        iconAsset: _iconAssetForType(conn.type),
+        icon: QueryaIcons.connectionIcon(conn.type),
+        iconAsset: QueryaIcons.connectionAsset(conn.type),
         onRemove: () => _removeConnection(conn.id!),
         onTap: () => widget.onConnectionSelected?.call(conn),
         onSqliteObjectSelected: widget.onSqliteObjectSelected,
@@ -499,8 +477,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
       return _ExtensionConnectionTile(
         connection: conn,
         isSelected: isSelected,
-        icon: _iconForType(conn.type),
-        iconAsset: _iconAssetForType(conn.type),
+        icon: QueryaIcons.connectionIcon(conn.type),
+        iconAsset: QueryaIcons.connectionAsset(conn.type),
         onRemove: () => _removeConnection(conn.id!),
         onTap: () => widget.onConnectionSelected?.call(conn),
         onObjectSelected: widget.onExtensionObjectSelected,
@@ -511,8 +489,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     return _ConnectionTile(
       connection: conn,
       isSelected: isSelected,
-      icon: _iconForType(conn.type),
-      iconAsset: _iconAssetForType(conn.type),
+      icon: QueryaIcons.connectionIcon(conn.type),
+      iconAsset: QueryaIcons.connectionAsset(conn.type),
       onRemove: () => _removeConnection(conn.id!),
       onTap: () => widget.onConnectionSelected?.call(conn),
     );
@@ -602,7 +580,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                                     .getFolderIdByName(folderName);
                                 await _createConnection(folderId: folderId);
                               },
-                              iconForType: _iconForType,
+                              iconForType: QueryaIcons.connectionIcon,
                               onRemoveConnection: _removeConnection,
                               onConnectionTap: widget.onConnectionSelected,
                               onRedisDatabaseTap:

@@ -296,7 +296,7 @@ class _FolderTileState extends State<_FolderTile> {
                             key: material.ValueKey('folder-conn-${conn.id}'),
                             connection: conn,
                             icon: widget.iconForType(conn.type),
-                            iconAsset: ConnectionsPanelState._iconAssetForType(
+                            iconAsset: QueryaIcons.connectionAsset(
                               conn.type,
                             ),
                             onRemove: () => widget.onRemoveConnection(conn.id!),

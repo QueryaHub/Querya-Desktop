@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/ui/querya_icons.dart';
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
@@ -27,22 +28,10 @@ extension ConnectionTypeX on ConnectionType {
         ConnectionType.mongodb => 'MongoDB',
         ConnectionType.sqlite => 'SQLite',
       };
-  material.IconData get icon => switch (this) {
-        ConnectionType.postgresql => material.Icons.storage_rounded,
-        ConnectionType.mysql => material.Icons.table_chart_rounded,
-        ConnectionType.redis => material.Icons.memory_rounded,
-        ConnectionType.mongodb => material.Icons.eco_rounded,
-        ConnectionType.sqlite => material.Icons.folder_open_rounded,
-      };
+  material.IconData get icon => QueryaIcons.connectionIcon(name);
 
   /// Asset path for custom icon (from Downloads).
-  String? get iconAsset => switch (this) {
-        ConnectionType.postgresql => 'assets/images/postgresql_icon.png',
-        ConnectionType.mysql => 'assets/images/mysql_icon.png',
-        ConnectionType.redis => 'assets/images/redis_icon.png',
-        ConnectionType.mongodb => 'assets/images/mongodb_icon.png',
-        ConnectionType.sqlite => null,
-      };
+  String? get iconAsset => QueryaIcons.connectionAsset(name);
   bool get isSql =>
       this == ConnectionType.postgresql ||
       this == ConnectionType.mysql ||

@@ -165,7 +165,7 @@ class _MysqlConnectionTileState extends State<_MysqlConnectionTile> {
                         duration: context.motionDuration(QueryaMotion.fast),
                         curve: context.motionCurve(QueryaMotion.standardCurve),
                         child: material.Icon(
-                          material.Icons.chevron_right_rounded,
+                          QueryaIcons.expandClosed,
                           size: 16,
                           color: theme.colorScheme.mutedForeground,
                         ),
@@ -244,16 +244,14 @@ class _MysqlConnectionTileState extends State<_MysqlConnectionTile> {
                       ),
                     ),
                   if (_error != null)
-                    material.Padding(
+                    TreeLoadError(
+                      message: _error!,
                       padding: const material.EdgeInsets.only(
-                          left: 28, top: 4, bottom: 4),
-                      child: material.Text(
-                        'Error',
-                        overflow: material.TextOverflow.ellipsis,
-                        maxLines: 1,
-                        style: material.TextStyle(
-                            fontSize: 11, color: theme.colorScheme.destructive),
+                        left: 28,
+                        top: 4,
+                        bottom: 4,
                       ),
+                      onRetry: _loadDatabases,
                     ),
                   if (_databases.isNotEmpty)
                     _MysqlDatabasesNode(
@@ -307,8 +305,8 @@ class _MysqlDatabasesNode extends material.StatelessWidget {
         children: [
           _PgTreeRow(
             label: 'Databases (${databases.length})',
-            icon: material.Icons.dns_rounded,
-            iconSize: 14,
+            icon: QueryaIcons.databasesFolder,
+            iconSize: QueryaIconSizes.treeConnection,
             iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
             textStyle: material.TextStyle(
               fontSize: 12,
@@ -445,13 +443,13 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
               duration: context.motionDuration(QueryaMotion.fast),
               curve: context.motionCurve(QueryaMotion.standardCurve),
               child: material.Icon(
-                material.Icons.chevron_right_rounded,
-                size: 14,
+                QueryaIcons.expandClosed,
+                size: QueryaIconSizes.treeExpand,
                 color: theme.colorScheme.mutedForeground,
               ),
             ),
-            icon: material.Icons.storage_rounded,
-            iconSize: 14,
+            icon: QueryaIcons.database,
+            iconSize: QueryaIconSizes.treeConnection,
             iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
             textStyle: material.TextStyle(
               fontSize: 12,
@@ -490,29 +488,9 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
                     ),
                   )
                 else if (_error != null)
-                  material.Padding(
-                    padding: const material.EdgeInsets.only(
-                      left: 24,
-                      top: 4,
-                      bottom: 8,
-                    ),
-                    child: material.Column(
-                      crossAxisAlignment: material.CrossAxisAlignment.start,
-                      children: [
-                        material.SelectableText(
-                          _error!,
-                          style: material.TextStyle(
-                            fontSize: 11,
-                            color: theme.colorScheme.destructive,
-                          ),
-                        ),
-                        const material.SizedBox(height: 6),
-                        GhostButton(
-                          onPressed: _loadTables,
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
+                  TreeLoadError(
+                    message: _error!,
+                    onRetry: _loadTables,
                   ),
                 if (_tables.isNotEmpty ||
                     _views.isNotEmpty ||
@@ -530,8 +508,8 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
                             objectKind: MysqlObjectKind.table,
                             onRefresh: _loadTables,
                             label: 'Tables',
-                            icon: material.Icons.table_chart_rounded,
-                            itemIcon: material.Icons.grid_on_rounded,
+                            icon: QueryaIcons.tableGroup,
+                            itemIcon: QueryaIcons.tableLeaf,
                             items: _tables,
                             onItemTap: widget.onMysqlObjectSelected == null
                                 ? null
@@ -549,8 +527,8 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
                             objectKind: MysqlObjectKind.view,
                             onRefresh: _loadTables,
                             label: 'Views',
-                            icon: material.Icons.view_agenda_rounded,
-                            itemIcon: material.Icons.view_week_rounded,
+                            icon: QueryaIcons.viewGroup,
+                            itemIcon: QueryaIcons.viewLeaf,
                             items: _views,
                             onItemTap: widget.onMysqlObjectSelected == null
                                 ? null
@@ -568,8 +546,8 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
                             objectKind: MysqlObjectKind.procedure,
                             onRefresh: _loadTables,
                             label: 'Procedures',
-                            icon: material.Icons.functions_rounded,
-                            itemIcon: material.Icons.code_rounded,
+                            icon: QueryaIcons.functionGroup,
+                            itemIcon: QueryaIcons.functionLeaf,
                             items: _procedures,
                             onItemTap: widget.onMysqlObjectSelected == null
                                 ? null
@@ -587,8 +565,8 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
                             objectKind: MysqlObjectKind.function,
                             onRefresh: _loadTables,
                             label: 'Functions',
-                            icon: material.Icons.functions_rounded,
-                            itemIcon: material.Icons.code_rounded,
+                            icon: QueryaIcons.functionGroup,
+                            itemIcon: QueryaIcons.functionLeaf,
                             items: _functions,
                             onItemTap: widget.onMysqlObjectSelected == null
                                 ? null
@@ -657,13 +635,13 @@ class _MysqlObjectGroupState extends State<_MysqlObjectGroup> {
               duration: context.motionDuration(QueryaMotion.fast),
               curve: context.motionCurve(QueryaMotion.standardCurve),
               child: material.Icon(
-                material.Icons.chevron_right_rounded,
-                size: 13,
+                QueryaIcons.expandClosed,
+                size: QueryaIconSizes.treeExpand,
                 color: theme.colorScheme.mutedForeground,
               ),
             ),
             icon: widget.icon,
-            iconSize: 13,
+            iconSize: QueryaIconSizes.treeGroup,
             iconColor: theme.colorScheme.mutedForeground,
             textStyle: material.TextStyle(
               fontSize: 11,
@@ -688,7 +666,7 @@ class _MysqlObjectGroupState extends State<_MysqlObjectGroup> {
                   ),
                   label: item,
                   icon: widget.itemIcon,
-                  iconSize: 12,
+                  iconSize: QueryaIconSizes.treeLeaf,
                   iconColor: theme.colorScheme.mutedForeground,
                   textStyle: material.TextStyle(
                     fontSize: 11,
