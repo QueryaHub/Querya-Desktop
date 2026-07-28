@@ -312,7 +312,7 @@ class _RedisDatabaseNode extends StatelessWidget {
             child: material.Row(
               children: [
                 material.Icon(
-                  material.Icons.dns_rounded,
+                  QueryaIcons.databasesFolder,
                   size: 14,
                   color: keys > 0
                       ? theme.colorScheme.primary.withValues(alpha: 0.7)

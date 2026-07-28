@@ -287,29 +287,14 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
                     ),
                   )
                 else if (_error != null)
-                  material.Padding(
+                  TreeLoadError(
+                    message: _error!,
                     padding: const material.EdgeInsets.only(
                       left: 28,
                       top: 4,
                       bottom: 8,
                     ),
-                    child: material.Column(
-                      crossAxisAlignment: material.CrossAxisAlignment.start,
-                      children: [
-                        material.SelectableText(
-                          _error!,
-                          style: material.TextStyle(
-                            fontSize: 11,
-                            color: theme.colorScheme.destructive,
-                          ),
-                        ),
-                        const material.SizedBox(height: 6),
-                        GhostButton(
-                          onPressed: _loadTree,
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
+                    onRetry: _loadTree,
                   )
                 else if (_schema != null)
                   material.Padding(

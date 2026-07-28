@@ -172,7 +172,7 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
                         duration: context.motionDuration(QueryaMotion.fast),
                         curve: context.motionCurve(QueryaMotion.standardCurve),
                         child: material.Icon(
-                          material.Icons.chevron_right_rounded,
+                          QueryaIcons.expandClosed,
                           size: 16,
                           color: theme.colorScheme.mutedForeground,
                         ),
@@ -251,16 +251,14 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
                       ),
                     ),
                   if (_error != null)
-                    material.Padding(
+                    TreeLoadError(
+                      message: _error!,
                       padding: const material.EdgeInsets.only(
-                          left: 28, top: 4, bottom: 4),
-                      child: material.Text(
-                        'Error loading schema',
-                        overflow: material.TextOverflow.ellipsis,
-                        maxLines: 1,
-                        style: material.TextStyle(
-                            fontSize: 11, color: theme.colorScheme.destructive),
+                        left: 28,
+                        top: 4,
+                        bottom: 4,
                       ),
+                      onRetry: _loadTables,
                     ),
                   if (!_loading && _error == null)
                     material.Padding(
@@ -274,8 +272,8 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
                               objectKind: SqliteObjectKind.table,
                               onRefresh: _loadTables,
                               label: 'Tables',
-                              icon: material.Icons.table_chart_rounded,
-                              itemIcon: material.Icons.grid_on_rounded,
+                              icon: QueryaIcons.tableGroup,
+                              itemIcon: QueryaIcons.tableLeaf,
                               items: _tables,
                               onItemTap: widget.onSqliteObjectSelected == null
                                   ? null
@@ -291,8 +289,8 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
                               objectKind: SqliteObjectKind.view,
                               onRefresh: _loadTables,
                               label: 'Views',
-                              icon: material.Icons.view_agenda_rounded,
-                              itemIcon: material.Icons.view_week_rounded,
+                              icon: QueryaIcons.viewGroup,
+                              itemIcon: QueryaIcons.viewLeaf,
                               items: _views,
                               onItemTap: widget.onSqliteObjectSelected == null
                                   ? null
@@ -367,13 +365,13 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
               duration: context.motionDuration(QueryaMotion.fast),
               curve: context.motionCurve(QueryaMotion.standardCurve),
               child: material.Icon(
-                material.Icons.chevron_right_rounded,
+                QueryaIcons.expandClosed,
                 size: 13,
                 color: theme.colorScheme.mutedForeground,
               ),
             ),
             icon: widget.icon,
-            iconSize: 13,
+            iconSize: QueryaIconSizes.treeGroup,
             iconColor: theme.colorScheme.mutedForeground,
             textStyle: material.TextStyle(
               fontSize: 11,
@@ -398,7 +396,7 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
                   ),
                   label: item,
                   icon: widget.itemIcon,
-                  iconSize: 12,
+                  iconSize: QueryaIconSizes.treeLeaf,
                   iconColor: theme.colorScheme.mutedForeground,
                   textStyle: material.TextStyle(
                     fontSize: 11,

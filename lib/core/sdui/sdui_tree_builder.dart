@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/sdui/sdui_tree_schema.dart';
+import 'package:querya_desktop/core/ui/querya_icon_sizes.dart';
+import 'package:querya_desktop/core/ui/querya_icons.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Renders a sidebar-style tree from an SDUI schema with lazy expansion.
@@ -224,8 +226,11 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
               )
             else
               material.Icon(
-                _iconFor(node),
-                size: 16,
+                QueryaIcons.sduiNodeIcon(
+                  node.icon,
+                  expandable: node.expandable,
+                ),
+                size: QueryaIconSizes.sduiNode,
               ),
             const Gap(8),
             material.Expanded(
@@ -251,33 +256,5 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
     if (fromMeta.isNotEmpty) return fromMeta;
     final parts = node.id.split('.');
     return parts.isNotEmpty ? parts.first : '';
-  }
-
-  material.IconData _iconFor(SduiTreeNode node) {
-    switch (node.icon) {
-      case 'database':
-        return material.Icons.storage_outlined;
-      case 'table':
-        return material.Icons.table_chart_outlined;
-      case 'view':
-      case 'eye':
-        return material.Icons.visibility_outlined;
-      case 'folder':
-      case 'folder-table':
-        return material.Icons.folder_outlined;
-      case 'folder-eye':
-        return material.Icons.folder_special_outlined;
-      case 'folder-book':
-      case 'book':
-        return material.Icons.menu_book_outlined;
-      case 'columns':
-        return material.Icons.view_column_outlined;
-      case 'archive':
-        return material.Icons.inventory_2_outlined;
-      default:
-        return node.expandable
-            ? material.Icons.folder_outlined
-            : material.Icons.insert_drive_file_outlined;
-    }
   }
 }
