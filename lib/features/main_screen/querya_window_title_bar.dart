@@ -68,6 +68,10 @@ class QueryaWindowTitleBar extends StatelessWidget {
     return scale(isMacOS ? 72 : 16);
   }
 
+  /// Bitsdojo chrome buttons duplicate system traffic lights on macOS.
+  @visibleForTesting
+  static bool showBitsdojoWindowButtons({required bool isMacOS}) => !isMacOS;
+
   @visibleForTesting
   static WindowButtonColors closeButtonColors(BuildContext context) {
     final wb = context.workbench;
@@ -278,9 +282,13 @@ class QueryaWindowTitleBar extends StatelessWidget {
                 if (activeConnection != null && isReadOnly)
                   const QueryaReadOnlyBadge(),
                 UpdateAvailableBadge(controller: UpdateController.instance),
-                MinimizeWindowButton(colors: buttonColors),
-                MaximizeWindowButton(colors: buttonColors),
-                CloseWindowButton(colors: closeButtonColors),
+                if (QueryaWindowTitleBar.showBitsdojoWindowButtons(
+                  isMacOS: Platform.isMacOS,
+                )) ...[
+                  MinimizeWindowButton(colors: buttonColors),
+                  MaximizeWindowButton(colors: buttonColors),
+                  CloseWindowButton(colors: closeButtonColors),
+                ],
               ],
             )
           ],

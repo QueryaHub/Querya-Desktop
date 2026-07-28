@@ -115,6 +115,17 @@ void main() {
     );
   });
 
+  test('bitsdojo window buttons hidden on macOS, shown elsewhere', () {
+    expect(
+      QueryaWindowTitleBar.showBitsdojoWindowButtons(isMacOS: true),
+      isFalse,
+    );
+    expect(
+      QueryaWindowTitleBar.showBitsdojoWindowButtons(isMacOS: false),
+      isTrue,
+    );
+  });
+
   testWidgets('read-only state is persistently visible in title bar',
       (tester) async {
     await tester.pumpWidget(
