@@ -9,10 +9,11 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// A compact, keyboard-operable tab strip using Querya's motion and theme.
 ///
-/// Selection uses a sliding pill indicator (spring when [QueryaSpring.springsEnabled])
-/// so tab changes feel continuous / redirectable.
+/// Selection uses a sliding pill indicator: spring when Full
+/// ([QueryaSpring.springsEnabled]), duration-token cubic under Reduced (#493),
+/// snap when Off / OS `disableAnimations`.
 ///
-/// Spring ticks rebuild only the pill ([_TabStripIndicator]), not the tab row.
+/// Spring/cubic ticks rebuild only the pill ([_TabStripIndicator]), not the tab row.
 class QueryaTabStrip extends material.StatefulWidget {
   const QueryaTabStrip({
     super.key,
@@ -55,6 +56,18 @@ class _QueryaTabStripState extends material.State<QueryaTabStrip>
     final springs = QueryaSpring.springsEnabled(context);
     _indicatorLeft.useSprings = springs;
     _indicatorWidth.useSprings = springs;
+
+    // Reduced: animate with halved fast token; Off / disableAnimations → snap.
+    Duration? cubic;
+    if (!springs) {
+      final d = context.motionDuration(QueryaMotion.fast);
+      if (d > Duration.zero) cubic = d;
+    }
+    final curve = context.motionCurve(QueryaMotion.enter);
+    _indicatorLeft.cubicDuration = cubic;
+    _indicatorWidth.cubicDuration = cubic;
+    _indicatorLeft.cubicCurve = curve;
+    _indicatorWidth.cubicCurve = curve;
   }
 
   @override

@@ -251,6 +251,47 @@ void main() {
       expect(controller.isAnimating, isFalse);
     });
 
+    testWidgets('cubics when springs off and cubicDuration set', (tester) async {
+      late QueryaSpringController controller;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: _SpringHost(
+            useSprings: false,
+            cubicDuration: const Duration(milliseconds: 100),
+            onCreated: (c) => controller = c,
+          ),
+        ),
+      );
+
+      controller.animateTo(1);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 40));
+      expect(controller.value, greaterThan(0));
+      expect(controller.value, lessThan(1));
+      expect(controller.isAnimating, isTrue);
+
+      await tester.pumpAndSettle();
+      expect(controller.value, closeTo(1, 0.001));
+      expect(controller.isAnimating, isFalse);
+    });
+
+    testWidgets('cubic Duration.zero snaps', (tester) async {
+      late QueryaSpringController controller;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: _SpringHost(
+            useSprings: false,
+            cubicDuration: Duration.zero,
+            onCreated: (c) => controller = c,
+          ),
+        ),
+      );
+
+      controller.animateTo(1);
+      expect(controller.value, 1);
+      expect(controller.isAnimating, isFalse);
+    });
+
     testWidgets('notifies listeners on animate', (tester) async {
       late QueryaSpringController controller;
       var notifications = 0;
@@ -295,11 +336,13 @@ class _SpringHost extends StatefulWidget {
     required this.onCreated,
     this.useSprings = true,
     this.spring = QueryaSpring.snappy,
+    this.cubicDuration,
   });
 
   final ValueChanged<QueryaSpringController> onCreated;
   final bool useSprings;
   final SpringDescription spring;
+  final Duration? cubicDuration;
 
   @override
   State<_SpringHost> createState() => _SpringHostState();
@@ -316,6 +359,7 @@ class _SpringHostState extends State<_SpringHost>
       vsync: this,
       useSprings: widget.useSprings,
       spring: widget.spring,
+      cubicDuration: widget.cubicDuration,
     );
     widget.onCreated(_controller);
   }
