@@ -13,6 +13,7 @@ import 'package:flutter/material.dart' as material
         Widget,
         Column;
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
+import 'package:querya_desktop/core/motion/querya_fade_slide.dart';
 import 'package:querya_desktop/core/motion/querya_switching_body.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -175,115 +176,141 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
     switch (activeConn.type) {
       case 'postgresql':
         final pg = widget.selectedPostgresObject;
-        driverWorkspace = pg == null
-            ? PostgresWorkspaceHome(
-                key: ValueKey('pg_home_${activeConn.id}'),
-                connectionRow: activeConn,
-                postgresSqlEditorContext: widget.postgresSqlEditorContext,
-                postgresSqlEditorContextToken:
-                    widget.postgresSqlEditorContextToken,
-                sqlTabRequestToken: widget.postgresSqlTabRequestToken,
-                isReadOnly: widget.isReadOnly,
-              )
-            : buildPostgresObjectWorkspace(
-                connection: activeConn,
-                pg: pg,
-              );
+        driverWorkspace = _homeObjectMorph(
+          showingObject: pg != null,
+          home: PostgresWorkspaceHome(
+            key: ValueKey('pg_home_${activeConn.id}'),
+            connectionRow: activeConn,
+            postgresSqlEditorContext: widget.postgresSqlEditorContext,
+            postgresSqlEditorContextToken:
+                widget.postgresSqlEditorContextToken,
+            sqlTabRequestToken: widget.postgresSqlTabRequestToken,
+            isReadOnly: widget.isReadOnly,
+          ),
+          object: pg == null
+              ? null
+              : buildPostgresObjectWorkspace(
+                  connection: activeConn,
+                  pg: pg,
+                ),
+        );
         break;
       case 'mysql':
         final my = widget.selectedMysqlObject;
-        if (my == null) {
-          driverWorkspace = MysqlWorkspaceHome(
+        material.Widget? mysqlObject;
+        if (my != null) {
+          if (my.kind == MysqlObjectKind.procedure ||
+              my.kind == MysqlObjectKind.function) {
+            mysqlObject = MysqlRoutineView(
+              key: ValueKey(
+                'mysql_${activeConn.id}_${my.database}_${my.name}_${my.kind}',
+              ),
+              connectionRow: activeConn,
+              database: my.database,
+              routineName: my.name,
+              isFunction: my.kind == MysqlObjectKind.function,
+            );
+          } else {
+            mysqlObject = MysqlTableView(
+              key: ValueKey(
+                'mysql_${activeConn.id}_${my.database}_${my.name}_${my.kind}',
+              ),
+              connectionRow: activeConn,
+              database: my.database,
+              tableName: my.name,
+              isView: my.kind == MysqlObjectKind.view,
+            );
+          }
+        }
+        driverWorkspace = _homeObjectMorph(
+          showingObject: my != null,
+          home: MysqlWorkspaceHome(
             key: ValueKey('mysql_home_${activeConn.id}'),
             connectionRow: activeConn,
             sqlTabRequestToken: widget.mysqlSqlTabRequestToken,
             isReadOnly: widget.isReadOnly,
-          );
-        } else if (my.kind == MysqlObjectKind.procedure ||
-            my.kind == MysqlObjectKind.function) {
-          driverWorkspace = MysqlRoutineView(
-            key: ValueKey(
-              'mysql_${activeConn.id}_${my.database}_${my.name}_${my.kind}',
-            ),
-            connectionRow: activeConn,
-            database: my.database,
-            routineName: my.name,
-            isFunction: my.kind == MysqlObjectKind.function,
-          );
-        } else {
-          driverWorkspace = MysqlTableView(
-            key: ValueKey(
-              'mysql_${activeConn.id}_${my.database}_${my.name}_${my.kind}',
-            ),
-            connectionRow: activeConn,
-            database: my.database,
-            tableName: my.name,
-            isView: my.kind == MysqlObjectKind.view,
-          );
-        }
+          ),
+          object: mysqlObject,
+        );
         break;
       case 'mongodb':
         final mongoDb = widget.selectedMongoDb;
-        driverWorkspace = mongoDb != null
-            ? MongoExplorerView(
-                key: ValueKey('mongo_${activeConn.id}_db_$mongoDb'),
-                connectionRow: activeConn,
-                database: mongoDb,
-              )
-            : MongoStatsView(
-                key: ValueKey(activeConn.id),
-                connectionRow: activeConn,
-              );
+        driverWorkspace = _homeObjectMorph(
+          showingObject: mongoDb != null,
+          home: MongoStatsView(
+            key: ValueKey('mongo_stats_${activeConn.id}'),
+            connectionRow: activeConn,
+          ),
+          object: mongoDb == null
+              ? null
+              : MongoExplorerView(
+                  key: ValueKey('mongo_${activeConn.id}_db_$mongoDb'),
+                  connectionRow: activeConn,
+                  database: mongoDb,
+                ),
+        );
         break;
       case 'redis':
         final redisDb = widget.selectedRedisDb;
-        driverWorkspace = redisDb != null
-            ? RedisExplorerView(
-                key: ValueKey('redis_${activeConn.id}_db_$redisDb'),
-                connectionRow: activeConn,
-                database: redisDb,
-              )
-            : RedisView(
-                key: ValueKey(activeConn.id),
-                connectionRow: activeConn,
-              );
+        driverWorkspace = _homeObjectMorph(
+          showingObject: redisDb != null,
+          home: RedisView(
+            key: ValueKey('redis_stats_${activeConn.id}'),
+            connectionRow: activeConn,
+          ),
+          object: redisDb == null
+              ? null
+              : RedisExplorerView(
+                  key: ValueKey('redis_${activeConn.id}_db_$redisDb'),
+                  connectionRow: activeConn,
+                  database: redisDb,
+                ),
+        );
         break;
       case 'sqlite':
         final sq = widget.selectedSqliteObject;
-        driverWorkspace = sq == null
-            ? SqliteWorkspaceHome(
-                key: ValueKey('sqlite_home_${activeConn.id}'),
-                connectionRow: activeConn,
-                sqlTabRequestToken: widget.sqliteSqlTabRequestToken,
-                isReadOnly: widget.isReadOnly,
-              )
-            : SqliteTableView(
-                key: ValueKey(
-                  'sqlite_${activeConn.id}_${sq.name}_${sq.kind}',
+        driverWorkspace = _homeObjectMorph(
+          showingObject: sq != null,
+          home: SqliteWorkspaceHome(
+            key: ValueKey('sqlite_home_${activeConn.id}'),
+            connectionRow: activeConn,
+            sqlTabRequestToken: widget.sqliteSqlTabRequestToken,
+            isReadOnly: widget.isReadOnly,
+          ),
+          object: sq == null
+              ? null
+              : SqliteTableView(
+                  key: ValueKey(
+                    'sqlite_${activeConn.id}_${sq.name}_${sq.kind}',
+                  ),
+                  connectionRow: activeConn,
+                  tableName: sq.name,
+                  isView: sq.kind == SqliteObjectKind.view,
                 ),
-                connectionRow: activeConn,
-                tableName: sq.name,
-                isView: sq.kind == SqliteObjectKind.view,
-              );
+        );
         break;
       default:
         if (ExtensionDriverCatalog.isExtensionDriverConnection(activeConn)) {
           final obj = widget.selectedExtensionObject;
-          driverWorkspace = obj == null
-              ? ExtensionWorkspaceHome(
-                  key: ValueKey('ext_home_${activeConn.id}'),
-                  connectionRow: activeConn,
-                  sqlTabRequestToken: widget.extensionSqlTabRequestToken,
-                  isReadOnly: widget.isReadOnly,
-                )
-              : ExtensionTableView(
-                  key: ValueKey(
-                    'ext_table_${activeConn.id}_${obj.database}_${obj.name}',
+          driverWorkspace = _homeObjectMorph(
+            showingObject: obj != null,
+            home: ExtensionWorkspaceHome(
+              key: ValueKey('ext_home_${activeConn.id}'),
+              connectionRow: activeConn,
+              sqlTabRequestToken: widget.extensionSqlTabRequestToken,
+              isReadOnly: widget.isReadOnly,
+            ),
+            object: obj == null
+                ? null
+                : ExtensionTableView(
+                    key: ValueKey(
+                      'ext_table_${activeConn.id}_${obj.database}_${obj.name}',
+                    ),
+                    connectionRow: activeConn,
+                    database: obj.database,
+                    tableName: obj.name,
                   ),
-                  connectionRow: activeConn,
-                  database: obj.database,
-                  tableName: obj.name,
-                );
+          );
         }
         break;
     }
@@ -312,6 +339,29 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
           ],
         ),
       ),
+    );
+  }
+
+  /// Home (stats / SQL) stays keep-alive; object/explorer morphs in on top.
+  ///
+  /// Object→object switches use [QueryaFadeSlide] so table/DB changes do not
+  /// hard-cut. Does not animate virtualized result rows inside those views.
+  material.Widget _homeObjectMorph({
+    required bool showingObject,
+    required material.Widget home,
+    required material.Widget? object,
+  }) {
+    return QueryaSwitchingBody(
+      index: showingObject ? 1 : 0,
+      children: [
+        home,
+        QueryaFadeSlide(
+          child: object ??
+              const material.SizedBox.expand(
+                key: ValueKey('workspace_object_placeholder'),
+              ),
+        ),
+      ],
     );
   }
 }
