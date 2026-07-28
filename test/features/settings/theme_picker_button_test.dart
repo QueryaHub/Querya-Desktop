@@ -581,6 +581,60 @@ void main() {
 
       expect(picked, ThemeController.builtinQueryaLightId);
     });
+
+    testWidgets('compact trigger uses min mainAxisSize (no forced Expanded)',
+        (tester) async {
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: ThemePickerButton(
+              themes: _fakeThemes(3),
+              selectedThemeId: 'theme-0',
+              onSelected: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final rows = tester.widgetList<material.Row>(find.byType(material.Row));
+      final triggerRow = rows.firstWhere(
+        (row) => row.mainAxisSize == material.MainAxisSize.min,
+      );
+      expect(triggerRow.mainAxisSize, material.MainAxisSize.min);
+      expect(
+        triggerRow.children.whereType<material.Expanded>(),
+        isEmpty,
+      );
+    });
+
+    testWidgets('selecting theme keeps overlay briefly for exit motion',
+        (tester) async {
+      final themes = _fakeThemes(5);
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: ThemePickerButton(
+              themes: themes,
+              selectedThemeId: 'theme-0',
+              onSelected: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.text('Theme 00'));
+      await tester.pumpAndSettle();
+      expect(find.byType(material.ListView), findsOneWidget);
+
+      await tester.tap(find.text('Theme 01'));
+      await tester.pump(); // start exit; overlay still mounted
+      expect(find.byType(material.ListView), findsOneWidget);
+
+      await tester.pumpAndSettle();
+      expect(find.byType(material.ListView), findsNothing);
+    });
   });
 
   group('filterThemeDefinitions metadata', () {
