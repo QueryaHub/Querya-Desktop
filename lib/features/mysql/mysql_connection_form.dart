@@ -295,24 +295,17 @@ class _MysqlConnectionFormContentState
   @override
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context).colorScheme;
-    final radius = Theme.of(context).radiusXxl;
 
-    return material.Container(
+    return QueryaDialogCard(
       constraints: WindowLayout.dialogConstraints(
         context,
         maxWidth: WindowLayout.connectionFormMaxWidth,
         maxHeight: WindowLayout.connectionFormMaxHeight,
       ),
-      decoration: material.BoxDecoration(
-        color: theme.popover,
-        borderRadius: material.BorderRadius.circular(radius),
-        border: material.Border.all(color: theme.muted),
-      ),
-      child: material.ClipRRect(
-        borderRadius: material.BorderRadius.circular(radius),
-        child: material.Column(
-          crossAxisAlignment: material.CrossAxisAlignment.stretch,
-          children: [
+      borderColor: theme.muted,
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
             material.Padding(
               padding: const material.EdgeInsets.fromLTRB(24, 24, 24, 16),
               child: material.Column(
@@ -619,7 +612,6 @@ class _MysqlConnectionFormContentState
             ),
           ],
         ),
-      ),
     );
   }
 }
