@@ -181,6 +181,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
 
       expect(find.text('Preferences'), findsOneWidget);
+      // Dialog chrome uses opaque DecoratedBox — must not host ListTile (#491).
+      expect(find.byType(material.CheckboxListTile), findsNothing);
     });
   });
 }

@@ -152,21 +152,16 @@ class _PreferencesDialogContentState
                                   .small()
                                   .foreground(),
                               const material.SizedBox(height: 8),
-                              material.CheckboxListTile(
-                                contentPadding: material.EdgeInsets.zero,
-                                controlAffinity:
-                                    material.ListTileControlAffinity.leading,
+                              PreferencesCheckboxRow(
+                                value: _checkUpdatesOnStartup,
                                 title: const Text(
                                   'Automatically check for updates on startup',
                                 ).small(),
                                 subtitle: const Text(
                                   'Queries GitHub Releases silently when Querya starts.',
                                 ).muted().xSmall(),
-                                value: _checkUpdatesOnStartup,
                                 onChanged: (v) {
-                                  if (v != null) {
-                                    unawaited(_setCheckUpdatesOnStartup(v));
-                                  }
+                                  unawaited(_setCheckUpdatesOnStartup(v));
                                 },
                               ),
                               const material.SizedBox(height: 24),

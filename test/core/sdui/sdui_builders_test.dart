@@ -118,6 +118,12 @@ void main() {
       expect(values['port'], 5432);
       expect(values['ssl'], isFalse);
       expect(key.currentState!.passwordFieldIds, ['password']);
+      expect(find.byType(material.CheckboxListTile), findsNothing);
+      expect(find.byType(material.Checkbox), findsOneWidget);
+
+      await tester.tap(find.byType(material.Checkbox));
+      await tester.pump();
+      expect(key.currentState!.snapshotValues()['ssl'], isTrue);
     });
 
     testWidgets('file_picker uses injectable picker', (tester) async {

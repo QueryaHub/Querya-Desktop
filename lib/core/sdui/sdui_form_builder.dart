@@ -162,15 +162,41 @@ class SduiFormBuilderState extends material.State<SduiFormBuilder> {
   material.Widget _buildField(SduiFormField field) {
     switch (field.type) {
       case SduiFieldType.checkbox:
-        return material.CheckboxListTile(
-          contentPadding: material.EdgeInsets.zero,
-          title: Text(field.label),
-          value: _checkboxValues[field.id] ?? false,
-          controlAffinity: material.ListTileControlAffinity.leading,
-          onChanged: (v) {
-            setState(() => _checkboxValues[field.id] = v ?? false);
-            _notifyChanged();
-          },
+        // Avoid CheckboxListTile under opaque dialog DecoratedBox (Flutter 3.44+
+        // ListTile ink assert — #492).
+        final checked = _checkboxValues[field.id] ?? false;
+        return material.Material(
+          type: material.MaterialType.transparency,
+          child: material.MergeSemantics(
+            child: material.InkWell(
+              onTap: () {
+                setState(() => _checkboxValues[field.id] = !checked);
+                _notifyChanged();
+              },
+              borderRadius: material.BorderRadius.circular(6),
+              child: material.Row(
+                crossAxisAlignment: material.CrossAxisAlignment.center,
+                children: [
+                  material.SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: material.Checkbox(
+                      value: checked,
+                      materialTapTargetSize:
+                          material.MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: material.VisualDensity.compact,
+                      onChanged: (v) {
+                        setState(() => _checkboxValues[field.id] = v ?? false);
+                        _notifyChanged();
+                      },
+                    ),
+                  ),
+                  const Gap(12),
+                  material.Expanded(child: Text(field.label)),
+                ],
+              ),
+            ),
+          ),
         );
       case SduiFieldType.select:
         return material.Column(
