@@ -151,6 +151,76 @@ void main() {
 
       expect(key.currentState!.snapshotValues()['db'], '/tmp/test.db');
     });
+
+    testWidgets(
+      'keepExistingSecrets allows blank required password with hint',
+      (tester) async {
+        final schema = SduiFormSchema.fromJson(const {
+          'fields': [
+            {'id': 'host', 'type': 'text', 'label': 'Host', 'required': true},
+            {
+              'id': 'password',
+              'type': 'password',
+              'label': 'Password',
+              'required': true,
+              'placeholder': 'Secret',
+            },
+          ],
+        });
+        final key = material.GlobalKey<SduiFormBuilderState>();
+
+        await tester.pumpWidget(
+          queryaThemeTestShell(
+            child: material.Scaffold(
+              body: SduiFormBuilder(
+                key: key,
+                schema: schema,
+                initialValues: const {'host': 'db.local'},
+                keepExistingSecrets: true,
+              ),
+            ),
+          ),
+        );
+
+        expect(find.text('Leave blank to keep existing'), findsOneWidget);
+        expect(find.text('Secret'), findsNothing);
+
+        final values = key.currentState!.collectValues();
+        expect(values, isNotNull);
+        expect(values!['host'], 'db.local');
+        expect(values['password'], '');
+        expect(find.text('Password is required'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'required password still blocks create when keepExistingSecrets is false',
+      (tester) async {
+        final schema = SduiFormSchema.fromJson(const {
+          'fields': [
+            {
+              'id': 'password',
+              'type': 'password',
+              'label': 'Password',
+              'required': true,
+            },
+          ],
+        });
+        final key = material.GlobalKey<SduiFormBuilderState>();
+
+        await tester.pumpWidget(
+          queryaThemeTestShell(
+            child: material.Scaffold(
+              body: SduiFormBuilder(key: key, schema: schema),
+            ),
+          ),
+        );
+
+        expect(key.currentState!.collectValues(), isNull);
+        await tester.pump();
+        expect(find.text('Password is required'), findsOneWidget);
+      },
+    );
   });
 
   group('SduiTreeSchema', () {
