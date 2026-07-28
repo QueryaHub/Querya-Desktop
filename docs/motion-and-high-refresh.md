@@ -177,7 +177,7 @@ When reviewing PRs that touch animation:
 | Constant | Value | Where |
 |----------|-------|--------|
 | `kQueryaStaggerStep` | 30 ms | `QueryaStagger` first-paint choreography |
-| `kUpdateBadgePulsePeriod` | 1400 ms | Update title-bar chip pulse (chrome; see #363) |
+| `kUpdateBadgePulsePeriod` | 1400 ms | Update title-bar chip pulse at Full; Reduced halves via `effectiveDuration`; Off / OS disable stop (#363, #482) |
 
 Checklist for 120 Hz verification: [perf-baseline.md](perf-baseline.md) § Fluid shell.
 

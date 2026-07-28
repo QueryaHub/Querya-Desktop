@@ -9,6 +9,7 @@ class QueryaHoverSurface extends StatefulWidget {
     super.key,
     required this.child,
     this.borderRadius,
+    this.border,
     this.padding,
     this.hoveredColor,
     this.idleColor = Colors.transparent,
@@ -18,6 +19,7 @@ class QueryaHoverSurface extends StatefulWidget {
 
   final Widget child;
   final BorderRadius? borderRadius;
+  final BoxBorder? border;
   final EdgeInsetsGeometry? padding;
   final Color? hoveredColor;
   final Color idleColor;
@@ -46,6 +48,7 @@ class _QueryaHoverSurfaceState extends State<QueryaHoverSurface> {
       decoration: BoxDecoration(
         color: _hovered ? hovered : widget.idleColor,
         borderRadius: widget.borderRadius,
+        border: widget.border,
       ),
       child: widget.child,
     );

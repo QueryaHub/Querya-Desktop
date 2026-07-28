@@ -89,4 +89,36 @@ void main() {
     expect(find.textContaining('v1.0.0 available'), findsOneWidget);
     expect(state.isPulseAnimating, isFalse);
   });
+
+  testWidgets('reduced motion pulses at half period', (tester) async {
+    controller.setPendingUpdate(
+      const UpdateManifest(
+        version: '2.0.0',
+        changelog: '',
+        assets: [],
+      ),
+    );
+
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: QueryaMotionScope(
+          level: QueryaMotionLevel.reduced,
+          child: material.Scaffold(
+            body: UpdateAvailableBadge(controller: controller),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final state = tester.state<UpdateAvailableBadgeState>(
+      find.byType(UpdateAvailableBadge),
+    );
+    expect(find.textContaining('v2.0.0 available'), findsOneWidget);
+    expect(state.isPulseAnimating, isTrue);
+    expect(
+      state.pulseDuration,
+      Duration(microseconds: kUpdateBadgePulsePeriod.inMicroseconds ~/ 2),
+    );
+  });
 }
