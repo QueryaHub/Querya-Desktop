@@ -65,10 +65,10 @@ abstract final class QueryaIcons {
       case 'database':
         return database;
       case 'table':
-        return tableGroup;
+        return expandable ? tableGroup : tableLeaf;
       case 'view':
       case 'eye':
-        return viewGroup;
+        return expandable ? viewGroup : viewLeaf;
       case 'folder':
       case 'folder-table':
         return folder;

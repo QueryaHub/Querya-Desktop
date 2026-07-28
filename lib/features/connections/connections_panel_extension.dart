@@ -184,7 +184,7 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
                       duration: context.motionDuration(QueryaMotion.fast),
                       curve: context.motionCurve(QueryaMotion.standardCurve),
                       child: material.Icon(
-                        material.Icons.chevron_right_rounded,
+                        QueryaIcons.expandClosed,
                         size: 16,
                         color: theme.colorScheme.mutedForeground,
                       ),
