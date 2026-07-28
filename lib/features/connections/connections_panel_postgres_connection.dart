@@ -110,17 +110,18 @@ class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
     final iconWidget = widget.iconAsset != null
         ? material.Image.asset(
             widget.iconAsset!,
-            width: 16,
-            height: 16,
+            width: QueryaIconSizes.sidebarConnectionIcon,
+            height: QueryaIconSizes.sidebarConnectionIcon,
             fit: material.BoxFit.contain,
             errorBuilder: (_, __, ___) => material.Icon(
               widget.icon,
-              size: 16,
+              size: QueryaIconSizes.sidebarConnectionIcon,
               color: theme.colorScheme.primary,
             ),
           )
         : material.Icon(widget.icon,
-            size: 16, color: theme.colorScheme.primary);
+            size: QueryaIconSizes.sidebarConnectionIcon,
+            color: theme.colorScheme.primary);
 
     return ContextMenu(
       items: [
@@ -160,8 +161,8 @@ class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
                         duration: context.motionDuration(QueryaMotion.treeExpand),
                         curve: context.motionCurve(QueryaMotion.treeExpandCurve),
                         child: material.Icon(
-                          material.Icons.chevron_right_rounded,
-                          size: 16,
+                          QueryaIcons.expandClosed,
+                          size: QueryaIconSizes.sidebarExpand,
                           color: theme.colorScheme.mutedForeground,
                         ),
                       ),

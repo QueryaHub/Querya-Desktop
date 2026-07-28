@@ -107,17 +107,18 @@ class _MysqlConnectionTileState extends State<_MysqlConnectionTile> {
     final iconWidget = widget.iconAsset != null
         ? material.Image.asset(
             widget.iconAsset!,
-            width: 16,
-            height: 16,
+            width: QueryaIconSizes.sidebarConnectionIcon,
+            height: QueryaIconSizes.sidebarConnectionIcon,
             fit: material.BoxFit.contain,
             errorBuilder: (_, __, ___) => material.Icon(
               widget.icon,
-              size: 16,
+              size: QueryaIconSizes.sidebarConnectionIcon,
               color: theme.colorScheme.primary,
             ),
           )
         : material.Icon(widget.icon,
-            size: 16, color: theme.colorScheme.primary);
+            size: QueryaIconSizes.sidebarConnectionIcon,
+            color: theme.colorScheme.primary);
 
     return ContextMenu(
       items: [
@@ -166,7 +167,7 @@ class _MysqlConnectionTileState extends State<_MysqlConnectionTile> {
                         curve: context.motionCurve(QueryaMotion.treeExpandCurve),
                         child: material.Icon(
                           QueryaIcons.expandClosed,
-                          size: 16,
+                          size: QueryaIconSizes.sidebarExpand,
                           color: theme.colorScheme.mutedForeground,
                         ),
                       ),

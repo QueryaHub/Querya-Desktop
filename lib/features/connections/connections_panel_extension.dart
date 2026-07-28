@@ -141,25 +141,25 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
     if (_iconFilePath != null) {
       iconWidget = DriverIconImage(
         path: _iconFilePath!,
-        size: 16,
+        size: QueryaIconSizes.sidebarConnectionIcon,
         fallbackIcon: widget.icon,
       );
     } else if (widget.iconAsset != null) {
       iconWidget = material.Image.asset(
         widget.iconAsset!,
-        width: 16,
-        height: 16,
+        width: QueryaIconSizes.sidebarConnectionIcon,
+        height: QueryaIconSizes.sidebarConnectionIcon,
         fit: material.BoxFit.contain,
         errorBuilder: (_, __, ___) => material.Icon(
           widget.icon,
-          size: 16,
+          size: QueryaIconSizes.sidebarConnectionIcon,
           color: theme.colorScheme.primary,
         ),
       );
     } else {
       iconWidget = material.Icon(
         widget.icon,
-        size: 16,
+        size: QueryaIconSizes.sidebarConnectionIcon,
         color: theme.colorScheme.primary,
       );
     }
@@ -185,7 +185,7 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
                       curve: context.motionCurve(QueryaMotion.treeExpandCurve),
                       child: material.Icon(
                         QueryaIcons.expandClosed,
-                        size: 16,
+                        size: QueryaIconSizes.sidebarExpand,
                         color: theme.colorScheme.mutedForeground,
                       ),
                     ),

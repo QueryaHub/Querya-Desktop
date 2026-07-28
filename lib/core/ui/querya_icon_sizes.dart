@@ -9,6 +9,12 @@ abstract final class QueryaIconSizes {
   /// Expand chevron in tree rows.
   static const double treeExpand = 13;
 
+  /// Expand chevron on connection / folder headers in the sidebar (#496).
+  static const double sidebarExpand = 16;
+
+  /// Connection-type icon / logo on sidebar header rows.
+  static const double sidebarConnectionIcon = 16;
+
   /// Database / connection-level tree nodes.
   static const double treeConnection = 14;
 
