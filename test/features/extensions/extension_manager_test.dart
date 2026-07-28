@@ -125,6 +125,19 @@ void main() {
       expect(find.text('ClickHouse Driver'), findsOneWidget);
       expect(find.textContaining('preview listings only'), findsOneWidget);
       expect(find.text('Preview'), findsWidgets);
+
+      await tester.tap(find.text('Updates'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('All installed extensions are up to date!'),
+        findsNothing,
+      );
+      expect(
+        find.text('Extension update checks are not available yet'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Marketplace API'), findsOneWidget);
     });
   });
 }

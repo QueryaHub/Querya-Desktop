@@ -403,10 +403,37 @@ class _ExtensionManagerContentState
   }
 
   material.Widget _buildUpdatesTab() {
-    return const material.Center(
+    if (_loading) {
+      return const material.Center(
+        child: material.CircularProgressIndicator(),
+      );
+    }
+    final theme = Theme.of(context).colorScheme;
+    return material.Center(
       child: material.Padding(
-        padding: material.EdgeInsets.all(32.0),
-        child: Text('All installed extensions are up to date!'),
+        padding: const material.EdgeInsets.all(32.0),
+        child: material.ConstrainedBox(
+          constraints: const material.BoxConstraints(maxWidth: 420),
+          child: material.Column(
+            mainAxisSize: material.MainAxisSize.min,
+            children: [
+              material.Icon(
+                material.Icons.system_update_alt_rounded,
+                size: 36,
+                color: theme.mutedForeground,
+              ),
+              const material.SizedBox(height: 16),
+              const Text('Extension update checks are not available yet')
+                  .semiBold(),
+              const material.SizedBox(height: 8),
+              const Text(
+                'Automatic update scanning ships with the Marketplace API. '
+                'Until then, reinstall from Marketplace or from a local file '
+                'to get a newer build.',
+              ).muted().small(),
+            ],
+          ),
+        ),
       ),
     );
   }
