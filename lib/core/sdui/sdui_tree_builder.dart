@@ -4,6 +4,7 @@ import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/core/sdui/sdui_tree_schema.dart';
 import 'package:querya_desktop/core/ui/querya_icon_sizes.dart';
 import 'package:querya_desktop/core/ui/querya_icons.dart';
+import 'package:querya_desktop/core/ui/querya_tree_tokens.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Renders a sidebar-style tree from an SDUI schema with lazy expansion.
@@ -174,7 +175,9 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
         final row = rows[index];
         if (row.isError) {
           return material.Padding(
-            padding: material.EdgeInsets.only(left: 36.0 + row.depth * 16.0),
+            padding: material.EdgeInsets.only(
+              left: 36.0 + row.depth * QueryaTreeTokens.indent,
+            ),
             child: material.Align(
               alignment: material.Alignment.centerLeft,
               child: Text(row.error!).muted().xSmall(),
@@ -196,7 +199,6 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
   material.Widget _buildNodeRow(SduiTreeNode node, {required int depth}) {
     final theme = Theme.of(context);
     final muted = theme.colorScheme.mutedForeground;
-    final primary = theme.colorScheme.primary;
     final canExpand = node.expandable || node.hasChildren;
     final isExpanded = _expanded.contains(node.id);
     final isLoading = _loading.contains(node.id);
@@ -205,8 +207,11 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
     // Same hierarchy as native trees (#476 / #497) — no separate sduiNode size.
     final iconSize =
         canExpand ? QueryaIconSizes.treeGroup : QueryaIconSizes.treeLeaf;
-    final iconColor = isBrowsable ? primary.withValues(alpha: 0.5) : muted;
-    final rowLeft = 8.0 + depth * 16.0 + (canExpand ? 0 : 4.0);
+    final iconColor = isBrowsable
+        ? QueryaTreeTokens.leafIconColor(theme.colorScheme.primary)
+        : muted;
+    final rowLeft =
+        8.0 + depth * QueryaTreeTokens.indent + (canExpand ? 0 : 4.0);
 
     return material.InkWell(
       onTap: () {

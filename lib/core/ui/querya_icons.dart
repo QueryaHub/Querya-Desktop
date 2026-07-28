@@ -14,7 +14,7 @@ abstract final class QueryaIcons {
       material.Icons.account_tree_rounded;
   static const material.IconData schema = material.Icons.diamond_rounded;
   static const material.IconData extension = material.Icons.extension_rounded;
-  static const material.IconData publicSchema = material.Icons.public_rounded;
+  static const material.IconData foreignData = material.Icons.hub_rounded;
 
   static const material.IconData tableGroup =
       material.Icons.table_chart_rounded;
@@ -23,11 +23,18 @@ abstract final class QueryaIcons {
   static const material.IconData viewLeaf = material.Icons.view_week_rounded;
   static const material.IconData materializedViewGroup =
       material.Icons.dynamic_feed_rounded;
+  static const material.IconData materializedViewLeaf =
+      material.Icons.layers_rounded;
   static const material.IconData functionGroup =
       material.Icons.functions_rounded;
   static const material.IconData functionLeaf = material.Icons.code_rounded;
-  static const material.IconData sequence =
+  static const material.IconData sequenceGroup =
       material.Icons.format_list_numbered_rounded;
+  static const material.IconData sequenceLeaf =
+      material.Icons.looks_one_rounded;
+
+  /// Alias kept for call sites that still say "sequence" as the group icon.
+  static const material.IconData sequence = sequenceGroup;
   static const material.IconData indexes = material.Icons.table_rows_rounded;
   static const material.IconData triggers = material.Icons.bolt_rounded;
   static const material.IconData types = material.Icons.category_rounded;
