@@ -295,12 +295,12 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
                       ),
                       onRetry: _loadDatabases,
                     ),
-                  for (final db in _databases)
-                    _MongoDatabaseNode(
+                  if (_databases.isNotEmpty)
+                    _MongoDatabasesNode(
                       connection: widget.connection,
-                      name: db,
-                      onTap: () => widget.onDatabaseTap?.call(db),
-                      onDelete: () => _deleteDatabase(db),
+                      databases: _databases,
+                      onDatabaseTap: widget.onDatabaseTap,
+                      onDeleteDatabase: _deleteDatabase,
                       onRefreshDatabases: () {
                         setState(() => _databases = []);
                         _loadDatabases();
@@ -311,6 +311,64 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _MongoDatabasesNode extends StatelessWidget {
+  const _MongoDatabasesNode({
+    required this.connection,
+    required this.databases,
+    required this.onRefreshDatabases,
+    required this.onDeleteDatabase,
+    this.onDatabaseTap,
+  });
+
+  final ConnectionRow connection;
+  final List<String> databases;
+  final VoidCallback onRefreshDatabases;
+  final Future<void> Function(String name) onDeleteDatabase;
+  final void Function(String database)? onDatabaseTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return material.Padding(
+      padding: const material.EdgeInsets.only(left: 20),
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.start,
+        mainAxisSize: material.MainAxisSize.min,
+        children: [
+          _PgTreeRow(
+            label: 'Databases (${databases.length})',
+            icon: QueryaIcons.databasesFolder,
+            iconSize: QueryaIconSizes.treeConnection,
+            iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
+            textStyle: material.TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.foreground,
+            ),
+            verticalPadding: 4,
+            onTap: null,
+            connection: connection,
+            onContextRefresh: onRefreshDatabases,
+          ),
+          lazyConnectionTreeList(
+            context: context,
+            itemCount: databases.length,
+            itemBuilder: (context, index) {
+              final db = databases[index];
+              return _MongoDatabaseNode(
+                connection: connection,
+                name: db,
+                onTap: () => onDatabaseTap?.call(db),
+                onDelete: () => onDeleteDatabase(db),
+                onRefreshDatabases: onRefreshDatabases,
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -339,7 +397,7 @@ class _MongoDatabaseNode extends StatelessWidget {
       child: _PgTreeRow(
         label: name,
         icon: QueryaIcons.database,
-        iconSize: QueryaIconSizes.treeGroup,
+        iconSize: QueryaIconSizes.treeConnection,
         iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
         textStyle: material.TextStyle(
           fontSize: 12,
