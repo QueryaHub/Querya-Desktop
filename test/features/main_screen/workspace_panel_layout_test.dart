@@ -211,5 +211,49 @@ void main() {
       expect(find.byType(RedisView), findsOneWidget);
       expect(find.byType(QueryaSwitchingBody), findsNWidgets(2));
     });
+
+    testWidgets('connection A→B morph uses outer QueryaFadeSlide',
+        (tester) async {
+      const redisB = ConnectionRow(
+        id: 43,
+        type: 'redis',
+        name: 'redis-b',
+        host: '127.0.0.1',
+        port: 6380,
+        createdAt: '0',
+      );
+
+      await pumpWidgetWithSurfaceSize(
+        tester,
+        const material.Size(800, 600),
+        queryaThemeTestShell(
+          child: const material.SizedBox.expand(
+            child: WorkspacePanel(activeConnection: redisConnection),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byKey(const material.ValueKey('ws_conn_42')), findsOneWidget);
+      expect(find.byType(RedisView), findsOneWidget);
+
+      await pumpWidgetWithSurfaceSize(
+        tester,
+        const material.Size(800, 600),
+        queryaThemeTestShell(
+          child: const material.SizedBox.expand(
+            child: WorkspacePanel(activeConnection: redisB),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.byKey(const material.ValueKey('ws_conn_43')), findsOneWidget);
+      // Outer empty↔connected FadeSlide + home↔object FadeSlide.
+      expect(find.byType(QueryaFadeSlide), findsWidgets);
+      expect(find.byType(RedisView), findsOneWidget);
+      expect(find.byType(QueryaSwitchingBody), findsNWidgets(2));
+    });
   });
 }

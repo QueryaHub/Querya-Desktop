@@ -133,6 +133,9 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
   /// Keeps the last connected workspace mounted so empty↔active can cross-fade.
   material.Widget? _cachedActiveBody;
 
+  /// Connection id for the cached active body (stable FadeSlide key on empty).
+  int? _lastConnectedId;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -152,9 +155,14 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
     if (activeConn == null) {
       activeBody = _cachedActiveBody ?? const material.SizedBox.expand();
     } else {
+      _lastConnectedId = activeConn.id;
       activeBody = _buildActiveConnectionBody(theme, activeConn);
       _cachedActiveBody = activeBody;
     }
+
+    // Connection A→B: keyed FadeSlide inside the connected slot (#494).
+    // Keep last id when deselected so empty↔connected SwitchingBody is undisturbed.
+    final connKey = activeConn?.id ?? _lastConnectedId ?? 0;
 
     return material.Container(
       color: theme.colorScheme.background,
@@ -162,7 +170,12 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
         index: activeConn == null ? 0 : 1,
         children: [
           empty,
-          material.SizedBox.expand(child: activeBody),
+          QueryaFadeSlide(
+            child: material.SizedBox.expand(
+              key: ValueKey('ws_conn_$connKey'),
+              child: activeBody,
+            ),
+          ),
         ],
       ),
     );
