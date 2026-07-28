@@ -91,4 +91,10 @@ void main() {
       QueryaIconSizes.sidebarConnectionIcon,
     );
   });
+
+  test('SDUI trees share native treeGroup/treeLeaf sizes (no sduiNode)', () {
+    // Guards against reintroducing a dead parallel size token (#497).
+    expect(QueryaIconSizes.treeGroup, 13);
+    expect(QueryaIconSizes.treeLeaf, 12);
+  });
 }
