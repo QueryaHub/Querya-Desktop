@@ -1,0 +1,47 @@
+# Manual AUR publish (hotfix / re-publish). Normal path: Release workflow → publish-aur job.
+#
+# First push creates the AUR repo automatically. Requires secret AUR_SSH_PRIVATE_KEY.
+
+name: Publish AUR (querya-desktop)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'pkgver (e.g. 0.4.12) — Querya-Desktop-{version}-linux.zip must exist on GitHub Releases'
+        required: true
+        type: string
+      release_tag:
+        description: 'GitHub Release tag if different from version (e.g. v0.4.12); leave empty to auto-try'
+        required: false
+        type: string
+
+jobs:
+  aur:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require AUR SSH secret
+        env:
+          KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        run: |
+          if [ -z "${KEY:-}" ]; then
+            echo "Missing repository secret AUR_SSH_PRIVATE_KEY" >&2
+            exit 1
+          fi
+
+      - name: SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+
+      - name: Publish to AUR
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          VER="${{ github.event.inputs.version }}"
+          TAG="${RELEASE_TAG:-$VER}"
+          chmod +x ./scripts/linux/aur_publish.sh
+          ./scripts/linux/aur_publish.sh "$VER" "$TAG"

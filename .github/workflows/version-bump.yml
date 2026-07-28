@@ -80,11 +80,20 @@ jobs:
           sed -i "s/^version: .*/version: ${NEW_VERSION}+${NEW_BUILD}/" pubspec.yaml
           grep "^version:" pubspec.yaml
 
+      - name: Sync AUR PKGBUILD pkgver with pubspec
+        if: steps.check.outputs.merged == 'true'
+        run: |
+          NEW_VERSION="${{ steps.bump.outputs.new_version }}"
+          sed -i "s/^pkgver=.*/pkgver=${NEW_VERSION}/" packaging/linux/aur/PKGBUILD
+          sed -i "s/^pkgrel=.*/pkgrel=1/" packaging/linux/aur/PKGBUILD
+          sed -i "s/^sha256sums=.*/sha256sums=('SKIP' 'SKIP' 'SKIP')/" packaging/linux/aur/PKGBUILD
+          grep ^pkgver packaging/linux/aur/PKGBUILD
+
       - name: Commit version bump
         if: steps.check.outputs.merged == 'true'
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add pubspec.yaml
+          git add pubspec.yaml packaging/linux/aur/PKGBUILD
           git commit -m "Bump version to ${{ steps.bump.outputs.new_version }}+${{ steps.bump.outputs.new_build }}"
           git push origin main

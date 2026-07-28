@@ -1,8 +1,8 @@
 # Maintainer: QueryaHub <https://github.com/QueryaHub/Querya-Desktop>
 # AUR package — installs the official Release portable Linux zip under /opt.
-# Bump pkgver/pkgrel when a new GitHub Release is published.
+# pkgver is synced by version-bump.yml; CI publishes real sha256sums on Release.
 pkgname=querya-desktop
-pkgver=0.4.11-b
+pkgver=0.4.12
 pkgrel=1
 pkgdesc="Multi-database desktop client (PostgreSQL, MySQL, Redis, MongoDB, SQLite)"
 arch=('x86_64')
@@ -15,8 +15,9 @@ optdepends=(
 source=(
   "Querya-Desktop-${pkgver}-linux.zip::https://github.com/QueryaHub/Querya-Desktop/releases/download/${pkgver}/Querya-Desktop-${pkgver}-linux.zip"
   "querya_desktop.desktop"
+  "querya_desktop.png"
 )
-sha256sums=('SKIP' 'SKIP')
+sha256sums=('SKIP' 'SKIP' 'SKIP')
 
 prepare() {
   bsdtar -xf "$srcdir/Querya-Desktop-${pkgver}-linux.zip" -C "$srcdir"
