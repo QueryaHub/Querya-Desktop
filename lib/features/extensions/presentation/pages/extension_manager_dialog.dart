@@ -158,86 +158,77 @@ class _ExtensionManagerContentState
   @override
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context).colorScheme;
-    final radius = Theme.of(context).radiusXxl;
     final onPopover = theme.popoverForeground;
 
     return material.DefaultTextStyle(
       style: material.TextStyle(color: onPopover),
       child: material.IconTheme(
         data: material.IconThemeData(color: onPopover),
-        child: material.Container(
+        child: QueryaDialogCard(
           constraints: WindowLayout.dialogConstraints(
             context,
             maxWidth: 800,
             minWidth: 600,
             maxHeight: 700,
           ),
-          decoration: material.BoxDecoration(
-            color: theme.popover,
-            borderRadius: material.BorderRadius.circular(radius),
-            border: material.Border.all(color: theme.border),
-          ),
-          child: material.ClipRRect(
-            borderRadius: material.BorderRadius.circular(radius),
-            child: material.Column(
-              crossAxisAlignment: material.CrossAxisAlignment.stretch,
-              children: [
-                material.Padding(
-                  padding: const material.EdgeInsets.fromLTRB(24, 24, 24, 8),
-                  child: material.Row(
-                    mainAxisAlignment: material.MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: material.CrossAxisAlignment.center,
-                    children: [
-                      material.Expanded(
-                        child: material.Column(
-                          crossAxisAlignment: material.CrossAxisAlignment.start,
-                          children: [
-                            const Text('Extensions')
-                                .large()
-                                .semiBold()
-                                .foreground(),
-                            const material.SizedBox(height: 6),
-                            const Text(
-                                    'Manage local and marketplace extensions')
-                                .muted()
-                                .small(),
-                          ],
-                        ),
+          borderColor: theme.border,
+          child: material.Column(
+            crossAxisAlignment: material.CrossAxisAlignment.stretch,
+            children: [
+              material.Padding(
+                padding: const material.EdgeInsets.fromLTRB(24, 24, 24, 8),
+                child: material.Row(
+                  mainAxisAlignment: material.MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: material.CrossAxisAlignment.center,
+                  children: [
+                    material.Expanded(
+                      child: material.Column(
+                        crossAxisAlignment: material.CrossAxisAlignment.start,
+                        children: [
+                          const Text('Extensions')
+                              .large()
+                              .semiBold()
+                              .foreground(),
+                          const material.SizedBox(height: 6),
+                          const Text('Manage local and marketplace extensions')
+                              .muted()
+                              .small(),
+                        ],
                       ),
-                      const material.SizedBox(width: 16),
-                      PrimaryButton(
-                        onPressed: () => material.Navigator.of(context).pop(),
-                        child: const Text('Close'),
-                      ),
-                    ],
-                  ),
+                    ),
+                    const material.SizedBox(width: 16),
+                    PrimaryButton(
+                      onPressed: () => material.Navigator.of(context).pop(),
+                      child: const Text('Close'),
+                    ),
+                  ],
                 ),
-                material.Padding(
-                  padding: const material.EdgeInsets.symmetric(
-                      horizontal: 24.0, vertical: 8.0),
-                  child: QueryaTabStrip(
-                    labels: [
-                      'Installed (${_installed.length})',
-                      'Marketplace',
-                      'Updates',
-                    ],
-                    selectedIndex: _tabIndex,
-                    onSelected: (index) => setState(() => _tabIndex = index),
-                  ),
+              ),
+              material.Padding(
+                padding: const material.EdgeInsets.symmetric(
+                    horizontal: 24.0, vertical: 8.0),
+                child: QueryaTabStrip(
+                  labels: [
+                    'Installed (${_installed.length})',
+                    'Marketplace',
+                    'Updates',
+                  ],
+                  selectedIndex: _tabIndex,
+                  onSelected: (index) => setState(() => _tabIndex = index),
                 ),
-                material.Divider(height: 1, color: theme.border),
-                material.Expanded(
-                  child: QueryaCrossFadeStack(
-                    index: _tabIndex,
-                    children: [
-                      _buildInstalledTab(),
-                      _buildMarketplaceTab(),
-                      _buildUpdatesTab(),
-                    ],
-                  ),
+              ),
+              material.Divider(height: 1, color: theme.border),
+              material.Expanded(
+                child: QueryaCrossFadeStack(
+                  index: _tabIndex,
+                  children: [
+                    _buildInstalledTab(),
+                    _buildMarketplaceTab(),
+                    _buildUpdatesTab(),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

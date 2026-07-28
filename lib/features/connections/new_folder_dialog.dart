@@ -37,93 +37,85 @@ class _NewFolderDialogContentState
   @override
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context).colorScheme;
-    final radius = Theme.of(context).radiusXxl;
-    return material.Container(
+    return QueryaDialogCard(
       constraints: WindowLayout.dialogConstraints(
         context,
         maxWidth: 440,
         minWidth: 360,
       ),
-      decoration: material.BoxDecoration(
-        color: theme.popover,
-        borderRadius: material.BorderRadius.circular(radius),
-        border: material.Border.all(color: theme.muted),
-      ),
-      child: material.ClipRRect(
-        borderRadius: material.BorderRadius.circular(radius),
-        child: material.Column(
-          mainAxisSize: material.MainAxisSize.min,
-          crossAxisAlignment: material.CrossAxisAlignment.stretch,
-          children: [
-            material.Padding(
-              padding: const material.EdgeInsets.fromLTRB(24, 24, 24, 8),
-              child: material.Column(
-                crossAxisAlignment: material.CrossAxisAlignment.start,
-                children: [
-                  const Text('New folder').large().semiBold(),
-                  const material.SizedBox(height: 6),
-                  const Text(
-                    'Enter a name for the new folder in the browser tree.',
-                  ).muted().small(),
-                  const material.SizedBox(height: 16),
-                  material.Container(
-                    decoration: material.BoxDecoration(
-                      color: theme.muted.withValues(alpha: 0.2),
-                      borderRadius: material.BorderRadius.circular(8),
-                      border: material.Border.all(
-                          color: theme.border.withValues(alpha: 0.4)),
-                    ),
-                    padding: const material.EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 4),
-                    child: material.Row(
-                      children: [
-                        material.Icon(
-                          material.Icons.folder_rounded,
-                          size: 20,
-                          color: theme.mutedForeground,
-                        ),
-                        const material.SizedBox(width: 10),
-                        material.Expanded(
-                          child: TextField(
-                            controller: _nameController,
-                            placeholder: const Text('Folder name'),
-                            onChanged: (_) => setState(() {}),
-                          ),
-                        ),
-                      ],
-                    ),
+      borderColor: theme.muted,
+      child: material.Column(
+        mainAxisSize: material.MainAxisSize.min,
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
+          material.Padding(
+            padding: const material.EdgeInsets.fromLTRB(24, 24, 24, 8),
+            child: material.Column(
+              crossAxisAlignment: material.CrossAxisAlignment.start,
+              children: [
+                const Text('New folder').large().semiBold(),
+                const material.SizedBox(height: 6),
+                const Text(
+                  'Enter a name for the new folder in the browser tree.',
+                ).muted().small(),
+                const material.SizedBox(height: 16),
+                material.Container(
+                  decoration: material.BoxDecoration(
+                    color: theme.muted.withValues(alpha: 0.2),
+                    borderRadius: material.BorderRadius.circular(8),
+                    border: material.Border.all(
+                        color: theme.border.withValues(alpha: 0.4)),
                   ),
-                ],
-              ),
-            ),
-            material.Container(
-              padding: const material.EdgeInsets.symmetric(
-                  horizontal: 24, vertical: 16),
-              decoration: material.BoxDecoration(
-                border: material.Border(
-                  top: material.BorderSide(
-                      color: theme.border.withValues(alpha: 0.3)),
+                  padding: const material.EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 4),
+                  child: material.Row(
+                    children: [
+                      material.Icon(
+                        material.Icons.folder_rounded,
+                        size: 20,
+                        color: theme.mutedForeground,
+                      ),
+                      const material.SizedBox(width: 10),
+                      material.Expanded(
+                        child: TextField(
+                          controller: _nameController,
+                          placeholder: const Text('Folder name'),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              child: material.Row(
-                mainAxisAlignment: material.MainAxisAlignment.end,
-                children: [
-                  GhostButton(
-                    onPressed: () => material.Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
-                  ),
-                  const material.SizedBox(width: 12),
-                  PrimaryButton(
-                    onPressed: _name.isEmpty
-                        ? null
-                        : () => material.Navigator.of(context).pop(_name),
-                    child: const Text('Create'),
-                  ),
-                ],
+              ],
+            ),
+          ),
+          material.Container(
+            padding: const material.EdgeInsets.symmetric(
+                horizontal: 24, vertical: 16),
+            decoration: material.BoxDecoration(
+              border: material.Border(
+                top: material.BorderSide(
+                    color: theme.border.withValues(alpha: 0.3)),
               ),
             ),
-          ],
-        ),
+            child: material.Row(
+              mainAxisAlignment: material.MainAxisAlignment.end,
+              children: [
+                GhostButton(
+                  onPressed: () => material.Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                const material.SizedBox(width: 12),
+                PrimaryButton(
+                  onPressed: _name.isEmpty
+                      ? null
+                      : () => material.Navigator.of(context).pop(_name),
+                  child: const Text('Create'),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

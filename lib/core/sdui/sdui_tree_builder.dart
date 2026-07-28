@@ -169,18 +169,19 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
       physics: widget.maxHeight == null
           ? const material.NeverScrollableScrollPhysics()
           : const material.ClampingScrollPhysics(),
-      itemExtent: _rowExtent,
+      itemExtent: rows.any((r) => r.isError) ? null : _rowExtent,
       itemCount: rows.length,
       itemBuilder: (context, index) {
         final row = rows[index];
         if (row.isError) {
-          return material.Padding(
+          return TreeLoadError(
+            title: 'Could not expand',
+            message: row.error!,
+            detailFontSize: 10,
             padding: material.EdgeInsets.only(
               left: 36.0 + row.depth * QueryaTreeTokens.indent,
-            ),
-            child: material.Align(
-              alignment: material.Alignment.centerLeft,
-              child: Text(row.error!).muted().xSmall(),
+              top: 2,
+              bottom: 2,
             ),
           );
         }
@@ -213,7 +214,7 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
     final rowLeft =
         8.0 + depth * QueryaTreeTokens.indent + (canExpand ? 0 : 4.0);
 
-    return material.InkWell(
+    final row = material.InkWell(
       onTap: () {
         if (isBrowsable) {
           widget.onNodeSelected?.call(node);
@@ -283,6 +284,12 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
           ],
         ),
       ),
+    );
+    if (!canExpand) return row;
+    return material.Semantics(
+      button: true,
+      expanded: isExpanded,
+      child: row,
     );
   }
 

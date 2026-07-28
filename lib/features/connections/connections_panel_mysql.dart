@@ -156,19 +156,25 @@ class _MysqlConnectionTileState extends State<_MysqlConnectionTile> {
               children: [
                 material.MouseRegion(
                   cursor: material.SystemMouseCursors.click,
-                  child: material.InkWell(
-                    onTap: _toggle,
-                    borderRadius: material.BorderRadius.circular(4),
-                    child: material.Padding(
-                      padding: const material.EdgeInsets.all(2),
-                      child: material.AnimatedRotation(
-                        turns: _expanded ? 0.25 : 0,
-                        duration: context.motionDuration(QueryaMotion.treeExpand),
-                        curve: context.motionCurve(QueryaMotion.treeExpandCurve),
-                        child: material.Icon(
-                          QueryaIcons.expandClosed,
-                          size: QueryaIconSizes.sidebarExpand,
-                          color: theme.colorScheme.mutedForeground,
+                  child: material.Semantics(
+                    button: true,
+                    expanded: _expanded,
+                    child: material.InkWell(
+                      onTap: _toggle,
+                      borderRadius: material.BorderRadius.circular(4),
+                      child: material.Padding(
+                        padding: const material.EdgeInsets.all(2),
+                        child: material.AnimatedRotation(
+                          turns: _expanded ? 0.25 : 0,
+                          duration:
+                              context.motionDuration(QueryaMotion.treeExpand),
+                          curve:
+                              context.motionCurve(QueryaMotion.treeExpandCurve),
+                          child: material.Icon(
+                            QueryaIcons.expandClosed,
+                            size: QueryaIconSizes.sidebarExpand,
+                            color: theme.colorScheme.mutedForeground,
+                          ),
                         ),
                       ),
                     ),
@@ -246,6 +252,7 @@ class _MysqlConnectionTileState extends State<_MysqlConnectionTile> {
                     ),
                   if (_error != null)
                     TreeLoadError(
+                      title: 'Could not load databases',
                       message: _error!,
                       padding: const material.EdgeInsets.only(
                         left: 28,
@@ -457,6 +464,7 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
               color: theme.colorScheme.foreground,
             ),
             verticalPadding: 4,
+            expanded: _expanded,
             onTap: _toggle,
             connection: widget.connection,
             onContextRefresh: _loadTables,
@@ -490,6 +498,7 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
                   )
                 else if (_error != null)
                   TreeLoadError(
+                    title: 'Could not load tables',
                     message: _error!,
                     onRetry: _loadTables,
                   ),
@@ -648,6 +657,7 @@ class _MysqlObjectGroupState extends State<_MysqlObjectGroup> {
               fontSize: 11,
               color: theme.colorScheme.mutedForeground,
             ),
+            expanded: _expanded,
             onTap: () => setState(() => _expanded = !_expanded),
             connection: widget.connection,
             onContextRefresh: widget.onRefresh,

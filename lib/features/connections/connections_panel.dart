@@ -38,6 +38,7 @@ import 'package:flutter/material.dart' as material
         Expanded,
         CircularProgressIndicator,
         Material,
+        Semantics,
         StatelessWidget,
         Colors,
         Tooltip,
@@ -349,11 +350,17 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
       _expandedConnections.remove(id);
     });
     if (conn.type == 'postgresql') {
-      PostgresService.instance.interrupt(conn, database: conn.databaseName ?? 'postgres', mode: PgSessionMode.readOnly);
-      PostgresService.instance.interrupt(conn, database: conn.databaseName ?? 'postgres', mode: PgSessionMode.readWrite);
+      PostgresService.instance.interrupt(conn,
+          database: conn.databaseName ?? 'postgres',
+          mode: PgSessionMode.readOnly);
+      PostgresService.instance.interrupt(conn,
+          database: conn.databaseName ?? 'postgres',
+          mode: PgSessionMode.readWrite);
     } else if (conn.type == 'mysql') {
-      MysqlService.instance.interrupt(conn, database: conn.databaseName ?? '', mode: MysqlSessionMode.readOnly);
-      MysqlService.instance.interrupt(conn, database: conn.databaseName ?? '', mode: MysqlSessionMode.readWrite);
+      MysqlService.instance.interrupt(conn,
+          database: conn.databaseName ?? '', mode: MysqlSessionMode.readOnly);
+      MysqlService.instance.interrupt(conn,
+          database: conn.databaseName ?? '', mode: MysqlSessionMode.readWrite);
     } else if (conn.type == 'sqlite') {
       SqliteService.instance.interrupt(conn, mode: SqliteSessionMode.readOnly);
       SqliteService.instance.interrupt(conn, mode: SqliteSessionMode.readWrite);

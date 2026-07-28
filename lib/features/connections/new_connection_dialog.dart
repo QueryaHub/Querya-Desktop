@@ -105,26 +105,20 @@ class _NewConnectionDialogContentState
   @override
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context).colorScheme;
-    final radius = Theme.of(context).radiusXxl;
     final dialogMaxW = WindowLayout.newConnectionDialogMaxWidth(context);
     final dialogH = WindowLayout.newConnectionDialogHeight(context);
     final headerPadH = dialogMaxW < 420 ? 16.0 : 24.0;
     final stackFilters = dialogMaxW < 520;
 
-    return material.Container(
+    return material.SizedBox(
       width: dialogMaxW,
-      constraints: material.BoxConstraints(
-        maxWidth: dialogMaxW,
-        maxHeight: dialogH,
-        minHeight: math.min(320.0, dialogH),
-      ),
-      decoration: material.BoxDecoration(
-        color: theme.popover,
-        borderRadius: material.BorderRadius.circular(radius),
-        border: material.Border.all(color: theme.muted),
-      ),
-      child: material.ClipRRect(
-        borderRadius: material.BorderRadius.circular(radius),
+      child: QueryaDialogCard(
+        constraints: material.BoxConstraints(
+          maxWidth: dialogMaxW,
+          maxHeight: dialogH,
+          minHeight: math.min(320.0, dialogH),
+        ),
+        borderColor: theme.muted,
         child: material.SizedBox(
           height: dialogH,
           child: material.Column(
@@ -403,8 +397,7 @@ class _DbTypeCard extends material.StatelessWidget {
     final highlight = t.muted.withValues(alpha: 0.4);
     return QueryaHoverSurface(
       borderRadius: material.BorderRadius.circular(10),
-      padding:
-          const material.EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      padding: const material.EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       idleColor: selected ? highlight : t.muted.withValues(alpha: 0.12),
       hoveredColor: highlight,
       border: material.Border.all(
