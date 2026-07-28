@@ -6,6 +6,7 @@ import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/extensions/models/extension_type.dart';
 import 'package:querya_desktop/core/market/marketplace_repository.dart';
+import 'package:querya_desktop/core/motion/querya_cross_fade_stack.dart';
 import 'package:querya_desktop/features/extensions/presentation/pages/extension_manager_dialog.dart';
 import 'package:querya_desktop/features/extensions/presentation/widgets/extension_card.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -114,6 +115,8 @@ void main() {
       expect(find.text('Installed (0)'), findsOneWidget);
       expect(find.text('Marketplace'), findsOneWidget);
       expect(find.text('Install from file…'), findsOneWidget);
+      expect(find.byType(QueryaTabStrip), findsOneWidget);
+      expect(find.byType(QueryaCrossFadeStack), findsOneWidget);
 
       // Switch to Marketplace tab
       await tester.tap(find.text('Marketplace'));
