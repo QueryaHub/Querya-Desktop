@@ -19,8 +19,8 @@ class QueryaAnimatedExpand extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedSize(
-      duration: context.motionDuration(QueryaMotion.standard),
-      curve: context.motionCurve(QueryaMotion.enter),
+      duration: context.motionDuration(QueryaMotion.treeExpand),
+      curve: context.motionCurve(QueryaMotion.treeExpandCurve),
       alignment: alignment,
       clipBehavior: Clip.hardEdge,
       child:

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/motion/querya_animated_expand.dart';
+import 'package:querya_desktop/core/motion/querya_motion.dart';
 
 void main() {
   testWidgets('QueryaAnimatedExpand hides child when collapsed',
@@ -22,6 +23,18 @@ void main() {
     );
 
     expect(find.text('child'), findsOneWidget);
+  });
+
+  testWidgets('uses treeExpand duration/curve tokens', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: _ExpandHost(expanded: true),
+      ),
+    );
+
+    final size = tester.widget<AnimatedSize>(find.byType(AnimatedSize));
+    expect(size.duration, QueryaMotion.treeExpand);
+    expect(size.curve, QueryaMotion.treeExpandCurve);
   });
 }
 

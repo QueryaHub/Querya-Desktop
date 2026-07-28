@@ -213,8 +213,8 @@ class _PgDatabasesNodeState extends State<_PgDatabasesNode> {
             label: 'Databases (${widget.databases.length})',
             leading: material.AnimatedRotation(
               turns: _expanded ? 0.25 : 0,
-              duration: context.motionDuration(QueryaMotion.fast),
-              curve: context.motionCurve(QueryaMotion.standardCurve),
+              duration: context.motionDuration(QueryaMotion.treeExpand),
+              curve: context.motionCurve(QueryaMotion.treeExpandCurve),
               child: material.Icon(
                 QueryaIcons.expandClosed,
                 size: QueryaIconSizes.treeExpand,
@@ -340,8 +340,8 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
             label: widget.databaseName,
             leading: material.AnimatedRotation(
               turns: _expanded ? 0.25 : 0,
-              duration: context.motionDuration(QueryaMotion.fast),
-              curve: context.motionCurve(QueryaMotion.standardCurve),
+              duration: context.motionDuration(QueryaMotion.treeExpand),
+              curve: context.motionCurve(QueryaMotion.treeExpandCurve),
               child: material.Icon(
                 QueryaIcons.expandClosed,
                 size: QueryaIconSizes.treeExpand,
@@ -535,8 +535,8 @@ class _PgSchemasNodeState extends State<_PgSchemasNode> {
             label: 'Schemas (${widget.schemas.length})',
             leading: material.AnimatedRotation(
               turns: _expanded ? 0.25 : 0,
-              duration: context.motionDuration(QueryaMotion.fast),
-              curve: context.motionCurve(QueryaMotion.standardCurve),
+              duration: context.motionDuration(QueryaMotion.treeExpand),
+              curve: context.motionCurve(QueryaMotion.treeExpandCurve),
               child: material.Icon(
                 QueryaIcons.expandClosed,
                 size: QueryaIconSizes.treeExpand,
@@ -691,8 +691,8 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
             label: widget.schemaName,
             leading: material.AnimatedRotation(
               turns: _expanded ? 0.25 : 0,
-              duration: context.motionDuration(QueryaMotion.fast),
-              curve: context.motionCurve(QueryaMotion.standardCurve),
+              duration: context.motionDuration(QueryaMotion.treeExpand),
+              curve: context.motionCurve(QueryaMotion.treeExpandCurve),
               child: material.Icon(
                 QueryaIcons.expandClosed,
                 size: QueryaIconSizes.treeExpand,
@@ -1009,8 +1009,8 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
             label: '${widget.label} (${widget.items.length})',
             leading: material.AnimatedRotation(
               turns: _expanded ? 0.25 : 0,
-              duration: context.motionDuration(QueryaMotion.fast),
-              curve: context.motionCurve(QueryaMotion.standardCurve),
+              duration: context.motionDuration(QueryaMotion.treeExpand),
+              curve: context.motionCurve(QueryaMotion.treeExpandCurve),
               child: material.Icon(
                 QueryaIcons.expandClosed,
                 size: QueryaIconSizes.treeExpand,
