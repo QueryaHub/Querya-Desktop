@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:querya_desktop/core/layout/ui_scale.dart';
+import 'package:querya_desktop/core/ui/querya_tooltip.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// Layout metrics for [VirtualResultGrid].
@@ -485,7 +486,7 @@ class _GridCell extends material.StatelessWidget {
 
     return material.Tooltip(
       message: text,
-      waitDuration: const Duration(milliseconds: 400),
+      waitDuration: kQueryaTooltipWait,
       child: interactiveCell,
     );
   }

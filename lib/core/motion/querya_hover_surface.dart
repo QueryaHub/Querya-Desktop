@@ -4,6 +4,10 @@ import 'querya_motion.dart';
 import 'querya_motion_context.dart';
 
 /// Unified hover background / border using motion tokens (Responsive chrome).
+///
+/// **Scope:** selection / picker cards (e.g. connection type tiles). Dense
+/// trees and explorer rows keep lighter `InkWell` / `MouseRegion` hover —
+/// do not broaden adoption without an explicit follow-up.
 class QueryaHoverSurface extends StatefulWidget {
   const QueryaHoverSurface({
     super.key,

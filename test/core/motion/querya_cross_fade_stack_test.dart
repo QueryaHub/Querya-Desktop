@@ -54,4 +54,49 @@ void main() {
     focusNode1.dispose();
     focusNode2.dispose();
   });
+
+  testWidgets('QueryaCrossFadeStack clamps out-of-range index',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: QueryaCrossFadeStack(
+            index: 99,
+            children: [
+              Text('only', key: Key('only_child')),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final opacity =
+        tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity));
+    expect(opacity.opacity, 1.0);
+    expect(find.byKey(const Key('only_child')), findsOneWidget);
+  });
+
+  testWidgets('QueryaCrossFadeStack uses exit curve when fading out',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: QueryaCrossFadeStack(
+            index: 0,
+            children: const [
+              Text('a', key: Key('a')),
+              Text('b', key: Key('b')),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final opacities =
+        tester.widgetList<AnimatedOpacity>(find.byType(AnimatedOpacity));
+    expect(opacities.elementAt(0).opacity, 1.0);
+    expect(opacities.elementAt(1).opacity, 0.0);
+    // Inactive layer uses exit curve; active uses enter.
+    expect(opacities.elementAt(0).curve, isNot(opacities.elementAt(1).curve));
+  });
 }

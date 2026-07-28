@@ -182,22 +182,31 @@ class _WorkspaceEmptyHeroState extends State<WorkspaceEmptyHero> {
                   QueryaFadeSlide(
                     alignment: material.Alignment.topCenter,
                     offset: const material.Offset(0, 0.03),
-                    child: showRecent
-                        ? _RecentConnectionsSection(
-                            key: const material.ValueKey('empty_recent_section'),
-                            connections: _recent,
-                            onOpenConnection: widget.onOpenConnection,
-                            compact: compact,
+                    child: !_loaded
+                        ? const material.SizedBox(
+                            key: material.ValueKey('empty_section_loading'),
+                            height: 120,
                           )
-                        : _QuickStartSection(
-                            key: const material.ValueKey('empty_quick_start'),
-                            compact: compact,
-                            surface: wb.surface,
-                            borderColor:
-                                wb.borderSubtle.withValues(alpha: 0.55),
-                            foreground: cs.foreground,
-                            primary: cs.primary,
-                          ),
+                        : showRecent
+                            ? _RecentConnectionsSection(
+                                key: const material.ValueKey(
+                                  'empty_recent_section',
+                                ),
+                                connections: _recent,
+                                onOpenConnection: widget.onOpenConnection,
+                                compact: compact,
+                              )
+                            : _QuickStartSection(
+                                key: const material.ValueKey(
+                                  'empty_quick_start',
+                                ),
+                                compact: compact,
+                                surface: wb.surface,
+                                borderColor:
+                                    wb.borderSubtle.withValues(alpha: 0.55),
+                                foreground: cs.foreground,
+                                primary: cs.primary,
+                              ),
                   ),
                 ],
               ),

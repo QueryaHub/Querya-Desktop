@@ -48,7 +48,7 @@ class _PgTreeRowLabel extends material.StatelessWidget {
     if (label.length < _tooltipMinLength) return text;
     return material.Tooltip(
       message: label,
-      waitDuration: const Duration(milliseconds: 450),
+      waitDuration: kQueryaTooltipWait,
       child: text,
     );
   }
@@ -381,7 +381,7 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
                   connection: widget.connection,
                   databaseName: widget.databaseName,
                   label: 'Foreign data',
-                  icon: QueryaIcons.publicSchema,
+                  icon: QueryaIcons.foreignData,
                   kind: PostgresObjectKind.databaseForeignData,
                   onPostgresObjectSelected: widget.onPostgresObjectSelected,
                   onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
@@ -682,7 +682,7 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return material.Padding(
-      padding: const material.EdgeInsets.only(left: 12),
+      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent),
       child: material.Column(
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
@@ -794,7 +794,7 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
                     onRefresh: _loadObjects,
                     label: 'Materialized views',
                     icon: QueryaIcons.materializedViewGroup,
-                    itemIcon: QueryaIcons.materializedViewGroup,
+                    itemIcon: QueryaIcons.materializedViewLeaf,
                     items: _matviews,
                     onItemTap: widget.onPostgresObjectSelected != null
                         ? (name) => widget.onPostgresObjectSelected!(
@@ -837,8 +837,8 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
                         widget.onPostgresOpenSqlWorkspace,
                     onRefresh: _loadObjects,
                     label: 'Sequences',
-                    icon: QueryaIcons.sequence,
-                    itemIcon: QueryaIcons.sequence,
+                    icon: QueryaIcons.sequenceGroup,
+                    itemIcon: QueryaIcons.sequenceLeaf,
                     items: _sequences,
                     onItemTap: widget.onPostgresObjectSelected != null
                         ? (name) => widget.onPostgresObjectSelected!(
@@ -1045,7 +1045,7 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
                   label: item,
                   icon: widget.itemIcon,
                   iconSize: QueryaIconSizes.treeLeaf,
-                  iconColor: theme.colorScheme.primary.withValues(alpha: 0.5),
+                  iconColor: QueryaTreeTokens.leafIconColor(theme.colorScheme),
                   textStyle: material.TextStyle(
                     fontSize: 11,
                     color: theme.colorScheme.foreground,

@@ -73,6 +73,30 @@ void main() {
     expect(sqliteTapped, isTrue);
   });
 
+  testWidgets('does not flash Quick start before recent load completes',
+      (tester) async {
+    await tester.pumpWidget(
+      heroShell(
+        child: material.SizedBox(
+          width: 900,
+          height: 700,
+          child: WorkspaceEmptyHero(
+            onNewConnection: () {},
+          ),
+        ),
+      ),
+    );
+    // First frame before async recent load settles.
+    await tester.pump();
+
+    expect(
+      find.byKey(const material.ValueKey('empty_section_loading')),
+      findsOneWidget,
+    );
+    expect(find.text('Quick start'), findsNothing);
+    expect(find.text('Recent connections'), findsNothing);
+  });
+
   testWidgets('WorkspaceEmptyHero opens a recent connection', (tester) async {
     ConnectionRow? opened;
 

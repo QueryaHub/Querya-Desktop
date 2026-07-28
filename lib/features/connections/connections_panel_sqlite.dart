@@ -398,7 +398,7 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
                   label: item,
                   icon: widget.itemIcon,
                   iconSize: QueryaIconSizes.treeLeaf,
-                  iconColor: theme.colorScheme.mutedForeground,
+                  iconColor: QueryaTreeTokens.leafIconColor(theme.colorScheme),
                   textStyle: material.TextStyle(
                     fontSize: 11,
                     color: theme.colorScheme.foreground,

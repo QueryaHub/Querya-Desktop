@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/window_layout.dart';
+import 'package:querya_desktop/core/motion/querya_motion.dart';
+import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/updater/app_updater_service.dart';
 import 'package:querya_desktop/core/updater/update_manifest.dart';
@@ -273,7 +275,24 @@ class _UpdateDialogContentState extends material.State<_UpdateDialogContent> {
                   horizontal: 24,
                   vertical: 8,
                 ),
-                child: _body(context),
+                child: material.AnimatedSwitcher(
+                  duration: context.motionDuration(QueryaMotion.standard),
+                  switchInCurve: context.motionCurve(QueryaMotion.enter),
+                  switchOutCurve: context.motionCurve(QueryaMotion.exit),
+                  layoutBuilder: (currentChild, previousChildren) {
+                    return material.Stack(
+                      alignment: material.Alignment.topCenter,
+                      children: [
+                        ...previousChildren,
+                        if (currentChild != null) currentChild,
+                      ],
+                    );
+                  },
+                  child: material.KeyedSubtree(
+                    key: material.ValueKey(_phase),
+                    child: _body(context),
+                  ),
+                ),
               ),
             ),
             material.Container(
