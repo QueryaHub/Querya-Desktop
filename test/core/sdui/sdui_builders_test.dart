@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/motion/querya_motion.dart';
+import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
 import 'package:querya_desktop/core/sdui/sdui_form_builder.dart';
 import 'package:querya_desktop/core/sdui/sdui_form_schema.dart';
 import 'package:querya_desktop/core/sdui/sdui_tree_builder.dart';
@@ -211,6 +213,45 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(fetches, 1);
+      expect(find.text('analytics'), findsOneWidget);
+    });
+
+    testWidgets('expand chevron uses QueryaMotion tokens (Off = instant)',
+        (tester) async {
+      final schema = SduiTreeSchema.fromJson(const {
+        'roots': [
+          {
+            'id': 'databases',
+            'label': 'Databases',
+            'expandable': true,
+          },
+        ],
+      });
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: QueryaMotionScope(
+            level: QueryaMotionLevel.off,
+            child: material.Scaffold(
+              body: SduiTreeBuilder(
+                schema: schema,
+                fetchChildren: (_) async => const [
+                  SduiTreeNode(id: 'db1', label: 'analytics'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final rotation = tester.widget<material.AnimatedRotation>(
+        find.byType(material.AnimatedRotation),
+      );
+      expect(rotation.duration, Duration.zero);
+
+      await tester.tap(find.byIcon(QueryaIcons.expandClosed));
+      await tester.pumpAndSettle();
+
       expect(find.text('analytics'), findsOneWidget);
     });
 
