@@ -260,21 +260,6 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
                               ],
                             ),
                           ),
-                          material.Tooltip(
-                            message: 'Remove',
-                            child: material.InkWell(
-                              onTap: widget.onRemove,
-                              borderRadius: material.BorderRadius.circular(6),
-                              child: material.Padding(
-                                padding: const material.EdgeInsets.all(4),
-                                child: material.Icon(
-                                  material.Icons.close_rounded,
-                                  size: 14,
-                                  color: theme.colorScheme.mutedForeground,
-                                ),
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                     ),

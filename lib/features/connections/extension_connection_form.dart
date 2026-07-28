@@ -10,6 +10,7 @@ import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/sdui/sdui_form_builder.dart';
 import 'package:querya_desktop/core/sdui/sdui_form_schema.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/connections/connection_edit_secrets.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Shows an SDUI connection form for an installed extension driver.
@@ -154,13 +155,16 @@ class _ExtensionConnectionFormContentState
     });
 
     try {
-      final row = connectionRowFromExtensionForm(
+      var row = connectionRowFromExtensionForm(
         manifest: widget.manifest,
         driver: widget.driver,
         name: 'connection-test',
         values: values,
         initial: widget.initial,
       );
+      if (widget.initial?.id != null) {
+        row = await mergeSecretsForConnectionUpdate(row);
+      }
       final version = await ExtensionDriverSession.instance.testConnection(
         manifest: widget.manifest,
         row: row,
@@ -247,6 +251,7 @@ class _ExtensionConnectionFormContentState
                         key: _formKey,
                         schema: _schema!,
                         initialValues: _initialValues,
+                        keepExistingSecrets: _isEditing,
                       ),
                     if (_testMessage != null) ...[
                       const material.SizedBox(height: 12),

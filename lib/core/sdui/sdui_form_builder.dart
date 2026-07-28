@@ -15,6 +15,7 @@ class SduiFormBuilder extends material.StatefulWidget {
     this.initialValues = const {},
     this.onChanged,
     this.filePicker,
+    this.keepExistingSecrets = false,
   });
 
   final SduiFormSchema schema;
@@ -23,6 +24,10 @@ class SduiFormBuilder extends material.StatefulWidget {
 
   /// Injectable file picker for tests. Defaults to `openFile`.
   final Future<String?> Function(SduiFormField field)? filePicker;
+
+  /// When true (edit connection), blank password fields are valid and show
+  /// "Leave blank to keep existing" — host merges stored secrets on save.
+  final bool keepExistingSecrets;
 
   @override
   material.State<SduiFormBuilder> createState() => SduiFormBuilderState();
@@ -290,7 +295,7 @@ class SduiFormBuilderState extends material.State<SduiFormBuilder> {
                   ? material.TextInputType.number
                   : material.TextInputType.text,
               decoration: material.InputDecoration(
-                hintText: field.placeholder,
+                hintText: _hintFor(field),
               ),
               validator: _validatorFor(field),
             ),
@@ -299,10 +304,20 @@ class SduiFormBuilderState extends material.State<SduiFormBuilder> {
     }
   }
 
+  String? _hintFor(SduiFormField field) {
+    if (widget.keepExistingSecrets &&
+        field.type == SduiFieldType.password) {
+      return 'Leave blank to keep existing';
+    }
+    return field.placeholder;
+  }
+
   material.FormFieldValidator<String>? _validatorFor(SduiFormField field) {
     return (value) {
       final text = value?.trim() ?? '';
-      if (field.required && text.isEmpty) {
+      final allowBlankSecret = widget.keepExistingSecrets &&
+          field.type == SduiFieldType.password;
+      if (field.required && text.isEmpty && !allowBlankSecret) {
         return '${field.label} is required';
       }
       if (field.type == SduiFieldType.number && text.isNotEmpty) {
