@@ -189,7 +189,7 @@ class _ExtensionConnectionFormContentState
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context).colorScheme;
+    final theme = context.colors;
     final title = _isEditing
         ? 'Edit ${widget.driver.displayName}'
         : widget.driver.displayName;

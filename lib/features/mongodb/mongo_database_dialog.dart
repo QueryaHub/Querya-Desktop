@@ -41,7 +41,7 @@ class _CreateMongoDBDialogContentState
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context).colorScheme;
+    final theme = context.colors;
 
     return QueryaDialogCard(
       constraints: WindowLayout.dialogConstraints(context, maxWidth: 500),

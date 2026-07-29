@@ -6,7 +6,7 @@ material.Widget _sidebarConnectionShell({
   required material.VoidCallback? onTap,
   required material.Widget child,
 }) {
-  final p = Theme.of(context).colorScheme.primary;
+  final p = context.colors.primary;
   return material.Material(
     color: material.Colors.transparent,
     child: material.InkWell(

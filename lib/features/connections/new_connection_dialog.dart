@@ -104,7 +104,7 @@ class _NewConnectionDialogContentState
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context).colorScheme;
+    final theme = context.colors;
     final dialogMaxW = WindowLayout.newConnectionDialogMaxWidth(context);
     final dialogH = WindowLayout.newConnectionDialogHeight(context);
     final headerPadH = dialogMaxW < 420 ? 16.0 : 24.0;

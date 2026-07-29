@@ -74,7 +74,7 @@ class _DriverManagerDialogContent extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context).colorScheme;
+    final theme = context.colors;
     final drivers = _buildDriverList();
     return QueryaDialogCard(
       constraints: WindowLayout.dialogConstraints(
