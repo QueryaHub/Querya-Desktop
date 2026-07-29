@@ -231,11 +231,14 @@ class LocalDb {
     await db.delete('app_settings', where: 'key = ?', whereArgs: [key]);
   }
 
+  final Map<String, int> _historyInsertCounts = {};
+
   Future<void> recordSqlQueryHistory({
     required int connectionId,
     String? databaseName,
     required String sqlText,
     int maxEntries = kDefaultSqlHistoryCap,
+    bool forcePrune = false,
   }) async {
     final sql = sqlText.trim();
     if (sql.isEmpty) return;
@@ -249,12 +252,21 @@ class LocalDb {
       'sql_text': sql,
       'recorded_at': now,
     });
-    await _pruneSqlQueryHistoryBucket(
-      db,
-      connectionId: connectionId,
-      databaseName: dbKey,
-      maxEntries: maxEntries,
-    );
+
+    final bucketKey = '$connectionId::${dbKey ?? ''}';
+    final insertCount = (_historyInsertCounts[bucketKey] ?? 0) + 1;
+    _historyInsertCounts[bucketKey] = insertCount;
+
+    final batchThreshold = maxEntries <= 10 ? 1 : 10;
+    if (forcePrune || insertCount >= batchThreshold) {
+      _historyInsertCounts[bucketKey] = 0;
+      await _pruneSqlQueryHistoryBucket(
+        db,
+        connectionId: connectionId,
+        databaseName: dbKey,
+        maxEntries: maxEntries,
+      );
+    }
   }
 
   /// Keeps the newest [maxEntries] rows in a (connection, database) bucket.
