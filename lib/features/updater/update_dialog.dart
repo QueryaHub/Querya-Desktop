@@ -276,7 +276,7 @@ class _UpdateDialogContentState extends material.State<_UpdateDialogContent> {
                     alignment: material.Alignment.topCenter,
                     children: [
                       ...previousChildren,
-                      ?currentChild,
+                      if (currentChild != null) currentChild,
                     ],
                   );
                 },

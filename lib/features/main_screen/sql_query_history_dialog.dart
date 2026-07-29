@@ -192,7 +192,7 @@ class _SqlQueryHistoryDialogContentState
                         vertical: 4,
                       ),
                       itemCount: items.length,
-                      separatorBuilder: (_, _) =>
+                      separatorBuilder: (_, __) =>
                           material.Divider(height: 1, color: scheme.border),
                       itemBuilder: (context, i) {
                         final e = items[i];

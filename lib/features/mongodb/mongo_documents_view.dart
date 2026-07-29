@@ -223,7 +223,7 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
                   padding: const material.EdgeInsets.all(16),
                   scrollCacheExtent: const ScrollCacheExtent.pixels(400),
                   itemCount: _documents.length,
-                  separatorBuilder: (_, _) => const Gap(8),
+                  separatorBuilder: (_, __) => const Gap(8),
                   itemBuilder: (context, i) {
                     final shadcnCs = shadcn.Theme.of(context).colorScheme;
                     return _DocumentCard(

@@ -146,7 +146,7 @@ class _PreferencesAppearanceSectionState
   material.Widget build(material.BuildContext context) {
     return ListenableBuilder(
       listenable: _controller,
-      builder: (context, _) {
+      builder: (context, __) {
         final c = _controller;
         final themes = c.availableThemes;
         final refreshingThemes = c.isLoadingAvailableThemes;
@@ -252,7 +252,7 @@ class _PreferencesAppearanceSectionState
           label: 'Motion',
           control: material.ListenableBuilder(
             listenable: QueryaMotionController.instance,
-            builder: (context, _) {
+            builder: (context, __) {
               final controller = QueryaMotionController.instance;
               return PreferencesDropdownMenu<QueryaMotionLevel>(
                 value: controller.level,

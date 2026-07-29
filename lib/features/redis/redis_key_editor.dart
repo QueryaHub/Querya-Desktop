@@ -554,7 +554,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
               ? material.Center(child: const Text('No fields').muted())
               : material.ListView.separated(
                   itemCount: entries.length,
-                  separatorBuilder: (_, _) => const Gap(4),
+                  separatorBuilder: (_, __) => const Gap(4),
                   itemBuilder: (context, index) {
                     final entry = entries[index];
                     return _FieldRow(
@@ -607,7 +607,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
               ? material.Center(child: const Text('No items').muted())
               : material.ListView.separated(
                   itemCount: _listValue.length,
-                  separatorBuilder: (_, _) => const Gap(4),
+                  separatorBuilder: (_, __) => const Gap(4),
                   itemBuilder: (context, i) => _IndexedValueRow(
                     index: i,
                     value: _listValue[i],
@@ -656,7 +656,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
               ? material.Center(child: const Text('No members').muted())
               : material.ListView.separated(
                   itemCount: _setValue.length,
-                  separatorBuilder: (_, _) => const Gap(4),
+                  separatorBuilder: (_, __) => const Gap(4),
                   itemBuilder: (context, index) => _MemberRow(
                     member: _setValue[index],
                     onDelete: () => _setRemove(_setValue[index]),
@@ -715,7 +715,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
               ? material.Center(child: const Text('No members').muted())
               : material.ListView.separated(
                   itemCount: _zsetValue.length,
-                  separatorBuilder: (_, _) => const Gap(4),
+                  separatorBuilder: (_, __) => const Gap(4),
                   itemBuilder: (context, index) {
                     final (member, score) = _zsetValue[index];
                     return _ScoredMemberRow(

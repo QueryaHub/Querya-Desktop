@@ -266,7 +266,7 @@ class _TabStripIndicator extends material.StatelessWidget {
   material.Widget build(material.BuildContext context) {
     return ListenableBuilder(
       listenable: Listenable.merge([left, width]),
-      builder: (context, _) {
+      builder: (context, __) {
         final w = width.value;
         if (w <= 0) return const material.SizedBox.shrink();
         return material.Positioned(
