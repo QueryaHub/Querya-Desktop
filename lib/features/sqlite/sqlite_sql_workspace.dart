@@ -177,8 +177,8 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         return cols.map((col) => row[col]).toList();
       }).toList();
 
-      // Yielding convert avoids isolate double-copy of the matrix (#421).
-      final outRows = await convertResultRowsToStringsYielding(rawRows);
+      // Adaptive convert offloads to background compute for large row sets (#522).
+      final outRows = await convertResultRowsToStringsAdaptive(rawRows);
 
       setState(() {
         _columns = cols;
