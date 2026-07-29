@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/rendering.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/postgres_metadata.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -129,7 +130,7 @@ class _PostgresIndexListViewState
               child: material.ListView.builder(
                 controller: _scroll,
                 padding: const material.EdgeInsets.all(16),
-                cacheExtent: 400,
+                scrollCacheExtent: const ScrollCacheExtent.pixels(400),
                 itemCount: _rows.isEmpty ? 1 : _rows.length,
                 itemBuilder: (context, i) {
                   if (_rows.isEmpty) {
@@ -309,7 +310,7 @@ class _PostgresTriggerListViewState
               child: material.ListView.builder(
                 controller: _scroll,
                 padding: const material.EdgeInsets.all(16),
-                cacheExtent: 400,
+                scrollCacheExtent: const ScrollCacheExtent.pixels(400),
                 itemCount: _rows.isEmpty ? 1 : _rows.length,
                 itemBuilder: (context, i) {
                   if (_rows.isEmpty) {
@@ -473,7 +474,7 @@ class _PostgresTypeListViewState extends material.State<PostgresTypeListView> {
             child: material.ListView.builder(
               controller: _scroll,
               padding: const material.EdgeInsets.all(16),
-              cacheExtent: 400,
+              scrollCacheExtent: const ScrollCacheExtent.pixels(400),
               itemCount: _rows.isEmpty ? 1 : _rows.length,
               itemBuilder: (context, i) {
                 if (_rows.isEmpty) {
@@ -625,7 +626,7 @@ class _PostgresExtensionListViewState
             child: material.ListView.builder(
               controller: _scroll,
               padding: const material.EdgeInsets.all(16),
-              cacheExtent: 400,
+              scrollCacheExtent: const ScrollCacheExtent.pixels(400),
               itemCount: _rows.isEmpty ? 1 : _rows.length,
               itemBuilder: (context, i) {
                 if (_rows.isEmpty) {
@@ -781,7 +782,7 @@ class _PostgresFdwListViewState extends material.State<PostgresFdwListView> {
             child: material.ListView.builder(
               controller: _scroll,
               padding: const material.EdgeInsets.all(16),
-              cacheExtent: 400,
+              scrollCacheExtent: const ScrollCacheExtent.pixels(400),
               itemCount: totalItems,
               itemBuilder: (context, i) {
                 if (i == 0) {
