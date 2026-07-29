@@ -205,7 +205,9 @@ class _InterfaceScaleSliderState extends material.State<InterfaceScaleSlider> {
 
   void _onCommittedScaleChanged() {
     if (_dragScale != null || !mounted) return;
-    setState(() {});
+    setState(() {
+      _dragScale = null;
+    });
   }
 
   bool _onKeyEvent(KeyEvent event) {

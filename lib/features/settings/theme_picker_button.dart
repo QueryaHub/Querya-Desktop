@@ -174,8 +174,12 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
     });
   }
 
+  String _searchQuery = '';
+
   void _onSearchChanged() {
-    setState(() {});
+    setState(() {
+      _searchQuery = _searchController.text;
+    });
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(0);
     }
@@ -187,7 +191,7 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
   }
 
   List<ThemeDefinition> get _filteredThemes =>
-      filterThemeDefinitions(widget.themes, _searchController.text);
+      filterThemeDefinitions(widget.themes, _searchQuery);
 
   bool get _enabled => !widget.isLoading;
 

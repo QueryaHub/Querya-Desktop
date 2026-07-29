@@ -26,14 +26,6 @@ class _CreateMongoDBDialogContentState
     extends material.State<_CreateMongoDBDialogContent> {
   final _nameController = material.TextEditingController();
 
-  @override
-  void initState() {
-    super.initState();
-    _nameController.addListener(_onFieldChanged);
-  }
-
-  void _onFieldChanged() => setState(() {});
-
   bool get _formValid => _nameController.text.trim().isNotEmpty;
 
   void _save() {
@@ -43,7 +35,6 @@ class _CreateMongoDBDialogContentState
 
   @override
   void dispose() {
-    _nameController.removeListener(_onFieldChanged);
     _nameController.dispose();
     super.dispose();
   }
@@ -106,9 +97,12 @@ class _CreateMongoDBDialogContentState
                   child: const Text('Cancel'),
                 ),
                 const Gap(12),
-                PrimaryButton(
-                  onPressed: _formValid ? _save : null,
-                  child: const Text('Create'),
+                ListenableBuilder(
+                  listenable: _nameController,
+                  builder: (context, _) => PrimaryButton(
+                    onPressed: _formValid ? _save : null,
+                    child: const Text('Create'),
+                  ),
                 ),
               ],
             ),

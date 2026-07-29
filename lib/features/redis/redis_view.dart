@@ -156,7 +156,7 @@ class _RedisViewState extends material.State<RedisView> {
       final info = parseRedisInfo(raw);
       if (!mounted) return;
       if (!replaceIfChanged(_info, info, (v) => _info = v)) return;
-      setState(() {});
+      setState(() => _info = info);
     } catch (_) {}
   }
 

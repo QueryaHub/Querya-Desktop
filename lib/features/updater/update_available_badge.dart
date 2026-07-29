@@ -63,7 +63,6 @@ class UpdateAvailableBadgeState extends material.State<UpdateAvailableBadge>
 
   void _onControllerChanged() {
     if (!mounted) return;
-    setState(() {});
     _syncPulse();
   }
 
@@ -100,9 +99,12 @@ class UpdateAvailableBadgeState extends material.State<UpdateAvailableBadge>
 
   @override
   material.Widget build(material.BuildContext context) {
-    if (!widget.controller.showBadge) {
-      return const material.SizedBox.shrink();
-    }
+    return ListenableBuilder(
+      listenable: widget.controller,
+      builder: (context, _) {
+        if (!widget.controller.showBadge) {
+          return const material.SizedBox.shrink();
+        }
 
     final version = widget.controller.pendingUpdate?.version ?? '';
     final wb = context.workbench;
@@ -160,5 +162,7 @@ class UpdateAvailableBadgeState extends material.State<UpdateAvailableBadge>
         ),
       ),
     );
+  },
+);
   }
 }

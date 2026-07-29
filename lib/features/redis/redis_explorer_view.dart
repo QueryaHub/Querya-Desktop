@@ -45,6 +45,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
 
   // View mode
   bool _showStats = false;
+  int _refreshEpoch = 0;
 
   // Navigation state
   String? _selectedKey;
@@ -224,7 +225,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
           _BreadcrumbBar(
             crumbs: _crumbs,
             onCrumbTap: _onCrumbTap,
-            onRefresh: () => setState(() {}),
+            onRefresh: () => setState(() => _refreshEpoch++),
             onStats: () => setState(() => _showStats = true),
           ),
           const Divider(height: 1),
@@ -238,7 +239,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
     // Key editor
     if (_selectedKey != null) {
       return RedisKeyEditor(
-        key: ValueKey('key_${widget.database}_$_selectedKey'),
+        key: ValueKey('key_${widget.database}_${_selectedKey}_$_refreshEpoch'),
         connection: conn,
         database: widget.database,
         keyName: _selectedKey!,
@@ -250,7 +251,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
 
     // Keys list
     return RedisKeysView(
-      key: ValueKey('keys_${widget.database}'),
+      key: ValueKey('keys_${widget.database}_$_refreshEpoch'),
       connection: conn,
       database: widget.database,
       onKeyTap: _navigateToKey,
