@@ -107,7 +107,7 @@ class _NewFolderDialogContentState
                 const material.SizedBox(width: 12),
                 ListenableBuilder(
                   listenable: _nameController,
-                  builder: (context, _) => PrimaryButton(
+                  builder: (context, __) => PrimaryButton(
                     onPressed: _name.isEmpty
                         ? null
                         : () => material.Navigator.of(context).pop(_name),

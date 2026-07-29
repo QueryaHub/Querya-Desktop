@@ -21,17 +21,17 @@ class QueryaApp extends StatelessWidget {
 
     return ListenableBuilder(
       listenable: themeController,
-      builder: (context, _) {
+      builder: (context, __) {
         final queryaTheme = themeController.activeTheme;
         final colorScheme = queryaTheme.colorScheme;
 
         return ListenableBuilder(
           listenable: uiScaleController,
-          builder: (context, _) {
+          builder: (context, __) {
             final scale = uiScaleController.scale;
             return ListenableBuilder(
               listenable: motionController,
-              builder: (context, _) {
+              builder: (context, __) {
                 final motionLevel = motionController.level;
                 final disableAnimations =
                     MediaQuery.maybeOf(context)?.disableAnimations ??

@@ -101,7 +101,7 @@ class UpdateAvailableBadgeState extends material.State<UpdateAvailableBadge>
   material.Widget build(material.BuildContext context) {
     return ListenableBuilder(
       listenable: widget.controller,
-      builder: (context, _) {
+      builder: (context, __) {
         if (!widget.controller.showBadge) {
           return const material.SizedBox.shrink();
         }

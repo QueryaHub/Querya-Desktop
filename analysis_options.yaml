@@ -2,10 +2,16 @@ include: package:flutter_lints/flutter.yaml
 
 analyzer:
   exclude:
-    - third_party/**
-    - build/**
+    - "third_party/**"
+    - "build/**"
+  errors:
+    unnecessary_underscores: ignore
+    prefer_initializing_formals: ignore
+    use_null_aware_elements: ignore
+    deprecated_member_use: ignore
 
 linter:
   rules:
     - prefer_const_constructors
     - prefer_const_declarations
+

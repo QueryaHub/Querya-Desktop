@@ -72,7 +72,7 @@ class _QueryaStaggerState extends State<QueryaStagger>
 
     return AnimatedBuilder(
       animation: _controller,
-      builder: (context, _) {
+      builder: (context, __) {
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
