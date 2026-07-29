@@ -146,6 +146,8 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
             widget.iconAsset!,
             width: QueryaIconSizes.sidebarConnectionIcon,
             height: QueryaIconSizes.sidebarConnectionIcon,
+            cacheWidth: (QueryaIconSizes.sidebarConnectionIcon * MediaQuery.devicePixelRatioOf(context)).toInt(),
+            cacheHeight: (QueryaIconSizes.sidebarConnectionIcon * MediaQuery.devicePixelRatioOf(context)).toInt(),
             fit: material.BoxFit.contain,
             errorBuilder: (_, __, ___) => material.Icon(
               widget.icon,

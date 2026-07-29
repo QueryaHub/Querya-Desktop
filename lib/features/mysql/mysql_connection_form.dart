@@ -318,6 +318,8 @@ class _MysqlConnectionFormContentState
                         height: 24,
                         child: material.Image.asset(
                           'assets/images/mysql_icon.png',
+                          cacheWidth: (40 * MediaQuery.devicePixelRatioOf(context)).toInt(),
+                          cacheHeight: (40 * MediaQuery.devicePixelRatioOf(context)).toInt(),
                           fit: material.BoxFit.contain,
                           errorBuilder: (_, __, ___) => material.Icon(
                             material.Icons.table_chart_rounded,

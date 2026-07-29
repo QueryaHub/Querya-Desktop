@@ -436,6 +436,8 @@ class _PostgresConnectionFormContentState
                         height: 24,
                         child: material.Image.asset(
                           'assets/images/postgresql_icon.png',
+                          cacheWidth: (40 * MediaQuery.devicePixelRatioOf(context)).toInt(),
+                          cacheHeight: (40 * MediaQuery.devicePixelRatioOf(context)).toInt(),
                           fit: material.BoxFit.contain,
                           errorBuilder: (_, __, ___) => material.Icon(
                             material.Icons.storage_rounded,
