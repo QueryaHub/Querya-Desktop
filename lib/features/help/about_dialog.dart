@@ -2,7 +2,6 @@ import 'package:flutter/material.dart' as material;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:querya_desktop/core/app/external_link.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
-import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Shows the About Querya dialog.
