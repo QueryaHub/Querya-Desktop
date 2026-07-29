@@ -143,7 +143,7 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
       final stats = await c.serverStats();
       if (!mounted) return;
       if (!replaceIfChanged(_stats, stats, (v) => _stats = v)) return;
-      setState(() {});
+      setState(() => _stats = stats);
     } catch (_) {}
   }
 

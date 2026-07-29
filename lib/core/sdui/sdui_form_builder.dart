@@ -137,9 +137,10 @@ class SduiFormBuilderState extends material.State<SduiFormBuilder> {
     final path =
         picker != null ? await picker(field) : (await openFile())?.path;
     if (path == null || !mounted) return;
-    _textControllers[field.id]?.text = path;
+    setState(() {
+      _textControllers[field.id]?.text = path;
+    });
     _notifyChanged();
-    setState(() {});
   }
 
   @override

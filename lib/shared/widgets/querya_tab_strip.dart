@@ -251,7 +251,7 @@ class _QueryaTabStripState extends material.State<QueryaTabStrip>
 }
 
 /// Sliding pill; listens to springs so the tab [Row] is not rebuilt per tick.
-class _TabStripIndicator extends material.StatefulWidget {
+class _TabStripIndicator extends material.StatelessWidget {
   const _TabStripIndicator({
     required this.left,
     required this.width,
@@ -263,62 +263,30 @@ class _TabStripIndicator extends material.StatefulWidget {
   final material.Color color;
 
   @override
-  material.State<_TabStripIndicator> createState() =>
-      _TabStripIndicatorState();
-}
-
-class _TabStripIndicatorState extends material.State<_TabStripIndicator> {
-  @override
-  void initState() {
-    super.initState();
-    widget.left.addListener(_onTick);
-    widget.width.addListener(_onTick);
-  }
-
-  @override
-  void didUpdateWidget(covariant _TabStripIndicator oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.left != widget.left) {
-      oldWidget.left.removeListener(_onTick);
-      widget.left.addListener(_onTick);
-    }
-    if (oldWidget.width != widget.width) {
-      oldWidget.width.removeListener(_onTick);
-      widget.width.addListener(_onTick);
-    }
-  }
-
-  @override
-  void dispose() {
-    widget.left.removeListener(_onTick);
-    widget.width.removeListener(_onTick);
-    super.dispose();
-  }
-
-  void _onTick() {
-    if (mounted) setState(() {});
-  }
-
-  @override
   material.Widget build(material.BuildContext context) {
-    final w = widget.width.value;
-    if (w <= 0) return const material.SizedBox.shrink();
-    return material.Positioned(
-      key: const material.ValueKey('querya_tab_indicator'),
-      left: widget.left.value,
-      width: w,
-      top: 0,
-      bottom: 0,
-      child: material.RepaintBoundary(
-        child: material.IgnorePointer(
-          child: material.DecoratedBox(
-            decoration: material.BoxDecoration(
-              color: widget.color,
-              borderRadius: material.BorderRadius.circular(6),
+    return ListenableBuilder(
+      listenable: Listenable.merge([left, width]),
+      builder: (context, _) {
+        final w = width.value;
+        if (w <= 0) return const material.SizedBox.shrink();
+        return material.Positioned(
+          key: const material.ValueKey('querya_tab_indicator'),
+          left: left.value,
+          width: w,
+          top: 0,
+          bottom: 0,
+          child: material.RepaintBoundary(
+            child: material.IgnorePointer(
+              child: material.DecoratedBox(
+                decoration: material.BoxDecoration(
+                  color: color,
+                  borderRadius: material.BorderRadius.circular(6),
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

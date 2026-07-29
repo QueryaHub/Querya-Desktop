@@ -80,7 +80,6 @@ class _NewFolderDialogContentState
                         child: TextField(
                           controller: _nameController,
                           placeholder: const Text('Folder name'),
-                          onChanged: (_) => setState(() {}),
                         ),
                       ),
                     ],
@@ -106,11 +105,14 @@ class _NewFolderDialogContentState
                   child: const Text('Cancel'),
                 ),
                 const material.SizedBox(width: 12),
-                PrimaryButton(
-                  onPressed: _name.isEmpty
-                      ? null
-                      : () => material.Navigator.of(context).pop(_name),
-                  child: const Text('Create'),
+                ListenableBuilder(
+                  listenable: _nameController,
+                  builder: (context, _) => PrimaryButton(
+                    onPressed: _name.isEmpty
+                        ? null
+                        : () => material.Navigator.of(context).pop(_name),
+                    child: const Text('Create'),
+                  ),
                 ),
               ],
             ),

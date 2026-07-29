@@ -126,7 +126,7 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
       final stats = await conn.serverStats();
       if (!mounted) return;
       if (!replaceIfChanged(_stats, stats, (v) => _stats = v)) return;
-      setState(() {});
+      setState(() => _stats = stats);
     } catch (_) {}
   }
 
