@@ -41,6 +41,12 @@ class JsonRpcStdioClient {
   StreamSubscription<String>? _subscription;
   Object? _fatalError;
 
+  /// Number of RPC requests currently in-flight waiting for a response.
+  int get pendingRequestCount => _pending.length;
+
+  /// Returns true when there is at least one active RPC request in-flight.
+  bool get hasPendingRequests => _pending.isNotEmpty;
+
   /// Serializes async line handling so large-line isolate decode stays ordered.
   Future<void> _lineChain = Future<void>.value();
 
