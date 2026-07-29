@@ -1,7 +1,6 @@
 import 'dart:math' show min;
 
 import 'package:flutter/material.dart' as material;
-import 'package:flutter/rendering.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -333,7 +332,7 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
                     child: const Text('No collections found').muted(),
                   )
                 : material.ListView.separated(
-                    scrollCacheExtent: const ScrollCacheExtent.pixels(400),
+                    cacheExtent: 400,
                     itemCount: _collections.length,
                     separatorBuilder: (_, __) => Divider(
                       height: 1,
