@@ -20,4 +20,6 @@ export 'querya_dropdown.dart'
         QueryaDropdownTokens,
         kPreferencesLabelWidth;
 export 'tree_load_error.dart';
+export 'package:querya_desktop/core/theme/querya_theme_scope.dart'
+    show QueryaThemeContext;
 export 'package:shadcn_flutter/shadcn_flutter.dart';
