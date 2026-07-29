@@ -119,8 +119,9 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
     }
     _cachedMenuItems = List<QueryaDropdownItem<T>>.from(widget.items);
     _cachedMenuValue = widget.value;
-    _cachedMenuChildren =
-        widget.items.map((item) => _menuItem(item, cs)).toList();
+    _cachedMenuChildren = [
+      for (final item in widget.items) _menuItem(item, cs),
+    ];
     return _cachedMenuChildren!;
   }
 
