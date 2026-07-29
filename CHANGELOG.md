@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.11-c] - 2026-07-29
+
+Flutter SDK & dependency compatibility update, image downsampling memory optimization, and UI polish.
+
+### Added
+
+- **Dependencies & SDK Constraints** — Updated Flutter/Dart SDK constraints and major library dependencies.
+
+### Performance
+
+- **Image Downsampling (#539)** — Reduced image memory consumption using `cacheWidth` and `cacheHeight` constraints on network and asset images.
+- **Isolate Offloading (#538 / #522)** — Offloaded heavy JSON parsing and large SQL result set decoding to background isolates.
+- **SQL History & Grid Optimization (#524 / #525)** — Optimized VirtualResultGrid visible column window calculation with binary search and batched SQL history pruning.
+
+### UI & Polish
+
+- **Connection Management (#510 / #520)** — Edit existing connection details from the sidebar context menu and migrated connection forms to QueryaDialogCard.
+- **Tree & Sidebar Hierarchy (#472 / #498)** — Unified tree indentation and leaf styling across SQLite, Redis, and Mongo database trees.
+- **Motion & Shell Polish (#478 / #488 / #494)** — Fluid motion transitions for workspace tab switches, connection switches, and extension manager.
+
+### Fixed
+
+- **Sandbox Watchdog (#526)** — Prevented false-positive SIGKILL in SandboxWatchdog during heavy RPC execution.
+- **Flutter Compatibility** — Maintained backward compatibility for Flutter SDKs.
+
 ## [0.4.11-b] - 2026-07-27
 
 Post-0.4.11 patch that **ships** security + Linux distro packaging (intended for 0.4.11-a), plus performance bounds (#414), UI reliability (#445), and code-review correctness (#463).
