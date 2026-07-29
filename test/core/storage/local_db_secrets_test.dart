@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../../memory_secrets_backend.dart';
@@ -117,7 +118,9 @@ void main() {
       expect(s.connectionString, isNull);
     });
 
-    test('updateConnection atomically updates SQLite row and secure-store secrets', () async {
+    test(
+        'updateConnection atomically updates SQLite row and secure-store secrets',
+        () async {
       const initialRow = ConnectionRow(
         type: 'postgres',
         name: 'PG_Init',
@@ -137,7 +140,8 @@ void main() {
         port: 5433,
         username: 'root',
         password: 'new-secret-password',
-        connectionString: 'postgres://root:new-secret-password@db.example.com:5433/mydb',
+        connectionString:
+            'postgres://root:new-secret-password@db.example.com:5433/mydb',
         createdAt: '2026-01-01T00:00:00Z',
       );
       await LocalDb.instance.updateConnection(updatedRow);
@@ -149,14 +153,18 @@ void main() {
       expect(loaded.port, 5433);
       expect(loaded.username, 'root');
       expect(loaded.password, 'new-secret-password');
-      expect(loaded.connectionString, 'postgres://root:new-secret-password@db.example.com:5433/mydb');
+      expect(loaded.connectionString,
+          'postgres://root:new-secret-password@db.example.com:5433/mydb');
 
       final secrets = await ConnectionSecretsStore.readForConnection(id);
       expect(secrets.password, 'new-secret-password');
-      expect(secrets.connectionString, 'postgres://root:new-secret-password@db.example.com:5433/mydb');
+      expect(secrets.connectionString,
+          'postgres://root:new-secret-password@db.example.com:5433/mydb');
     });
 
-    test('removeConnection still deletes SQLite row when secure-store delete fails', () async {
+    test(
+        'removeConnection still deletes SQLite row when secure-store delete fails',
+        () async {
       const row = ConnectionRow(
         type: 'redis',
         name: 'R3',
@@ -174,7 +182,8 @@ void main() {
       expect(list.where((c) => c.id == id), isEmpty);
     });
 
-    test('addConnection rolls back SQLite row when secure-store write fails', () async {
+    test('addConnection rolls back SQLite row when secure-store write fails',
+        () async {
       testMemorySecrets.failNextWrite = StateError('keychain write failed');
       const row = ConnectionRow(
         type: 'redis',
@@ -194,7 +203,9 @@ void main() {
       expect(list.where((c) => c.name == 'R4'), isEmpty);
     });
 
-    test('updateConnection rolls back SQLite and secrets when secure-store write fails', () async {
+    test(
+        'updateConnection rolls back SQLite and secrets when secure-store write fails',
+        () async {
       const initialRow = ConnectionRow(
         type: 'postgres',
         name: 'PG_Before',
@@ -230,6 +241,42 @@ void main() {
       expect(loaded.port, 5432);
       expect(loaded.username, 'admin');
       expect(loaded.password, 'old-password');
+    });
+
+    test(
+        'mergeSecretsForConnectionUpdate keeps password when form leaves it blank',
+        () async {
+      const initialRow = ConnectionRow(
+        type: 'postgresql',
+        name: 'PG',
+        host: 'localhost',
+        port: 5432,
+        username: 'admin',
+        password: 'keep-me',
+        createdAt: '2026-01-01T00:00:00Z',
+      );
+      final id = await LocalDb.instance.addConnection(initialRow);
+
+      final edited = ConnectionRow(
+        id: id,
+        type: 'postgresql',
+        name: 'PG Renamed',
+        host: 'db.example.com',
+        port: 5432,
+        username: 'admin',
+        password: null,
+        createdAt: '2026-01-01T00:00:00Z',
+      );
+      final merged = await mergeSecretsForConnectionUpdate(edited);
+      expect(merged.password, 'keep-me');
+      expect(merged.name, 'PG Renamed');
+      expect(merged.host, 'db.example.com');
+
+      await LocalDb.instance.updateConnection(merged);
+      final loaded = (await LocalDb.instance.getConnections())
+          .singleWhere((c) => c.id == id);
+      expect(loaded.password, 'keep-me');
+      expect(loaded.name, 'PG Renamed');
     });
   });
 }

@@ -25,16 +25,19 @@ enum SandboxWatchdogStopReason {
 class SandboxWatchdog {
   SandboxWatchdog({
     this.pingInterval = const Duration(seconds: 30),
-    this.pongTimeout = const Duration(seconds: 5),
+    this.pongTimeout = const Duration(seconds: 15),
     this.recovery,
+    bool Function()? isBusy,
     Future<Object?> Function()? ping,
     void Function(SandboxWatchdogStopReason reason)? onStopped,
-  })  : _pingOverride = ping,
+  })  : _isBusy = isBusy,
+        _pingOverride = ping,
         _onStopped = onStopped;
 
   final Duration pingInterval;
   final Duration pongTimeout;
   final SandboxAutoRecovery? recovery;
+  final bool Function()? _isBusy;
   final Future<Object?> Function()? _pingOverride;
   final void Function(SandboxWatchdogStopReason reason)? _onStopped;
 
@@ -107,6 +110,7 @@ class SandboxWatchdog {
 
   Future<void> _tick() async {
     if (!_running || _pingInFlight) return;
+    if (_isBusy?.call() ?? false) return;
     _pingInFlight = true;
     try {
       final result = await _sendPing().timeout(pongTimeout);

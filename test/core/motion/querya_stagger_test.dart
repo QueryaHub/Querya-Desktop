@@ -102,6 +102,24 @@ void main() {
     expect(opacityOf(tester, 'item-2'), 1.0);
   });
 
+  testWidgets('Reduced motion halves stagger step timing', (tester) async {
+    await tester.pumpWidget(
+      wrap(
+        QueryaStagger(
+          step: const Duration(milliseconds: 80),
+          children: texts(3),
+        ),
+        level: QueryaMotionLevel.reduced,
+      ),
+    );
+    // Full would still have item-2 at 0 after 30ms with 80ms step; Reduced
+    // halves step to 40ms so later items start earlier.
+    await tester.pump(const Duration(milliseconds: 30));
+    expect(opacityOf(tester, 'item-0'), greaterThan(0));
+    await tester.pumpAndSettle();
+    expect(opacityOf(tester, 'item-2'), 1.0);
+  });
+
   testWidgets('OS disableAnimations skips stagger', (tester) async {
     await tester.pumpWidget(
       MaterialApp(

@@ -104,7 +104,7 @@ class _ExtensionStatsViewState extends material.State<ExtensionStatsView> {
           .getServerStats(widget.connectionRow);
       if (!mounted) return;
       if (!replaceIfChanged(_stats, stats, (v) => _stats = v)) return;
-      setState(() {});
+      setState(() => _stats = stats);
     } catch (_) {}
   }
 
@@ -316,7 +316,9 @@ class _ExtensionStatsViewState extends material.State<ExtensionStatsView> {
             mainAxisSpacing: 16,
             mainAxisExtent: _summaryChipHeight,
           ),
-          children: chips.map((c) => _buildChip(cs, c)).toList(),
+          children: [
+            for (final c in chips) _buildChip(cs, c),
+          ],
         );
       },
     );

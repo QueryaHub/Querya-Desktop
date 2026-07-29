@@ -5,6 +5,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
 import 'package:querya_desktop/shared/widgets/form_validity_notifier.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -13,21 +14,26 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 Future<ConnectionRow?> showPostgresConnectionForm(
   BuildContext context, {
   int? folderId,
+  ConnectionRow? initial,
 }) async {
   return showAppDialog<ConnectionRow>(
     context: context,
     builder: (context) => material.Dialog(
       backgroundColor: material.Colors.transparent,
       insetPadding: WindowLayout.dialogSymmetricInsets(context),
-      child: _PostgresConnectionFormContent(folderId: folderId),
+      child: _PostgresConnectionFormContent(
+        folderId: folderId,
+        initial: initial,
+      ),
     ),
   );
 }
 
 class _PostgresConnectionFormContent extends material.StatefulWidget {
-  const _PostgresConnectionFormContent({this.folderId});
+  const _PostgresConnectionFormContent({this.folderId, this.initial});
 
   final int? folderId;
+  final ConnectionRow? initial;
 
   @override
   material.State<_PostgresConnectionFormContent> createState() =>
@@ -54,6 +60,8 @@ class _PostgresConnectionFormContentState
   Timer? _dismissTimer;
   late final FormValidityNotifier _formValidNotifier;
 
+  bool get _isEditing => widget.initial != null;
+
   @override
   void initState() {
     super.initState();
@@ -72,6 +80,20 @@ class _PostgresConnectionFormContentState
     _sslRootCertController.addListener(_syncUriSslParams);
     _sslCertController.addListener(_syncUriSslParams);
     _sslKeyController.addListener(_syncUriSslParams);
+
+    final initial = widget.initial;
+    if (initial != null) {
+      _nameController.text = initial.name;
+      _hostController.text = initial.host ?? '';
+      _portController.text = (initial.port ?? 5432).toString();
+      _usernameController.text = initial.username ?? '';
+      _databaseController.text = initial.databaseName ?? '';
+      _useSSL = initial.useSSL;
+      _connectionStringController.text =
+          redactUriPassword(initial.connectionString) ?? '';
+      // Password left empty — mergeSecretsForConnectionUpdate keeps existing.
+    }
+
     _formValidNotifier.seed();
   }
 
@@ -159,8 +181,10 @@ class _PostgresConnectionFormContentState
     String? sslKey,
   }) {
     final userInfoParts = <String>[
-      if (username != null && username.isNotEmpty) Uri.encodeComponent(username),
-      if (password != null && password.isNotEmpty) Uri.encodeComponent(password),
+      if (username != null && username.isNotEmpty)
+        Uri.encodeComponent(username),
+      if (password != null && password.isNotEmpty)
+        Uri.encodeComponent(password),
     ];
     final queryParams = <String, String>{
       if (sslRootCert != null && sslRootCert.isNotEmpty)
@@ -298,8 +322,10 @@ class _PostgresConnectionFormContentState
         : (effectiveUri.isNotEmpty
             ? 'PostgreSQL: $effectiveHost:$effectivePort'
             : 'PostgreSQL $host:$port/$database');
+    final initial = widget.initial;
     final row = ConnectionRow(
-      type: 'postgresql',
+      id: initial?.id,
+      type: initial?.type ?? 'postgresql',
       name: displayName,
       host: uriHost ?? (effectiveUri.isEmpty ? host : null),
       port: uriPort ?? (effectiveUri.isEmpty ? port : null),
@@ -312,8 +338,11 @@ class _PostgresConnectionFormContentState
           effectiveUri.isNotEmpty ? null : (database.isEmpty ? null : database),
       useSSL: effectiveUseSSL,
       connectionString: effectiveUri.isEmpty ? null : effectiveUri,
-      folderId: widget.folderId,
-      createdAt: DateTime.now().toUtc().toIso8601String(),
+      extensionId: initial?.extensionId,
+      driverOptions: initial?.driverOptions,
+      folderId: initial?.folderId ?? widget.folderId,
+      sortOrder: initial?.sortOrder ?? 0,
+      createdAt: initial?.createdAt ?? DateTime.now().toUtc().toIso8601String(),
     );
     material.Navigator.of(context).pop(row);
   }
@@ -329,15 +358,15 @@ class _PostgresConnectionFormContentState
         Text(label).xSmall().muted(),
         const Gap(4),
         material.Row(
-              children: [
-                material.Expanded(
-                  child: TextField(
-                    key: Key(label),
-                    controller: controller,
-                    placeholder: const Text('/path/to/file.pem'),
-                    onChanged: (_) => _syncUriSslParams(),
-                  ),
-                ),
+          children: [
+            material.Expanded(
+              child: TextField(
+                key: Key(label),
+                controller: controller,
+                placeholder: const Text('/path/to/file.pem'),
+                onChanged: (_) => _syncUriSslParams(),
+              ),
+            ),
             const Gap(8),
             GhostButton(
               onPressed: () => _pickCertificateFile(controller),
@@ -383,24 +412,17 @@ class _PostgresConnectionFormContentState
   @override
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context).colorScheme;
-    final radius = Theme.of(context).radiusXxl;
 
-    return material.Container(
+    return QueryaDialogCard(
       constraints: WindowLayout.dialogConstraints(
         context,
         maxWidth: WindowLayout.connectionFormMaxWidth,
         maxHeight: WindowLayout.connectionFormMaxHeight,
       ),
-      decoration: material.BoxDecoration(
-        color: theme.popover,
-        borderRadius: material.BorderRadius.circular(radius),
-        border: material.Border.all(color: theme.muted),
-      ),
-      child: material.ClipRRect(
-        borderRadius: material.BorderRadius.circular(radius),
-        child: material.Column(
-          crossAxisAlignment: material.CrossAxisAlignment.stretch,
-          children: [
+      borderColor: theme.muted,
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
             // Header
             material.Padding(
               padding: const material.EdgeInsets.fromLTRB(24, 24, 24, 16),
@@ -414,6 +436,8 @@ class _PostgresConnectionFormContentState
                         height: 24,
                         child: material.Image.asset(
                           'assets/images/postgresql_icon.png',
+                          cacheWidth: (40 * MediaQuery.devicePixelRatioOf(context)).toInt(),
+                          cacheHeight: (40 * MediaQuery.devicePixelRatioOf(context)).toInt(),
                           fit: material.BoxFit.contain,
                           errorBuilder: (_, __, ___) => material.Icon(
                             material.Icons.storage_rounded,
@@ -423,7 +447,11 @@ class _PostgresConnectionFormContentState
                         ),
                       ),
                       const Gap(12),
-                      const Text('PostgreSQL Connection').large().semiBold(),
+                      Text(
+                        _isEditing
+                            ? 'Edit PostgreSQL Connection'
+                            : 'PostgreSQL Connection',
+                      ).large().semiBold(),
                     ],
                   ),
                   const Gap(8),
@@ -530,7 +558,11 @@ class _PostgresConnectionFormContentState
                       children: [
                         TextField(
                           controller: _passwordController,
-                          placeholder: const Text('Password'),
+                          placeholder: Text(
+                            _isEditing
+                                ? 'Leave blank to keep existing'
+                                : 'Password',
+                          ),
                           obscureText: !_showPassword,
                         ),
                         material.Positioned(
@@ -728,7 +760,6 @@ class _PostgresConnectionFormContentState
             ),
           ],
         ),
-      ),
     );
   }
 }

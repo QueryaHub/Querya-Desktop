@@ -690,7 +690,7 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
       title,
       _twoColumnMetrics(
         context,
-        data.entries.map((e) => MapEntry(e.key, e.value)).toList(),
+        [ for (final e in data.entries) MapEntry(e.key, e.value) ],
       ),
     );
   }

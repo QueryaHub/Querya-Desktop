@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/mysql_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
 import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
 import 'package:querya_desktop/shared/widgets/form_validity_notifier.dart';
 import 'package:querya_desktop/shared/widgets/ssl_certificate_fields.dart';
@@ -14,21 +15,26 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 Future<ConnectionRow?> showMysqlConnectionForm(
   BuildContext context, {
   int? folderId,
+  ConnectionRow? initial,
 }) async {
   return showAppDialog<ConnectionRow>(
     context: context,
     builder: (context) => material.Dialog(
       backgroundColor: material.Colors.transparent,
       insetPadding: WindowLayout.dialogSymmetricInsets(context),
-      child: _MysqlConnectionFormContent(folderId: folderId),
+      child: _MysqlConnectionFormContent(
+        folderId: folderId,
+        initial: initial,
+      ),
     ),
   );
 }
 
 class _MysqlConnectionFormContent extends material.StatefulWidget {
-  const _MysqlConnectionFormContent({this.folderId});
+  const _MysqlConnectionFormContent({this.folderId, this.initial});
 
   final int? folderId;
+  final ConnectionRow? initial;
 
   @override
   material.State<_MysqlConnectionFormContent> createState() =>
@@ -55,6 +61,8 @@ class _MysqlConnectionFormContentState
   Timer? _dismissTimer;
   late final FormValidityNotifier _formValidNotifier;
 
+  bool get _isEditing => widget.initial != null;
+
   @override
   void initState() {
     super.initState();
@@ -73,6 +81,19 @@ class _MysqlConnectionFormContentState
     _sslRootCertController.addListener(_syncUriSslParams);
     _sslCertController.addListener(_syncUriSslParams);
     _sslKeyController.addListener(_syncUriSslParams);
+
+    final initial = widget.initial;
+    if (initial != null) {
+      _nameController.text = initial.name;
+      _hostController.text = initial.host ?? '';
+      _portController.text = (initial.port ?? 3306).toString();
+      _usernameController.text = initial.username ?? '';
+      _databaseController.text = initial.databaseName ?? '';
+      _useSSL = initial.useSSL;
+      _connectionStringController.text =
+          redactUriPassword(initial.connectionString) ?? '';
+    }
+
     _formValidNotifier.seed();
   }
 
@@ -215,8 +236,10 @@ class _MysqlConnectionFormContentState
         : (uri.isNotEmpty
             ? 'MySQL (URI)'
             : 'MySQL $host:$port${database.isNotEmpty ? '/$database' : ''}');
+    final initial = widget.initial;
     final row = ConnectionRow(
-      type: 'mysql',
+      id: initial?.id,
+      type: initial?.type ?? 'mysql',
       name: displayName,
       host: uri.isNotEmpty ? null : host,
       port: uri.isNotEmpty ? null : port,
@@ -229,8 +252,11 @@ class _MysqlConnectionFormContentState
           uri.isNotEmpty ? null : (database.isEmpty ? null : database),
       useSSL: _useSSL || _hasSslCertificateFields(),
       connectionString: uri.isEmpty ? null : uri,
-      folderId: widget.folderId,
-      createdAt: DateTime.now().toUtc().toIso8601String(),
+      extensionId: initial?.extensionId,
+      driverOptions: initial?.driverOptions,
+      folderId: initial?.folderId ?? widget.folderId,
+      sortOrder: initial?.sortOrder ?? 0,
+      createdAt: initial?.createdAt ?? DateTime.now().toUtc().toIso8601String(),
     );
     material.Navigator.of(context).pop(row);
   }
@@ -269,24 +295,17 @@ class _MysqlConnectionFormContentState
   @override
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context).colorScheme;
-    final radius = Theme.of(context).radiusXxl;
 
-    return material.Container(
+    return QueryaDialogCard(
       constraints: WindowLayout.dialogConstraints(
         context,
         maxWidth: WindowLayout.connectionFormMaxWidth,
         maxHeight: WindowLayout.connectionFormMaxHeight,
       ),
-      decoration: material.BoxDecoration(
-        color: theme.popover,
-        borderRadius: material.BorderRadius.circular(radius),
-        border: material.Border.all(color: theme.muted),
-      ),
-      child: material.ClipRRect(
-        borderRadius: material.BorderRadius.circular(radius),
-        child: material.Column(
-          crossAxisAlignment: material.CrossAxisAlignment.stretch,
-          children: [
+      borderColor: theme.muted,
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
             material.Padding(
               padding: const material.EdgeInsets.fromLTRB(24, 24, 24, 16),
               child: material.Column(
@@ -299,6 +318,8 @@ class _MysqlConnectionFormContentState
                         height: 24,
                         child: material.Image.asset(
                           'assets/images/mysql_icon.png',
+                          cacheWidth: (40 * MediaQuery.devicePixelRatioOf(context)).toInt(),
+                          cacheHeight: (40 * MediaQuery.devicePixelRatioOf(context)).toInt(),
                           fit: material.BoxFit.contain,
                           errorBuilder: (_, __, ___) => material.Icon(
                             material.Icons.table_chart_rounded,
@@ -308,7 +329,11 @@ class _MysqlConnectionFormContentState
                         ),
                       ),
                       const Gap(12),
-                      const Text('MySQL Connection').large().semiBold(),
+                      Text(
+                        _isEditing
+                            ? 'Edit MySQL Connection'
+                            : 'MySQL Connection',
+                      ).large().semiBold(),
                     ],
                   ),
                   const Gap(8),
@@ -408,7 +433,11 @@ class _MysqlConnectionFormContentState
                       children: [
                         TextField(
                           controller: _passwordController,
-                          placeholder: const Text('Password'),
+                          placeholder: Text(
+                            _isEditing
+                                ? 'Leave blank to keep existing'
+                                : 'Password',
+                          ),
                           obscureText: !_showPassword,
                         ),
                         material.Positioned(
@@ -585,7 +614,6 @@ class _MysqlConnectionFormContentState
             ),
           ],
         ),
-      ),
     );
   }
 }

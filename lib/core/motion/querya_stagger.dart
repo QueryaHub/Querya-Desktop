@@ -31,6 +31,7 @@ class _QueryaStaggerState extends State<QueryaStagger>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   bool _played = false;
+  Duration _effectiveStep = kQueryaStaggerStep;
 
   @override
   void initState() {
@@ -47,12 +48,13 @@ class _QueryaStaggerState extends State<QueryaStagger>
     if (n == 0) return;
 
     final base = context.motionDuration(QueryaMotion.fast);
+    _effectiveStep = context.motionDuration(widget.step);
     if (base == QueryaMotion.instant) {
       _controller.value = 1;
       return;
     }
 
-    final total = base + widget.step * n;
+    final total = base + _effectiveStep * n;
     _controller.duration = total;
     _controller.forward();
   }
@@ -70,7 +72,7 @@ class _QueryaStaggerState extends State<QueryaStagger>
 
     return AnimatedBuilder(
       animation: _controller,
-      builder: (context, _) {
+      builder: (context, __) {
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -96,7 +98,7 @@ class _QueryaStaggerState extends State<QueryaStagger>
     final totalMs = _controller.duration!.inMilliseconds;
     if (totalMs <= 0) return 1;
 
-    final stepMs = widget.step.inMilliseconds;
+    final stepMs = _effectiveStep.inMilliseconds;
     final start = (stepMs * index) / totalMs;
     final end = (start + 0.35).clamp(0.0, 1.0);
     final t = _controller.value;

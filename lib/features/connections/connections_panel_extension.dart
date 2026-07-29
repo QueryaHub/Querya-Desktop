@@ -8,6 +8,7 @@ class _ExtensionConnectionTile extends StatefulWidget {
     required this.icon,
     this.iconAsset,
     required this.onRemove,
+    required this.onEdit,
     this.onTap,
     this.onObjectSelected,
     this.isExpanded = false,
@@ -19,6 +20,7 @@ class _ExtensionConnectionTile extends StatefulWidget {
   final material.IconData icon;
   final String? iconAsset;
   final VoidCallback onRemove;
+  final VoidCallback onEdit;
   final VoidCallback? onTap;
 
   /// Fires when a table/view node is clicked in the schema tree.
@@ -91,8 +93,8 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
       _error = null;
     });
     try {
-      final schema =
-          await ExtensionDriverSession.instance.getSchemaTree(widget.connection);
+      final schema = await ExtensionDriverSession.instance
+          .getSchemaTree(widget.connection);
       if (!mounted) return;
       setState(() {
         _schema = schema;
@@ -141,199 +143,194 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
     if (_iconFilePath != null) {
       iconWidget = DriverIconImage(
         path: _iconFilePath!,
-        size: 16,
+        size: QueryaIconSizes.sidebarConnectionIcon,
         fallbackIcon: widget.icon,
       );
     } else if (widget.iconAsset != null) {
       iconWidget = material.Image.asset(
         widget.iconAsset!,
-        width: 16,
-        height: 16,
+        width: QueryaIconSizes.sidebarConnectionIcon,
+        height: QueryaIconSizes.sidebarConnectionIcon,
+        cacheWidth: (QueryaIconSizes.sidebarConnectionIcon * MediaQuery.devicePixelRatioOf(context)).toInt(),
+        cacheHeight: (QueryaIconSizes.sidebarConnectionIcon * MediaQuery.devicePixelRatioOf(context)).toInt(),
         fit: material.BoxFit.contain,
         errorBuilder: (_, __, ___) => material.Icon(
           widget.icon,
-          size: 16,
+          size: QueryaIconSizes.sidebarConnectionIcon,
           color: theme.colorScheme.primary,
         ),
       );
     } else {
       iconWidget = material.Icon(
         widget.icon,
-        size: 16,
+        size: QueryaIconSizes.sidebarConnectionIcon,
         color: theme.colorScheme.primary,
       );
     }
 
-    return material.Padding(
-      padding: const material.EdgeInsets.only(bottom: 2),
-      child: material.Column(
-        crossAxisAlignment: material.CrossAxisAlignment.start,
-        mainAxisSize: material.MainAxisSize.min,
-        children: [
-          material.Row(
-            children: [
-              material.MouseRegion(
-                cursor: material.SystemMouseCursors.click,
-                child: material.InkWell(
-                  onTap: _toggle,
-                  borderRadius: material.BorderRadius.circular(4),
-                  child: material.Padding(
-                    padding: const material.EdgeInsets.all(2),
-                    child: material.AnimatedRotation(
-                      turns: widget.isExpanded ? 0.25 : 0,
-                      duration: context.motionDuration(QueryaMotion.fast),
-                      curve: context.motionCurve(QueryaMotion.standardCurve),
-                      child: material.Icon(
-                        material.Icons.chevron_right_rounded,
-                        size: 16,
-                        color: theme.colorScheme.mutedForeground,
+    return ContextMenu(
+      items: [
+        MenuButton(
+          leading: material.Icon(material.Icons.edit_outlined,
+              size: 18, color: theme.colorScheme.mutedForeground),
+          onPressed: (_) => widget.onEdit(),
+          child: const Text('Edit connection…'),
+        ),
+        MenuButton(
+          leading: material.Icon(material.Icons.delete_outline_rounded,
+              size: 18, color: theme.colorScheme.mutedForeground),
+          onPressed: (_) => widget.onRemove(),
+          child: const Text('Remove connection'),
+        ),
+      ],
+      child: material.Padding(
+        padding: const material.EdgeInsets.only(bottom: 2),
+        child: material.Column(
+          crossAxisAlignment: material.CrossAxisAlignment.start,
+          mainAxisSize: material.MainAxisSize.min,
+          children: [
+            material.Row(
+              children: [
+                material.MouseRegion(
+                  cursor: material.SystemMouseCursors.click,
+                  child: material.Semantics(
+                    button: true,
+                    expanded: widget.isExpanded,
+                    child: material.InkWell(
+                      onTap: _toggle,
+                      borderRadius: material.BorderRadius.circular(4),
+                      child: material.Padding(
+                        padding: const material.EdgeInsets.all(2),
+                        child: material.AnimatedRotation(
+                          turns: widget.isExpanded ? 0.25 : 0,
+                          duration:
+                              context.motionDuration(QueryaMotion.treeExpand),
+                          curve:
+                              context.motionCurve(QueryaMotion.treeExpandCurve),
+                          child: material.Icon(
+                            QueryaIcons.expandClosed,
+                            size: QueryaIconSizes.sidebarExpand,
+                            color: theme.colorScheme.mutedForeground,
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              material.Expanded(
-                child: _sidebarConnectionShell(
-                  context: context,
-                  isSelected: widget.isSelected,
-                  onTap: widget.onTap,
-                  child: material.Padding(
-                    padding: const material.EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 6,
-                    ),
-                    child: material.Row(
-                      children: [
-                        iconWidget,
-                        const Gap(8),
-                        material.Expanded(
-                          child: material.Column(
-                            crossAxisAlignment:
-                                material.CrossAxisAlignment.start,
-                            mainAxisSize: material.MainAxisSize.min,
-                            children: [
-                              material.Text(
-                                widget.connection.name,
-                                overflow: material.TextOverflow.ellipsis,
-                                maxLines: 1,
-                                style: material.TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: widget.isSelected
-                                      ? material.FontWeight.w600
-                                      : material.FontWeight.w500,
-                                  color: theme.colorScheme.foreground,
-                                ),
-                              ),
-                              if (widget.connection.host != null)
+                material.Expanded(
+                  child: _sidebarConnectionShell(
+                    context: context,
+                    isSelected: widget.isSelected,
+                    onTap: widget.onTap,
+                    child: material.Padding(
+                      padding: const material.EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 6,
+                      ),
+                      child: material.Row(
+                        children: [
+                          iconWidget,
+                          const Gap(8),
+                          material.Expanded(
+                            child: material.Column(
+                              crossAxisAlignment:
+                                  material.CrossAxisAlignment.start,
+                              mainAxisSize: material.MainAxisSize.min,
+                              children: [
                                 material.Text(
-                                  '${widget.connection.host}:${widget.connection.port ?? ''}',
+                                  widget.connection.name,
                                   overflow: material.TextOverflow.ellipsis,
                                   maxLines: 1,
                                   style: material.TextStyle(
-                                    fontSize: 11,
-                                    color: theme.colorScheme.mutedForeground,
+                                    fontSize: 13,
+                                    fontWeight: widget.isSelected
+                                        ? material.FontWeight.w600
+                                        : material.FontWeight.w500,
+                                    color: theme.colorScheme.foreground,
                                   ),
                                 ),
-                            ],
-                          ),
-                        ),
-                        material.Tooltip(
-                          message: 'Remove',
-                          child: material.InkWell(
-                            onTap: widget.onRemove,
-                            borderRadius: material.BorderRadius.circular(6),
-                            child: material.Padding(
-                              padding: const material.EdgeInsets.all(4),
-                              child: material.Icon(
-                                material.Icons.close_rounded,
-                                size: 14,
-                                color: theme.colorScheme.mutedForeground,
-                              ),
+                                if (widget.connection.host != null)
+                                  material.Text(
+                                    '${widget.connection.host}:${widget.connection.port ?? ''}',
+                                    overflow: material.TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                    style: material.TextStyle(
+                                      fontSize: 11,
+                                      color: theme.colorScheme.mutedForeground,
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          QueryaAnimatedExpand(
-            expanded: widget.isExpanded,
-            child: material.Column(
-              crossAxisAlignment: material.CrossAxisAlignment.stretch,
-              mainAxisSize: material.MainAxisSize.min,
-              children: [
-                if (_loading)
-                  material.Padding(
-                    padding: const material.EdgeInsets.only(
-                      left: 28,
-                      top: 4,
-                      bottom: 4,
-                    ),
-                    child: material.Row(
-                      children: [
-                        const material.SizedBox(
-                          width: 12,
-                          height: 12,
-                          child: material.CircularProgressIndicator(
-                            strokeWidth: 1.5,
-                          ),
-                        ),
-                        const Gap(8),
-                        const Text('Loading...').muted().xSmall(),
-                      ],
-                    ),
-                  )
-                else if (_error != null)
-                  material.Padding(
-                    padding: const material.EdgeInsets.only(
-                      left: 28,
-                      top: 4,
-                      bottom: 8,
-                    ),
-                    child: material.Column(
-                      crossAxisAlignment: material.CrossAxisAlignment.start,
-                      children: [
-                        material.SelectableText(
-                          _error!,
-                          style: material.TextStyle(
-                            fontSize: 11,
-                            color: theme.colorScheme.destructive,
-                          ),
-                        ),
-                        const material.SizedBox(height: 6),
-                        GhostButton(
-                          onPressed: _loadTree,
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  )
-                else if (_schema != null)
-                  material.Padding(
-                    padding: const material.EdgeInsets.only(left: 20),
-                    child: _schema!.roots.isEmpty
-                        ? material.Padding(
-                            padding:
-                                const material.EdgeInsets.fromLTRB(0, 8, 8, 8),
-                            child: const Text(
-                              'No databases found on this server.',
-                            ).muted().small(),
-                          )
-                        : SduiTreeBuilder(
-                            schema: _schema!,
-                            fetchChildren: _fetchChildren,
-                            onNodeSelected: _onNodeSelected,
-                            maxHeight: kConnectionTreeMaxVisibleRows *
-                                kConnectionTreeRowExtent,
-                          ),
-                  ),
               ],
             ),
-          ),
-        ],
+            QueryaAnimatedExpand(
+              expanded: widget.isExpanded,
+              child: material.Column(
+                crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                mainAxisSize: material.MainAxisSize.min,
+                children: [
+                  if (_loading)
+                    material.Padding(
+                      padding: const material.EdgeInsets.only(
+                        left: 28,
+                        top: 4,
+                        bottom: 4,
+                      ),
+                      child: material.Row(
+                        children: [
+                          const material.SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: material.CircularProgressIndicator(
+                              strokeWidth: 1.5,
+                            ),
+                          ),
+                          const Gap(8),
+                          const Text('Loading...').muted().xSmall(),
+                        ],
+                      ),
+                    )
+                  else if (_error != null)
+                    TreeLoadError(
+                      title: 'Could not load extension tree',
+                      message: _error!,
+                      padding: const material.EdgeInsets.only(
+                        left: 28,
+                        top: 4,
+                        bottom: 8,
+                      ),
+                      onRetry: _loadTree,
+                    )
+                  else if (_schema != null)
+                    material.Padding(
+                      padding: const material.EdgeInsets.only(left: 20),
+                      child: _schema!.roots.isEmpty
+                          ? material.Padding(
+                              padding: const material.EdgeInsets.fromLTRB(
+                                  0, 8, 8, 8),
+                              child: const Text(
+                                'No databases found on this server.',
+                              ).muted().small(),
+                            )
+                          : SduiTreeBuilder(
+                              schema: _schema!,
+                              fetchChildren: _fetchChildren,
+                              onNodeSelected: _onNodeSelected,
+                              maxHeight: kConnectionTreeMaxVisibleRows *
+                                  kConnectionTreeRowExtent,
+                            ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

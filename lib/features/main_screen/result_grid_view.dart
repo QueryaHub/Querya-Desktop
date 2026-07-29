@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:querya_desktop/core/layout/ui_scale.dart';
+import 'package:querya_desktop/core/ui/querya_tooltip.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// Layout metrics for [VirtualResultGrid].
@@ -124,16 +125,34 @@ ResultGridColumnWindow computeVisibleColumnWindow({
   final start = scrollOffset.clamp(0.0, total);
   final end = (scrollOffset + viewportWidth).clamp(0.0, total);
 
-  // First column with any pixel past [start].
+  // First column with any pixel past [start]: smallest index where columnOffsets[first + 1] > start
   var first = 0;
-  while (first < n && columnOffsets[first + 1] <= start) {
-    first++;
+  var low = 0;
+  var high = n - 1;
+  while (low <= high) {
+    final mid = (low + high) ~/ 2;
+    if (columnOffsets[mid + 1] > start) {
+      first = mid;
+      high = mid - 1;
+    } else {
+      low = mid + 1;
+    }
   }
-  // Last column with any pixel before [end].
+
+  // Last column with any pixel before [end]: largest index where columnOffsets[last] < end
   var last = n - 1;
-  while (last > 0 && columnOffsets[last] >= end) {
-    last--;
+  low = 0;
+  high = n - 1;
+  while (low <= high) {
+    final mid = (low + high) ~/ 2;
+    if (columnOffsets[mid] < end) {
+      last = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
   }
+
   if (first > last) {
     first = last.clamp(0, n - 1);
   }
@@ -485,7 +504,7 @@ class _GridCell extends material.StatelessWidget {
 
     return material.Tooltip(
       message: text,
-      waitDuration: const Duration(milliseconds: 400),
+      waitDuration: kQueryaTooltipWait,
       child: interactiveCell,
     );
   }

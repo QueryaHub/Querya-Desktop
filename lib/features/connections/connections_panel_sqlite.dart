@@ -12,6 +12,7 @@ class _SqliteConnectionTile extends StatefulWidget {
     required this.icon,
     this.iconAsset,
     required this.onRemove,
+    required this.onEdit,
     this.onTap,
     this.onSqliteObjectSelected,
     this.onSqliteOpenSqlWorkspace,
@@ -24,6 +25,7 @@ class _SqliteConnectionTile extends StatefulWidget {
   final material.IconData icon;
   final String? iconAsset;
   final VoidCallback onRemove;
+  final VoidCallback onEdit;
   final VoidCallback? onTap;
   final void Function(
     ConnectionRow connection,
@@ -111,17 +113,20 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
     final iconWidget = widget.iconAsset != null
         ? material.Image.asset(
             widget.iconAsset!,
-            width: 16,
-            height: 16,
+            width: QueryaIconSizes.sidebarConnectionIcon,
+            height: QueryaIconSizes.sidebarConnectionIcon,
+            cacheWidth: (QueryaIconSizes.sidebarConnectionIcon * MediaQuery.devicePixelRatioOf(context)).toInt(),
+            cacheHeight: (QueryaIconSizes.sidebarConnectionIcon * MediaQuery.devicePixelRatioOf(context)).toInt(),
             fit: material.BoxFit.contain,
             errorBuilder: (_, __, ___) => material.Icon(
               widget.icon,
-              size: 16,
+              size: QueryaIconSizes.sidebarConnectionIcon,
               color: theme.colorScheme.primary,
             ),
           )
         : material.Icon(widget.icon,
-            size: 16, color: theme.colorScheme.primary);
+            size: QueryaIconSizes.sidebarConnectionIcon,
+            color: theme.colorScheme.primary);
 
     return ContextMenu(
       items: [
@@ -146,6 +151,12 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
             child: const Text('Open in SQL'),
           ),
         MenuButton(
+          leading: material.Icon(material.Icons.edit_outlined,
+              size: 18, color: theme.colorScheme.mutedForeground),
+          onPressed: (_) => widget.onEdit(),
+          child: const Text('Edit connection…'),
+        ),
+        MenuButton(
           leading: material.Icon(material.Icons.delete_outline_rounded,
               size: 18, color: theme.colorScheme.mutedForeground),
           onPressed: (_) => widget.onRemove(),
@@ -162,19 +173,25 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
               children: [
                 material.MouseRegion(
                   cursor: material.SystemMouseCursors.click,
-                  child: material.InkWell(
-                    onTap: _toggle,
-                    borderRadius: material.BorderRadius.circular(4),
-                    child: material.Padding(
-                      padding: const material.EdgeInsets.all(2),
-                      child: material.AnimatedRotation(
-                        turns: _expanded ? 0.25 : 0,
-                        duration: context.motionDuration(QueryaMotion.fast),
-                        curve: context.motionCurve(QueryaMotion.standardCurve),
-                        child: material.Icon(
-                          material.Icons.chevron_right_rounded,
-                          size: 16,
-                          color: theme.colorScheme.mutedForeground,
+                  child: material.Semantics(
+                    button: true,
+                    expanded: _expanded,
+                    child: material.InkWell(
+                      onTap: _toggle,
+                      borderRadius: material.BorderRadius.circular(4),
+                      child: material.Padding(
+                        padding: const material.EdgeInsets.all(2),
+                        child: material.AnimatedRotation(
+                          turns: _expanded ? 0.25 : 0,
+                          duration:
+                              context.motionDuration(QueryaMotion.treeExpand),
+                          curve:
+                              context.motionCurve(QueryaMotion.treeExpandCurve),
+                          child: material.Icon(
+                            QueryaIcons.expandClosed,
+                            size: QueryaIconSizes.sidebarExpand,
+                            color: theme.colorScheme.mutedForeground,
+                          ),
                         ),
                       ),
                     ),
@@ -251,16 +268,15 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
                       ),
                     ),
                   if (_error != null)
-                    material.Padding(
+                    TreeLoadError(
+                      title: 'Could not load objects',
+                      message: _error!,
                       padding: const material.EdgeInsets.only(
-                          left: 28, top: 4, bottom: 4),
-                      child: material.Text(
-                        'Error loading schema',
-                        overflow: material.TextOverflow.ellipsis,
-                        maxLines: 1,
-                        style: material.TextStyle(
-                            fontSize: 11, color: theme.colorScheme.destructive),
+                        left: 28,
+                        top: 4,
+                        bottom: 4,
                       ),
+                      onRetry: _loadTables,
                     ),
                   if (!_loading && _error == null)
                     material.Padding(
@@ -274,8 +290,8 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
                               objectKind: SqliteObjectKind.table,
                               onRefresh: _loadTables,
                               label: 'Tables',
-                              icon: material.Icons.table_chart_rounded,
-                              itemIcon: material.Icons.grid_on_rounded,
+                              icon: QueryaIcons.tableGroup,
+                              itemIcon: QueryaIcons.tableLeaf,
                               items: _tables,
                               onItemTap: widget.onSqliteObjectSelected == null
                                   ? null
@@ -291,8 +307,8 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
                               objectKind: SqliteObjectKind.view,
                               onRefresh: _loadTables,
                               label: 'Views',
-                              icon: material.Icons.view_agenda_rounded,
-                              itemIcon: material.Icons.view_week_rounded,
+                              icon: QueryaIcons.viewGroup,
+                              itemIcon: QueryaIcons.viewLeaf,
                               items: _views,
                               onItemTap: widget.onSqliteObjectSelected == null
                                   ? null
@@ -364,21 +380,22 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
             label: '${widget.label} (${widget.items.length})',
             leading: material.AnimatedRotation(
               turns: _expanded ? 0.25 : 0,
-              duration: context.motionDuration(QueryaMotion.fast),
-              curve: context.motionCurve(QueryaMotion.standardCurve),
+              duration: context.motionDuration(QueryaMotion.treeExpand),
+              curve: context.motionCurve(QueryaMotion.treeExpandCurve),
               child: material.Icon(
-                material.Icons.chevron_right_rounded,
-                size: 13,
+                QueryaIcons.expandClosed,
+                size: QueryaIconSizes.treeExpand,
                 color: theme.colorScheme.mutedForeground,
               ),
             ),
             icon: widget.icon,
-            iconSize: 13,
+            iconSize: QueryaIconSizes.treeGroup,
             iconColor: theme.colorScheme.mutedForeground,
             textStyle: material.TextStyle(
               fontSize: 11,
               color: theme.colorScheme.mutedForeground,
             ),
+            expanded: _expanded,
             onTap: () => setState(() => _expanded = !_expanded),
             connection: widget.connection,
             onContextRefresh: widget.onRefresh,
@@ -389,7 +406,7 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
               context: context,
               itemCount: widget.items.length,
               itemExtent: kConnectionTreeRowExtent,
-              padding: const material.EdgeInsets.only(left: 22),
+              padding: const material.EdgeInsets.only(left: 26),
               itemBuilder: (context, index) {
                 final item = widget.items[index];
                 return _PgTreeRow(
@@ -398,8 +415,10 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
                   ),
                   label: item,
                   icon: widget.itemIcon,
-                  iconSize: 12,
-                  iconColor: theme.colorScheme.mutedForeground,
+                  iconSize: QueryaIconSizes.treeLeaf,
+                  iconColor: QueryaTreeTokens.leafIconColor(
+                    theme.colorScheme.primary,
+                  ),
                   textStyle: material.TextStyle(
                     fontSize: 11,
                     color: theme.colorScheme.foreground,

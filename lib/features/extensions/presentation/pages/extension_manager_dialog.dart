@@ -6,6 +6,7 @@ import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/market/marketplace_repository.dart';
+import 'package:querya_desktop/core/motion/querya_cross_fade_stack.dart';
 import 'package:querya_desktop/features/extensions/presentation/widgets/extension_card.dart';
 import 'package:querya_desktop/features/extensions/presentation/widgets/extension_sideload_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -157,103 +158,78 @@ class _ExtensionManagerContentState
   @override
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context).colorScheme;
-    final radius = Theme.of(context).radiusXxl;
     final onPopover = theme.popoverForeground;
 
     return material.DefaultTextStyle(
       style: material.TextStyle(color: onPopover),
       child: material.IconTheme(
         data: material.IconThemeData(color: onPopover),
-        child: material.Container(
+        child: QueryaDialogCard(
           constraints: WindowLayout.dialogConstraints(
             context,
             maxWidth: 800,
             minWidth: 600,
             maxHeight: 700,
           ),
-          decoration: material.BoxDecoration(
-            color: theme.popover,
-            borderRadius: material.BorderRadius.circular(radius),
-            border: material.Border.all(color: theme.border),
-          ),
-          child: material.ClipRRect(
-            borderRadius: material.BorderRadius.circular(radius),
-            child: material.Column(
-              crossAxisAlignment: material.CrossAxisAlignment.stretch,
-              children: [
-                material.Padding(
-                  padding: const material.EdgeInsets.fromLTRB(24, 24, 24, 8),
-                  child: material.Row(
-                    mainAxisAlignment: material.MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: material.CrossAxisAlignment.center,
-                    children: [
-                      material.Expanded(
-                        child: material.Column(
-                          crossAxisAlignment: material.CrossAxisAlignment.start,
-                          children: [
-                            const Text('Extensions')
-                                .large()
-                                .semiBold()
-                                .foreground(),
-                            const material.SizedBox(height: 6),
-                            const Text(
-                                    'Manage local and marketplace extensions')
-                                .muted()
-                                .small(),
-                          ],
-                        ),
+          borderColor: theme.border,
+          child: material.Column(
+            crossAxisAlignment: material.CrossAxisAlignment.stretch,
+            children: [
+              material.Padding(
+                padding: const material.EdgeInsets.fromLTRB(24, 24, 24, 8),
+                child: material.Row(
+                  mainAxisAlignment: material.MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: material.CrossAxisAlignment.center,
+                  children: [
+                    material.Expanded(
+                      child: material.Column(
+                        crossAxisAlignment: material.CrossAxisAlignment.start,
+                        children: [
+                          const Text('Extensions')
+                              .large()
+                              .semiBold()
+                              .foreground(),
+                          const material.SizedBox(height: 6),
+                          const Text('Manage local and marketplace extensions')
+                              .muted()
+                              .small(),
+                        ],
                       ),
-                      const material.SizedBox(width: 16),
-                      PrimaryButton(
-                        onPressed: () => material.Navigator.of(context).pop(),
-                        child: const Text('Close'),
-                      ),
-                    ],
-                  ),
+                    ),
+                    const material.SizedBox(width: 16),
+                    PrimaryButton(
+                      onPressed: () => material.Navigator.of(context).pop(),
+                      child: const Text('Close'),
+                    ),
+                  ],
                 ),
-                material.Padding(
-                  padding: const material.EdgeInsets.symmetric(
-                      horizontal: 24.0, vertical: 8.0),
-                  child: material.Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _buildTabButton(0, 'Installed', count: _installed.length),
-                      _buildTabButton(1, 'Marketplace'),
-                      _buildTabButton(2, 'Updates'),
-                    ],
-                  ),
+              ),
+              material.Padding(
+                padding: const material.EdgeInsets.symmetric(
+                    horizontal: 24.0, vertical: 8.0),
+                child: QueryaTabStrip(
+                  labels: [
+                    'Installed (${_installed.length})',
+                    'Marketplace',
+                    'Updates',
+                  ],
+                  selectedIndex: _tabIndex,
+                  onSelected: (index) => setState(() => _tabIndex = index),
                 ),
-                material.Divider(height: 1, color: theme.border),
-                material.Expanded(
-                  child: material.IndexedStack(
-                    index: _tabIndex,
-                    children: [
-                      _buildInstalledTab(),
-                      _buildMarketplaceTab(),
-                      _buildUpdatesTab(),
-                    ],
-                  ),
+              ),
+              material.Divider(height: 1, color: theme.border),
+              material.Expanded(
+                child: QueryaCrossFadeStack(
+                  index: _tabIndex,
+                  children: [
+                    _buildInstalledTab(),
+                    _buildMarketplaceTab(),
+                    _buildUpdatesTab(),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ),
-      ),
-    );
-  }
-
-  material.Widget _buildTabButton(int index, String label, {int? count}) {
-    final isSelected = _tabIndex == index;
-    final displayLabel = count != null ? '$label ($count)' : label;
-    return SecondaryButton(
-      onPressed: () => setState(() => _tabIndex = index),
-      child: material.Text(
-        displayLabel,
-        style: material.TextStyle(
-          color: isSelected ? Theme.of(context).colorScheme.primary : null,
-          fontWeight:
-              isSelected ? material.FontWeight.w600 : material.FontWeight.w400,
         ),
       ),
     );
@@ -418,10 +394,37 @@ class _ExtensionManagerContentState
   }
 
   material.Widget _buildUpdatesTab() {
-    return const material.Center(
+    if (_loading) {
+      return const material.Center(
+        child: material.CircularProgressIndicator(),
+      );
+    }
+    final theme = Theme.of(context).colorScheme;
+    return material.Center(
       child: material.Padding(
-        padding: material.EdgeInsets.all(32.0),
-        child: Text('All installed extensions are up to date!'),
+        padding: const material.EdgeInsets.all(32.0),
+        child: material.ConstrainedBox(
+          constraints: const material.BoxConstraints(maxWidth: 420),
+          child: material.Column(
+            mainAxisSize: material.MainAxisSize.min,
+            children: [
+              material.Icon(
+                material.Icons.system_update_alt_rounded,
+                size: 36,
+                color: theme.mutedForeground,
+              ),
+              const material.SizedBox(height: 16),
+              const Text('Extension update checks are not available yet')
+                  .semiBold(),
+              const material.SizedBox(height: 8),
+              const Text(
+                'Automatic update scanning ships with the Marketplace API. '
+                'Until then, reinstall from Marketplace or from a local file '
+                'to get a newer build.',
+              ).muted().small(),
+            ],
+          ),
+        ),
       ),
     );
   }

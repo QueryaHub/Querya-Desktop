@@ -117,6 +117,7 @@ class PluginRpcBridge {
     if (enableWatchdog) {
       _watchdog = SandboxWatchdog(
         recovery: _recovery,
+        isBusy: () => client.hasPendingRequests,
         onStopped: (reason) {
           if (reason == SandboxWatchdogStopReason.deadlock) {
             unawaited(_audit?.record(

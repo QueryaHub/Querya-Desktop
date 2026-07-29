@@ -4,11 +4,16 @@ import 'querya_motion.dart';
 import 'querya_motion_context.dart';
 
 /// Unified hover background / border using motion tokens (Responsive chrome).
+///
+/// **Scope:** selection / picker cards (e.g. connection type tiles). Dense
+/// trees and explorer rows keep lighter `InkWell` / `MouseRegion` hover —
+/// do not broaden adoption without an explicit follow-up.
 class QueryaHoverSurface extends StatefulWidget {
   const QueryaHoverSurface({
     super.key,
     required this.child,
     this.borderRadius,
+    this.border,
     this.padding,
     this.hoveredColor,
     this.idleColor = Colors.transparent,
@@ -18,6 +23,7 @@ class QueryaHoverSurface extends StatefulWidget {
 
   final Widget child;
   final BorderRadius? borderRadius;
+  final BoxBorder? border;
   final EdgeInsetsGeometry? padding;
   final Color? hoveredColor;
   final Color idleColor;
@@ -46,6 +52,7 @@ class _QueryaHoverSurfaceState extends State<QueryaHoverSurface> {
       decoration: BoxDecoration(
         color: _hovered ? hovered : widget.idleColor,
         borderRadius: widget.borderRadius,
+        border: widget.border,
       ),
       child: widget.child,
     );

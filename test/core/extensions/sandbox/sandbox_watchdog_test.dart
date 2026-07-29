@@ -254,6 +254,34 @@ void main() {
       await client.close();
       await handle.dispose();
     });
+
+    test('skips ping tick when isBusy returns true', () async {
+      final process = _FakeProcess();
+      final handle = await _handle(process, tempBase);
+      var pings = 0;
+      var busy = true;
+
+      final watchdog = SandboxWatchdog(
+        pingInterval: const Duration(milliseconds: 15),
+        pongTimeout: const Duration(seconds: 1),
+        isBusy: () => busy,
+        ping: () async {
+          pings++;
+          return 'pong';
+        },
+      );
+
+      watchdog.start(handle);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(pings, 0, reason: 'Pings should be skipped while busy');
+
+      busy = false;
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(pings, greaterThan(0), reason: 'Pings should resume when idle');
+
+      watchdog.stop();
+      await handle.dispose();
+    });
   });
 
   group('SandboxWatchdog.isPong', () {

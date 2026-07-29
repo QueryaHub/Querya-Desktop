@@ -156,7 +156,7 @@ class _RedisViewState extends material.State<RedisView> {
       final info = parseRedisInfo(raw);
       if (!mounted) return;
       if (!replaceIfChanged(_info, info, (v) => _info = v)) return;
-      setState(() {});
+      setState(() => _info = info);
     } catch (_) {}
   }
 
@@ -680,11 +680,10 @@ class _RedisViewState extends material.State<RedisView> {
       {List<String>? keys}) {
     if (data == null || data.isEmpty) return const material.SizedBox.shrink();
     final entries = keys != null
-        ? keys
-            .map((k) => MapEntry(k, data[k]))
-            .where((e) => e.value != null)
-            .map((e) => MapEntry(e.key, e.value as String))
-            .toList()
+        ? <MapEntry<String, String>>[
+            for (final k in keys)
+              if (data[k] != null) MapEntry(k, data[k]!),
+          ]
         : data.entries.toList();
     if (entries.isEmpty) return const material.SizedBox.shrink();
     return _card(
@@ -692,7 +691,7 @@ class _RedisViewState extends material.State<RedisView> {
       title,
       _twoColumnMetrics(
         context,
-        entries.map((e) => MapEntry(_labelFor(e.key), e.value)).toList(),
+        [ for (final e in entries) MapEntry(_labelFor(e.key), e.value) ],
       ),
     );
   }

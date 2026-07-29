@@ -10,6 +10,7 @@ import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/sdui/sdui_form_builder.dart';
 import 'package:querya_desktop/core/sdui/sdui_form_schema.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/connections/connection_edit_secrets.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Shows an SDUI connection form for an installed extension driver.
@@ -18,6 +19,7 @@ Future<ConnectionRow?> showExtensionConnectionForm(
   required ExtensionManifest manifest,
   required DriverContribution driver,
   int? folderId,
+  ConnectionRow? initial,
 }) {
   return showAppDialog<ConnectionRow>(
     context: context,
@@ -28,6 +30,7 @@ Future<ConnectionRow?> showExtensionConnectionForm(
         manifest: manifest,
         driver: driver,
         folderId: folderId,
+        initial: initial,
       ),
     ),
   );
@@ -38,11 +41,13 @@ class _ExtensionConnectionFormContent extends material.StatefulWidget {
     required this.manifest,
     required this.driver,
     this.folderId,
+    this.initial,
   });
 
   final ExtensionManifest manifest;
   final DriverContribution driver;
   final int? folderId;
+  final ConnectionRow? initial;
 
   @override
   material.State<_ExtensionConnectionFormContent> createState() =>
@@ -59,11 +64,21 @@ class _ExtensionConnectionFormContentState
   var _testing = false;
   String? _testMessage;
   bool _testSucceeded = false;
+  late final Map<String, Object?> _initialValues;
+
+  bool get _isEditing => widget.initial != null;
 
   @override
   void initState() {
     super.initState();
-    _nameController.text = widget.driver.displayName;
+    final initial = widget.initial;
+    if (initial != null) {
+      _nameController.text = initial.name;
+      _initialValues = _sduiInitialValuesFromConnection(initial);
+    } else {
+      _nameController.text = widget.driver.displayName;
+      _initialValues = const {};
+    }
     _loadSchema();
   }
 
@@ -111,6 +126,7 @@ class _ExtensionConnectionFormContentState
       name: name,
       values: values,
       folderId: widget.folderId,
+      initial: widget.initial,
     );
     material.Navigator.of(context).pop(row);
   }
@@ -139,12 +155,16 @@ class _ExtensionConnectionFormContentState
     });
 
     try {
-      final row = connectionRowFromExtensionForm(
+      var row = connectionRowFromExtensionForm(
         manifest: widget.manifest,
         driver: widget.driver,
         name: 'connection-test',
         values: values,
+        initial: widget.initial,
       );
+      if (widget.initial?.id != null) {
+        row = await mergeSecretsForConnectionUpdate(row);
+      }
       final version = await ExtensionDriverSession.instance.testConnection(
         manifest: widget.manifest,
         row: row,
@@ -169,31 +189,27 @@ class _ExtensionConnectionFormContentState
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context).colorScheme;
-    final radius = Theme.of(context).radiusXxl;
-    return material.Container(
+    final theme = context.colors;
+    final title = _isEditing
+        ? 'Edit ${widget.driver.displayName}'
+        : widget.driver.displayName;
+    return QueryaDialogCard(
       constraints: WindowLayout.dialogConstraints(
         context,
         maxWidth: WindowLayout.connectionFormMaxWidth,
         minWidth: 440,
       ),
-      decoration: material.BoxDecoration(
-        color: theme.popover,
-        borderRadius: material.BorderRadius.circular(radius),
-        border: material.Border.all(color: theme.muted),
-      ),
-      child: material.ClipRRect(
-        borderRadius: material.BorderRadius.circular(radius),
-        child: material.Column(
-          mainAxisSize: material.MainAxisSize.min,
-          crossAxisAlignment: material.CrossAxisAlignment.stretch,
-          children: [
+      borderColor: theme.muted,
+      child: material.Column(
+        mainAxisSize: material.MainAxisSize.min,
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
             material.Padding(
               padding: const material.EdgeInsets.fromLTRB(24, 24, 24, 8),
               child: material.Column(
                 crossAxisAlignment: material.CrossAxisAlignment.start,
                 children: [
-                  Text(widget.driver.displayName).large().semiBold(),
+                  Text(title).large().semiBold(),
                   const material.SizedBox(height: 6),
                   Text(
                     'Extension driver · ${widget.manifest.id}',
@@ -224,7 +240,12 @@ class _ExtensionConnectionFormContentState
                     else if (_loadError != null)
                       Text(_loadError!).muted().small()
                     else if (_schema != null)
-                      SduiFormBuilder(key: _formKey, schema: _schema!),
+                      SduiFormBuilder(
+                        key: _formKey,
+                        schema: _schema!,
+                        initialValues: _initialValues,
+                        keepExistingSecrets: _isEditing,
+                      ),
                     if (_testMessage != null) ...[
                       const material.SizedBox(height: 12),
                       material.SelectableText(
@@ -287,9 +308,56 @@ class _ExtensionConnectionFormContentState
             ),
           ],
         ),
-      ),
     );
   }
+}
+
+/// Non-secret SDUI seed values from an existing [ConnectionRow] (no passwords).
+Map<String, Object?> _sduiInitialValuesFromConnection(ConnectionRow row) {
+  final values = <String, Object?>{};
+
+  final optionsRaw = row.driverOptions;
+  if (optionsRaw != null && optionsRaw.trim().isNotEmpty) {
+    try {
+      final decoded = jsonDecode(optionsRaw);
+      if (decoded is Map) {
+        for (final entry in decoded.entries) {
+          final key = entry.key.toString();
+          if (_isPasswordKey(key)) continue;
+          values[key] = entry.value;
+        }
+      }
+    } catch (_) {
+      // Ignore malformed driverOptions; host fields still apply.
+    }
+  }
+
+  final host = row.host;
+  if (host != null && host.isNotEmpty) values['host'] = host;
+  if (row.port != null) values['port'] = row.port;
+  final username = row.username;
+  if (username != null && username.isNotEmpty) values['username'] = username;
+  final database = row.databaseName;
+  if (database != null && database.isNotEmpty) {
+    values['database'] = database;
+    values['databaseName'] = database;
+  }
+  values['useSSL'] = row.useSSL;
+  values['ssl'] = row.useSSL;
+  if (row.useSSL) {
+    values.putIfAbsent('sslMode', () => 'require');
+  }
+
+  values.removeWhere((key, _) => _isPasswordKey(key));
+  return values;
+}
+
+bool _isPasswordKey(String key) {
+  final lower = key.toLowerCase();
+  return lower == 'password' ||
+      lower.endsWith('password') ||
+      lower.contains('secret') ||
+      lower.contains('passwd');
 }
 
 /// Loads SDUI form schema from the extension package (file path preferred).
@@ -321,6 +389,7 @@ ConnectionRow connectionRowFromExtensionForm({
   required String name,
   required Map<String, Object?> values,
   int? folderId,
+  ConnectionRow? initial,
 }) {
   final known = {
     'host',
@@ -358,7 +427,8 @@ ConnectionRow connectionRowFromExtensionForm({
   }
 
   return ConnectionRow(
-    type: driver.driverId,
+    id: initial?.id,
+    type: initial?.type ?? driver.driverId,
     name: name,
     host: (host == null || host.isEmpty) ? null : host,
     port: port,
@@ -366,9 +436,10 @@ ConnectionRow connectionRowFromExtensionForm({
     password: (password == null || password.isEmpty) ? null : password,
     databaseName: database,
     useSSL: useSsl,
-    extensionId: manifest.id,
+    extensionId: initial?.extensionId ?? manifest.id,
     driverOptions: options.isEmpty ? null : jsonEncode(options),
-    folderId: folderId,
-    createdAt: DateTime.now().toUtc().toIso8601String(),
+    folderId: initial?.folderId ?? folderId,
+    sortOrder: initial?.sortOrder ?? 0,
+    createdAt: initial?.createdAt ?? DateTime.now().toUtc().toIso8601String(),
   );
 }

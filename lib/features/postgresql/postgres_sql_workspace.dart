@@ -13,7 +13,6 @@ import 'package:querya_desktop/core/database/result_row_string_convert.dart';
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_utils.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
@@ -358,8 +357,8 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         n++;
       }
 
-      // Yielding convert avoids isolate double-copy of the matrix (#421).
-      final outRows = await convertResultRowsToStringsYielding(rawRows);
+      // Adaptive convert offloads to background compute for large row sets (#522).
+      final outRows = await convertResultRowsToStringsAdaptive(rawRows);
 
       setState(() {
         _columns = cols;

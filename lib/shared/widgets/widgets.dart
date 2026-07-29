@@ -11,6 +11,7 @@ library;
 export 'app_dialog.dart';
 export 'app_toast.dart';
 export 'export_menu_button.dart';
+export 'querya_dialog_card.dart';
 export 'querya_tab_strip.dart';
 export 'querya_dropdown.dart'
     show
@@ -18,4 +19,7 @@ export 'querya_dropdown.dart'
         QueryaDropdownItem,
         QueryaDropdownTokens,
         kPreferencesLabelWidth;
+export 'tree_load_error.dart';
+export 'package:querya_desktop/core/theme/querya_theme_scope.dart'
+    show QueryaThemeContext;
 export 'package:shadcn_flutter/shadcn_flutter.dart';

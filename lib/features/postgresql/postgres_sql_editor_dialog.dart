@@ -101,102 +101,93 @@ class _PostgresSqlEditorDialogState
   @override
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context).colorScheme;
-    final radius = Theme.of(context).radiusXxl;
     return material.Dialog(
       backgroundColor: material.Colors.transparent,
       insetPadding: WindowLayout.dialogSymmetricInsets(context),
-      child: material.Container(
+      child: QueryaDialogCard(
         constraints: WindowLayout.dialogConstraints(
           context,
           maxWidth: 720,
           minWidth: 480,
           maxHeight: 520,
         ),
-        decoration: material.BoxDecoration(
-          color: theme.popover,
-          borderRadius: material.BorderRadius.circular(radius),
-          border: material.Border.all(color: theme.muted),
-        ),
-        child: material.ClipRRect(
-          borderRadius: material.BorderRadius.circular(radius),
-          child: material.Column(
-            mainAxisSize: material.MainAxisSize.min,
-            crossAxisAlignment: material.CrossAxisAlignment.stretch,
-            children: [
-              material.Padding(
-                padding: const material.EdgeInsets.fromLTRB(24, 20, 24, 8),
-                child: material.Column(
-                  crossAxisAlignment: material.CrossAxisAlignment.start,
-                  children: [
-                    const Text('SQL query').large().semiBold(),
-                    const material.SizedBox(height: 6),
-                    const Text(
-                      'Table browse uses SELECT with LIMIT/OFFSET. '
-                      'Edit it or write your own SELECT. Reset restores the table browse query. '
-                      'Run reloads the grid from the database; if rows are unchanged, the view will look the same.',
-                    ).muted().xSmall(),
-                  ],
-                ),
+        borderColor: theme.muted,
+        child: material.Column(
+          mainAxisSize: material.MainAxisSize.min,
+          crossAxisAlignment: material.CrossAxisAlignment.stretch,
+          children: [
+            material.Padding(
+              padding: const material.EdgeInsets.fromLTRB(24, 20, 24, 8),
+              child: material.Column(
+                crossAxisAlignment: material.CrossAxisAlignment.start,
+                children: [
+                  const Text('SQL query').large().semiBold(),
+                  const material.SizedBox(height: 6),
+                  const Text(
+                    'Table browse uses SELECT with LIMIT/OFFSET. '
+                    'Edit it or write your own SELECT. Reset restores the table browse query. '
+                    'Run reloads the grid from the database; if rows are unchanged, the view will look the same.',
+                  ).muted().xSmall(),
+                ],
               ),
-              material.Padding(
-                padding: const material.EdgeInsets.symmetric(horizontal: 24),
-                child: material.SizedBox(
-                  height: 280,
-                  child: material.Container(
-                    decoration:
-                        SqlEditorChrome.inlineFieldDecorationFromContext(
-                      context,
-                    ),
-                    child: QueryaCodeEditor(
-                      controller: _controller,
-                      language: QueryaCodeLanguage.sql,
-                      fontSize: 12,
-                      variant: QueryaCodeEditorVariant.material,
-                      textAlignVertical: material.TextAlignVertical.top,
-                      hintText: 'SELECT …',
-                      contentPadding: const material.EdgeInsets.all(12),
-                    ),
+            ),
+            material.Padding(
+              padding: const material.EdgeInsets.symmetric(horizontal: 24),
+              child: material.SizedBox(
+                height: 280,
+                child: material.Container(
+                  decoration: SqlEditorChrome.inlineFieldDecorationFromContext(
+                    context,
+                  ),
+                  child: QueryaCodeEditor(
+                    controller: _controller,
+                    language: QueryaCodeLanguage.sql,
+                    fontSize: 12,
+                    variant: QueryaCodeEditorVariant.material,
+                    textAlignVertical: material.TextAlignVertical.top,
+                    hintText: 'SELECT …',
+                    contentPadding: const material.EdgeInsets.all(12),
                   ),
                 ),
               ),
-              if (_error != null)
-                material.Padding(
-                  padding: const material.EdgeInsets.fromLTRB(24, 8, 24, 0),
-                  child: material.Text(
-                    _error!,
-                    style: material.TextStyle(
-                        color: theme.destructive, fontSize: 12),
-                  ),
-                ),
+            ),
+            if (_error != null)
               material.Padding(
-                padding: const material.EdgeInsets.all(20),
-                child: material.Row(
-                  mainAxisAlignment: material.MainAxisAlignment.end,
-                  children: [
-                    OutlineButton(
-                      onPressed: () => material.Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
-                    ),
-                    const Gap(8),
-                    OutlineButton(
-                      onPressed: () {
-                        setState(() {
-                          _error = null;
-                          _controller.text = widget.browseSql;
-                        });
-                      },
-                      child: const Text('Reset'),
-                    ),
-                    const Gap(8),
-                    PrimaryButton(
-                      onPressed: _submit,
-                      child: const Text('Run'),
-                    ),
-                  ],
+                padding: const material.EdgeInsets.fromLTRB(24, 8, 24, 0),
+                child: material.Text(
+                  _error!,
+                  style: material.TextStyle(
+                      color: theme.destructive, fontSize: 12),
                 ),
               ),
-            ],
-          ),
+            material.Padding(
+              padding: const material.EdgeInsets.all(20),
+              child: material.Row(
+                mainAxisAlignment: material.MainAxisAlignment.end,
+                children: [
+                  OutlineButton(
+                    onPressed: () => material.Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  const Gap(8),
+                  OutlineButton(
+                    onPressed: () {
+                      setState(() {
+                        _error = null;
+                        _controller.text = widget.browseSql;
+                      });
+                    },
+                    child: const Text('Reset'),
+                  ),
+                  const Gap(8),
+                  PrimaryButton(
+                    onPressed: _submit,
+                    child: const Text('Run'),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

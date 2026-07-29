@@ -126,7 +126,7 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
       final stats = await conn.serverStats();
       if (!mounted) return;
       if (!replaceIfChanged(_stats, stats, (v) => _stats = v)) return;
-      setState(() {});
+      setState(() => _stats = stats);
     } catch (_) {}
   }
 
@@ -147,7 +147,7 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
     );
 
     final cs = Theme.of(context).colorScheme;
-    final width = material.MediaQuery.sizeOf(context).width;
+    final width = MediaQuery.sizeOf(context).width;
 
     if (_loading) {
       return material.Center(
@@ -254,6 +254,8 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
             height: 28,
             child: material.Image.asset(
               'assets/images/mysql_icon.png',
+              cacheWidth: (28 * MediaQuery.devicePixelRatioOf(context)).toInt(),
+              cacheHeight: (28 * MediaQuery.devicePixelRatioOf(context)).toInt(),
               fit: material.BoxFit.contain,
               errorBuilder: (_, __, ___) => material.Icon(
                 material.Icons.storage_rounded,

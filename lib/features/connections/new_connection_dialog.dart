@@ -1,11 +1,11 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/ui/querya_icons.dart';
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
-import 'package:querya_desktop/core/motion/querya_motion.dart';
-import 'package:querya_desktop/core/motion/querya_motion_context.dart';
+import 'package:querya_desktop/core/motion/querya_hover_surface.dart';
 import 'package:querya_desktop/features/connections/connection_type_choice.dart';
 import 'package:querya_desktop/features/connections/driver_icon.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -27,22 +27,10 @@ extension ConnectionTypeX on ConnectionType {
         ConnectionType.mongodb => 'MongoDB',
         ConnectionType.sqlite => 'SQLite',
       };
-  material.IconData get icon => switch (this) {
-        ConnectionType.postgresql => material.Icons.storage_rounded,
-        ConnectionType.mysql => material.Icons.table_chart_rounded,
-        ConnectionType.redis => material.Icons.memory_rounded,
-        ConnectionType.mongodb => material.Icons.eco_rounded,
-        ConnectionType.sqlite => material.Icons.folder_open_rounded,
-      };
+  material.IconData get icon => QueryaIcons.connectionIcon(name);
 
   /// Asset path for custom icon (from Downloads).
-  String? get iconAsset => switch (this) {
-        ConnectionType.postgresql => 'assets/images/postgresql_icon.png',
-        ConnectionType.mysql => 'assets/images/mysql_icon.png',
-        ConnectionType.redis => 'assets/images/redis_icon.png',
-        ConnectionType.mongodb => 'assets/images/mongodb_icon.png',
-        ConnectionType.sqlite => null,
-      };
+  String? get iconAsset => QueryaIcons.connectionAsset(name);
   bool get isSql =>
       this == ConnectionType.postgresql ||
       this == ConnectionType.mysql ||
@@ -116,27 +104,21 @@ class _NewConnectionDialogContentState
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context).colorScheme;
-    final radius = Theme.of(context).radiusXxl;
+    final theme = context.colors;
     final dialogMaxW = WindowLayout.newConnectionDialogMaxWidth(context);
     final dialogH = WindowLayout.newConnectionDialogHeight(context);
     final headerPadH = dialogMaxW < 420 ? 16.0 : 24.0;
     final stackFilters = dialogMaxW < 520;
 
-    return material.Container(
+    return material.SizedBox(
       width: dialogMaxW,
-      constraints: material.BoxConstraints(
-        maxWidth: dialogMaxW,
-        maxHeight: dialogH,
-        minHeight: math.min(320.0, dialogH),
-      ),
-      decoration: material.BoxDecoration(
-        color: theme.popover,
-        borderRadius: material.BorderRadius.circular(radius),
-        border: material.Border.all(color: theme.muted),
-      ),
-      child: material.ClipRRect(
-        borderRadius: material.BorderRadius.circular(radius),
+      child: QueryaDialogCard(
+        constraints: material.BoxConstraints(
+          maxWidth: dialogMaxW,
+          maxHeight: dialogH,
+          minHeight: math.min(320.0, dialogH),
+        ),
+        borderColor: theme.muted,
         child: material.SizedBox(
           height: dialogH,
           child: material.Column(
@@ -396,7 +378,7 @@ class _FilterDropdowns extends StatelessWidget {
   }
 }
 
-class _DbTypeCard extends material.StatefulWidget {
+class _DbTypeCard extends material.StatelessWidget {
   const _DbTypeCard({
     required this.choice,
     required this.theme,
@@ -410,88 +392,68 @@ class _DbTypeCard extends material.StatefulWidget {
   final VoidCallback onTap;
 
   @override
-  material.State<_DbTypeCard> createState() => _DbTypeCardState();
-}
-
-class _DbTypeCardState extends material.State<_DbTypeCard> {
-  bool _hovered = false;
-
-  @override
   material.Widget build(material.BuildContext context) {
-    final t = widget.theme;
-    final highlighted = widget.selected || _hovered;
-    return material.MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: material.SystemMouseCursors.click,
-      child: material.GestureDetector(
-        onTap: widget.onTap,
-        child: material.AnimatedContainer(
-          duration: context.motionDuration(QueryaMotion.fast),
-          curve: context.motionCurve(QueryaMotion.enter),
-          padding:
-              const material.EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-          decoration: material.BoxDecoration(
-            color: highlighted
-                ? t.muted.withValues(alpha: 0.4)
-                : t.muted.withValues(alpha: 0.12),
-            borderRadius: material.BorderRadius.circular(10),
-            border: material.Border.all(
-              color: widget.selected
-                  ? t.primary.withValues(alpha: 0.6)
-                  : t.border.withValues(alpha: 0.35),
-              width: widget.selected ? 1.5 : 1,
+    final t = theme;
+    final highlight = t.muted.withValues(alpha: 0.4);
+    return QueryaHoverSurface(
+      borderRadius: material.BorderRadius.circular(10),
+      padding: const material.EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      idleColor: selected ? highlight : t.muted.withValues(alpha: 0.12),
+      hoveredColor: highlight,
+      border: material.Border.all(
+        color: selected
+            ? t.primary.withValues(alpha: 0.6)
+            : t.border.withValues(alpha: 0.35),
+        width: selected ? 1.5 : 1,
+      ),
+      onTap: onTap,
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
+          material.Expanded(
+            child: material.Center(
+              child: material.SizedBox(
+                width: 52,
+                height: 52,
+                child: DriverIcon(
+                  filePath: choice.iconFile,
+                  assetPath: choice.iconAsset,
+                  size: 52,
+                  fallbackIcon: choice.icon,
+                ),
+              ),
             ),
           ),
-          child: material.Column(
-            crossAxisAlignment: material.CrossAxisAlignment.stretch,
-            children: [
-              material.Expanded(
-                child: material.Center(
-                  child: material.SizedBox(
-                    width: 52,
-                    height: 52,
-                    child: DriverIcon(
-                      filePath: widget.choice.iconFile,
-                      assetPath: widget.choice.iconAsset,
-                      size: 52,
-                      fallbackIcon: widget.choice.icon,
+          const material.SizedBox(height: 6),
+          material.LayoutBuilder(
+            builder: (context, lc) {
+              return material.SizedBox(
+                height: 38,
+                child: material.FittedBox(
+                  fit: material.BoxFit.scaleDown,
+                  alignment: material.Alignment.center,
+                  child: material.ConstrainedBox(
+                    constraints: material.BoxConstraints(
+                      maxWidth: math.max(48.0, lc.maxWidth),
+                    ),
+                    child: material.Text(
+                      choice.label,
+                      textAlign: material.TextAlign.center,
+                      maxLines: 2,
+                      overflow: material.TextOverflow.ellipsis,
+                      style: material.TextStyle(
+                        fontSize: 13,
+                        fontWeight: material.FontWeight.w600,
+                        height: 1.2,
+                        color: t.foreground,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const material.SizedBox(height: 6),
-              material.LayoutBuilder(
-                builder: (context, lc) {
-                  return material.SizedBox(
-                    height: 38,
-                    child: material.FittedBox(
-                      fit: material.BoxFit.scaleDown,
-                      alignment: material.Alignment.center,
-                      child: material.ConstrainedBox(
-                        constraints: material.BoxConstraints(
-                          maxWidth: math.max(48.0, lc.maxWidth),
-                        ),
-                        child: material.Text(
-                          widget.choice.label,
-                          textAlign: material.TextAlign.center,
-                          maxLines: 2,
-                          overflow: material.TextOverflow.ellipsis,
-                          style: material.TextStyle(
-                            fontSize: 13,
-                            fontWeight: material.FontWeight.w600,
-                            height: 1.2,
-                            color: t.foreground,
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
+              );
+            },
           ),
-        ),
+        ],
       ),
     );
   }

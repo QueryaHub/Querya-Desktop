@@ -1,19 +1,38 @@
 # Arch Linux (AUR)
 
-Community packaging for Arch-based distros. The PKGBUILD installs the official
-**portable Linux zip** from GitHub Releases under `/opt/querya-desktop`.
+Official **`querya-desktop`** package on AUR. Installs the Release portable Linux zip
+under `/opt/querya-desktop`.
 
-## Before publishing to AUR
+## Install
 
-1. Copy `PKGBUILD`, `querya_desktop.desktop`, and `querya_desktop.png` into a clean build directory.
-2. Bump `pkgver` / `pkgrel` to match the GitHub Release tag and AUR revision.
-3. Run `makepkg -si` locally and smoke-launch `querya_desktop`.
-4. Generate `.SRCINFO`: `makepkg --printsrcinfo > .SRCINFO`
-5. Push to your AUR repo (e.g. `querya-desktop`).
+```bash
+yay -S querya-desktop
+# or: paru -S querya-desktop
+```
 
-`querya_desktop.desktop` and the 512×512 icon are the same assets used by
-`.deb` / `.rpm` packaging (`packaging/linux/querya_desktop.desktop` and
-`macos/Runner/Assets.xcassets/.../app_icon_512.png`).
+## CI publish
+
+| Trigger | Workflow |
+|---------|----------|
+| After GitHub Release | [Release](../../.github/workflows/release.yml) → job `publish-aur` |
+| Manual hotfix | [Publish AUR](../../.github/workflows/aur-publish.yml) |
+
+Requires repository secret **`AUR_SSH_PRIVATE_KEY`**. Without it, Release skips AUR
+(no failed job). First `git push` creates the AUR repo automatically.
+
+`pkgver` in the template PKGBUILD is synced on merge to `main` by
+[version-bump.yml](../../.github/workflows/version-bump.yml); CI fills real
+`sha256sums` and `.SRCINFO` at publish time via
+[scripts/linux/aur_publish.sh](../../scripts/linux/aur_publish.sh).
+
+## Local smoke test
+
+```bash
+cp packaging/linux/aur/{PKGBUILD,querya_desktop.desktop,querya_desktop.png} /tmp/querya-aur/
+cd /tmp/querya-aur
+makepkg -si
+querya_desktop
+```
 
 ## Updates
 

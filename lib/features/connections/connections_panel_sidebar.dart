@@ -6,7 +6,7 @@ material.Widget _sidebarConnectionShell({
   required material.VoidCallback? onTap,
   required material.Widget child,
 }) {
-  final p = Theme.of(context).colorScheme.primary;
+  final p = context.colors.primary;
   return material.Material(
     color: material.Colors.transparent,
     child: material.InkWell(
@@ -75,6 +75,7 @@ class _ConnectionTile extends StatelessWidget {
     required this.icon,
     this.iconAsset,
     required this.onRemove,
+    required this.onEdit,
     this.onTap,
   });
 
@@ -83,6 +84,7 @@ class _ConnectionTile extends StatelessWidget {
   final material.IconData icon;
   final String? iconAsset;
   final VoidCallback onRemove;
+  final VoidCallback onEdit;
   final VoidCallback? onTap;
 
   @override
@@ -91,18 +93,30 @@ class _ConnectionTile extends StatelessWidget {
     final iconWidget = iconAsset != null
         ? material.Image.asset(
             iconAsset!,
-            width: 16,
-            height: 16,
+            width: QueryaIconSizes.sidebarConnectionIcon,
+            height: QueryaIconSizes.sidebarConnectionIcon,
+            cacheWidth: (QueryaIconSizes.sidebarConnectionIcon * MediaQuery.devicePixelRatioOf(context)).toInt(),
+            cacheHeight: (QueryaIconSizes.sidebarConnectionIcon * MediaQuery.devicePixelRatioOf(context)).toInt(),
             fit: material.BoxFit.contain,
             errorBuilder: (_, __, ___) => material.Icon(
               icon,
-              size: 16,
+              size: QueryaIconSizes.sidebarConnectionIcon,
               color: theme.colorScheme.primary,
             ),
           )
-        : material.Icon(icon, size: 16, color: theme.colorScheme.primary);
+        : material.Icon(
+            icon,
+            size: QueryaIconSizes.sidebarConnectionIcon,
+            color: theme.colorScheme.primary,
+          );
     return ContextMenu(
       items: [
+        MenuButton(
+          leading: material.Icon(material.Icons.edit_outlined,
+              size: 18, color: theme.colorScheme.mutedForeground),
+          onPressed: (_) => onEdit(),
+          child: const Text('Edit connection…'),
+        ),
         MenuButton(
           leading: material.Icon(material.Icons.delete_outline_rounded,
               size: 18, color: theme.colorScheme.mutedForeground),
@@ -243,40 +257,47 @@ class _FolderTileState extends State<_FolderTile> {
           children: [
             material.MouseRegion(
               cursor: material.SystemMouseCursors.click,
-              child: material.InkWell(
-                onTap: _toggle,
-                borderRadius: material.BorderRadius.circular(6),
-                child: material.Padding(
-                  padding: const material.EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 6),
-                  child: material.Row(
-                    children: [
-                      material.AnimatedRotation(
-                        turns: _expanded ? 0.25 : 0,
-                        duration: context.motionDuration(QueryaMotion.fast),
-                        curve: context.motionCurve(QueryaMotion.standardCurve),
-                        child: material.Icon(
-                          material.Icons.chevron_right_rounded,
-                          size: 18,
-                          color: theme.colorScheme.mutedForeground,
-                        ),
-                      ),
-                      const Gap(2),
-                      material.Icon(material.Icons.folder_rounded,
-                          size: 18, color: theme.colorScheme.primary),
-                      const Gap(8),
-                      material.Expanded(
-                        child: material.Text(
-                          widget.name,
-                          overflow: material.TextOverflow.ellipsis,
-                          maxLines: 1,
-                          style: material.TextStyle(
-                            fontSize: 13,
-                            color: theme.colorScheme.foreground,
+              child: material.Semantics(
+                button: true,
+                expanded: _expanded,
+                child: material.InkWell(
+                  onTap: _toggle,
+                  borderRadius: material.BorderRadius.circular(6),
+                  child: material.Padding(
+                    padding: const material.EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 6),
+                    child: material.Row(
+                      children: [
+                        material.AnimatedRotation(
+                          turns: _expanded ? 0.25 : 0,
+                          duration:
+                              context.motionDuration(QueryaMotion.treeExpand),
+                          curve:
+                              context.motionCurve(QueryaMotion.treeExpandCurve),
+                          child: material.Icon(
+                            QueryaIcons.expandClosed,
+                            size: QueryaIconSizes.sidebarExpand,
+                            color: theme.colorScheme.mutedForeground,
                           ),
                         ),
-                      ),
-                    ],
+                        const Gap(2),
+                        material.Icon(QueryaIcons.folder,
+                            size: QueryaIconSizes.sidebarConnectionIcon,
+                            color: theme.colorScheme.primary),
+                        const Gap(8),
+                        material.Expanded(
+                          child: material.Text(
+                            widget.name,
+                            overflow: material.TextOverflow.ellipsis,
+                            maxLines: 1,
+                            style: material.TextStyle(
+                              fontSize: 13,
+                              color: theme.colorScheme.foreground,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -296,10 +317,11 @@ class _FolderTileState extends State<_FolderTile> {
                             key: material.ValueKey('folder-conn-${conn.id}'),
                             connection: conn,
                             icon: widget.iconForType(conn.type),
-                            iconAsset: ConnectionsPanelState._iconAssetForType(
+                            iconAsset: QueryaIcons.connectionAsset(
                               conn.type,
                             ),
                             onRemove: () => widget.onRemoveConnection(conn.id!),
+                            onEdit: () {},
                             onTap: () => widget.onConnectionTap?.call(conn),
                           );
                   },

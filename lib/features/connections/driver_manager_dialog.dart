@@ -74,86 +74,78 @@ class _DriverManagerDialogContent extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context).colorScheme;
-    final radius = Theme.of(context).radiusXxl;
+    final theme = context.colors;
     final drivers = _buildDriverList();
-    return material.Container(
+    return QueryaDialogCard(
       constraints: WindowLayout.dialogConstraints(
         context,
         maxWidth: 520,
         minWidth: 400,
       ),
-      decoration: material.BoxDecoration(
-        color: theme.popover,
-        borderRadius: material.BorderRadius.circular(radius),
-        border: material.Border.all(color: theme.muted),
-      ),
-      child: material.ClipRRect(
-        borderRadius: material.BorderRadius.circular(radius),
-        child: material.Column(
-          mainAxisSize: material.MainAxisSize.min,
-          crossAxisAlignment: material.CrossAxisAlignment.stretch,
-          children: [
-            material.Padding(
-              padding: const material.EdgeInsets.fromLTRB(24, 24, 24, 8),
-              child: material.Column(
-                crossAxisAlignment: material.CrossAxisAlignment.start,
-                children: [
-                  const Text('Driver Manager').large().semiBold(),
-                  const material.SizedBox(height: 6),
-                  const Text(
-                    'Built-in Dart drivers and installed sandboxed extension drivers. '
-                    'Add a server under Connection → New Database Connection.',
-                  ).muted().small(),
-                ],
-              ),
+      borderColor: theme.muted,
+      child: material.Column(
+        mainAxisSize: material.MainAxisSize.min,
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
+          material.Padding(
+            padding: const material.EdgeInsets.fromLTRB(24, 24, 24, 8),
+            child: material.Column(
+              crossAxisAlignment: material.CrossAxisAlignment.start,
+              children: [
+                const Text('Driver Manager').large().semiBold(),
+                const material.SizedBox(height: 6),
+                const Text(
+                  'Built-in Dart drivers and installed sandboxed extension drivers. '
+                  'Add a server under Connection → New Database Connection.',
+                ).muted().small(),
+              ],
             ),
-            material.Padding(
-              padding: const material.EdgeInsets.symmetric(
-                  horizontal: 24, vertical: 12),
-              child: material.Container(
-                decoration: material.BoxDecoration(
-                  color: theme.muted.withValues(alpha: 0.15),
-                  borderRadius: material.BorderRadius.circular(10),
-                  border: material.Border.all(
-                      color: theme.border.withValues(alpha: 0.3)),
-                ),
-                child: material.ListView.separated(
-                  shrinkWrap: true,
-                  padding: const material.EdgeInsets.symmetric(vertical: 8),
-                  itemCount: drivers.length,
-                  separatorBuilder: (_, __) => material.Divider(
-                    height: 1,
-                    color: theme.border.withValues(alpha: 0.3),
-                  ),
-                  itemBuilder: (context, index) {
-                    final info = drivers[index];
-                    return _DriverRow(info: info, theme: theme);
-                  },
-                ),
-              ),
-            ),
-            material.Container(
-              padding: const material.EdgeInsets.symmetric(
-                  horizontal: 24, vertical: 16),
+          ),
+          material.Padding(
+            padding: const material.EdgeInsets.symmetric(
+                horizontal: 24, vertical: 12),
+            child: material.Container(
               decoration: material.BoxDecoration(
-                border: material.Border(
-                  top: material.BorderSide(
-                      color: theme.border.withValues(alpha: 0.3)),
-                ),
+                color: theme.muted.withValues(alpha: 0.15),
+                borderRadius: material.BorderRadius.circular(10),
+                border: material.Border.all(
+                    color: theme.border.withValues(alpha: 0.3)),
               ),
-              child: material.Row(
-                mainAxisAlignment: material.MainAxisAlignment.end,
-                children: [
-                  PrimaryButton(
-                    onPressed: () => material.Navigator.of(context).pop(),
-                    child: const Text('Close'),
-                  ),
-                ],
+              child: material.ListView.separated(
+                shrinkWrap: true,
+                padding: const material.EdgeInsets.symmetric(vertical: 8),
+                itemCount: drivers.length,
+                separatorBuilder: (_, __) => material.Divider(
+                  height: 1,
+                  color: theme.border.withValues(alpha: 0.3),
+                ),
+                itemBuilder: (context, index) {
+                  final info = drivers[index];
+                  return _DriverRow(info: info, theme: theme);
+                },
               ),
             ),
-          ],
-        ),
+          ),
+          material.Container(
+            padding: const material.EdgeInsets.symmetric(
+                horizontal: 24, vertical: 16),
+            decoration: material.BoxDecoration(
+              border: material.Border(
+                top: material.BorderSide(
+                    color: theme.border.withValues(alpha: 0.3)),
+              ),
+            ),
+            child: material.Row(
+              mainAxisAlignment: material.MainAxisAlignment.end,
+              children: [
+                PrimaryButton(
+                  onPressed: () => material.Navigator.of(context).pop(),
+                  child: const Text('Close'),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

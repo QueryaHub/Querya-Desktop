@@ -9,6 +9,7 @@ class _RedisConnectionTile extends StatefulWidget {
     required this.icon,
     this.iconAsset,
     required this.onRemove,
+    required this.onEdit,
     this.onTap,
     this.onDatabaseTap,
     this.isExpanded = false,
@@ -20,6 +21,7 @@ class _RedisConnectionTile extends StatefulWidget {
   final material.IconData icon;
   final String? iconAsset;
   final VoidCallback onRemove;
+  final VoidCallback onEdit;
   final VoidCallback? onTap;
   final void Function(int database)? onDatabaseTap;
   final bool isExpanded;
@@ -125,17 +127,20 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
     final iconWidget = widget.iconAsset != null
         ? material.Image.asset(
             widget.iconAsset!,
-            width: 16,
-            height: 16,
+            width: QueryaIconSizes.sidebarConnectionIcon,
+            height: QueryaIconSizes.sidebarConnectionIcon,
+            cacheWidth: (QueryaIconSizes.sidebarConnectionIcon * MediaQuery.devicePixelRatioOf(context)).toInt(),
+            cacheHeight: (QueryaIconSizes.sidebarConnectionIcon * MediaQuery.devicePixelRatioOf(context)).toInt(),
             fit: material.BoxFit.contain,
             errorBuilder: (_, __, ___) => material.Icon(
               widget.icon,
-              size: 16,
+              size: QueryaIconSizes.sidebarConnectionIcon,
               color: theme.colorScheme.primary,
             ),
           )
         : material.Icon(widget.icon,
-            size: 16, color: theme.colorScheme.primary);
+            size: QueryaIconSizes.sidebarConnectionIcon,
+            color: theme.colorScheme.primary);
 
     return ContextMenu(
       items: [
@@ -147,6 +152,12 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
             _loadDatabases();
           },
           child: const Text('Refresh databases'),
+        ),
+        MenuButton(
+          leading: material.Icon(material.Icons.edit_outlined,
+              size: 18, color: theme.colorScheme.mutedForeground),
+          onPressed: (_) => widget.onEdit(),
+          child: const Text('Edit connection…'),
         ),
         MenuButton(
           leading: material.Icon(material.Icons.delete_outline_rounded,
@@ -167,19 +178,25 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
                 // Expand/collapse arrow
                 material.MouseRegion(
                   cursor: material.SystemMouseCursors.click,
-                  child: material.InkWell(
-                    onTap: _toggle,
-                    borderRadius: material.BorderRadius.circular(4),
-                    child: material.Padding(
-                      padding: const material.EdgeInsets.all(2),
-                      child: material.AnimatedRotation(
-                        turns: _expanded ? 0.25 : 0,
-                        duration: context.motionDuration(QueryaMotion.fast),
-                        curve: context.motionCurve(QueryaMotion.standardCurve),
-                        child: material.Icon(
-                          material.Icons.chevron_right_rounded,
-                          size: 16,
-                          color: theme.colorScheme.mutedForeground,
+                  child: material.Semantics(
+                    button: true,
+                    expanded: _expanded,
+                    child: material.InkWell(
+                      onTap: _toggle,
+                      borderRadius: material.BorderRadius.circular(4),
+                      child: material.Padding(
+                        padding: const material.EdgeInsets.all(2),
+                        child: material.AnimatedRotation(
+                          turns: _expanded ? 0.25 : 0,
+                          duration:
+                              context.motionDuration(QueryaMotion.treeExpand),
+                          curve:
+                              context.motionCurve(QueryaMotion.treeExpandCurve),
+                          child: material.Icon(
+                            QueryaIcons.expandClosed,
+                            size: QueryaIconSizes.sidebarExpand,
+                            color: theme.colorScheme.mutedForeground,
+                          ),
                         ),
                       ),
                     ),
@@ -258,28 +275,85 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
                       ),
                     ),
                   if (_error != null)
-                    material.Padding(
+                    TreeLoadError(
+                      title: 'Could not load Redis info',
+                      message: _error!,
                       padding: const material.EdgeInsets.only(
-                          left: 28, top: 4, bottom: 4),
-                      child: material.Text(
-                        'Error',
-                        overflow: material.TextOverflow.ellipsis,
-                        maxLines: 1,
-                        style: material.TextStyle(
-                            fontSize: 11, color: theme.colorScheme.destructive),
+                        left: 28,
+                        top: 4,
+                        bottom: 4,
                       ),
+                      onRetry: _loadDatabases,
                     ),
-                  for (final db in _databases)
-                    _RedisDatabaseNode(
-                      index: db.index,
-                      keys: db.keys,
-                      onTap: () => widget.onDatabaseTap?.call(db.index),
+                  if (_databases.isNotEmpty)
+                    _RedisDatabasesNode(
+                      connection: widget.connection,
+                      databases: _databases,
+                      onRefreshDatabases: () {
+                        setState(() => _databases = []);
+                        _loadDatabases();
+                      },
+                      onDatabaseTap: widget.onDatabaseTap,
                     ),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _RedisDatabasesNode extends material.StatelessWidget {
+  const _RedisDatabasesNode({
+    required this.connection,
+    required this.databases,
+    required this.onRefreshDatabases,
+    this.onDatabaseTap,
+  });
+
+  final ConnectionRow connection;
+  final List<({int index, int keys})> databases;
+  final VoidCallback onRefreshDatabases;
+  final void Function(int database)? onDatabaseTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return material.Padding(
+      padding: const material.EdgeInsets.only(left: 20),
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.start,
+        mainAxisSize: material.MainAxisSize.min,
+        children: [
+          _PgTreeRow(
+            label: 'Databases (${databases.length})',
+            icon: QueryaIcons.databasesFolder,
+            iconSize: QueryaIconSizes.treeConnection,
+            iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
+            textStyle: material.TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.foreground,
+            ),
+            verticalPadding: 4,
+            onTap: null,
+            connection: connection,
+            onContextRefresh: onRefreshDatabases,
+          ),
+          lazyConnectionTreeList(
+            context: context,
+            itemCount: databases.length,
+            itemBuilder: (context, index) {
+              final db = databases[index];
+              return _RedisDatabaseNode(
+                index: db.index,
+                keys: db.keys,
+                onTap: () => onDatabaseTap?.call(db.index),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -300,49 +374,31 @@ class _RedisDatabaseNode extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return material.Padding(
-      padding: const material.EdgeInsets.only(left: 24),
-      child: material.MouseRegion(
-        cursor: material.SystemMouseCursors.click,
-        child: material.InkWell(
-          onTap: onTap,
-          borderRadius: material.BorderRadius.circular(6),
-          child: material.Padding(
-            padding:
-                const material.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-            child: material.Row(
-              children: [
-                material.Icon(
-                  material.Icons.dns_rounded,
-                  size: 14,
-                  color: keys > 0
-                      ? theme.colorScheme.primary.withValues(alpha: 0.7)
-                      : theme.colorScheme.mutedForeground
-                          .withValues(alpha: 0.5),
+      padding: const material.EdgeInsets.only(left: 16),
+      child: _PgTreeRow(
+        label: 'db$index',
+        icon: QueryaIcons.database,
+        iconSize: QueryaIconSizes.treeConnection,
+        iconColor: keys > 0
+            ? theme.colorScheme.primary.withValues(alpha: 0.7)
+            : theme.colorScheme.mutedForeground.withValues(alpha: 0.5),
+        trailing: keys > 0
+            ? material.Text(
+                '$keys',
+                style: material.TextStyle(
+                  fontSize: 10,
+                  color: theme.colorScheme.mutedForeground,
                 ),
-                const Gap(8),
-                material.Expanded(
-                  child: material.Text(
-                    'db$index',
-                    overflow: material.TextOverflow.ellipsis,
-                    maxLines: 1,
-                    style: material.TextStyle(
-                      fontSize: 12,
-                      color: keys > 0
-                          ? theme.colorScheme.foreground
-                          : theme.colorScheme.mutedForeground,
-                    ),
-                  ),
-                ),
-                if (keys > 0)
-                  material.Text(
-                    '$keys',
-                    style: material.TextStyle(
-                        fontSize: 10, color: theme.colorScheme.mutedForeground),
-                  ),
-              ],
-            ),
-          ),
+              )
+            : null,
+        textStyle: material.TextStyle(
+          fontSize: 12,
+          color: keys > 0
+              ? theme.colorScheme.foreground
+              : theme.colorScheme.mutedForeground,
         ),
+        verticalPadding: 3,
+        onTap: onTap,
       ),
     );
   }

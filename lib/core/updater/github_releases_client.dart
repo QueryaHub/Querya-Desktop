@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:isolate';
 
 import 'package:http/http.dart' as http;
 
@@ -28,7 +29,8 @@ class GitHubReleasesClient {
           'GitHub Releases API returned HTTP ${response.statusCode}',
         );
       }
-      final decoded = jsonDecode(response.body);
+      final body = response.body;
+      final decoded = await Isolate.run(() => jsonDecode(body));
       if (decoded is! Map<String, dynamic>) {
         throw const GitHubReleasesException('Unexpected GitHub Releases payload');
       }
@@ -41,7 +43,8 @@ class GitHubReleasesClient {
         'GitHub Releases API returned HTTP ${response.statusCode}',
       );
     }
-    final decoded = jsonDecode(response.body);
+    final body = response.body;
+    final decoded = await Isolate.run(() => jsonDecode(body));
     if (decoded is! List) {
       throw const GitHubReleasesException('Unexpected GitHub Releases list payload');
     }

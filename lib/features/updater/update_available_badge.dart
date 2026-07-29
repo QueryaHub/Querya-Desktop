@@ -9,7 +9,10 @@ import 'package:querya_desktop/features/updater/update_controller.dart';
 import 'package:querya_desktop/features/updater/update_dialog.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
-/// Soft pulse period for the update chip (documented chrome constant; see F9).
+/// Soft pulse period for the update chip at Full motion (see F9 / #482).
+///
+/// Under [QueryaMotionLevel.reduced] the effective period is halved via
+/// [QueryaMotion.effectiveDuration]; Off / OS `disableAnimations` stop the pulse.
 const Duration kUpdateBadgePulsePeriod = Duration(milliseconds: 1400);
 
 /// Pulsing title-bar chip when a background update check finds a newer release.
@@ -28,6 +31,9 @@ class UpdateAvailableBadgeState extends material.State<UpdateAvailableBadge>
 
   @visibleForTesting
   bool get isPulseAnimating => _pulse.isAnimating;
+
+  @visibleForTesting
+  Duration? get pulseDuration => _pulse.duration;
 
   @override
   void initState() {
@@ -57,7 +63,6 @@ class UpdateAvailableBadgeState extends material.State<UpdateAvailableBadge>
 
   void _onControllerChanged() {
     if (!mounted) return;
-    setState(() {});
     _syncPulse();
   }
 
@@ -73,7 +78,14 @@ class UpdateAvailableBadgeState extends material.State<UpdateAvailableBadge>
       _pulse.value = 0;
       return;
     }
-    if (!_pulse.isAnimating) {
+
+    final period =
+        QueryaMotion.effectiveDuration(context, kUpdateBadgePulsePeriod);
+    final periodChanged = _pulse.duration != period;
+    if (periodChanged) {
+      _pulse.duration = period;
+    }
+    if (!_pulse.isAnimating || periodChanged) {
       _pulse.repeat(reverse: true);
     }
   }
@@ -87,14 +99,22 @@ class UpdateAvailableBadgeState extends material.State<UpdateAvailableBadge>
 
   @override
   material.Widget build(material.BuildContext context) {
-    if (!widget.controller.showBadge) {
-      return const material.SizedBox.shrink();
-    }
+    return ListenableBuilder(
+      listenable: widget.controller,
+      builder: (context, __) {
+        if (!widget.controller.showBadge) {
+          return const material.SizedBox.shrink();
+        }
 
     final version = widget.controller.pendingUpdate?.version ?? '';
     final wb = context.workbench;
     // Depend on motion so Off/Reduced rebuilds re-sync the pulse.
     context.motionDuration(QueryaMotion.fast);
+    final reduced =
+        QueryaMotionScope.maybeOf(context) == QueryaMotionLevel.reduced;
+    // Quieter chrome under Reduced (#482).
+    final fillAmp = reduced ? 0.04 : 0.08;
+    final borderAmp = reduced ? 0.12 : 0.25;
 
     return material.Padding(
       padding: const material.EdgeInsets.only(right: 8),
@@ -115,12 +135,12 @@ class UpdateAvailableBadgeState extends material.State<UpdateAvailableBadge>
                 padding: const material.EdgeInsets.symmetric(
                     horizontal: 10, vertical: 4),
                 decoration: material.BoxDecoration(
-                  color:
-                      wb.accent.withValues(alpha: 0.12 + 0.08 * _pulse.value),
+                  color: wb.accent
+                      .withValues(alpha: 0.12 + fillAmp * _pulse.value),
                   borderRadius: material.BorderRadius.circular(999),
                   border: material.Border.all(
-                    color:
-                        wb.accent.withValues(alpha: 0.35 + 0.25 * _pulse.value),
+                    color: wb.accent
+                        .withValues(alpha: 0.35 + borderAmp * _pulse.value),
                   ),
                 ),
                 child: child,
@@ -142,5 +162,7 @@ class UpdateAvailableBadgeState extends material.State<UpdateAvailableBadge>
         ),
       ),
     );
+  },
+);
   }
 }

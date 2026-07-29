@@ -124,6 +124,36 @@ void main() {
       expect(list.map((e) => e.sqlText), ['q4', 'q3', 'q2']);
     });
 
+    test('prunes in batches when maxEntries > 10', () async {
+      const row = ConnectionRow(
+        type: 'mysql',
+        name: 'M2',
+        host: '127.0.0.1',
+        port: 3306,
+        createdAt: '2026-01-01T00:00:00Z',
+      );
+      final id = await LocalDb.instance.addConnection(row);
+
+      // Insert 25 items with maxEntries = 15 (batch threshold = 10)
+      for (var i = 0; i < 25; i++) {
+        await LocalDb.instance.recordSqlQueryHistory(
+          connectionId: id,
+          databaseName: 'db_batch',
+          sqlText: 'query_$i',
+          maxEntries: 15,
+        );
+      }
+
+      final list = await LocalDb.instance.listSqlQueryHistory(
+        connectionId: id,
+        databaseName: 'db_batch',
+        limit: 100,
+      );
+      // On 20th insert (batch threshold 10 hit twice), pruned to 15. Then 5 more inserted (21..24) -> total 20 items.
+      expect(list.length, lessThanOrEqualTo(20));
+      expect(list.first.sqlText, 'query_24');
+    });
+
     test('history lookup index includes database_name', () async {
       await LocalDb.instance.getAppSetting('__touch__'); // ensure DB open
       final dbFile = p.join(tempDir.path, 'querya_desktop', 'querya.db');

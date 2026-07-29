@@ -11,7 +11,6 @@ import 'package:querya_desktop/core/database/sql_limit.dart';
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/main_screen/query_editor_tab.dart';
 import 'package:querya_desktop/features/main_screen/results_tab.dart';
@@ -177,8 +176,8 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         return cols.map((col) => row[col]).toList();
       }).toList();
 
-      // Yielding convert avoids isolate double-copy of the matrix (#421).
-      final outRows = await convertResultRowsToStringsYielding(rawRows);
+      // Adaptive convert offloads to background compute for large row sets (#522).
+      final outRows = await convertResultRowsToStringsAdaptive(rawRows);
 
       setState(() {
         _columns = cols;

@@ -13,21 +13,26 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 Future<ConnectionRow?> showSqliteConnectionForm(
   material.BuildContext context, {
   int? folderId,
+  ConnectionRow? initial,
 }) async {
   return showAppDialog<ConnectionRow>(
     context: context,
     builder: (context) => material.Dialog(
       backgroundColor: material.Colors.transparent,
       insetPadding: WindowLayout.dialogSymmetricInsets(context),
-      child: _SqliteConnectionFormContent(folderId: folderId),
+      child: _SqliteConnectionFormContent(
+        folderId: folderId,
+        initial: initial,
+      ),
     ),
   );
 }
 
 class _SqliteConnectionFormContent extends material.StatefulWidget {
-  const _SqliteConnectionFormContent({this.folderId});
+  const _SqliteConnectionFormContent({this.folderId, this.initial});
 
   final int? folderId;
+  final ConnectionRow? initial;
 
   @override
   material.State<_SqliteConnectionFormContent> createState() =>
@@ -45,12 +50,22 @@ class _SqliteConnectionFormContentState
   Timer? _dismissTimer;
   late final FormValidityNotifier _formValidNotifier;
 
+  bool get _isEditing => widget.initial != null;
+
   @override
   void initState() {
     super.initState();
     _formValidNotifier = FormValidityNotifier(_computeFormValid);
     _formValidNotifier.listenTo(_nameController);
     _formValidNotifier.listenTo(_pathController);
+
+    final initial = widget.initial;
+    if (initial != null) {
+      _nameController.text = initial.name;
+      _pathController.text = initial.host ?? '';
+      _readOnly = initial.useSSL;
+    }
+
     _formValidNotifier.seed();
   }
 
@@ -136,38 +151,37 @@ class _SqliteConnectionFormContentState
 
   void _save() {
     if (!_formValidNotifier.value) return;
+    final initial = widget.initial;
     final row = ConnectionRow(
-      id: null,
-      type: 'sqlite',
+      id: initial?.id,
+      type: initial?.type ?? 'sqlite',
       name: _nameController.text.trim(),
       host: _pathController.text.trim(),
       useSSL: _readOnly, // Store read-only toggle in useSSL field
-      createdAt: DateTime.now().toIso8601String(),
-      folderId: widget.folderId,
+      extensionId: initial?.extensionId,
+      driverOptions: initial?.driverOptions,
+      createdAt: initial?.createdAt ?? DateTime.now().toUtc().toIso8601String(),
+      folderId: initial?.folderId ?? widget.folderId,
+      sortOrder: initial?.sortOrder ?? 0,
     );
     material.Navigator.of(context).pop(row);
   }
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context).colorScheme;
+    final theme = context.colors;
     final dialogMaxW = WindowLayout.newConnectionDialogMaxWidth(context);
     final dialogH = WindowLayout.newConnectionDialogHeight(context);
     final scrollH = dialogH - 120.0; // Subtract header and footer heights
 
-    return material.Container(
+    return material.SizedBox(
       width: dialogMaxW,
-      constraints: material.BoxConstraints(
-        maxWidth: dialogMaxW,
-        maxHeight: dialogH,
-      ),
-      decoration: material.BoxDecoration(
-        color: theme.popover,
-        borderRadius: material.BorderRadius.circular(Theme.of(context).radiusXxl),
-        border: material.Border.all(color: theme.muted),
-      ),
-      child: material.ClipRRect(
-        borderRadius: material.BorderRadius.circular(Theme.of(context).radiusXxl),
+      child: QueryaDialogCard(
+        constraints: material.BoxConstraints(
+          maxWidth: dialogMaxW,
+          maxHeight: dialogH,
+        ),
+        borderColor: theme.muted,
         child: material.Column(
           mainAxisSize: material.MainAxisSize.min,
           crossAxisAlignment: material.CrossAxisAlignment.stretch,
@@ -178,7 +192,11 @@ class _SqliteConnectionFormContentState
               child: material.Column(
                 crossAxisAlignment: material.CrossAxisAlignment.stretch,
                 children: [
-                  const Text('New SQLite Connection').large().semiBold(),
+                  Text(
+                    _isEditing
+                        ? 'Edit SQLite Connection'
+                        : 'New SQLite Connection',
+                  ).large().semiBold(),
                   const Gap(6),
                   const Text('Connect to a local SQLite database file.')
                       .muted()
@@ -193,7 +211,8 @@ class _SqliteConnectionFormContentState
               ),
               child: material.SingleChildScrollView(
                 physics: const material.ClampingScrollPhysics(),
-                padding: const material.EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const material.EdgeInsets.symmetric(
+                    horizontal: 24, vertical: 12),
                 child: material.Column(
                   crossAxisAlignment: material.CrossAxisAlignment.stretch,
                   children: [
@@ -229,7 +248,8 @@ class _SqliteConnectionFormContentState
                       children: [
                         material.Checkbox(
                           value: _readOnly,
-                          onChanged: (v) => setState(() => _readOnly = v ?? false),
+                          onChanged: (v) =>
+                              setState(() => _readOnly = v ?? false),
                         ),
                         const Gap(8),
                         const Text('Read-only mode').small(),
@@ -250,7 +270,8 @@ class _SqliteConnectionFormContentState
                     onTap: _dismissResult,
                     borderRadius: material.BorderRadius.circular(8),
                     child: material.Container(
-                      padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      padding: const material.EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
                       decoration: material.BoxDecoration(
                         color: _testResult == 'success'
                             ? theme.primary.withValues(alpha: 0.12)
@@ -270,7 +291,9 @@ class _SqliteConnectionFormContentState
                                 ? material.Icons.check_circle_outline
                                 : material.Icons.info_outline_rounded,
                             size: 18,
-                            color: _testResult == 'success' ? theme.primary : theme.destructive,
+                            color: _testResult == 'success'
+                                ? theme.primary
+                                : theme.destructive,
                           ),
                           const Gap(10),
                           material.Expanded(
@@ -306,7 +329,8 @@ class _SqliteConnectionFormContentState
               ),
             // Footer
             material.Container(
-              padding: const material.EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: const material.EdgeInsets.symmetric(
+                  horizontal: 24, vertical: 16),
               child: ValueListenableBuilder<bool>(
                 valueListenable: _formValidNotifier.listenable,
                 builder: (context, formValid, _) {
@@ -316,7 +340,8 @@ class _SqliteConnectionFormContentState
                     alignment: material.WrapAlignment.spaceBetween,
                     children: [
                       OutlineButton(
-                        onPressed: formValid && !_isTesting ? _testConnection : null,
+                        onPressed:
+                            formValid && !_isTesting ? _testConnection : null,
                         leading: _isTesting
                             ? material.SizedBox(
                                 width: 18,
@@ -329,13 +354,17 @@ class _SqliteConnectionFormContentState
                             : material.Icon(
                                 material.Icons.link_rounded,
                                 size: 18,
-                                color: formValid ? theme.primary : theme.mutedForeground,
+                                color: formValid
+                                    ? theme.primary
+                                    : theme.mutedForeground,
                               ),
                         child: Text(
                           'Test Connection',
                           style: material.TextStyle(
                             fontWeight: material.FontWeight.w500,
-                            color: formValid ? theme.primary : theme.mutedForeground,
+                            color: formValid
+                                ? theme.primary
+                                : theme.mutedForeground,
                           ),
                         ),
                       ),
@@ -343,7 +372,8 @@ class _SqliteConnectionFormContentState
                         mainAxisSize: material.MainAxisSize.min,
                         children: [
                           GhostButton(
-                            onPressed: () => material.Navigator.of(context).pop(),
+                            onPressed: () =>
+                                material.Navigator.of(context).pop(),
                             child: const Text('Cancel'),
                           ),
                           const Gap(12),

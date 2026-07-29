@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
 import 'package:querya_desktop/core/sdui/sdui_form_builder.dart';
 import 'package:querya_desktop/core/sdui/sdui_form_schema.dart';
 import 'package:querya_desktop/core/sdui/sdui_tree_builder.dart';
 import 'package:querya_desktop/core/sdui/sdui_tree_schema.dart';
+import 'package:querya_desktop/core/ui/querya_icons.dart';
 
 import '../../support/querya_theme_test_shell.dart';
 
@@ -116,6 +118,12 @@ void main() {
       expect(values['port'], 5432);
       expect(values['ssl'], isFalse);
       expect(key.currentState!.passwordFieldIds, ['password']);
+      expect(find.byType(material.CheckboxListTile), findsNothing);
+      expect(find.byType(material.Checkbox), findsOneWidget);
+
+      await tester.tap(find.byType(material.Checkbox));
+      await tester.pump();
+      expect(key.currentState!.snapshotValues()['ssl'], isTrue);
     });
 
     testWidgets('file_picker uses injectable picker', (tester) async {
@@ -143,6 +151,76 @@ void main() {
 
       expect(key.currentState!.snapshotValues()['db'], '/tmp/test.db');
     });
+
+    testWidgets(
+      'keepExistingSecrets allows blank required password with hint',
+      (tester) async {
+        final schema = SduiFormSchema.fromJson(const {
+          'fields': [
+            {'id': 'host', 'type': 'text', 'label': 'Host', 'required': true},
+            {
+              'id': 'password',
+              'type': 'password',
+              'label': 'Password',
+              'required': true,
+              'placeholder': 'Secret',
+            },
+          ],
+        });
+        final key = material.GlobalKey<SduiFormBuilderState>();
+
+        await tester.pumpWidget(
+          queryaThemeTestShell(
+            child: material.Scaffold(
+              body: SduiFormBuilder(
+                key: key,
+                schema: schema,
+                initialValues: const {'host': 'db.local'},
+                keepExistingSecrets: true,
+              ),
+            ),
+          ),
+        );
+
+        expect(find.text('Leave blank to keep existing'), findsOneWidget);
+        expect(find.text('Secret'), findsNothing);
+
+        final values = key.currentState!.collectValues();
+        expect(values, isNotNull);
+        expect(values!['host'], 'db.local');
+        expect(values['password'], '');
+        expect(find.text('Password is required'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'required password still blocks create when keepExistingSecrets is false',
+      (tester) async {
+        final schema = SduiFormSchema.fromJson(const {
+          'fields': [
+            {
+              'id': 'password',
+              'type': 'password',
+              'label': 'Password',
+              'required': true,
+            },
+          ],
+        });
+        final key = material.GlobalKey<SduiFormBuilderState>();
+
+        await tester.pumpWidget(
+          queryaThemeTestShell(
+            child: material.Scaffold(
+              body: SduiFormBuilder(key: key, schema: schema),
+            ),
+          ),
+        );
+
+        expect(key.currentState!.collectValues(), isNull);
+        await tester.pump();
+        expect(find.text('Password is required'), findsOneWidget);
+      },
+    );
   });
 
   group('SduiTreeSchema', () {
@@ -206,10 +284,49 @@ void main() {
       expect(find.text('Databases'), findsOneWidget);
       expect(find.text('analytics'), findsNothing);
 
-      await tester.tap(find.byIcon(material.Icons.chevron_right));
+      await tester.tap(find.byIcon(QueryaIcons.expandClosed));
       await tester.pumpAndSettle();
 
       expect(fetches, 1);
+      expect(find.text('analytics'), findsOneWidget);
+    });
+
+    testWidgets('expand chevron uses QueryaMotion tokens (Off = instant)',
+        (tester) async {
+      final schema = SduiTreeSchema.fromJson(const {
+        'roots': [
+          {
+            'id': 'databases',
+            'label': 'Databases',
+            'expandable': true,
+          },
+        ],
+      });
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: QueryaMotionScope(
+            level: QueryaMotionLevel.off,
+            child: material.Scaffold(
+              body: SduiTreeBuilder(
+                schema: schema,
+                fetchChildren: (_) async => const [
+                  SduiTreeNode(id: 'db1', label: 'analytics'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final rotation = tester.widget<material.AnimatedRotation>(
+        find.byType(material.AnimatedRotation),
+      );
+      expect(rotation.duration, Duration.zero);
+
+      await tester.tap(find.byIcon(QueryaIcons.expandClosed));
+      await tester.pumpAndSettle();
+
       expect(find.text('analytics'), findsOneWidget);
     });
 

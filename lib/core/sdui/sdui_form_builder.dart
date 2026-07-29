@@ -15,6 +15,7 @@ class SduiFormBuilder extends material.StatefulWidget {
     this.initialValues = const {},
     this.onChanged,
     this.filePicker,
+    this.keepExistingSecrets = false,
   });
 
   final SduiFormSchema schema;
@@ -23,6 +24,10 @@ class SduiFormBuilder extends material.StatefulWidget {
 
   /// Injectable file picker for tests. Defaults to `openFile`.
   final Future<String?> Function(SduiFormField field)? filePicker;
+
+  /// When true (edit connection), blank password fields are valid and show
+  /// "Leave blank to keep existing" — host merges stored secrets on save.
+  final bool keepExistingSecrets;
 
   @override
   material.State<SduiFormBuilder> createState() => SduiFormBuilderState();
@@ -129,13 +134,13 @@ class SduiFormBuilderState extends material.State<SduiFormBuilder> {
 
   Future<void> _pickFile(SduiFormField field) async {
     final picker = widget.filePicker;
-    final path = picker != null
-        ? await picker(field)
-        : (await openFile())?.path;
+    final path =
+        picker != null ? await picker(field) : (await openFile())?.path;
     if (path == null || !mounted) return;
-    _textControllers[field.id]?.text = path;
+    setState(() {
+      _textControllers[field.id]?.text = path;
+    });
     _notifyChanged();
-    setState(() {});
   }
 
   @override
@@ -162,39 +167,89 @@ class SduiFormBuilderState extends material.State<SduiFormBuilder> {
   material.Widget _buildField(SduiFormField field) {
     switch (field.type) {
       case SduiFieldType.checkbox:
-        return material.CheckboxListTile(
-          contentPadding: material.EdgeInsets.zero,
-          title: Text(field.label),
-          value: _checkboxValues[field.id] ?? false,
-          controlAffinity: material.ListTileControlAffinity.leading,
-          onChanged: (v) {
-            setState(() => _checkboxValues[field.id] = v ?? false);
-            _notifyChanged();
-          },
+        // Avoid CheckboxListTile under opaque dialog DecoratedBox (Flutter 3.44+
+        // ListTile ink assert — #492).
+        final checked = _checkboxValues[field.id] ?? false;
+        return material.Material(
+          type: material.MaterialType.transparency,
+          child: material.MergeSemantics(
+            child: material.InkWell(
+              onTap: () {
+                setState(() => _checkboxValues[field.id] = !checked);
+                _notifyChanged();
+              },
+              borderRadius: material.BorderRadius.circular(6),
+              child: material.Row(
+                crossAxisAlignment: material.CrossAxisAlignment.center,
+                children: [
+                  material.SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: material.Checkbox(
+                      value: checked,
+                      materialTapTargetSize:
+                          material.MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: material.VisualDensity.compact,
+                      onChanged: (v) {
+                        setState(() => _checkboxValues[field.id] = v ?? false);
+                        _notifyChanged();
+                      },
+                    ),
+                  ),
+                  const Gap(12),
+                  material.Expanded(child: Text(field.label)),
+                ],
+              ),
+            ),
+          ),
         );
       case SduiFieldType.select:
+        final options = field.options;
+        final current = _selectValues[field.id] ??
+            (options.isNotEmpty ? options.first.value : '');
         return material.Column(
           crossAxisAlignment: material.CrossAxisAlignment.stretch,
           children: [
             Text(field.label).small().semiBold(),
             const Gap(4),
-            material.DropdownButtonFormField<String>(
-              initialValue: _selectValues[field.id],
-              items: [
-                for (final opt in field.options)
-                  material.DropdownMenuItem(
-                    value: opt.value,
-                    child: material.Text(opt.label),
-                  ),
-              ],
-              onChanged: (v) {
-                setState(() => _selectValues[field.id] = v);
-                _notifyChanged();
-              },
+            material.FormField<String>(
+              initialValue: current,
               validator: field.required
-                  ? (v) =>
-                      (v == null || v.isEmpty) ? '${field.label} is required' : null
+                  ? (v) => (v == null || v.isEmpty)
+                      ? '${field.label} is required'
+                      : null
                   : null,
+              builder: (state) {
+                final value = state.value ?? current;
+                return material.Column(
+                  crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                  children: [
+                    QueryaDropdown<String>(
+                      value: value.isEmpty && options.isNotEmpty
+                          ? options.first.value
+                          : value,
+                      expandToParent: true,
+                      items: [
+                        for (final opt in options)
+                          QueryaDropdownItem<String>(
+                            value: opt.value,
+                            label: opt.label,
+                          ),
+                      ],
+                      onSelected: (v) {
+                        final next = v ?? value;
+                        setState(() => _selectValues[field.id] = next);
+                        state.didChange(next);
+                        _notifyChanged();
+                      },
+                    ),
+                    if (state.hasError) ...[
+                      const Gap(4),
+                      Text(state.errorText!).xSmall().muted(),
+                    ],
+                  ],
+                );
+              },
             ),
           ],
         );
@@ -241,7 +296,7 @@ class SduiFormBuilderState extends material.State<SduiFormBuilder> {
                   ? material.TextInputType.number
                   : material.TextInputType.text,
               decoration: material.InputDecoration(
-                hintText: field.placeholder,
+                hintText: _hintFor(field),
               ),
               validator: _validatorFor(field),
             ),
@@ -250,10 +305,20 @@ class SduiFormBuilderState extends material.State<SduiFormBuilder> {
     }
   }
 
+  String? _hintFor(SduiFormField field) {
+    if (widget.keepExistingSecrets &&
+        field.type == SduiFieldType.password) {
+      return 'Leave blank to keep existing';
+    }
+    return field.placeholder;
+  }
+
   material.FormFieldValidator<String>? _validatorFor(SduiFormField field) {
     return (value) {
       final text = value?.trim() ?? '';
-      if (field.required && text.isEmpty) {
+      final allowBlankSecret = widget.keepExistingSecrets &&
+          field.type == SduiFieldType.password;
+      if (field.required && text.isEmpty && !allowBlankSecret) {
         return '${field.label} is required';
       }
       if (field.type == SduiFieldType.number && text.isNotEmpty) {

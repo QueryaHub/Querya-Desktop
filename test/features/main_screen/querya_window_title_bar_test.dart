@@ -97,6 +97,35 @@ void main() {
     expect(background, _customSurface);
   });
 
+  testWidgets('title bar leading inset reserves macOS traffic-light space',
+      (tester) async {
+    expect(
+      QueryaWindowTitleBar.titleBarLeadingInset(
+        isMacOS: true,
+        scale: (v) => v,
+      ),
+      72,
+    );
+    expect(
+      QueryaWindowTitleBar.titleBarLeadingInset(
+        isMacOS: false,
+        scale: (v) => v,
+      ),
+      16,
+    );
+  });
+
+  test('bitsdojo window buttons hidden on macOS, shown elsewhere', () {
+    expect(
+      QueryaWindowTitleBar.showBitsdojoWindowButtons(isMacOS: true),
+      isFalse,
+    );
+    expect(
+      QueryaWindowTitleBar.showBitsdojoWindowButtons(isMacOS: false),
+      isTrue,
+    );
+  });
+
   testWidgets('read-only state is persistently visible in title bar',
       (tester) async {
     await tester.pumpWidget(

@@ -201,6 +201,45 @@ void main() {
     );
   });
 
+  testWidgets('reduced motion slides indicator with cubic (not snap)',
+      (tester) async {
+    var selected = 0;
+    await tester.pumpWidget(
+      stripShell(
+        level: QueryaMotionLevel.reduced,
+        child: material.StatefulBuilder(
+          builder: (context, setState) => material.Center(
+            child: QueryaTabStrip(
+              labels: const ['Server', 'SQL', 'History'],
+              selectedIndex: selected,
+              onSelected: (index) => setState(() => selected = index),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    final startLeft = indicatorOf(tester).left!;
+
+    await tester.tap(find.bySemanticsLabel('History'));
+    await tester.pump();
+    await tester.pump(); // post-frame sync starts cubic
+    await tester.pump(const Duration(milliseconds: 20));
+
+    final midLeft = indicatorOf(tester).left!;
+    expect(midLeft, greaterThan(startLeft));
+    final history =
+        tester.getRect(find.byKey(const material.ValueKey('querya_tab_History')));
+    final strip = tester.getRect(find.byType(QueryaTabStrip));
+    final endLeft = history.left - strip.left;
+    expect(midLeft, lessThan(endLeft - 0.5));
+
+    await tester.pumpAndSettle();
+    expect(indicatorOf(tester).left, closeTo(endLeft, 1.0));
+  });
+
   testWidgets('redirect mid-slide settles on final selection', (tester) async {
     var selected = 0;
     await tester.pumpWidget(

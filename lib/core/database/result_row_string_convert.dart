@@ -1,16 +1,24 @@
-/// Converts SQL result cells to display strings without a second isolate copy.
-///
-/// Prefer this over [compute] for large matrices: shipping `List<List<Object?>>`
-/// across isolates often costs more than `toString()` itself and roughly
-/// doubles peak memory. Yielding every [yieldEvery] rows keeps the UI isolate
-/// responsive for 10k+ row caps.
-library;
+import 'package:flutter/foundation.dart';
 
 const int kResultStringConvertYieldEvery = 250;
+const int kResultStringConvertComputeThreshold = 1000;
 
 /// Maps null cells to `'NULL'` and others via [Object.toString].
 String resultCellToDisplayString(Object? value) =>
     value == null ? 'NULL' : value.toString();
+
+/// Converts [rowValues] to string rows synchronously.
+List<List<String>> convertResultRowsToStringsSync(List<List<Object?>> rowValues) {
+  if (rowValues.isEmpty) return const [];
+  return [
+    for (final row in rowValues)
+      [for (final value in row) resultCellToDisplayString(value)],
+  ];
+}
+
+/// Top-level function suitable for [compute] offloading.
+List<List<String>> convertResultRowsToStringsCompute(List<List<Object?>> rowValues) =>
+    convertResultRowsToStringsSync(rowValues);
 
 /// Converts [rowValues] to string rows, yielding periodically.
 Future<List<List<String>>> convertResultRowsToStringsYielding(
@@ -30,4 +38,18 @@ Future<List<List<String>>> convertResultRowsToStringsYielding(
     }
   }
   return out;
+}
+
+/// Converts [rowValues] adaptively: offloads to a background isolate via [compute]
+/// if row count >= [computeThreshold], otherwise yields on the main isolate.
+Future<List<List<String>>> convertResultRowsToStringsAdaptive(
+  List<List<Object?>> rowValues, {
+  int computeThreshold = kResultStringConvertComputeThreshold,
+  int yieldEvery = kResultStringConvertYieldEvery,
+}) async {
+  if (rowValues.isEmpty) return const [];
+  if (rowValues.length >= computeThreshold) {
+    return compute(convertResultRowsToStringsCompute, rowValues);
+  }
+  return convertResultRowsToStringsYielding(rowValues, yieldEvery: yieldEvery);
 }

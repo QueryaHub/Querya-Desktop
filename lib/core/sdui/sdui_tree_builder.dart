@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/motion/querya_motion.dart';
+import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/core/sdui/sdui_tree_schema.dart';
+import 'package:querya_desktop/core/ui/querya_icon_sizes.dart';
+import 'package:querya_desktop/core/ui/querya_icons.dart';
+import 'package:querya_desktop/core/ui/querya_tree_tokens.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Renders a sidebar-style tree from an SDUI schema with lazy expansion.
 ///
 /// Visible rows are flattened into a [ListView.builder] so only viewport
 /// rows are built (large schemas no longer create a full widget Column).
+/// Expand chevrons and height morph share [QueryaMotion.treeExpand] /
+/// [QueryaMotion.treeExpandCurve]. Height morph via [QueryaAnimatedExpand] is
+/// not used on the flat virtualized row list (nested expand would fight
+/// `ListView` itemExtent); chevron timing still matches native trees.
 class SduiTreeBuilder extends material.StatefulWidget {
   const SduiTreeBuilder({
     super.key,
@@ -48,7 +57,7 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
   final Set<String> _expanded = {};
   final Map<String, String> _expandErrors = {};
 
-  static const double _rowExtent = 36;
+  static const double _rowExtent = 28;
 
   @override
   void initState() {
@@ -108,6 +117,14 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
     setState(() => _expanded.remove(node.id));
   }
 
+  void _toggleExpand(SduiTreeNode node) {
+    if (_expanded.contains(node.id)) {
+      _onCollapse(node);
+    } else {
+      _onExpand(node);
+    }
+  }
+
   List<SduiTreeNode> _replaceNode(
     List<SduiTreeNode> nodes,
     String id,
@@ -152,16 +169,19 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
       physics: widget.maxHeight == null
           ? const material.NeverScrollableScrollPhysics()
           : const material.ClampingScrollPhysics(),
-      itemExtent: _rowExtent,
+      itemExtent: rows.any((r) => r.isError) ? null : _rowExtent,
       itemCount: rows.length,
       itemBuilder: (context, index) {
         final row = rows[index];
         if (row.isError) {
-          return material.Padding(
-            padding: material.EdgeInsets.only(left: 36.0 + row.depth * 16.0),
-            child: material.Align(
-              alignment: material.Alignment.centerLeft,
-              child: Text(row.error!).muted().xSmall(),
+          return TreeLoadError(
+            title: 'Could not expand',
+            message: row.error!,
+            detailFontSize: 10,
+            padding: material.EdgeInsets.only(
+              left: 36.0 + row.depth * QueryaTreeTokens.indent,
+              top: 2,
+              bottom: 2,
             ),
           );
         }
@@ -178,44 +198,61 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
   }
 
   material.Widget _buildNodeRow(SduiTreeNode node, {required int depth}) {
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.mutedForeground;
     final canExpand = node.expandable || node.hasChildren;
     final isExpanded = _expanded.contains(node.id);
     final isLoading = _loading.contains(node.id);
     final nodeKind = _resolveNodeKind(node);
     final isBrowsable = nodeKind == 'table' || nodeKind == 'view';
+    // Same hierarchy as native trees (#476 / #497) — no separate sduiNode size.
+    final iconSize =
+        canExpand ? QueryaIconSizes.treeGroup : QueryaIconSizes.treeLeaf;
+    final iconColor = isBrowsable
+        ? QueryaTreeTokens.leafIconColor(theme.colorScheme.primary)
+        : muted;
+    final rowLeft =
+        8.0 + depth * QueryaTreeTokens.indent + (canExpand ? 0 : 4.0);
 
-    return material.InkWell(
-      onTap: isBrowsable ? () => widget.onNodeSelected?.call(node) : null,
+    final row = material.InkWell(
+      onTap: () {
+        if (isBrowsable) {
+          widget.onNodeSelected?.call(node);
+        } else if (canExpand) {
+          _toggleExpand(node);
+        }
+      },
+      borderRadius: material.BorderRadius.circular(4),
       child: material.Padding(
         padding: material.EdgeInsets.only(
-          left: 8.0 + depth * 16.0,
+          left: rowLeft,
           right: 8,
         ),
         child: material.Row(
           children: [
             if (canExpand)
-              material.SizedBox(
-                width: 28,
-                height: 28,
-                child: material.IconButton(
-                  padding: material.EdgeInsets.zero,
-                  iconSize: 18,
-                  onPressed: () {
-                    if (isExpanded) {
-                      _onCollapse(node);
-                    } else {
-                      _onExpand(node);
-                    }
-                  },
-                  icon: material.Icon(
-                    isExpanded
-                        ? material.Icons.expand_more
-                        : material.Icons.chevron_right,
+              material.MouseRegion(
+                cursor: material.SystemMouseCursors.click,
+                child: material.GestureDetector(
+                  behavior: material.HitTestBehavior.opaque,
+                  onTap: () => _toggleExpand(node),
+                  child: material.Padding(
+                    padding: const material.EdgeInsets.all(2),
+                    child: material.AnimatedRotation(
+                      turns: isExpanded ? 0.25 : 0,
+                      duration: context.motionDuration(QueryaMotion.treeExpand),
+                      curve: context.motionCurve(QueryaMotion.treeExpandCurve),
+                      child: material.Icon(
+                        QueryaIcons.expandClosed,
+                        size: QueryaIconSizes.treeExpand,
+                        color: muted,
+                      ),
+                    ),
                   ),
                 ),
               )
             else
-              const material.SizedBox(width: 28),
+              const material.SizedBox(width: QueryaIconSizes.treeExpand + 4),
             if (isLoading)
               const material.SizedBox(
                 width: 14,
@@ -224,8 +261,12 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
               )
             else
               material.Icon(
-                _iconFor(node),
-                size: 16,
+                QueryaIcons.sduiNodeIcon(
+                  node.icon,
+                  expandable: node.expandable,
+                ),
+                size: iconSize,
+                color: iconColor,
               ),
             const Gap(8),
             material.Expanded(
@@ -234,7 +275,8 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
                 overflow: material.TextOverflow.ellipsis,
                 maxLines: 1,
                 style: material.TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
+                  color: isBrowsable ? theme.colorScheme.foreground : muted,
                   fontWeight: isBrowsable ? material.FontWeight.w600 : null,
                 ),
               ),
@@ -242,6 +284,12 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
           ],
         ),
       ),
+    );
+    if (!canExpand) return row;
+    return material.Semantics(
+      button: true,
+      expanded: isExpanded,
+      child: row,
     );
   }
 
@@ -251,33 +299,5 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
     if (fromMeta.isNotEmpty) return fromMeta;
     final parts = node.id.split('.');
     return parts.isNotEmpty ? parts.first : '';
-  }
-
-  material.IconData _iconFor(SduiTreeNode node) {
-    switch (node.icon) {
-      case 'database':
-        return material.Icons.storage_outlined;
-      case 'table':
-        return material.Icons.table_chart_outlined;
-      case 'view':
-      case 'eye':
-        return material.Icons.visibility_outlined;
-      case 'folder':
-      case 'folder-table':
-        return material.Icons.folder_outlined;
-      case 'folder-eye':
-        return material.Icons.folder_special_outlined;
-      case 'folder-book':
-      case 'book':
-        return material.Icons.menu_book_outlined;
-      case 'columns':
-        return material.Icons.view_column_outlined;
-      case 'archive':
-        return material.Icons.inventory_2_outlined;
-      default:
-        return node.expandable
-            ? material.Icons.folder_outlined
-            : material.Icons.insert_drive_file_outlined;
-    }
   }
 }

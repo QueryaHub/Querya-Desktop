@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
 import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
 import 'package:querya_desktop/shared/widgets/form_validity_notifier.dart';
 import 'package:querya_desktop/shared/widgets/ssl_certificate_fields.dart';
@@ -13,21 +14,26 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 Future<ConnectionRow?> showRedisConnectionForm(
   BuildContext context, {
   int? folderId,
+  ConnectionRow? initial,
 }) async {
   return showAppDialog<ConnectionRow>(
     context: context,
     builder: (context) => material.Dialog(
       backgroundColor: material.Colors.transparent,
       insetPadding: WindowLayout.dialogSymmetricInsets(context),
-      child: _RedisConnectionFormContent(folderId: folderId),
+      child: _RedisConnectionFormContent(
+        folderId: folderId,
+        initial: initial,
+      ),
     ),
   );
 }
 
 class _RedisConnectionFormContent extends material.StatefulWidget {
-  const _RedisConnectionFormContent({this.folderId});
+  const _RedisConnectionFormContent({this.folderId, this.initial});
 
   final int? folderId;
+  final ConnectionRow? initial;
 
   @override
   material.State<_RedisConnectionFormContent> createState() =>
@@ -53,6 +59,8 @@ class _RedisConnectionFormContentState
   Timer? _dismissTimer;
   late final FormValidityNotifier _formValidNotifier;
 
+  bool get _isEditing => widget.initial != null;
+
   @override
   void initState() {
     super.initState();
@@ -69,6 +77,18 @@ class _RedisConnectionFormContentState
     _sslRootCertController.addListener(_syncUriSslParams);
     _sslCertController.addListener(_syncUriSslParams);
     _sslKeyController.addListener(_syncUriSslParams);
+
+    final initial = widget.initial;
+    if (initial != null) {
+      _nameController.text = initial.name;
+      _hostController.text = initial.host ?? '';
+      _portController.text = (initial.port ?? 6379).toString();
+      _usernameController.text = initial.username ?? '';
+      _useSSL = initial.useSSL;
+      _connectionStringController.text =
+          redactUriPassword(initial.connectionString) ?? '';
+    }
+
     _formValidNotifier.seed();
   }
 
@@ -195,8 +215,10 @@ class _RedisConnectionFormContentState
     final port = int.tryParse(_portController.text.trim()) ?? 6379;
     final uri = _effectiveConnectionUri();
     final displayName = name.isNotEmpty ? name : 'Redis $host:$port';
+    final initial = widget.initial;
     final row = ConnectionRow(
-      type: 'redis',
+      id: initial?.id,
+      type: initial?.type ?? 'redis',
       name: displayName,
       host: uri.isNotEmpty ? null : host,
       port: uri.isNotEmpty ? null : port,
@@ -207,8 +229,11 @@ class _RedisConnectionFormContentState
           _passwordController.text.isEmpty ? null : _passwordController.text,
       useSSL: _useSSL || _hasSslCertificateFields(),
       connectionString: uri.isEmpty ? null : uri,
-      folderId: widget.folderId,
-      createdAt: DateTime.now().toUtc().toIso8601String(),
+      extensionId: initial?.extensionId,
+      driverOptions: initial?.driverOptions,
+      folderId: initial?.folderId ?? widget.folderId,
+      sortOrder: initial?.sortOrder ?? 0,
+      createdAt: initial?.createdAt ?? DateTime.now().toUtc().toIso8601String(),
     );
     material.Navigator.of(context).pop(row);
   }
@@ -244,24 +269,17 @@ class _RedisConnectionFormContentState
   @override
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context).colorScheme;
-    final radius = Theme.of(context).radiusXxl;
 
-    return material.Container(
+    return QueryaDialogCard(
       constraints: WindowLayout.dialogConstraints(
         context,
         maxWidth: WindowLayout.connectionFormMaxWidth,
         maxHeight: WindowLayout.connectionFormMaxHeight,
       ),
-      decoration: material.BoxDecoration(
-        color: theme.popover,
-        borderRadius: material.BorderRadius.circular(radius),
-        border: material.Border.all(color: theme.muted),
-      ),
-      child: material.ClipRRect(
-        borderRadius: material.BorderRadius.circular(radius),
-        child: material.Column(
-          crossAxisAlignment: material.CrossAxisAlignment.stretch,
-          children: [
+      borderColor: theme.muted,
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
             material.Padding(
               padding: const material.EdgeInsets.fromLTRB(24, 24, 24, 16),
               child: material.Column(
@@ -272,7 +290,11 @@ class _RedisConnectionFormContentState
                       material.Icon(material.Icons.memory_rounded,
                           size: 24, color: theme.primary),
                       const Gap(12),
-                      const Text('Redis Connection').large().semiBold(),
+                      Text(
+                        _isEditing
+                            ? 'Edit Redis Connection'
+                            : 'Redis Connection',
+                      ).large().semiBold(),
                     ],
                   ),
                   const Gap(8),
@@ -360,7 +382,11 @@ class _RedisConnectionFormContentState
                       children: [
                         TextField(
                           controller: _passwordController,
-                          placeholder: const Text('Password'),
+                          placeholder: Text(
+                            _isEditing
+                                ? 'Leave blank to keep existing'
+                                : 'Password',
+                          ),
                           obscureText: !_showPassword,
                         ),
                         material.Positioned(
@@ -530,7 +556,6 @@ class _RedisConnectionFormContentState
             ),
           ],
         ),
-      ),
     );
   }
 }

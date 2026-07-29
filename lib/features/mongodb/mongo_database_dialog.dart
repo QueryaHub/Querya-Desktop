@@ -26,14 +26,6 @@ class _CreateMongoDBDialogContentState
     extends material.State<_CreateMongoDBDialogContent> {
   final _nameController = material.TextEditingController();
 
-  @override
-  void initState() {
-    super.initState();
-    _nameController.addListener(_onFieldChanged);
-  }
-
-  void _onFieldChanged() => setState(() {});
-
   bool get _formValid => _nameController.text.trim().isNotEmpty;
 
   void _save() {
@@ -43,85 +35,79 @@ class _CreateMongoDBDialogContentState
 
   @override
   void dispose() {
-    _nameController.removeListener(_onFieldChanged);
     _nameController.dispose();
     super.dispose();
   }
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context).colorScheme;
-    final radius = Theme.of(context).radiusXxl;
+    final theme = context.colors;
 
-    return material.Container(
+    return QueryaDialogCard(
       constraints: WindowLayout.dialogConstraints(context, maxWidth: 500),
-      decoration: material.BoxDecoration(
-        color: theme.popover,
-        borderRadius: material.BorderRadius.circular(radius),
-        border: material.Border.all(color: theme.muted),
-      ),
-      child: material.ClipRRect(
-        borderRadius: material.BorderRadius.circular(radius),
-        child: material.Column(
-          mainAxisSize: material.MainAxisSize.min,
-          crossAxisAlignment: material.CrossAxisAlignment.stretch,
-          children: [
-            material.Padding(
-              padding: const material.EdgeInsets.fromLTRB(24, 24, 24, 16),
-              child: material.Column(
-                crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                children: [
-                  material.Row(
-                    children: [
-                      material.Icon(material.Icons.storage_rounded,
-                          size: 24, color: theme.primary),
-                      const Gap(12),
-                      const Text('Create Database').large().semiBold(),
-                    ],
-                  ),
-                  const Gap(8),
-                  const Text('Enter the name for the new MongoDB database.')
-                      .muted()
-                      .small(),
-                ],
-              ),
+      borderColor: theme.muted,
+      child: material.Column(
+        mainAxisSize: material.MainAxisSize.min,
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
+          material.Padding(
+            padding: const material.EdgeInsets.fromLTRB(24, 24, 24, 16),
+            child: material.Column(
+              crossAxisAlignment: material.CrossAxisAlignment.stretch,
+              children: [
+                material.Row(
+                  children: [
+                    material.Icon(material.Icons.storage_rounded,
+                        size: 24, color: theme.primary),
+                    const Gap(12),
+                    const Text('Create Database').large().semiBold(),
+                  ],
+                ),
+                const Gap(8),
+                const Text('Enter the name for the new MongoDB database.')
+                    .muted()
+                    .small(),
+              ],
             ),
-            const material.Divider(height: 1),
-            material.Padding(
-              padding: const material.EdgeInsets.all(24),
-              child: material.Column(
-                crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                children: [
-                  const Text('Database Name').small().semiBold(),
-                  const Gap(8),
-                  TextField(
-                    controller: _nameController,
-                    placeholder: const Text('mydb'),
-                  ),
-                ],
-              ),
+          ),
+          const material.Divider(height: 1),
+          material.Padding(
+            padding: const material.EdgeInsets.all(24),
+            child: material.Column(
+              crossAxisAlignment: material.CrossAxisAlignment.stretch,
+              children: [
+                const Text('Database Name').small().semiBold(),
+                const Gap(8),
+                TextField(
+                  controller: _nameController,
+                  placeholder: const Text('mydb'),
+                ),
+              ],
             ),
-            const material.Divider(height: 1),
-            material.Container(
-              padding: const material.EdgeInsets.symmetric(
-                  horizontal: 24, vertical: 16),
-              child: material.Row(
-                mainAxisAlignment: material.MainAxisAlignment.end,
-                children: [
-                  GhostButton(
-                    onPressed: () => material.Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
-                  ),
-                  const Gap(12),
-                  PrimaryButton(
+          ),
+          const material.Divider(height: 1),
+          material.Container(
+            padding: const material.EdgeInsets.symmetric(
+                horizontal: 24, vertical: 16),
+            child: material.Row(
+              mainAxisAlignment: material.MainAxisAlignment.end,
+              children: [
+                GhostButton(
+                  onPressed: () => material.Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                const Gap(12),
+                ListenableBuilder(
+                  listenable: _nameController,
+                  builder: (context, __) => PrimaryButton(
                     onPressed: _formValid ? _save : null,
                     child: const Text('Create'),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

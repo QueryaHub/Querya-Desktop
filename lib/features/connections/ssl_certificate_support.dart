@@ -25,7 +25,8 @@ class SslCertificatePaths {
   bool get hasAny =>
       _nonEmpty(rootCert) || _nonEmpty(clientCert) || _nonEmpty(clientKey);
 
-  static bool _nonEmpty(String? value) => value != null && value.trim().isNotEmpty;
+  static bool _nonEmpty(String? value) =>
+      value != null && value.trim().isNotEmpty;
 }
 
 SslCertificatePaths extractSslCertificatePaths(Uri uri) {

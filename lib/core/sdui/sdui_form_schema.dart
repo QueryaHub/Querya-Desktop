@@ -60,7 +60,8 @@ class SduiFormField {
         if (item is Map<String, dynamic>) {
           options.add(SduiSelectOption.fromJson(item));
         } else if (item is Map) {
-          options.add(SduiSelectOption.fromJson(Map<String, dynamic>.from(item)));
+          options
+              .add(SduiSelectOption.fromJson(Map<String, dynamic>.from(item)));
         } else if (item != null) {
           options.add(SduiSelectOption(value: '$item', label: '$item'));
         }

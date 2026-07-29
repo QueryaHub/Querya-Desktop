@@ -76,7 +76,10 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
       material.ScrollController();
   final material.TextEditingController _searchController =
       material.TextEditingController();
+  final material.ValueNotifier<bool> _menuOpen =
+      material.ValueNotifier<bool>(false);
   bool _triggerHovered = false;
+  bool _closingWithExit = false;
   String? _previewThemeId;
   String? _previewThemeLabel;
   QueryaTheme? _previewTheme;
@@ -97,7 +100,24 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     _scrollController.dispose();
+    _menuOpen.dispose();
     super.dispose();
+  }
+
+  /// Plays exit fade-slide, then removes the [MenuAnchor] overlay (#499).
+  Future<void> _closeWithExit() async {
+    if (!_controller.isOpen || _closingWithExit) return;
+    _closingWithExit = true;
+    _menuOpen.value = false;
+    final duration = context.motionDuration(QueryaMotion.standard);
+    if (duration > QueryaMotion.instant) {
+      await Future<void>.delayed(duration);
+    }
+    if (!mounted) return;
+    if (_controller.isOpen) {
+      _controller.close();
+    }
+    _closingWithExit = false;
   }
 
   void _resetPreviewState() {
@@ -154,8 +174,12 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
     });
   }
 
+  String _searchQuery = '';
+
   void _onSearchChanged() {
-    setState(() {});
+    setState(() {
+      _searchQuery = _searchController.text;
+    });
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(0);
     }
@@ -167,7 +191,7 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
   }
 
   List<ThemeDefinition> get _filteredThemes =>
-      filterThemeDefinitions(widget.themes, _searchController.text);
+      filterThemeDefinitions(widget.themes, _searchQuery);
 
   bool get _enabled => !widget.isLoading;
 
@@ -192,6 +216,14 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
 
     final anchor = material.MenuAnchor(
       controller: _controller,
+      onOpen: () {
+        _closingWithExit = false;
+        _menuOpen.value = true;
+      },
+      onClose: () {
+        _closingWithExit = false;
+        _menuOpen.value = false;
+      },
       crossAxisUnconstrained: false,
       alignmentOffset: material.Offset(
         0,
@@ -223,10 +255,13 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
         ),
       ),
       menuChildren: [
-        material.SizedBox(
-          width: menuWidth,
-          height: menuHeight,
-          child: _buildMenuPanel(context, cs),
+        _ThemePickerMenuEnter(
+          openNotifier: _menuOpen,
+          child: material.SizedBox(
+            width: menuWidth,
+            height: menuHeight,
+            child: _buildMenuPanel(context, cs),
+          ),
         ),
       ],
       builder: (context, controller, child) {
@@ -354,7 +389,7 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
                           widget.onSelected(theme.id);
                           _clearSearch();
                           _resetPreviewState();
-                          _controller.close();
+                          unawaited(_closeWithExit());
                         },
                       );
                     },
@@ -403,16 +438,10 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
               ? material.MainAxisSize.max
               : material.MainAxisSize.min,
           children: [
-            material.Expanded(
-              child: material.Text(
-                _triggerLabel,
-                maxLines: 1,
-                overflow: material.TextOverflow.ellipsis,
-                style: QueryaDropdownTokens.triggerTextStyle(
-                  context,
-                  _enabled ? cs.popoverForeground : cs.mutedForeground,
-                ),
-              ),
+            _triggerLabelText(
+              context: context,
+              cs: cs,
+              expand: widget.expandToParent || fieldWidth != null,
             ),
             material.SizedBox(width: chevronGap),
             material.Icon(
@@ -433,7 +462,7 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
         onTap: _enabled
             ? () {
                 if (controller.isOpen) {
-                  controller.close();
+                  unawaited(_closeWithExit());
                 } else {
                   _clearSearch();
                   _resetPreviewState();
@@ -444,6 +473,61 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
         borderRadius: material.BorderRadius.circular(radius),
         child: triggerBody,
       ),
+    );
+  }
+
+  material.Widget _triggerLabelText({
+    required material.BuildContext context,
+    required ColorScheme cs,
+    required bool expand,
+  }) {
+    final text = material.Text(
+      _triggerLabel,
+      maxLines: 1,
+      overflow: material.TextOverflow.ellipsis,
+      style: QueryaDropdownTokens.triggerTextStyle(
+        context,
+        _enabled ? cs.popoverForeground : cs.mutedForeground,
+      ),
+    );
+    if (expand) {
+      return material.Expanded(child: text);
+    }
+    return text;
+  }
+}
+
+/// Enter/exit fade-slide for theme menu body while the overlay stays mounted.
+class _ThemePickerMenuEnter extends material.StatelessWidget {
+  const _ThemePickerMenuEnter({
+    required this.openNotifier,
+    required this.child,
+  });
+
+  final material.ValueNotifier<bool> openNotifier;
+  final material.Widget child;
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    final duration = context.motionDuration(QueryaMotion.standard);
+    final enter = context.motionCurve(QueryaMotion.enter);
+    final exit = context.motionCurve(QueryaMotion.exit);
+    return material.ValueListenableBuilder<bool>(
+      valueListenable: openNotifier,
+      builder: (context, open, _) {
+        final curve = open ? enter : exit;
+        return material.AnimatedSlide(
+          offset: open ? material.Offset.zero : const material.Offset(0, -0.04),
+          duration: duration,
+          curve: curve,
+          child: material.AnimatedOpacity(
+            opacity: open ? 1 : 0,
+            duration: duration,
+            curve: curve,
+            child: child,
+          ),
+        );
+      },
     );
   }
 }

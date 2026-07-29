@@ -200,7 +200,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
           List<Object?>.generate(row.length, (i) => row[i]),
       ];
 
-      final stringRows = await convertResultRowsToStringsYielding(rawRows);
+      final stringRows = await convertResultRowsToStringsAdaptive(rawRows);
 
       if (!mounted) return;
       setState(() {
@@ -257,7 +257,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
           List<Object?>.generate(row.length, (i) => row[i]),
       ];
 
-      final stringRows = await convertResultRowsToStringsYielding(rawRows);
+      final stringRows = await convertResultRowsToStringsAdaptive(rawRows);
 
       if (!mounted) return;
       setState(() {

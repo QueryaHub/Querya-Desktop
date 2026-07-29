@@ -35,22 +35,6 @@ class _PreferencesAppearanceSectionState
   bool _installingFromUrl = false;
   bool _openingThemesFolder = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _controller.addListener(_onThemeChanged);
-  }
-
-  @override
-  void dispose() {
-    _controller.removeListener(_onThemeChanged);
-    super.dispose();
-  }
-
-  void _onThemeChanged() {
-    if (mounted) setState(() {});
-  }
-
   Future<void> _setThemeMode(ThemeMode mode) async {
     await _controller.setThemeMode(mode);
   }
@@ -160,9 +144,12 @@ class _PreferencesAppearanceSectionState
 
   @override
   material.Widget build(material.BuildContext context) {
-    final c = _controller;
-    final themes = c.availableThemes;
-    final refreshingThemes = c.isLoadingAvailableThemes;
+    return ListenableBuilder(
+      listenable: _controller,
+      builder: (context, __) {
+        final c = _controller;
+        final themes = c.availableThemes;
+        final refreshingThemes = c.isLoadingAvailableThemes;
 
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.start,
@@ -265,7 +252,7 @@ class _PreferencesAppearanceSectionState
           label: 'Motion',
           control: material.ListenableBuilder(
             listenable: QueryaMotionController.instance,
-            builder: (context, _) {
+            builder: (context, __) {
               final controller = QueryaMotionController.instance;
               return PreferencesDropdownMenu<QueryaMotionLevel>(
                 value: controller.level,
@@ -364,5 +351,7 @@ class _PreferencesAppearanceSectionState
         ),
       ],
     );
+  },
+);
   }
 }

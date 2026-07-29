@@ -9,6 +9,7 @@ class _MongoConnectionTile extends StatefulWidget {
     required this.icon,
     this.iconAsset,
     required this.onRemove,
+    required this.onEdit,
     this.onTap,
     this.onDatabaseTap,
     this.isExpanded = false,
@@ -20,6 +21,7 @@ class _MongoConnectionTile extends StatefulWidget {
   final material.IconData icon;
   final String? iconAsset;
   final VoidCallback onRemove;
+  final VoidCallback onEdit;
   final VoidCallback? onTap;
   final void Function(String database)? onDatabaseTap;
   final bool isExpanded;
@@ -142,17 +144,20 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
     final iconWidget = widget.iconAsset != null
         ? material.Image.asset(
             widget.iconAsset!,
-            width: 16,
-            height: 16,
+            width: QueryaIconSizes.sidebarConnectionIcon,
+            height: QueryaIconSizes.sidebarConnectionIcon,
+            cacheWidth: (QueryaIconSizes.sidebarConnectionIcon * MediaQuery.devicePixelRatioOf(context)).toInt(),
+            cacheHeight: (QueryaIconSizes.sidebarConnectionIcon * MediaQuery.devicePixelRatioOf(context)).toInt(),
             fit: material.BoxFit.contain,
             errorBuilder: (_, __, ___) => material.Icon(
               widget.icon,
-              size: 16,
+              size: QueryaIconSizes.sidebarConnectionIcon,
               color: theme.colorScheme.primary,
             ),
           )
         : material.Icon(widget.icon,
-            size: 16, color: theme.colorScheme.primary);
+            size: QueryaIconSizes.sidebarConnectionIcon,
+            color: theme.colorScheme.primary);
 
     return ContextMenu(
       items: [
@@ -170,6 +175,12 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
             _loadDatabases();
           },
           child: const Text('Refresh databases'),
+        ),
+        MenuButton(
+          leading: material.Icon(material.Icons.edit_outlined,
+              size: 18, color: theme.colorScheme.mutedForeground),
+          onPressed: (_) => widget.onEdit(),
+          child: const Text('Edit connection…'),
         ),
         MenuButton(
           leading: material.Icon(material.Icons.delete_outline_rounded,
@@ -190,19 +201,25 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
                 // Expand/collapse arrow
                 material.MouseRegion(
                   cursor: material.SystemMouseCursors.click,
-                  child: material.InkWell(
-                    onTap: _toggle,
-                    borderRadius: material.BorderRadius.circular(4),
-                    child: material.Padding(
-                      padding: const material.EdgeInsets.all(2),
-                      child: material.AnimatedRotation(
-                        turns: _expanded ? 0.25 : 0,
-                        duration: context.motionDuration(QueryaMotion.fast),
-                        curve: context.motionCurve(QueryaMotion.standardCurve),
-                        child: material.Icon(
-                          material.Icons.chevron_right_rounded,
-                          size: 16,
-                          color: theme.colorScheme.mutedForeground,
+                  child: material.Semantics(
+                    button: true,
+                    expanded: _expanded,
+                    child: material.InkWell(
+                      onTap: _toggle,
+                      borderRadius: material.BorderRadius.circular(4),
+                      child: material.Padding(
+                        padding: const material.EdgeInsets.all(2),
+                        child: material.AnimatedRotation(
+                          turns: _expanded ? 0.25 : 0,
+                          duration:
+                              context.motionDuration(QueryaMotion.treeExpand),
+                          curve:
+                              context.motionCurve(QueryaMotion.treeExpandCurve),
+                          child: material.Icon(
+                            QueryaIcons.expandClosed,
+                            size: QueryaIconSizes.sidebarExpand,
+                            color: theme.colorScheme.mutedForeground,
+                          ),
                         ),
                       ),
                     ),
@@ -281,58 +298,24 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
                       ),
                     ),
                   if (_error != null)
-                    material.Padding(
+                    TreeLoadError(
+                      title: 'Could not load databases',
+                      message: _error!,
+                      detailFontSize: 10,
                       padding: const material.EdgeInsets.only(
-                          left: 28, top: 4, bottom: 4, right: 8),
-                      child: material.ConstrainedBox(
-                        constraints: const material.BoxConstraints(
-                            maxWidth: double.infinity),
-                        child: material.Column(
-                          crossAxisAlignment: material.CrossAxisAlignment.start,
-                          mainAxisSize: material.MainAxisSize.min,
-                          children: [
-                            material.Row(
-                              crossAxisAlignment:
-                                  material.CrossAxisAlignment.start,
-                              children: [
-                                material.Icon(
-                                  material.Icons.error_outline_rounded,
-                                  size: 14,
-                                  color: theme.colorScheme.destructive,
-                                ),
-                                const Gap(6),
-                                material.Expanded(
-                                  child: material.Text(
-                                    'Could not load databases',
-                                    maxLines: 2,
-                                    overflow: material.TextOverflow.ellipsis,
-                                    style: material.TextStyle(
-                                      fontSize: 12,
-                                      color: theme.colorScheme.destructive,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const Gap(6),
-                            material.SelectableText(
-                              _error!,
-                              style: material.TextStyle(
-                                fontSize: 10,
-                                height: 1.35,
-                                color: theme.colorScheme.mutedForeground,
-                              ),
-                            ),
-                          ],
-                        ),
+                        left: 28,
+                        top: 4,
+                        bottom: 4,
+                        right: 8,
                       ),
+                      onRetry: _loadDatabases,
                     ),
-                  for (final db in _databases)
-                    _MongoDatabaseNode(
+                  if (_databases.isNotEmpty)
+                    _MongoDatabasesNode(
                       connection: widget.connection,
-                      name: db,
-                      onTap: () => widget.onDatabaseTap?.call(db),
-                      onDelete: () => _deleteDatabase(db),
+                      databases: _databases,
+                      onDatabaseTap: widget.onDatabaseTap,
+                      onDeleteDatabase: _deleteDatabase,
                       onRefreshDatabases: () {
                         setState(() => _databases = []);
                         _loadDatabases();
@@ -343,6 +326,64 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _MongoDatabasesNode extends StatelessWidget {
+  const _MongoDatabasesNode({
+    required this.connection,
+    required this.databases,
+    required this.onRefreshDatabases,
+    required this.onDeleteDatabase,
+    this.onDatabaseTap,
+  });
+
+  final ConnectionRow connection;
+  final List<String> databases;
+  final VoidCallback onRefreshDatabases;
+  final Future<void> Function(String name) onDeleteDatabase;
+  final void Function(String database)? onDatabaseTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return material.Padding(
+      padding: const material.EdgeInsets.only(left: 20),
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.start,
+        mainAxisSize: material.MainAxisSize.min,
+        children: [
+          _PgTreeRow(
+            label: 'Databases (${databases.length})',
+            icon: QueryaIcons.databasesFolder,
+            iconSize: QueryaIconSizes.treeConnection,
+            iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
+            textStyle: material.TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.foreground,
+            ),
+            verticalPadding: 4,
+            onTap: null,
+            connection: connection,
+            onContextRefresh: onRefreshDatabases,
+          ),
+          lazyConnectionTreeList(
+            context: context,
+            itemCount: databases.length,
+            itemBuilder: (context, index) {
+              final db = databases[index];
+              return _MongoDatabaseNode(
+                connection: connection,
+                name: db,
+                onTap: () => onDatabaseTap?.call(db),
+                onDelete: () => onDeleteDatabase(db),
+                onRefreshDatabases: onRefreshDatabases,
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -370,8 +411,8 @@ class _MongoDatabaseNode extends StatelessWidget {
       padding: const material.EdgeInsets.only(left: 16, top: 2, bottom: 2),
       child: _PgTreeRow(
         label: name,
-        icon: material.Icons.storage_rounded,
-        iconSize: 13,
+        icon: QueryaIcons.database,
+        iconSize: QueryaIconSizes.treeConnection,
         iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
         textStyle: material.TextStyle(
           fontSize: 12,
