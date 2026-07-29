@@ -91,7 +91,7 @@ class _BoundedUtf8LineSplitter
       },
       onError: fail,
       onDone: () {
-        if (pending.length > 0) {
+        if (pending.isNotEmpty) {
           if (pending.length > maxLineBytes) {
             fail(
               JsonRpcPayloadTooLargeException(
