@@ -106,6 +106,24 @@ void main() {
       expect(window.last, lessThan(30));
       expect(window.leadingWidth, greaterThan(0));
     });
+
+    test('handles large scale column sets (10000 columns) efficiently', () {
+      final widths = List<double>.filled(10000, 100);
+      final offsets = computeResultGridColumnOffsets(widths);
+      final window = computeVisibleColumnWindow(
+        columnWidths: widths,
+        columnOffsets: offsets,
+        scrollOffset: 500000,
+        viewportWidth: 1000,
+        overscanColumns: 2,
+      );
+      // scrollOffset 500000 = index 5000 (since width is 100)
+      // viewport 1000 = 10 columns (indices 5000..5009)
+      // with overscan 2 -> first: 4998, last: 5011
+      expect(window.first, 4998);
+      expect(window.last, 5011);
+      expect(window.leadingWidth, 4998 * 100.0);
+    });
   });
 
   group('ResultsTab', () {
