@@ -9,3 +9,6 @@ linter:
   rules:
     - prefer_const_constructors
     - prefer_const_declarations
+    unnecessary_underscores: false
+    prefer_initializing_formals: false
+    use_null_aware_elements: false

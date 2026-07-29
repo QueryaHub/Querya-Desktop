@@ -283,7 +283,7 @@ class _ExtensionManagerContentState
               : material.ListView.separated(
                   padding: const material.EdgeInsets.all(24),
                   itemCount: _installed.length,
-                  separatorBuilder: (_, __) =>
+                  separatorBuilder: (_, _) =>
                       const material.SizedBox(height: 16),
                   itemBuilder: (ctx, i) {
                     final manifest = _installed[i];
@@ -369,7 +369,7 @@ class _ExtensionManagerContentState
               : material.ListView.separated(
                   padding: const material.EdgeInsets.all(24),
                   itemCount: _marketplace.length,
-                  separatorBuilder: (_, __) =>
+                  separatorBuilder: (_, _) =>
                       const material.SizedBox(height: 16),
                   itemBuilder: (ctx, i) {
                     final manifest = _marketplace[i];

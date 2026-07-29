@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/rendering.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -220,9 +221,9 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
                 )
               : material.ListView.separated(
                   padding: const material.EdgeInsets.all(16),
-                  cacheExtent: 400,
+                  scrollCacheExtent: const ScrollCacheExtent.pixels(400),
                   itemCount: _documents.length,
-                  separatorBuilder: (_, __) => const Gap(8),
+                  separatorBuilder: (_, _) => const Gap(8),
                   itemBuilder: (context, i) {
                     final shadcnCs = shadcn.Theme.of(context).colorScheme;
                     return _DocumentCard(
