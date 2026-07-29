@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -72,7 +73,8 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
     if (response.statusCode != 200) {
       throw MarketplaceException('Failed to load trending extensions (HTTP ${response.statusCode})');
     }
-    final List<dynamic> data = jsonDecode(response.body) as List<dynamic>;
+    final body = response.body;
+    final List<dynamic> data = await Isolate.run(() => jsonDecode(body)) as List<dynamic>;
     return data.map((json) => ExtensionManifest.fromJson(json as Map<String, dynamic>)).toList();
   }
 
@@ -89,7 +91,8 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
     if (response.statusCode != 200) {
       throw MarketplaceException('Search failed (HTTP ${response.statusCode})');
     }
-    final List<dynamic> data = jsonDecode(response.body) as List<dynamic>;
+    final body = response.body;
+    final List<dynamic> data = await Isolate.run(() => jsonDecode(body)) as List<dynamic>;
     return data.map((json) => ExtensionManifest.fromJson(json as Map<String, dynamic>)).toList();
   }
 
