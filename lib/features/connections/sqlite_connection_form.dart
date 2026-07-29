@@ -174,21 +174,14 @@ class _SqliteConnectionFormContentState
     final dialogH = WindowLayout.newConnectionDialogHeight(context);
     final scrollH = dialogH - 120.0; // Subtract header and footer heights
 
-    return material.Container(
+    return material.SizedBox(
       width: dialogMaxW,
-      constraints: material.BoxConstraints(
-        maxWidth: dialogMaxW,
-        maxHeight: dialogH,
-      ),
-      decoration: material.BoxDecoration(
-        color: theme.popover,
-        borderRadius:
-            material.BorderRadius.circular(Theme.of(context).radiusXxl),
-        border: material.Border.all(color: theme.muted),
-      ),
-      child: material.ClipRRect(
-        borderRadius:
-            material.BorderRadius.circular(Theme.of(context).radiusXxl),
+      child: QueryaDialogCard(
+        constraints: material.BoxConstraints(
+          maxWidth: dialogMaxW,
+          maxHeight: dialogH,
+        ),
+        borderColor: theme.muted,
         child: material.Column(
           mainAxisSize: material.MainAxisSize.min,
           crossAxisAlignment: material.CrossAxisAlignment.stretch,

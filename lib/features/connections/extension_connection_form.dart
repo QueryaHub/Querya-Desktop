@@ -190,27 +190,20 @@ class _ExtensionConnectionFormContentState
   @override
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context).colorScheme;
-    final radius = Theme.of(context).radiusXxl;
     final title = _isEditing
         ? 'Edit ${widget.driver.displayName}'
         : widget.driver.displayName;
-    return material.Container(
+    return QueryaDialogCard(
       constraints: WindowLayout.dialogConstraints(
         context,
         maxWidth: WindowLayout.connectionFormMaxWidth,
         minWidth: 440,
       ),
-      decoration: material.BoxDecoration(
-        color: theme.popover,
-        borderRadius: material.BorderRadius.circular(radius),
-        border: material.Border.all(color: theme.muted),
-      ),
-      child: material.ClipRRect(
-        borderRadius: material.BorderRadius.circular(radius),
-        child: material.Column(
-          mainAxisSize: material.MainAxisSize.min,
-          crossAxisAlignment: material.CrossAxisAlignment.stretch,
-          children: [
+      borderColor: theme.muted,
+      child: material.Column(
+        mainAxisSize: material.MainAxisSize.min,
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
             material.Padding(
               padding: const material.EdgeInsets.fromLTRB(24, 24, 24, 8),
               child: material.Column(
@@ -315,7 +308,6 @@ class _ExtensionConnectionFormContentState
             ),
           ],
         ),
-      ),
     );
   }
 }
