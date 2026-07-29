@@ -35,10 +35,13 @@ class DriverIcon extends StatelessWidget {
       );
     }
     if (assetPath != null) {
+      final cacheSize = (size * MediaQuery.devicePixelRatioOf(context)).toInt();
       return material.Image.asset(
         assetPath!,
         width: size,
         height: size,
+        cacheWidth: cacheSize,
+        cacheHeight: cacheSize,
         fit: material.BoxFit.contain,
         filterQuality: material.FilterQuality.medium,
         errorBuilder: (_, __, ___) => fallback,
@@ -83,10 +86,13 @@ class DriverIconImage extends StatelessWidget {
         errorBuilder: (_, __, ___) => fallback,
       );
     }
+    final cacheSize = (size * MediaQuery.devicePixelRatioOf(context)).toInt();
     return material.Image.file(
       file,
       width: size,
       height: size,
+      cacheWidth: cacheSize,
+      cacheHeight: cacheSize,
       fit: material.BoxFit.contain,
       filterQuality: material.FilterQuality.medium,
       errorBuilder: (_, __, ___) => fallback,

@@ -276,6 +276,8 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
                         height: 28,
                         child: material.Image.asset(
                           'assets/images/postgresql_icon.png',
+                          cacheWidth: (32 * MediaQuery.devicePixelRatioOf(context)).toInt(),
+                          cacheHeight: (32 * MediaQuery.devicePixelRatioOf(context)).toInt(),
                           fit: material.BoxFit.contain,
                           errorBuilder: (_, __, ___) => material.Icon(
                               material.Icons.storage_rounded,

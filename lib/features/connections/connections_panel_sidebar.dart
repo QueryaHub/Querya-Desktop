@@ -95,6 +95,8 @@ class _ConnectionTile extends StatelessWidget {
             iconAsset!,
             width: QueryaIconSizes.sidebarConnectionIcon,
             height: QueryaIconSizes.sidebarConnectionIcon,
+            cacheWidth: (QueryaIconSizes.sidebarConnectionIcon * MediaQuery.devicePixelRatioOf(context)).toInt(),
+            cacheHeight: (QueryaIconSizes.sidebarConnectionIcon * MediaQuery.devicePixelRatioOf(context)).toInt(),
             fit: material.BoxFit.contain,
             errorBuilder: (_, __, ___) => material.Icon(
               icon,
