@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart' as material;
-import 'package:flutter/rendering.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/theme/querya_semantic_palette.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -187,7 +186,7 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
                 )
               : material.ListView.builder(
                   padding: const material.EdgeInsets.all(16),
-                  scrollCacheExtent: const ScrollCacheExtent.pixels(400),
+                  cacheExtent: 400,
                   itemCount: _keys.length + (_hasMore ? 1 : 0),
                   itemBuilder: (context, i) {
                     final shadcnCs = shadcn.Theme.of(context).colorScheme;
