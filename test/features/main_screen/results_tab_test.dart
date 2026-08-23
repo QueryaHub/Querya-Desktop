@@ -494,5 +494,49 @@ void main() {
       );
       expect(find.text('Rows affected: 4'), findsOneWidget);
     });
+
+    testWidgets('allows manual column drag-resizing in VirtualResultGrid',
+        (tester) async {
+      await tester.pumpWidget(
+        resultsShell(
+          child: const material.Scaffold(
+            body: material.SizedBox(
+              width: 800,
+              height: 400,
+              child: VirtualResultGrid(
+                columns: ['id', 'username', 'email'],
+                rows: [
+                  ['1', 'alice', 'alice@example.com'],
+                  ['2', 'bob', 'bob@example.com'],
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('id'), findsOneWidget);
+      expect(find.text('username'), findsOneWidget);
+      expect(find.text('email'), findsOneWidget);
+
+      // Verify resize handles are rendered with resizeColumn cursor
+      final resizeRegions = find.byWidgetPredicate(
+        (w) =>
+            w is material.MouseRegion &&
+            w.cursor == material.SystemMouseCursors.resizeColumn,
+      );
+      expect(resizeRegions, findsNWidgets(3));
+
+      // Drag the first column handle by +50 pixels
+      final firstHandle = resizeRegions.first;
+      final startCenter = tester.getCenter(firstHandle);
+      await tester.dragFrom(startCenter, const material.Offset(50, 0));
+      await tester.pumpAndSettle();
+
+      // Column headers and rows remain stable and rendered
+      expect(find.text('alice'), findsOneWidget);
+      expect(find.text('bob'), findsOneWidget);
+    });
   });
 }
