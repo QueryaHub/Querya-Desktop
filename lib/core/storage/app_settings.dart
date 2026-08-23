@@ -122,6 +122,7 @@ abstract final class AppSettingsKeys {
   static const themeAnimationEnabled = 'theme_animation_enabled';
   static const uiScale = 'ui_scale';
   static const connectionsPanelWidth = 'connections_panel_width';
+  static const sidebarVisible = 'sidebar_visible';
   static const recentConnectionIds = 'recent_connection_ids';
   static const motionLevel = 'motion_level';
   static const updateChannel = 'update_channel';
@@ -269,6 +270,21 @@ class AppSettings {
     await LocalDb.instance.setAppSetting(
       AppSettingsKeys.connectionsPanelWidth,
       normalized.toStringAsFixed(1),
+    );
+  }
+
+  Future<bool> getSidebarVisible() async {
+    final value = await LocalDb.instance.getAppSetting(
+      AppSettingsKeys.sidebarVisible,
+    );
+    if (value == null) return true;
+    return value == '1' || value.toLowerCase() == 'true';
+  }
+
+  Future<void> setSidebarVisible(bool visible) async {
+    await LocalDb.instance.setAppSetting(
+      AppSettingsKeys.sidebarVisible,
+      visible ? '1' : '0',
     );
   }
 

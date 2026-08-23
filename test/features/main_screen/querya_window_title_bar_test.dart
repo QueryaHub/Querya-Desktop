@@ -17,6 +17,14 @@ QueryaTheme _themeWithWorkbench(QueryaWorkbenchTheme workbench) {
 }
 
 void main() {
+  setUp(() {
+    QueryaWindowTitleBar.useNativeWindowChrome = false;
+  });
+
+  tearDown(() {
+    QueryaWindowTitleBar.useNativeWindowChrome = true;
+  });
+
   testWidgets('title bar background follows workbench canvas', (tester) async {
     late Color background;
 
@@ -142,5 +150,34 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Read-only'), findsWidgets);
+  });
+
+  testWidgets('toggle sidebar button calls onToggleSidebar when pressed',
+      (tester) async {
+    var toggled = false;
+
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.SizedBox(
+          width: 1000,
+          child: QueryaWindowTitleBar(
+            onNewDatabaseConnection: () async {},
+            onNewDatabaseConnectionFromUrl: () async {},
+            isSidebarVisible: true,
+            onToggleSidebar: () {
+              toggled = true;
+            },
+          ),
+        ),
+      ),
+    );
+
+    final button = find.byKey(const Key('title_bar_toggle_sidebar_button'));
+    expect(button, findsOneWidget);
+
+    await tester.tap(button);
+    await tester.pump();
+
+    expect(toggled, isTrue);
   });
 }
