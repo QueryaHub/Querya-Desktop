@@ -293,6 +293,8 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
                               icon: QueryaIcons.tableGroup,
                               itemIcon: QueryaIcons.tableLeaf,
                               items: _tables,
+                              onOpenSqlWorkspace:
+                                  widget.onSqliteOpenSqlWorkspace,
                               onItemTap: widget.onSqliteObjectSelected == null
                                   ? null
                                   : (name) => widget.onSqliteObjectSelected!(
@@ -310,6 +312,8 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
                               icon: QueryaIcons.viewGroup,
                               itemIcon: QueryaIcons.viewLeaf,
                               items: _views,
+                              onOpenSqlWorkspace:
+                                  widget.onSqliteOpenSqlWorkspace,
                               onItemTap: widget.onSqliteObjectSelected == null
                                   ? null
                                   : (name) => widget.onSqliteObjectSelected!(
@@ -349,6 +353,7 @@ class _SqliteObjectGroup extends StatefulWidget {
     required this.itemIcon,
     required this.items,
     this.onItemTap,
+    this.onOpenSqlWorkspace,
   });
 
   final ConnectionRow connection;
@@ -359,6 +364,7 @@ class _SqliteObjectGroup extends StatefulWidget {
   final material.IconData itemIcon;
   final List<String> items;
   final void Function(String itemName)? onItemTap;
+  final void Function(ConnectionRow connection)? onOpenSqlWorkspace;
 
   @override
   State<_SqliteObjectGroup> createState() => _SqliteObjectGroupState();
@@ -428,8 +434,12 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
                       ? () => widget.onItemTap!(item)
                       : null,
                   connection: widget.connection,
-                  onContextRefresh: null,
-                  onOpenSqlWorkspace: null,
+                  openSqlName: item,
+                  onContextRefresh: widget.onRefresh,
+                  onOpenSqlWorkspace: widget.onOpenSqlWorkspace != null
+                      ? (conn, {database, schema, name, kind}) =>
+                          widget.onOpenSqlWorkspace!(conn)
+                      : null,
                 );
               },
             ),
