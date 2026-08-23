@@ -12,13 +12,17 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 Future<void> showWelcomeTourDialog(
   material.BuildContext context, {
   material.VoidCallback? onLaunchDemo,
+  material.VoidCallback? onGoHome,
 }) {
   return showAppDialog<void>(
     context: context,
     builder: (ctx) => material.Dialog(
       backgroundColor: material.Colors.transparent,
       insetPadding: WindowLayout.dialogSymmetricInsets(ctx),
-      child: WelcomeTourDialog(onLaunchDemo: onLaunchDemo),
+      child: WelcomeTourDialog(
+        onLaunchDemo: onLaunchDemo,
+        onGoHome: onGoHome,
+      ),
     ),
   );
 }
@@ -27,9 +31,11 @@ class WelcomeTourDialog extends StatefulWidget {
   const WelcomeTourDialog({
     super.key,
     this.onLaunchDemo,
+    this.onGoHome,
   });
 
   final material.VoidCallback? onLaunchDemo;
+  final material.VoidCallback? onGoHome;
 
   @override
   State<WelcomeTourDialog> createState() => _WelcomeTourDialogState();
@@ -38,6 +44,12 @@ class WelcomeTourDialog extends StatefulWidget {
 class _WelcomeTourDialogState extends State<WelcomeTourDialog> {
   int _currentStep = 0;
   static const int _totalSteps = 4;
+
+  void _goToStep(int step) {
+    if (step >= 0 && step < _totalSteps && step != _currentStep) {
+      setState(() => _currentStep = step);
+    }
+  }
 
   void _next() {
     if (_currentStep < _totalSteps - 1) {
@@ -66,6 +78,14 @@ class _WelcomeTourDialogState extends State<WelcomeTourDialog> {
       material.Navigator.of(context).pop();
     }
     widget.onLaunchDemo?.call();
+  }
+
+  void _goHomeAndClose() {
+    unawaited(AppSettings.instance.setHasCompletedWelcomeTour(true));
+    if (mounted && material.Navigator.of(context).canPop()) {
+      material.Navigator.of(context).pop();
+    }
+    widget.onGoHome?.call();
   }
 
   @override
@@ -103,6 +123,9 @@ class _WelcomeTourDialogState extends State<WelcomeTourDialog> {
                     decoration: material.BoxDecoration(
                       color: wb.accent.withValues(alpha: 0.15),
                       borderRadius: material.BorderRadius.circular(10),
+                      border: material.Border.all(
+                        color: wb.accent.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: material.Icon(
                       material.Icons.auto_awesome_rounded,
@@ -122,6 +145,19 @@ class _WelcomeTourDialogState extends State<WelcomeTourDialog> {
                       ],
                     ),
                   ),
+                  if (widget.onGoHome != null) ...[
+                    GhostButton(
+                      key: const Key('welcome_tour_home_button'),
+                      density: ButtonDensity.compact,
+                      onPressed: _goHomeAndClose,
+                      leading: const material.Icon(
+                        material.Icons.home_rounded,
+                        size: 16,
+                      ),
+                      child: const Text('Home'),
+                    ),
+                    const material.SizedBox(width: 4),
+                  ],
                   material.IconButton(
                     icon: const material.Icon(
                       material.Icons.close_rounded,
@@ -135,32 +171,60 @@ class _WelcomeTourDialogState extends State<WelcomeTourDialog> {
               ),
               const material.SizedBox(height: 18),
 
-              // Slide body
-              _buildSlideContent(
-                step: _currentStep,
-                cmdCtrl: cmdCtrl,
-                cs: cs,
-                wb: wb,
+              // Animated Slide body
+              material.AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                transitionBuilder: (child, animation) {
+                  return material.FadeTransition(
+                    opacity: animation,
+                    child: material.SlideTransition(
+                      position: material.Tween<material.Offset>(
+                        begin: const material.Offset(0.04, 0),
+                        end: material.Offset.zero,
+                      ).animate(animation),
+                      child: child,
+                    ),
+                  );
+                },
+                child: _buildSlideContent(
+                  step: _currentStep,
+                  cmdCtrl: cmdCtrl,
+                  cs: cs,
+                  wb: wb,
+                ),
               ),
               const material.SizedBox(height: 20),
 
               // Footer controls & Step dots
               material.Row(
                 children: [
-                  // Step indicator dots
+                  // Step indicator dots (clickable)
                   material.Row(
                     mainAxisSize: material.MainAxisSize.min,
                     children: List.generate(_totalSteps, (index) {
                       final active = index == _currentStep;
-                      return material.Container(
-                        margin: const material.EdgeInsets.symmetric(horizontal: 3),
-                        width: active ? 20 : 6,
-                        height: 6,
-                        decoration: material.BoxDecoration(
-                          color: active
-                              ? wb.accent
-                              : wb.mutedForeground.withValues(alpha: 0.3),
-                          borderRadius: material.BorderRadius.circular(3),
+                      return material.GestureDetector(
+                        onTap: () => _goToStep(index),
+                        behavior: material.HitTestBehavior.opaque,
+                        child: material.Container(
+                          padding: const material.EdgeInsets.symmetric(
+                            horizontal: 3,
+                            vertical: 6,
+                          ),
+                          child: material.AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            curve: Curves.easeOutCubic,
+                            width: active ? 22 : 6,
+                            height: 6,
+                            decoration: material.BoxDecoration(
+                              color: active
+                                  ? wb.accent
+                                  : wb.mutedForeground.withValues(alpha: 0.3),
+                              borderRadius: material.BorderRadius.circular(3),
+                            ),
+                          ),
                         ),
                       );
                     }),
@@ -257,17 +321,30 @@ class _WelcomeTourDialogState extends State<WelcomeTourDialog> {
           tipText:
               'Toggle Read-Only mode in the title bar for risk-free production exploration.',
           shortcutBadge: 'Protected',
-          actionButton: widget.onLaunchDemo != null
-              ? OutlineButton(
-                  key: const Key('welcome_tour_demo_button'),
-                  onPressed: _launchDemoAndClose,
-                  leading: const material.Icon(
-                    material.Icons.play_arrow_rounded,
-                    size: 18,
-                  ),
-                  child: const Text('Try Demo Playground Now'),
-                )
-              : null,
+          actionButtons: [
+            if (widget.onLaunchDemo != null)
+              OutlineButton(
+                key: const Key('welcome_tour_demo_button'),
+                onPressed: _launchDemoAndClose,
+                leading: const material.Icon(
+                  material.Icons.play_arrow_rounded,
+                  size: 18,
+                ),
+                child: const Text('Try Demo Playground Now'),
+              ),
+            if (widget.onGoHome != null) ...[
+              const material.SizedBox(height: 8),
+              GhostButton(
+                key: const Key('welcome_tour_slide_home_button'),
+                onPressed: _goHomeAndClose,
+                leading: const material.Icon(
+                  material.Icons.home_rounded,
+                  size: 16,
+                ),
+                child: const Text('Return to Start Screen'),
+              ),
+            ],
+          ],
           wb: wb,
         );
     }
@@ -283,7 +360,7 @@ class _TourSlideView extends StatelessWidget {
     required this.description,
     required this.tipText,
     required this.shortcutBadge,
-    this.actionButton,
+    this.actionButtons,
     required this.wb,
   });
 
@@ -293,7 +370,7 @@ class _TourSlideView extends StatelessWidget {
   final String description;
   final String tipText;
   final String shortcutBadge;
-  final Widget? actionButton;
+  final List<Widget>? actionButtons;
   final QueryaWorkbenchTheme wb;
 
   @override
@@ -307,7 +384,17 @@ class _TourSlideView extends StatelessWidget {
           decoration: material.BoxDecoration(
             color: wb.canvas,
             borderRadius: material.BorderRadius.circular(12),
-            border: material.Border.all(color: wb.borderSubtle.withValues(alpha: 0.5)),
+            border: material.Border.all(
+              color: wb.borderSubtle.withValues(alpha: 0.5),
+            ),
+            gradient: material.LinearGradient(
+              begin: material.Alignment.topLeft,
+              end: material.Alignment.bottomRight,
+              colors: [
+                wb.canvas,
+                wb.surface.withValues(alpha: 0.85),
+              ],
+            ),
           ),
           child: material.Row(
             children: [
@@ -317,6 +404,9 @@ class _TourSlideView extends StatelessWidget {
                 decoration: material.BoxDecoration(
                   color: iconColor.withValues(alpha: 0.15),
                   shape: material.BoxShape.circle,
+                  border: material.Border.all(
+                    color: iconColor.withValues(alpha: 0.35),
+                  ),
                 ),
                 child: material.Icon(
                   icon,
@@ -373,11 +463,16 @@ class _TourSlideView extends StatelessWidget {
 
         // Tip banner
         material.Container(
-          padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const material.EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 10,
+          ),
           decoration: material.BoxDecoration(
             color: wb.accent.withValues(alpha: 0.08),
             borderRadius: material.BorderRadius.circular(8),
-            border: material.Border.all(color: wb.accent.withValues(alpha: 0.2)),
+            border: material.Border.all(
+              color: wb.accent.withValues(alpha: 0.2),
+            ),
           ),
           child: material.Row(
             children: [
@@ -401,9 +496,9 @@ class _TourSlideView extends StatelessWidget {
           ),
         ),
 
-        if (actionButton != null) ...[
+        if (actionButtons != null && actionButtons!.isNotEmpty) ...[
           const material.SizedBox(height: 14),
-          actionButton!,
+          ...actionButtons!,
         ],
       ],
     );

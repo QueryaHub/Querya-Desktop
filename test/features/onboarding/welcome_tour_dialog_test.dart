@@ -140,4 +140,26 @@ void main() {
     await tester.tap(find.byKey(const Key('welcome_tour_skip_button')));
     await tester.pumpAndSettle();
   });
+
+  testWidgets('WelcomeTourDialog exposes Home buttons and triggers onGoHome',
+      (tester) async {
+    var homeTriggered = false;
+
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.Scaffold(
+          body: WelcomeTourDialog(
+            onGoHome: () => homeTriggered = true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('welcome_tour_home_button')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('welcome_tour_home_button')));
+    await tester.pumpAndSettle();
+
+    expect(homeTriggered, isTrue);
+  });
 }
