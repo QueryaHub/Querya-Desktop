@@ -106,41 +106,53 @@ class _PgTreeRow extends material.StatelessWidget {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
     final muted = theme.colorScheme.mutedForeground;
-    final row = material.Material(
-      color: material.Colors.transparent,
-      child: material.InkWell(
-        onTap: onTap,
-        borderRadius: material.BorderRadius.circular(4),
-        hoverColor: primary.withValues(alpha: 0.07),
-        splashColor: primary.withValues(alpha: 0.10),
-        highlightColor: primary.withValues(alpha: 0.05),
-        mouseCursor: onTap != null
-            ? material.SystemMouseCursors.click
-            : material.SystemMouseCursors.basic,
-        child: material.Padding(
-          padding: material.EdgeInsets.symmetric(
-            horizontal: 4,
-            vertical: verticalPadding,
-          ),
-          child: material.Row(
-            children: [
-              if (leading != null) ...[
-                leading!,
-                const Gap(4),
-              ],
-              if (icon != null) ...[
-                material.Icon(
-                  icon,
-                  size: iconSize,
-                  color: iconColor ?? muted,
+    final row = material.CallbackShortcuts(
+      bindings: {
+        if (expanded == false && onTap != null)
+          const material.SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+              onTap!(),
+        if (expanded == true && onTap != null)
+          const material.SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+              onTap!(),
+      },
+      child: material.Material(
+        color: material.Colors.transparent,
+        child: material.InkWell(
+          onTap: onTap,
+          canRequestFocus: onTap != null,
+          borderRadius: material.BorderRadius.circular(4),
+          hoverColor: primary.withValues(alpha: 0.07),
+          focusColor: primary.withValues(alpha: 0.14),
+          splashColor: primary.withValues(alpha: 0.10),
+          highlightColor: primary.withValues(alpha: 0.05),
+          mouseCursor: onTap != null
+              ? material.SystemMouseCursors.click
+              : material.SystemMouseCursors.basic,
+          child: material.Padding(
+            padding: material.EdgeInsets.symmetric(
+              horizontal: 4,
+              vertical: verticalPadding,
+            ),
+            child: material.Row(
+              children: [
+                if (leading != null) ...[
+                  leading!,
+                  const Gap(4),
+                ],
+                if (icon != null) ...[
+                  material.Icon(
+                    icon,
+                    size: iconSize,
+                    color: iconColor ?? muted,
+                  ),
+                  const Gap(6),
+                ],
+                material.Expanded(
+                  child: _PgTreeRowLabel(label: label, textStyle: textStyle),
                 ),
-                const Gap(6),
+                if (trailing != null) trailing!,
               ],
-              material.Expanded(
-                child: _PgTreeRowLabel(label: label, textStyle: textStyle),
-              ),
-              if (trailing != null) trailing!,
-            ],
+            ),
           ),
         ),
       ),

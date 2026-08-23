@@ -51,8 +51,11 @@ import 'package:flutter/material.dart' as material
         VoidCallback,
         RepaintBoundary,
         ListView,
-        ClampingScrollPhysics;
-import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+        ClampingScrollPhysics,
+        CallbackShortcuts,
+        SingleActivator;
+import 'package:flutter/services.dart'
+    show Clipboard, ClipboardData, LogicalKeyboardKey;
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
