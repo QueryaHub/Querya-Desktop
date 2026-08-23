@@ -156,6 +156,48 @@ class _PgTreeRow extends material.StatelessWidget {
     }
     final menu = ContextMenu(
       items: [
+        if (openSqlName != null) ...[
+          MenuButton(
+            leading: material.Icon(
+              material.Icons.table_rows_outlined,
+              size: 18,
+              color: theme.colorScheme.primary,
+            ),
+            onPressed: (_) {
+              final qualified = openSqlSchema != null && openSqlSchema!.isNotEmpty
+                  ? '"$openSqlSchema"."$openSqlName"'
+                  : '"$openSqlName"';
+              Clipboard.setData(
+                ClipboardData(text: 'SELECT * FROM $qualified LIMIT 100;'),
+              );
+              if (onOpenSqlWorkspace != null && connection != null) {
+                onOpenSqlWorkspace!(
+                  connection!,
+                  database: openSqlDatabase,
+                  schema: openSqlSchema,
+                  name: openSqlName,
+                  kind: openSqlKind,
+                );
+              }
+            },
+            child: const Text('Select TOP 100'),
+          ),
+          MenuButton(
+            leading: material.Icon(
+              material.Icons.code_rounded,
+              size: 18,
+              color: theme.colorScheme.mutedForeground,
+            ),
+            onPressed: (_) {
+              final qualified = openSqlSchema != null && openSqlSchema!.isNotEmpty
+                  ? '"$openSqlSchema"."$openSqlName"'
+                  : '"$openSqlName"';
+              Clipboard.setData(ClipboardData(text: 'SELECT * FROM $qualified;'));
+            },
+            child: const Text('Copy SELECT statement'),
+          ),
+          const MenuDivider(),
+        ],
         if (onContextRefresh != null)
           MenuButton(
             leading: material.Icon(
@@ -177,7 +219,7 @@ class _PgTreeRow extends material.StatelessWidget {
           },
           child: const Text('Copy name'),
         ),
-        if (onOpenSqlWorkspace != null)
+        if (onOpenSqlWorkspace != null && openSqlName == null)
           MenuButton(
             leading: material.Icon(
               material.Icons.terminal_rounded,
@@ -193,7 +235,8 @@ class _PgTreeRow extends material.StatelessWidget {
             ),
             child: const Text('Open in SQL'),
           ),
-        if (onContextDelete != null)
+        if (onContextDelete != null) ...[
+          const MenuDivider(),
           MenuButton(
             leading: material.Icon(
               material.Icons.delete_outline_rounded,
@@ -203,6 +246,7 @@ class _PgTreeRow extends material.StatelessWidget {
             onPressed: (_) => onContextDelete!(),
             child: Text(contextDeleteLabel ?? 'Delete'),
           ),
+        ],
       ],
       child: row,
     );
