@@ -61,6 +61,58 @@ void main() {
     });
   });
 
+  group('sortResultGridRows', () {
+    test('sorts numerically when all values are numbers', () {
+      final rows = [
+        ['10', 'b'],
+        ['2', 'a'],
+        ['1', 'c'],
+      ];
+      final sortedAsc = sortResultGridRows(
+        rows: rows,
+        columnIndex: 0,
+        order: ResultGridSortOrder.ascending,
+      );
+      expect(sortedAsc.map((r) => r[0]).toList(), ['1', '2', '10']);
+
+      final sortedDesc = sortResultGridRows(
+        rows: rows,
+        columnIndex: 0,
+        order: ResultGridSortOrder.descending,
+      );
+      expect(sortedDesc.map((r) => r[0]).toList(), ['10', '2', '1']);
+    });
+
+    test('sorts lexicographically for non-numeric strings', () {
+      final rows = [
+        ['banana'],
+        ['Apple'],
+        ['cherry'],
+      ];
+      final sorted = sortResultGridRows(
+        rows: rows,
+        columnIndex: 0,
+        order: ResultGridSortOrder.ascending,
+      );
+      expect(sorted.map((r) => r[0]).toList(), ['Apple', 'banana', 'cherry']);
+    });
+
+    test('handles NULL and empty values gracefully', () {
+      final rows = [
+        ['100'],
+        ['NULL'],
+        ['50'],
+        [''],
+      ];
+      final sorted = sortResultGridRows(
+        rows: rows,
+        columnIndex: 0,
+        order: ResultGridSortOrder.ascending,
+      );
+      expect(sorted.map((r) => r[0]).take(2).toList(), ['50', '100']);
+    });
+  });
+
   group('computeVisibleColumnWindow', () {
     test('returns empty for no columns', () {
       expect(
@@ -537,6 +589,50 @@ void main() {
       // Column headers and rows remain stable and rendered
       expect(find.text('alice'), findsOneWidget);
       expect(find.text('bob'), findsOneWidget);
+    });
+
+    testWidgets('allows sorting by clicking column headers in VirtualResultGrid',
+        (tester) async {
+      await tester.pumpWidget(
+        resultsShell(
+          child: const material.Scaffold(
+            body: material.SizedBox(
+              width: 800,
+              height: 400,
+              child: VirtualResultGrid(
+                columns: ['id', 'score'],
+                rows: [
+                  ['1', '100'],
+                  ['2', '20'],
+                  ['3', '500'],
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Tap on 'score' header -> Ascending sort
+      await tester.tap(find.text('score'));
+      await tester.pumpAndSettle();
+
+      // Arrow up icon should appear
+      expect(find.byIcon(material.Icons.arrow_upward_rounded), findsOneWidget);
+
+      // Tap again -> Descending sort
+      await tester.tap(find.text('score'));
+      await tester.pumpAndSettle();
+
+      // Arrow down icon should appear
+      expect(find.byIcon(material.Icons.arrow_downward_rounded), findsOneWidget);
+
+      // Tap again -> Reset to natural order
+      await tester.tap(find.text('score'));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(material.Icons.arrow_upward_rounded), findsNothing);
+      expect(find.byIcon(material.Icons.arrow_downward_rounded), findsNothing);
     });
   });
 }

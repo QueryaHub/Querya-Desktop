@@ -168,6 +168,55 @@ ResultGridColumnWindow computeVisibleColumnWindow({
   );
 }
 
+/// Sorting direction for [VirtualResultGrid].
+enum ResultGridSortOrder {
+  ascending,
+  descending,
+}
+
+/// Sorts rows by the specified column index with natural numeric / temporal / lexicographic comparison.
+List<List<String>> sortResultGridRows({
+  required List<List<String>> rows,
+  required int columnIndex,
+  required ResultGridSortOrder order,
+}) {
+  if (rows.isEmpty || columnIndex < 0) return rows;
+  final sorted = List<List<String>>.from(rows);
+
+  sorted.sort((a, b) {
+    final valA = columnIndex < a.length ? a[columnIndex] : '';
+    final valB = columnIndex < b.length ? b[columnIndex] : '';
+
+    final isNullA = valA == 'NULL' || valA.isEmpty;
+    final isNullB = valB == 'NULL' || valB.isEmpty;
+    if (isNullA && isNullB) return 0;
+    if (isNullA) return 1;
+    if (isNullB) return -1;
+
+    final numA = num.tryParse(valA);
+    final numB = num.tryParse(valB);
+    int cmp;
+    if (numA != null && numB != null) {
+      cmp = numA.compareTo(numB);
+    } else {
+      final dtA = DateTime.tryParse(valA);
+      final dtB = DateTime.tryParse(valB);
+      if (dtA != null && dtB != null) {
+        cmp = dtA.compareTo(dtB);
+      } else {
+        cmp = valA.toLowerCase().compareTo(valB.toLowerCase());
+        if (cmp == 0) {
+          cmp = valA.compareTo(valB);
+        }
+      }
+    }
+
+    return order == ResultGridSortOrder.ascending ? cmp : -cmp;
+  });
+
+  return sorted;
+}
+
 /// Virtualized read-only grid for SQL query results (rows + columns).
 class VirtualResultGrid extends material.StatefulWidget {
   const VirtualResultGrid({
@@ -193,10 +242,15 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   bool _userHasResized = false;
   double _scrollOffset = 0;
 
+  int? _sortColumnIndex;
+  ResultGridSortOrder? _sortOrder;
+  List<List<String>> _sortedRows = const [];
+
   @override
   void initState() {
     super.initState();
     _horizontalController.addListener(_onHorizontalScroll);
+    _updateSortedRows();
   }
 
   @override
@@ -212,7 +266,10 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
       _widthsNeedUpdate = true;
       if (oldWidget.columns != widget.columns) {
         _userHasResized = false;
+        _sortColumnIndex = null;
+        _sortOrder = null;
       }
+      _updateSortedRows();
     }
   }
 
@@ -243,6 +300,36 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
       _columnOffsets = computeResultGridColumnOffsets(_columnWidths);
       _widthsNeedUpdate = false;
     });
+  }
+
+  void _toggleSort(int columnIndex) {
+    if (columnIndex < 0 || columnIndex >= widget.columns.length) return;
+    setState(() {
+      if (_sortColumnIndex == columnIndex) {
+        if (_sortOrder == ResultGridSortOrder.ascending) {
+          _sortOrder = ResultGridSortOrder.descending;
+        } else {
+          _sortColumnIndex = null;
+          _sortOrder = null;
+        }
+      } else {
+        _sortColumnIndex = columnIndex;
+        _sortOrder = ResultGridSortOrder.ascending;
+      }
+      _updateSortedRows();
+    });
+  }
+
+  void _updateSortedRows() {
+    if (_sortColumnIndex == null || _sortOrder == null) {
+      _sortedRows = widget.rows;
+    } else {
+      _sortedRows = sortResultGridRows(
+        rows: widget.rows,
+        columnIndex: _sortColumnIndex!,
+        order: _sortOrder!,
+      );
+    }
   }
 
   List<double> _computeColumnWidths() {
@@ -329,6 +416,9 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
                       window: window,
                       height: headerHeight,
                       colorScheme: cs,
+                      sortColumnIndex: _sortColumnIndex,
+                      sortOrder: _sortOrder,
+                      onSortColumn: _toggleSort,
                       onResizeColumn: _onColumnResize,
                     ),
                     material.Expanded(
@@ -337,10 +427,10 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
                         thumbVisibility: true,
                         child: material.ListView.builder(
                           controller: _verticalController,
-                          itemCount: widget.rows.length,
+                          itemCount: _sortedRows.length,
                           itemExtent: rowHeight,
                           itemBuilder: (context, rowIndex) {
-                            final row = widget.rows[rowIndex];
+                            final row = _sortedRows[rowIndex];
                             final isEven = rowIndex.isEven;
                             return _DataRow(
                               key: ValueKey('result-row-$rowIndex'),
@@ -373,6 +463,9 @@ class _HeaderRow extends material.StatelessWidget {
     required this.window,
     required this.height,
     required this.colorScheme,
+    this.sortColumnIndex,
+    this.sortOrder,
+    this.onSortColumn,
     this.onResizeColumn,
   });
 
@@ -381,6 +474,9 @@ class _HeaderRow extends material.StatelessWidget {
   final ResultGridColumnWindow window;
   final double height;
   final ColorScheme colorScheme;
+  final int? sortColumnIndex;
+  final ResultGridSortOrder? sortOrder;
+  final material.ValueChanged<int>? onSortColumn;
   final void Function(int index, double delta)? onResizeColumn;
 
   @override
@@ -404,6 +500,8 @@ class _HeaderRow extends material.StatelessWidget {
               text: columns[i],
               width: columnWidths[i],
               colorScheme: colorScheme,
+              sortOrder: sortColumnIndex == i ? sortOrder : null,
+              onSort: onSortColumn != null ? () => onSortColumn!(i) : null,
               onResize: onResizeColumn != null
                   ? (delta) => onResizeColumn!(i, delta)
                   : null,
@@ -421,20 +519,25 @@ class _HeaderCell extends material.StatelessWidget {
     required this.text,
     required this.width,
     required this.colorScheme,
+    this.sortOrder,
+    this.onSort,
     this.onResize,
   });
 
   final String text;
   final double width;
   final ColorScheme colorScheme;
+  final ResultGridSortOrder? sortOrder;
+  final material.VoidCallback? onSort;
   final material.ValueChanged<double>? onResize;
 
   @override
   material.Widget build(material.BuildContext context) {
+    final isSorted = sortOrder != null;
     final style = material.TextStyle(
       fontSize: 12,
       fontWeight: material.FontWeight.w600,
-      color: colorScheme.foreground,
+      color: isSorted ? colorScheme.primary : colorScheme.foreground,
     );
 
     return material.Container(
@@ -451,15 +554,37 @@ class _HeaderCell extends material.StatelessWidget {
         clipBehavior: material.Clip.none,
         children: [
           material.Positioned.fill(
-            child: material.Padding(
-              padding: const material.EdgeInsets.symmetric(horizontal: 10),
-              child: material.Align(
-                alignment: material.Alignment.centerLeft,
-                child: material.Text(
-                  text,
-                  style: style,
-                  overflow: material.TextOverflow.ellipsis,
-                  maxLines: 1,
+            child: material.MouseRegion(
+              cursor: onSort != null
+                  ? material.SystemMouseCursors.click
+                  : material.MouseCursor.defer,
+              child: material.GestureDetector(
+                behavior: material.HitTestBehavior.opaque,
+                onTap: onSort,
+                child: material.Padding(
+                  padding: const material.EdgeInsets.symmetric(horizontal: 10),
+                  child: material.Row(
+                    children: [
+                      material.Expanded(
+                        child: material.Text(
+                          text,
+                          style: style,
+                          overflow: material.TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                      if (isSorted) ...[
+                        const material.SizedBox(width: 4),
+                        material.Icon(
+                          sortOrder == ResultGridSortOrder.ascending
+                              ? material.Icons.arrow_upward_rounded
+                              : material.Icons.arrow_downward_rounded,
+                          size: 13,
+                          color: colorScheme.primary,
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
             ),
