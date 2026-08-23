@@ -32,6 +32,7 @@ class QueryaWindowTitleBar extends StatelessWidget {
     this.isSidebarVisible = true,
     this.onToggleSidebar,
     this.onOpenWelcomeTour,
+    this.onGoHome,
   });
 
   final Future<void> Function() onNewDatabaseConnection;
@@ -47,6 +48,7 @@ class QueryaWindowTitleBar extends StatelessWidget {
   final bool isSidebarVisible;
   final VoidCallback? onToggleSidebar;
   final VoidCallback? onOpenWelcomeTour;
+  final VoidCallback? onGoHome;
 
   @visibleForTesting
   static Color titleBarBackground(BuildContext context) =>
@@ -179,6 +181,20 @@ class QueryaWindowTitleBar extends StatelessWidget {
                                   );
                                 },
                                 child: const Text('Save')),
+                            if (activeConnection != null && onGoHome != null) ...[
+                              const MenuDivider(),
+                              MenuButton(
+                                leading: const material.Icon(
+                                  material.Icons.home_rounded,
+                                  size: 18,
+                                ),
+                                trailing: Text(
+                                  Platform.isMacOS ? 'Cmd+Shift+0' : 'Ctrl+Shift+0',
+                                ).xSmall().muted(),
+                                onPressed: (_) => onGoHome?.call(),
+                                child: const Text('Close Workspace (Home)'),
+                              ),
+                            ],
                             const MenuDivider(),
                             MenuButton(
                                 onPressed: (_) => appWindow.close(),
@@ -222,6 +238,34 @@ class QueryaWindowTitleBar extends StatelessWidget {
                               onPressed: (_) => onToggleSidebar?.call(),
                               child: const Text('Toggle Sidebar'),
                             ),
+                            const MenuDivider(),
+                            MenuButton(
+                              leading: const material.Icon(
+                                material.Icons.auto_awesome_rounded,
+                                size: 18,
+                              ),
+                              trailing: Text(
+                                Platform.isMacOS ? 'Cmd+Shift+H' : 'F1',
+                              ).xSmall().muted(),
+                              onPressed: (_) => onOpenWelcomeTour?.call(),
+                              child: const Text('Welcome & Tutorial…'),
+                            ),
+                            if (activeConnection != null && onGoHome != null) ...[
+                              const MenuDivider(),
+                              MenuButton(
+                                leading: const material.Icon(
+                                  material.Icons.home_rounded,
+                                  size: 18,
+                                ),
+                                trailing: Text(
+                                  Platform.isMacOS
+                                      ? 'Cmd+Shift+0'
+                                      : 'Ctrl+Shift+0',
+                                ).xSmall().muted(),
+                                onPressed: (_) => onGoHome?.call(),
+                                child: const Text('Home / Start Screen'),
+                              ),
+                            ],
                           ],
                           child: const Text('View'),
                         ),

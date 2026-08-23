@@ -213,10 +213,15 @@ class _MainScreenState extends State<MainScreen> {
     await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
   }
 
+  void _onGoHome() {
+    _workspace.value = MainScreenWorkspaceState.empty;
+  }
+
   void _onOpenWelcomeTour() {
     showWelcomeTourDialog(
       context,
       onLaunchDemo: _onLaunchDemoPlayground,
+      onGoHome: _workspace.value.activeConnection != null ? _onGoHome : null,
     );
   }
 
@@ -238,6 +243,19 @@ class _MainScreenState extends State<MainScreen> {
       builder: (context, workspace, _) {
         return material.CallbackShortcuts(
           bindings: {
+            const material.SingleActivator(
+              LogicalKeyboardKey.keyN,
+              meta: true,
+            ): () => unawaited(_onNewDatabaseConnectionFromMenu()),
+            const material.SingleActivator(
+              LogicalKeyboardKey.keyN,
+              control: true,
+            ): () => unawaited(_onNewDatabaseConnectionFromMenu()),
+            const material.SingleActivator(
+              LogicalKeyboardKey.keyN,
+              meta: true,
+              shift: true,
+            ): () => unawaited(_onNewDatabaseConnectionFromMenu()),
             const material.SingleActivator(
               LogicalKeyboardKey.keyN,
               control: true,
@@ -264,6 +282,16 @@ class _MainScreenState extends State<MainScreen> {
               control: true,
               shift: true,
             ): () => _onOpenWelcomeTour(),
+            const material.SingleActivator(
+              LogicalKeyboardKey.digit0,
+              meta: true,
+              shift: true,
+            ): _onGoHome,
+            const material.SingleActivator(
+              LogicalKeyboardKey.digit0,
+              control: true,
+              shift: true,
+            ): _onGoHome,
           },
           child: SqlEditorGlobalActions(
             activeConnection: workspace.activeConnection,
@@ -289,6 +317,7 @@ class _MainScreenState extends State<MainScreen> {
                           onToggleSidebar: () =>
                               _splitKey.currentState?.toggleSidebar(),
                           onOpenWelcomeTour: _onOpenWelcomeTour,
+                          onGoHome: _onGoHome,
                           onReadOnlyChanged: () {
                             _workspace.value =
                                 _workspace.value.toggleReadOnly();
@@ -442,11 +471,11 @@ class _MainContentSplitState extends State<_MainContentSplit>
   static const double _minWorkspaceWidth = 64;
   static const double _resizeHandleWidth = 6;
 
-  /// High-responsiveness critically damped spring for fluid sidebar toggling (~0.25s).
+  /// High-responsiveness critically damped spring for fluid sidebar toggling (~0.22s).
   static const SpringDescription _sidebarSpring = SpringDescription(
     mass: 1.0,
-    stiffness: 480.0,
-    damping: 43.8,
+    stiffness: 580.0,
+    damping: 48.0,
   );
 
   late final QueryaSpringController _widthSpring;
@@ -466,7 +495,7 @@ class _MainContentSplitState extends State<_MainContentSplit>
       vsync: this,
       value: kDefaultConnectionsPanelWidth,
       spring: _sidebarSpring,
-      cubicDuration: const Duration(milliseconds: 170),
+      cubicDuration: const Duration(milliseconds: 160),
       cubicCurve: Curves.easeOutCubic,
     );
     _widthSpring.addListener(_onWidthSpringChanged);
@@ -551,13 +580,14 @@ class _MainContentSplitState extends State<_MainContentSplit>
     return LayoutBuilder(
       builder: (context, constraints) {
         _lastMaxWidth = constraints.maxWidth;
-        final currentW = _widthSpring.value;
-        final isFullyCollapsed = currentW <= 0.5 && !_widthSpring.isAnimating;
-        final handleOpacity = (currentW / 40.0).clamp(0.0, 1.0);
-        final parallaxOffset = (currentW - _lastExpandedWidth) * 0.28;
-        final contentOpacity = _lastExpandedWidth > 0
-            ? (currentW / (_lastExpandedWidth * 0.45)).clamp(0.0, 1.0)
-            : 1.0;
+        final currentW = _widthSpring.value.clamp(0.0, constraints.maxWidth);
+        final isFullyCollapsed = currentW <= 0.001 && !_widthSpring.isAnimating;
+        final progress = _lastExpandedWidth > 0
+            ? (currentW / _lastExpandedWidth).clamp(0.0, 1.0)
+            : 0.0;
+        final handleOpacity = (progress * 5.0).clamp(0.0, 1.0);
+        final contentOpacity = (progress * 2.2).clamp(0.0, 1.0);
+        final parallaxOffset = (progress - 1.0) * 36.0;
 
         return Row(
           children: [
@@ -602,11 +632,11 @@ class _MainContentSplitState extends State<_MainContentSplit>
                   ),
                 ),
               ),
-            if (!isFullyCollapsed || _widthSpring.isAnimating)
+            if (!isFullyCollapsed)
               Opacity(
                 opacity: handleOpacity,
                 child: IgnorePointer(
-                  ignoring: currentW <= 20.0,
+                  ignoring: currentW <= 20.0 || !_sidebarVisible,
                   child: QueryaSplitHandle(
                     key: const Key('main_content_resize_handle'),
                     axis: Axis.horizontal,
