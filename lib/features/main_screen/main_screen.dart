@@ -6,9 +6,9 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:querya_desktop/core/actions/sql_editor_global_actions.dart';
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
-import 'package:querya_desktop/core/layout/querya_drag_settle.dart';
 import 'package:querya_desktop/core/layout/querya_split_handle.dart';
 import 'package:querya_desktop/core/motion/querya_spring.dart';
+import 'package:querya_desktop/core/motion/querya_spring_controller.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/extensions/sandbox/unsandboxed_launch_consent_gate.dart';
@@ -35,9 +35,12 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   final GlobalKey<ConnectionsPanelState> _connectionsPanelKey =
       GlobalKey<ConnectionsPanelState>();
+  final GlobalKey<_MainContentSplitState> _splitKey =
+      GlobalKey<_MainContentSplitState>();
 
   final ValueNotifier<MainScreenWorkspaceState> _workspace =
       ValueNotifier(MainScreenWorkspaceState.empty);
+  final ValueNotifier<bool> _isSidebarVisible = ValueNotifier(true);
 
   @override
   void initState() {
@@ -52,6 +55,7 @@ class _MainScreenState extends State<MainScreen> {
   void dispose() {
     UnsandboxedLaunchConsentGate.instance.handler = null;
     _workspace.dispose();
+    _isSidebarVisible.dispose();
     super.dispose();
   }
 
@@ -210,6 +214,14 @@ class _MainScreenState extends State<MainScreen> {
               control: true,
               shift: true,
             ): () => unawaited(_onNewDatabaseConnectionFromMenu()),
+            const material.SingleActivator(
+              LogicalKeyboardKey.keyB,
+              control: true,
+            ): () => _splitKey.currentState?.toggleSidebar(),
+            const material.SingleActivator(
+              LogicalKeyboardKey.keyB,
+              meta: true,
+            ): () => _splitKey.currentState?.toggleSidebar(),
           },
           child: SqlEditorGlobalActions(
             activeConnection: workspace.activeConnection,
@@ -221,43 +233,55 @@ class _MainScreenState extends State<MainScreen> {
                 width: 1,
                 child: Column(
                   children: [
-                    QueryaWindowTitleBar(
-                      onNewDatabaseConnection: _onNewDatabaseConnectionFromMenu,
-                      onNewDatabaseConnectionFromUrl:
-                          _onNewDatabaseConnectionFromUrl,
-                      activeConnection: workspace.activeConnection,
-                      isReadOnly: workspace.isReadOnly,
-                      onReadOnlyChanged: () {
-                        _workspace.value = _workspace.value.toggleReadOnly();
-                      },
-                      onConnect: () {
-                        final active = workspace.activeConnection;
-                        if (active != null && active.id != null) {
-                          _connectionsPanelKey.currentState
-                              ?.connect(active.id!);
-                        }
-                      },
-                      onReconnect: () {
-                        final active = workspace.activeConnection;
-                        if (active != null) {
-                          _connectionsPanelKey.currentState?.reconnect(active);
-                        }
-                      },
-                      onDisconnect: () {
-                        final active = workspace.activeConnection;
-                        if (active != null) {
-                          _connectionsPanelKey.currentState?.disconnect(active);
-                        }
-                      },
-                      onDisconnectAll: () {
-                        _connectionsPanelKey.currentState?.disconnectAll();
-                      },
-                      onDisconnectOthers: () {
-                        final active = workspace.activeConnection;
-                        if (active != null) {
-                          _connectionsPanelKey.currentState
-                              ?.disconnectOthers(active);
-                        }
+                    ValueListenableBuilder<bool>(
+                      valueListenable: _isSidebarVisible,
+                      builder: (context, isSidebarVisible, _) {
+                        return QueryaWindowTitleBar(
+                          onNewDatabaseConnection:
+                              _onNewDatabaseConnectionFromMenu,
+                          onNewDatabaseConnectionFromUrl:
+                              _onNewDatabaseConnectionFromUrl,
+                          activeConnection: workspace.activeConnection,
+                          isReadOnly: workspace.isReadOnly,
+                          isSidebarVisible: isSidebarVisible,
+                          onToggleSidebar: () =>
+                              _splitKey.currentState?.toggleSidebar(),
+                          onReadOnlyChanged: () {
+                            _workspace.value =
+                                _workspace.value.toggleReadOnly();
+                          },
+                          onConnect: () {
+                            final active = workspace.activeConnection;
+                            if (active != null && active.id != null) {
+                              _connectionsPanelKey.currentState
+                                  ?.connect(active.id!);
+                            }
+                          },
+                          onReconnect: () {
+                            final active = workspace.activeConnection;
+                            if (active != null) {
+                              _connectionsPanelKey.currentState
+                                  ?.reconnect(active);
+                            }
+                          },
+                          onDisconnect: () {
+                            final active = workspace.activeConnection;
+                            if (active != null) {
+                              _connectionsPanelKey.currentState
+                                  ?.disconnect(active);
+                            }
+                          },
+                          onDisconnectAll: () {
+                            _connectionsPanelKey.currentState?.disconnectAll();
+                          },
+                          onDisconnectOthers: () {
+                            final active = workspace.activeConnection;
+                            if (active != null) {
+                              _connectionsPanelKey.currentState
+                                  ?.disconnectOthers(active);
+                            }
+                          },
+                        );
                       },
                     ),
                     Divider(
@@ -265,8 +289,11 @@ class _MainScreenState extends State<MainScreen> {
                         color: wb.borderSubtle.withValues(alpha: 0.22)),
                     Expanded(
                       child: _MainContentSplit(
+                        key: _splitKey,
                         connectionsPanelKey: _connectionsPanelKey,
                         workspace: _workspace,
+                        onSidebarVisibilityChanged: (v) =>
+                            _isSidebarVisible.value = v,
                         onConnectionSelected: _onConnectionSelected,
                         onPostgresObjectSelected: _onPostgresObjectSelected,
                         onMysqlObjectSelected: _onMysqlObjectSelected,
@@ -295,9 +322,10 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-/// Owns splitter width so resizing does not rebuild [MainScreen] or title bar.
+/// Owns splitter width and collapsible spring motion.
 class _MainContentSplit extends StatefulWidget {
   const _MainContentSplit({
+    super.key,
     required this.connectionsPanelKey,
     required this.workspace,
     required this.onConnectionSelected,
@@ -314,10 +342,12 @@ class _MainContentSplit extends StatefulWidget {
     required this.onRequestNewConnectionFromUrl,
     required this.onRequestOpenSqlite,
     required this.onOpenConnection,
+    this.onSidebarVisibilityChanged,
   });
 
   final GlobalKey<ConnectionsPanelState> connectionsPanelKey;
   final ValueNotifier<MainScreenWorkspaceState> workspace;
+  final ValueChanged<bool>? onSidebarVisibilityChanged;
   final void Function(ConnectionRow) onConnectionSelected;
   final void Function(
     ConnectionRow,
@@ -362,12 +392,20 @@ class _MainContentSplitState extends State<_MainContentSplit>
   static const double _maxLeftWidth = 500;
   static const double _minWorkspaceWidth = 64;
   static const double _resizeHandleWidth = 6;
-  final ValueNotifier<double> _leftPanelWidth =
-      ValueNotifier(kDefaultConnectionsPanelWidth);
-  late final QueryaDragSettleController _widthSettle;
+
+  /// High-responsiveness critically damped spring for fluid sidebar toggling (~0.25s).
+  static const SpringDescription _sidebarSpring = SpringDescription(
+    mass: 1.0,
+    stiffness: 480.0,
+    damping: 43.8,
+  );
+
+  late final QueryaSpringController _widthSpring;
   late final ConnectionsPanelWidthPersist _widthPersist;
   VoidCallback? _persistWhenSettled;
   double _lastMaxWidth = 1200;
+  double _lastExpandedWidth = kDefaultConnectionsPanelWidth;
+  bool _sidebarVisible = true;
 
   @override
   void initState() {
@@ -375,29 +413,42 @@ class _MainContentSplitState extends State<_MainContentSplit>
     _widthPersist = ConnectionsPanelWidthPersist(
       write: AppSettings.instance.setConnectionsPanelWidth,
     );
-    _widthSettle = QueryaDragSettleController(
+    _widthSpring = QueryaSpringController(
       vsync: this,
       value: kDefaultConnectionsPanelWidth,
-      maxSettleVelocity: 1200,
+      spring: _sidebarSpring,
+      cubicDuration: const Duration(milliseconds: 170),
+      cubicCurve: Curves.easeOutCubic,
     );
-    _widthSettle.addListener(_onWidthSettle);
-    unawaited(_restoreConnectionsPanelWidth());
+    _widthSpring.addListener(_onWidthSpringChanged);
+    unawaited(_restoreState());
   }
 
-  Future<void> _restoreConnectionsPanelWidth() async {
+  Future<void> _restoreState() async {
     final width = await AppSettings.instance.getConnectionsPanelWidth();
+    final visible = await AppSettings.instance.getSidebarVisible();
     if (!mounted) return;
     final clamped = _clampLeftWidth(width, _lastMaxWidth);
-    _widthSettle.jumpTo(clamped);
-    _leftPanelWidth.value = clamped;
+    _lastExpandedWidth = clamped;
+    _sidebarVisible = visible;
+    widget.onSidebarVisibilityChanged?.call(visible);
+    final targetW = visible ? clamped : 0.0;
+    _widthSpring.jumpTo(targetW);
   }
 
-  void _onWidthSettle() {
-    final clamped = _clampLeftWidth(_widthSettle.value, _lastMaxWidth);
-    _leftPanelWidth.value = clamped;
-    if (!_widthSettle.isSettling &&
-        (clamped - _widthSettle.value).abs() > 0.5) {
-      _widthSettle.jumpTo(clamped);
+  void toggleSidebar({bool? visible}) {
+    final target = visible ?? !_sidebarVisible;
+    _sidebarVisible = target;
+    widget.onSidebarVisibilityChanged?.call(target);
+    _widthSpring.useSprings = QueryaSpring.springsEnabled(context);
+    final targetWidth = target ? _lastExpandedWidth : 0.0;
+    _widthSpring.animateTo(targetWidth);
+    unawaited(AppSettings.instance.setSidebarVisible(target));
+  }
+
+  void _onWidthSpringChanged() {
+    if (mounted) {
+      setState(() {});
     }
   }
 
@@ -405,18 +456,20 @@ class _MainContentSplitState extends State<_MainContentSplit>
     _widthPersist.markDirty();
     final pending = _persistWhenSettled;
     if (pending != null) {
-      _widthSettle.removeListener(pending);
+      _widthSpring.removeListener(pending);
     }
     void listener() {
-      if (_widthSettle.isSettling) return;
-      _widthSettle.removeListener(listener);
+      if (_widthSpring.isAnimating) return;
+      _widthSpring.removeListener(listener);
       _persistWhenSettled = null;
-      unawaited(_widthPersist.persist(_leftPanelWidth.value));
+      if (_sidebarVisible) {
+        unawaited(_widthPersist.persist(_lastExpandedWidth));
+      }
     }
 
     _persistWhenSettled = listener;
-    if (_widthSettle.isSettling) {
-      _widthSettle.addListener(listener);
+    if (_widthSpring.isAnimating) {
+      _widthSpring.addListener(listener);
     } else {
       listener();
     }
@@ -426,13 +479,14 @@ class _MainContentSplitState extends State<_MainContentSplit>
   void dispose() {
     final pending = _persistWhenSettled;
     if (pending != null) {
-      _widthSettle.removeListener(pending);
+      _widthSpring.removeListener(pending);
       _persistWhenSettled = null;
     }
-    _widthPersist.disposeFlush(_leftPanelWidth.value);
-    _widthSettle.removeListener(_onWidthSettle);
-    _widthSettle.dispose();
-    _leftPanelWidth.dispose();
+    if (_sidebarVisible) {
+      _widthPersist.disposeFlush(_lastExpandedWidth);
+    }
+    _widthSpring.removeListener(_onWidthSpringChanged);
+    _widthSpring.dispose();
     super.dispose();
   }
 
@@ -448,60 +502,109 @@ class _MainContentSplitState extends State<_MainContentSplit>
     return LayoutBuilder(
       builder: (context, constraints) {
         _lastMaxWidth = constraints.maxWidth;
+        final currentW = _widthSpring.value;
+        final isFullyCollapsed = currentW <= 0.5 && !_widthSpring.isAnimating;
+        final handleOpacity = (currentW / 40.0).clamp(0.0, 1.0);
+        final parallaxOffset = (currentW - _lastExpandedWidth) * 0.28;
+        final contentOpacity = _lastExpandedWidth > 0
+            ? (currentW / (_lastExpandedWidth * 0.45)).clamp(0.0, 1.0)
+            : 1.0;
+
         return Row(
           children: [
-            ValueListenableBuilder<double>(
-              valueListenable: _leftPanelWidth,
-              builder: (context, rawWidth, connectionsPanel) {
-                final leftW = _clampLeftWidth(rawWidth, constraints.maxWidth);
-                return SizedBox(width: leftW, child: connectionsPanel);
-              },
-              child: material.RepaintBoundary(
-                child: _ConnectionsPanelSlot(
-                  connectionsPanelKey: widget.connectionsPanelKey,
-                  workspace: widget.workspace,
-                  onConnectionSelected: widget.onConnectionSelected,
-                  onRedisDatabaseSelected: widget.onRedisDatabaseSelected,
-                  onMongoDBDatabaseSelected: widget.onMongoDBDatabaseSelected,
-                  onPostgresObjectSelected: widget.onPostgresObjectSelected,
-                  onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
-                  onMysqlObjectSelected: widget.onMysqlObjectSelected,
-                  onMysqlOpenSqlWorkspace: widget.onMysqlOpenSqlWorkspace,
-                  onSqliteObjectSelected: widget.onSqliteObjectSelected,
-                  onSqliteOpenSqlWorkspace: widget.onSqliteOpenSqlWorkspace,
-                  onExtensionObjectSelected: widget.onExtensionObjectSelected,
+            if (!isFullyCollapsed)
+              ClipRect(
+                child: SizedBox(
+                  width: currentW,
+                  child: OverflowBox(
+                    minWidth: _lastExpandedWidth,
+                    maxWidth: _lastExpandedWidth,
+                    alignment: Alignment.topLeft,
+                    child: Transform.translate(
+                      offset: Offset(parallaxOffset, 0),
+                      child: Opacity(
+                        opacity: contentOpacity,
+                        child: material.RepaintBoundary(
+                          child: _ConnectionsPanelSlot(
+                            connectionsPanelKey: widget.connectionsPanelKey,
+                            workspace: widget.workspace,
+                            onConnectionSelected: widget.onConnectionSelected,
+                            onRedisDatabaseSelected:
+                                widget.onRedisDatabaseSelected,
+                            onMongoDBDatabaseSelected:
+                                widget.onMongoDBDatabaseSelected,
+                            onPostgresObjectSelected:
+                                widget.onPostgresObjectSelected,
+                            onPostgresOpenSqlWorkspace:
+                                widget.onPostgresOpenSqlWorkspace,
+                            onMysqlObjectSelected: widget.onMysqlObjectSelected,
+                            onMysqlOpenSqlWorkspace:
+                                widget.onMysqlOpenSqlWorkspace,
+                            onSqliteObjectSelected:
+                                widget.onSqliteObjectSelected,
+                            onSqliteOpenSqlWorkspace:
+                                widget.onSqliteOpenSqlWorkspace,
+                            onExtensionObjectSelected:
+                                widget.onExtensionObjectSelected,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
-            QueryaSplitHandle(
-              key: const Key('main_content_resize_handle'),
-              axis: Axis.horizontal,
-              semanticsLabel: 'Resize connections and workspace panes',
-              onDragDelta: (dx) {
-                final ml = constraints.maxWidth -
-                    _resizeHandleWidth -
-                    _minWorkspaceWidth;
-                if (ml <= 0) return;
-                _widthSettle.dragTo(
-                  _clampLeftWidth(
-                    _widthSettle.value + dx,
-                    constraints.maxWidth,
+            if (!isFullyCollapsed || _widthSpring.isAnimating)
+              Opacity(
+                opacity: handleOpacity,
+                child: IgnorePointer(
+                  ignoring: currentW <= 20.0,
+                  child: QueryaSplitHandle(
+                    key: const Key('main_content_resize_handle'),
+                    axis: Axis.horizontal,
+                    semanticsLabel: 'Resize connections and workspace panes',
+                    onDragDelta: (dx) {
+                      final ml = constraints.maxWidth -
+                          _resizeHandleWidth -
+                          _minWorkspaceWidth;
+                      if (ml <= 0) return;
+                      final nextW = _clampLeftWidth(
+                        _widthSpring.value + dx,
+                        constraints.maxWidth,
+                      );
+                      _lastExpandedWidth = nextW;
+                      _widthSpring.jumpTo(nextW);
+                    },
+                    onDiscreteResize: () => _widthPersist
+                        .onDiscreteResize(() => _lastExpandedWidth),
+                    onDragEnd: (details) {
+                      _widthPersist.cancelDiscreteTimer();
+                      final velocity = details.primaryVelocity ??
+                          details.velocity.pixelsPerSecond.dx;
+                      final useSprings = QueryaSpring.springsEnabled(context);
+                      _widthSpring.useSprings = useSprings;
+                      if (_widthSpring.value < 100 && velocity < -50) {
+                        _sidebarVisible = false;
+                        widget.onSidebarVisibilityChanged?.call(false);
+                        _widthSpring.animateTo(0.0, velocity: velocity);
+                        unawaited(AppSettings.instance.setSidebarVisible(false));
+                      } else {
+                        _sidebarVisible = true;
+                        widget.onSidebarVisibilityChanged?.call(true);
+                        _lastExpandedWidth = _clampLeftWidth(
+                          _widthSpring.value,
+                          constraints.maxWidth,
+                        );
+                        _widthSpring.animateTo(
+                          _lastExpandedWidth,
+                          velocity: velocity,
+                        );
+                        unawaited(AppSettings.instance.setSidebarVisible(true));
+                        _schedulePersistAfterSettle();
+                      }
+                    },
                   ),
-                );
-              },
-              onDiscreteResize: () => _widthPersist
-                  .onDiscreteResize(() => _leftPanelWidth.value),
-              onDragEnd: (details) {
-                _widthPersist.cancelDiscreteTimer();
-                final velocity = details.primaryVelocity ??
-                    details.velocity.pixelsPerSecond.dx;
-                _widthSettle.settle(
-                  velocity: velocity,
-                  useSprings: QueryaSpring.springsEnabled(context),
-                );
-                _schedulePersistAfterSettle();
-              },
-            ),
+                ),
+              ),
             Expanded(
               child: material.RepaintBoundary(
                 child: ValueListenableBuilder<MainScreenWorkspaceState>(

@@ -29,6 +29,8 @@ class QueryaWindowTitleBar extends StatelessWidget {
     this.onDisconnectOthers,
     this.isReadOnly = false,
     this.onReadOnlyChanged,
+    this.isSidebarVisible = true,
+    this.onToggleSidebar,
   });
 
   final Future<void> Function() onNewDatabaseConnection;
@@ -41,6 +43,8 @@ class QueryaWindowTitleBar extends StatelessWidget {
   final VoidCallback? onDisconnectOthers;
   final bool isReadOnly;
   final VoidCallback? onReadOnlyChanged;
+  final bool isSidebarVisible;
+  final VoidCallback? onToggleSidebar;
 
   @visibleForTesting
   static Color titleBarBackground(BuildContext context) =>
@@ -84,36 +88,59 @@ class QueryaWindowTitleBar extends StatelessWidget {
     );
   }
 
+  /// Allows headless widget tests to render without native bitsdojo symbols.
+  @visibleForTesting
+  static bool useNativeWindowChrome = true;
+
   @override
   material.Widget build(material.BuildContext context) {
     final wb = context.workbench;
     final buttonColors = windowButtonColors(context);
     final closeButtonColors = QueryaWindowTitleBar.closeButtonColors(context);
 
-    return material.Container(
-      height: context.scaled(40),
-      color: titleBarBackground(context),
-      child: WindowTitleBarBox(
-        child: Row(
-          children: [
-            Expanded(
-              child: MoveWindow(
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: QueryaWindowTitleBar.titleBarLeadingInset(
-                        isMacOS: Platform.isMacOS,
-                        scale: context.scaled,
-                      ),
-                    ),
-                    material.Icon(
-                      material.Icons.storage_rounded,
-                      size: 18,
-                      color: wb.accent,
-                    ),
+    final rowContent = Row(
+      children: [
+        SizedBox(
+          width: QueryaWindowTitleBar.titleBarLeadingInset(
+            isMacOS: Platform.isMacOS,
+            scale: context.scaled,
+          ),
+        ),
+        material.Icon(
+          material.Icons.storage_rounded,
+          size: 18,
+          color: wb.accent,
+        ),
                     const Gap(8),
                     const Text('Querya').semiBold().small(),
-                    const Gap(24),
+                    const Gap(12),
+                    if (onToggleSidebar != null) ...[
+                      material.Tooltip(
+                        message:
+                            'Toggle Sidebar (${Platform.isMacOS ? "Cmd+B" : "Ctrl+B"})',
+                        child: material.IconButton(
+                          key: const Key('title_bar_toggle_sidebar_button'),
+                          icon: material.Icon(
+                            isSidebarVisible
+                                ? material.Icons.view_sidebar_rounded
+                                : material.Icons.view_sidebar_outlined,
+                            size: 16,
+                            color: isSidebarVisible
+                                ? Theme.of(context).colorScheme.foreground
+                                : wb.mutedForeground,
+                          ),
+                          splashRadius: 14,
+                          padding: const material.EdgeInsets.all(4),
+                          constraints: const material.BoxConstraints(
+                            minWidth: 26,
+                            minHeight: 26,
+                          ),
+                          onPressed: onToggleSidebar,
+                        ),
+                      ),
+                      const Gap(12),
+                    ] else
+                      const Gap(12),
                     Menubar(
                       border: false,
                       popoverOffset: const Offset(0, 8),
@@ -179,6 +206,22 @@ class QueryaWindowTitleBar extends StatelessWidget {
                             ),
                           ],
                           child: const Text('Edit'),
+                        ),
+                        MenuButton(
+                          subMenu: [
+                            MenuButton(
+                              leading: const material.Icon(
+                                material.Icons.view_sidebar_rounded,
+                                size: 18,
+                              ),
+                              trailing: Text(
+                                Platform.isMacOS ? 'Cmd+B' : 'Ctrl+B',
+                              ).xSmall().muted(),
+                              onPressed: (_) => onToggleSidebar?.call(),
+                              child: const Text('Toggle Sidebar'),
+                            ),
+                          ],
+                          child: const Text('View'),
                         ),
                         MenuButton(
                           subMenu: [
@@ -273,27 +316,38 @@ class QueryaWindowTitleBar extends StatelessWidget {
                       ],
                     ),
                   ],
-                ),
-              ),
-            ),
-            Row(
-              mainAxisSize: material.MainAxisSize.min,
-              children: [
-                if (activeConnection != null && isReadOnly)
-                  const QueryaReadOnlyBadge(),
-                UpdateAvailableBadge(controller: UpdateController.instance),
-                if (QueryaWindowTitleBar.showBitsdojoWindowButtons(
+                );
+
+    final inner = Row(
+      children: [
+        Expanded(
+          child: useNativeWindowChrome
+              ? MoveWindow(child: rowContent)
+              : rowContent,
+        ),
+        Row(
+          mainAxisSize: material.MainAxisSize.min,
+          children: [
+            if (activeConnection != null && isReadOnly)
+              const QueryaReadOnlyBadge(),
+            UpdateAvailableBadge(controller: UpdateController.instance),
+            if (useNativeWindowChrome &&
+                QueryaWindowTitleBar.showBitsdojoWindowButtons(
                   isMacOS: Platform.isMacOS,
                 )) ...[
-                  MinimizeWindowButton(colors: buttonColors),
-                  MaximizeWindowButton(colors: buttonColors),
-                  CloseWindowButton(colors: closeButtonColors),
-                ],
-              ],
-            )
+              MinimizeWindowButton(colors: buttonColors),
+              MaximizeWindowButton(colors: buttonColors),
+              CloseWindowButton(colors: closeButtonColors),
+            ],
           ],
-        ),
-      ),
+        )
+      ],
+    );
+
+    return material.Container(
+      height: context.scaled(40),
+      color: titleBarBackground(context),
+      child: useNativeWindowChrome ? WindowTitleBarBox(child: inner) : inner,
     );
   }
 }
