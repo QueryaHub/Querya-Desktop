@@ -113,6 +113,49 @@ void main() {
     });
   });
 
+  group('ResultGridSelection', () {
+    test('contains point inside bounding box', () {
+      const selection = ResultGridSelection(
+        startRow: 1,
+        startColumn: 1,
+        endRow: 3,
+        endColumn: 4,
+      );
+      expect(selection.contains(1, 1), isTrue);
+      expect(selection.contains(2, 3), isTrue);
+      expect(selection.contains(3, 4), isTrue);
+      expect(selection.contains(0, 1), isFalse);
+      expect(selection.contains(1, 5), isFalse);
+    });
+
+    test('toTsv formats tab-delimited grid', () {
+      final rows = [
+        ['1', 'Alice', 'Engineer'],
+        ['2', 'Bob', 'Designer'],
+        ['3', 'Charlie', 'Manager'],
+      ];
+      final selection = ResultGridSelection.fromPoints(
+        anchor: const ResultGridCellCoordinate(0, 1),
+        focus: const ResultGridCellCoordinate(1, 2),
+      );
+      final tsv = selection.toTsv(rows);
+      expect(tsv, 'Alice\tEngineer\nBob\tDesigner');
+    });
+
+    test('toCsv formats comma-separated grid with quotes if needed', () {
+      final rows = [
+        ['1', 'Alice, Jr.', 'Engineer'],
+        ['2', 'Bob', 'Designer'],
+      ];
+      final selection = ResultGridSelection.fromPoints(
+        anchor: const ResultGridCellCoordinate(0, 0),
+        focus: const ResultGridCellCoordinate(1, 1),
+      );
+      final csv = selection.toCsv(rows);
+      expect(csv, '1,"Alice, Jr."\n2,Bob');
+    });
+  });
+
   group('computeVisibleColumnWindow', () {
     test('returns empty for no columns', () {
       expect(
