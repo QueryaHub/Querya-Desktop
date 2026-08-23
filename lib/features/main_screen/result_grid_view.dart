@@ -190,6 +190,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   List<double> _columnWidths = const [];
   List<double> _columnOffsets = const [0];
   bool _widthsNeedUpdate = true;
+  bool _userHasResized = false;
   double _scrollOffset = 0;
 
   @override
@@ -209,6 +210,9 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.columns != widget.columns || oldWidget.rows != widget.rows) {
       _widthsNeedUpdate = true;
+      if (oldWidget.columns != widget.columns) {
+        _userHasResized = false;
+      }
     }
   }
 
@@ -225,6 +229,20 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     final offset = _horizontalController.offset;
     if ((offset - _scrollOffset).abs() < 0.5) return;
     setState(() => _scrollOffset = offset);
+  }
+
+  void _onColumnResize(int index, double delta) {
+    if (index < 0 || index >= _columnWidths.length) return;
+    setState(() {
+      _userHasResized = true;
+      final minWidth = context.scaled(ResultGridMetrics.minColumnWidth);
+      final maxWidth = context.scaled(ResultGridMetrics.maxColumnWidth * 3);
+      final newWidth = (_columnWidths[index] + delta).clamp(minWidth, maxWidth);
+      _columnWidths = List<double>.from(_columnWidths);
+      _columnWidths[index] = newWidth;
+      _columnOffsets = computeResultGridColumnOffsets(_columnWidths);
+      _widthsNeedUpdate = false;
+    });
   }
 
   List<double> _computeColumnWidths() {
@@ -264,7 +282,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    if (_widthsNeedUpdate) {
+    if (_widthsNeedUpdate && !_userHasResized) {
       _columnWidths = _computeColumnWidths();
       _columnOffsets = computeResultGridColumnOffsets(_columnWidths);
       _widthsNeedUpdate = false;
@@ -280,14 +298,14 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
 
           var displayWidths = _columnWidths;
           var tableWidth = _tableWidth;
-          if (tableWidth < availableWidth && _columnWidths.isNotEmpty) {
+          if (!_userHasResized &&
+              tableWidth < availableWidth &&
+              _columnWidths.isNotEmpty) {
             final extraPerCol =
                 (availableWidth - tableWidth) / _columnWidths.length;
             displayWidths = [for (final w in _columnWidths) w + extraPerCol];
             tableWidth = availableWidth;
-          } else if (tableWidth > availableWidth) {
-            tableWidth = _tableWidth;
-          } else {
+          } else if (tableWidth < availableWidth) {
             tableWidth = availableWidth;
           }
 
@@ -311,6 +329,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
                       window: window,
                       height: headerHeight,
                       colorScheme: cs,
+                      onResizeColumn: _onColumnResize,
                     ),
                     material.Expanded(
                       child: material.Scrollbar(
@@ -354,6 +373,7 @@ class _HeaderRow extends material.StatelessWidget {
     required this.window,
     required this.height,
     required this.colorScheme,
+    this.onResizeColumn,
   });
 
   final List<String> columns;
@@ -361,6 +381,7 @@ class _HeaderRow extends material.StatelessWidget {
   final ResultGridColumnWindow window;
   final double height;
   final ColorScheme colorScheme;
+  final void Function(int index, double delta)? onResizeColumn;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -379,14 +400,86 @@ class _HeaderRow extends material.StatelessWidget {
           if (window.leadingWidth > 0)
             material.SizedBox(width: window.leadingWidth),
           for (var i = window.first; i <= window.last; i++)
-            _GridCell(
+            _HeaderCell(
               text: columns[i],
               width: columnWidths[i],
-              isHeader: true,
               colorScheme: colorScheme,
+              onResize: onResizeColumn != null
+                  ? (delta) => onResizeColumn!(i, delta)
+                  : null,
             ),
           if (window.trailingWidth > 0)
             material.SizedBox(width: window.trailingWidth),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderCell extends material.StatelessWidget {
+  const _HeaderCell({
+    required this.text,
+    required this.width,
+    required this.colorScheme,
+    this.onResize,
+  });
+
+  final String text;
+  final double width;
+  final ColorScheme colorScheme;
+  final material.ValueChanged<double>? onResize;
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    final style = material.TextStyle(
+      fontSize: 12,
+      fontWeight: material.FontWeight.w600,
+      color: colorScheme.foreground,
+    );
+
+    return material.Container(
+      width: width,
+      height: double.infinity,
+      decoration: material.BoxDecoration(
+        border: material.Border(
+          right: material.BorderSide(
+            color: colorScheme.border.withValues(alpha: 0.3),
+          ),
+        ),
+      ),
+      child: material.Stack(
+        clipBehavior: material.Clip.none,
+        children: [
+          material.Positioned.fill(
+            child: material.Padding(
+              padding: const material.EdgeInsets.symmetric(horizontal: 10),
+              child: material.Align(
+                alignment: material.Alignment.centerLeft,
+                child: material.Text(
+                  text,
+                  style: style,
+                  overflow: material.TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+            ),
+          ),
+          if (onResize != null)
+            material.Positioned(
+              right: -4,
+              top: 0,
+              bottom: 0,
+              width: 10,
+              child: material.MouseRegion(
+                cursor: material.SystemMouseCursors.resizeColumn,
+                child: material.GestureDetector(
+                  behavior: material.HitTestBehavior.translucent,
+                  onHorizontalDragUpdate: (details) {
+                    onResize!(details.delta.dx);
+                  },
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -450,25 +543,22 @@ class _GridCell extends material.StatelessWidget {
     required this.text,
     required this.width,
     required this.colorScheme,
-    this.isHeader = false,
   });
 
   final String text;
   final double width;
   final ColorScheme colorScheme;
-  final bool isHeader;
 
   @override
   material.Widget build(material.BuildContext context) {
-    final isNull = !isHeader && text == 'NULL';
+    final isNull = text == 'NULL';
     final style = material.TextStyle(
-      fontSize: isHeader ? 12 : 12,
-      fontWeight:
-          isHeader ? material.FontWeight.w600 : material.FontWeight.normal,
-      fontFamily: isHeader ? null : 'monospace',
+      fontSize: 12,
+      fontWeight: material.FontWeight.normal,
+      fontFamily: 'monospace',
       color: isNull
           ? colorScheme.mutedForeground.withValues(alpha: 0.5)
-          : (isHeader ? colorScheme.foreground : colorScheme.foreground),
+          : colorScheme.foreground,
       fontStyle: isNull ? material.FontStyle.italic : material.FontStyle.normal,
     );
 
@@ -490,8 +580,6 @@ class _GridCell extends material.StatelessWidget {
         maxLines: 1,
       ),
     );
-
-    if (isHeader) return cell;
 
     final interactiveCell = material.GestureDetector(
       onSecondaryTap: () => Clipboard.setData(ClipboardData(text: text)),
