@@ -313,14 +313,6 @@ class _QuickStartSection extends StatelessWidget {
             actionLabel: 'Connect',
             onTap: onNewConnection,
           ),
-          const material.SizedBox(height: 10),
-          _QuickStartRow(
-            icon: material.Icons.security_rounded,
-            title: 'Credentials stay protected',
-            description:
-                'Passwords are stored in your operating system secure store',
-            color: primary,
-          ),
         ],
       ),
     );
@@ -588,56 +580,6 @@ class _InteractiveQuickStartRowState extends State<_InteractiveQuickStartRow> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _QuickStartRow extends StatelessWidget {
-  const _QuickStartRow({
-    required this.icon,
-    required this.title,
-    required this.description,
-    required this.color,
-  });
-
-  final material.IconData icon;
-  final String title;
-  final String description;
-  final material.Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return material.Row(
-      crossAxisAlignment: material.CrossAxisAlignment.start,
-      children: [
-        material.Icon(icon, size: 18, color: color),
-        const material.SizedBox(width: 12),
-        material.Expanded(
-          child: material.Column(
-            crossAxisAlignment: material.CrossAxisAlignment.start,
-            children: [
-              material.Text(
-                title,
-                style: material.TextStyle(
-                  color: cs.foreground,
-                  fontSize: 13,
-                  fontWeight: material.FontWeight.w500,
-                ),
-              ),
-              const material.SizedBox(height: 2),
-              material.Text(
-                description,
-                style: material.TextStyle(
-                  color: cs.mutedForeground,
-                  fontSize: 12,
-                  height: 1.35,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

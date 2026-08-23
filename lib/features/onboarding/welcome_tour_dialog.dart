@@ -109,13 +109,17 @@ class _WelcomeTourDialogState extends State<WelcomeTourDialog> {
           maxWidth: 580,
           minWidth: 420,
         ),
-        child: material.Padding(
-          padding: const material.EdgeInsets.all(24),
-          child: material.Column(
-            mainAxisSize: material.MainAxisSize.min,
-            crossAxisAlignment: material.CrossAxisAlignment.stretch,
-            children: [
-              // Header row
+        child: material.AnimatedSize(
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutCubic,
+          alignment: material.Alignment.topCenter,
+          child: material.Padding(
+            padding: const material.EdgeInsets.all(24),
+            child: material.Column(
+              mainAxisSize: material.MainAxisSize.min,
+              crossAxisAlignment: material.CrossAxisAlignment.stretch,
+              children: [
+                // Header row
               material.Row(
                 children: [
                   material.Container(
@@ -261,8 +265,9 @@ class _WelcomeTourDialogState extends State<WelcomeTourDialog> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildSlideContent({
     required int step,
@@ -468,27 +473,37 @@ class _TourSlideView extends StatelessWidget {
             vertical: 10,
           ),
           decoration: material.BoxDecoration(
-            color: wb.accent.withValues(alpha: 0.08),
+            color: wb.surface,
             borderRadius: material.BorderRadius.circular(8),
             border: material.Border.all(
-              color: wb.accent.withValues(alpha: 0.2),
+              color: wb.borderSubtle.withValues(alpha: 0.65),
             ),
           ),
           child: material.Row(
             children: [
-              material.Icon(
-                material.Icons.lightbulb_outline_rounded,
-                size: 16,
-                color: wb.accent,
+              material.Container(
+                padding: const material.EdgeInsets.all(4),
+                decoration: material.BoxDecoration(
+                  color: wb.accent.withValues(alpha: 0.15),
+                  shape: material.BoxShape.circle,
+                ),
+                child: material.Icon(
+                  material.Icons.lightbulb_rounded,
+                  size: 14,
+                  color: wb.accent,
+                ),
               ),
-              const material.SizedBox(width: 8),
+              const material.SizedBox(width: 10),
               material.Expanded(
                 child: Text(
                   tipText,
                   style: TextStyle(
-                    fontSize: 12,
-                    color: wb.onAccent,
-                    height: 1.3,
+                    fontSize: 12.5,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .foreground
+                        .withValues(alpha: 0.9),
+                    height: 1.35,
                   ),
                 ),
               ),
