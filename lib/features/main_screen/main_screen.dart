@@ -5,6 +5,7 @@ import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:querya_desktop/core/actions/sql_editor_global_actions.dart';
+import 'package:querya_desktop/core/demo/demo_playground_service.dart';
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
 import 'package:querya_desktop/core/layout/querya_split_handle.dart';
 import 'package:querya_desktop/core/motion/querya_spring.dart';
@@ -19,6 +20,7 @@ import 'package:querya_desktop/features/connections/connections_panel.dart';
 import 'package:querya_desktop/features/connections/sqlite_connection_form.dart';
 import 'package:querya_desktop/features/main_screen/connections_panel_width_persist.dart';
 import 'package:querya_desktop/features/main_screen/querya_window_title_bar.dart';
+import 'package:querya_desktop/features/onboarding/welcome_tour_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
@@ -49,6 +51,16 @@ class _MainScreenState extends State<MainScreen> {
       if (!mounted) return Future.value(false);
       return showUnsandboxedDriverConsentDialog(context, details);
     };
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final completed = await AppSettings.instance.getHasCompletedWelcomeTour();
+      if (!completed && mounted) {
+        final connections = await LocalDb.instance.getConnections();
+        if (connections.isEmpty && mounted) {
+          _onOpenWelcomeTour();
+        }
+      }
+    });
   }
 
   @override
@@ -201,6 +213,23 @@ class _MainScreenState extends State<MainScreen> {
     await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
   }
 
+  void _onOpenWelcomeTour() {
+    showWelcomeTourDialog(
+      context,
+      onLaunchDemo: _onLaunchDemoPlayground,
+    );
+  }
+
+  Future<void> _onLaunchDemoPlayground() async {
+    try {
+      final demoConn = await DemoPlaygroundService.getOrCreateDemoConnection();
+      if (!mounted) return;
+      await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
+      _workspace.value = _workspace.value.selectConnection(demoConn);
+      _onSqliteOpenSqlWorkspace(demoConn);
+    } catch (_) {}
+  }
+
   @override
   material.Widget build(material.BuildContext context) {
     final wb = context.workbench;
@@ -222,6 +251,19 @@ class _MainScreenState extends State<MainScreen> {
               LogicalKeyboardKey.keyB,
               meta: true,
             ): () => _splitKey.currentState?.toggleSidebar(),
+            const material.SingleActivator(
+              LogicalKeyboardKey.f1,
+            ): () => _onOpenWelcomeTour(),
+            const material.SingleActivator(
+              LogicalKeyboardKey.keyH,
+              meta: true,
+              shift: true,
+            ): () => _onOpenWelcomeTour(),
+            const material.SingleActivator(
+              LogicalKeyboardKey.keyH,
+              control: true,
+              shift: true,
+            ): () => _onOpenWelcomeTour(),
           },
           child: SqlEditorGlobalActions(
             activeConnection: workspace.activeConnection,
@@ -246,6 +288,7 @@ class _MainScreenState extends State<MainScreen> {
                           isSidebarVisible: isSidebarVisible,
                           onToggleSidebar: () =>
                               _splitKey.currentState?.toggleSidebar(),
+                          onOpenWelcomeTour: _onOpenWelcomeTour,
                           onReadOnlyChanged: () {
                             _workspace.value =
                                 _workspace.value.toggleReadOnly();
@@ -308,6 +351,8 @@ class _MainScreenState extends State<MainScreen> {
                         onRequestNewConnectionFromUrl:
                             _onNewDatabaseConnectionFromUrl,
                         onRequestOpenSqlite: _openSqliteFromHero,
+                        onRequestLaunchDemo: _onLaunchDemoPlayground,
+                        onRequestOpenTour: _onOpenWelcomeTour,
                         onOpenConnection: _onConnectionSelected,
                       ),
                     ),
@@ -341,6 +386,8 @@ class _MainContentSplit extends StatefulWidget {
     required this.onRequestNewConnection,
     required this.onRequestNewConnectionFromUrl,
     required this.onRequestOpenSqlite,
+    this.onRequestLaunchDemo,
+    this.onRequestOpenTour,
     required this.onOpenConnection,
     this.onSidebarVisibilityChanged,
   });
@@ -380,6 +427,8 @@ class _MainContentSplit extends StatefulWidget {
   final VoidCallback onRequestNewConnection;
   final VoidCallback onRequestNewConnectionFromUrl;
   final VoidCallback onRequestOpenSqlite;
+  final VoidCallback? onRequestLaunchDemo;
+  final VoidCallback? onRequestOpenTour;
   final void Function(ConnectionRow) onOpenConnection;
 
   @override
@@ -629,6 +678,8 @@ class _MainContentSplitState extends State<_MainContentSplit>
                       onRequestNewConnectionFromUrl:
                           widget.onRequestNewConnectionFromUrl,
                       onRequestOpenSqlite: widget.onRequestOpenSqlite,
+                      onRequestLaunchDemo: widget.onRequestLaunchDemo,
+                      onRequestOpenTour: widget.onRequestOpenTour,
                       onOpenConnection: widget.onOpenConnection,
                     );
                   },

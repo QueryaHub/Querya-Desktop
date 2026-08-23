@@ -415,5 +415,13 @@ void main() {
       await AppSettings.instance.setCheckForUpdatesOnStartup(false);
       expect(await AppSettings.instance.getCheckForUpdatesOnStartup(), isFalse);
     });
+
+    test('hasCompletedWelcomeTour defaults to false and roundtrips true', () async {
+      expect(await AppSettings.instance.getHasCompletedWelcomeTour(), isFalse);
+      await AppSettings.instance.setHasCompletedWelcomeTour(true);
+      expect(await AppSettings.instance.getHasCompletedWelcomeTour(), isTrue);
+      await AppSettings.instance.setHasCompletedWelcomeTour(false);
+      expect(await AppSettings.instance.getHasCompletedWelcomeTour(), isFalse);
+    });
   });
 }

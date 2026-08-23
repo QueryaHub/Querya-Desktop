@@ -31,6 +31,7 @@ class QueryaWindowTitleBar extends StatelessWidget {
     this.onReadOnlyChanged,
     this.isSidebarVisible = true,
     this.onToggleSidebar,
+    this.onOpenWelcomeTour,
   });
 
   final Future<void> Function() onNewDatabaseConnection;
@@ -45,6 +46,7 @@ class QueryaWindowTitleBar extends StatelessWidget {
   final VoidCallback? onReadOnlyChanged;
   final bool isSidebarVisible;
   final VoidCallback? onToggleSidebar;
+  final VoidCallback? onOpenWelcomeTour;
 
   @visibleForTesting
   static Color titleBarBackground(BuildContext context) =>
@@ -300,6 +302,18 @@ class QueryaWindowTitleBar extends StatelessWidget {
                         ),
                         MenuButton(
                           subMenu: [
+                            MenuButton(
+                              leading: const material.Icon(
+                                material.Icons.auto_awesome_rounded,
+                                size: 18,
+                              ),
+                              trailing: Text(
+                                Platform.isMacOS ? 'Cmd+Shift+H' : 'F1',
+                              ).xSmall().muted(),
+                              onPressed: (_) => onOpenWelcomeTour?.call(),
+                              child: const Text('Welcome & Quick Tour…'),
+                            ),
+                            const MenuDivider(),
                             MenuButton(
                                 onPressed: (ctx) => showAboutDialog(ctx),
                                 child: const Text('About')),
