@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
-import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'package:flutter/services.dart'
+    show Clipboard, ClipboardData, HardwareKeyboard, LogicalKeyboardKey;
 import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/ui/querya_tooltip.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -168,6 +169,115 @@ ResultGridColumnWindow computeVisibleColumnWindow({
   );
 }
 
+/// Coordinate of a cell in [VirtualResultGrid].
+@immutable
+class ResultGridCellCoordinate {
+  const ResultGridCellCoordinate(this.row, this.column);
+
+  final int row;
+  final int column;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ResultGridCellCoordinate &&
+          row == other.row &&
+          column == other.column;
+
+  @override
+  int get hashCode => Object.hash(row, column);
+}
+
+/// Rectangular cell selection range in [VirtualResultGrid].
+@immutable
+class ResultGridSelection {
+  const ResultGridSelection({
+    required this.startRow,
+    required this.startColumn,
+    required this.endRow,
+    required this.endColumn,
+  });
+
+  factory ResultGridSelection.fromPoints({
+    required ResultGridCellCoordinate anchor,
+    required ResultGridCellCoordinate focus,
+  }) {
+    final minR = anchor.row < focus.row ? anchor.row : focus.row;
+    final maxR = anchor.row > focus.row ? anchor.row : focus.row;
+    final minC = anchor.column < focus.column ? anchor.column : focus.column;
+    final maxC = anchor.column > focus.column ? anchor.column : focus.column;
+    return ResultGridSelection(
+      startRow: minR,
+      startColumn: minC,
+      endRow: maxR,
+      endColumn: maxC,
+    );
+  }
+
+  final int startRow;
+  final int startColumn;
+  final int endRow;
+  final int endColumn;
+
+  bool contains(int row, int column) =>
+      row >= startRow &&
+      row <= endRow &&
+      column >= startColumn &&
+      column <= endColumn;
+
+  int get rowCount => endRow - startRow + 1;
+  int get columnCount => endColumn - startColumn + 1;
+
+  /// Formats selected cell values as a Tab-Separated Values (TSV) string.
+  String toTsv(List<List<String>> rows) {
+    if (rows.isEmpty) return '';
+    final buffer = StringBuffer();
+    for (var r = startRow; r <= endRow; r++) {
+      if (r < 0 || r >= rows.length) continue;
+      final rowData = rows[r];
+      final cells = <String>[];
+      for (var c = startColumn; c <= endColumn; c++) {
+        cells.add(c < rowData.length ? rowData[c] : '');
+      }
+      buffer.writeln(cells.join('\t'));
+    }
+    return buffer.toString().trimRight();
+  }
+
+  /// Formats selected cell values as a CSV string.
+  String toCsv(List<List<String>> rows) {
+    if (rows.isEmpty) return '';
+    final buffer = StringBuffer();
+    for (var r = startRow; r <= endRow; r++) {
+      if (r < 0 || r >= rows.length) continue;
+      final rowData = rows[r];
+      final cells = <String>[];
+      for (var c = startColumn; c <= endColumn; c++) {
+        final val = c < rowData.length ? rowData[c] : '';
+        if (val.contains(',') || val.contains('"') || val.contains('\n')) {
+          cells.add('"${val.replaceAll('"', '""')}"');
+        } else {
+          cells.add(val);
+        }
+      }
+      buffer.writeln(cells.join(','));
+    }
+    return buffer.toString().trimRight();
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ResultGridSelection &&
+          startRow == other.startRow &&
+          startColumn == other.startColumn &&
+          endRow == other.endRow &&
+          endColumn == other.endColumn;
+
+  @override
+  int get hashCode => Object.hash(startRow, startColumn, endRow, endColumn);
+}
+
 /// Sorting direction for [VirtualResultGrid].
 enum ResultGridSortOrder {
   ascending,
@@ -235,6 +345,7 @@ class VirtualResultGrid extends material.StatefulWidget {
 class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   final _horizontalController = material.ScrollController();
   final _verticalController = material.ScrollController();
+  final _focusNode = material.FocusNode();
 
   List<double> _columnWidths = const [];
   List<double> _columnOffsets = const [0];
@@ -245,6 +356,9 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   int? _sortColumnIndex;
   ResultGridSortOrder? _sortOrder;
   List<List<String>> _sortedRows = const [];
+
+  ResultGridCellCoordinate? _selectionAnchor;
+  ResultGridSelection? _selection;
 
   @override
   void initState() {
@@ -268,6 +382,8 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
         _userHasResized = false;
         _sortColumnIndex = null;
         _sortOrder = null;
+        _selectionAnchor = null;
+        _selection = null;
       }
       _updateSortedRows();
     }
@@ -278,6 +394,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     _horizontalController.removeListener(_onHorizontalScroll);
     _horizontalController.dispose();
     _verticalController.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -332,6 +449,55 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     }
   }
 
+  void _onCellTap(int row, int column, {bool isShift = false}) {
+    _focusNode.requestFocus();
+    setState(() {
+      final coord = ResultGridCellCoordinate(row, column);
+      if (isShift && _selectionAnchor != null) {
+        _selection = ResultGridSelection.fromPoints(
+          anchor: _selectionAnchor!,
+          focus: coord,
+        );
+      } else {
+        _selectionAnchor = coord;
+        _selection = ResultGridSelection(
+          startRow: row,
+          startColumn: column,
+          endRow: row,
+          endColumn: column,
+        );
+      }
+    });
+  }
+
+  void _onCellSecondaryTap(int row, int column) {
+    _focusNode.requestFocus();
+    if (_selection != null && _selection!.contains(row, column)) {
+      _copySelection();
+    } else {
+      setState(() {
+        _selectionAnchor = ResultGridCellCoordinate(row, column);
+        _selection = ResultGridSelection(
+          startRow: row,
+          startColumn: column,
+          endRow: row,
+          endColumn: column,
+        );
+      });
+      _copySelection();
+    }
+  }
+
+  void _copySelection({bool asCsv = false}) {
+    if (_selection == null) return;
+    final text = asCsv
+        ? _selection!.toCsv(_sortedRows)
+        : _selection!.toTsv(_sortedRows);
+    if (text.isNotEmpty) {
+      Clipboard.setData(ClipboardData(text: text));
+    }
+  }
+
   List<double> _computeColumnWidths() {
     return computeResultGridColumnWidths(
       columns: widget.columns,
@@ -378,79 +544,104 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     final rowHeight = _scaledRowHeight(context);
     final headerHeight = _scaledHeaderHeight(context);
 
-    return material.RepaintBoundary(
-      child: material.LayoutBuilder(
-        builder: (context, constraints) {
-          final availableWidth = constraints.maxWidth;
+    return material.CallbackShortcuts(
+      bindings: {
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyC,
+          meta: true,
+        ): () => _copySelection(),
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyC,
+          control: true,
+        ): () => _copySelection(),
+        const material.SingleActivator(
+          LogicalKeyboardKey.escape,
+        ): () => setState(() {
+              _selection = null;
+              _selectionAnchor = null;
+            }),
+      },
+      child: material.Focus(
+        focusNode: _focusNode,
+        child: material.RepaintBoundary(
+          child: material.LayoutBuilder(
+            builder: (context, constraints) {
+              final availableWidth = constraints.maxWidth;
 
-          var displayWidths = _columnWidths;
-          var tableWidth = _tableWidth;
-          if (!_userHasResized &&
-              tableWidth < availableWidth &&
-              _columnWidths.isNotEmpty) {
-            final extraPerCol =
-                (availableWidth - tableWidth) / _columnWidths.length;
-            displayWidths = [for (final w in _columnWidths) w + extraPerCol];
-            tableWidth = availableWidth;
-          } else if (tableWidth < availableWidth) {
-            tableWidth = availableWidth;
-          }
+              var displayWidths = _columnWidths;
+              var tableWidth = _tableWidth;
+              if (!_userHasResized &&
+                  tableWidth < availableWidth &&
+                  _columnWidths.isNotEmpty) {
+                final extraPerCol =
+                    (availableWidth - tableWidth) / _columnWidths.length;
+                displayWidths = [for (final w in _columnWidths) w + extraPerCol];
+                tableWidth = availableWidth;
+              } else if (tableWidth < availableWidth) {
+                tableWidth = availableWidth;
+              }
 
-          final window = _columnWindow(displayWidths, availableWidth);
+              final window = _columnWindow(displayWidths, availableWidth);
 
-          return material.Scrollbar(
-            controller: _horizontalController,
-            thumbVisibility: true,
-            notificationPredicate: (_) => true,
-            child: material.SingleChildScrollView(
-              controller: _horizontalController,
-              scrollDirection: material.Axis.horizontal,
-              child: material.SizedBox(
-                width: tableWidth,
-                child: material.Column(
-                  crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                  children: [
-                    _HeaderRow(
-                      columns: widget.columns,
-                      columnWidths: displayWidths,
-                      window: window,
-                      height: headerHeight,
-                      colorScheme: cs,
-                      sortColumnIndex: _sortColumnIndex,
-                      sortOrder: _sortOrder,
-                      onSortColumn: _toggleSort,
-                      onResizeColumn: _onColumnResize,
-                    ),
-                    material.Expanded(
-                      child: material.Scrollbar(
-                        controller: _verticalController,
-                        thumbVisibility: true,
-                        child: material.ListView.builder(
-                          controller: _verticalController,
-                          itemCount: _sortedRows.length,
-                          itemExtent: rowHeight,
-                          itemBuilder: (context, rowIndex) {
-                            final row = _sortedRows[rowIndex];
-                            final isEven = rowIndex.isEven;
-                            return _DataRow(
-                              key: ValueKey('result-row-$rowIndex'),
-                              row: row,
-                              columnWidths: displayWidths,
-                              window: window,
-                              height: rowHeight,
-                              colorScheme: cs,
-                              striped: !isEven,
-                            );
-                          },
+              return material.Scrollbar(
+                controller: _horizontalController,
+                thumbVisibility: true,
+                notificationPredicate: (_) => true,
+                child: material.SingleChildScrollView(
+                  controller: _horizontalController,
+                  scrollDirection: material.Axis.horizontal,
+                  child: material.SizedBox(
+                    width: tableWidth,
+                    child: material.Column(
+                      crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                      children: [
+                        _HeaderRow(
+                          columns: widget.columns,
+                          columnWidths: displayWidths,
+                          window: window,
+                          height: headerHeight,
+                          colorScheme: cs,
+                          sortColumnIndex: _sortColumnIndex,
+                          sortOrder: _sortOrder,
+                          onSortColumn: _toggleSort,
+                          onResizeColumn: _onColumnResize,
                         ),
-                      ),
+                        material.Expanded(
+                          child: material.Scrollbar(
+                            controller: _verticalController,
+                            thumbVisibility: true,
+                            child: material.ListView.builder(
+                              controller: _verticalController,
+                              itemCount: _sortedRows.length,
+                              itemExtent: rowHeight,
+                              itemBuilder: (context, rowIndex) {
+                                final row = _sortedRows[rowIndex];
+                                final isEven = rowIndex.isEven;
+                                return _DataRow(
+                                  key: ValueKey('result-row-$rowIndex'),
+                                  rowIndex: rowIndex,
+                                  row: row,
+                                  columnWidths: displayWidths,
+                                  window: window,
+                                  height: rowHeight,
+                                  colorScheme: cs,
+                                  striped: !isEven,
+                                  selection: _selection,
+                                  onCellTap: _onCellTap,
+                                  onCellSecondaryTap: _onCellSecondaryTap,
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-          );
-        },
+              );
+            },
+          ),
+        ),
       ),
     );
   }
@@ -614,45 +805,61 @@ class _HeaderCell extends material.StatelessWidget {
 class _DataRow extends material.StatelessWidget {
   const _DataRow({
     super.key,
+    required this.rowIndex,
     required this.row,
     required this.columnWidths,
     required this.window,
     required this.height,
     required this.colorScheme,
     required this.striped,
+    this.selection,
+    this.onCellTap,
+    this.onCellSecondaryTap,
   });
 
+  final int rowIndex;
   final List<String> row;
   final List<double> columnWidths;
   final ResultGridColumnWindow window;
   final double height;
   final ColorScheme colorScheme;
   final bool striped;
+  final ResultGridSelection? selection;
+  final void Function(int row, int col, {bool isShift})? onCellTap;
+  final void Function(int row, int col)? onCellSecondaryTap;
 
   @override
   material.Widget build(material.BuildContext context) {
     return material.RepaintBoundary(
-      child: material.Container(
+      child: material.SizedBox(
         height: height,
-        decoration: material.BoxDecoration(
-          color: striped
-              ? colorScheme.muted.withValues(alpha: 0.12)
-              : material.Colors.transparent,
-          border: material.Border(
-            bottom: material.BorderSide(
-              color: colorScheme.border.withValues(alpha: 0.15),
-            ),
-          ),
-        ),
         child: material.Row(
           children: [
             if (window.leadingWidth > 0)
               material.SizedBox(width: window.leadingWidth),
             for (var c = window.first; c <= window.last; c++)
               _GridCell(
+                row: rowIndex,
+                column: c,
                 text: c < row.length ? row[c] : '',
                 width: columnWidths[c],
                 colorScheme: colorScheme,
+                striped: striped,
+                isSelected: selection?.contains(rowIndex, c) ?? false,
+                isSelectionTop: selection != null &&
+                    selection!.contains(rowIndex, c) &&
+                    rowIndex == selection!.startRow,
+                isSelectionBottom: selection != null &&
+                    selection!.contains(rowIndex, c) &&
+                    rowIndex == selection!.endRow,
+                isSelectionLeft: selection != null &&
+                    selection!.contains(rowIndex, c) &&
+                    c == selection!.startColumn,
+                isSelectionRight: selection != null &&
+                    selection!.contains(rowIndex, c) &&
+                    c == selection!.endColumn,
+                onTap: onCellTap,
+                onSecondaryTap: onCellSecondaryTap,
               ),
             if (window.trailingWidth > 0)
               material.SizedBox(width: window.trailingWidth),
@@ -665,14 +872,34 @@ class _DataRow extends material.StatelessWidget {
 
 class _GridCell extends material.StatelessWidget {
   const _GridCell({
+    required this.row,
+    required this.column,
     required this.text,
     required this.width,
     required this.colorScheme,
+    required this.striped,
+    this.isSelected = false,
+    this.isSelectionTop = false,
+    this.isSelectionBottom = false,
+    this.isSelectionLeft = false,
+    this.isSelectionRight = false,
+    this.onTap,
+    this.onSecondaryTap,
   });
 
+  final int row;
+  final int column;
   final String text;
   final double width;
   final ColorScheme colorScheme;
+  final bool striped;
+  final bool isSelected;
+  final bool isSelectionTop;
+  final bool isSelectionBottom;
+  final bool isSelectionLeft;
+  final bool isSelectionRight;
+  final void Function(int row, int col, {bool isShift})? onTap;
+  final void Function(int row, int col)? onSecondaryTap;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -687,15 +914,37 @@ class _GridCell extends material.StatelessWidget {
       fontStyle: isNull ? material.FontStyle.italic : material.FontStyle.normal,
     );
 
+    final bg = isSelected
+        ? colorScheme.primary.withValues(alpha: 0.18)
+        : (striped
+            ? colorScheme.muted.withValues(alpha: 0.12)
+            : material.Colors.transparent);
+
     final cell = material.Container(
       width: width,
+      height: double.infinity,
       padding: const material.EdgeInsets.symmetric(horizontal: 10),
       alignment: material.Alignment.centerLeft,
       decoration: material.BoxDecoration(
+        color: bg,
         border: material.Border(
           right: material.BorderSide(
-            color: colorScheme.border.withValues(alpha: 0.3),
+            color: isSelectionRight
+                ? colorScheme.primary
+                : colorScheme.border.withValues(alpha: 0.3),
+            width: isSelectionRight ? 1.5 : 1.0,
           ),
+          left: isSelectionLeft
+              ? material.BorderSide(color: colorScheme.primary, width: 1.5)
+              : material.BorderSide.none,
+          top: isSelectionTop
+              ? material.BorderSide(color: colorScheme.primary, width: 1.5)
+              : material.BorderSide.none,
+          bottom: isSelectionBottom
+              ? material.BorderSide(color: colorScheme.primary, width: 1.5)
+              : material.BorderSide(
+                  color: colorScheme.border.withValues(alpha: 0.15),
+                ),
         ),
       ),
       child: material.Text(
@@ -707,7 +956,14 @@ class _GridCell extends material.StatelessWidget {
     );
 
     final interactiveCell = material.GestureDetector(
-      onSecondaryTap: () => Clipboard.setData(ClipboardData(text: text)),
+      behavior: material.HitTestBehavior.opaque,
+      onTap: () {
+        final isShift = HardwareKeyboard.instance.isShiftPressed;
+        onTap?.call(row, column, isShift: isShift);
+      },
+      onSecondaryTap: () {
+        onSecondaryTap?.call(row, column);
+      },
       child: cell,
     );
 
