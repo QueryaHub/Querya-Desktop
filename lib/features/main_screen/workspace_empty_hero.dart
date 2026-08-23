@@ -17,6 +17,8 @@ class WorkspaceEmptyHero extends StatefulWidget {
     required this.onNewConnection,
     this.onNewConnectionFromUrl,
     this.onOpenSqlite,
+    this.onLaunchDemo,
+    this.onOpenTour,
     this.onOpenConnection,
     this.recentConnections,
   });
@@ -24,6 +26,8 @@ class WorkspaceEmptyHero extends StatefulWidget {
   final VoidCallback onNewConnection;
   final VoidCallback? onNewConnectionFromUrl;
   final VoidCallback? onOpenSqlite;
+  final VoidCallback? onLaunchDemo;
+  final VoidCallback? onOpenTour;
   final ValueChanged<ConnectionRow>? onOpenConnection;
 
   /// When provided (e.g. in tests), skips loading recent connections from storage.
@@ -133,7 +137,7 @@ class _WorkspaceEmptyHeroState extends State<WorkspaceEmptyHero> {
                   ),
                   const material.SizedBox(height: 8),
                   material.Text(
-                    'Connect to a database or open a local SQLite file.',
+                    'Connect to a database, try the demo playground, or take a quick tour.',
                     textAlign: material.TextAlign.center,
                     style: material.TextStyle(
                       color: cs.mutedForeground,
@@ -155,6 +159,16 @@ class _WorkspaceEmptyHeroState extends State<WorkspaceEmptyHero> {
                         ),
                         child: const Text('New connection'),
                       ),
+                      if (widget.onLaunchDemo != null)
+                        OutlineButton(
+                          key: const Key('empty_try_demo_playground'),
+                          onPressed: widget.onLaunchDemo,
+                          leading: const material.Icon(
+                            material.Icons.play_circle_outline_rounded,
+                            size: 18,
+                          ),
+                          child: const Text('Demo Playground'),
+                        ),
                       if (widget.onNewConnectionFromUrl != null)
                         OutlineButton(
                           key: const Key('empty_new_from_url'),
@@ -205,6 +219,9 @@ class _WorkspaceEmptyHeroState extends State<WorkspaceEmptyHero> {
                                     wb.borderSubtle.withValues(alpha: 0.55),
                                 foreground: cs.foreground,
                                 primary: cs.primary,
+                                onLaunchDemo: widget.onLaunchDemo,
+                                onOpenTour: widget.onOpenTour,
+                                onNewConnection: widget.onNewConnection,
                               ),
                   ),
                 ],
@@ -225,6 +242,9 @@ class _QuickStartSection extends StatelessWidget {
     required this.borderColor,
     required this.foreground,
     required this.primary,
+    this.onLaunchDemo,
+    this.onOpenTour,
+    required this.onNewConnection,
   });
 
   final bool compact;
@@ -232,9 +252,15 @@ class _QuickStartSection extends StatelessWidget {
   final material.Color borderColor;
   final material.Color foreground;
   final material.Color primary;
+  final VoidCallback? onLaunchDemo;
+  final VoidCallback? onOpenTour;
+  final VoidCallback onNewConnection;
 
   @override
   Widget build(BuildContext context) {
+    final openTour = onOpenTour;
+    final launchDemo = onLaunchDemo;
+
     return material.Container(
       padding: material.EdgeInsets.all(compact ? 16 : 20),
       decoration: material.BoxDecoration(
@@ -254,22 +280,40 @@ class _QuickStartSection extends StatelessWidget {
             ),
           ),
           const material.SizedBox(height: 12),
-          _QuickStartRow(
+          if (openTour != null) ...[
+            _InteractiveQuickStartRow(
+              icon: material.Icons.auto_awesome_rounded,
+              title: 'Interactive Quick Tour',
+              description:
+                  'Learn connections, shortcuts & grid navigation in 4 visual steps',
+              color: primary,
+              actionLabel: 'Start Tour',
+              onTap: openTour,
+            ),
+            const material.SizedBox(height: 10),
+          ],
+          if (launchDemo != null) ...[
+            _InteractiveQuickStartRow(
+              icon: material.Icons.play_arrow_rounded,
+              title: '1-Click Demo Playground',
+              description:
+                  'Instant sample SQLite database with ready-to-run queries & grid',
+              color: const material.Color(0xFF10B981),
+              actionLabel: 'Launch Demo',
+              onTap: launchDemo,
+            ),
+            const material.SizedBox(height: 10),
+          ],
+          _InteractiveQuickStartRow(
             icon: material.Icons.dns_rounded,
-            title: 'Server databases',
+            title: 'Server & Local Databases',
             description:
-                'PostgreSQL, MySQL, MongoDB, Redis and extension drivers',
-            color: primary,
+                'PostgreSQL, MySQL, MongoDB, Redis, SQLite & custom extension drivers',
+            color: const material.Color(0xFF8B5CF6),
+            actionLabel: 'Connect',
+            onTap: onNewConnection,
           ),
-          const material.SizedBox(height: 12),
-          _QuickStartRow(
-            icon: material.Icons.insert_drive_file_rounded,
-            title: 'Local database',
-            description:
-                'Open an existing SQLite file or create a connection',
-            color: primary,
-          ),
-          const material.SizedBox(height: 12),
+          const material.SizedBox(height: 10),
           _QuickStartRow(
             icon: material.Icons.security_rounded,
             title: 'Credentials stay protected',
@@ -409,6 +453,136 @@ class _RecentConnectionRow extends StatelessWidget {
                 material.Icons.chevron_right_rounded,
                 size: 18,
                 color: cs.mutedForeground,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InteractiveQuickStartRow extends StatefulWidget {
+  const _InteractiveQuickStartRow({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.color,
+    required this.actionLabel,
+    required this.onTap,
+  });
+
+  final material.IconData icon;
+  final String title;
+  final String description;
+  final material.Color color;
+  final String actionLabel;
+  final VoidCallback onTap;
+
+  @override
+  State<_InteractiveQuickStartRow> createState() =>
+      _InteractiveQuickStartRowState();
+}
+
+class _InteractiveQuickStartRowState extends State<_InteractiveQuickStartRow> {
+  var _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final wb = context.workbench;
+
+    return material.MouseRegion(
+      cursor: material.SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: material.GestureDetector(
+        onTap: widget.onTap,
+        child: material.AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const material.EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 10,
+          ),
+          decoration: material.BoxDecoration(
+            color: _hovered
+                ? wb.borderSubtle.withValues(alpha: 0.2)
+                : material.Colors.transparent,
+            borderRadius: material.BorderRadius.circular(8),
+            border: material.Border.all(
+              color: _hovered
+                  ? wb.borderSubtle.withValues(alpha: 0.6)
+                  : material.Colors.transparent,
+            ),
+          ),
+          child: material.Row(
+            crossAxisAlignment: material.CrossAxisAlignment.center,
+            children: [
+              material.Container(
+                width: 32,
+                height: 32,
+                decoration: material.BoxDecoration(
+                  color: widget.color.withValues(alpha: 0.15),
+                  shape: material.BoxShape.circle,
+                ),
+                child: material.Icon(widget.icon, size: 16, color: widget.color),
+              ),
+              const material.SizedBox(width: 12),
+              material.Expanded(
+                child: material.Column(
+                  crossAxisAlignment: material.CrossAxisAlignment.start,
+                  children: [
+                    material.Text(
+                      widget.title,
+                      style: material.TextStyle(
+                        color: cs.foreground,
+                        fontSize: 13,
+                        fontWeight: material.FontWeight.w600,
+                      ),
+                    ),
+                    const material.SizedBox(height: 2),
+                    material.Text(
+                      widget.description,
+                      style: material.TextStyle(
+                        color: cs.mutedForeground,
+                        fontSize: 12,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const material.SizedBox(width: 8),
+              material.Container(
+                padding: const material.EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                decoration: material.BoxDecoration(
+                  color: _hovered
+                      ? wb.accent.withValues(alpha: 0.2)
+                      : wb.borderSubtle.withValues(alpha: 0.3),
+                  borderRadius: material.BorderRadius.circular(6),
+                ),
+                child: material.Row(
+                  mainAxisSize: material.MainAxisSize.min,
+                  children: [
+                    material.Text(
+                      widget.actionLabel,
+                      style: material.TextStyle(
+                        color: _hovered ? wb.accent : cs.mutedForeground,
+                        fontSize: 11,
+                        fontWeight: material.FontWeight.w600,
+                      ),
+                    ),
+                    const material.SizedBox(width: 4),
+                    material.Icon(
+                      material.Icons.chevron_right_rounded,
+                      size: 14,
+                      color: _hovered ? wb.accent : cs.mutedForeground,
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
