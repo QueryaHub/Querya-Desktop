@@ -9,6 +9,7 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:postgres/src/connection_string.dart' show parseConnectionString;
 
 import 'postgres_metadata.dart';
+import 'table_schema_meta.dart';
 
 /// Replaces the database in a `postgresql://` / `postgres://` URI (path or
 /// `database=` query param). Used when switching DB while keeping URI auth/SSL.
@@ -327,6 +328,79 @@ class PostgresConnection {
       parameters: {'schema': schema},
     );
     return result.map((row) => row[0] as String).toList();
+  }
+
+  /// Retrieves schema metadata and primary keys for [table] in [schema].
+  Future<TableSchemaMeta> getTableSchema({
+    String schema = 'public',
+    required String table,
+  }) async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final colsRs = await _conn!.execute(
+      Sql.named(
+        'SELECT column_name, data_type, is_nullable, column_default '
+        'FROM information_schema.columns '
+        'WHERE table_schema = @schema AND table_name = @table '
+        'ORDER BY ordinal_position',
+      ),
+      parameters: {'schema': schema, 'table': table},
+    );
+
+    final pkRs = await _conn!.execute(
+      Sql.named(
+        'SELECT kcu.column_name '
+        'FROM information_schema.table_constraints tc '
+        'JOIN information_schema.key_column_usage kcu '
+        '  ON tc.constraint_name = kcu.constraint_name '
+        ' AND tc.table_schema = kcu.table_schema '
+        "WHERE tc.constraint_type = 'PRIMARY KEY' "
+        '  AND tc.table_schema = @schema '
+        '  AND tc.table_name = @table '
+        'ORDER BY kcu.ordinal_position',
+      ),
+      parameters: {'schema': schema, 'table': table},
+    );
+
+    final primaryKeys = pkRs.map((r) => r[0] as String).toList();
+    final columns = <TableColumnMeta>[];
+
+    for (final r in colsRs) {
+      final name = r[0] as String? ?? '';
+      final dataType = r[1] as String? ?? '';
+      final isNullable = (r[2] as String? ?? 'YES').toUpperCase() == 'YES';
+      final isPk = primaryKeys.contains(name);
+      final pkPos = isPk ? primaryKeys.indexOf(name) + 1 : null;
+      final dflt = r[3]?.toString();
+
+      columns.add(
+        TableColumnMeta(
+          name: name,
+          dataType: dataType,
+          isNullable: isNullable,
+          isPrimaryKey: isPk,
+          primaryKeyPosition: pkPos,
+          defaultValue: dflt,
+        ),
+      );
+    }
+
+    return TableSchemaMeta(
+      tableName: table,
+      schema: schema,
+      columns: columns,
+      primaryKeys: primaryKeys,
+    );
+  }
+
+  /// Returns primary key column names for [table] in [schema].
+  Future<List<String>> getPrimaryKeys({
+    String schema = 'public',
+    required String table,
+  }) async {
+    final s = await getTableSchema(schema: schema, table: table);
+    return s.primaryKeys;
   }
 
   Future<List<String>> listViews({String schema = 'public'}) async {
