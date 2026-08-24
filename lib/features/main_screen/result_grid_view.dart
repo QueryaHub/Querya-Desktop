@@ -4,6 +4,8 @@ import 'package:flutter/services.dart'
 import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/ui/querya_tooltip.dart';
 import 'package:querya_desktop/features/main_screen/data_grid_staging_buffer.dart';
+import 'package:querya_desktop/features/main_screen/grid_cell_editor.dart';
+import 'package:querya_desktop/features/main_screen/grid_cell_popover_inspector.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// Layout metrics for [VirtualResultGrid].
@@ -364,6 +366,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
 
   ResultGridCellCoordinate? _selectionAnchor;
   ResultGridSelection? _selection;
+  ResultGridCellCoordinate? _editingCell;
 
   @override
   void initState() {
@@ -404,6 +407,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
         _sortOrder = null;
         _selectionAnchor = null;
         _selection = null;
+        _editingCell = null;
         widget.onRowSelected?.call(null);
       }
       _updateSortedRows();
@@ -418,6 +422,112 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     _verticalController.dispose();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  void _startEditing(int row, int column) {
+    if (widget.stagingBuffer == null) return;
+    if (row < 0 || row >= _sortedRows.length || column < 0 || column >= widget.columns.length) return;
+    setState(() {
+      _editingCell = ResultGridCellCoordinate(row, column);
+      _selectionAnchor = _editingCell;
+      _selection = ResultGridSelection(
+        startRow: row,
+        startColumn: column,
+        endRow: row,
+        endColumn: column,
+      );
+    });
+  }
+
+  void _commitEdit(
+    int row,
+    int column,
+    String value, {
+    bool moveNextCol = false,
+    bool movePrevCol = false,
+    bool moveNextRow = false,
+  }) {
+    if (widget.stagingBuffer != null) {
+      widget.stagingBuffer!.setCell(row, column, value);
+    }
+    setState(() {
+      if (moveNextCol) {
+        if (column + 1 < widget.columns.length) {
+          _editingCell = ResultGridCellCoordinate(row, column + 1);
+          _selection = ResultGridSelection(
+            startRow: row,
+            startColumn: column + 1,
+            endRow: row,
+            endColumn: column + 1,
+          );
+        } else if (row + 1 < _sortedRows.length) {
+          _editingCell = ResultGridCellCoordinate(row + 1, 0);
+          _selection = ResultGridSelection(
+            startRow: row + 1,
+            startColumn: 0,
+            endRow: row + 1,
+            endColumn: 0,
+          );
+        } else {
+          _editingCell = null;
+        }
+      } else if (movePrevCol) {
+        if (column > 0) {
+          _editingCell = ResultGridCellCoordinate(row, column - 1);
+          _selection = ResultGridSelection(
+            startRow: row,
+            startColumn: column - 1,
+            endRow: row,
+            endColumn: column - 1,
+          );
+        } else if (row > 0) {
+          _editingCell = ResultGridCellCoordinate(row - 1, widget.columns.length - 1);
+          _selection = ResultGridSelection(
+            startRow: row - 1,
+            startColumn: widget.columns.length - 1,
+            endRow: row - 1,
+            endColumn: widget.columns.length - 1,
+          );
+        } else {
+          _editingCell = null;
+        }
+      } else if (moveNextRow) {
+        if (row + 1 < _sortedRows.length) {
+          _editingCell = ResultGridCellCoordinate(row + 1, column);
+          _selection = ResultGridSelection(
+            startRow: row + 1,
+            startColumn: column,
+            endRow: row + 1,
+            endColumn: column,
+          );
+        } else {
+          _editingCell = null;
+        }
+      } else {
+        _editingCell = null;
+      }
+    });
+  }
+
+  void _cancelEdit() {
+    setState(() {
+      _editingCell = null;
+    });
+  }
+
+  Future<void> _openInspector(int row, int column) async {
+    if (row < 0 || row >= _sortedRows.length || column < 0 || column >= widget.columns.length) return;
+    final colName = widget.columns[column];
+    final currentVal = column < _sortedRows[row].length ? _sortedRows[row][column] : '';
+    final result = await showGridCellInspectorDialog(
+      context: context,
+      columnName: colName,
+      initialValue: currentVal,
+      rowIndex: row,
+    );
+    if (result != null && widget.stagingBuffer != null) {
+      widget.stagingBuffer!.setCell(row, column, result);
+    }
   }
 
   void _onHorizontalScroll() {
@@ -629,11 +739,55 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
         const material.SingleActivator(
           LogicalKeyboardKey.escape,
         ): () {
-          widget.onRowSelected?.call(null);
-          setState(() {
-            _selection = null;
-            _selectionAnchor = null;
-          });
+          if (_editingCell != null) {
+            _cancelEdit();
+          } else {
+            widget.onRowSelected?.call(null);
+            setState(() {
+              _selection = null;
+              _selectionAnchor = null;
+            });
+          }
+        },
+        const material.SingleActivator(
+          LogicalKeyboardKey.f2,
+        ): () {
+          if (_selection != null && _editingCell == null) {
+            _startEditing(_selection!.startRow, _selection!.startColumn);
+          }
+        },
+        const material.SingleActivator(
+          LogicalKeyboardKey.enter,
+        ): () {
+          if (_selection != null && _editingCell == null) {
+            _startEditing(_selection!.startRow, _selection!.startColumn);
+          }
+        },
+        const material.SingleActivator(
+          LogicalKeyboardKey.numpadEnter,
+        ): () {
+          if (_selection != null && _editingCell == null) {
+            _startEditing(_selection!.startRow, _selection!.startColumn);
+          }
+        },
+        const material.SingleActivator(
+          LogicalKeyboardKey.space,
+        ): () {
+          if (_selection != null && _editingCell == null) {
+            _openInspector(_selection!.startRow, _selection!.startColumn);
+          }
+        },
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyN,
+          alt: true,
+        ): () {
+          if (_selection != null && widget.stagingBuffer != null) {
+            widget.stagingBuffer!.setCell(
+              _selection!.startRow,
+              _selection!.startColumn,
+              'NULL',
+            );
+          }
         },
       },
       child: material.Focus(
@@ -703,8 +857,13 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
                                   striped: !isEven,
                                   selection: _selection,
                                   stagingBuffer: widget.stagingBuffer,
+                                  editingCell: _editingCell,
                                   onCellTap: _onCellTap,
+                                  onCellDoubleTap: _startEditing,
                                   onCellSecondaryTap: _onCellSecondaryTap,
+                                  onCommitEdit: _commitEdit,
+                                  onCancelEdit: _cancelEdit,
+                                  onOpenInspector: _openInspector,
                                 );
                               },
                             ),
@@ -890,8 +1049,13 @@ class _DataRow extends material.StatelessWidget {
     required this.striped,
     this.selection,
     this.stagingBuffer,
+    this.editingCell,
     this.onCellTap,
+    this.onCellDoubleTap,
     this.onCellSecondaryTap,
+    this.onCommitEdit,
+    this.onCancelEdit,
+    this.onOpenInspector,
   });
 
   final int rowIndex;
@@ -903,8 +1067,20 @@ class _DataRow extends material.StatelessWidget {
   final bool striped;
   final ResultGridSelection? selection;
   final DataGridStagingBuffer? stagingBuffer;
+  final ResultGridCellCoordinate? editingCell;
   final void Function(int row, int col, {bool isShift})? onCellTap;
+  final void Function(int row, int col)? onCellDoubleTap;
   final void Function(int row, int col)? onCellSecondaryTap;
+  final void Function(
+    int row,
+    int col,
+    String val, {
+    bool moveNextCol,
+    bool movePrevCol,
+    bool moveNextRow,
+  })? onCommitEdit;
+  final material.VoidCallback? onCancelEdit;
+  final void Function(int row, int col)? onOpenInspector;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -928,6 +1104,7 @@ class _DataRow extends material.StatelessWidget {
                 rowStatus: rowStatus,
                 cellStatus: stagingBuffer?.getCellStatus(rowIndex, c) ?? StagedCellStatus.clean,
                 isSelected: selection?.contains(rowIndex, c) ?? false,
+                isEditing: editingCell?.row == rowIndex && editingCell?.column == c,
                 isSelectionTop: selection != null &&
                     selection!.contains(rowIndex, c) &&
                     rowIndex == selection!.startRow,
@@ -941,7 +1118,11 @@ class _DataRow extends material.StatelessWidget {
                     selection!.contains(rowIndex, c) &&
                     c == selection!.endColumn,
                 onTap: onCellTap,
+                onDoubleTap: onCellDoubleTap,
                 onSecondaryTap: onCellSecondaryTap,
+                onCommitEdit: onCommitEdit,
+                onCancelEdit: onCancelEdit,
+                onOpenInspector: onOpenInspector,
               ),
             if (window.trailingWidth > 0)
               material.SizedBox(width: window.trailingWidth),
@@ -963,12 +1144,17 @@ class _GridCell extends material.StatelessWidget {
     this.rowStatus = StagedRowStatus.unchanged,
     this.cellStatus = StagedCellStatus.clean,
     this.isSelected = false,
+    this.isEditing = false,
     this.isSelectionTop = false,
     this.isSelectionBottom = false,
     this.isSelectionLeft = false,
     this.isSelectionRight = false,
     this.onTap,
+    this.onDoubleTap,
     this.onSecondaryTap,
+    this.onCommitEdit,
+    this.onCancelEdit,
+    this.onOpenInspector,
   });
 
   final int row;
@@ -980,15 +1166,47 @@ class _GridCell extends material.StatelessWidget {
   final StagedRowStatus rowStatus;
   final StagedCellStatus cellStatus;
   final bool isSelected;
+  final bool isEditing;
   final bool isSelectionTop;
   final bool isSelectionBottom;
   final bool isSelectionLeft;
   final bool isSelectionRight;
   final void Function(int row, int col, {bool isShift})? onTap;
+  final void Function(int row, int col)? onDoubleTap;
   final void Function(int row, int col)? onSecondaryTap;
+  final void Function(
+    int row,
+    int col,
+    String val, {
+    bool moveNextCol,
+    bool movePrevCol,
+    bool moveNextRow,
+  })? onCommitEdit;
+  final material.VoidCallback? onCancelEdit;
+  final void Function(int row, int col)? onOpenInspector;
 
   @override
   material.Widget build(material.BuildContext context) {
+    if (isEditing) {
+      return GridCellEditor(
+        initialValue: text,
+        width: width,
+        height: double.infinity,
+        onCommit: (val, {moveNextCol = false, movePrevCol = false, moveNextRow = false}) {
+          onCommitEdit?.call(
+            row,
+            column,
+            val,
+            moveNextCol: moveNextCol,
+            movePrevCol: movePrevCol,
+            moveNextRow: moveNextRow,
+          );
+        },
+        onCancel: () => onCancelEdit?.call(),
+        onOpenInspector: () => onOpenInspector?.call(row, column),
+      );
+    }
+
     final isNull = text == 'NULL';
     final isDeleted = rowStatus == StagedRowStatus.deleted;
     final isInserted = rowStatus == StagedRowStatus.inserted;
@@ -1075,6 +1293,9 @@ class _GridCell extends material.StatelessWidget {
         final isShift = HardwareKeyboard.instance.isShiftPressed;
         onTap?.call(row, column, isShift: isShift);
       },
+      onDoubleTap: () {
+        onDoubleTap?.call(row, column);
+      },
       onSecondaryTap: () {
         onSecondaryTap?.call(row, column);
       },
@@ -1112,3 +1333,4 @@ class _TriangleCornerPainter extends material.CustomPainter {
   bool shouldRepaint(covariant _TriangleCornerPainter oldDelegate) =>
       oldDelegate.color != color;
 }
+
