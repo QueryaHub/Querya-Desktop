@@ -8,12 +8,17 @@ import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/theme/querya_workbench_theme.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
-/// Shows the interactive Welcome Tour dialog.
+/// Shows or toggles the interactive Welcome Tour dialog.
 Future<void> showWelcomeTourDialog(
   material.BuildContext context, {
   material.VoidCallback? onLaunchDemo,
   material.VoidCallback? onGoHome,
 }) {
+  if (WelcomeTourDialog.isOpen) {
+    WelcomeTourDialog.close();
+    return Future.value();
+  }
+
   return showAppDialog<void>(
     context: context,
     builder: (ctx) => material.Dialog(
@@ -37,6 +42,18 @@ class WelcomeTourDialog extends StatefulWidget {
   final material.VoidCallback? onLaunchDemo;
   final material.VoidCallback? onGoHome;
 
+  static material.BuildContext? _activeContext;
+  static bool get isOpen => _activeContext != null;
+
+  static void close() {
+    if (_activeContext != null) {
+      if (material.Navigator.of(_activeContext!).canPop()) {
+        material.Navigator.of(_activeContext!).pop();
+      }
+      _activeContext = null;
+    }
+  }
+
   @override
   State<WelcomeTourDialog> createState() => _WelcomeTourDialogState();
 }
@@ -44,6 +61,20 @@ class WelcomeTourDialog extends StatefulWidget {
 class _WelcomeTourDialogState extends State<WelcomeTourDialog> {
   int _currentStep = 0;
   static const int _totalSteps = 4;
+
+  @override
+  void initState() {
+    super.initState();
+    WelcomeTourDialog._activeContext = context;
+  }
+
+  @override
+  void dispose() {
+    if (WelcomeTourDialog._activeContext == context) {
+      WelcomeTourDialog._activeContext = null;
+    }
+    super.dispose();
+  }
 
   void _goToStep(int step) {
     if (step >= 0 && step < _totalSteps && step != _currentStep) {
@@ -102,6 +133,17 @@ class _WelcomeTourDialogState extends State<WelcomeTourDialog> {
         const material.SingleActivator(LogicalKeyboardKey.arrowLeft): _previous,
         const material.SingleActivator(LogicalKeyboardKey.enter): _next,
         const material.SingleActivator(LogicalKeyboardKey.escape): _finish,
+        const material.SingleActivator(LogicalKeyboardKey.f1): _finish,
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyH,
+          control: true,
+          shift: true,
+        ): _finish,
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyH,
+          meta: true,
+          shift: true,
+        ): _finish,
       },
       child: QueryaDialogCard(
         constraints: WindowLayout.dialogConstraints(

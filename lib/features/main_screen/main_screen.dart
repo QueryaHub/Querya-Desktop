@@ -46,6 +46,7 @@ class _MainScreenState extends State<MainScreen> {
   final ValueNotifier<MainScreenWorkspaceState> _workspace =
       ValueNotifier(MainScreenWorkspaceState.empty);
   final ValueNotifier<bool> _isSidebarVisible = ValueNotifier(true);
+  bool _openingConnectionDialog = false;
 
   @override
   void initState() {
@@ -296,22 +297,34 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _onNewDatabaseConnectionFromMenu() async {
-    // Menu overlay context is torn down before the connection form opens.
-    await Future.delayed(const Duration(milliseconds: 100));
-    if (!mounted) return;
-    final row = await promptCreateConnection(context, folderId: null);
-    if (!mounted || row == null) return;
-    await LocalDb.instance.addConnection(row);
-    await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
+    if (_openingConnectionDialog) return;
+    _openingConnectionDialog = true;
+    try {
+      // Menu overlay context is torn down before the connection form opens.
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (!mounted) return;
+      final row = await promptCreateConnection(context, folderId: null);
+      if (!mounted || row == null) return;
+      await LocalDb.instance.addConnection(row);
+      await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
+    } finally {
+      _openingConnectionDialog = false;
+    }
   }
 
   Future<void> _onNewDatabaseConnectionFromUrl() async {
-    await Future.delayed(const Duration(milliseconds: 100));
-    if (!mounted) return;
-    final row = await showNewConnectionUrlDialog(context);
-    if (!mounted || row == null) return;
-    await LocalDb.instance.addConnection(row);
-    await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
+    if (_openingConnectionDialog) return;
+    _openingConnectionDialog = true;
+    try {
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (!mounted) return;
+      final row = await showNewConnectionUrlDialog(context);
+      if (!mounted || row == null) return;
+      await LocalDb.instance.addConnection(row);
+      await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
+    } finally {
+      _openingConnectionDialog = false;
+    }
   }
 
   Future<void> _openSqliteFromHero() async {
