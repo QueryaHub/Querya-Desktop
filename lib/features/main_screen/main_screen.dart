@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
+import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:querya_desktop/core/actions/sql_editor_global_actions.dart';
 import 'package:querya_desktop/core/demo/demo_playground_service.dart';
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
@@ -241,64 +242,119 @@ class _MainScreenState extends State<MainScreen> {
     return ValueListenableBuilder<MainScreenWorkspaceState>(
       valueListenable: _workspace,
       builder: (context, workspace, _) {
-        return material.CallbackShortcuts(
-          bindings: {
-            const material.SingleActivator(
-              LogicalKeyboardKey.keyN,
-              meta: true,
-            ): () => unawaited(_onNewDatabaseConnectionFromMenu()),
-            const material.SingleActivator(
-              LogicalKeyboardKey.keyN,
-              control: true,
-            ): () => unawaited(_onNewDatabaseConnectionFromMenu()),
-            const material.SingleActivator(
-              LogicalKeyboardKey.keyN,
-              meta: true,
-              shift: true,
-            ): () => unawaited(_onNewDatabaseConnectionFromMenu()),
-            const material.SingleActivator(
-              LogicalKeyboardKey.keyN,
-              control: true,
-              shift: true,
-            ): () => unawaited(_onNewDatabaseConnectionFromMenu()),
-            const material.SingleActivator(
-              LogicalKeyboardKey.keyB,
-              control: true,
-            ): () => _splitKey.currentState?.toggleSidebar(),
-            const material.SingleActivator(
-              LogicalKeyboardKey.keyB,
-              meta: true,
-            ): () => _splitKey.currentState?.toggleSidebar(),
-            const material.SingleActivator(
-              LogicalKeyboardKey.f1,
-            ): () => _onOpenWelcomeTour(),
-            const material.SingleActivator(
-              LogicalKeyboardKey.keyH,
-              meta: true,
-              shift: true,
-            ): () => _onOpenWelcomeTour(),
-            const material.SingleActivator(
-              LogicalKeyboardKey.keyH,
-              control: true,
-              shift: true,
-            ): () => _onOpenWelcomeTour(),
-            const material.SingleActivator(
-              LogicalKeyboardKey.digit0,
-              meta: true,
-              shift: true,
-            ): _onGoHome,
-            const material.SingleActivator(
-              LogicalKeyboardKey.digit0,
-              control: true,
-              shift: true,
-            ): _onGoHome,
-          },
-          child: SqlEditorGlobalActions(
-            activeConnection: workspace.activeConnection,
-            onOpenSqlWorkspace: _openSqlWorkspaceForConnection,
-            child: material.Scaffold(
-              backgroundColor: wb.canvas,
-              body: WindowBorder(
+        return FocusScope(
+          autofocus: true,
+          child: material.CallbackShortcuts(
+            bindings: {
+              // New Database Connection: Ctrl+N / Cmd+N
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyN,
+                meta: true,
+              ): () => unawaited(_onNewDatabaseConnectionFromMenu()),
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyN,
+                control: true,
+              ): () => unawaited(_onNewDatabaseConnectionFromMenu()),
+
+              // New Query Tab: Ctrl+Shift+N / Cmd+Shift+N
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyN,
+                meta: true,
+                shift: true,
+              ): () {
+                final ctx =
+                    FocusManager.instance.primaryFocus?.context ?? context;
+                Actions.maybeInvoke(ctx, const NewSqlIntent());
+              },
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyN,
+                control: true,
+                shift: true,
+              ): () {
+                final ctx =
+                    FocusManager.instance.primaryFocus?.context ?? context;
+                Actions.maybeInvoke(ctx, const NewSqlIntent());
+              },
+
+              // Open SQL File: Ctrl+O / Cmd+O
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyO,
+                meta: true,
+              ): () {
+                final ctx =
+                    FocusManager.instance.primaryFocus?.context ?? context;
+                Actions.maybeInvoke(ctx, const OpenSqlIntent());
+              },
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyO,
+                control: true,
+              ): () {
+                final ctx =
+                    FocusManager.instance.primaryFocus?.context ?? context;
+                Actions.maybeInvoke(ctx, const OpenSqlIntent());
+              },
+
+              // Save SQL File: Ctrl+S / Cmd+S
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyS,
+                meta: true,
+              ): () {
+                final ctx =
+                    FocusManager.instance.primaryFocus?.context ?? context;
+                Actions.maybeInvoke(ctx, const SaveSqlIntent());
+              },
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyS,
+                control: true,
+              ): () {
+                final ctx =
+                    FocusManager.instance.primaryFocus?.context ?? context;
+                Actions.maybeInvoke(ctx, const SaveSqlIntent());
+              },
+
+              // Toggle Left Sidebar: Ctrl+B / Cmd+B
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyB,
+                control: true,
+              ): () => _splitKey.currentState?.toggleSidebar(),
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyB,
+                meta: true,
+              ): () => _splitKey.currentState?.toggleSidebar(),
+
+              // Welcome Tour & Tutorial: F1 / Cmd+Shift+H / Ctrl+Shift+H
+              const material.SingleActivator(
+                LogicalKeyboardKey.f1,
+              ): () => _onOpenWelcomeTour(),
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyH,
+                meta: true,
+                shift: true,
+              ): () => _onOpenWelcomeTour(),
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyH,
+                control: true,
+                shift: true,
+              ): () => _onOpenWelcomeTour(),
+
+              // Return to Start / Home Screen: Cmd+Shift+0 / Ctrl+Shift+0
+              const material.SingleActivator(
+                LogicalKeyboardKey.digit0,
+                meta: true,
+                shift: true,
+              ): _onGoHome,
+              const material.SingleActivator(
+                LogicalKeyboardKey.digit0,
+                control: true,
+                shift: true,
+              ): _onGoHome,
+            },
+            child: SqlEditorGlobalActions(
+              activeConnection: workspace.activeConnection,
+              onOpenSqlWorkspace: _openSqlWorkspaceForConnection,
+              child: material.Scaffold(
+                backgroundColor: wb.canvas,
+                body: WindowBorder(
                 color: wb.borderSubtle.withValues(alpha: 0.35),
                 width: 1,
                 child: Column(
@@ -390,10 +446,11 @@ class _MainScreenState extends State<MainScreen> {
               ),
             ),
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 }
 
 /// Owns splitter width and collapsible spring motion.

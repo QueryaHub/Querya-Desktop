@@ -492,6 +492,42 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
           const material.SingleActivator(LogicalKeyboardKey.f5): () {
             if (!_running) _execute();
           },
+          const material.SingleActivator(
+            LogicalKeyboardKey.enter,
+            control: true,
+          ): () {
+            if (!_running) _execute();
+          },
+          const material.SingleActivator(
+            LogicalKeyboardKey.enter,
+            meta: true,
+          ): () {
+            if (!_running) _execute();
+          },
+          const material.SingleActivator(
+            LogicalKeyboardKey.numpadEnter,
+            control: true,
+          ): () {
+            if (!_running) _execute();
+          },
+          const material.SingleActivator(
+            LogicalKeyboardKey.numpadEnter,
+            meta: true,
+          ): () {
+            if (!_running) _execute();
+          },
+          const material.SingleActivator(
+            LogicalKeyboardKey.keyR,
+            control: true,
+          ): () {
+            if (!_running) _execute();
+          },
+          const material.SingleActivator(
+            LogicalKeyboardKey.keyR,
+            meta: true,
+          ): () {
+            if (!_running) _execute();
+          },
         },
         child: material.Focus(
           autofocus: true,

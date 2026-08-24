@@ -152,6 +152,11 @@ class QueryaWindowTitleBar extends StatelessWidget {
                         MenuButton(
                           subMenu: [
                             MenuButton(
+                                trailing: Text(
+                                  Platform.isMacOS
+                                      ? 'Cmd+Shift+N'
+                                      : 'Ctrl+Shift+N',
+                                ).xSmall().muted(),
                                 onPressed: (ctx) {
                                   Actions.maybeInvoke(
                                     FocusManager
@@ -160,8 +165,11 @@ class QueryaWindowTitleBar extends StatelessWidget {
                                     const NewSqlIntent(),
                                   );
                                 },
-                                child: const Text('New')),
+                                child: const Text('New Query')),
                             MenuButton(
+                                trailing: Text(
+                                  Platform.isMacOS ? 'Cmd+O' : 'Ctrl+O',
+                                ).xSmall().muted(),
                                 onPressed: (ctx) {
                                   Actions.maybeInvoke(
                                     FocusManager
@@ -172,6 +180,9 @@ class QueryaWindowTitleBar extends StatelessWidget {
                                 },
                                 child: const Text('Open...')),
                             MenuButton(
+                                trailing: Text(
+                                  Platform.isMacOS ? 'Cmd+S' : 'Ctrl+S',
+                                ).xSmall().muted(),
                                 onPressed: (ctx) {
                                   Actions.maybeInvoke(
                                     FocusManager
@@ -275,8 +286,9 @@ class QueryaWindowTitleBar extends StatelessWidget {
                               leading: const material.Icon(
                                   material.Icons.add_link_rounded,
                                   size: 18),
-                              trailing:
-                                  const Text('Shift+Ctrl+N').xSmall().muted(),
+                              trailing: Text(
+                                Platform.isMacOS ? 'Cmd+N' : 'Ctrl+N',
+                              ).xSmall().muted(),
                               onPressed: (_) => onNewDatabaseConnection(),
                               child: const Text('New Database Connection'),
                             ),

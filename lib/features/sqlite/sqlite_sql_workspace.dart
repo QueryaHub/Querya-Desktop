@@ -299,9 +299,43 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       child: material.CallbackShortcuts(
         bindings: {
           const material.SingleActivator(LogicalKeyboardKey.f5): () {
-            if (!_running) {
-              unawaited(_execute());
-            }
+            if (!_running) unawaited(_execute());
+          },
+          const material.SingleActivator(
+            LogicalKeyboardKey.enter,
+            control: true,
+          ): () {
+            if (!_running) unawaited(_execute());
+          },
+          const material.SingleActivator(
+            LogicalKeyboardKey.enter,
+            meta: true,
+          ): () {
+            if (!_running) unawaited(_execute());
+          },
+          const material.SingleActivator(
+            LogicalKeyboardKey.numpadEnter,
+            control: true,
+          ): () {
+            if (!_running) unawaited(_execute());
+          },
+          const material.SingleActivator(
+            LogicalKeyboardKey.numpadEnter,
+            meta: true,
+          ): () {
+            if (!_running) unawaited(_execute());
+          },
+          const material.SingleActivator(
+            LogicalKeyboardKey.keyR,
+            control: true,
+          ): () {
+            if (!_running) unawaited(_execute());
+          },
+          const material.SingleActivator(
+            LogicalKeyboardKey.keyR,
+            meta: true,
+          ): () {
+            if (!_running) unawaited(_execute());
           },
         },
         child: material.Focus(
