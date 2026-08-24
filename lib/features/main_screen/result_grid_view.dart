@@ -3,6 +3,7 @@ import 'package:flutter/services.dart'
     show Clipboard, ClipboardData, HardwareKeyboard, LogicalKeyboardKey;
 import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/ui/querya_tooltip.dart';
+import 'package:querya_desktop/features/main_screen/data_grid_staging_buffer.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// Layout metrics for [VirtualResultGrid].
@@ -327,16 +328,20 @@ List<List<String>> sortResultGridRows({
   return sorted;
 }
 
-/// Virtualized read-only grid for SQL query results (rows + columns).
+/// Virtualized read-only or interactive grid for SQL query results (rows + columns).
 class VirtualResultGrid extends material.StatefulWidget {
   const VirtualResultGrid({
     super.key,
     required this.columns,
     required this.rows,
+    this.stagingBuffer,
+    this.onRowSelected,
   });
 
   final List<String> columns;
   final List<List<String>> rows;
+  final DataGridStagingBuffer? stagingBuffer;
+  final material.ValueChanged<int?>? onRowSelected;
 
   @override
   material.State<VirtualResultGrid> createState() => _VirtualResultGridState();
@@ -364,7 +369,16 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   void initState() {
     super.initState();
     _horizontalController.addListener(_onHorizontalScroll);
+    widget.stagingBuffer?.addListener(_onStagingBufferChanged);
     _updateSortedRows();
+  }
+
+  void _onStagingBufferChanged() {
+    if (!mounted) return;
+    setState(() {
+      _updateSortedRows();
+      _widthsNeedUpdate = true;
+    });
   }
 
   @override
@@ -376,7 +390,13 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   @override
   void didUpdateWidget(VirtualResultGrid oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.columns != widget.columns || oldWidget.rows != widget.rows) {
+    if (oldWidget.stagingBuffer != widget.stagingBuffer) {
+      oldWidget.stagingBuffer?.removeListener(_onStagingBufferChanged);
+      widget.stagingBuffer?.addListener(_onStagingBufferChanged);
+    }
+    if (oldWidget.columns != widget.columns ||
+        oldWidget.rows != widget.rows ||
+        oldWidget.stagingBuffer != widget.stagingBuffer) {
       _widthsNeedUpdate = true;
       if (oldWidget.columns != widget.columns) {
         _userHasResized = false;
@@ -384,6 +404,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
         _sortOrder = null;
         _selectionAnchor = null;
         _selection = null;
+        widget.onRowSelected?.call(null);
       }
       _updateSortedRows();
     }
@@ -391,6 +412,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
 
   @override
   void dispose() {
+    widget.stagingBuffer?.removeListener(_onStagingBufferChanged);
     _horizontalController.removeListener(_onHorizontalScroll);
     _horizontalController.dispose();
     _verticalController.dispose();
@@ -437,12 +459,16 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     });
   }
 
+  List<List<String>> get _baseRows =>
+      widget.stagingBuffer?.effectiveRows ?? widget.rows;
+
   void _updateSortedRows() {
+    final rows = _baseRows;
     if (_sortColumnIndex == null || _sortOrder == null) {
-      _sortedRows = widget.rows;
+      _sortedRows = rows;
     } else {
       _sortedRows = sortResultGridRows(
-        rows: widget.rows,
+        rows: rows,
         columnIndex: _sortColumnIndex!,
         order: _sortOrder!,
       );
@@ -451,6 +477,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
 
   void _onCellTap(int row, int column, {bool isShift = false}) {
     _focusNode.requestFocus();
+    widget.onRowSelected?.call(row);
     setState(() {
       final coord = ResultGridCellCoordinate(row, column);
       if (isShift && _selectionAnchor != null) {
@@ -472,6 +499,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
 
   void _onCellSecondaryTap(int row, int column) {
     _focusNode.requestFocus();
+    widget.onRowSelected?.call(row);
     if (_selection != null && _selection!.contains(row, column)) {
       _copySelection();
     } else {
@@ -501,7 +529,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   List<double> _computeColumnWidths() {
     return computeResultGridColumnWidths(
       columns: widget.columns,
-      rows: widget.rows,
+      rows: _baseRows,
       minWidth: context.scaled(ResultGridMetrics.minColumnWidth),
       maxWidth: context.scaled(ResultGridMetrics.maxColumnWidth),
     );
@@ -555,11 +583,58 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
           control: true,
         ): () => _copySelection(),
         const material.SingleActivator(
+          LogicalKeyboardKey.insert,
+          control: true,
+        ): () => widget.stagingBuffer?.addRow(),
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyN,
+          meta: true,
+        ): () {
+          if (widget.stagingBuffer != null) {
+            widget.stagingBuffer!.addRow();
+          }
+        },
+        const material.SingleActivator(
+          LogicalKeyboardKey.delete,
+          control: true,
+        ): () {
+          if (widget.stagingBuffer != null && _selection != null) {
+            widget.stagingBuffer!.toggleDeleteRow(_selection!.startRow);
+          }
+        },
+        const material.SingleActivator(
+          LogicalKeyboardKey.backspace,
+          meta: true,
+        ): () {
+          if (widget.stagingBuffer != null && _selection != null) {
+            widget.stagingBuffer!.toggleDeleteRow(_selection!.startRow);
+          }
+        },
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyZ,
+          control: true,
+        ): () {
+          if (widget.stagingBuffer != null && _selection != null) {
+            widget.stagingBuffer!.revertRow(_selection!.startRow);
+          }
+        },
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyZ,
+          meta: true,
+        ): () {
+          if (widget.stagingBuffer != null && _selection != null) {
+            widget.stagingBuffer!.revertRow(_selection!.startRow);
+          }
+        },
+        const material.SingleActivator(
           LogicalKeyboardKey.escape,
-        ): () => setState(() {
-              _selection = null;
-              _selectionAnchor = null;
-            }),
+        ): () {
+          widget.onRowSelected?.call(null);
+          setState(() {
+            _selection = null;
+            _selectionAnchor = null;
+          });
+        },
       },
       child: material.Focus(
         focusNode: _focusNode,
@@ -627,6 +702,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
                                   colorScheme: cs,
                                   striped: !isEven,
                                   selection: _selection,
+                                  stagingBuffer: widget.stagingBuffer,
                                   onCellTap: _onCellTap,
                                   onCellSecondaryTap: _onCellSecondaryTap,
                                 );
@@ -748,7 +824,7 @@ class _HeaderCell extends material.StatelessWidget {
             child: material.MouseRegion(
               cursor: onSort != null
                   ? material.SystemMouseCursors.click
-                  : material.MouseCursor.defer,
+                  : material.SystemMouseCursors.basic,
               child: material.GestureDetector(
                 behavior: material.HitTestBehavior.opaque,
                 onTap: onSort,
@@ -764,13 +840,13 @@ class _HeaderCell extends material.StatelessWidget {
                           maxLines: 1,
                         ),
                       ),
-                      if (isSorted) ...[
-                        const material.SizedBox(width: 4),
+                      if (sortOrder != null) ...[
+                        const Gap(4),
                         material.Icon(
                           sortOrder == ResultGridSortOrder.ascending
                               ? material.Icons.arrow_upward_rounded
                               : material.Icons.arrow_downward_rounded,
-                          size: 13,
+                          size: 14,
                           color: colorScheme.primary,
                         ),
                       ],
@@ -813,6 +889,7 @@ class _DataRow extends material.StatelessWidget {
     required this.colorScheme,
     required this.striped,
     this.selection,
+    this.stagingBuffer,
     this.onCellTap,
     this.onCellSecondaryTap,
   });
@@ -825,11 +902,14 @@ class _DataRow extends material.StatelessWidget {
   final ColorScheme colorScheme;
   final bool striped;
   final ResultGridSelection? selection;
+  final DataGridStagingBuffer? stagingBuffer;
   final void Function(int row, int col, {bool isShift})? onCellTap;
   final void Function(int row, int col)? onCellSecondaryTap;
 
   @override
   material.Widget build(material.BuildContext context) {
+    final rowStatus = stagingBuffer?.getRowStatus(rowIndex) ?? StagedRowStatus.unchanged;
+
     return material.RepaintBoundary(
       child: material.SizedBox(
         height: height,
@@ -845,6 +925,8 @@ class _DataRow extends material.StatelessWidget {
                 width: columnWidths[c],
                 colorScheme: colorScheme,
                 striped: striped,
+                rowStatus: rowStatus,
+                cellStatus: stagingBuffer?.getCellStatus(rowIndex, c) ?? StagedCellStatus.clean,
                 isSelected: selection?.contains(rowIndex, c) ?? false,
                 isSelectionTop: selection != null &&
                     selection!.contains(rowIndex, c) &&
@@ -878,6 +960,8 @@ class _GridCell extends material.StatelessWidget {
     required this.width,
     required this.colorScheme,
     required this.striped,
+    this.rowStatus = StagedRowStatus.unchanged,
+    this.cellStatus = StagedCellStatus.clean,
     this.isSelected = false,
     this.isSelectionTop = false,
     this.isSelectionBottom = false,
@@ -893,6 +977,8 @@ class _GridCell extends material.StatelessWidget {
   final double width;
   final ColorScheme colorScheme;
   final bool striped;
+  final StagedRowStatus rowStatus;
+  final StagedCellStatus cellStatus;
   final bool isSelected;
   final bool isSelectionTop;
   final bool isSelectionBottom;
@@ -904,21 +990,34 @@ class _GridCell extends material.StatelessWidget {
   @override
   material.Widget build(material.BuildContext context) {
     final isNull = text == 'NULL';
-    final style = material.TextStyle(
+    final isDeleted = rowStatus == StagedRowStatus.deleted;
+    final isInserted = rowStatus == StagedRowStatus.inserted;
+    final isModified = cellStatus == StagedCellStatus.modified;
+
+    var style = material.TextStyle(
       fontSize: 12,
       fontWeight: material.FontWeight.normal,
       fontFamily: 'monospace',
-      color: isNull
-          ? colorScheme.mutedForeground.withValues(alpha: 0.5)
-          : colorScheme.foreground,
+      color: isDeleted
+          ? colorScheme.destructive.withValues(alpha: 0.7)
+          : (isNull
+              ? colorScheme.mutedForeground.withValues(alpha: 0.5)
+              : colorScheme.foreground),
+      decoration: isDeleted ? material.TextDecoration.lineThrough : null,
       fontStyle: isNull ? material.FontStyle.italic : material.FontStyle.normal,
     );
 
-    final bg = isSelected
+    var bg = isSelected
         ? colorScheme.primary.withValues(alpha: 0.18)
-        : (striped
-            ? colorScheme.muted.withValues(alpha: 0.12)
-            : material.Colors.transparent);
+        : (isDeleted
+            ? colorScheme.destructive.withValues(alpha: 0.08)
+            : (isModified
+                ? colorScheme.primary.withValues(alpha: 0.14)
+                : (isInserted
+                    ? colorScheme.primary.withValues(alpha: 0.08)
+                    : (striped
+                        ? colorScheme.muted.withValues(alpha: 0.12)
+                        : material.Colors.transparent))));
 
     final cell = material.Container(
       width: width,
@@ -947,11 +1046,26 @@ class _GridCell extends material.StatelessWidget {
                 ),
         ),
       ),
-      child: material.Text(
-        text,
-        style: style,
-        overflow: material.TextOverflow.ellipsis,
-        maxLines: 1,
+      child: material.Stack(
+        clipBehavior: material.Clip.none,
+        alignment: material.Alignment.centerLeft,
+        children: [
+          material.Text(
+            text,
+            style: style,
+            overflow: material.TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
+          if (isModified)
+            material.Positioned(
+              top: -8,
+              right: -8,
+              child: material.CustomPaint(
+                size: const material.Size(6, 6),
+                painter: _TriangleCornerPainter(color: colorScheme.primary),
+              ),
+            ),
+        ],
       ),
     );
 
@@ -977,4 +1091,24 @@ class _GridCell extends material.StatelessWidget {
       child: interactiveCell,
     );
   }
+}
+
+class _TriangleCornerPainter extends material.CustomPainter {
+  const _TriangleCornerPainter({required this.color});
+  final material.Color color;
+
+  @override
+  void paint(material.Canvas canvas, material.Size size) {
+    final paint = material.Paint()..color = color;
+    final path = material.Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width, size.height)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _TriangleCornerPainter oldDelegate) =>
+      oldDelegate.color != color;
 }

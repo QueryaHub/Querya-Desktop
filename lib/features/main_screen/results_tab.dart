@@ -3,6 +3,8 @@ import 'dart:async' show unawaited;
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/motion/querya_fade_slide.dart';
 import 'package:querya_desktop/core/widgets/virtual_selectable_text_view.dart';
+import 'package:querya_desktop/features/main_screen/data_grid_staging_buffer.dart';
+import 'package:querya_desktop/features/main_screen/data_grid_staging_toolbar.dart';
 import 'package:querya_desktop/features/main_screen/result_grid_view.dart';
 import 'package:querya_desktop/shared/services/data_export_service.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -16,7 +18,7 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 /// Mode changes (idle / loading / error / status / grid) morph via
 /// [QueryaFadeSlide]. Keys are per **mode**, not per row — so grid data updates
 /// and scroll rebuilds do not re-trigger the transition.
-class ResultsTab extends StatelessWidget {
+class ResultsTab extends material.StatefulWidget {
   const ResultsTab({
     super.key,
     this.columns = const [],
@@ -26,6 +28,9 @@ class ResultsTab extends StatelessWidget {
     this.affectedRows,
     this.statusLine,
     this.showExportToolbar = true,
+    this.stagingBuffer,
+    this.onApplyChanges,
+    this.isSaving = false,
   });
 
   final List<String> columns;
@@ -35,6 +40,16 @@ class ResultsTab extends StatelessWidget {
   final int? affectedRows;
   final String? statusLine;
   final bool showExportToolbar;
+  final DataGridStagingBuffer? stagingBuffer;
+  final material.VoidCallback? onApplyChanges;
+  final bool isSaving;
+
+  @override
+  material.State<ResultsTab> createState() => _ResultsTabState();
+}
+
+class _ResultsTabState extends material.State<ResultsTab> {
+  int? _selectedRowIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -46,17 +61,17 @@ class ResultsTab extends StatelessWidget {
   }
 
   material.Widget _buildBody(material.BuildContext context) {
-    if (isLoading) {
+    if (widget.isLoading) {
       return const material.Center(
         key: material.ValueKey('results_mode_loading'),
         child: material.CircularProgressIndicator(),
       );
     }
-    if (errorMessage != null && errorMessage!.isNotEmpty) {
+    if (widget.errorMessage != null && widget.errorMessage!.isNotEmpty) {
       return material.KeyedSubtree(
         key: const material.ValueKey('results_mode_error'),
         child: VirtualSelectableTextView(
-          text: errorMessage!,
+          text: widget.errorMessage!,
           style: material.TextStyle(
             fontFamily: 'monospace',
             fontSize: 12,
@@ -65,21 +80,21 @@ class ResultsTab extends StatelessWidget {
         ),
       );
     }
-    if (columns.isEmpty && rows.isEmpty) {
-      if (statusLine != null) {
+    if (widget.columns.isEmpty && widget.rows.isEmpty && widget.stagingBuffer == null) {
+      if (widget.statusLine != null) {
         return material.Padding(
           key: const material.ValueKey('results_mode_status'),
           padding: const material.EdgeInsets.all(16),
           child: Align(
             alignment: material.Alignment.topLeft,
-            child: Text(statusLine!).muted().small(),
+            child: Text(widget.statusLine!).muted().small(),
           ),
         );
       }
-      if (affectedRows != null) {
+      if (widget.affectedRows != null) {
         return material.Center(
           key: const material.ValueKey('results_mode_affected'),
-          child: Text('Rows affected: $affectedRows').muted(),
+          child: Text('Rows affected: ${widget.affectedRows}').muted(),
         );
       }
       return material.Center(
@@ -88,11 +103,22 @@ class ResultsTab extends StatelessWidget {
       );
     }
 
+    final effectiveRows = widget.stagingBuffer != null
+        ? widget.stagingBuffer!.effectiveRows
+        : widget.rows;
+
     return material.Column(
       key: const material.ValueKey('results_mode_grid'),
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
-        if (showExportToolbar && columns.isNotEmpty)
+        if (widget.stagingBuffer != null)
+          DataGridStagingToolbar(
+            stagingBuffer: widget.stagingBuffer!,
+            selectedRowIndex: _selectedRowIndex,
+            onApplyChanges: widget.onApplyChanges,
+            isSaving: widget.isSaving,
+          ),
+        if (widget.showExportToolbar && widget.columns.isNotEmpty)
           material.Container(
             padding: const material.EdgeInsets.symmetric(
               horizontal: 12,
@@ -118,10 +144,10 @@ class ResultsTab extends StatelessWidget {
                 ),
                 const Gap(6),
                 Text(
-                  statusLine ??
-                      (affectedRows != null
-                          ? 'Rows affected: $affectedRows'
-                          : '${rows.length} rows returned'),
+                  widget.statusLine ??
+                      (widget.affectedRows != null
+                          ? 'Rows affected: ${widget.affectedRows}'
+                          : '${effectiveRows.length} rows returned'),
                 ).small().semiBold(),
                 const material.Spacer(),
                 ExportMenuButton(
@@ -132,8 +158,8 @@ class ResultsTab extends StatelessWidget {
                     unawaited(() async {
                       await DataExportService.copyToClipboard(
                         format,
-                        columns: columns,
-                        rows: rows,
+                        columns: widget.columns,
+                        rows: effectiveRows,
                       );
                     }());
                   },
@@ -147,8 +173,8 @@ class ResultsTab extends StatelessWidget {
                     unawaited(() async {
                       final outcome = await DataExportService.saveToFile(
                         format,
-                        columns: columns,
-                        rows: rows,
+                        columns: widget.columns,
+                        rows: effectiveRows,
                       );
                       if (!context.mounted) return;
                       if (outcome == SaveExportOutcome.error) {
@@ -161,7 +187,12 @@ class ResultsTab extends StatelessWidget {
             ),
           ),
         material.Expanded(
-          child: VirtualResultGrid(columns: columns, rows: rows),
+          child: VirtualResultGrid(
+            columns: widget.columns,
+            rows: widget.rows,
+            stagingBuffer: widget.stagingBuffer,
+            onRowSelected: (row) => setState(() => _selectedRowIndex = row),
+          ),
         ),
       ],
     );
