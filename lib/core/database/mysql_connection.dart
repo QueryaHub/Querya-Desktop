@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:mysql_client/mysql_client.dart';
+import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
 
@@ -347,6 +348,76 @@ class MysqlConnection {
       },
     );
     return rs.rows.map((r) => r.colAt(0)!).toList();
+  }
+
+  /// Retrieves schema metadata and primary keys for [table] in [database].
+  Future<TableSchemaMeta> getTableSchema({
+    required String database,
+    required String table,
+  }) async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to MySQL');
+    }
+    final colsRs = await execute(
+      'SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT '
+      'FROM information_schema.COLUMNS '
+      'WHERE TABLE_SCHEMA = :database AND TABLE_NAME = :table '
+      'ORDER BY ORDINAL_POSITION',
+      {
+        'database': database,
+        'table': table,
+      },
+    );
+
+    final pkRs = await execute(
+      'SELECT COLUMN_NAME '
+      'FROM information_schema.KEY_COLUMN_USAGE '
+      "WHERE CONSTRAINT_NAME = 'PRIMARY' AND TABLE_SCHEMA = :database AND TABLE_NAME = :table "
+      'ORDER BY ORDINAL_POSITION',
+      {
+        'database': database,
+        'table': table,
+      },
+    );
+
+    final primaryKeys = pkRs.rows.map((r) => r.colAt(0)!).toList();
+    final columns = <TableColumnMeta>[];
+
+    for (final r in colsRs.rows) {
+      final name = r.colByName('COLUMN_NAME') ?? '';
+      final dataType = r.colByName('DATA_TYPE') ?? '';
+      final isNullable = (r.colByName('IS_NULLABLE') ?? 'YES').toUpperCase() == 'YES';
+      final isPk = primaryKeys.contains(name);
+      final pkPos = isPk ? primaryKeys.indexOf(name) + 1 : null;
+      final dflt = r.colByName('COLUMN_DEFAULT');
+
+      columns.add(
+        TableColumnMeta(
+          name: name,
+          dataType: dataType,
+          isNullable: isNullable,
+          isPrimaryKey: isPk,
+          primaryKeyPosition: pkPos,
+          defaultValue: dflt,
+        ),
+      );
+    }
+
+    return TableSchemaMeta(
+      tableName: table,
+      schema: database,
+      columns: columns,
+      primaryKeys: primaryKeys,
+    );
+  }
+
+  /// Returns primary key column names for [table] in [database].
+  Future<List<String>> getPrimaryKeys({
+    required String database,
+    required String table,
+  }) async {
+    final schema = await getTableSchema(database: database, table: table);
+    return schema.primaryKeys;
   }
 
   /// Lists base tables in [schema] (MySQL: database name).
