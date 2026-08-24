@@ -2,6 +2,8 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/motion/querya_fade_slide.dart';
 import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
+import 'package:querya_desktop/features/main_screen/data_grid_staging_buffer.dart';
+import 'package:querya_desktop/features/main_screen/data_grid_staging_toolbar.dart';
 import 'package:querya_desktop/features/main_screen/result_grid_view.dart';
 import 'package:querya_desktop/features/main_screen/results_tab.dart';
 
@@ -676,6 +678,82 @@ void main() {
 
       expect(find.byIcon(material.Icons.arrow_upward_rounded), findsNothing);
       expect(find.byIcon(material.Icons.arrow_downward_rounded), findsNothing);
+    });
+
+    testWidgets('renders DataGridStagingToolbar and updates on add/delete/revert',
+        (tester) async {
+      final staging = DataGridStagingBuffer(
+        columns: ['id', 'name'],
+        rows: [
+          ['1', 'Alice'],
+          ['2', 'Bob'],
+        ],
+      );
+
+      var appliedChanges = 0;
+
+      await tester.pumpWidget(
+        resultsShell(
+          child: material.Scaffold(
+            body: material.SizedBox(
+              width: 800,
+              height: 500,
+              child: ResultsTab(
+                columns: const ['id', 'name'],
+                rows: const [
+                  ['1', 'Alice'],
+                  ['2', 'Bob'],
+                ],
+                stagingBuffer: staging,
+                onApplyChanges: () => appliedChanges++,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Verify DataGridStagingToolbar is rendered
+      expect(find.byType(DataGridStagingToolbar), findsOneWidget);
+      expect(find.text('No changes'), findsOneWidget);
+      expect(find.text('Add Row'), findsOneWidget);
+
+      // Tap 'Add Row' -> appends a new row
+      await tester.tap(find.text('Add Row'));
+      await tester.pumpAndSettle();
+
+      expect(staging.isDirty, isTrue);
+      expect(staging.totalRowCount, 3);
+      expect(find.text('1 pending change'), findsOneWidget);
+      expect(find.text('Revert All'), findsOneWidget);
+
+      // Tap 'Revert All' -> resets buffer
+      await tester.tap(find.text('Revert All'));
+      await tester.pumpAndSettle();
+
+      expect(staging.isDirty, isFalse);
+      expect(staging.totalRowCount, 2);
+      expect(find.text('No changes'), findsOneWidget);
+
+      // Select row 0 in grid
+      await tester.tap(find.text('Alice'));
+      await tester.pumpAndSettle();
+
+      // Tap 'Delete Row' in toolbar
+      await tester.tap(find.text('Delete Row'));
+      await tester.pumpAndSettle();
+
+      expect(staging.isDirty, isTrue);
+      expect(staging.deletedRowCount, 1);
+      expect(find.text('Restore Row'), findsOneWidget);
+
+      // Save button should now be enabled; tap it
+      await tester.ensureVisible(find.text('Save Changes'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save Changes'));
+      await tester.pumpAndSettle();
+
+      expect(appliedChanges, 1);
     });
   });
 }
