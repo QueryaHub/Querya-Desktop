@@ -585,6 +585,8 @@ class _MainContentSplitState extends State<_MainContentSplit>
         final progress = _lastExpandedWidth > 0
             ? (currentW / _lastExpandedWidth).clamp(0.0, 1.0)
             : 0.0;
+        final currentHandleW =
+            (progress * _resizeHandleWidth).clamp(0.0, _resizeHandleWidth);
         final handleOpacity = (progress * 5.0).clamp(0.0, 1.0);
         final contentOpacity = (progress * 2.2).clamp(0.0, 1.0);
         final parallaxOffset = (progress - 1.0) * 36.0;
@@ -633,54 +635,68 @@ class _MainContentSplitState extends State<_MainContentSplit>
                 ),
               ),
             if (!isFullyCollapsed)
-              Opacity(
-                opacity: handleOpacity,
-                child: IgnorePointer(
-                  ignoring: currentW <= 20.0 || !_sidebarVisible,
-                  child: QueryaSplitHandle(
-                    key: const Key('main_content_resize_handle'),
-                    axis: Axis.horizontal,
-                    semanticsLabel: 'Resize connections and workspace panes',
-                    onDragDelta: (dx) {
-                      final ml = constraints.maxWidth -
-                          _resizeHandleWidth -
-                          _minWorkspaceWidth;
-                      if (ml <= 0) return;
-                      final nextW = _clampLeftWidth(
-                        _widthSpring.value + dx,
-                        constraints.maxWidth,
-                      );
-                      _lastExpandedWidth = nextW;
-                      _widthSpring.jumpTo(nextW);
-                    },
-                    onDiscreteResize: () => _widthPersist
-                        .onDiscreteResize(() => _lastExpandedWidth),
-                    onDragEnd: (details) {
-                      _widthPersist.cancelDiscreteTimer();
-                      final velocity = details.primaryVelocity ??
-                          details.velocity.pixelsPerSecond.dx;
-                      final useSprings = QueryaSpring.springsEnabled(context);
-                      _widthSpring.useSprings = useSprings;
-                      if (_widthSpring.value < 100 && velocity < -50) {
-                        _sidebarVisible = false;
-                        widget.onSidebarVisibilityChanged?.call(false);
-                        _widthSpring.animateTo(0.0, velocity: velocity);
-                        unawaited(AppSettings.instance.setSidebarVisible(false));
-                      } else {
-                        _sidebarVisible = true;
-                        widget.onSidebarVisibilityChanged?.call(true);
-                        _lastExpandedWidth = _clampLeftWidth(
-                          _widthSpring.value,
-                          constraints.maxWidth,
-                        );
-                        _widthSpring.animateTo(
-                          _lastExpandedWidth,
-                          velocity: velocity,
-                        );
-                        unawaited(AppSettings.instance.setSidebarVisible(true));
-                        _schedulePersistAfterSettle();
-                      }
-                    },
+              SizedBox(
+                width: currentHandleW,
+                child: ClipRect(
+                  child: OverflowBox(
+                    minWidth: _resizeHandleWidth,
+                    maxWidth: _resizeHandleWidth,
+                    alignment: Alignment.center,
+                    child: Opacity(
+                      opacity: handleOpacity,
+                      child: IgnorePointer(
+                        ignoring: currentW <= 20.0 || !_sidebarVisible,
+                        child: QueryaSplitHandle(
+                          key: const Key('main_content_resize_handle'),
+                          axis: Axis.horizontal,
+                          semanticsLabel:
+                              'Resize connections and workspace panes',
+                          onDragDelta: (dx) {
+                            final ml = constraints.maxWidth -
+                                _resizeHandleWidth -
+                                _minWorkspaceWidth;
+                            if (ml <= 0) return;
+                            final nextW = _clampLeftWidth(
+                              _widthSpring.value + dx,
+                              constraints.maxWidth,
+                            );
+                            _lastExpandedWidth = nextW;
+                            _widthSpring.jumpTo(nextW);
+                          },
+                          onDiscreteResize: () => _widthPersist
+                              .onDiscreteResize(() => _lastExpandedWidth),
+                          onDragEnd: (details) {
+                            _widthPersist.cancelDiscreteTimer();
+                            final velocity = details.primaryVelocity ??
+                                details.velocity.pixelsPerSecond.dx;
+                            final useSprings =
+                                QueryaSpring.springsEnabled(context);
+                            _widthSpring.useSprings = useSprings;
+                            if (_widthSpring.value < 100 && velocity < -50) {
+                              _sidebarVisible = false;
+                              widget.onSidebarVisibilityChanged?.call(false);
+                              _widthSpring.animateTo(0.0, velocity: velocity);
+                              unawaited(
+                                  AppSettings.instance.setSidebarVisible(false));
+                            } else {
+                              _sidebarVisible = true;
+                              widget.onSidebarVisibilityChanged?.call(true);
+                              _lastExpandedWidth = _clampLeftWidth(
+                                _widthSpring.value,
+                                constraints.maxWidth,
+                              );
+                              _widthSpring.animateTo(
+                                _lastExpandedWidth,
+                                velocity: velocity,
+                              );
+                              unawaited(
+                                  AppSettings.instance.setSidebarVisible(true));
+                              _schedulePersistAfterSettle();
+                            }
+                          },
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
