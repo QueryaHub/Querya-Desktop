@@ -737,6 +737,7 @@ void main() {
 
       // Select row 0 in grid
       await tester.tap(find.text('Alice'));
+      await tester.pump(const Duration(milliseconds: 350));
       await tester.pumpAndSettle();
 
       // Tap 'Delete Row' in toolbar
