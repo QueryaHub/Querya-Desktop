@@ -75,6 +75,9 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       onNew: () => _sqlController.clear(),
       onOpen: () => unawaited(_openSqlFile()),
       onSave: () => unawaited(_saveSqlFile()),
+      onExecute: () {
+        if (!_running) unawaited(_execute());
+      },
     );
   }
 

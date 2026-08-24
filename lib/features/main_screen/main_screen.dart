@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart' as material;
-import 'package:flutter/services.dart' show LogicalKeyboardKey;
+import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
+import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/actions/sql_editor_global_actions.dart';
 import 'package:querya_desktop/core/demo/demo_playground_service.dart';
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
@@ -48,6 +50,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    HardwareKeyboard.instance.addHandler(_handleGlobalKeyEvent);
     UnsandboxedLaunchConsentGate.instance.handler = (details) {
       if (!mounted) return Future.value(false);
       return showUnsandboxedDriverConsentDialog(context, details);
@@ -66,10 +69,114 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleGlobalKeyEvent);
     UnsandboxedLaunchConsentGate.instance.handler = null;
     _workspace.dispose();
     _isSidebarVisible.dispose();
     super.dispose();
+  }
+
+  bool _handleGlobalKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+
+    final isMac = Platform.isMacOS;
+    final isCmdOrCtrl = isMac
+        ? (HardwareKeyboard.instance.isMetaPressed ||
+            HardwareKeyboard.instance.isControlPressed)
+        : HardwareKeyboard.instance.isControlPressed;
+    final isShift = HardwareKeyboard.instance.isShiftPressed;
+    final isAlt = HardwareKeyboard.instance.isAltPressed;
+
+    final physical = event.physicalKey;
+    final logical = event.logicalKey;
+
+    // 1. Execute SQL: F5, or (Ctrl/Cmd + Enter), or (Ctrl/Cmd + R)
+    final isEnter = physical == PhysicalKeyboardKey.enter ||
+        physical == PhysicalKeyboardKey.numpadEnter ||
+        logical == LogicalKeyboardKey.enter ||
+        logical == LogicalKeyboardKey.numpadEnter;
+    final isF5 = physical == PhysicalKeyboardKey.f5 ||
+        logical == LogicalKeyboardKey.f5;
+    final isKeyR = physical == PhysicalKeyboardKey.keyR ||
+        logical == LogicalKeyboardKey.keyR ||
+        logical == const LogicalKeyboardKey(0x0000043a); // Russian 'к'
+
+    if ((isCmdOrCtrl && isEnter) ||
+        isF5 ||
+        (isCmdOrCtrl && !isShift && !isAlt && isKeyR)) {
+      if (SqlEditorCommandBridge.instance.canExecute) {
+        SqlEditorCommandBridge.instance.invokeExecute();
+        return true;
+      }
+    }
+
+    // 2. Toggle Left Sidebar: Ctrl+B / Cmd+B (Physical B, Logical B, Russian 'и')
+    final isKeyB = physical == PhysicalKeyboardKey.keyB ||
+        logical == LogicalKeyboardKey.keyB ||
+        logical == const LogicalKeyboardKey(0x00000438); // Russian 'и'
+    if (isCmdOrCtrl && !isShift && !isAlt && isKeyB) {
+      _splitKey.currentState?.toggleSidebar();
+      return true;
+    }
+
+    // 3. New Connection / New Query Tab: (Physical N, Logical N, Russian 'т')
+    final isKeyN = physical == PhysicalKeyboardKey.keyN ||
+        logical == LogicalKeyboardKey.keyN ||
+        logical == const LogicalKeyboardKey(0x00000442); // Russian 'т'
+    if (isCmdOrCtrl && !isAlt && isKeyN) {
+      if (isShift) {
+        // Ctrl+Shift+N: New Query
+        final ctx = FocusManager.instance.primaryFocus?.context ?? context;
+        Actions.maybeInvoke(ctx, const NewSqlIntent());
+      } else {
+        // Ctrl+N: New Database Connection
+        unawaited(_onNewDatabaseConnectionFromMenu());
+      }
+      return true;
+    }
+
+    // 4. Open SQL: Ctrl+O / Cmd+O (Physical O, Logical O, Russian 'щ')
+    final isKeyO = physical == PhysicalKeyboardKey.keyO ||
+        logical == LogicalKeyboardKey.keyO ||
+        logical == const LogicalKeyboardKey(0x00000449); // Russian 'щ'
+    if (isCmdOrCtrl && !isShift && !isAlt && isKeyO) {
+      final ctx = FocusManager.instance.primaryFocus?.context ?? context;
+      Actions.maybeInvoke(ctx, const OpenSqlIntent());
+      return true;
+    }
+
+    // 5. Save SQL: Ctrl+S / Cmd+S (Physical S, Logical S, Russian 'ы')
+    final isKeyS = physical == PhysicalKeyboardKey.keyS ||
+        logical == LogicalKeyboardKey.keyS ||
+        logical == const LogicalKeyboardKey(0x0000044b); // Russian 'ы'
+    if (isCmdOrCtrl && !isShift && !isAlt && isKeyS) {
+      final ctx = FocusManager.instance.primaryFocus?.context ?? context;
+      Actions.maybeInvoke(ctx, const SaveSqlIntent());
+      return true;
+    }
+
+    // 6. Tutorial & Welcome: F1 or Ctrl+Shift+H / Cmd+Shift+H (Physical H, Logical H, Russian 'р')
+    final isF1 = physical == PhysicalKeyboardKey.f1 ||
+        logical == LogicalKeyboardKey.f1;
+    final isKeyH = physical == PhysicalKeyboardKey.keyH ||
+        logical == LogicalKeyboardKey.keyH ||
+        logical == const LogicalKeyboardKey(0x00000440); // Russian 'р'
+    if (isF1 || (isCmdOrCtrl && isShift && isKeyH)) {
+      _onOpenWelcomeTour();
+      return true;
+    }
+
+    // 7. Home / Start Screen: Ctrl+Shift+0 / Cmd+Shift+0
+    final isDigit0 = physical == PhysicalKeyboardKey.digit0 ||
+        physical == PhysicalKeyboardKey.numpad0 ||
+        logical == LogicalKeyboardKey.digit0 ||
+        logical == LogicalKeyboardKey.numpad0;
+    if (isCmdOrCtrl && isShift && isDigit0) {
+      _onGoHome();
+      return true;
+    }
+
+    return false;
   }
 
   void _onConnectionSelected(ConnectionRow connection) {

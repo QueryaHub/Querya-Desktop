@@ -118,6 +118,9 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       onNew: () => _sqlController.clear(),
       onOpen: () => unawaited(_openSqlFile()),
       onSave: () => unawaited(_saveSqlFile()),
+      onExecute: () {
+        if (!_running) _execute();
+      },
     );
   }
 

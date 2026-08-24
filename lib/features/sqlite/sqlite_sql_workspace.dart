@@ -72,6 +72,9 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       onNew: () => _sqlController.clear(),
       onOpen: () => unawaited(_openSqlFile()),
       onSave: () => unawaited(_saveSqlFile()),
+      onExecute: () {
+        if (!_running) unawaited(_execute());
+      },
     );
   }
 

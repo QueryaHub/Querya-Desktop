@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-enum SqlEditorPendingAction { none, newQuery, openFile, saveFile }
+enum SqlEditorPendingAction { none, newQuery, openFile, saveFile, executeQuery }
 
 /// Lets the active SQL workspace handle File menu commands when menu focus is
 /// outside the editor subtree (e.g. title bar).
@@ -13,21 +13,25 @@ class SqlEditorCommandBridge {
   VoidCallback? _onNew;
   VoidCallback? _onOpen;
   VoidCallback? _onSave;
+  VoidCallback? _onExecute;
 
   SqlEditorPendingAction pendingAction = SqlEditorPendingAction.none;
 
   bool get isActive => _onNew != null;
+  bool get canExecute => _onExecute != null;
 
   void register({
     required int? connectionId,
     required VoidCallback onNew,
     required VoidCallback onOpen,
     required VoidCallback onSave,
+    VoidCallback? onExecute,
   }) {
     _ownerConnectionId = connectionId;
     _onNew = onNew;
     _onOpen = onOpen;
     _onSave = onSave;
+    _onExecute = onExecute;
     _flushPending();
   }
 
@@ -37,6 +41,7 @@ class SqlEditorCommandBridge {
     _onNew = null;
     _onOpen = null;
     _onSave = null;
+    _onExecute = null;
   }
 
   void queuePending(SqlEditorPendingAction action) {
@@ -67,6 +72,14 @@ class SqlEditorCommandBridge {
     pendingAction = SqlEditorPendingAction.saveFile;
   }
 
+  void invokeExecute() {
+    if (_onExecute != null) {
+      _onExecute!();
+      return;
+    }
+    pendingAction = SqlEditorPendingAction.executeQuery;
+  }
+
   void _flushPending() {
     final action = pendingAction;
     if (action == SqlEditorPendingAction.none) return;
@@ -81,6 +94,8 @@ class SqlEditorCommandBridge {
         _onOpen?.call();
       case SqlEditorPendingAction.saveFile:
         _onSave?.call();
+      case SqlEditorPendingAction.executeQuery:
+        _onExecute?.call();
     }
   }
 
@@ -90,6 +105,7 @@ class SqlEditorCommandBridge {
     _onNew = null;
     _onOpen = null;
     _onSave = null;
+    _onExecute = null;
     pendingAction = SqlEditorPendingAction.none;
   }
 }
