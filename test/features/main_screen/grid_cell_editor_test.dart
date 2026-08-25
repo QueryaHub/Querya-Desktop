@@ -22,7 +22,7 @@ void main() {
               initialValue: 'Original',
               width: 200,
               height: 36,
-              onCommit: (val, {moveNextCol = false, movePrevCol = false, moveNextRow = false}) {
+              onCommit: (val, {moveNextCol = false, movePrevCol = false, moveNextRow = false, movePrevRow = false}) {
                 committed = val;
                 movedRow = moveNextRow;
               },
@@ -54,7 +54,7 @@ void main() {
               initialValue: 'Original',
               width: 200,
               height: 36,
-              onCommit: (val, {moveNextCol = false, movePrevCol = false, moveNextRow = false}) {},
+              onCommit: (val, {moveNextCol = false, movePrevCol = false, moveNextRow = false, movePrevRow = false}) {},
               onCancel: () => cancelled = true,
             ),
           ),
@@ -66,6 +66,32 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(cancelled, isTrue);
+    });
+
+    testWidgets('displays validation error icon on invalid integer input', (tester) async {
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Material(
+            child: GridCellEditor(
+              initialValue: '123',
+              dataTypeName: 'integer',
+              width: 200,
+              height: 36,
+              onCommit: (val, {moveNextCol = false, movePrevCol = false, moveNextRow = false, movePrevRow = false}) {},
+              onCancel: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(material.Icons.error_outline_rounded), findsNothing);
+
+      // Enter non-integer text
+      await tester.enterText(find.byType(material.TextField), 'not_a_number');
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(material.Icons.error_outline_rounded), findsOneWidget);
     });
   });
 
