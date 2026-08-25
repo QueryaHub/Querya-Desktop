@@ -10,6 +10,8 @@ import 'package:postgres/postgres.dart' as pg;
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/postgres_sql.dart';
 import 'package:querya_desktop/core/database/result_row_string_convert.dart';
+import 'package:querya_desktop/core/database/sql_table_target_extractor.dart';
+import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -17,6 +19,7 @@ import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_utils.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
+import 'package:querya_desktop/features/main_screen/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/features/main_screen/query_editor_tab.dart';
 import 'package:querya_desktop/features/main_screen/results_tab.dart';
 import 'package:querya_desktop/features/main_screen/sql_editor_chrome.dart';
@@ -80,6 +83,9 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
   List<List<String>> _rows = [];
   int? _affectedRows;
   String? _statusLine;
+  DataGridStagingBuffer? _stagingBuffer;
+  String? _lastExecutedSql;
+  bool _savingChanges = false;
 
   /// PostgreSQL default: each statement is its own transaction unless you use
   /// `BEGIN` / `BEGIN`+implicit when autocommit is off.
@@ -367,6 +373,10 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         _columns = cols;
         _rows = outRows;
         _affectedRows = result.affectedRows;
+        _lastExecutedSql = userSql;
+        _stagingBuffer = cols.isNotEmpty
+            ? DataGridStagingBuffer(columns: cols, rows: outRows)
+            : null;
         if (cols.isEmpty && outRows.isEmpty) {
           _statusLine =
               'Command completed. Rows affected: ${result.affectedRows}.';
@@ -413,6 +423,61 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       }
     } finally {
       await _refreshTxStatus();
+    }
+  }
+
+  Future<void> _applyStagedChanges() async {
+    if (_stagingBuffer == null || !_stagingBuffer!.isDirty || _savingChanges) return;
+    final target = _lastExecutedSql != null ? SqlTableTargetExtractor.extract(_lastExecutedSql!) : null;
+    final tableName = target?.tableName ?? 'table';
+    final schemaName = target?.schema;
+
+    setState(() => _savingChanges = true);
+    try {
+      final plan = _stagingBuffer!.generateMutationPlan(
+        dialect: SqlDialect.postgres,
+        tableName: tableName,
+        schema: schemaName,
+      );
+      if (plan.isEmpty) {
+        setState(() => _savingChanges = false);
+        return;
+      }
+
+      await _ensureLease();
+      final conn = _lease?.connection;
+      if (conn == null || !conn.isConnected) {
+        throw StateError('Could not connect to PostgreSQL.');
+      }
+
+      final txSql = plan.toTransactionSql();
+      final to = _statementTimeout();
+      await conn.execute(txSql, timeout: to);
+
+      if (!mounted) return;
+      setState(() {
+        _rows = _stagingBuffer!.effectiveRows;
+        _stagingBuffer = DataGridStagingBuffer(columns: _columns, rows: _rows);
+        _savingChanges = false;
+      });
+      await _refreshTxStatus();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _savingChanges = false);
+        await showAppDialog<void>(
+          context: context,
+          builder: (ctx) => material.AlertDialog(
+            title: const material.Text('Save Changes Failed'),
+            content: material.Text(e.toString()),
+            actions: [
+              material.TextButton(
+                onPressed: () => material.Navigator.of(ctx).pop(),
+                child: const material.Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
     }
   }
 
@@ -597,6 +662,9 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
                     isLoading: _running,
                     affectedRows: _affectedRows,
                     statusLine: _statusLine,
+                    stagingBuffer: _stagingBuffer,
+                    onApplyChanges: widget.isReadOnly ? null : _applyStagedChanges,
+                    isSaving: _savingChanges,
                   ),
                 ),
               ],

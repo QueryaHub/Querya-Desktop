@@ -8,11 +8,14 @@ import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
 import 'package:querya_desktop/core/database/result_row_string_convert.dart';
+import 'package:querya_desktop/core/database/sql_table_target_extractor.dart';
+import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
+import 'package:querya_desktop/features/main_screen/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/features/main_screen/query_editor_tab.dart';
 import 'package:querya_desktop/features/main_screen/results_tab.dart';
 import 'package:querya_desktop/features/main_screen/sql_editor_chrome.dart';
@@ -46,6 +49,9 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
   List<List<String>> _rows = [];
   int? _affectedRows;
   String? _statusLine;
+  DataGridStagingBuffer? _stagingBuffer;
+  String? _lastExecutedSql;
+  bool _savingChanges = false;
 
   int? _queryTimeoutSeconds;
 
@@ -224,6 +230,10 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
         _columns = cols;
         _rows = outRows;
         _affectedRows = affected;
+        _lastExecutedSql = userSql;
+        _stagingBuffer = cols.isNotEmpty
+            ? DataGridStagingBuffer(columns: cols, rows: outRows)
+            : null;
         if (cols.isEmpty && outRows.isEmpty) {
           _statusLine = affected != null
               ? 'OK. Rows affected: $affected.'
@@ -260,6 +270,60 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
           _error = e.toString();
           _running = false;
         });
+      }
+    }
+  }
+
+  Future<void> _applyStagedChanges() async {
+    if (_stagingBuffer == null || !_stagingBuffer!.isDirty || _savingChanges) return;
+    final target = _lastExecutedSql != null ? SqlTableTargetExtractor.extract(_lastExecutedSql!) : null;
+    final tableName = target?.tableName ?? 'table';
+    final schemaName = target?.schema;
+
+    setState(() => _savingChanges = true);
+    try {
+      final plan = _stagingBuffer!.generateMutationPlan(
+        dialect: SqlDialect.mysql,
+        tableName: tableName,
+        schema: schemaName,
+      );
+      if (plan.isEmpty) {
+        setState(() => _savingChanges = false);
+        return;
+      }
+
+      await _ensureLease();
+      final conn = _lease?.connection;
+      if (conn == null || !conn.isConnected) {
+        throw StateError('Could not connect to MySQL.');
+      }
+
+      for (final stmt in plan.statements) {
+        await conn.execute(stmt.sql);
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _rows = _stagingBuffer!.effectiveRows;
+        _stagingBuffer = DataGridStagingBuffer(columns: _columns, rows: _rows);
+        _savingChanges = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _savingChanges = false);
+        await showAppDialog<void>(
+          context: context,
+          builder: (ctx) => material.AlertDialog(
+            title: const material.Text('Save Changes Failed'),
+            content: material.Text(e.toString()),
+            actions: [
+              material.TextButton(
+                onPressed: () => material.Navigator.of(ctx).pop(),
+                child: const material.Text('OK'),
+              ),
+            ],
+          ),
+        );
       }
     }
   }
@@ -453,6 +517,9 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
                     isLoading: _running,
                     affectedRows: _affectedRows,
                     statusLine: _statusLine,
+                    stagingBuffer: _stagingBuffer,
+                    onApplyChanges: widget.isReadOnly ? null : _applyStagedChanges,
+                    isSaving: _savingChanges,
                   ),
                 ),
               ],
