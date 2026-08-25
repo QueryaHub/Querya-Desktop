@@ -26,7 +26,7 @@ void main() {
   }
 
   group('DmlPreviewConfirmationDialog', () {
-    final samplePlan = TableMutationPlan(
+    const samplePlan = TableMutationPlan(
       dialect: SqlDialect.postgres,
       tableName: 'users',
       schema: 'public',
