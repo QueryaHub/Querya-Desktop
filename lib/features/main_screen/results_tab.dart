@@ -1,6 +1,7 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/motion/querya_fade_slide.dart';
 import 'package:querya_desktop/core/widgets/virtual_selectable_text_view.dart';
 import 'package:querya_desktop/features/main_screen/data_grid_calc_bar.dart';
@@ -131,17 +132,60 @@ class _ResultsTabState extends material.State<ResultsTab> {
         ? effectiveRows
         : filteredIndices.map((i) => effectiveRows[i]).toList();
 
-    return material.Column(
-      key: const material.ValueKey('results_mode_grid'),
-      crossAxisAlignment: material.CrossAxisAlignment.stretch,
-      children: [
-        if (widget.stagingBuffer != null)
-          DataGridStagingToolbar(
-            stagingBuffer: widget.stagingBuffer!,
-            selectedRowIndex: _selectedRowIndex,
-            onApplyChanges: widget.onApplyChanges,
-            isSaving: widget.isSaving,
-          ),
+    return material.CallbackShortcuts(
+      bindings: {
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyF,
+          meta: true,
+        ): () => setState(() => _showFilterBar = !_showFilterBar),
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyF,
+          control: true,
+        ): () => setState(() => _showFilterBar = !_showFilterBar),
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyS,
+          meta: true,
+        ): () {
+          if (widget.stagingBuffer?.isDirty == true && !widget.isSaving) {
+            widget.onApplyChanges?.call();
+          }
+        },
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyS,
+          control: true,
+        ): () {
+          if (widget.stagingBuffer?.isDirty == true && !widget.isSaving) {
+            widget.onApplyChanges?.call();
+          }
+        },
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyG,
+          meta: true,
+        ): () => setState(() {
+          _viewMode = _viewMode == ResultViewMode.grid
+              ? ResultViewMode.groupings
+              : ResultViewMode.grid;
+        }),
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyG,
+          control: true,
+        ): () => setState(() {
+          _viewMode = _viewMode == ResultViewMode.grid
+              ? ResultViewMode.groupings
+              : ResultViewMode.grid;
+        }),
+      },
+      child: material.Column(
+        key: const material.ValueKey('results_mode_grid'),
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
+          if (widget.stagingBuffer != null)
+            DataGridStagingToolbar(
+              stagingBuffer: widget.stagingBuffer!,
+              selectedRowIndex: _selectedRowIndex,
+              onApplyChanges: widget.onApplyChanges,
+              isSaving: widget.isSaving,
+            ),
         if (widget.showExportToolbar && widget.columns.isNotEmpty)
           material.Container(
             padding: const material.EdgeInsets.symmetric(
@@ -348,7 +392,8 @@ class _ResultsTabState extends material.State<ResultsTab> {
         if (_viewMode == ResultViewMode.grid)
           DataGridCalcBar(stats: _selectionStats),
       ],
-    );
+    ),
+  );
   }
 }
 
