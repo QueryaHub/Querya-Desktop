@@ -15,6 +15,7 @@ import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/main_screen/data_grid_staging_buffer.dart';
+import 'package:querya_desktop/features/main_screen/dml_preview_dialog.dart';
 import 'package:querya_desktop/features/main_screen/query_editor_tab.dart';
 import 'package:querya_desktop/features/main_screen/results_tab.dart';
 import 'package:querya_desktop/features/main_screen/sql_editor_chrome.dart';
@@ -248,6 +249,15 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         schema: target?.schema,
       );
       if (plan.isEmpty) {
+        setState(() => _savingChanges = false);
+        return;
+      }
+
+      final confirmed = await showDmlPreviewDialog(
+        context: context,
+        plan: plan,
+      );
+      if (confirmed != true) {
         setState(() => _savingChanges = false);
         return;
       }
