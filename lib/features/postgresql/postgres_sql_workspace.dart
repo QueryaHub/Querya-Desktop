@@ -20,6 +20,7 @@ import 'package:querya_desktop/features/postgresql/postgres_table_utils.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
 import 'package:querya_desktop/features/main_screen/data_grid_staging_buffer.dart';
+import 'package:querya_desktop/features/main_screen/dml_preview_dialog.dart';
 import 'package:querya_desktop/features/main_screen/query_editor_tab.dart';
 import 'package:querya_desktop/features/main_screen/results_tab.dart';
 import 'package:querya_desktop/features/main_screen/sql_editor_chrome.dart';
@@ -440,6 +441,15 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         schema: schemaName,
       );
       if (plan.isEmpty) {
+        setState(() => _savingChanges = false);
+        return;
+      }
+
+      final confirmed = await showDmlPreviewDialog(
+        context: context,
+        plan: plan,
+      );
+      if (confirmed != true) {
         setState(() => _savingChanges = false);
         return;
       }

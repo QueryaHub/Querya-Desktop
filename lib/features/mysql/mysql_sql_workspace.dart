@@ -16,6 +16,7 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
 import 'package:querya_desktop/features/main_screen/data_grid_staging_buffer.dart';
+import 'package:querya_desktop/features/main_screen/dml_preview_dialog.dart';
 import 'package:querya_desktop/features/main_screen/query_editor_tab.dart';
 import 'package:querya_desktop/features/main_screen/results_tab.dart';
 import 'package:querya_desktop/features/main_screen/sql_editor_chrome.dart';
@@ -288,6 +289,15 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
         schema: schemaName,
       );
       if (plan.isEmpty) {
+        setState(() => _savingChanges = false);
+        return;
+      }
+
+      final confirmed = await showDmlPreviewDialog(
+        context: context,
+        plan: plan,
+      );
+      if (confirmed != true) {
         setState(() => _savingChanges = false);
         return;
       }
