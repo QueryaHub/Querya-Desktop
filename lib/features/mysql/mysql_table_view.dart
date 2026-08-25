@@ -508,15 +508,72 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
                             mainAxisAlignment: material.MainAxisAlignment.end,
                             mainAxisSize: material.MainAxisSize.min,
                             children: [
-                              material.Text(
-                                _paginationLabel(),
-                                style: material.TextStyle(
-                                  fontSize: 11,
-                                  color: cs.mutedForeground,
+                              material.Container(
+                                padding: const material.EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
                                 ),
+                                decoration: material.BoxDecoration(
+                                  color: cs.muted.withValues(alpha: 0.4),
+                                  borderRadius: material.BorderRadius.circular(4),
+                                ),
+                                child: material.Text(
+                                  _paginationLabel(),
+                                  style: material.TextStyle(
+                                    fontSize: 11,
+                                    color: cs.mutedForeground,
+                                  ),
+                                ),
+                              ),
+                              const Gap(6),
+                              OutlineButton(
+                                size: ButtonSize.small,
+                                onPressed: _openSqlEditor,
+                                leading: const material.Icon(
+                                  material.Icons.code_rounded,
+                                  size: 15,
+                                ),
+                                child: const Text('SQL'),
+                              ),
+                              if (_customSqlActive) ...[
+                                const Gap(4),
+                                OutlineButton(
+                                  size: ButtonSize.small,
+                                  onPressed: _exitCustomMode,
+                                  leading: const material.Icon(
+                                    material.Icons.table_chart_rounded,
+                                    size: 15,
+                                  ),
+                                  child: const Text('Browse'),
+                                ),
+                              ],
+                              const Gap(4),
+                              OutlineButton(
+                                size: ButtonSize.small,
+                                onPressed: (!_canGoPrevious || _loading)
+                                    ? null
+                                    : _goToPreviousPage,
+                                leading: const material.Icon(
+                                  material.Icons.chevron_left_rounded,
+                                  size: 16,
+                                ),
+                                child: const Text('Back'),
+                              ),
+                              const Gap(4),
+                              OutlineButton(
+                                size: ButtonSize.small,
+                                onPressed: (!_canGoNext || _loading)
+                                    ? null
+                                    : _goToNextPage,
+                                leading: const material.Icon(
+                                  material.Icons.chevron_right_rounded,
+                                  size: 16,
+                                ),
+                                child: const Text('Next'),
                               ),
                               const Gap(8),
                               OutlineButton(
+                                size: ButtonSize.small,
                                 onPressed: _loading
                                     ? null
                                     : () {
@@ -526,36 +583,11 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
                                           unawaited(_fetch(refreshCount: true));
                                         }
                                       },
-                                child: const Text('Refresh'),
-                              ),
-                              const Gap(6),
-                              OutlineButton(
-                                onPressed: _openSqlEditor,
-                                child: const Text('SQL'),
-                              ),
-                              if (_customSqlActive) ...[
-                                const Gap(6),
-                                OutlineButton(
-                                  onPressed: _exitCustomMode,
-                                  child: const Text('Browse'),
+                                leading: const material.Icon(
+                                  material.Icons.refresh_rounded,
+                                  size: 14,
                                 ),
-                              ],
-                              const Gap(6),
-                              GhostButton(
-                                onPressed: (!_canGoPrevious || _loading)
-                                    ? null
-                                    : _goToPreviousPage,
-                                child: const Icon(
-                                    material.Icons.chevron_left_rounded,
-                                    size: 20),
-                              ),
-                              GhostButton(
-                                onPressed: (!_canGoNext || _loading)
-                                    ? null
-                                    : _goToNextPage,
-                                child: const Icon(
-                                    material.Icons.chevron_right_rounded,
-                                    size: 20),
+                                child: const Text('Refresh'),
                               ),
                             ],
                           ),

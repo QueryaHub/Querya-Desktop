@@ -294,52 +294,54 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
   }
 
   material.Widget _headerCell(ColorScheme cs, String name) {
-    return material.Container(
-      width: 150,
-      padding: const material.EdgeInsets.symmetric(horizontal: 10),
-      alignment: material.Alignment.centerLeft,
-      decoration: material.BoxDecoration(
-        border: material.Border(
-          right: material.BorderSide(
-            color: cs.border.withValues(alpha: 0.22),
-            width: 1,
+    return material.Expanded(
+      child: material.Container(
+        padding: const material.EdgeInsets.symmetric(horizontal: 10),
+        alignment: material.Alignment.centerLeft,
+        decoration: material.BoxDecoration(
+          border: material.Border(
+            right: material.BorderSide(
+              color: cs.border.withValues(alpha: 0.22),
+              width: 1,
+            ),
           ),
         ),
-      ),
-      child: material.Text(
-        name,
-        overflow: material.TextOverflow.ellipsis,
-        style: material.TextStyle(
-          fontSize: 12,
-          fontWeight: material.FontWeight.w600,
-          color: cs.foreground,
+        child: material.Text(
+          name,
+          overflow: material.TextOverflow.ellipsis,
+          style: material.TextStyle(
+            fontSize: 12,
+            fontWeight: material.FontWeight.w600,
+            color: cs.foreground,
+          ),
         ),
       ),
     );
   }
 
   material.Widget _dataCell(ColorScheme cs, String value) {
-    return material.Container(
-      width: 150,
-      padding: const material.EdgeInsets.symmetric(horizontal: 10),
-      alignment: material.Alignment.centerLeft,
-      decoration: material.BoxDecoration(
-        border: material.Border(
-          right: material.BorderSide(
-            color: cs.border.withValues(alpha: 0.15),
-            width: 1,
+    return material.Expanded(
+      child: material.Container(
+        padding: const material.EdgeInsets.symmetric(horizontal: 10),
+        alignment: material.Alignment.centerLeft,
+        decoration: material.BoxDecoration(
+          border: material.Border(
+            right: material.BorderSide(
+              color: cs.border.withValues(alpha: 0.15),
+              width: 1,
+            ),
           ),
         ),
-      ),
-      child: material.SelectableText(
-        value,
-        maxLines: 1,
-        style: material.TextStyle(
-          fontSize: 12,
-          fontFamily: 'monospace',
-          color: value == 'NULL'
-              ? cs.mutedForeground.withValues(alpha: 0.7)
-              : cs.foreground,
+        child: material.SelectableText(
+          value,
+          maxLines: 1,
+          style: material.TextStyle(
+            fontSize: 12,
+            fontFamily: 'monospace',
+            color: value == 'NULL'
+                ? cs.mutedForeground.withValues(alpha: 0.7)
+                : cs.foreground,
+          ),
         ),
       ),
     );
@@ -481,14 +483,24 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
                             mainAxisAlignment: material.MainAxisAlignment.end,
                             mainAxisSize: material.MainAxisSize.min,
                             children: [
-                              material.Text(
-                                _paginationLabel(),
-                                style: material.TextStyle(
-                                  fontSize: 11,
-                                  color: cs.mutedForeground,
+                              material.Container(
+                                padding: const material.EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: material.BoxDecoration(
+                                  color: cs.muted.withValues(alpha: 0.4),
+                                  borderRadius: material.BorderRadius.circular(4),
+                                ),
+                                child: material.Text(
+                                  _paginationLabel(),
+                                  style: material.TextStyle(
+                                    fontSize: 11,
+                                    color: cs.mutedForeground,
+                                  ),
                                 ),
                               ),
-                              const Gap(8),
+                              const Gap(6),
                               OutlineButton(
                                 size: ButtonSize.small,
                                 onPressed: _loading
@@ -496,29 +508,41 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
                                     : () => unawaited(_showDdlDialog()),
                                 child: const Text('DDL'),
                               ),
-                              const Gap(6),
+                              const Gap(4),
                               OutlineButton(
+                                size: ButtonSize.small,
                                 onPressed: _loading
                                     ? null
                                     : () => unawaited(_fetch()),
+                                leading: const material.Icon(
+                                  material.Icons.refresh_rounded,
+                                  size: 14,
+                                ),
                                 child: const Text('Refresh'),
                               ),
-                              const Gap(6),
-                              GhostButton(
+                              const Gap(4),
+                              OutlineButton(
+                                size: ButtonSize.small,
                                 onPressed: (!_canGoPrevious || _loading)
                                     ? null
                                     : _goToPreviousPage,
-                                child: const Icon(
-                                    material.Icons.chevron_left_rounded,
-                                    size: 20),
+                                leading: const material.Icon(
+                                  material.Icons.chevron_left_rounded,
+                                  size: 16,
+                                ),
+                                child: const Text('Back'),
                               ),
-                              GhostButton(
+                              const Gap(4),
+                              OutlineButton(
+                                size: ButtonSize.small,
                                 onPressed: (!_canGoNext || _loading)
                                     ? null
                                     : _goToNextPage,
-                                child: const Icon(
-                                    material.Icons.chevron_right_rounded,
-                                    size: 20),
+                                leading: const material.Icon(
+                                  material.Icons.chevron_right_rounded,
+                                  size: 16,
+                                ),
+                                child: const Text('Next'),
                               ),
                             ],
                           ),

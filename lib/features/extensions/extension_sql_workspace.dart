@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:file_selector/file_selector.dart';
+import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/extensions/extension_driver_session.dart';
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
@@ -60,7 +61,30 @@ class _ExtensionSqlWorkspaceState
     material.WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_loadWorkspaceSettings());
       _applySelectedObject();
+      _registerSqlEditorCommands();
     });
+  }
+
+  @override
+  void dispose() {
+    SqlEditorCommandBridge.instance
+        .unregister(connectionId: widget.connectionRow.id);
+    _sqlController.dispose();
+    _topFraction.dispose();
+    super.dispose();
+  }
+
+  void _registerSqlEditorCommands() {
+    if (!mounted) return;
+    SqlEditorCommandBridge.instance.register(
+      connectionId: widget.connectionRow.id,
+      onNew: () => _sqlController.clear(),
+      onOpen: () => unawaited(_openSqlFile()),
+      onSave: () => unawaited(_saveSqlFile()),
+      onExecute: () {
+        if (!_running) unawaited(_execute());
+      },
+    );
   }
 
   @override
@@ -99,12 +123,7 @@ class _ExtensionSqlWorkspaceState
     });
   }
 
-  @override
-  void dispose() {
-    _topFraction.dispose();
-    _sqlController.dispose();
-    super.dispose();
-  }
+
 
   Future<void> _execute() async {
     if (_running) return;
@@ -224,9 +243,43 @@ class _ExtensionSqlWorkspaceState
     return material.CallbackShortcuts(
       bindings: {
         const material.SingleActivator(LogicalKeyboardKey.f5): () {
-          if (!_running) {
-            unawaited(_execute());
-          }
+          if (!_running) unawaited(_execute());
+        },
+        const material.SingleActivator(
+          LogicalKeyboardKey.enter,
+          control: true,
+        ): () {
+          if (!_running) unawaited(_execute());
+        },
+        const material.SingleActivator(
+          LogicalKeyboardKey.enter,
+          meta: true,
+        ): () {
+          if (!_running) unawaited(_execute());
+        },
+        const material.SingleActivator(
+          LogicalKeyboardKey.numpadEnter,
+          control: true,
+        ): () {
+          if (!_running) unawaited(_execute());
+        },
+        const material.SingleActivator(
+          LogicalKeyboardKey.numpadEnter,
+          meta: true,
+        ): () {
+          if (!_running) unawaited(_execute());
+        },
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyR,
+          control: true,
+        ): () {
+          if (!_running) unawaited(_execute());
+        },
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyR,
+          meta: true,
+        ): () {
+          if (!_running) unawaited(_execute());
         },
       },
       child: material.Focus(

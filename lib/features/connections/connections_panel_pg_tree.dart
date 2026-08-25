@@ -106,41 +106,53 @@ class _PgTreeRow extends material.StatelessWidget {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
     final muted = theme.colorScheme.mutedForeground;
-    final row = material.Material(
-      color: material.Colors.transparent,
-      child: material.InkWell(
-        onTap: onTap,
-        borderRadius: material.BorderRadius.circular(4),
-        hoverColor: primary.withValues(alpha: 0.07),
-        splashColor: primary.withValues(alpha: 0.10),
-        highlightColor: primary.withValues(alpha: 0.05),
-        mouseCursor: onTap != null
-            ? material.SystemMouseCursors.click
-            : material.SystemMouseCursors.basic,
-        child: material.Padding(
-          padding: material.EdgeInsets.symmetric(
-            horizontal: 4,
-            vertical: verticalPadding,
-          ),
-          child: material.Row(
-            children: [
-              if (leading != null) ...[
-                leading!,
-                const Gap(4),
-              ],
-              if (icon != null) ...[
-                material.Icon(
-                  icon,
-                  size: iconSize,
-                  color: iconColor ?? muted,
+    final row = material.CallbackShortcuts(
+      bindings: {
+        if (expanded == false && onTap != null)
+          const material.SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+              onTap!(),
+        if (expanded == true && onTap != null)
+          const material.SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+              onTap!(),
+      },
+      child: material.Material(
+        color: material.Colors.transparent,
+        child: material.InkWell(
+          onTap: onTap,
+          canRequestFocus: onTap != null,
+          borderRadius: material.BorderRadius.circular(4),
+          hoverColor: primary.withValues(alpha: 0.07),
+          focusColor: primary.withValues(alpha: 0.14),
+          splashColor: primary.withValues(alpha: 0.10),
+          highlightColor: primary.withValues(alpha: 0.05),
+          mouseCursor: onTap != null
+              ? material.SystemMouseCursors.click
+              : material.SystemMouseCursors.basic,
+          child: material.Padding(
+            padding: material.EdgeInsets.symmetric(
+              horizontal: 4,
+              vertical: verticalPadding,
+            ),
+            child: material.Row(
+              children: [
+                if (leading != null) ...[
+                  leading!,
+                  const Gap(4),
+                ],
+                if (icon != null) ...[
+                  material.Icon(
+                    icon,
+                    size: iconSize,
+                    color: iconColor ?? muted,
+                  ),
+                  const Gap(6),
+                ],
+                material.Expanded(
+                  child: _PgTreeRowLabel(label: label, textStyle: textStyle),
                 ),
-                const Gap(6),
+                if (trailing != null) trailing!,
               ],
-              material.Expanded(
-                child: _PgTreeRowLabel(label: label, textStyle: textStyle),
-              ),
-              if (trailing != null) trailing!,
-            ],
+            ),
           ),
         ),
       ),
@@ -156,6 +168,48 @@ class _PgTreeRow extends material.StatelessWidget {
     }
     final menu = ContextMenu(
       items: [
+        if (openSqlName != null) ...[
+          MenuButton(
+            leading: material.Icon(
+              material.Icons.table_rows_outlined,
+              size: 18,
+              color: theme.colorScheme.primary,
+            ),
+            onPressed: (_) {
+              final qualified = openSqlSchema != null && openSqlSchema!.isNotEmpty
+                  ? '"$openSqlSchema"."$openSqlName"'
+                  : '"$openSqlName"';
+              Clipboard.setData(
+                ClipboardData(text: 'SELECT * FROM $qualified LIMIT 100;'),
+              );
+              if (onOpenSqlWorkspace != null && connection != null) {
+                onOpenSqlWorkspace!(
+                  connection!,
+                  database: openSqlDatabase,
+                  schema: openSqlSchema,
+                  name: openSqlName,
+                  kind: openSqlKind,
+                );
+              }
+            },
+            child: const Text('Select TOP 100'),
+          ),
+          MenuButton(
+            leading: material.Icon(
+              material.Icons.code_rounded,
+              size: 18,
+              color: theme.colorScheme.mutedForeground,
+            ),
+            onPressed: (_) {
+              final qualified = openSqlSchema != null && openSqlSchema!.isNotEmpty
+                  ? '"$openSqlSchema"."$openSqlName"'
+                  : '"$openSqlName"';
+              Clipboard.setData(ClipboardData(text: 'SELECT * FROM $qualified;'));
+            },
+            child: const Text('Copy SELECT statement'),
+          ),
+          const MenuDivider(),
+        ],
         if (onContextRefresh != null)
           MenuButton(
             leading: material.Icon(
@@ -177,7 +231,7 @@ class _PgTreeRow extends material.StatelessWidget {
           },
           child: const Text('Copy name'),
         ),
-        if (onOpenSqlWorkspace != null)
+        if (onOpenSqlWorkspace != null && openSqlName == null)
           MenuButton(
             leading: material.Icon(
               material.Icons.terminal_rounded,
@@ -193,7 +247,8 @@ class _PgTreeRow extends material.StatelessWidget {
             ),
             child: const Text('Open in SQL'),
           ),
-        if (onContextDelete != null)
+        if (onContextDelete != null) ...[
+          const MenuDivider(),
           MenuButton(
             leading: material.Icon(
               material.Icons.delete_outline_rounded,
@@ -203,6 +258,7 @@ class _PgTreeRow extends material.StatelessWidget {
             onPressed: (_) => onContextDelete!(),
             child: Text(contextDeleteLabel ?? 'Delete'),
           ),
+        ],
       ],
       child: row,
     );

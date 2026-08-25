@@ -49,6 +49,8 @@ class _SqliteConnectionFormContentState
   String? _testResult;
   Timer? _dismissTimer;
   late final FormValidityNotifier _formValidNotifier;
+  bool _nameTouched = false;
+  bool _pathTouched = false;
 
   bool get _isEditing => widget.initial != null;
 
@@ -65,6 +67,17 @@ class _SqliteConnectionFormContentState
       _pathController.text = initial.host ?? '';
       _readOnly = initial.useSSL;
     }
+
+    _nameController.addListener(() {
+      if (_nameController.text.isNotEmpty && !_nameTouched) {
+        setState(() => _nameTouched = true);
+      }
+    });
+    _pathController.addListener(() {
+      if (_pathController.text.isNotEmpty && !_pathTouched) {
+        setState(() => _pathTouched = true);
+      }
+    });
 
     _formValidNotifier.seed();
   }
@@ -223,6 +236,16 @@ class _SqliteConnectionFormContentState
                       controller: _nameController,
                       placeholder: const Text('e.g. Local Cache'),
                     ),
+                    if (_nameTouched && _nameController.text.trim().isEmpty) ...[
+                      const Gap(4),
+                      Text(
+                        'Connection name is required.',
+                        style: material.TextStyle(
+                          color: theme.destructive,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
                     const Gap(16),
                     // Database File Path
                     const Text('Database file path').small().semiBold(),
@@ -242,6 +265,16 @@ class _SqliteConnectionFormContentState
                         ),
                       ],
                     ),
+                    if (_pathTouched && _pathController.text.trim().isEmpty) ...[
+                      const Gap(4),
+                      Text(
+                        'Database file path is required.',
+                        style: material.TextStyle(
+                          color: theme.destructive,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
                     const Gap(16),
                     // Read-only toggle
                     material.Row(

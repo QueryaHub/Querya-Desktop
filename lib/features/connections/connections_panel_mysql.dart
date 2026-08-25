@@ -531,6 +531,7 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
                             icon: QueryaIcons.tableGroup,
                             itemIcon: QueryaIcons.tableLeaf,
                             items: _tables,
+                            onOpenSqlWorkspace: widget.onMysqlOpenSqlWorkspace,
                             onItemTap: widget.onMysqlObjectSelected == null
                                 ? null
                                 : (name) => widget.onMysqlObjectSelected!(
@@ -550,6 +551,7 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
                             icon: QueryaIcons.viewGroup,
                             itemIcon: QueryaIcons.viewLeaf,
                             items: _views,
+                            onOpenSqlWorkspace: widget.onMysqlOpenSqlWorkspace,
                             onItemTap: widget.onMysqlObjectSelected == null
                                 ? null
                                 : (name) => widget.onMysqlObjectSelected!(
@@ -569,6 +571,7 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
                             icon: QueryaIcons.functionGroup,
                             itemIcon: QueryaIcons.functionLeaf,
                             items: _procedures,
+                            onOpenSqlWorkspace: widget.onMysqlOpenSqlWorkspace,
                             onItemTap: widget.onMysqlObjectSelected == null
                                 ? null
                                 : (name) => widget.onMysqlObjectSelected!(
@@ -588,6 +591,7 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
                             icon: QueryaIcons.functionGroup,
                             itemIcon: QueryaIcons.functionLeaf,
                             items: _functions,
+                            onOpenSqlWorkspace: widget.onMysqlOpenSqlWorkspace,
                             onItemTap: widget.onMysqlObjectSelected == null
                                 ? null
                                 : (name) => widget.onMysqlObjectSelected!(
@@ -620,6 +624,7 @@ class _MysqlObjectGroup extends StatefulWidget {
     required this.itemIcon,
     required this.items,
     this.onItemTap,
+    this.onOpenSqlWorkspace,
   });
 
   final ConnectionRow connection;
@@ -631,6 +636,7 @@ class _MysqlObjectGroup extends StatefulWidget {
   final material.IconData itemIcon;
   final List<String> items;
   final void Function(String itemName)? onItemTap;
+  final void Function(ConnectionRow connection)? onOpenSqlWorkspace;
 
   @override
   State<_MysqlObjectGroup> createState() => _MysqlObjectGroupState();
@@ -700,8 +706,13 @@ class _MysqlObjectGroupState extends State<_MysqlObjectGroup> {
                       ? () => widget.onItemTap!(item)
                       : null,
                   connection: widget.connection,
-                  onContextRefresh: null,
-                  onOpenSqlWorkspace: null,
+                  openSqlDatabase: widget.databaseName,
+                  openSqlName: item,
+                  onContextRefresh: widget.onRefresh,
+                  onOpenSqlWorkspace: widget.onOpenSqlWorkspace != null
+                      ? (conn, {database, schema, name, kind}) =>
+                          widget.onOpenSqlWorkspace!(conn)
+                      : null,
                 );
               },
             ),

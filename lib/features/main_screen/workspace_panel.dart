@@ -58,8 +58,13 @@ class WorkspacePanel extends StatefulWidget {
     this.onRequestNewConnection,
     this.onRequestNewConnectionFromUrl,
     this.onRequestOpenSqlite,
+    this.onRequestLaunchDemo,
+    this.onRequestOpenTour,
     this.onOpenConnection,
   });
+
+  final VoidCallback? onRequestLaunchDemo;
+  final VoidCallback? onRequestOpenTour;
 
   /// Currently selected connection from the sidebar.
   final ConnectionRow? activeConnection;
@@ -147,6 +152,8 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
         onNewConnection: widget.onRequestNewConnection ?? () {},
         onNewConnectionFromUrl: widget.onRequestNewConnectionFromUrl,
         onOpenSqlite: widget.onRequestOpenSqlite,
+        onLaunchDemo: widget.onRequestLaunchDemo,
+        onOpenTour: widget.onRequestOpenTour,
         onOpenConnection: widget.onOpenConnection,
       ),
     );

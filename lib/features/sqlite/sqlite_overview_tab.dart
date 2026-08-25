@@ -133,7 +133,7 @@ class _SqliteOverviewTabState extends material.State<SqliteOverviewTab> {
   @override
   material.Widget build(material.BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final width = material.MediaQuery.of(context).size.width;
+    final width = material.MediaQuery.sizeOf(context).width;
 
     if (_loading && _overview == null) {
       return material.Center(

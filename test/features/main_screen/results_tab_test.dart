@@ -2,6 +2,8 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/motion/querya_fade_slide.dart';
 import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
+import 'package:querya_desktop/features/main_screen/data_grid_staging_buffer.dart';
+import 'package:querya_desktop/features/main_screen/data_grid_staging_toolbar.dart';
 import 'package:querya_desktop/features/main_screen/result_grid_view.dart';
 import 'package:querya_desktop/features/main_screen/results_tab.dart';
 
@@ -58,6 +60,101 @@ void main() {
         ],
       ).single;
       expect(long, greaterThan(short));
+    });
+  });
+
+  group('sortResultGridRows', () {
+    test('sorts numerically when all values are numbers', () {
+      final rows = [
+        ['10', 'b'],
+        ['2', 'a'],
+        ['1', 'c'],
+      ];
+      final sortedAsc = sortResultGridRows(
+        rows: rows,
+        columnIndex: 0,
+        order: ResultGridSortOrder.ascending,
+      );
+      expect(sortedAsc.map((r) => r[0]).toList(), ['1', '2', '10']);
+
+      final sortedDesc = sortResultGridRows(
+        rows: rows,
+        columnIndex: 0,
+        order: ResultGridSortOrder.descending,
+      );
+      expect(sortedDesc.map((r) => r[0]).toList(), ['10', '2', '1']);
+    });
+
+    test('sorts lexicographically for non-numeric strings', () {
+      final rows = [
+        ['banana'],
+        ['Apple'],
+        ['cherry'],
+      ];
+      final sorted = sortResultGridRows(
+        rows: rows,
+        columnIndex: 0,
+        order: ResultGridSortOrder.ascending,
+      );
+      expect(sorted.map((r) => r[0]).toList(), ['Apple', 'banana', 'cherry']);
+    });
+
+    test('handles NULL and empty values gracefully', () {
+      final rows = [
+        ['100'],
+        ['NULL'],
+        ['50'],
+        [''],
+      ];
+      final sorted = sortResultGridRows(
+        rows: rows,
+        columnIndex: 0,
+        order: ResultGridSortOrder.ascending,
+      );
+      expect(sorted.map((r) => r[0]).take(2).toList(), ['50', '100']);
+    });
+  });
+
+  group('ResultGridSelection', () {
+    test('contains point inside bounding box', () {
+      const selection = ResultGridSelection(
+        startRow: 1,
+        startColumn: 1,
+        endRow: 3,
+        endColumn: 4,
+      );
+      expect(selection.contains(1, 1), isTrue);
+      expect(selection.contains(2, 3), isTrue);
+      expect(selection.contains(3, 4), isTrue);
+      expect(selection.contains(0, 1), isFalse);
+      expect(selection.contains(1, 5), isFalse);
+    });
+
+    test('toTsv formats tab-delimited grid', () {
+      final rows = [
+        ['1', 'Alice', 'Engineer'],
+        ['2', 'Bob', 'Designer'],
+        ['3', 'Charlie', 'Manager'],
+      ];
+      final selection = ResultGridSelection.fromPoints(
+        anchor: const ResultGridCellCoordinate(0, 1),
+        focus: const ResultGridCellCoordinate(1, 2),
+      );
+      final tsv = selection.toTsv(rows);
+      expect(tsv, 'Alice\tEngineer\nBob\tDesigner');
+    });
+
+    test('toCsv formats comma-separated grid with quotes if needed', () {
+      final rows = [
+        ['1', 'Alice, Jr.', 'Engineer'],
+        ['2', 'Bob', 'Designer'],
+      ];
+      final selection = ResultGridSelection.fromPoints(
+        anchor: const ResultGridCellCoordinate(0, 0),
+        focus: const ResultGridCellCoordinate(1, 1),
+      );
+      final csv = selection.toCsv(rows);
+      expect(csv, '1,"Alice, Jr."\n2,Bob');
     });
   });
 
@@ -493,6 +590,171 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Rows affected: 4'), findsOneWidget);
+    });
+
+    testWidgets('allows manual column drag-resizing in VirtualResultGrid',
+        (tester) async {
+      await tester.pumpWidget(
+        resultsShell(
+          child: const material.Scaffold(
+            body: material.SizedBox(
+              width: 800,
+              height: 400,
+              child: VirtualResultGrid(
+                columns: ['id', 'username', 'email'],
+                rows: [
+                  ['1', 'alice', 'alice@example.com'],
+                  ['2', 'bob', 'bob@example.com'],
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('id'), findsOneWidget);
+      expect(find.text('username'), findsOneWidget);
+      expect(find.text('email'), findsOneWidget);
+
+      // Verify resize handles are rendered with resizeColumn cursor
+      final resizeRegions = find.byWidgetPredicate(
+        (w) =>
+            w is material.MouseRegion &&
+            w.cursor == material.SystemMouseCursors.resizeColumn,
+      );
+      expect(resizeRegions, findsNWidgets(3));
+
+      // Drag the first column handle by +50 pixels
+      final firstHandle = resizeRegions.first;
+      final startCenter = tester.getCenter(firstHandle);
+      await tester.dragFrom(startCenter, const material.Offset(50, 0));
+      await tester.pumpAndSettle();
+
+      // Column headers and rows remain stable and rendered
+      expect(find.text('alice'), findsOneWidget);
+      expect(find.text('bob'), findsOneWidget);
+    });
+
+    testWidgets('allows sorting by clicking column headers in VirtualResultGrid',
+        (tester) async {
+      await tester.pumpWidget(
+        resultsShell(
+          child: const material.Scaffold(
+            body: material.SizedBox(
+              width: 800,
+              height: 400,
+              child: VirtualResultGrid(
+                columns: ['id', 'score'],
+                rows: [
+                  ['1', '100'],
+                  ['2', '20'],
+                  ['3', '500'],
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Tap on 'score' header -> Ascending sort
+      await tester.tap(find.text('score'));
+      await tester.pumpAndSettle();
+
+      // Arrow up icon should appear
+      expect(find.byIcon(material.Icons.arrow_upward_rounded), findsOneWidget);
+
+      // Tap again -> Descending sort
+      await tester.tap(find.text('score'));
+      await tester.pumpAndSettle();
+
+      // Arrow down icon should appear
+      expect(find.byIcon(material.Icons.arrow_downward_rounded), findsOneWidget);
+
+      // Tap again -> Reset to natural order
+      await tester.tap(find.text('score'));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(material.Icons.arrow_upward_rounded), findsNothing);
+      expect(find.byIcon(material.Icons.arrow_downward_rounded), findsNothing);
+    });
+
+    testWidgets('renders DataGridStagingToolbar and updates on add/delete/revert',
+        (tester) async {
+      final staging = DataGridStagingBuffer(
+        columns: ['id', 'name'],
+        rows: [
+          ['1', 'Alice'],
+          ['2', 'Bob'],
+        ],
+      );
+
+      var appliedChanges = 0;
+
+      await tester.pumpWidget(
+        resultsShell(
+          child: material.Scaffold(
+            body: material.SizedBox(
+              width: 800,
+              height: 500,
+              child: ResultsTab(
+                columns: const ['id', 'name'],
+                rows: const [
+                  ['1', 'Alice'],
+                  ['2', 'Bob'],
+                ],
+                stagingBuffer: staging,
+                onApplyChanges: () => appliedChanges++,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Verify DataGridStagingToolbar is rendered
+      expect(find.byType(DataGridStagingToolbar), findsOneWidget);
+      expect(find.text('No changes'), findsOneWidget);
+      expect(find.text('Add Row'), findsOneWidget);
+
+      // Tap 'Add Row' -> appends a new row
+      await tester.tap(find.text('Add Row'));
+      await tester.pumpAndSettle();
+
+      expect(staging.isDirty, isTrue);
+      expect(staging.totalRowCount, 3);
+      expect(find.text('1 pending change'), findsOneWidget);
+      expect(find.text('Revert All'), findsOneWidget);
+
+      // Tap 'Revert All' -> resets buffer
+      await tester.tap(find.text('Revert All'));
+      await tester.pumpAndSettle();
+
+      expect(staging.isDirty, isFalse);
+      expect(staging.totalRowCount, 2);
+      expect(find.text('No changes'), findsOneWidget);
+
+      // Select row 0 in grid
+      await tester.tap(find.text('Alice'));
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pumpAndSettle();
+
+      // Tap 'Delete Row' in toolbar
+      await tester.tap(find.text('Delete Row'));
+      await tester.pumpAndSettle();
+
+      expect(staging.isDirty, isTrue);
+      expect(staging.deletedRowCount, 1);
+      expect(find.text('Restore Row'), findsOneWidget);
+
+      // Save button should now be enabled; tap it
+      await tester.ensureVisible(find.text('Save Changes'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save Changes'));
+      await tester.pumpAndSettle();
+
+      expect(appliedChanges, 1);
     });
   });
 }

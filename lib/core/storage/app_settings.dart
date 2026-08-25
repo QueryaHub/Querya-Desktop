@@ -122,11 +122,13 @@ abstract final class AppSettingsKeys {
   static const themeAnimationEnabled = 'theme_animation_enabled';
   static const uiScale = 'ui_scale';
   static const connectionsPanelWidth = 'connections_panel_width';
+  static const sidebarVisible = 'sidebar_visible';
   static const recentConnectionIds = 'recent_connection_ids';
   static const motionLevel = 'motion_level';
   static const updateChannel = 'update_channel';
   static const checkForUpdatesOnStartup = 'check_for_updates_on_startup';
   static const updateDismissedVersion = 'update_dismissed_version';
+  static const hasCompletedWelcomeTour = 'has_completed_welcome_tour';
 }
 
 /// Bumps [listenable] when any preference is persisted (theme, legacy listeners).
@@ -269,6 +271,21 @@ class AppSettings {
     await LocalDb.instance.setAppSetting(
       AppSettingsKeys.connectionsPanelWidth,
       normalized.toStringAsFixed(1),
+    );
+  }
+
+  Future<bool> getSidebarVisible() async {
+    final value = await LocalDb.instance.getAppSetting(
+      AppSettingsKeys.sidebarVisible,
+    );
+    if (value == null) return true;
+    return value == '1' || value.toLowerCase() == 'true';
+  }
+
+  Future<void> setSidebarVisible(bool visible) async {
+    await LocalDb.instance.setAppSetting(
+      AppSettingsKeys.sidebarVisible,
+      visible ? '1' : '0',
     );
   }
 
@@ -680,6 +697,23 @@ class AppSettings {
         version,
       );
     }
+    AppSettingsRevision.bump();
+  }
+
+  /// Whether the user has completed or dismissed the initial interactive welcome tour.
+  Future<bool> getHasCompletedWelcomeTour() async {
+    final v = await LocalDb.instance.getAppSetting(
+      AppSettingsKeys.hasCompletedWelcomeTour,
+    );
+    if (v == null || v.isEmpty) return false;
+    return v == 'true' || v == '1';
+  }
+
+  Future<void> setHasCompletedWelcomeTour(bool completed) async {
+    await LocalDb.instance.setAppSetting(
+      AppSettingsKeys.hasCompletedWelcomeTour,
+      completed ? 'true' : 'false',
+    );
     AppSettingsRevision.bump();
   }
 }

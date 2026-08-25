@@ -1,14 +1,18 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart' as material;
-import 'package:flutter/services.dart' show LogicalKeyboardKey;
+import 'package:flutter/services.dart';
+import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
+import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/actions/sql_editor_global_actions.dart';
+import 'package:querya_desktop/core/demo/demo_playground_service.dart';
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
-import 'package:querya_desktop/core/layout/querya_drag_settle.dart';
 import 'package:querya_desktop/core/layout/querya_split_handle.dart';
 import 'package:querya_desktop/core/motion/querya_spring.dart';
+import 'package:querya_desktop/core/motion/querya_spring_controller.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/extensions/sandbox/unsandboxed_launch_consent_gate.dart';
@@ -19,6 +23,7 @@ import 'package:querya_desktop/features/connections/connections_panel.dart';
 import 'package:querya_desktop/features/connections/sqlite_connection_form.dart';
 import 'package:querya_desktop/features/main_screen/connections_panel_width_persist.dart';
 import 'package:querya_desktop/features/main_screen/querya_window_title_bar.dart';
+import 'package:querya_desktop/features/onboarding/welcome_tour_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
@@ -35,24 +40,144 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   final GlobalKey<ConnectionsPanelState> _connectionsPanelKey =
       GlobalKey<ConnectionsPanelState>();
+  final GlobalKey<_MainContentSplitState> _splitKey =
+      GlobalKey<_MainContentSplitState>();
 
   final ValueNotifier<MainScreenWorkspaceState> _workspace =
       ValueNotifier(MainScreenWorkspaceState.empty);
+  final ValueNotifier<bool> _isSidebarVisible = ValueNotifier(true);
+  bool _openingConnectionDialog = false;
 
   @override
   void initState() {
     super.initState();
+    HardwareKeyboard.instance.addHandler(_handleGlobalKeyEvent);
     UnsandboxedLaunchConsentGate.instance.handler = (details) {
       if (!mounted) return Future.value(false);
       return showUnsandboxedDriverConsentDialog(context, details);
     };
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final completed = await AppSettings.instance.getHasCompletedWelcomeTour();
+      if (!completed && mounted) {
+        final connections = await LocalDb.instance.getConnections();
+        if (connections.isEmpty && mounted) {
+          _onOpenWelcomeTour();
+        }
+      }
+    });
   }
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleGlobalKeyEvent);
     UnsandboxedLaunchConsentGate.instance.handler = null;
     _workspace.dispose();
+    _isSidebarVisible.dispose();
     super.dispose();
+  }
+
+  bool _handleGlobalKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+
+    final isMac = Platform.isMacOS;
+    final isCmdOrCtrl = isMac
+        ? (HardwareKeyboard.instance.isMetaPressed ||
+            HardwareKeyboard.instance.isControlPressed)
+        : HardwareKeyboard.instance.isControlPressed;
+    final isShift = HardwareKeyboard.instance.isShiftPressed;
+    final isAlt = HardwareKeyboard.instance.isAltPressed;
+
+    final physical = event.physicalKey;
+    final logical = event.logicalKey;
+
+    // 1. Execute SQL: F5, or (Ctrl/Cmd + Enter), or (Ctrl/Cmd + R)
+    final isEnter = physical == PhysicalKeyboardKey.enter ||
+        physical == PhysicalKeyboardKey.numpadEnter ||
+        logical == LogicalKeyboardKey.enter ||
+        logical == LogicalKeyboardKey.numpadEnter;
+    final isF5 = physical == PhysicalKeyboardKey.f5 ||
+        logical == LogicalKeyboardKey.f5;
+    final isKeyR = physical == PhysicalKeyboardKey.keyR ||
+        logical == LogicalKeyboardKey.keyR ||
+        logical == const LogicalKeyboardKey(0x0000043a); // Russian 'к'
+
+    if ((isCmdOrCtrl && isEnter) ||
+        isF5 ||
+        (isCmdOrCtrl && !isShift && !isAlt && isKeyR)) {
+      if (SqlEditorCommandBridge.instance.canExecute) {
+        SqlEditorCommandBridge.instance.invokeExecute();
+        return true;
+      }
+    }
+
+    // 2. Toggle Left Sidebar: Ctrl+B / Cmd+B (Physical B, Logical B, Russian 'и')
+    final isKeyB = physical == PhysicalKeyboardKey.keyB ||
+        logical == LogicalKeyboardKey.keyB ||
+        logical == const LogicalKeyboardKey(0x00000438); // Russian 'и'
+    if (isCmdOrCtrl && !isShift && !isAlt && isKeyB) {
+      _splitKey.currentState?.toggleSidebar();
+      return true;
+    }
+
+    // 3. New Connection / New Query Tab: (Physical N, Logical N, Russian 'т')
+    final isKeyN = physical == PhysicalKeyboardKey.keyN ||
+        logical == LogicalKeyboardKey.keyN ||
+        logical == const LogicalKeyboardKey(0x00000442); // Russian 'т'
+    if (isCmdOrCtrl && !isAlt && isKeyN) {
+      if (isShift) {
+        // Ctrl+Shift+N: New Query
+        final ctx = FocusManager.instance.primaryFocus?.context ?? context;
+        Actions.maybeInvoke(ctx, const NewSqlIntent());
+      } else {
+        // Ctrl+N: New Database Connection
+        unawaited(_onNewDatabaseConnectionFromMenu());
+      }
+      return true;
+    }
+
+    // 4. Open SQL: Ctrl+O / Cmd+O (Physical O, Logical O, Russian 'щ')
+    final isKeyO = physical == PhysicalKeyboardKey.keyO ||
+        logical == LogicalKeyboardKey.keyO ||
+        logical == const LogicalKeyboardKey(0x00000449); // Russian 'щ'
+    if (isCmdOrCtrl && !isShift && !isAlt && isKeyO) {
+      final ctx = FocusManager.instance.primaryFocus?.context ?? context;
+      Actions.maybeInvoke(ctx, const OpenSqlIntent());
+      return true;
+    }
+
+    // 5. Save SQL: Ctrl+S / Cmd+S (Physical S, Logical S, Russian 'ы')
+    final isKeyS = physical == PhysicalKeyboardKey.keyS ||
+        logical == LogicalKeyboardKey.keyS ||
+        logical == const LogicalKeyboardKey(0x0000044b); // Russian 'ы'
+    if (isCmdOrCtrl && !isShift && !isAlt && isKeyS) {
+      final ctx = FocusManager.instance.primaryFocus?.context ?? context;
+      Actions.maybeInvoke(ctx, const SaveSqlIntent());
+      return true;
+    }
+
+    // 6. Tutorial & Welcome: F1 or Ctrl+Shift+H / Cmd+Shift+H (Physical H, Logical H, Russian 'р')
+    final isF1 = physical == PhysicalKeyboardKey.f1 ||
+        logical == LogicalKeyboardKey.f1;
+    final isKeyH = physical == PhysicalKeyboardKey.keyH ||
+        logical == LogicalKeyboardKey.keyH ||
+        logical == const LogicalKeyboardKey(0x00000440); // Russian 'р'
+    if (isF1 || (isCmdOrCtrl && isShift && isKeyH)) {
+      _onOpenWelcomeTour();
+      return true;
+    }
+
+    // 7. Home / Start Screen: Ctrl+Shift+0 / Cmd+Shift+0
+    final isDigit0 = physical == PhysicalKeyboardKey.digit0 ||
+        physical == PhysicalKeyboardKey.numpad0 ||
+        logical == LogicalKeyboardKey.digit0 ||
+        logical == LogicalKeyboardKey.numpad0;
+    if (isCmdOrCtrl && isShift && isDigit0) {
+      _onGoHome();
+      return true;
+    }
+
+    return false;
   }
 
   void _onConnectionSelected(ConnectionRow connection) {
@@ -172,22 +297,34 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _onNewDatabaseConnectionFromMenu() async {
-    // Menu overlay context is torn down before the connection form opens.
-    await Future.delayed(const Duration(milliseconds: 100));
-    if (!mounted) return;
-    final row = await promptCreateConnection(context, folderId: null);
-    if (!mounted || row == null) return;
-    await LocalDb.instance.addConnection(row);
-    await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
+    if (_openingConnectionDialog) return;
+    _openingConnectionDialog = true;
+    try {
+      // Menu overlay context is torn down before the connection form opens.
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (!mounted) return;
+      final row = await promptCreateConnection(context, folderId: null);
+      if (!mounted || row == null) return;
+      await LocalDb.instance.addConnection(row);
+      await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
+    } finally {
+      _openingConnectionDialog = false;
+    }
   }
 
   Future<void> _onNewDatabaseConnectionFromUrl() async {
-    await Future.delayed(const Duration(milliseconds: 100));
-    if (!mounted) return;
-    final row = await showNewConnectionUrlDialog(context);
-    if (!mounted || row == null) return;
-    await LocalDb.instance.addConnection(row);
-    await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
+    if (_openingConnectionDialog) return;
+    _openingConnectionDialog = true;
+    try {
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (!mounted) return;
+      final row = await showNewConnectionUrlDialog(context);
+      if (!mounted || row == null) return;
+      await LocalDb.instance.addConnection(row);
+      await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
+    } finally {
+      _openingConnectionDialog = false;
+    }
   }
 
   Future<void> _openSqliteFromHero() async {
@@ -197,67 +334,202 @@ class _MainScreenState extends State<MainScreen> {
     await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
   }
 
+  void _onGoHome() {
+    _workspace.value = MainScreenWorkspaceState.empty;
+  }
+
+  void _onOpenWelcomeTour() {
+    showWelcomeTourDialog(
+      context,
+      onLaunchDemo: _onLaunchDemoPlayground,
+      onGoHome: _workspace.value.activeConnection != null ? _onGoHome : null,
+    );
+  }
+
+  Future<void> _onLaunchDemoPlayground() async {
+    try {
+      final demoConn = await DemoPlaygroundService.getOrCreateDemoConnection();
+      if (!mounted) return;
+      await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
+      _workspace.value = _workspace.value.selectConnection(demoConn);
+      _onSqliteOpenSqlWorkspace(demoConn);
+    } catch (_) {}
+  }
+
   @override
   material.Widget build(material.BuildContext context) {
     final wb = context.workbench;
     return ValueListenableBuilder<MainScreenWorkspaceState>(
       valueListenable: _workspace,
       builder: (context, workspace, _) {
-        return material.CallbackShortcuts(
-          bindings: {
-            const material.SingleActivator(
-              LogicalKeyboardKey.keyN,
-              control: true,
-              shift: true,
-            ): () => unawaited(_onNewDatabaseConnectionFromMenu()),
-          },
-          child: SqlEditorGlobalActions(
-            activeConnection: workspace.activeConnection,
-            onOpenSqlWorkspace: _openSqlWorkspaceForConnection,
-            child: material.Scaffold(
-              backgroundColor: wb.canvas,
-              body: WindowBorder(
+        return FocusScope(
+          autofocus: true,
+          child: material.CallbackShortcuts(
+            bindings: {
+              // New Database Connection: Ctrl+N / Cmd+N
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyN,
+                meta: true,
+              ): () => unawaited(_onNewDatabaseConnectionFromMenu()),
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyN,
+                control: true,
+              ): () => unawaited(_onNewDatabaseConnectionFromMenu()),
+
+              // New Query Tab: Ctrl+Shift+N / Cmd+Shift+N
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyN,
+                meta: true,
+                shift: true,
+              ): () {
+                final ctx =
+                    FocusManager.instance.primaryFocus?.context ?? context;
+                Actions.maybeInvoke(ctx, const NewSqlIntent());
+              },
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyN,
+                control: true,
+                shift: true,
+              ): () {
+                final ctx =
+                    FocusManager.instance.primaryFocus?.context ?? context;
+                Actions.maybeInvoke(ctx, const NewSqlIntent());
+              },
+
+              // Open SQL File: Ctrl+O / Cmd+O
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyO,
+                meta: true,
+              ): () {
+                final ctx =
+                    FocusManager.instance.primaryFocus?.context ?? context;
+                Actions.maybeInvoke(ctx, const OpenSqlIntent());
+              },
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyO,
+                control: true,
+              ): () {
+                final ctx =
+                    FocusManager.instance.primaryFocus?.context ?? context;
+                Actions.maybeInvoke(ctx, const OpenSqlIntent());
+              },
+
+              // Save SQL File: Ctrl+S / Cmd+S
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyS,
+                meta: true,
+              ): () {
+                final ctx =
+                    FocusManager.instance.primaryFocus?.context ?? context;
+                Actions.maybeInvoke(ctx, const SaveSqlIntent());
+              },
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyS,
+                control: true,
+              ): () {
+                final ctx =
+                    FocusManager.instance.primaryFocus?.context ?? context;
+                Actions.maybeInvoke(ctx, const SaveSqlIntent());
+              },
+
+              // Toggle Left Sidebar: Ctrl+B / Cmd+B
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyB,
+                control: true,
+              ): () => _splitKey.currentState?.toggleSidebar(),
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyB,
+                meta: true,
+              ): () => _splitKey.currentState?.toggleSidebar(),
+
+              // Welcome Tour & Tutorial: F1 / Cmd+Shift+H / Ctrl+Shift+H
+              const material.SingleActivator(
+                LogicalKeyboardKey.f1,
+              ): () => _onOpenWelcomeTour(),
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyH,
+                meta: true,
+                shift: true,
+              ): () => _onOpenWelcomeTour(),
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyH,
+                control: true,
+                shift: true,
+              ): () => _onOpenWelcomeTour(),
+
+              // Return to Start / Home Screen: Cmd+Shift+0 / Ctrl+Shift+0
+              const material.SingleActivator(
+                LogicalKeyboardKey.digit0,
+                meta: true,
+                shift: true,
+              ): _onGoHome,
+              const material.SingleActivator(
+                LogicalKeyboardKey.digit0,
+                control: true,
+                shift: true,
+              ): _onGoHome,
+            },
+            child: SqlEditorGlobalActions(
+              activeConnection: workspace.activeConnection,
+              onOpenSqlWorkspace: _openSqlWorkspaceForConnection,
+              child: material.Scaffold(
+                backgroundColor: wb.canvas,
+                body: WindowBorder(
                 color: wb.borderSubtle.withValues(alpha: 0.35),
                 width: 1,
                 child: Column(
                   children: [
-                    QueryaWindowTitleBar(
-                      onNewDatabaseConnection: _onNewDatabaseConnectionFromMenu,
-                      onNewDatabaseConnectionFromUrl:
-                          _onNewDatabaseConnectionFromUrl,
-                      activeConnection: workspace.activeConnection,
-                      isReadOnly: workspace.isReadOnly,
-                      onReadOnlyChanged: () {
-                        _workspace.value = _workspace.value.toggleReadOnly();
-                      },
-                      onConnect: () {
-                        final active = workspace.activeConnection;
-                        if (active != null && active.id != null) {
-                          _connectionsPanelKey.currentState
-                              ?.connect(active.id!);
-                        }
-                      },
-                      onReconnect: () {
-                        final active = workspace.activeConnection;
-                        if (active != null) {
-                          _connectionsPanelKey.currentState?.reconnect(active);
-                        }
-                      },
-                      onDisconnect: () {
-                        final active = workspace.activeConnection;
-                        if (active != null) {
-                          _connectionsPanelKey.currentState?.disconnect(active);
-                        }
-                      },
-                      onDisconnectAll: () {
-                        _connectionsPanelKey.currentState?.disconnectAll();
-                      },
-                      onDisconnectOthers: () {
-                        final active = workspace.activeConnection;
-                        if (active != null) {
-                          _connectionsPanelKey.currentState
-                              ?.disconnectOthers(active);
-                        }
+                    ValueListenableBuilder<bool>(
+                      valueListenable: _isSidebarVisible,
+                      builder: (context, isSidebarVisible, _) {
+                        return QueryaWindowTitleBar(
+                          onNewDatabaseConnection:
+                              _onNewDatabaseConnectionFromMenu,
+                          onNewDatabaseConnectionFromUrl:
+                              _onNewDatabaseConnectionFromUrl,
+                          activeConnection: workspace.activeConnection,
+                          isReadOnly: workspace.isReadOnly,
+                          isSidebarVisible: isSidebarVisible,
+                          onToggleSidebar: () =>
+                              _splitKey.currentState?.toggleSidebar(),
+                          onOpenWelcomeTour: _onOpenWelcomeTour,
+                          onGoHome: _onGoHome,
+                          onReadOnlyChanged: () {
+                            _workspace.value =
+                                _workspace.value.toggleReadOnly();
+                          },
+                          onConnect: () {
+                            final active = workspace.activeConnection;
+                            if (active != null && active.id != null) {
+                              _connectionsPanelKey.currentState
+                                  ?.connect(active.id!);
+                            }
+                          },
+                          onReconnect: () {
+                            final active = workspace.activeConnection;
+                            if (active != null) {
+                              _connectionsPanelKey.currentState
+                                  ?.reconnect(active);
+                            }
+                          },
+                          onDisconnect: () {
+                            final active = workspace.activeConnection;
+                            if (active != null) {
+                              _connectionsPanelKey.currentState
+                                  ?.disconnect(active);
+                            }
+                          },
+                          onDisconnectAll: () {
+                            _connectionsPanelKey.currentState?.disconnectAll();
+                          },
+                          onDisconnectOthers: () {
+                            final active = workspace.activeConnection;
+                            if (active != null) {
+                              _connectionsPanelKey.currentState
+                                  ?.disconnectOthers(active);
+                            }
+                          },
+                        );
                       },
                     ),
                     Divider(
@@ -265,8 +537,11 @@ class _MainScreenState extends State<MainScreen> {
                         color: wb.borderSubtle.withValues(alpha: 0.22)),
                     Expanded(
                       child: _MainContentSplit(
+                        key: _splitKey,
                         connectionsPanelKey: _connectionsPanelKey,
                         workspace: _workspace,
+                        onSidebarVisibilityChanged: (v) =>
+                            _isSidebarVisible.value = v,
                         onConnectionSelected: _onConnectionSelected,
                         onPostgresObjectSelected: _onPostgresObjectSelected,
                         onMysqlObjectSelected: _onMysqlObjectSelected,
@@ -281,6 +556,8 @@ class _MainScreenState extends State<MainScreen> {
                         onRequestNewConnectionFromUrl:
                             _onNewDatabaseConnectionFromUrl,
                         onRequestOpenSqlite: _openSqliteFromHero,
+                        onRequestLaunchDemo: _onLaunchDemoPlayground,
+                        onRequestOpenTour: _onOpenWelcomeTour,
                         onOpenConnection: _onConnectionSelected,
                       ),
                     ),
@@ -289,15 +566,17 @@ class _MainScreenState extends State<MainScreen> {
               ),
             ),
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 }
 
-/// Owns splitter width so resizing does not rebuild [MainScreen] or title bar.
+/// Owns splitter width and collapsible spring motion.
 class _MainContentSplit extends StatefulWidget {
   const _MainContentSplit({
+    super.key,
     required this.connectionsPanelKey,
     required this.workspace,
     required this.onConnectionSelected,
@@ -313,11 +592,15 @@ class _MainContentSplit extends StatefulWidget {
     required this.onRequestNewConnection,
     required this.onRequestNewConnectionFromUrl,
     required this.onRequestOpenSqlite,
+    this.onRequestLaunchDemo,
+    this.onRequestOpenTour,
     required this.onOpenConnection,
+    this.onSidebarVisibilityChanged,
   });
 
   final GlobalKey<ConnectionsPanelState> connectionsPanelKey;
   final ValueNotifier<MainScreenWorkspaceState> workspace;
+  final ValueChanged<bool>? onSidebarVisibilityChanged;
   final void Function(ConnectionRow) onConnectionSelected;
   final void Function(
     ConnectionRow,
@@ -350,6 +633,8 @@ class _MainContentSplit extends StatefulWidget {
   final VoidCallback onRequestNewConnection;
   final VoidCallback onRequestNewConnectionFromUrl;
   final VoidCallback onRequestOpenSqlite;
+  final VoidCallback? onRequestLaunchDemo;
+  final VoidCallback? onRequestOpenTour;
   final void Function(ConnectionRow) onOpenConnection;
 
   @override
@@ -362,12 +647,20 @@ class _MainContentSplitState extends State<_MainContentSplit>
   static const double _maxLeftWidth = 500;
   static const double _minWorkspaceWidth = 64;
   static const double _resizeHandleWidth = 6;
-  final ValueNotifier<double> _leftPanelWidth =
-      ValueNotifier(kDefaultConnectionsPanelWidth);
-  late final QueryaDragSettleController _widthSettle;
+
+  /// High-responsiveness critically damped spring for fluid sidebar toggling (~0.22s).
+  static const SpringDescription _sidebarSpring = SpringDescription(
+    mass: 1.0,
+    stiffness: 580.0,
+    damping: 48.0,
+  );
+
+  late final QueryaSpringController _widthSpring;
   late final ConnectionsPanelWidthPersist _widthPersist;
   VoidCallback? _persistWhenSettled;
   double _lastMaxWidth = 1200;
+  double _lastExpandedWidth = kDefaultConnectionsPanelWidth;
+  bool _sidebarVisible = true;
 
   @override
   void initState() {
@@ -375,29 +668,42 @@ class _MainContentSplitState extends State<_MainContentSplit>
     _widthPersist = ConnectionsPanelWidthPersist(
       write: AppSettings.instance.setConnectionsPanelWidth,
     );
-    _widthSettle = QueryaDragSettleController(
+    _widthSpring = QueryaSpringController(
       vsync: this,
       value: kDefaultConnectionsPanelWidth,
-      maxSettleVelocity: 1200,
+      spring: _sidebarSpring,
+      cubicDuration: const Duration(milliseconds: 160),
+      cubicCurve: Curves.easeOutCubic,
     );
-    _widthSettle.addListener(_onWidthSettle);
-    unawaited(_restoreConnectionsPanelWidth());
+    _widthSpring.addListener(_onWidthSpringChanged);
+    unawaited(_restoreState());
   }
 
-  Future<void> _restoreConnectionsPanelWidth() async {
+  Future<void> _restoreState() async {
     final width = await AppSettings.instance.getConnectionsPanelWidth();
+    final visible = await AppSettings.instance.getSidebarVisible();
     if (!mounted) return;
     final clamped = _clampLeftWidth(width, _lastMaxWidth);
-    _widthSettle.jumpTo(clamped);
-    _leftPanelWidth.value = clamped;
+    _lastExpandedWidth = clamped;
+    _sidebarVisible = visible;
+    widget.onSidebarVisibilityChanged?.call(visible);
+    final targetW = visible ? clamped : 0.0;
+    _widthSpring.jumpTo(targetW);
   }
 
-  void _onWidthSettle() {
-    final clamped = _clampLeftWidth(_widthSettle.value, _lastMaxWidth);
-    _leftPanelWidth.value = clamped;
-    if (!_widthSettle.isSettling &&
-        (clamped - _widthSettle.value).abs() > 0.5) {
-      _widthSettle.jumpTo(clamped);
+  void toggleSidebar({bool? visible}) {
+    final target = visible ?? !_sidebarVisible;
+    _sidebarVisible = target;
+    widget.onSidebarVisibilityChanged?.call(target);
+    _widthSpring.useSprings = QueryaSpring.springsEnabled(context);
+    final targetWidth = target ? _lastExpandedWidth : 0.0;
+    _widthSpring.animateTo(targetWidth);
+    unawaited(AppSettings.instance.setSidebarVisible(target));
+  }
+
+  void _onWidthSpringChanged() {
+    if (mounted) {
+      setState(() {});
     }
   }
 
@@ -405,18 +711,20 @@ class _MainContentSplitState extends State<_MainContentSplit>
     _widthPersist.markDirty();
     final pending = _persistWhenSettled;
     if (pending != null) {
-      _widthSettle.removeListener(pending);
+      _widthSpring.removeListener(pending);
     }
     void listener() {
-      if (_widthSettle.isSettling) return;
-      _widthSettle.removeListener(listener);
+      if (_widthSpring.isAnimating) return;
+      _widthSpring.removeListener(listener);
       _persistWhenSettled = null;
-      unawaited(_widthPersist.persist(_leftPanelWidth.value));
+      if (_sidebarVisible) {
+        unawaited(_widthPersist.persist(_lastExpandedWidth));
+      }
     }
 
     _persistWhenSettled = listener;
-    if (_widthSettle.isSettling) {
-      _widthSettle.addListener(listener);
+    if (_widthSpring.isAnimating) {
+      _widthSpring.addListener(listener);
     } else {
       listener();
     }
@@ -426,13 +734,14 @@ class _MainContentSplitState extends State<_MainContentSplit>
   void dispose() {
     final pending = _persistWhenSettled;
     if (pending != null) {
-      _widthSettle.removeListener(pending);
+      _widthSpring.removeListener(pending);
       _persistWhenSettled = null;
     }
-    _widthPersist.disposeFlush(_leftPanelWidth.value);
-    _widthSettle.removeListener(_onWidthSettle);
-    _widthSettle.dispose();
-    _leftPanelWidth.dispose();
+    if (_sidebarVisible) {
+      _widthPersist.disposeFlush(_lastExpandedWidth);
+    }
+    _widthSpring.removeListener(_onWidthSpringChanged);
+    _widthSpring.dispose();
     super.dispose();
   }
 
@@ -448,60 +757,126 @@ class _MainContentSplitState extends State<_MainContentSplit>
     return LayoutBuilder(
       builder: (context, constraints) {
         _lastMaxWidth = constraints.maxWidth;
+        final currentW = _widthSpring.value.clamp(0.0, constraints.maxWidth);
+        final isFullyCollapsed = currentW <= 0.001 && !_widthSpring.isAnimating;
+        final progress = _lastExpandedWidth > 0
+            ? (currentW / _lastExpandedWidth).clamp(0.0, 1.0)
+            : 0.0;
+        final currentHandleW =
+            (progress * _resizeHandleWidth).clamp(0.0, _resizeHandleWidth);
+        final handleOpacity = (progress * 5.0).clamp(0.0, 1.0);
+        final contentOpacity = (progress * 2.2).clamp(0.0, 1.0);
+        final parallaxOffset = (progress - 1.0) * 36.0;
+
         return Row(
           children: [
-            ValueListenableBuilder<double>(
-              valueListenable: _leftPanelWidth,
-              builder: (context, rawWidth, connectionsPanel) {
-                final leftW = _clampLeftWidth(rawWidth, constraints.maxWidth);
-                return SizedBox(width: leftW, child: connectionsPanel);
-              },
-              child: material.RepaintBoundary(
-                child: _ConnectionsPanelSlot(
-                  connectionsPanelKey: widget.connectionsPanelKey,
-                  workspace: widget.workspace,
-                  onConnectionSelected: widget.onConnectionSelected,
-                  onRedisDatabaseSelected: widget.onRedisDatabaseSelected,
-                  onMongoDBDatabaseSelected: widget.onMongoDBDatabaseSelected,
-                  onPostgresObjectSelected: widget.onPostgresObjectSelected,
-                  onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
-                  onMysqlObjectSelected: widget.onMysqlObjectSelected,
-                  onMysqlOpenSqlWorkspace: widget.onMysqlOpenSqlWorkspace,
-                  onSqliteObjectSelected: widget.onSqliteObjectSelected,
-                  onSqliteOpenSqlWorkspace: widget.onSqliteOpenSqlWorkspace,
-                  onExtensionObjectSelected: widget.onExtensionObjectSelected,
+            if (!isFullyCollapsed)
+              ClipRect(
+                child: SizedBox(
+                  width: currentW,
+                  child: OverflowBox(
+                    minWidth: _lastExpandedWidth,
+                    maxWidth: _lastExpandedWidth,
+                    alignment: Alignment.topLeft,
+                    child: Transform.translate(
+                      offset: Offset(parallaxOffset, 0),
+                      child: Opacity(
+                        opacity: contentOpacity,
+                        child: material.RepaintBoundary(
+                          child: _ConnectionsPanelSlot(
+                            connectionsPanelKey: widget.connectionsPanelKey,
+                            workspace: widget.workspace,
+                            onConnectionSelected: widget.onConnectionSelected,
+                            onRedisDatabaseSelected:
+                                widget.onRedisDatabaseSelected,
+                            onMongoDBDatabaseSelected:
+                                widget.onMongoDBDatabaseSelected,
+                            onPostgresObjectSelected:
+                                widget.onPostgresObjectSelected,
+                            onPostgresOpenSqlWorkspace:
+                                widget.onPostgresOpenSqlWorkspace,
+                            onMysqlObjectSelected: widget.onMysqlObjectSelected,
+                            onMysqlOpenSqlWorkspace:
+                                widget.onMysqlOpenSqlWorkspace,
+                            onSqliteObjectSelected:
+                                widget.onSqliteObjectSelected,
+                            onSqliteOpenSqlWorkspace:
+                                widget.onSqliteOpenSqlWorkspace,
+                            onExtensionObjectSelected:
+                                widget.onExtensionObjectSelected,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
-            QueryaSplitHandle(
-              key: const Key('main_content_resize_handle'),
-              axis: Axis.horizontal,
-              semanticsLabel: 'Resize connections and workspace panes',
-              onDragDelta: (dx) {
-                final ml = constraints.maxWidth -
-                    _resizeHandleWidth -
-                    _minWorkspaceWidth;
-                if (ml <= 0) return;
-                _widthSettle.dragTo(
-                  _clampLeftWidth(
-                    _widthSettle.value + dx,
-                    constraints.maxWidth,
+            if (!isFullyCollapsed)
+              SizedBox(
+                width: currentHandleW,
+                child: ClipRect(
+                  child: OverflowBox(
+                    minWidth: _resizeHandleWidth,
+                    maxWidth: _resizeHandleWidth,
+                    alignment: Alignment.center,
+                    child: Opacity(
+                      opacity: handleOpacity,
+                      child: IgnorePointer(
+                        ignoring: currentW <= 20.0 || !_sidebarVisible,
+                        child: QueryaSplitHandle(
+                          key: const Key('main_content_resize_handle'),
+                          axis: Axis.horizontal,
+                          semanticsLabel:
+                              'Resize connections and workspace panes',
+                          onDragDelta: (dx) {
+                            final ml = constraints.maxWidth -
+                                _resizeHandleWidth -
+                                _minWorkspaceWidth;
+                            if (ml <= 0) return;
+                            final nextW = _clampLeftWidth(
+                              _widthSpring.value + dx,
+                              constraints.maxWidth,
+                            );
+                            _lastExpandedWidth = nextW;
+                            _widthSpring.jumpTo(nextW);
+                          },
+                          onDiscreteResize: () => _widthPersist
+                              .onDiscreteResize(() => _lastExpandedWidth),
+                          onDragEnd: (details) {
+                            _widthPersist.cancelDiscreteTimer();
+                            final velocity = details.primaryVelocity ??
+                                details.velocity.pixelsPerSecond.dx;
+                            final useSprings =
+                                QueryaSpring.springsEnabled(context);
+                            _widthSpring.useSprings = useSprings;
+                            if (_widthSpring.value < 100 && velocity < -50) {
+                              _sidebarVisible = false;
+                              widget.onSidebarVisibilityChanged?.call(false);
+                              _widthSpring.animateTo(0.0, velocity: velocity);
+                              unawaited(
+                                  AppSettings.instance.setSidebarVisible(false));
+                            } else {
+                              _sidebarVisible = true;
+                              widget.onSidebarVisibilityChanged?.call(true);
+                              _lastExpandedWidth = _clampLeftWidth(
+                                _widthSpring.value,
+                                constraints.maxWidth,
+                              );
+                              _widthSpring.animateTo(
+                                _lastExpandedWidth,
+                                velocity: velocity,
+                              );
+                              unawaited(
+                                  AppSettings.instance.setSidebarVisible(true));
+                              _schedulePersistAfterSettle();
+                            }
+                          },
+                        ),
+                      ),
+                    ),
                   ),
-                );
-              },
-              onDiscreteResize: () => _widthPersist
-                  .onDiscreteResize(() => _leftPanelWidth.value),
-              onDragEnd: (details) {
-                _widthPersist.cancelDiscreteTimer();
-                final velocity = details.primaryVelocity ??
-                    details.velocity.pixelsPerSecond.dx;
-                _widthSettle.settle(
-                  velocity: velocity,
-                  useSprings: QueryaSpring.springsEnabled(context),
-                );
-                _schedulePersistAfterSettle();
-              },
-            ),
+                ),
+              ),
             Expanded(
               child: material.RepaintBoundary(
                 child: ValueListenableBuilder<MainScreenWorkspaceState>(
@@ -526,6 +901,8 @@ class _MainContentSplitState extends State<_MainContentSplit>
                       onRequestNewConnectionFromUrl:
                           widget.onRequestNewConnectionFromUrl,
                       onRequestOpenSqlite: widget.onRequestOpenSqlite,
+                      onRequestLaunchDemo: widget.onRequestLaunchDemo,
+                      onRequestOpenTour: widget.onRequestOpenTour,
                       onOpenConnection: widget.onOpenConnection,
                     );
                   },

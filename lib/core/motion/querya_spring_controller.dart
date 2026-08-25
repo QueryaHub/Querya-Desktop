@@ -136,9 +136,8 @@ class QueryaSpringController extends ChangeNotifier {
     final t = (elapsed - _simulationStart!).inMicroseconds / 1e6;
     final next = simulation.x(t);
     _velocity = simulation.dx(t);
-
     final settled = simulation.isDone(t) ||
-        ((next - _target).abs() < 0.0005 && _velocity.abs() < 0.01);
+        ((next - _target).abs() < 0.002 && _velocity.abs() < 0.02);
 
     if (settled) {
       _value = _target;

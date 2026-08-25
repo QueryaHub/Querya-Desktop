@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 
 /// SQLite database connection using sqflite_common_ffi.
@@ -174,6 +175,52 @@ class SqliteConnection {
   Future<List<String>> listColumnNames({required String table}) async {
     final rows = await execute('PRAGMA table_info(${quoteIdentifier(table)})');
     return rows.map((r) => r['name'] as String).toList();
+  }
+
+  /// Retrieves schema metadata and primary keys for [table].
+  Future<TableSchemaMeta> getTableSchema({required String table}) async {
+    final rows = await execute('PRAGMA table_info(${quoteIdentifier(table)})');
+    final columns = <TableColumnMeta>[];
+    final pkList = <Map<String, dynamic>>[];
+
+    for (final r in rows) {
+      final name = r['name'] as String? ?? '';
+      final type = r['type'] as String? ?? '';
+      final notNull = (r['notnull'] as int? ?? 0) == 1;
+      final pk = r['pk'] as int? ?? 0;
+      final dflt = r['dflt_value']?.toString();
+
+      final isPk = pk > 0;
+      if (isPk) {
+        pkList.add({'name': name, 'pk': pk});
+      }
+
+      columns.add(
+        TableColumnMeta(
+          name: name,
+          dataType: type,
+          isNullable: !notNull,
+          isPrimaryKey: isPk,
+          primaryKeyPosition: isPk ? pk : null,
+          defaultValue: dflt,
+        ),
+      );
+    }
+
+    pkList.sort((a, b) => (a['pk'] as int).compareTo(b['pk'] as int));
+    final primaryKeys = pkList.map((e) => e['name'] as String).toList();
+
+    return TableSchemaMeta(
+      tableName: table,
+      columns: columns,
+      primaryKeys: primaryKeys,
+    );
+  }
+
+  /// Returns primary key column names for [table].
+  Future<List<String>> getPrimaryKeys({required String table}) async {
+    final schema = await getTableSchema(table: table);
+    return schema.primaryKeys;
   }
 
   /// Returns the DDL (`sql`) of a table or view from sqlite_master.

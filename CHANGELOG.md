@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.13] - 2026-08-25
+
+Production-ready UI polish, complete interactive Data Grid editing suite, advanced query filtering, fluid collapsible navigation, and platform hardening.
+
+### Added
+
+- **In-Place Cell Editing & Staging Engine (#560, #561, #564, #565)** — Double-click cell to edit in-place with type-aware inline editors, dirty state indicators, staging buffer for staged mutations (inserts/updates/deletions), and keyboard navigation (Tab/Shift+Tab, Enter, Escape).
+- **Atomic DML Preview & Multi-Dialect Generation (#562, #566)** — Visual DML confirmation modal displaying compiled atomic `UPDATE`, `INSERT`, and `DELETE` statements with primary key resolution before committing to SQLite, PostgreSQL, and MySQL.
+- **In-Cell Validation & Safety Guardrails (#567)** — Real-time cell validation for integer, float, boolean, UUID, JSON, date, and timestamp data types with visual error cues.
+- **Advanced Query Filter Engine (#568, #569, #570)** — Compound predicate filter bar with `AND`, `OR`, `NOT`, parentheses, `LIKE`, `ILIKE`, `IN`, `IS NULL`, `BETWEEN`, escaped quotes, and intelligent popup autocomplete suggestions.
+- **Syntax Highlighting & Value Inspector (#571, #572)** — Dedicated inspector panel with syntax highlighting for JSON, XML, YAML, and automated XML/HTML formatting and validation.
+- **Selection Statistics & Quick Calc (#573)** — Extended selection calculations in the status bar (Count, Distinct, Sum, Avg, Min, Max, Median, Standard Deviation) with one-click clipboard summary export.
+- **Multi-Column Grouping & Pivot View (#574, #575, #576)** — Hierarchical multi-level grouping, custom aggregations (SUM, AVG, MIN, MAX, COUNT), sorting, and CSV export for grouped summaries.
+- **Column Drag-Resizing & 3-Phase Sorting (#548, #549)** — Interactive column width drag-resizing with divider handles and 3-phase client-side sorting (`natural` -> `asc` -> `desc`).
+- **Multi-Cell Range Selection & Clipboard (#550)** — Rectangular multi-cell selection (Shift+Click) with TSV/CSV clipboard copy for Excel/Google Sheets.
+- **Fluid Collapsible Sidebar (#557, #559)** — Physics-driven animated sidebar toggle with `QueryaSpring`, global `Cmd+B` / `Ctrl+B` hotkey, titlebar toggle button, and width persistence.
+- **Rich Object Context Menus (#551)** — Right-click native context menus for database tables, views, procedures, and connections (*«Select TOP 100»*, *«Copy SELECT statement»*, *«Copy name»*, *«Open in SQL»*).
+- **Tree Keyboard Navigation (#552)** — Full arrow-key navigation (Left/Right to expand/collapse, Up/Down, Enter/Space) across database trees.
+- **Interactive Welcome Tour & 1-Click Playground (#558)** — Built-in onboarding tour and 1-click SQLite demo database playground.
+- **Global Shortcuts & Focus Polish (#579)** — Added global shortcuts (`Ctrl+F` for filter bar, `Ctrl+S` for staging commit, `Ctrl+G` for groupings panel) and enhanced focus accessibility.
+
+### Fixed
+
+- **Connection Dialogs Inline Validation (#553)** — Real-time URI parser and validation with dynamic database driver and host badges.
+- **Toolbar Layout Responsive Scroll (#577)** — Wrapped data grid action bars in horizontal scroll to eliminate overflow on compact viewports.
+- **macOS SPM Path (#555)** — Corrected relative path to `refresh_rate` plugin source in `Package.swift` for Swift Package Manager builds.
+- **macOS App Sandbox Entitlements (#556)** — Added `network.client` and `files.user-selected.read-write` entitlements for outbound TCP connections and local file access.
+
 ## [0.4.11-c] - 2026-07-29
 
 Flutter SDK & dependency compatibility update, image downsampling memory optimization, and UI polish.

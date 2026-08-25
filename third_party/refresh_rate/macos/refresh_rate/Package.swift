@@ -25,10 +25,10 @@ let package = Package(
             dependencies: [
                 .product(name: "FlutterFramework", package: "FlutterFramework"),
             ],
-            path: "Classes",
+            path: "../Classes",
             publicHeadersPath: ".",
             cSettings: [
-                .headerSearchPath("Classes"),
+                .headerSearchPath("../Classes"),
             ]
         ),
     ]
