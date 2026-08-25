@@ -234,7 +234,9 @@ class DataGridStagingBuffer extends ChangeNotifier {
 
   /// Read-only snapshot of modified cells mapping.
   Map<int, Map<int, String>> get modifiedCells =>
-      Map.unmodifiable(_modifiedCells.map((k, v) => MapEntry(k, Map.unmodifiable(v))));
+      Map<int, Map<int, String>>.unmodifiable(
+        _modifiedCells.map((k, v) => MapEntry(k, Map<int, String>.unmodifiable(v))),
+      );
 
   /// Read-only list of newly inserted rows.
   List<List<String>> get insertedRows =>
