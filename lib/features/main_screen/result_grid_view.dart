@@ -338,12 +338,16 @@ class VirtualResultGrid extends material.StatefulWidget {
     required this.rows,
     this.stagingBuffer,
     this.onRowSelected,
+    this.onSelectionValuesChanged,
+    this.onCellFocused,
   });
 
   final List<String> columns;
   final List<List<String>> rows;
   final DataGridStagingBuffer? stagingBuffer;
   final material.ValueChanged<int?>? onRowSelected;
+  final material.ValueChanged<List<String>>? onSelectionValuesChanged;
+  final void Function(String columnName, String cellValue, int rowIndex)? onCellFocused;
 
   @override
   material.State<VirtualResultGrid> createState() => _VirtualResultGridState();
@@ -446,6 +450,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     bool moveNextCol = false,
     bool movePrevCol = false,
     bool moveNextRow = false,
+    bool movePrevRow = false,
   }) {
     if (widget.stagingBuffer != null) {
       widget.stagingBuffer!.setCell(row, column, value);
@@ -498,6 +503,18 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
             startRow: row + 1,
             startColumn: column,
             endRow: row + 1,
+            endColumn: column,
+          );
+        } else {
+          _editingCell = null;
+        }
+      } else if (movePrevRow) {
+        if (row > 0) {
+          _editingCell = ResultGridCellCoordinate(row - 1, column);
+          _selection = ResultGridSelection(
+            startRow: row - 1,
+            startColumn: column,
+            endRow: row - 1,
             endColumn: column,
           );
         } else {
@@ -585,6 +602,38 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     }
   }
 
+  void _notifySelectionAndFocus() {
+    if (widget.onSelectionValuesChanged != null) {
+      if (_selection == null) {
+        widget.onSelectionValuesChanged!(const []);
+      } else {
+        final rows = _sortedRows;
+        final values = <String>[];
+        for (var r = _selection!.startRow; r <= _selection!.endRow; r++) {
+          if (r >= 0 && r < rows.length) {
+            for (var c = _selection!.startColumn; c <= _selection!.endColumn; c++) {
+              if (c >= 0 && c < rows[r].length) {
+                values.add(rows[r][c]);
+              }
+            }
+          }
+        }
+        widget.onSelectionValuesChanged!(values);
+      }
+    }
+
+    if (widget.onCellFocused != null && _selectionAnchor != null) {
+      final r = _selectionAnchor!.row;
+      final c = _selectionAnchor!.column;
+      final rows = _sortedRows;
+      if (r >= 0 && r < rows.length && c >= 0 && c < widget.columns.length) {
+        final colName = widget.columns[c];
+        final val = c < rows[r].length ? rows[r][c] : '';
+        widget.onCellFocused!(colName, val, r);
+      }
+    }
+  }
+
   void _onCellTap(int row, int column, {bool isShift = false}) {
     _focusNode.requestFocus();
     widget.onRowSelected?.call(row);
@@ -605,6 +654,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
         );
       }
     });
+    _notifySelectionAndFocus();
   }
 
   void _onCellSecondaryTap(int row, int column) {
@@ -622,6 +672,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
           endColumn: column,
         );
       });
+      _notifySelectionAndFocus();
       _copySelection();
     }
   }
@@ -1078,6 +1129,7 @@ class _DataRow extends material.StatelessWidget {
     bool moveNextCol,
     bool movePrevCol,
     bool moveNextRow,
+    bool movePrevRow,
   })? onCommitEdit;
   final material.VoidCallback? onCancelEdit;
   final void Function(int row, int col)? onOpenInspector;
@@ -1181,6 +1233,7 @@ class _GridCell extends material.StatelessWidget {
     bool moveNextCol,
     bool movePrevCol,
     bool moveNextRow,
+    bool movePrevRow,
   })? onCommitEdit;
   final material.VoidCallback? onCancelEdit;
   final void Function(int row, int col)? onOpenInspector;
@@ -1192,7 +1245,7 @@ class _GridCell extends material.StatelessWidget {
         initialValue: text,
         width: width,
         height: double.infinity,
-        onCommit: (val, {moveNextCol = false, movePrevCol = false, moveNextRow = false}) {
+        onCommit: (val, {moveNextCol = false, movePrevCol = false, moveNextRow = false, movePrevRow = false}) {
           onCommitEdit?.call(
             row,
             column,
@@ -1200,6 +1253,7 @@ class _GridCell extends material.StatelessWidget {
             moveNextCol: moveNextCol,
             movePrevCol: movePrevCol,
             moveNextRow: moveNextRow,
+            movePrevRow: movePrevRow,
           );
         },
         onCancel: () => onCancelEdit?.call(),

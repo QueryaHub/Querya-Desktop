@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
+import 'package:querya_desktop/features/main_screen/grid_data_type_validator.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// Active inline editor widget for a data grid cell.
@@ -11,17 +12,20 @@ class GridCellEditor extends material.StatefulWidget {
     required this.height,
     required this.onCommit,
     required this.onCancel,
+    this.dataTypeName,
     this.onOpenInspector,
   });
 
   final String initialValue;
   final double width;
   final double height;
+  final String? dataTypeName;
   final void Function(
     String value, {
     bool moveNextCol,
     bool movePrevCol,
     bool moveNextRow,
+    bool movePrevRow,
   }) onCommit;
   final material.VoidCallback onCancel;
   final material.VoidCallback? onOpenInspector;
@@ -33,6 +37,7 @@ class GridCellEditor extends material.StatefulWidget {
 class _GridCellEditorState extends material.State<GridCellEditor> {
   late final material.TextEditingController _controller;
   final _focusNode = material.FocusNode();
+  String? _validationError;
 
   @override
   void initState() {
@@ -45,10 +50,26 @@ class _GridCellEditorState extends material.State<GridCellEditor> {
       baseOffset: 0,
       extentOffset: _controller.text.length,
     );
+
+    _validate();
+    _controller.addListener(_validate);
+  }
+
+  void _validate() {
+    final error = GridDataTypeValidator.validate(
+      _controller.text,
+      dataTypeName: widget.dataTypeName,
+    );
+    if (error != _validationError) {
+      setState(() {
+        _validationError = error;
+      });
+    }
   }
 
   @override
   void dispose() {
+    _controller.removeListener(_validate);
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -59,18 +80,35 @@ class _GridCellEditorState extends material.State<GridCellEditor> {
 
     final isShift = HardwareKeyboard.instance.isShiftPressed;
     final isAlt = HardwareKeyboard.instance.isAltPressed;
+    final isControl = HardwareKeyboard.instance.isControlPressed ||
+        HardwareKeyboard.instance.isMetaPressed;
 
-    if (event.logicalKey == LogicalKeyboardKey.keyN && isAlt) {
+    // Alt+N / Ctrl+Alt+N -> Set NULL
+    if (event.logicalKey == LogicalKeyboardKey.keyN && (isAlt || (isControl && isAlt))) {
       widget.onCommit('NULL');
       return;
     }
 
-    if (event.logicalKey == LogicalKeyboardKey.enter ||
-        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
-      widget.onCommit(_controller.text, moveNextRow: true);
+    // Alt+Enter or Ctrl+Enter -> Open Inspector
+    if ((event.logicalKey == LogicalKeyboardKey.enter ||
+            event.logicalKey == LogicalKeyboardKey.numpadEnter) &&
+        (isAlt || isControl)) {
+      widget.onOpenInspector?.call();
       return;
     }
 
+    // Enter / Shift+Enter -> Commit and navigate row
+    if (event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+      if (isShift) {
+        widget.onCommit(_controller.text, movePrevRow: true);
+      } else {
+        widget.onCommit(_controller.text, moveNextRow: true);
+      }
+      return;
+    }
+
+    // Tab / Shift+Tab -> Commit and navigate col
     if (event.logicalKey == LogicalKeyboardKey.tab) {
       if (isShift) {
         widget.onCommit(_controller.text, movePrevCol: true);
@@ -80,6 +118,7 @@ class _GridCellEditorState extends material.State<GridCellEditor> {
       return;
     }
 
+    // Escape -> Cancel
     if (event.logicalKey == LogicalKeyboardKey.escape) {
       widget.onCancel();
       return;
@@ -89,6 +128,7 @@ class _GridCellEditorState extends material.State<GridCellEditor> {
   @override
   material.Widget build(material.BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final hasError = _validationError != null;
 
     return material.Container(
       width: widget.width,
@@ -96,7 +136,7 @@ class _GridCellEditorState extends material.State<GridCellEditor> {
       decoration: material.BoxDecoration(
         color: cs.card,
         border: material.Border.all(
-          color: cs.primary,
+          color: hasError ? material.Colors.red.shade500 : cs.primary,
           width: 1.5,
         ),
       ),
@@ -128,6 +168,18 @@ class _GridCellEditorState extends material.State<GridCellEditor> {
               ),
             ),
           ),
+          if (hasError)
+            material.Tooltip(
+              message: _validationError!,
+              child: material.Padding(
+                padding: const material.EdgeInsets.only(left: 4),
+                child: material.Icon(
+                  material.Icons.error_outline_rounded,
+                  size: 14,
+                  color: material.Colors.red.shade500,
+                ),
+              ),
+            ),
           if (widget.onOpenInspector != null)
             material.MouseRegion(
               cursor: material.SystemMouseCursors.click,
