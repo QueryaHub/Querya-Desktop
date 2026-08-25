@@ -3,21 +3,24 @@ import 'dart:async' show unawaited;
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/motion/querya_fade_slide.dart';
 import 'package:querya_desktop/core/widgets/virtual_selectable_text_view.dart';
+import 'package:querya_desktop/features/main_screen/data_grid_calc_bar.dart';
+import 'package:querya_desktop/features/main_screen/data_grid_filter_bar.dart';
+import 'package:querya_desktop/features/main_screen/data_grid_groupings_view.dart';
 import 'package:querya_desktop/features/main_screen/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/features/main_screen/data_grid_staging_toolbar.dart';
+import 'package:querya_desktop/features/main_screen/data_grid_value_panel.dart';
+import 'package:querya_desktop/features/main_screen/grid_filter_engine.dart';
+import 'package:querya_desktop/features/main_screen/grid_selection_calc_engine.dart';
 import 'package:querya_desktop/features/main_screen/result_grid_view.dart';
 import 'package:querya_desktop/shared/services/data_export_service.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
+enum ResultViewMode {
+  grid,
+  groupings,
+}
+
 /// Query output: grid, loading, error, or placeholder.
-///
-/// Render order in [_buildBody]: **loading** first (only when [isLoading]),
-/// then **error** when [errorMessage] is non-empty (including when
-/// `isLoading` is false), then status / affected / idle / grid content.
-///
-/// Mode changes (idle / loading / error / status / grid) morph via
-/// [QueryaFadeSlide]. Keys are per **mode**, not per row — so grid data updates
-/// and scroll rebuilds do not re-trigger the transition.
 class ResultsTab extends material.StatefulWidget {
   const ResultsTab({
     super.key,
@@ -50,6 +53,17 @@ class ResultsTab extends material.StatefulWidget {
 
 class _ResultsTabState extends material.State<ResultsTab> {
   int? _selectedRowIndex;
+  ResultViewMode _viewMode = ResultViewMode.grid;
+
+  bool _showFilterBar = false;
+  String _filterText = '';
+
+  bool _showValuePanel = false;
+  String? _focusedColumnName;
+  String? _focusedCellValue;
+  int? _focusedRowIndex;
+
+  GridCalcStats _selectionStats = GridCalcStats.empty;
 
   @override
   Widget build(BuildContext context) {
@@ -107,6 +121,16 @@ class _ResultsTabState extends material.State<ResultsTab> {
         ? widget.stagingBuffer!.effectiveRows
         : widget.rows;
 
+    final filteredIndices = GridFilterEngine.filterRowIndices(
+      filterText: _filterText,
+      columns: widget.columns,
+      rows: effectiveRows,
+    );
+
+    final filteredRows = filteredIndices.length == effectiveRows.length
+        ? effectiveRows
+        : filteredIndices.map((i) => effectiveRows[i]).toList();
+
     return material.Column(
       key: const material.ValueKey('results_mode_grid'),
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
@@ -122,7 +146,7 @@ class _ResultsTabState extends material.State<ResultsTab> {
           material.Container(
             padding: const material.EdgeInsets.symmetric(
               horizontal: 12,
-              vertical: 6,
+              vertical: 4,
             ),
             decoration: material.BoxDecoration(
               color: Theme.of(context).colorScheme.card,
@@ -135,65 +159,194 @@ class _ResultsTabState extends material.State<ResultsTab> {
                 ),
               ),
             ),
-            child: material.Row(
-              children: [
-                material.Icon(
-                  material.Icons.table_rows_rounded,
-                  size: 14,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const Gap(6),
-                Text(
-                  widget.statusLine ??
-                      (widget.affectedRows != null
-                          ? 'Rows affected: ${widget.affectedRows}'
-                          : '${effectiveRows.length} rows returned'),
-                ).small().semiBold(),
-                const material.Spacer(),
-                ExportMenuButton(
-                  label: 'Copy ▾',
-                  icon: material.Icons.copy_rounded,
-                  isSave: false,
-                  onSelected: (format) {
-                    unawaited(() async {
-                      await DataExportService.copyToClipboard(
-                        format,
-                        columns: widget.columns,
-                        rows: effectiveRows,
-                      );
-                    }());
-                  },
-                ),
-                const Gap(6),
-                ExportMenuButton(
-                  label: 'Save ▾',
-                  icon: material.Icons.save_alt_rounded,
-                  isSave: true,
-                  onSelected: (format) {
-                    unawaited(() async {
-                      final outcome = await DataExportService.saveToFile(
-                        format,
-                        columns: widget.columns,
-                        rows: effectiveRows,
-                      );
-                      if (!context.mounted) return;
-                      if (outcome == SaveExportOutcome.error) {
-                        await _showSaveFileErrorDialog(context);
-                      }
-                    }());
-                  },
-                ),
-              ],
+            child: material.SingleChildScrollView(
+              scrollDirection: material.Axis.horizontal,
+              child: material.Row(
+                mainAxisSize: material.MainAxisSize.min,
+                children: [
+                  // Grid / Groupings View Selector
+                  material.SizedBox(
+                    height: 28,
+                    child: material.SegmentedButton<ResultViewMode>(
+                      segments: const [
+                        material.ButtonSegment(
+                          value: ResultViewMode.grid,
+                          label: Text('Grid'),
+                          icon: material.Icon(material.Icons.table_chart_outlined, size: 14),
+                        ),
+                        material.ButtonSegment(
+                          value: ResultViewMode.groupings,
+                          label: Text('Groupings'),
+                          icon: material.Icon(material.Icons.grid_view_rounded, size: 14),
+                        ),
+                      ],
+                      selected: {_viewMode},
+                      onSelectionChanged: (selected) {
+                        setState(() => _viewMode = selected.first);
+                      },
+                      showSelectedIcon: false,
+                      style: material.SegmentedButton.styleFrom(
+                        padding: const material.EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                        visualDensity: material.VisualDensity.compact,
+                      ),
+                    ),
+                  ),
+                  const Gap(10),
+                  Text(
+                    widget.statusLine ??
+                        (widget.affectedRows != null
+                            ? 'Rows affected: ${widget.affectedRows}'
+                            : '${filteredRows.length}${_filterText.isNotEmpty ? ' of ${effectiveRows.length}' : ''} rows'),
+                  ).small().semiBold(),
+
+                  const Gap(16),
+
+                  // Toggle Quick Filter
+                  material.IconButton(
+                    icon: material.Icon(
+                      _showFilterBar ? material.Icons.filter_alt : material.Icons.filter_alt_outlined,
+                      size: 15,
+                    ),
+                    tooltip: 'Toggle Quick Filter',
+                    padding: material.EdgeInsets.zero,
+                    constraints: const material.BoxConstraints(minWidth: 28, minHeight: 28),
+                    color: _showFilterBar || _filterText.isNotEmpty
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.mutedForeground,
+                    onPressed: () {
+                      setState(() => _showFilterBar = !_showFilterBar);
+                    },
+                  ),
+                  const Gap(4),
+
+                  // Toggle Value Side Panel
+                  material.IconButton(
+                    icon: material.Icon(
+                      _showValuePanel ? material.Icons.dock : material.Icons.data_object_rounded,
+                      size: 15,
+                    ),
+                    tooltip: 'Inspect Cell Panel',
+                    padding: material.EdgeInsets.zero,
+                    constraints: const material.BoxConstraints(minWidth: 28, minHeight: 28),
+                    color: _showValuePanel
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.mutedForeground,
+                    onPressed: () {
+                      setState(() => _showValuePanel = !_showValuePanel);
+                    },
+                  ),
+                  const Gap(8),
+
+                  ExportMenuButton(
+                    label: 'Copy ▾',
+                    icon: material.Icons.copy_rounded,
+                    isSave: false,
+                    onSelected: (format) {
+                      unawaited(() async {
+                        await DataExportService.copyToClipboard(
+                          format,
+                          columns: widget.columns,
+                          rows: filteredRows,
+                        );
+                      }());
+                    },
+                  ),
+                  const Gap(6),
+                  ExportMenuButton(
+                    label: 'Save ▾',
+                    icon: material.Icons.save_alt_rounded,
+                    isSave: true,
+                    onSelected: (format) {
+                      unawaited(() async {
+                        final outcome = await DataExportService.saveToFile(
+                          format,
+                          columns: widget.columns,
+                          rows: filteredRows,
+                        );
+                        if (!context.mounted) return;
+                        if (outcome == SaveExportOutcome.error) {
+                          await _showSaveFileErrorDialog(context);
+                        }
+                      }());
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
-        material.Expanded(
-          child: VirtualResultGrid(
+
+        // Quick Filter Bar
+        if (_showFilterBar || _filterText.isNotEmpty)
+          DataGridFilterBar(
+            filterText: _filterText,
+            onFilterChanged: (text) => setState(() => _filterText = text),
+            totalRowCount: effectiveRows.length,
+            filteredRowCount: filteredRows.length,
             columns: widget.columns,
-            rows: widget.rows,
-            stagingBuffer: widget.stagingBuffer,
-            onRowSelected: (row) => setState(() => _selectedRowIndex = row),
           ),
+
+        // Main Grid Body / Groupings View + Side Panel
+        material.Expanded(
+          child: _viewMode == ResultViewMode.groupings
+              ? DataGridGroupingsView(
+                  columns: widget.columns,
+                  rows: filteredRows,
+                )
+              : material.Row(
+                  crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                  children: [
+                    material.Expanded(
+                      child: VirtualResultGrid(
+                        columns: widget.columns,
+                        rows: filteredRows,
+                        stagingBuffer: widget.stagingBuffer,
+                        onRowSelected: (row) => setState(() => _selectedRowIndex = row),
+                        onSelectionValuesChanged: (values) {
+                          setState(() {
+                            _selectionStats = GridSelectionCalcEngine.compute(values);
+                          });
+                        },
+                        onCellFocused: (colName, cellVal, rowIdx) {
+                          setState(() {
+                            _focusedColumnName = colName;
+                            _focusedCellValue = cellVal;
+                            _focusedRowIndex = rowIdx;
+                          });
+                        },
+                      ),
+                    ),
+
+                    // Value Inspector Panel
+                    if (_showValuePanel &&
+                        _focusedColumnName != null &&
+                        _focusedCellValue != null)
+                      DataGridValuePanel(
+                        columnName: _focusedColumnName!,
+                        cellValue: _focusedCellValue!,
+                        rowIndex: _focusedRowIndex,
+                        onClose: () => setState(() => _showValuePanel = false),
+                        onUpdateValue: widget.stagingBuffer != null &&
+                                _focusedRowIndex != null &&
+                                _focusedColumnName != null
+                            ? (newVal) {
+                                final colIdx = widget.columns.indexOf(_focusedColumnName!);
+                                if (colIdx != -1) {
+                                  widget.stagingBuffer!.setCell(
+                                    _focusedRowIndex!,
+                                    colIdx,
+                                    newVal,
+                                  );
+                                }
+                              }
+                            : null,
+                      ),
+                  ],
+                ),
         ),
+
+        // Calc Bar Footer
+        if (_viewMode == ResultViewMode.grid)
+          DataGridCalcBar(stats: _selectionStats),
       ],
     );
   }
