@@ -30,7 +30,7 @@ void main() {
       dialect: SqlDialect.postgres,
       tableName: 'users',
       schema: 'public',
-      statements: const [
+      statements: [
         TableMutationStatement(
           type: MutationType.update,
           sql: 'UPDATE "public"."users" SET "name" = \'Alice\' WHERE "id" = 1',

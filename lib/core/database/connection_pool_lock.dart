@@ -20,21 +20,26 @@ class PoolEntryLock<T> {
     }
     final completer = Completer<void>();
     _lock = completer.future;
+    Future<T> result;
     try {
       final existing = _pending[key];
-      if (existing != null) return existing;
-      final future = create();
-      _pending[key] = future;
-      // Ensure the pending entry is removed once the creation finishes, and
-      // swallow errors on the cleanup chain so they don't become unhandled.
-      final guarded = future.whenComplete(() => _pending.remove(key));
-      guarded.then((_) {}, onError: (_) {});
-      return future;
+      if (existing != null) {
+        result = existing;
+      } else {
+        final future = create();
+        _pending[key] = future;
+        // Ensure the pending entry is removed once the creation finishes, and
+        // swallow errors on the cleanup chain so they don't become unhandled.
+        final guarded = future.whenComplete(() => _pending.remove(key));
+        guarded.then((_) {}, onError: (_) {});
+        result = future;
+      }
     } finally {
       completer.complete();
       if (_lock == completer.future) {
         _lock = null;
       }
     }
+    return result;
   }
 }
