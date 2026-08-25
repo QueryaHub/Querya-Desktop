@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 
 /// Status of a row within the staging buffer.
 enum StagedRowStatus {
@@ -231,6 +232,37 @@ class DataGridStagingBuffer extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Read-only snapshot of modified cells mapping.
+  Map<int, Map<int, String>> get modifiedCells =>
+      Map.unmodifiable(_modifiedCells.map((k, v) => MapEntry(k, Map.unmodifiable(v))));
+
+  /// Read-only list of newly inserted rows.
+  List<List<String>> get insertedRows =>
+      List.unmodifiable(_insertedRows.map((r) => List<String>.unmodifiable(r)));
+
+  /// Read-only set of deleted row indices.
+  Set<int> get deletedRowIndices => Set.unmodifiable(_deletedRowIndices);
+
+  /// Generates an atomic [TableMutationPlan] for the current staged changes.
+  TableMutationPlan generateMutationPlan({
+    required SqlDialect dialect,
+    required String tableName,
+    String? schema,
+    List<String> primaryKeys = const [],
+  }) {
+    return TableMutationEngine.generatePlan(
+      dialect: dialect,
+      tableName: tableName,
+      schema: schema,
+      columns: _originalColumns,
+      primaryKeys: primaryKeys,
+      originalRows: _originalRows,
+      modifiedCells: _modifiedCells,
+      insertedRows: _insertedRows,
+      deletedRowIndices: _deletedRowIndices,
+    );
+  }
+
   /// Returns the full list of effective rows (original with modifications applied + inserted rows).
   List<List<String>> get effectiveRows {
     final result = <List<String>>[];
@@ -252,3 +284,4 @@ class DataGridStagingBuffer extends ChangeNotifier {
     return result;
   }
 }
+
