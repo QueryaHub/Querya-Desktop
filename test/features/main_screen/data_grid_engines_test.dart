@@ -198,16 +198,16 @@ void main() {
 
   group('GridGroupingsEngine', () {
     final rows = [
-      ['1', 'ACTIVE'],
-      ['2', 'PENDING'],
-      ['3', 'ACTIVE'],
-      ['4', 'ACTIVE'],
-      ['5', 'CANCELLED'],
+      ['1', 'ACTIVE', '100'],
+      ['2', 'PENDING', '50'],
+      ['3', 'ACTIVE', '200'],
+      ['4', 'ACTIVE', '300'],
+      ['5', 'CANCELLED', '0'],
     ];
 
     test('groups rows by column index and calculates percentages', () {
       final groups = GridGroupingsEngine.buildGroups(
-        colIndex: 1,
+        groupColIndices: [1],
         rows: rows,
       );
 
@@ -215,8 +215,65 @@ void main() {
       expect(groups[0].groupKey, equals('ACTIVE'));
       expect(groups[0].count, equals(3));
       expect(groups[0].percentage, closeTo(60.0, 0.1));
-
       expect(groups[1].count, equals(1));
+    });
+
+    test('computes custom aggregations (SUM and AVG)', () {
+      final sumGroups = GridGroupingsEngine.buildGroups(
+        groupColIndices: [1],
+        rows: rows,
+        aggConfig: const GroupAggregationConfig(
+          aggType: GroupingAggType.sum,
+          targetColIndex: 2,
+        ),
+      );
+
+      final activeGroup = sumGroups.firstWhere((g) => g.groupKey == 'ACTIVE');
+      expect(activeGroup.aggValue, equals(600.0));
+
+      final avgGroups = GridGroupingsEngine.buildGroups(
+        groupColIndices: [1],
+        rows: rows,
+        aggConfig: const GroupAggregationConfig(
+          aggType: GroupingAggType.avg,
+          targetColIndex: 2,
+        ),
+      );
+
+      final activeAvg = avgGroups.firstWhere((g) => g.groupKey == 'ACTIVE');
+      expect(activeAvg.aggValue, equals(200.0));
+    });
+
+    test('sorts groups by key or aggregate', () {
+      final keySorted = GridGroupingsEngine.buildGroups(
+        groupColIndices: [1],
+        rows: rows,
+        sortBy: GroupSortBy.key,
+        sortAscending: true,
+      );
+
+      expect(keySorted[0].groupKey, equals('ACTIVE'));
+      expect(keySorted[1].groupKey, equals('CANCELLED'));
+      expect(keySorted[2].groupKey, equals('PENDING'));
+    });
+
+    test('exports pivot table to CSV format', () {
+      final groups = GridGroupingsEngine.buildGroups(
+        groupColIndices: [1],
+        rows: rows,
+        aggConfig: const GroupAggregationConfig(
+          aggType: GroupingAggType.sum,
+          targetColIndex: 2,
+        ),
+      );
+
+      final csv = GridGroupingsEngine.exportPivotToCsv(
+        groups: groups,
+        groupByColumnName: 'status',
+      );
+
+      expect(csv, contains('Group Key,Count,Percentage,Aggregate'));
+      expect(csv, contains('"ACTIVE",3,60.00%,600.00'));
     });
   });
 }
