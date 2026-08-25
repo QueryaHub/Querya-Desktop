@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/features/main_screen/data_grid_staging_buffer.dart';
 
 void main() {
@@ -118,6 +119,27 @@ void main() {
       expect(eff[1], ['2', 'Bob', 'bob@test.com']);
       expect(eff[2], ['3', 'Charlie', 'charlie@test.com']);
       expect(eff[3], ['4', 'David', 'david@test.com']);
+    });
+
+    test('generateMutationPlan builds correct DML statements from staged modifications', () {
+      buffer.setCell(0, 1, 'Alice Updated');
+      buffer.addRow(['4', 'Diana', 'diana@test.com']);
+      buffer.toggleDeleteRow(2);
+
+      final plan = buffer.generateMutationPlan(
+        dialect: SqlDialect.postgres,
+        tableName: 'users',
+        schema: 'public',
+        primaryKeys: ['id'],
+      );
+
+      expect(plan.statementCount, 3);
+      expect(plan.statements[0].type, MutationType.update);
+      expect(plan.statements[0].sql, 'UPDATE "public"."users" SET "name" = \'Alice Updated\' WHERE "id" = 1');
+      expect(plan.statements[1].type, MutationType.insert);
+      expect(plan.statements[1].sql, 'INSERT INTO "public"."users" ("id", "name", "email") VALUES (4, \'Diana\', \'diana@test.com\')');
+      expect(plan.statements[2].type, MutationType.delete);
+      expect(plan.statements[2].sql, 'DELETE FROM "public"."users" WHERE "id" = 3');
     });
   });
 }
