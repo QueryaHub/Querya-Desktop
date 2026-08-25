@@ -84,6 +84,81 @@ void main() {
       );
       expect(res, equals([0, 1]));
     });
+
+    test('filters with LIKE and ILIKE wildcards', () {
+      final resLike = GridFilterEngine.filterRowIndices(
+        filterText: "status LIKE 'ACT%'",
+        columns: columns,
+        rows: rows,
+      );
+      expect(resLike, equals([0, 2]));
+
+      final resIlike = GridFilterEngine.filterRowIndices(
+        filterText: "status ILIKE '%pend%'",
+        columns: columns,
+        rows: rows,
+      );
+      expect(resIlike, equals([1]));
+    });
+
+    test('filters with IN and NOT IN list of literals', () {
+      final resIn = GridFilterEngine.filterRowIndices(
+        filterText: "status IN ('PENDING', 'CANCELLED')",
+        columns: columns,
+        rows: rows,
+      );
+      expect(resIn, equals([1, 3]));
+
+      final resNotIn = GridFilterEngine.filterRowIndices(
+        filterText: "status NOT IN ('ACTIVE')",
+        columns: columns,
+        rows: rows,
+      );
+      expect(resNotIn, equals([1, 3]));
+    });
+
+    test('filters with IS NULL and IS NOT NULL', () {
+      final rowsWithNull = [
+        ['1', 'ACTIVE', '100'],
+        ['2', 'NULL', '200'],
+        ['3', '', '300'],
+      ];
+      final resNull = GridFilterEngine.filterRowIndices(
+        filterText: 'status IS NULL',
+        columns: columns,
+        rows: rowsWithNull,
+      );
+      expect(resNull, equals([1, 2]));
+
+      final resNotNull = GridFilterEngine.filterRowIndices(
+        filterText: 'status IS NOT NULL',
+        columns: columns,
+        rows: rowsWithNull,
+      );
+      expect(resNotNull, equals([0]));
+    });
+
+    test('filters with BETWEEN range', () {
+      final res = GridFilterEngine.filterRowIndices(
+        filterText: 'amount BETWEEN 50 AND 200',
+        columns: columns,
+        rows: rows,
+      );
+      expect(res, equals([0, 1]));
+    });
+
+    test('handles escaped quotes inside string literals', () {
+      final rowsWithQuotes = [
+        ['1', "O'Connor", '100'],
+        ['2', 'Smith', '200'],
+      ];
+      final res = GridFilterEngine.filterRowIndices(
+        filterText: "status = 'O''Connor'",
+        columns: columns,
+        rows: rowsWithQuotes,
+      );
+      expect(res, equals([0]));
+    });
   });
 
   group('GridSelectionCalcEngine', () {
