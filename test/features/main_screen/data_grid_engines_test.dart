@@ -165,17 +165,28 @@ void main() {
     test('computes correct stats for numeric values', () {
       final stats = GridSelectionCalcEngine.compute(['10', '20', '30', '40']);
       expect(stats.totalCount, equals(4));
+      expect(stats.distinctCount, equals(4));
       expect(stats.numericCount, equals(4));
       expect(stats.nullCount, equals(0));
       expect(stats.sum, equals(100.0));
       expect(stats.average, equals(25.0));
+      expect(stats.median, equals(25.0));
       expect(stats.min, equals(10.0));
       expect(stats.max, equals(40.0));
+    });
+
+    test('computes odd-length median and distinct count with duplicates', () {
+      final stats = GridSelectionCalcEngine.compute(['10', '20', '20', '50', '100']);
+      expect(stats.distinctCount, equals(4));
+      expect(stats.median, equals(20.0));
+      expect(stats.toSummaryString(), contains('Count: 5 | Distinct: 4'));
+      expect(stats.toSummaryString(), contains('Median: 20'));
     });
 
     test('handles NULLs and mixed string data', () {
       final stats = GridSelectionCalcEngine.compute(['10', 'NULL', 'text', '50.5']);
       expect(stats.totalCount, equals(4));
+      expect(stats.distinctCount, equals(3));
       expect(stats.numericCount, equals(2));
       expect(stats.nullCount, equals(1));
       expect(stats.sum, equals(60.5));
