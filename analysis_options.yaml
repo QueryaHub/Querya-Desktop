@@ -4,6 +4,12 @@ analyzer:
   exclude:
     - "third_party/**"
     - "build/**"
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
   errors:
     unnecessary_underscores: ignore
     prefer_initializing_formals: ignore
