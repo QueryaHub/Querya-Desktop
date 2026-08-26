@@ -194,6 +194,21 @@ void main() {
       expect(stats.min, equals(10.0));
       expect(stats.max, equals(50.5));
     });
+
+    test('computes correct QuickSelect median for large odd and even selections (> 500)', () {
+      // Odd length > 500 (1001 items)
+      final oddData = List<String>.generate(1001, (i) => '${(i * 3) % 1000}');
+      final oddStats = GridSelectionCalcEngine.compute(oddData);
+      final oddParsed = oddData.map(double.parse).toList()..sort();
+      expect(oddStats.median, equals(oddParsed[500]));
+
+      // Even length > 500 (1000 items)
+      final evenData = List<String>.generate(1000, (i) => '${(i * 7) % 2000}');
+      final evenStats = GridSelectionCalcEngine.compute(evenData);
+      final evenParsed = evenData.map(double.parse).toList()..sort();
+      final expectedEvenMedian = (evenParsed[499] + evenParsed[500]) / 2.0;
+      expect(evenStats.median, equals(expectedEvenMedian));
+    });
   });
 
   group('GridGroupingsEngine', () {

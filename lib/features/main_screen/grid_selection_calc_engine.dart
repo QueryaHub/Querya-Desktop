@@ -132,15 +132,25 @@ abstract final class GridSelectionCalcEngine {
     final numericCount = numericList.length;
     final avg = numericCount > 0 ? sum / numericCount : null;
 
-    // Calculate median
+    // Calculate median using QuickSelect (O(N)) for large datasets (> 500 elements) or fast sort (<= 500)
     double? median;
     if (numericCount > 0) {
-      numericList.sort();
       final mid = numericCount ~/ 2;
-      if (numericCount.isOdd) {
-        median = numericList[mid];
+      if (numericCount <= 500) {
+        numericList.sort();
+        if (numericCount.isOdd) {
+          median = numericList[mid];
+        } else {
+          median = (numericList[mid - 1] + numericList[mid]) / 2.0;
+        }
       } else {
-        median = (numericList[mid - 1] + numericList[mid]) / 2.0;
+        if (numericCount.isOdd) {
+          median = _quickSelect(numericList, 0, numericCount - 1, mid);
+        } else {
+          final m1 = _quickSelect(numericList, 0, numericCount - 1, mid - 1);
+          final m2 = _quickSelect(numericList, mid, numericCount - 1, mid);
+          median = (m1 + m2) / 2.0;
+        }
       }
     }
 
@@ -166,6 +176,63 @@ abstract final class GridSelectionCalcEngine {
       max: maxVal,
       stdDev: stdDev,
     );
+  }
+
+  /// Linear-time QuickSelect algorithm to find the k-th smallest element.
+  static double _quickSelect(List<double> list, int left, int right, int k) {
+    while (left < right) {
+      if (right - left < 10) {
+        // Insertion sort for small sub-arrays
+        for (var i = left + 1; i <= right; i++) {
+          final temp = list[i];
+          var j = i - 1;
+          while (j >= left && list[j] > temp) {
+            list[j + 1] = list[j];
+            j--;
+          }
+          list[j + 1] = temp;
+        }
+        return list[k];
+      }
+
+      final pivotIndex = _partition(list, left, right);
+      if (pivotIndex == k) {
+        return list[k];
+      } else if (pivotIndex > k) {
+        right = pivotIndex - 1;
+      } else {
+        left = pivotIndex + 1;
+      }
+    }
+    return list[left];
+  }
+
+  static int _partition(List<double> list, int left, int right) {
+    // Median-of-three pivot selection for optimal partitioning
+    final mid = left + ((right - left) >> 1);
+    if (list[left] > list[mid]) _swap(list, left, mid);
+    if (list[left] > list[right]) _swap(list, left, right);
+    if (list[mid] > list[right]) _swap(list, mid, right);
+
+    final pivotValue = list[mid];
+    _swap(list, mid, right - 1);
+    var i = left;
+    var j = right - 1;
+
+    while (true) {
+      while (list[++i] < pivotValue) {}
+      while (list[--j] > pivotValue) {}
+      if (i >= j) break;
+      _swap(list, i, j);
+    }
+    _swap(list, i, right - 1);
+    return i;
+  }
+
+  static void _swap(List<double> list, int i, int j) {
+    final temp = list[i];
+    list[i] = list[j];
+    list[j] = temp;
   }
 
   /// Formats a numeric stat cleanly for UI display.
