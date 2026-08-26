@@ -61,6 +61,8 @@ void main() {
         'supportsDDLInspection': true,
         'supportsPrivileges': false,
         'hasServerStats': true,
+        'supportsMutations': true,
+        'supportsBatchMutations': true,
       });
 
       expect(caps.supportsTransactions, isTrue);
@@ -68,6 +70,12 @@ void main() {
       expect(caps.supportsDDLInspection, isTrue);
       expect(caps.supportsPrivileges, isFalse);
       expect(caps.hasServerStats, isTrue);
+      expect(caps.supportsMutations, isTrue);
+      expect(caps.supportsBatchMutations, isTrue);
+
+      final json = caps.toJson();
+      expect(json['supportsMutations'], isTrue);
+      expect(json['supportsBatchMutations'], isTrue);
     });
 
     test('ExtensionServerStats.fromRpc normalizes metrics map', () {

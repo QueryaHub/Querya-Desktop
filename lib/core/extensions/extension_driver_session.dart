@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
+import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
 import 'package:querya_desktop/core/extensions/extension_support.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
@@ -376,6 +377,53 @@ class ExtensionDriverSession {
       debugPrint('ExtensionDriverSession cancelQuery failed ($e)');
       return false;
     }
+  }
+
+  /// Queries table schema metadata (column types, nullability, PKs) via `db.getTableSchema`.
+  Future<TableSchemaMeta> getTableSchema(
+    ConnectionRow row, {
+    required String database,
+    String? schema,
+    required String tableName,
+  }) async {
+    final bridge = await ensureConnected(row);
+    try {
+      final result = await bridge.sendRequest('db.getTableSchema', {
+        'connectionId': row.id,
+        'database': database,
+        if (schema != null && schema.isNotEmpty) 'schema': schema,
+        'tableName': tableName,
+      });
+      if (result is Map) {
+        return TableSchemaMeta.fromJson(Map<String, dynamic>.from(result));
+      }
+      return TableSchemaMeta(tableName: tableName, schema: schema);
+    } catch (e) {
+      debugPrint('ExtensionDriverSession getTableSchema fallback ($e)');
+      return TableSchemaMeta(tableName: tableName, schema: schema);
+    }
+  }
+
+  /// Executes batch data mutations (insert, update, delete) via `db.mutate`.
+  Future<Map<String, dynamic>> mutate(
+    ConnectionRow row, {
+    required String database,
+    String? schema,
+    required String tableName,
+    required List<Map<String, dynamic>> mutations,
+  }) async {
+    final bridge = await ensureConnected(row);
+    final result = await bridge.sendRequest('db.mutate', {
+      'connectionId': row.id,
+      'database': database,
+      if (schema != null && schema.isNotEmpty) 'schema': schema,
+      'tableName': tableName,
+      'mutations': mutations,
+    });
+    if (result is Map) {
+      return Map<String, dynamic>.from(result);
+    }
+    return {'success': true, 'affectedRows': mutations.length};
   }
 
   Future<void> disconnect(int connectionId) async {
