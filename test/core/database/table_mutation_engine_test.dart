@@ -253,5 +253,33 @@ void main() {
         '123',
       );
     });
+
+    test('differentiates literal NULL string from SQL NULL', () {
+      // For string column: 'NULL' is preserved as string literal ''NULL''
+      expect(
+        TableMutationEngine.formatLiteral(
+          'NULL',
+          SqlDialect.postgres,
+          dataTypeName: 'varchar',
+        ),
+        '\'NULL\'',
+      );
+
+      // Explicit SQL NULL via sentinel is emitted as bare NULL
+      expect(
+        TableMutationEngine.formatLiteral(
+          TableMutationEngine.kNullSentinel,
+          SqlDialect.postgres,
+          dataTypeName: 'varchar',
+        ),
+        'NULL',
+      );
+
+      // Fallback without dataTypeName still handles 'NULL' as bare NULL
+      expect(
+        TableMutationEngine.formatLiteral('NULL', SqlDialect.postgres),
+        'NULL',
+      );
+    });
   });
 }

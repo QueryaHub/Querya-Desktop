@@ -82,7 +82,9 @@ class DataGridStagingBuffer extends ChangeNotifier {
     if (row < 0 || col < 0) return '';
     if (row < _originalRows.length) {
       final staged = _modifiedCells[row]?[col];
-      if (staged != null) return staged;
+      if (staged != null) {
+        return staged == TableMutationEngine.kNullSentinel ? 'NULL' : staged;
+      }
       if (col < _originalRows[row].length) {
         return _originalRows[row][col];
       }
@@ -90,9 +92,30 @@ class DataGridStagingBuffer extends ChangeNotifier {
     }
     final insertIdx = row - _originalRows.length;
     if (insertIdx < _insertedRows.length && col < _insertedRows[insertIdx].length) {
-      return _insertedRows[insertIdx][col];
+      final ins = _insertedRows[insertIdx][col];
+      return ins == TableMutationEngine.kNullSentinel ? 'NULL' : ins;
     }
     return '';
+  }
+
+  /// True if the specified cell is explicitly null or stores 'NULL'.
+  bool isCellNull(int row, int col) {
+    if (row < 0 || col < 0) return false;
+    if (row < _originalRows.length) {
+      final staged = _modifiedCells[row]?[col];
+      if (staged != null) return staged == TableMutationEngine.kNullSentinel;
+      if (col < _originalRows[row].length) {
+        final orig = _originalRows[row][col];
+        return orig == 'NULL' || orig == TableMutationEngine.kNullSentinel;
+      }
+      return false;
+    }
+    final insertIdx = row - _originalRows.length;
+    if (insertIdx < _insertedRows.length && col < _insertedRows[insertIdx].length) {
+      final ins = _insertedRows[insertIdx][col];
+      return ins == 'NULL' || ins == TableMutationEngine.kNullSentinel;
+    }
+    return false;
   }
 
   /// Returns original baseline cell value, or null if row is inserted.
@@ -126,6 +149,11 @@ class DataGridStagingBuffer extends ChangeNotifier {
       }
     }
     return StagedCellStatus.clean;
+  }
+
+  /// Explicitly sets the cell to SQL NULL.
+  void setCellNull(int row, int col) {
+    setCell(row, col, TableMutationEngine.kNullSentinel);
   }
 
   /// Stages an edit for the specified cell.

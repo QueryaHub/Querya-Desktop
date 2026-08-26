@@ -121,6 +121,19 @@ void main() {
       expect(eff[3], ['4', 'David', 'david@test.com']);
     });
 
+    test('setCellNull and isCellNull handle explicit SQL NULL states', () {
+      expect(buffer.isCellNull(0, 1), isFalse);
+
+      buffer.setCellNull(0, 1);
+      expect(buffer.isDirty, isTrue);
+      expect(buffer.isCellNull(0, 1), isTrue);
+      expect(buffer.getCellValue(0, 1), 'NULL');
+
+      buffer.setCell(0, 1, 'NULL');
+      expect(buffer.isCellNull(0, 1), isFalse);
+      expect(buffer.getCellValue(0, 1), 'NULL');
+    });
+
     test('generateMutationPlan builds correct DML statements from staged modifications', () {
       buffer.setCell(0, 1, 'Alice Updated');
       buffer.addRow(['4', 'Diana', 'diana@test.com']);

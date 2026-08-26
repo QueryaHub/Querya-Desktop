@@ -127,14 +127,17 @@ abstract final class TableMutationEngine {
         lower.contains('number');
   }
 
+  static const String kNullSentinel = '\u0000__QUERYA_NULL__\u0000';
+
   /// Formats a cell string value safely as an SQL literal or `NULL`.
   /// If [dataTypeName] is provided, formats according to the column type semantics.
   static String formatLiteral(
     String value,
     SqlDialect dialect, {
     String? dataTypeName,
+    bool isExplicitNull = false,
   }) {
-    if (value == 'NULL' || value == 'null') {
+    if (isExplicitNull || value == kNullSentinel) {
       return 'NULL';
     }
 
@@ -142,11 +145,15 @@ abstract final class TableMutationEngine {
 
     if (dataTypeName != null && dataTypeName.isNotEmpty) {
       if (_isTextType(dataTypeName)) {
+        // String columns: preserve literal 'NULL' or 'null' as a text string
         final escaped = value.replaceAll("'", "''");
         return "'$escaped'";
       }
 
       if (_isBoolType(dataTypeName)) {
+        if (trimmed == 'NULL' || trimmed == 'null') {
+          return 'NULL';
+        }
         if (trimmed.toLowerCase() == 'true' || trimmed == '1') {
           return dialect == SqlDialect.sqlite ? '1' : 'TRUE';
         }
@@ -156,10 +163,17 @@ abstract final class TableMutationEngine {
       }
 
       if (_isNumericType(dataTypeName)) {
+        if (trimmed == 'NULL' || trimmed == 'null') {
+          return 'NULL';
+        }
         if (RegExp(r'^-?\d+(\.\d+)?$').hasMatch(trimmed)) {
           return trimmed;
         }
       }
+    }
+
+    if (value == 'NULL' || value == 'null') {
+      return 'NULL';
     }
 
     // Fallback heuristic:
