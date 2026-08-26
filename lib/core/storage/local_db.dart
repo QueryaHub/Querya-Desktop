@@ -57,10 +57,23 @@ class LocalDb {
         onUpgrade: _onUpgrade,
         onOpen: (db) async {
           await db.execute('PRAGMA foreign_keys = ON');
+          await db.execute('PRAGMA journal_mode = WAL');
+          await db.execute('PRAGMA busy_timeout = 5000');
+          await db.execute('PRAGMA synchronous = NORMAL');
         },
       ),
     );
     return _db!;
+  }
+
+  /// Queries an active PRAGMA setting from the database for verification and diagnostic purposes.
+  Future<String> getPragma(String pragmaName) async {
+    final db = await _open();
+    final res = await db.rawQuery('PRAGMA $pragmaName');
+    if (res.isNotEmpty && res.first.values.isNotEmpty) {
+      return res.first.values.first.toString();
+    }
+    return '';
   }
 
   Future<void> _onCreate(Database db, int version) async {
