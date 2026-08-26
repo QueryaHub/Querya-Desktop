@@ -303,9 +303,11 @@ class _MysqlConnectionFormContentState
         maxHeight: WindowLayout.connectionFormMaxHeight,
       ),
       borderColor: theme.muted,
-      child: material.Column(
-        crossAxisAlignment: material.CrossAxisAlignment.stretch,
-        children: [
+      child: material.FocusTraversalGroup(
+        policy: material.WidgetOrderTraversalPolicy(),
+        child: material.Column(
+          crossAxisAlignment: material.CrossAxisAlignment.stretch,
+          children: [
             material.Padding(
               padding: const material.EdgeInsets.fromLTRB(24, 24, 24, 16),
               child: material.Column(
@@ -345,14 +347,16 @@ class _MysqlConnectionFormContentState
             ),
             const material.Divider(height: 1),
             material.Expanded(
-              child: material.SingleChildScrollView(
-                padding: const material.EdgeInsets.all(24),
-                child: material.Column(
-                  crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                  children: [
-                    const Text('Connection Name').small().semiBold(),
-                    const Gap(8),
-                    TextField(
+              child: material.FocusTraversalGroup(
+                policy: material.WidgetOrderTraversalPolicy(),
+                child: material.SingleChildScrollView(
+                  padding: const material.EdgeInsets.all(24),
+                  child: material.Column(
+                    crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                    children: [
+                      const Text('Connection Name').small().semiBold(),
+                      const Gap(8),
+                      TextField(
                       controller: _nameController,
                       placeholder: const Text('My MySQL Server'),
                     ),
@@ -472,16 +476,17 @@ class _MysqlConnectionFormContentState
                         const Text('Use SSL/TLS').small(),
                       ],
                     ),
-                    if (_useSSL) ...[
-                      const Gap(16),
-                      SslCertificateFields(
-                        rootCertController: _sslRootCertController,
-                        clientCertController: _sslCertController,
-                        clientKeyController: _sslKeyController,
-                        onChanged: _syncUriSslParams,
-                      ),
+                      if (_useSSL) ...[
+                        const Gap(16),
+                        SslCertificateFields(
+                          rootCertController: _sslRootCertController,
+                          clientCertController: _sslCertController,
+                          clientKeyController: _sslKeyController,
+                          onChanged: _syncUriSslParams,
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -552,68 +557,72 @@ class _MysqlConnectionFormContentState
                   ),
                 ),
               ),
-            material.Container(
-              padding: const material.EdgeInsets.symmetric(
-                  horizontal: 24, vertical: 16),
-              child: ValueListenableBuilder<bool>(
-                valueListenable: _formValidNotifier.listenable,
-                builder: (context, formValid, _) {
-                  return material.Wrap(
-                    spacing: 12,
-                    runSpacing: 8,
-                    alignment: material.WrapAlignment.spaceBetween,
-                    children: [
-                      OutlineButton(
-                        onPressed:
-                            formValid && !_isTesting ? _testConnection : null,
-                        leading: _isTesting
-                            ? material.SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: material.CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: theme.primary,
+            material.FocusTraversalGroup(
+              policy: material.WidgetOrderTraversalPolicy(),
+              child: material.Container(
+                padding: const material.EdgeInsets.symmetric(
+                    horizontal: 24, vertical: 16),
+                child: ValueListenableBuilder<bool>(
+                  valueListenable: _formValidNotifier.listenable,
+                  builder: (context, formValid, _) {
+                    return material.Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      alignment: material.WrapAlignment.spaceBetween,
+                      children: [
+                        OutlineButton(
+                          onPressed:
+                              formValid && !_isTesting ? _testConnection : null,
+                          leading: _isTesting
+                              ? material.SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: material.CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: theme.primary,
+                                  ),
+                                )
+                              : material.Icon(
+                                  material.Icons.link_rounded,
+                                  size: 18,
+                                  color: formValid
+                                      ? theme.primary
+                                      : theme.mutedForeground,
                                 ),
-                              )
-                            : material.Icon(
-                                material.Icons.link_rounded,
-                                size: 18,
-                                color: formValid
-                                    ? theme.primary
-                                    : theme.mutedForeground,
-                              ),
-                        child: Text(
-                          'Test Connection',
-                          style: material.TextStyle(
-                            fontWeight: material.FontWeight.w500,
-                            color: formValid
-                                ? theme.primary
-                                : theme.mutedForeground,
+                          child: Text(
+                            'Test Connection',
+                            style: material.TextStyle(
+                              fontWeight: material.FontWeight.w500,
+                              color: formValid
+                                  ? theme.primary
+                                  : theme.mutedForeground,
+                            ),
                           ),
                         ),
-                      ),
-                      material.Row(
-                        mainAxisSize: material.MainAxisSize.min,
-                        children: [
-                          GhostButton(
-                            onPressed: () =>
-                                material.Navigator.of(context).pop(),
-                            child: const Text('Cancel'),
-                          ),
-                          const Gap(12),
-                          PrimaryButton(
-                            onPressed: formValid ? _save : null,
-                            child: const Text('Save'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  );
-                },
+                        material.Row(
+                          mainAxisSize: material.MainAxisSize.min,
+                          children: [
+                            GhostButton(
+                              onPressed: () =>
+                                  material.Navigator.of(context).pop(),
+                              child: const Text('Cancel'),
+                            ),
+                            const Gap(12),
+                            PrimaryButton(
+                              onPressed: formValid ? _save : null,
+                              child: const Text('Save'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ),
             ),
           ],
         ),
+      ),
     );
   }
 }

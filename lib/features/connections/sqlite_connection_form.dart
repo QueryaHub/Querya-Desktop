@@ -195,233 +195,242 @@ class _SqliteConnectionFormContentState
           maxHeight: dialogH,
         ),
         borderColor: theme.muted,
-        child: material.Column(
-          mainAxisSize: material.MainAxisSize.min,
-          crossAxisAlignment: material.CrossAxisAlignment.stretch,
-          children: [
-            // Header
-            material.Padding(
-              padding: const material.EdgeInsets.fromLTRB(24, 20, 24, 8),
-              child: material.Column(
-                crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    _isEditing
-                        ? 'Edit SQLite Connection'
-                        : 'New SQLite Connection',
-                  ).large().semiBold(),
-                  const Gap(6),
-                  const Text('Connect to a local SQLite database file.')
-                      .muted()
-                      .small(),
-                ],
-              ),
-            ),
-            // Form body
-            material.ConstrainedBox(
-              constraints: material.BoxConstraints(
-                maxHeight: scrollH,
-              ),
-              child: material.SingleChildScrollView(
-                physics: const material.ClampingScrollPhysics(),
-                padding: const material.EdgeInsets.symmetric(
-                    horizontal: 24, vertical: 12),
+        child: material.FocusTraversalGroup(
+          policy: material.WidgetOrderTraversalPolicy(),
+          child: material.Column(
+            mainAxisSize: material.MainAxisSize.min,
+            crossAxisAlignment: material.CrossAxisAlignment.stretch,
+            children: [
+              // Header
+              material.Padding(
+                padding: const material.EdgeInsets.fromLTRB(24, 20, 24, 8),
                 child: material.Column(
                   crossAxisAlignment: material.CrossAxisAlignment.stretch,
                   children: [
-                    // Connection Name
-                    const Text('Connection name').small().semiBold(),
-                    const Gap(8),
-                    TextField(
-                      controller: _nameController,
-                      placeholder: const Text('e.g. Local Cache'),
-                    ),
-                    if (_nameTouched && _nameController.text.trim().isEmpty) ...[
-                      const Gap(4),
-                      Text(
-                        'Connection name is required.',
-                        style: material.TextStyle(
-                          color: theme.destructive,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                    const Gap(16),
-                    // Database File Path
-                    const Text('Database file path').small().semiBold(),
-                    const Gap(8),
-                    material.Row(
-                      children: [
-                        material.Expanded(
-                          child: TextField(
-                            controller: _pathController,
-                            placeholder: const Text('/path/to/database.db'),
-                          ),
-                        ),
-                        const Gap(10),
-                        OutlineButton(
-                          onPressed: _pickFile,
-                          child: const Text('Browse…'),
-                        ),
-                      ],
-                    ),
-                    if (_pathTouched && _pathController.text.trim().isEmpty) ...[
-                      const Gap(4),
-                      Text(
-                        'Database file path is required.',
-                        style: material.TextStyle(
-                          color: theme.destructive,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                    const Gap(16),
-                    // Read-only toggle
-                    material.Row(
-                      children: [
-                        material.Checkbox(
-                          value: _readOnly,
-                          onChanged: (v) =>
-                              setState(() => _readOnly = v ?? false),
-                        ),
-                        const Gap(8),
-                        const Text('Read-only mode').small(),
-                      ],
-                    ),
+                    Text(
+                      _isEditing
+                          ? 'Edit SQLite Connection'
+                          : 'New SQLite Connection',
+                    ).large().semiBold(),
+                    const Gap(6),
+                    const Text('Connect to a local SQLite database file.')
+                        .muted()
+                        .small(),
                   ],
                 ),
               ),
-            ),
-            const material.Divider(height: 1),
-            // Test result banner
-            if (_testResult != null)
-              material.Padding(
-                padding: const material.EdgeInsets.fromLTRB(24, 8, 16, 8),
-                child: material.Material(
-                  color: material.Colors.transparent,
-                  child: material.InkWell(
-                    onTap: _dismissResult,
-                    borderRadius: material.BorderRadius.circular(8),
-                    child: material.Container(
-                      padding: const material.EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 10),
-                      decoration: material.BoxDecoration(
-                        color: _testResult == 'success'
-                            ? theme.primary.withValues(alpha: 0.12)
-                            : theme.destructive.withValues(alpha: 0.12),
-                        borderRadius: material.BorderRadius.circular(8),
-                        border: material.Border.all(
-                          color: _testResult == 'success'
-                              ? theme.primary.withValues(alpha: 0.35)
-                              : theme.destructive.withValues(alpha: 0.35),
-                          width: 1,
+              // Form body
+              material.ConstrainedBox(
+                constraints: material.BoxConstraints(
+                  maxHeight: scrollH,
+                ),
+                child: material.FocusTraversalGroup(
+                  policy: material.WidgetOrderTraversalPolicy(),
+                  child: material.SingleChildScrollView(
+                    physics: const material.ClampingScrollPhysics(),
+                    padding: const material.EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
+                    child: material.Column(
+                      crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                      children: [
+                        // Connection Name
+                        const Text('Connection name').small().semiBold(),
+                        const Gap(8),
+                        TextField(
+                          controller: _nameController,
+                          placeholder: const Text('e.g. Local Cache'),
                         ),
-                      ),
-                      child: material.Row(
-                        children: [
-                          material.Icon(
-                            _testResult == 'success'
-                                ? material.Icons.check_circle_outline
-                                : material.Icons.info_outline_rounded,
-                            size: 18,
-                            color: _testResult == 'success'
-                                ? theme.primary
-                                : theme.destructive,
-                          ),
-                          const Gap(10),
-                          material.Expanded(
-                            child: Text(
-                              _testResult == 'success'
-                                  ? 'Connection successful!'
-                                  : _testResult!.startsWith('error:')
-                                      ? _testResult!.substring(7)
-                                      : 'Connection failed',
-                              style: material.TextStyle(
-                                fontSize: 13,
-                                color: theme.foreground,
-                              ),
-                            ).small(),
-                          ),
-                          material.IconButton(
-                            icon: material.Icon(
-                              material.Icons.close,
-                              size: 18,
-                              color: theme.mutedForeground,
-                            ),
-                            onPressed: _dismissResult,
-                            style: material.IconButton.styleFrom(
-                              minimumSize: const material.Size(28, 28),
-                              padding: material.EdgeInsets.zero,
+                        if (_nameTouched && _nameController.text.trim().isEmpty) ...[
+                          const Gap(4),
+                          Text(
+                            'Connection name is required.',
+                            style: material.TextStyle(
+                              color: theme.destructive,
+                              fontSize: 11,
                             ),
                           ),
                         ],
-                      ),
+                        const Gap(16),
+                        // Database File Path
+                        const Text('Database file path').small().semiBold(),
+                        const Gap(8),
+                        material.Row(
+                          children: [
+                            material.Expanded(
+                              child: TextField(
+                                controller: _pathController,
+                                placeholder: const Text('/path/to/database.db'),
+                              ),
+                            ),
+                            const Gap(10),
+                            OutlineButton(
+                              onPressed: _pickFile,
+                              child: const Text('Browse…'),
+                            ),
+                          ],
+                        ),
+                        if (_pathTouched && _pathController.text.trim().isEmpty) ...[
+                          const Gap(4),
+                          Text(
+                            'Database file path is required.',
+                            style: material.TextStyle(
+                              color: theme.destructive,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                        const Gap(16),
+                        // Read-only toggle
+                        material.Row(
+                          children: [
+                            material.Checkbox(
+                              value: _readOnly,
+                              onChanged: (v) =>
+                                  setState(() => _readOnly = v ?? false),
+                            ),
+                            const Gap(8),
+                            const Text('Read-only mode').small(),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
-            // Footer
-            material.Container(
-              padding: const material.EdgeInsets.symmetric(
-                  horizontal: 24, vertical: 16),
-              child: ValueListenableBuilder<bool>(
-                valueListenable: _formValidNotifier.listenable,
-                builder: (context, formValid, _) {
-                  return material.Wrap(
-                    spacing: 12,
-                    runSpacing: 8,
-                    alignment: material.WrapAlignment.spaceBetween,
-                    children: [
-                      OutlineButton(
-                        onPressed:
-                            formValid && !_isTesting ? _testConnection : null,
-                        leading: _isTesting
-                            ? material.SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: material.CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: theme.primary,
+              const material.Divider(height: 1),
+              // Test result banner
+              if (_testResult != null)
+                material.Padding(
+                  padding: const material.EdgeInsets.fromLTRB(24, 8, 16, 8),
+                  child: material.Material(
+                    color: material.Colors.transparent,
+                    child: material.InkWell(
+                      onTap: _dismissResult,
+                      borderRadius: material.BorderRadius.circular(8),
+                      child: material.Container(
+                        padding: const material.EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                        decoration: material.BoxDecoration(
+                          color: _testResult == 'success'
+                              ? theme.primary.withValues(alpha: 0.12)
+                              : theme.destructive.withValues(alpha: 0.12),
+                          borderRadius: material.BorderRadius.circular(8),
+                          border: material.Border.all(
+                            color: _testResult == 'success'
+                                ? theme.primary.withValues(alpha: 0.35)
+                                : theme.destructive.withValues(alpha: 0.35),
+                            width: 1,
+                          ),
+                        ),
+                        child: material.Row(
+                          children: [
+                            material.Icon(
+                              _testResult == 'success'
+                                  ? material.Icons.check_circle_outline
+                                  : material.Icons.info_outline_rounded,
+                              size: 18,
+                              color: _testResult == 'success'
+                                  ? theme.primary
+                                  : theme.destructive,
+                            ),
+                            const Gap(10),
+                            material.Expanded(
+                              child: Text(
+                                _testResult == 'success'
+                                    ? 'Connection successful!'
+                                    : _testResult!.startsWith('error:')
+                                        ? _testResult!.substring(7)
+                                        : 'Connection failed',
+                                style: material.TextStyle(
+                                  fontSize: 13,
+                                  color: theme.foreground,
                                 ),
-                              )
-                            : material.Icon(
-                                material.Icons.link_rounded,
+                              ).small(),
+                            ),
+                            material.IconButton(
+                              icon: material.Icon(
+                                material.Icons.close,
                                 size: 18,
+                                color: theme.mutedForeground,
+                              ),
+                              onPressed: _dismissResult,
+                              style: material.IconButton.styleFrom(
+                                minimumSize: const material.Size(28, 28),
+                                padding: material.EdgeInsets.zero,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              // Footer
+              material.FocusTraversalGroup(
+                policy: material.WidgetOrderTraversalPolicy(),
+                child: material.Container(
+                  padding: const material.EdgeInsets.symmetric(
+                      horizontal: 24, vertical: 16),
+                  child: ValueListenableBuilder<bool>(
+                    valueListenable: _formValidNotifier.listenable,
+                    builder: (context, formValid, _) {
+                      return material.Wrap(
+                        spacing: 12,
+                        runSpacing: 8,
+                        alignment: material.WrapAlignment.spaceBetween,
+                        children: [
+                          OutlineButton(
+                            onPressed:
+                                formValid && !_isTesting ? _testConnection : null,
+                            leading: _isTesting
+                                ? material.SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: material.CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: theme.primary,
+                                    ),
+                                  )
+                                : material.Icon(
+                                    material.Icons.link_rounded,
+                                    size: 18,
+                                    color: formValid
+                                        ? theme.primary
+                                        : theme.mutedForeground,
+                                  ),
+                            child: Text(
+                              'Test Connection',
+                              style: material.TextStyle(
+                                fontWeight: material.FontWeight.w500,
                                 color: formValid
                                     ? theme.primary
                                     : theme.mutedForeground,
                               ),
-                        child: Text(
-                          'Test Connection',
-                          style: material.TextStyle(
-                            fontWeight: material.FontWeight.w500,
-                            color: formValid
-                                ? theme.primary
-                                : theme.mutedForeground,
+                            ),
                           ),
-                        ),
-                      ),
-                      material.Row(
-                        mainAxisSize: material.MainAxisSize.min,
-                        children: [
-                          GhostButton(
-                            onPressed: () =>
-                                material.Navigator.of(context).pop(),
-                            child: const Text('Cancel'),
-                          ),
-                          const Gap(12),
-                          PrimaryButton(
-                            onPressed: formValid ? _save : null,
-                            child: const Text('Save'),
+                          material.Row(
+                            mainAxisSize: material.MainAxisSize.min,
+                            children: [
+                              GhostButton(
+                                onPressed: () =>
+                                    material.Navigator.of(context).pop(),
+                                child: const Text('Cancel'),
+                              ),
+                              const Gap(12),
+                              PrimaryButton(
+                                onPressed: formValid ? _save : null,
+                                child: const Text('Save'),
+                              ),
+                            ],
                           ),
                         ],
-                      ),
-                    ],
-                  );
-                },
+                      );
+                    },
+                  ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
