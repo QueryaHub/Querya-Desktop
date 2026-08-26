@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'querya_colors.dart';
 import 'querya_typography.dart';
 
@@ -21,6 +22,7 @@ class QueryaEditorTheme {
     required this.type,
     this.widgetBorder,
     this.fontFamily = QueryaTypography.mono,
+    this.fontFamilyFallback = QueryaTypography.monoFontFamilyFallback,
     this.fontSize = 13,
   });
 
@@ -41,6 +43,7 @@ class QueryaEditorTheme {
   final Color function;
   final Color type;
   final String fontFamily;
+  final List<String>? fontFamilyFallback;
   final double fontSize;
 
   /// Aligned with dark workbench; VS Code Dark+–like token hues.
@@ -93,6 +96,7 @@ class QueryaEditorTheme {
     Color? function,
     Color? type,
     String? fontFamily,
+    List<String>? fontFamilyFallback,
     double? fontSize,
   }) {
     return QueryaEditorTheme(
@@ -112,6 +116,7 @@ class QueryaEditorTheme {
       function: function ?? this.function,
       type: type ?? this.type,
       fontFamily: fontFamily ?? this.fontFamily,
+      fontFamilyFallback: fontFamilyFallback ?? this.fontFamilyFallback,
       fontSize: fontSize ?? this.fontSize,
     );
   }
@@ -138,6 +143,8 @@ class QueryaEditorTheme {
       function: c(a.function, b.function),
       type: c(a.type, b.type),
       fontFamily: t < 0.5 ? a.fontFamily : b.fontFamily,
+      fontFamilyFallback:
+          t < 0.5 ? a.fontFamilyFallback : b.fontFamilyFallback,
       fontSize: a.fontSize + (b.fontSize - a.fontSize) * t,
     );
   }
@@ -161,6 +168,7 @@ class QueryaEditorTheme {
           function == other.function &&
           type == other.type &&
           fontFamily == other.fontFamily &&
+          listEquals(fontFamilyFallback, other.fontFamilyFallback) &&
           fontSize == other.fontSize;
 
   @override
@@ -180,6 +188,7 @@ class QueryaEditorTheme {
         function,
         type,
         fontFamily,
+        fontFamilyFallback,
         fontSize,
       );
 }
