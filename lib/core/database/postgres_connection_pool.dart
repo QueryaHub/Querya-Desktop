@@ -50,7 +50,7 @@ class PostgresConnectionPool {
     this.maxEntries = defaultMaxEntries,
   });
 
-  static const Duration defaultIdleDisposeDelay = Duration(seconds: 8);
+  static const Duration defaultIdleDisposeDelay = Duration(seconds: 4);
 
   /// Max distinct pool keys `(connection id, database, mode)`. When full,
   /// least-recently-used **idle** slots (`refs == 0`) are closed first.
