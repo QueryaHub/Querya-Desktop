@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:querya_desktop/features/connections/new_connection_dialog.dart';
 import 'package:querya_desktop/features/connections/new_connection_url_dialog.dart';
 import 'package:querya_desktop/features/postgresql/postgresql_connection_form.dart';
 import 'package:querya_desktop/shared/widgets/ssl_certificate_fields.dart';
