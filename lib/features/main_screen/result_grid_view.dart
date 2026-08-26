@@ -287,47 +287,90 @@ enum ResultGridSortOrder {
   descending,
 }
 
+enum _SortKeyType { nullOrEmpty, numeric, dateTime, string }
+
+class _SortKey implements Comparable<_SortKey> {
+  final _SortKeyType type;
+  final num? numVal;
+  final DateTime? dtVal;
+  final String strLower;
+  final String strRaw;
+
+  _SortKey._({
+    required this.type,
+    this.numVal,
+    this.dtVal,
+    this.strLower = '',
+    this.strRaw = '',
+  });
+
+  factory _SortKey.parse(String val) {
+    if (val == 'NULL' || val.isEmpty) {
+      return _SortKey._(type: _SortKeyType.nullOrEmpty);
+    }
+    final n = num.tryParse(val);
+    if (n != null) {
+      return _SortKey._(type: _SortKeyType.numeric, numVal: n, strRaw: val);
+    }
+    final dt = DateTime.tryParse(val);
+    if (dt != null) {
+      return _SortKey._(type: _SortKeyType.dateTime, dtVal: dt, strRaw: val);
+    }
+    return _SortKey._(
+      type: _SortKeyType.string,
+      strLower: val.toLowerCase(),
+      strRaw: val,
+    );
+  }
+
+  @override
+  int compareTo(_SortKey other) {
+    if (type == _SortKeyType.nullOrEmpty && other.type == _SortKeyType.nullOrEmpty) {
+      return 0;
+    }
+    if (type == _SortKeyType.nullOrEmpty) return 1;
+    if (other.type == _SortKeyType.nullOrEmpty) return -1;
+
+    if (type == _SortKeyType.numeric && other.type == _SortKeyType.numeric) {
+      return numVal!.compareTo(other.numVal!);
+    }
+    if (type == _SortKeyType.dateTime && other.type == _SortKeyType.dateTime) {
+      return dtVal!.compareTo(other.dtVal!);
+    }
+
+    final aLower = type == _SortKeyType.string ? strLower : strRaw.toLowerCase();
+    final bLower = other.type == _SortKeyType.string ? other.strLower : other.strRaw.toLowerCase();
+    final cmp = aLower.compareTo(bLower);
+    if (cmp != 0) return cmp;
+
+    return strRaw.compareTo(other.strRaw);
+  }
+}
+
 /// Sorts rows by the specified column index with natural numeric / temporal / lexicographic comparison.
+/// Uses Schwartzian transform (Decorate-Sort-Undecorate) to precompute sort keys in O(N) time.
 List<List<String>> sortResultGridRows({
   required List<List<String>> rows,
   required int columnIndex,
   required ResultGridSortOrder order,
 }) {
   if (rows.isEmpty || columnIndex < 0) return rows;
-  final sorted = List<List<String>>.from(rows);
+  final n = rows.length;
 
-  sorted.sort((a, b) {
-    final valA = columnIndex < a.length ? a[columnIndex] : '';
-    final valB = columnIndex < b.length ? b[columnIndex] : '';
+  final keys = List<_SortKey>.generate(n, (i) {
+    final row = rows[i];
+    final val = columnIndex < row.length ? row[columnIndex] : '';
+    return _SortKey.parse(val);
+  }, growable: false);
 
-    final isNullA = valA == 'NULL' || valA.isEmpty;
-    final isNullB = valB == 'NULL' || valB.isEmpty;
-    if (isNullA && isNullB) return 0;
-    if (isNullA) return 1;
-    if (isNullB) return -1;
+  final indices = List<int>.generate(n, (i) => i, growable: false);
 
-    final numA = num.tryParse(valA);
-    final numB = num.tryParse(valB);
-    int cmp;
-    if (numA != null && numB != null) {
-      cmp = numA.compareTo(numB);
-    } else {
-      final dtA = DateTime.tryParse(valA);
-      final dtB = DateTime.tryParse(valB);
-      if (dtA != null && dtB != null) {
-        cmp = dtA.compareTo(dtB);
-      } else {
-        cmp = valA.toLowerCase().compareTo(valB.toLowerCase());
-        if (cmp == 0) {
-          cmp = valA.compareTo(valB);
-        }
-      }
-    }
-
+  indices.sort((a, b) {
+    final cmp = keys[a].compareTo(keys[b]);
     return order == ResultGridSortOrder.ascending ? cmp : -cmp;
   });
 
-  return sorted;
+  return List<List<String>>.generate(n, (i) => rows[indices[i]], growable: false);
 }
 
 /// Virtualized read-only or interactive grid for SQL query results (rows + columns).

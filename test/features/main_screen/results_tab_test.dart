@@ -99,6 +99,58 @@ void main() {
       expect(sorted.map((r) => r[0]).toList(), ['Apple', 'banana', 'cherry']);
     });
 
+    test('sorts temporally for ISO-8601 date strings', () {
+      final rows = [
+        ['2026-12-31 23:59:59'],
+        ['2025-01-01 00:00:00'],
+        ['2026-08-26 10:30:00'],
+      ];
+      final sorted = sortResultGridRows(
+        rows: rows,
+        columnIndex: 0,
+        order: ResultGridSortOrder.ascending,
+      );
+      expect(sorted.map((r) => r[0]).toList(), [
+        '2025-01-01 00:00:00',
+        '2026-08-26 10:30:00',
+        '2026-12-31 23:59:59',
+      ]);
+    });
+
+    test('handles case-insensitive sorting with exact tie-breaking', () {
+      final rows = [
+        ['alpha'],
+        ['Alpha'],
+        ['BETA'],
+        ['beta'],
+      ];
+      final sorted = sortResultGridRows(
+        rows: rows,
+        columnIndex: 0,
+        order: ResultGridSortOrder.ascending,
+      );
+      expect(sorted.map((r) => r[0]).toList(), ['Alpha', 'alpha', 'BETA', 'beta']);
+    });
+
+    test('handles large 5000-row dataset efficiently with Schwartzian transform', () {
+      final rows = List<List<String>>.generate(
+        5000,
+        (i) => ['${(5000 - i) * 3}', 'user_$i'],
+      );
+      final stopwatch = Stopwatch()..start();
+      final sorted = sortResultGridRows(
+        rows: rows,
+        columnIndex: 0,
+        order: ResultGridSortOrder.ascending,
+      );
+      stopwatch.stop();
+
+      expect(sorted.first[0], '3');
+      expect(sorted.last[0], '15000');
+      // Performance expectation: 5000 rows should easily sort within 50ms with precomputed keys
+      expect(stopwatch.elapsedMilliseconds, lessThan(300));
+    });
+
     test('handles NULL and empty values gracefully', () {
       final rows = [
         ['100'],
