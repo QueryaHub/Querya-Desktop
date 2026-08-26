@@ -709,4 +709,21 @@ class ConnectionRow {
       createdAt: createdAt ?? this.createdAt,
     );
   }
+
+  /// Whether in-memory password credentials are set.
+  bool get hasPassword => password != null && password!.isNotEmpty;
+
+  /// Whether in-memory connection URI credentials are set.
+  bool get hasConnectionString =>
+      connectionString != null && connectionString!.isNotEmpty;
+
+  /// Whether any in-memory secret credentials are held.
+  bool get hasSecrets => hasPassword || hasConnectionString;
+
+  /// Returns a clean copy of this [ConnectionRow] with all secret credentials
+  /// ([password] and [connectionString]) scrubbed to null.
+  ConnectionRow withoutSecrets() => copyWith(
+        clearPassword: true,
+        clearConnectionString: true,
+      );
 }

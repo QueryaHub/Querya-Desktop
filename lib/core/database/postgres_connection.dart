@@ -3,6 +3,7 @@ import 'dart:io' show SecurityContext;
 
 import 'package:flutter/foundation.dart';
 import 'package:postgres/postgres.dart';
+import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 
 // ignore: implementation_imports
@@ -44,14 +45,15 @@ class PostgresConnection {
     required this.host,
     this.port = 5432,
     this.username,
-    this.password,
+    String? password,
     this.database,
     this.useSSL = false,
-    this.connectionString,
+    String? connectionString,
     this.sslRootCert,
     this.sslCert,
     this.sslKey,
-  });
+  })  : _password = password,
+        _connectionString = connectionString;
 
   /// Builds a connection from a saved [ConnectionRow] (host/port or URI).
   factory PostgresConnection.fromConnectionRow(
@@ -91,29 +93,38 @@ class PostgresConnection {
   final String host;
   final int port;
   final String? username;
-  final String? password;
+  String? _password;
   final String? database;
   final bool useSSL;
-  final String? connectionString;
+  String? _connectionString;
   final String? sslRootCert;
   final String? sslCert;
   final String? sslKey;
+
+  String? get password => _password;
+  String? get connectionString => _connectionString;
 
   Connection? _conn;
   bool _isConnected = false;
 
   bool get isConnected => _isConnected && _conn != null;
 
-  bool get _usesConnectionString =>
-      connectionString != null && connectionString!.trim().isNotEmpty;
+  /// Scrubs sensitive in-memory credentials once the network handshake completes.
+  void scrubCredentials() {
+    _password = null;
+    _connectionString = null;
+  }
 
-  Endpoint _buildEndpoint() {
+  bool _usesConnectionString(String? connStr) =>
+      connStr != null && connStr.trim().isNotEmpty;
+
+  Endpoint _buildEndpoint({String? pass}) {
     return Endpoint(
       host: host,
       port: port,
       database: database ?? 'postgres',
       username: username,
-      password: password,
+      password: pass ?? _password,
     );
   }
 
@@ -148,14 +159,28 @@ class PostgresConnection {
   /// form checkbox still applies; otherwise libpq-style URLs drive TLS mode.
   Future<void> connect() async {
     if (_isConnected && _conn != null) return;
+
+    var effectivePassword = _password;
+    var effectiveConnectionString = _connectionString;
+
+    if ((effectivePassword == null || effectivePassword.isEmpty) &&
+        (effectiveConnectionString == null || effectiveConnectionString.isEmpty) &&
+        id > 0) {
+      try {
+        final secrets = await ConnectionSecretsStore.readForConnection(id);
+        effectivePassword = secrets.password;
+        effectiveConnectionString = secrets.connectionString;
+      } catch (_) {}
+    }
+
     try {
-      if (_usesConnectionString) {
+      if (_usesConnectionString(effectiveConnectionString)) {
         // Pool passes target catalog via [database]; URI alone would always open
         // the DB embedded in the string — every tree branch then queried the
         // same database (duplicate tables under finance / logistics, etc.).
         final dbName = database ?? 'postgres';
         final uriForOpen = replaceDatabaseInConnectionString(
-          connectionString!.trim(),
+          effectiveConnectionString!.trim(),
           dbName,
         );
         final parsed = parseConnectionString(uriForOpen);
@@ -176,11 +201,12 @@ class PostgresConnection {
         );
       } else {
         _conn = await Connection.open(
-          _buildEndpoint(),
+          _buildEndpoint(pass: effectivePassword),
           settings: _buildSettings(),
         );
       }
       _isConnected = true;
+      scrubCredentials();
     } catch (e, st) {
       _isConnected = false;
       _conn = null;
