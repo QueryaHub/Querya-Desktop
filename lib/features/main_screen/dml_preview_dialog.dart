@@ -181,6 +181,46 @@ class _DmlPreviewDialogState extends material.State<_DmlPreviewDialog> {
                     ),
                 ],
               ),
+
+              // Warning banner if table lacks primary key and performs UPDATE/DELETE
+              if (!widget.plan.hasPrimaryKey &&
+                  widget.plan.statements.any(
+                    (s) =>
+                        s.type == MutationType.update ||
+                        s.type == MutationType.delete,
+                  )) ...[
+                const Gap(10),
+                material.Container(
+                  padding: const material.EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: material.BoxDecoration(
+                    color: material.Colors.amber.withValues(
+                      alpha: isDark ? 0.15 : 0.08,
+                    ),
+                    borderRadius: material.BorderRadius.circular(6),
+                    border: material.Border.all(
+                      color: material.Colors.amber.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: material.Row(
+                    children: [
+                      material.Icon(
+                        material.Icons.warning_amber_rounded,
+                        size: 15,
+                        color: material.Colors.amber.shade700,
+                      ),
+                      const Gap(8),
+                      material.Expanded(
+                        child: const Text(
+                          'No Primary Key detected. WHERE clauses compare all columns (identical duplicate rows will be modified together).',
+                        ).xSmall().muted(),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const Gap(14),
 
               // SQL Preview code block header

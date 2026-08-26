@@ -32,12 +32,14 @@ class TableMutationPlan {
     required this.tableName,
     this.schema,
     required this.statements,
+    this.hasPrimaryKey = true,
   });
 
   final SqlDialect dialect;
   final String tableName;
   final String? schema;
   final List<TableMutationStatement> statements;
+  final bool hasPrimaryKey;
 
   bool get isEmpty => statements.isEmpty;
   int get statementCount => statements.length;
@@ -318,6 +320,7 @@ abstract final class TableMutationEngine {
       tableName: tableName,
       schema: schema,
       statements: statements,
+      hasPrimaryKey: primaryKeys.isNotEmpty,
     );
   }
 
