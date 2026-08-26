@@ -32,6 +32,7 @@ class _PreferencesDialogContentState
     extends material.State<_PreferencesDialogContent> {
   bool _loading = true;
   bool _checkUpdatesOnStartup = true;
+  bool _confirmDestructive = true;
   int? _pgTimeout;
   int? _mysqlTimeout;
   int _maxRows = kDefaultSqlResultMaxRows;
@@ -46,6 +47,8 @@ class _PreferencesDialogContentState
 
   Future<void> _load() async {
     final startup = await AppSettings.instance.getCheckForUpdatesOnStartup();
+    final destructive =
+        await AppSettings.instance.getConfirmDestructiveOperations();
     final pg = await AppSettings.instance.getPostgresSqlStmtTimeoutSeconds();
     final my = await AppSettings.instance.getMysqlSqlStmtTimeoutSeconds();
     final rows = await AppSettings.instance.getSqlResultMaxRows();
@@ -54,6 +57,7 @@ class _PreferencesDialogContentState
     if (!mounted) return;
     setState(() {
       _checkUpdatesOnStartup = startup;
+      _confirmDestructive = destructive;
       _pgTimeout = pg;
       _mysqlTimeout = my;
       _maxRows = rows;
@@ -66,6 +70,11 @@ class _PreferencesDialogContentState
   Future<void> _setCheckUpdatesOnStartup(bool enabled) async {
     setState(() => _checkUpdatesOnStartup = enabled);
     await AppSettings.instance.setCheckForUpdatesOnStartup(enabled);
+  }
+
+  Future<void> _setConfirmDestructive(bool enabled) async {
+    setState(() => _confirmDestructive = enabled);
+    await AppSettings.instance.setConfirmDestructiveOperations(enabled);
   }
 
   Future<void> _setPg(int? v) async {
@@ -266,6 +275,19 @@ class _PreferencesDialogContentState
                                   ),
                                 ],
                               ),
+                            ),
+                            const material.SizedBox(height: 12),
+                            PreferencesCheckboxRow(
+                              value: _confirmDestructive,
+                              title: const Text(
+                                'Confirm destructive SQL operations',
+                              ).small(),
+                              subtitle: const Text(
+                                'Prompts before executing DROP, TRUNCATE, or unconditional DELETE queries.',
+                              ).muted().xSmall(),
+                              onChanged: (v) {
+                                unawaited(_setConfirmDestructive(v));
+                              },
                             ),
                             const material.SizedBox(height: 16),
                             const PreferencesHint(

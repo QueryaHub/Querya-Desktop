@@ -7,6 +7,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:postgres/postgres.dart' as pg;
+import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/postgres_sql.dart';
 import 'package:querya_desktop/core/database/result_row_string_convert.dart';
@@ -20,6 +21,7 @@ import 'package:querya_desktop/features/postgresql/postgres_table_utils.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
 import 'package:querya_desktop/features/main_screen/data_grid_staging_buffer.dart';
+import 'package:querya_desktop/features/main_screen/destructive_query_dialog.dart';
 import 'package:querya_desktop/features/main_screen/dml_preview_dialog.dart';
 import 'package:querya_desktop/features/main_screen/query_editor_tab.dart';
 import 'package:querya_desktop/features/main_screen/results_tab.dart';
@@ -313,6 +315,23 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       userSql = _sqlController.text.trim();
     }
     if (userSql.isEmpty) return;
+
+    final confirmDestructive =
+        await AppSettings.instance.getConfirmDestructiveOperations();
+    if (confirmDestructive) {
+      final inspection = DestructiveSqlDetector.inspect(userSql);
+      if (inspection.isDestructive) {
+        if (!mounted) return;
+        final confirmed = await showDestructiveQueryDialog(
+          context: context,
+          result: inspection,
+          sql: userSql,
+          connectionName: widget.connectionRow.name,
+        );
+        if (confirmed != true) return;
+      }
+    }
+
     var sql = injectSqlLimit(userSql, _resultMaxRows);
 
     setState(() {
