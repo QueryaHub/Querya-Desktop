@@ -6,6 +6,8 @@ class ExtensionDriverCapabilities {
     this.supportsDDLInspection = false,
     this.supportsPrivileges = false,
     this.hasServerStats = false,
+    this.supportsMutations = false,
+    this.supportsBatchMutations = false,
   });
 
   /// True if `db.query` supports transaction control queries (BEGIN, COMMIT, ROLLBACK).
@@ -22,6 +24,12 @@ class ExtensionDriverCapabilities {
 
   /// True if the driver supports `db.getServerStats`.
   final bool hasServerStats;
+
+  /// True if the driver supports `db.getTableSchema` and `db.mutate`.
+  final bool supportsMutations;
+
+  /// True if the driver supports batch multi-row mutations in `db.mutate`.
+  final bool supportsBatchMutations;
 
   factory ExtensionDriverCapabilities.fromRpc(Object? raw) {
     if (raw is! Map) return const ExtensionDriverCapabilities();
@@ -42,6 +50,11 @@ class ExtensionDriverCapabilities {
           map['supports_privileges'] == true,
       hasServerStats:
           map['hasServerStats'] == true || map['has_server_stats'] == true,
+      supportsMutations:
+          map['supportsMutations'] == true || map['supports_mutations'] == true,
+      supportsBatchMutations:
+          map['supportsBatchMutations'] == true ||
+          map['supports_batch_mutations'] == true,
     );
   }
 
@@ -51,6 +64,8 @@ class ExtensionDriverCapabilities {
         'supportsDDLInspection': supportsDDLInspection,
         'supportsPrivileges': supportsPrivileges,
         'hasServerStats': hasServerStats,
+        'supportsMutations': supportsMutations,
+        'supportsBatchMutations': supportsBatchMutations,
       };
 
   @override
@@ -62,7 +77,9 @@ class ExtensionDriverCapabilities {
           supportsCancel == other.supportsCancel &&
           supportsDDLInspection == other.supportsDDLInspection &&
           supportsPrivileges == other.supportsPrivileges &&
-          hasServerStats == other.hasServerStats;
+          hasServerStats == other.hasServerStats &&
+          supportsMutations == other.supportsMutations &&
+          supportsBatchMutations == other.supportsBatchMutations;
 
   @override
   int get hashCode =>
@@ -72,5 +89,7 @@ class ExtensionDriverCapabilities {
         supportsDDLInspection,
         supportsPrivileges,
         hasServerStats,
+        supportsMutations,
+        supportsBatchMutations,
       );
 }
