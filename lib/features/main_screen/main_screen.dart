@@ -23,10 +23,12 @@ import 'package:querya_desktop/features/connections/connections_panel.dart';
 import 'package:querya_desktop/features/connections/sqlite_connection_form.dart';
 import 'package:querya_desktop/features/main_screen/connections_panel_width_persist.dart';
 import 'package:querya_desktop/features/main_screen/querya_window_title_bar.dart';
-import 'package:querya_desktop/features/onboarding/welcome_tour_dialog.dart';
-import 'package:querya_desktop/shared/widgets/widgets.dart';
+import 'package:querya_desktop/features/macos/querya_platform_menu_bar.dart';
 import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
+import 'package:querya_desktop/features/onboarding/welcome_tour_dialog.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
+import 'package:querya_desktop/features/settings/preferences_dialog.dart';
+import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'main_screen_workspace_state.dart';
 import 'workspace_panel.dart';
 
@@ -469,10 +471,34 @@ class _MainScreenState extends State<MainScreen> {
                 shift: true,
               ): _onGoHome,
             },
-            child: SqlEditorGlobalActions(
-              activeConnection: workspace.activeConnection,
-              onOpenSqlWorkspace: _openSqlWorkspaceForConnection,
-              child: material.Scaffold(
+            child: QueryaPlatformMenuBar(
+              onNewConnection: () =>
+                  unawaited(_onNewDatabaseConnectionFromMenu()),
+              onNewQueryTab: () {
+                final ctx =
+                    FocusManager.instance.primaryFocus?.context ?? context;
+                Actions.maybeInvoke(ctx, const NewSqlIntent());
+              },
+              onOpenSqlScript: () {
+                final ctx =
+                    FocusManager.instance.primaryFocus?.context ?? context;
+                Actions.maybeInvoke(ctx, const OpenSqlIntent());
+              },
+              onSaveQuery: () {
+                final ctx =
+                    FocusManager.instance.primaryFocus?.context ?? context;
+                Actions.maybeInvoke(ctx, const SaveSqlIntent());
+              },
+              onExecuteQuery: () =>
+                  SqlEditorCommandBridge.instance.invokeExecute(),
+              onToggleSidebar: () => _splitKey.currentState?.toggleSidebar(),
+              onOpenPreferences: () => showPreferencesDialog(context),
+              onOpenWelcomeTour: () => _onOpenWelcomeTour(),
+              onGoHome: _onGoHome,
+              child: SqlEditorGlobalActions(
+                activeConnection: workspace.activeConnection,
+                onOpenSqlWorkspace: _openSqlWorkspaceForConnection,
+                child: material.Scaffold(
                 backgroundColor: wb.canvas,
                 body: WindowBorder(
                 color: wb.borderSubtle.withValues(alpha: 0.35),
@@ -564,6 +590,7 @@ class _MainScreenState extends State<MainScreen> {
                   ],
                 ),
               ),
+            ),
             ),
           ),
         ),
