@@ -13,8 +13,11 @@ abstract class QueryaColors {
   /// Elevated surface (cards, mock window chrome).
   static const Color surface = Color(0xFF0C0C0C);
 
-  /// Brand accent (CTAs, tree icons, focus ring).
+  /// Brand accent (CTAs, tree icons, focus ring on dark surfaces).
   static const Color accentCyan = Color(0xFF22D3EE);
+
+  /// High-contrast brand accent for light surfaces (WCAG AA 4.5:1+ compliant against white/light gray).
+  static const Color accentCyanLight = Color(0xFF0E7490);
 
   /// Text / icons on filled primary buttons.
   static const Color onAccent = Color(0xFF0A0A0A);
