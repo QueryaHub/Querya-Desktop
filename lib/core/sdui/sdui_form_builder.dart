@@ -145,21 +145,24 @@ class SduiFormBuilderState extends material.State<SduiFormBuilder> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    return material.Form(
-      key: _formKey,
-      child: material.Column(
-        crossAxisAlignment: material.CrossAxisAlignment.stretch,
-        mainAxisSize: material.MainAxisSize.min,
-        children: [
-          if (widget.schema.title != null) ...[
-            Text(widget.schema.title!).large().semiBold(),
-            const Gap(12),
+    return material.FocusTraversalGroup(
+      policy: material.WidgetOrderTraversalPolicy(),
+      child: material.Form(
+        key: _formKey,
+        child: material.Column(
+          crossAxisAlignment: material.CrossAxisAlignment.stretch,
+          mainAxisSize: material.MainAxisSize.min,
+          children: [
+            if (widget.schema.title != null) ...[
+              Text(widget.schema.title!).large().semiBold(),
+              const Gap(12),
+            ],
+            for (var i = 0; i < widget.schema.fields.length; i++) ...[
+              if (i > 0) const Gap(12),
+              _buildField(widget.schema.fields[i]),
+            ],
           ],
-          for (var i = 0; i < widget.schema.fields.length; i++) ...[
-            if (i > 0) const Gap(12),
-            _buildField(widget.schema.fields[i]),
-          ],
-        ],
+        ),
       ),
     );
   }

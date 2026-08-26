@@ -19,35 +19,38 @@ class SslCertificateFields extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    return material.Column(
-      crossAxisAlignment: material.CrossAxisAlignment.stretch,
-      mainAxisSize: material.MainAxisSize.min,
-      children: [
-        const Text('SSL Certificates (optional)').small().semiBold(),
-        const Gap(4),
-        const Text(
-          'Root CA, client certificate, and client key are appended to the '
-          'connection URI.',
-        ).muted().small(),
-        const Gap(8),
-        _SslFileField(
-          label: 'Root CA / SSL Root Certificate',
-          controller: rootCertController,
-          onChanged: onChanged,
-        ),
-        const Gap(8),
-        _SslFileField(
-          label: 'SSL Client Certificate',
-          controller: clientCertController,
-          onChanged: onChanged,
-        ),
-        const Gap(8),
-        _SslFileField(
-          label: 'SSL Client Key',
-          controller: clientKeyController,
-          onChanged: onChanged,
-        ),
-      ],
+    return material.FocusTraversalGroup(
+      policy: material.WidgetOrderTraversalPolicy(),
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        mainAxisSize: material.MainAxisSize.min,
+        children: [
+          const Text('SSL Certificates (optional)').small().semiBold(),
+          const Gap(4),
+          const Text(
+            'Root CA, client certificate, and client key are appended to the '
+            'connection URI.',
+          ).muted().small(),
+          const Gap(8),
+          _SslFileField(
+            label: 'Root CA / SSL Root Certificate',
+            controller: rootCertController,
+            onChanged: onChanged,
+          ),
+          const Gap(8),
+          _SslFileField(
+            label: 'SSL Client Certificate',
+            controller: clientCertController,
+            onChanged: onChanged,
+          ),
+          const Gap(8),
+          _SslFileField(
+            label: 'SSL Client Key',
+            controller: clientKeyController,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
     );
   }
 }
