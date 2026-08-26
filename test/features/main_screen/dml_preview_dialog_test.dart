@@ -101,5 +101,27 @@ void main() {
 
       expect(result, isTrue);
     });
+
+    testWidgets('shows warning banner when plan has no primary key and updates rows', (tester) async {
+      const noPkPlan = TableMutationPlan(
+        dialect: SqlDialect.postgres,
+        tableName: 'tags',
+        schema: 'public',
+        hasPrimaryKey: false,
+        statements: [
+          TableMutationStatement(
+            type: MutationType.update,
+            sql: 'UPDATE "public"."tags" SET "name" = \'val\' WHERE "name" = \'old\'',
+            description: 'Update row 1',
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(buildTestDialog(plan: noPkPlan));
+      await tester.tap(find.text('Open Dialog'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('No Primary Key detected'), findsOneWidget);
+    });
   });
 }
