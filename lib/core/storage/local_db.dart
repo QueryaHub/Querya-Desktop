@@ -307,7 +307,7 @@ class LocalDb {
       '''
       SELECT id FROM sql_query_history
       WHERE connection_id = ? AND database_name IS NOT DISTINCT FROM ?
-      ORDER BY recorded_at ASC, id ASC
+      ORDER BY id ASC
       LIMIT ?
       ''',
       [connectionId, databaseName, excess],
@@ -340,7 +340,7 @@ class LocalDb {
       SELECT id, connection_id, database_name, sql_text, recorded_at
       FROM sql_query_history
       WHERE connection_id = ? AND database_name IS NOT DISTINCT FROM ?
-      ORDER BY recorded_at DESC, id DESC
+      ORDER BY id DESC
       LIMIT ?
       ''',
       [connectionId, dbKey, limit],
@@ -350,6 +350,7 @@ class LocalDb {
 
   /// Removes all history rows for [connectionId] (every database bucket).
   Future<void> clearSqlQueryHistoryForConnection(int connectionId) async {
+    _historyInsertCounts.removeWhere((k, _) => k.startsWith('$connectionId::'));
     final db = await _open();
     await db.delete(
       'sql_query_history',
@@ -363,8 +364,9 @@ class LocalDb {
     required int connectionId,
     String? databaseName,
   }) async {
-    final db = await _open();
     final dbKey = _normalizeHistoryDatabaseName(databaseName);
+    _historyInsertCounts.remove('$connectionId::${dbKey ?? ''}');
+    final db = await _open();
     await db.rawDelete(
       '''
       DELETE FROM sql_query_history
@@ -524,6 +526,7 @@ class LocalDb {
   /// Deletes a connection. SQLite deletion always proceeds even if the secure
   /// store delete fails (e.g. missing key or unavailable libsecret daemon).
   Future<void> removeConnection(int id) async {
+    _historyInsertCounts.removeWhere((k, _) => k.startsWith('$id::'));
     try {
       await ConnectionSecretsStore.deleteForConnection(id);
     } catch (_) {
