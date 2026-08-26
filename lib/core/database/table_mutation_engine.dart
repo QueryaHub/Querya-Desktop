@@ -92,22 +92,93 @@ abstract final class TableMutationEngine {
     return quotedTable;
   }
 
+  static bool _isTextType(String dataTypeName) {
+    final lower = dataTypeName.toLowerCase().trim();
+    return lower.contains('char') ||
+        lower.contains('text') ||
+        lower.contains('varchar') ||
+        lower.contains('string') ||
+        lower.contains('uuid') ||
+        lower.contains('json') ||
+        lower.contains('xml') ||
+        lower.contains('clob') ||
+        lower.contains('enum') ||
+        lower.contains('citext') ||
+        lower.contains('name') ||
+        lower.contains('bpchar');
+  }
+
+  static bool _isBoolType(String dataTypeName) {
+    final lower = dataTypeName.toLowerCase().trim();
+    return lower == 'bool' ||
+        lower == 'boolean' ||
+        lower.startsWith('tinyint(1)');
+  }
+
+  static bool _isNumericType(String dataTypeName) {
+    final lower = dataTypeName.toLowerCase().trim();
+    return lower.contains('int') ||
+        lower.contains('float') ||
+        lower.contains('double') ||
+        lower.contains('decimal') ||
+        lower.contains('numeric') ||
+        lower.contains('real') ||
+        lower.contains('serial') ||
+        lower.contains('number');
+  }
+
   /// Formats a cell string value safely as an SQL literal or `NULL`.
-  static String formatLiteral(String value, SqlDialect dialect) {
+  /// If [dataTypeName] is provided, formats according to the column type semantics.
+  static String formatLiteral(
+    String value,
+    SqlDialect dialect, {
+    String? dataTypeName,
+  }) {
     if (value == 'NULL' || value == 'null') {
       return 'NULL';
     }
 
-    // Number literals (integer or floating point)
-    if (RegExp(r'^-?\d+(\.\d+)?$').hasMatch(value)) {
-      return value;
+    final trimmed = value.trim();
+
+    if (dataTypeName != null && dataTypeName.isNotEmpty) {
+      if (_isTextType(dataTypeName)) {
+        final escaped = value.replaceAll("'", "''");
+        return "'$escaped'";
+      }
+
+      if (_isBoolType(dataTypeName)) {
+        if (trimmed.toLowerCase() == 'true' || trimmed == '1') {
+          return dialect == SqlDialect.sqlite ? '1' : 'TRUE';
+        }
+        if (trimmed.toLowerCase() == 'false' || trimmed == '0') {
+          return dialect == SqlDialect.sqlite ? '0' : 'FALSE';
+        }
+      }
+
+      if (_isNumericType(dataTypeName)) {
+        if (RegExp(r'^-?\d+(\.\d+)?$').hasMatch(trimmed)) {
+          return trimmed;
+        }
+      }
+    }
+
+    // Fallback heuristic:
+    // Leading zeros with more digits (e.g. '01234', '007') are preserved as strings
+    if (RegExp(r'^0\d+$').hasMatch(trimmed)) {
+      final escaped = value.replaceAll("'", "''");
+      return "'$escaped'";
+    }
+
+    // Number literals (integer or floating point, e.g. '123', '0', '0.45', '-5.2')
+    if (RegExp(r'^-?\d+(\.\d+)?$').hasMatch(trimmed)) {
+      return trimmed;
     }
 
     // Boolean literals
-    if (value.toLowerCase() == 'true') {
+    if (trimmed.toLowerCase() == 'true') {
       return dialect == SqlDialect.sqlite ? '1' : 'TRUE';
     }
-    if (value.toLowerCase() == 'false') {
+    if (trimmed.toLowerCase() == 'false') {
       return dialect == SqlDialect.sqlite ? '0' : 'FALSE';
     }
 
@@ -127,6 +198,7 @@ abstract final class TableMutationEngine {
     required Map<int, Map<int, String>> modifiedCells,
     required List<List<String>> insertedRows,
     required Set<int> deletedRowIndices,
+    Map<String, String>? columnDataTypes,
   }) {
     final statements = <TableMutationStatement>[];
     final tableRef = quoteQualifiedTable(
@@ -151,9 +223,11 @@ abstract final class TableMutationEngine {
         final colIndex = mod.key;
         final stagedVal = mod.value;
         if (colIndex < columns.length) {
-          final colName = quoteIdentifier(columns[colIndex], dialect);
-          final literal = formatLiteral(stagedVal, dialect);
-          setClauses.add('$colName = $literal');
+          final colName = columns[colIndex];
+          final quotedCol = quoteIdentifier(colName, dialect);
+          final colType = columnDataTypes?[colName];
+          final literal = formatLiteral(stagedVal, dialect, dataTypeName: colType);
+          setClauses.add('$quotedCol = $literal');
         }
       }
 
@@ -163,6 +237,7 @@ abstract final class TableMutationEngine {
           primaryKeys: primaryKeys,
           row: origRow,
           dialect: dialect,
+          columnDataTypes: columnDataTypes,
         );
 
         final sql = 'UPDATE $tableRef SET ${setClauses.join(', ')} WHERE $whereClause';
@@ -183,10 +258,12 @@ abstract final class TableMutationEngine {
       final values = <String>[];
 
       for (var c = 0; c < columns.length; c++) {
-        final colName = quoteIdentifier(columns[c], dialect);
+        final colName = columns[c];
+        final quotedCol = quoteIdentifier(colName, dialect);
         final cellVal = c < row.length ? row[c] : 'NULL';
-        colNames.add(colName);
-        values.add(formatLiteral(cellVal, dialect));
+        final colType = columnDataTypes?[colName];
+        colNames.add(quotedCol);
+        values.add(formatLiteral(cellVal, dialect, dataTypeName: colType));
       }
 
       final sql = 'INSERT INTO $tableRef (${colNames.join(', ')}) VALUES (${values.join(', ')})';
@@ -208,6 +285,7 @@ abstract final class TableMutationEngine {
           primaryKeys: primaryKeys,
           row: origRow,
           dialect: dialect,
+          columnDataTypes: columnDataTypes,
         );
 
         final sql = 'DELETE FROM $tableRef WHERE $whereClause';
@@ -234,6 +312,7 @@ abstract final class TableMutationEngine {
     required List<String> primaryKeys,
     required List<String> row,
     required SqlDialect dialect,
+    Map<String, String>? columnDataTypes,
   }) {
     final clauses = <String>[];
 
@@ -246,7 +325,8 @@ abstract final class TableMutationEngine {
           if (val == 'NULL' || val == 'null') {
             clauses.add('$colName IS NULL');
           } else {
-            clauses.add('$colName = ${formatLiteral(val, dialect)}');
+            final colType = columnDataTypes?[pk];
+            clauses.add('$colName = ${formatLiteral(val, dialect, dataTypeName: colType)}');
           }
         }
       }
@@ -255,12 +335,14 @@ abstract final class TableMutationEngine {
     // Fallback: if no primary keys found or matched, match all columns
     if (clauses.isEmpty) {
       for (var c = 0; c < columns.length; c++) {
-        final colName = quoteIdentifier(columns[c], dialect);
+        final colName = columns[c];
+        final quotedCol = quoteIdentifier(colName, dialect);
         final val = c < row.length ? row[c] : 'NULL';
         if (val == 'NULL' || val == 'null') {
-          clauses.add('$colName IS NULL');
+          clauses.add('$quotedCol IS NULL');
         } else {
-          clauses.add('$colName = ${formatLiteral(val, dialect)}');
+          final colType = columnDataTypes?[colName];
+          clauses.add('$quotedCol = ${formatLiteral(val, dialect, dataTypeName: colType)}');
         }
       }
     }

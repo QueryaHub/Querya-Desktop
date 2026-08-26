@@ -251,6 +251,7 @@ class DataGridStagingBuffer extends ChangeNotifier {
     required String tableName,
     String? schema,
     List<String> primaryKeys = const [],
+    Map<String, String>? columnDataTypes,
   }) {
     return TableMutationEngine.generatePlan(
       dialect: dialect,
@@ -262,6 +263,7 @@ class DataGridStagingBuffer extends ChangeNotifier {
       modifiedCells: _modifiedCells,
       insertedRows: _insertedRows,
       deletedRowIndices: _deletedRowIndices,
+      columnDataTypes: columnDataTypes,
     );
   }
 

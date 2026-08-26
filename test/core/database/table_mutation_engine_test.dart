@@ -197,5 +197,61 @@ void main() {
         'UPDATE "tags" SET "description" = \'online store\' WHERE "category" = \'sales\' AND "description" = \'retail store\'',
       );
     });
+
+    test('preserves leading zeros and boolean strings in string columns with columnDataTypes', () {
+      const stringCols = ['id', 'zip_code', 'is_flag_str'];
+      const stringRows = [
+        ['1', '01234', 'true'],
+      ];
+
+      final plan = TableMutationEngine.generatePlan(
+        dialect: SqlDialect.postgres,
+        tableName: 'addresses',
+        columns: stringCols,
+        primaryKeys: ['id'],
+        originalRows: stringRows,
+        modifiedCells: {
+          0: {1: '00789', 2: 'false'},
+        },
+        insertedRows: [
+          ['2', '04560', 'true'],
+        ],
+        deletedRowIndices: {},
+        columnDataTypes: {
+          'id': 'int',
+          'zip_code': 'varchar(10)',
+          'is_flag_str': 'text',
+        },
+      );
+
+      expect(plan.statementCount, 2);
+      expect(
+        plan.statements[0].sql,
+        'UPDATE "addresses" SET "zip_code" = \'00789\', "is_flag_str" = \'false\' WHERE "id" = 1',
+      );
+      expect(
+        plan.statements[1].sql,
+        'INSERT INTO "addresses" ("id", "zip_code", "is_flag_str") VALUES (2, \'04560\', \'true\')',
+      );
+    });
+
+    test('preserves leading zeros in fallback heuristic without columnDataTypes', () {
+      expect(
+        TableMutationEngine.formatLiteral('01234', SqlDialect.postgres),
+        '\'01234\'',
+      );
+      expect(
+        TableMutationEngine.formatLiteral('007', SqlDialect.mysql),
+        '\'007\'',
+      );
+      expect(
+        TableMutationEngine.formatLiteral('0', SqlDialect.sqlite),
+        '0',
+      );
+      expect(
+        TableMutationEngine.formatLiteral('123', SqlDialect.postgres),
+        '123',
+      );
+    });
   });
 }
