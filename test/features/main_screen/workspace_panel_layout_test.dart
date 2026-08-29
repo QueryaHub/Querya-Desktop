@@ -4,6 +4,8 @@ import 'package:querya_desktop/core/motion/querya_fade_slide.dart';
 import 'package:querya_desktop/core/motion/querya_switching_body.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/main_screen/workspace_panel.dart';
+import 'package:querya_desktop/features/connections/connections_panel.dart'
+    show SqliteObjectKind;
 import 'package:querya_desktop/features/redis/redis_explorer_view.dart';
 import 'package:querya_desktop/features/redis/redis_view.dart';
 
@@ -279,6 +281,43 @@ void main() {
         orElse: () => throw StateError('No switching body with Offset.zero'),
       );
       expect(homeObjectSwitchingBody.slide, material.Offset.zero);
+    });
+
+    testWidgets(
+        'SqliteWorkspaceHome renders quick return chip when lastSelectedSqliteObject present',
+        (tester) async {
+      const sqConn = ConnectionRow(
+        id: 10,
+        type: 'sqlite',
+        name: 'sqlite-main',
+        host: ':memory:',
+        port: 0,
+        createdAt: '0',
+      );
+      var restored = false;
+      await pumpWidgetWithSurfaceSize(
+        tester,
+        const material.Size(800, 600),
+        queryaThemeTestShell(
+          child: material.SizedBox.expand(
+            child: WorkspacePanel(
+              activeConnection: sqConn,
+              lastSelectedSqliteObject: (
+                name: 'users',
+                kind: SqliteObjectKind.table,
+              ),
+              onRestoreLastSelectedObject: () => restored = true,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final returnButton = find.text('Return to users');
+      expect(returnButton, findsOneWidget);
+      await tester.tap(returnButton);
+      expect(restored, isTrue);
     });
   });
 }

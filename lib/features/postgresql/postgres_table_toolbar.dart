@@ -20,6 +20,7 @@ class PostgresTableToolbar extends material.StatelessWidget {
     required this.onGoPrevious,
     required this.onGoNext,
     required this.onRefresh,
+    this.onNavigateHome,
   });
 
   final String title;
@@ -37,6 +38,7 @@ class PostgresTableToolbar extends material.StatelessWidget {
   final VoidCallback onGoPrevious;
   final VoidCallback onGoNext;
   final VoidCallback onRefresh;
+  final VoidCallback? onNavigateHome;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -53,6 +55,21 @@ class PostgresTableToolbar extends material.StatelessWidget {
       ),
       child: material.Row(
         children: [
+          if (onNavigateHome != null) ...[
+            material.Tooltip(
+              message: 'Return to server overview',
+              child: OutlineButton(
+                size: ButtonSize.small,
+                onPressed: onNavigateHome,
+                leading: const material.Icon(
+                  material.Icons.dns_outlined,
+                  size: 14,
+                ),
+                child: const Text('Server'),
+              ),
+            ),
+            const Gap(10),
+          ],
           material.Icon(tableIcon, size: 18, color: cs.primary),
           const Gap(8),
           material.Expanded(
@@ -151,7 +168,7 @@ class PostgresTableToolbar extends material.StatelessWidget {
                             material.Icons.chevron_left_rounded,
                             size: 16,
                           ),
-                          child: const Text('Back'),
+                          child: const Text('Prev'),
                         ),
                         const Gap(4),
                         OutlineButton(

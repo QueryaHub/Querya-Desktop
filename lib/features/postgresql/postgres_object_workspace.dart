@@ -15,6 +15,7 @@ Widget buildPostgresObjectWorkspace({
     String name,
     PostgresObjectKind kind
   }) pg,
+  VoidCallback? onNavigateHome,
 }) {
   switch (pg.kind) {
     case PostgresObjectKind.table:
@@ -28,6 +29,7 @@ Widget buildPostgresObjectWorkspace({
         tableName: pg.name,
         isView: false,
         isMaterializedView: false,
+        onNavigateHome: onNavigateHome,
       );
     case PostgresObjectKind.view:
       return PostgresTableView(
@@ -40,6 +42,7 @@ Widget buildPostgresObjectWorkspace({
         tableName: pg.name,
         isView: true,
         isMaterializedView: false,
+        onNavigateHome: onNavigateHome,
       );
     case PostgresObjectKind.materializedView:
       return PostgresTableView(
@@ -52,6 +55,7 @@ Widget buildPostgresObjectWorkspace({
         tableName: pg.name,
         isView: false,
         isMaterializedView: true,
+        onNavigateHome: onNavigateHome,
       );
     case PostgresObjectKind.function:
       return PostgresRoutineView(

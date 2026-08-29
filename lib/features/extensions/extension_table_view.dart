@@ -22,6 +22,7 @@ class ExtensionTableView extends material.StatefulWidget {
     required this.tableName,
     this.isView = false,
     this.pageSize = _defaultPageSize,
+    this.onNavigateHome,
   });
 
   final ConnectionRow connectionRow;
@@ -29,6 +30,7 @@ class ExtensionTableView extends material.StatefulWidget {
   final String tableName;
   final bool isView;
   final int pageSize;
+  final VoidCallback? onNavigateHome;
 
   @override
   material.State<ExtensionTableView> createState() =>
@@ -401,6 +403,7 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
           loading: _loading,
           canGoPrevious: _canGoBack && !_loading,
           canGoNext: _canGoForward && !_loading,
+          onNavigateHome: widget.onNavigateHome,
           filterActive: _filterActive || _filterController.text.isNotEmpty,
           filterText: _filterController.text,
           onToggleFilter: () {

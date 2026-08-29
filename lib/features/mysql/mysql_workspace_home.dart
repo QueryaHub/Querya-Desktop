@@ -3,6 +3,7 @@ import 'dart:async' show unawaited;
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/motion/querya_cross_fade_stack.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
 import 'package:querya_desktop/features/mysql/mysql_sql_workspace.dart';
 import 'package:querya_desktop/features/mysql/mysql_stats_view.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -13,11 +14,21 @@ class MysqlWorkspaceHome extends material.StatefulWidget {
     super.key,
     required this.connectionRow,
     this.sqlTabRequestToken = 0,
+    this.lastSelectedMysqlObject,
+    this.onRestoreLastSelectedObject,
     this.isReadOnly = false,
   });
 
   final ConnectionRow connectionRow;
   final bool isReadOnly;
+
+  /// Remembers the last visited table/view for 1-click return.
+  final ({
+    String database,
+    String name,
+    MysqlObjectKind kind
+  })? lastSelectedMysqlObject;
+  final VoidCallback? onRestoreLastSelectedObject;
 
   /// Parent increments to switch to the SQL tab (e.g. context menu on connection).
   final int sqlTabRequestToken;
@@ -80,6 +91,19 @@ class _MysqlWorkspaceHomeState extends material.State<MysqlWorkspaceHome> {
                   material.Icons.lock_outline_rounded,
                   size: 14,
                   color: theme.colorScheme.mutedForeground,
+                ),
+              ],
+              if (widget.lastSelectedMysqlObject != null &&
+                  widget.onRestoreLastSelectedObject != null) ...[
+                const Gap(12),
+                OutlineButton(
+                  size: ButtonSize.small,
+                  onPressed: widget.onRestoreLastSelectedObject,
+                  leading: const material.Icon(
+                    material.Icons.table_chart_outlined,
+                    size: 14,
+                  ),
+                  child: Text('Return to ${widget.lastSelectedMysqlObject!.name}'),
                 ),
               ],
               const Spacer(),
