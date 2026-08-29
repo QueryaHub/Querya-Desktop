@@ -255,5 +255,30 @@ void main() {
       expect(find.byType(RedisView), findsOneWidget);
       expect(find.byType(QueryaSwitchingBody), findsNWidgets(2));
     });
+
+    testWidgets(
+        'home↔object morph uses slide: Offset.zero to prevent dual-axis wobble',
+        (tester) async {
+      await pumpWidgetWithSurfaceSize(
+        tester,
+        const material.Size(800, 600),
+        queryaThemeTestShell(
+          child: const material.SizedBox.expand(
+            child: WorkspacePanel(activeConnection: redisConnection),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      final switchingBodies = tester
+          .widgetList<QueryaSwitchingBody>(find.byType(QueryaSwitchingBody))
+          .toList();
+      final homeObjectSwitchingBody = switchingBodies.firstWhere(
+        (sb) => sb.slide == material.Offset.zero,
+        orElse: () => throw StateError('No switching body with Offset.zero'),
+      );
+      expect(homeObjectSwitchingBody.slide, material.Offset.zero);
+    });
   });
 }

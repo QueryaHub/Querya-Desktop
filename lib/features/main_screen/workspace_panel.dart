@@ -11,7 +11,8 @@ import 'package:flutter/material.dart' as material
         MainAxisSize,
         SizedBox,
         Widget,
-        Column;
+        Column,
+        Offset;
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
 import 'package:querya_desktop/core/motion/querya_fade_slide.dart';
 import 'package:querya_desktop/core/motion/querya_switching_body.dart';
@@ -372,10 +373,12 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
     required material.Widget? object,
   }) {
     return QueryaSwitchingBody(
+      slide: material.Offset.zero,
       index: showingObject ? 1 : 0,
       children: [
         home,
         QueryaFadeSlide(
+          offset: const material.Offset(0, 0.015),
           child: object ??
               const material.SizedBox.expand(
                 key: ValueKey('workspace_object_placeholder'),
