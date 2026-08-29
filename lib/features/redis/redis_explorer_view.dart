@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/database/redis_service.dart';
+import 'package:querya_desktop/core/motion/querya_switching_body.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
@@ -17,7 +18,7 @@ class _Crumb {
   final _Level level;
 }
 
-enum _Level { keys, key }
+enum _Level { keys, key, stats }
 
 // ─── Main explorer widget ───────────────────────────────────────────────────
 
@@ -138,14 +139,22 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
     if (_selectedKey != null) {
       list.add(_Crumb(_selectedKey!, _Level.key));
     }
+    if (_showStats) {
+      list.add(const _Crumb('Statistics', _Level.stats));
+    }
     return list;
   }
 
   void _onCrumbTap(_Crumb crumb) {
+    if (_showStats && crumb.level != _Level.stats) {
+      setState(() => _showStats = false);
+    }
     switch (crumb.level) {
       case _Level.keys:
         _navigateToKeys();
       case _Level.key:
+        break;
+      case _Level.stats:
         break;
     }
   }
@@ -207,16 +216,6 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
     final conn = _connection;
     if (conn == null) return const material.SizedBox.shrink();
 
-    // Statistics mode
-    if (_showStats) {
-      return RedisView(
-        key: ValueKey('stats_${widget.connectionRow.id}'),
-        connectionRow: widget.connectionRow,
-        connection: conn,
-        onBack: () => setState(() => _showStats = false),
-      );
-    }
-
     return material.Container(
       color: cs.background,
       child: material.Column(
@@ -226,10 +225,25 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
             crumbs: _crumbs,
             onCrumbTap: _onCrumbTap,
             onRefresh: () => setState(() => _refreshEpoch++),
-            onStats: () => setState(() => _showStats = true),
+            onStats: () => setState(() => _showStats = !_showStats),
           ),
           const Divider(height: 1),
-          material.Expanded(child: _buildContent(conn)),
+          // Content with fluid cross-fade morph between keys and stats
+          material.Expanded(
+            child: QueryaSwitchingBody(
+              slide: material.Offset.zero,
+              index: _showStats ? 1 : 0,
+              children: [
+                _buildContent(conn),
+                RedisView(
+                  key: ValueKey('stats_${widget.connectionRow.id}'),
+                  connectionRow: widget.connectionRow,
+                  connection: conn,
+                  onBack: () => setState(() => _showStats = false),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
