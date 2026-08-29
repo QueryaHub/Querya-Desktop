@@ -415,11 +415,18 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
               padding: const material.EdgeInsets.only(left: 26),
               itemBuilder: (context, index) {
                 final item = widget.items[index];
+                final sel = _ConnectionsTreeSelectionScope.of(context);
+                final isSelected = sel != null &&
+                    sel.selectedConnectionId == widget.connection.id &&
+                    sel.selectedSqliteObject != null &&
+                    sel.selectedSqliteObject!.name == item &&
+                    sel.selectedSqliteObject!.kind == widget.objectKind;
                 return _PgTreeRow(
                   key: material.ValueKey(
                     'sqlite-${widget.objectKind.name}-$item',
                   ),
                   label: item,
+                  isSelected: isSelected,
                   icon: widget.itemIcon,
                   iconSize: QueryaIconSizes.treeLeaf,
                   iconColor: QueryaTreeTokens.leafIconColor(

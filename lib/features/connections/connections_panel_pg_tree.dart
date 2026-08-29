@@ -59,6 +59,7 @@ class _PgTreeRow extends material.StatelessWidget {
   const _PgTreeRow({
     super.key,
     required this.label,
+    this.isSelected = false,
     this.leading,
     this.icon,
     this.iconSize = QueryaIconSizes.treeGroup,
@@ -80,6 +81,7 @@ class _PgTreeRow extends material.StatelessWidget {
   });
 
   final String label;
+  final bool isSelected;
   final material.Widget? leading;
   final material.IconData? icon;
   final double iconSize;
@@ -115,43 +117,67 @@ class _PgTreeRow extends material.StatelessWidget {
           const material.SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
               onTap!(),
       },
-      child: material.Material(
-        color: material.Colors.transparent,
-        child: material.InkWell(
-          onTap: onTap,
-          canRequestFocus: onTap != null,
+      child: material.AnimatedContainer(
+        duration: context.motionDuration(QueryaMotion.fast),
+        curve: context.motionCurve(QueryaMotion.standardCurve),
+        decoration: material.BoxDecoration(
+          color: isSelected
+              ? primary.withValues(alpha: 0.12)
+              : material.Colors.transparent,
           borderRadius: material.BorderRadius.circular(4),
-          hoverColor: primary.withValues(alpha: 0.07),
-          focusColor: primary.withValues(alpha: 0.14),
-          splashColor: primary.withValues(alpha: 0.10),
-          highlightColor: primary.withValues(alpha: 0.05),
-          mouseCursor: onTap != null
-              ? material.SystemMouseCursors.click
-              : material.SystemMouseCursors.basic,
-          child: material.Padding(
-            padding: material.EdgeInsets.symmetric(
-              horizontal: 4,
-              vertical: verticalPadding,
-            ),
-            child: material.Row(
-              children: [
-                if (leading != null) ...[
-                  leading!,
-                  const Gap(4),
-                ],
-                if (icon != null) ...[
-                  material.Icon(
-                    icon,
-                    size: iconSize,
-                    color: iconColor ?? muted,
+          border: isSelected
+              ? material.Border.all(
+                  color: primary.withValues(alpha: 0.35),
+                  width: 1,
+                )
+              : null,
+        ),
+        child: material.Material(
+          color: material.Colors.transparent,
+          child: material.InkWell(
+            onTap: onTap,
+            canRequestFocus: onTap != null,
+            borderRadius: material.BorderRadius.circular(4),
+            hoverColor: primary.withValues(alpha: 0.07),
+            focusColor: primary.withValues(alpha: 0.14),
+            splashColor: primary.withValues(alpha: 0.10),
+            highlightColor: primary.withValues(alpha: 0.05),
+            mouseCursor: onTap != null
+                ? material.SystemMouseCursors.click
+                : material.SystemMouseCursors.basic,
+            child: material.Padding(
+              padding: material.EdgeInsets.symmetric(
+                horizontal: 4,
+                vertical: verticalPadding,
+              ),
+              child: material.Row(
+                children: [
+                  if (leading != null) ...[
+                    leading!,
+                    const Gap(4),
+                  ],
+                  if (icon != null) ...[
+                    material.Icon(
+                      icon,
+                      size: iconSize,
+                      color: isSelected ? primary : (iconColor ?? muted),
+                    ),
+                    const Gap(6),
+                  ],
+                  material.Expanded(
+                    child: _PgTreeRowLabel(
+                      label: label,
+                      textStyle: isSelected
+                          ? textStyle.copyWith(
+                              fontWeight: material.FontWeight.w600,
+                              color: theme.colorScheme.foreground,
+                            )
+                          : textStyle,
+                    ),
                   ),
-                  const Gap(6),
+                  if (trailing != null) trailing!,
                 ],
-                material.Expanded(
-                  child: _PgTreeRowLabel(label: label, textStyle: textStyle),
-                ),
-                if (trailing != null) trailing!,
-              ],
+              ),
             ),
           ),
         ),
@@ -1119,11 +1145,21 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
               padding: const material.EdgeInsets.only(left: 26),
               itemBuilder: (context, index) {
                 final item = widget.items[index];
+                final sel = _ConnectionsTreeSelectionScope.of(context);
+                final isSelected = sel != null &&
+                    sel.selectedConnectionId == widget.connection.id &&
+                    sel.selectedPostgresObject != null &&
+                    sel.selectedPostgresObject!.database ==
+                        widget.databaseName &&
+                    sel.selectedPostgresObject!.schema == widget.schemaName &&
+                    sel.selectedPostgresObject!.name == item &&
+                    sel.selectedPostgresObject!.kind == widget.objectKind;
                 return _PgTreeRow(
                   key: material.ValueKey(
                     'pg-${widget.objectKind.name}-${widget.databaseName}-${widget.schemaName}-$item',
                   ),
                   label: item,
+                  isSelected: isSelected,
                   icon: widget.itemIcon,
                   iconSize: QueryaIconSizes.treeLeaf,
                   iconColor: QueryaTreeTokens.leafIconColor(
