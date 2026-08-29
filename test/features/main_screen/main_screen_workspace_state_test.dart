@@ -184,5 +184,35 @@ void main() {
       state = state.selectConnection(mysqlConn);
       expect(state.isReadOnly, isFalse);
     });
+
+    test('unselectActiveObject and restoreLastSelectedObject for fluid return',
+        () {
+      final withTable = MainScreenWorkspaceState.empty.selectPostgresObject(
+        pgConn,
+        'warehouse',
+        'public',
+        'stock',
+        PostgresObjectKind.table,
+      );
+      expect(withTable.selectedPostgresObject?.name, 'stock');
+      expect(withTable.lastSelectedPostgresObject?.name, 'stock');
+
+      final unselected = withTable.unselectActiveObject();
+      expect(unselected.selectedPostgresObject, isNull);
+      expect(unselected.lastSelectedPostgresObject?.name, 'stock');
+
+      final restored = unselected.restoreLastSelectedObject();
+      expect(restored.selectedPostgresObject?.name, 'stock');
+      expect(restored.selectedPostgresObject?.schema, 'public');
+
+      // Selecting the same connection keeps lastSelected
+      final reselectedSame = withTable.selectConnection(pgConn);
+      expect(reselectedSame.selectedPostgresObject, isNull);
+      expect(reselectedSame.lastSelectedPostgresObject?.name, 'stock');
+
+      // Selecting a different connection clears lastSelected
+      final diffConn = reselectedSame.selectConnection(mysqlConn);
+      expect(diffConn.lastSelectedPostgresObject, isNull);
+    });
   });
 }

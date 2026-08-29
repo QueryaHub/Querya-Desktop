@@ -923,6 +923,19 @@ class _MainContentSplitState extends State<_MainContentSplit>
                       selectedSqliteObject: ws.selectedSqliteObject,
                       sqliteSqlTabRequestToken: ws.sqliteSqlTabRequestToken,
                       selectedExtensionObject: ws.selectedExtensionObject,
+                      lastSelectedPostgresObject: ws.lastSelectedPostgresObject,
+                      lastSelectedMysqlObject: ws.lastSelectedMysqlObject,
+                      lastSelectedSqliteObject: ws.lastSelectedSqliteObject,
+                      lastSelectedExtensionObject:
+                          ws.lastSelectedExtensionObject,
+                      onNavigateHome: () {
+                        widget.workspace.value =
+                            widget.workspace.value.unselectActiveObject();
+                      },
+                      onRestoreLastSelectedObject: () {
+                        widget.workspace.value =
+                            widget.workspace.value.restoreLastSelectedObject();
+                      },
                       isReadOnly: ws.isReadOnly,
                       onRequestNewConnection: widget.onRequestNewConnection,
                       onRequestNewConnectionFromUrl:

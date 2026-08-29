@@ -15,6 +15,8 @@ class ExtensionWorkspaceHome extends material.StatefulWidget {
     required this.connectionRow,
     this.selectedObject,
     this.sqlTabRequestToken = 0,
+    this.lastSelectedExtensionObject,
+    this.onRestoreLastSelectedObject,
     this.isReadOnly = false,
   });
 
@@ -22,6 +24,11 @@ class ExtensionWorkspaceHome extends material.StatefulWidget {
   final ExtensionSelectedObject? selectedObject;
   final int sqlTabRequestToken;
   final bool isReadOnly;
+  final ({
+    String database,
+    String name,
+  })? lastSelectedExtensionObject;
+  final VoidCallback? onRestoreLastSelectedObject;
 
   @override
   material.State<ExtensionWorkspaceHome> createState() =>
@@ -92,6 +99,19 @@ class _ExtensionWorkspaceHomeState
                   material.Icons.lock_outline_rounded,
                   size: 14,
                   color: theme.colorScheme.mutedForeground,
+                ),
+              ],
+              if (widget.lastSelectedExtensionObject != null &&
+                  widget.onRestoreLastSelectedObject != null) ...[
+                const Gap(12),
+                OutlineButton(
+                  size: ButtonSize.small,
+                  onPressed: widget.onRestoreLastSelectedObject,
+                  leading: const material.Icon(
+                    material.Icons.table_chart_outlined,
+                    size: 14,
+                  ),
+                  child: Text('Return to ${widget.lastSelectedExtensionObject!.name}'),
                 ),
               ],
               const Spacer(),
