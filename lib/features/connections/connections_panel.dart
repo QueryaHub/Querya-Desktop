@@ -53,7 +53,8 @@ import 'package:flutter/material.dart' as material
         ListView,
         ClampingScrollPhysics,
         CallbackShortcuts,
-        SingleActivator;
+        SingleActivator,
+        AnimatedContainer;
 import 'package:flutter/services.dart'
     show Clipboard, ClipboardData, LogicalKeyboardKey;
 import 'package:querya_desktop/core/database/mongodb_service.dart';
@@ -155,11 +156,57 @@ material.Widget lazyConnectionTreeList({
   );
 }
 
+/// Inherited scope providing the active connection and object selection down the connections tree.
+class _ConnectionsTreeSelectionScope extends InheritedWidget {
+  const _ConnectionsTreeSelectionScope({
+    required this.selectedConnectionId,
+    required this.selectedPostgresObject,
+    required this.selectedMysqlObject,
+    required this.selectedSqliteObject,
+    required this.selectedExtensionObject,
+    required this.selectedRedisDb,
+    required this.selectedMongoDb,
+    required super.child,
+  });
+
+  final int? selectedConnectionId;
+  final ({String database, String schema, String name, PostgresObjectKind kind})?
+      selectedPostgresObject;
+  final ({String database, String name, MysqlObjectKind kind})?
+      selectedMysqlObject;
+  final ({String name, SqliteObjectKind kind})? selectedSqliteObject;
+  final ({String database, String name})? selectedExtensionObject;
+  final int? selectedRedisDb;
+  final String? selectedMongoDb;
+
+  static _ConnectionsTreeSelectionScope? of(material.BuildContext context) {
+    return context
+        .dependOnInheritedWidgetOfExactType<_ConnectionsTreeSelectionScope>();
+  }
+
+  @override
+  bool updateShouldNotify(_ConnectionsTreeSelectionScope oldWidget) {
+    return selectedConnectionId != oldWidget.selectedConnectionId ||
+        selectedPostgresObject != oldWidget.selectedPostgresObject ||
+        selectedMysqlObject != oldWidget.selectedMysqlObject ||
+        selectedSqliteObject != oldWidget.selectedSqliteObject ||
+        selectedExtensionObject != oldWidget.selectedExtensionObject ||
+        selectedRedisDb != oldWidget.selectedRedisDb ||
+        selectedMongoDb != oldWidget.selectedMongoDb;
+  }
+}
+
 /// Left panel: Browser tree (pgAdmin-style). Uses shadcn layout widgets.
 class ConnectionsPanel extends StatefulWidget {
   const ConnectionsPanel({
     super.key,
     this.selectedConnectionId,
+    this.selectedPostgresObject,
+    this.selectedMysqlObject,
+    this.selectedSqliteObject,
+    this.selectedExtensionObject,
+    this.selectedRedisDb,
+    this.selectedMongoDb,
     this.onConnectionSelected,
     this.onRedisDatabaseSelected,
     this.onMongoDBDatabaseSelected,
@@ -180,6 +227,16 @@ class ConnectionsPanel extends StatefulWidget {
 
   /// Highlights the active connection row in the sidebar (workspace selection).
   final int? selectedConnectionId;
+
+  /// Currently selected database objects (table, view, routine, db).
+  final ({String database, String schema, String name, PostgresObjectKind kind})?
+      selectedPostgresObject;
+  final ({String database, String name, MysqlObjectKind kind})?
+      selectedMysqlObject;
+  final ({String name, SqliteObjectKind kind})? selectedSqliteObject;
+  final ({String database, String name})? selectedExtensionObject;
+  final int? selectedRedisDb;
+  final String? selectedMongoDb;
 
   /// Called when the user taps a connection tile.
   final void Function(ConnectionRow connection)? onConnectionSelected;
@@ -551,7 +608,15 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     final topLevelCount =
         _folders.length + rootConnections.length + (showEmptyState ? 1 : 0);
 
-    return material.Container(
+    return _ConnectionsTreeSelectionScope(
+      selectedConnectionId: widget.selectedConnectionId,
+      selectedPostgresObject: widget.selectedPostgresObject,
+      selectedMysqlObject: widget.selectedMysqlObject,
+      selectedSqliteObject: widget.selectedSqliteObject,
+      selectedExtensionObject: widget.selectedExtensionObject,
+      selectedRedisDb: widget.selectedRedisDb,
+      selectedMongoDb: widget.selectedMongoDb,
+      child: material.Container(
       decoration: material.BoxDecoration(
         color: theme.colorScheme.background,
         border: material.Border(
@@ -689,6 +754,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

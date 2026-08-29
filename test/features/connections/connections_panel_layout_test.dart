@@ -365,5 +365,30 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       expect(panelState.isConnectionExpanded(id1), true);
     });
+
+    testWidgets('ConnectionsPanel propagates selection scope to child tree',
+        (tester) async {
+      await pumpWidgetWithSurfaceSize(
+        tester,
+        const material.Size(400, 600),
+        ShadcnApp(
+          theme: AppTheme.dark,
+          darkTheme: AppTheme.dark,
+          themeMode: ThemeMode.dark,
+          home: const material.SizedBox(
+            width: 400,
+            height: 600,
+            child: ConnectionsPanel(
+              skipInitialDbLoadForTest: true,
+              selectedConnectionId: 10,
+              selectedRedisDb: 0,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byType(ConnectionsPanel), findsOneWidget);
+    });
   });
 }

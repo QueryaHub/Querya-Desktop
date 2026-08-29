@@ -687,11 +687,19 @@ class _MysqlObjectGroupState extends State<_MysqlObjectGroup> {
               padding: const material.EdgeInsets.only(left: 26),
               itemBuilder: (context, index) {
                 final item = widget.items[index];
+                final sel = _ConnectionsTreeSelectionScope.of(context);
+                final isSelected = sel != null &&
+                    sel.selectedConnectionId == widget.connection.id &&
+                    sel.selectedMysqlObject != null &&
+                    sel.selectedMysqlObject!.database == widget.databaseName &&
+                    sel.selectedMysqlObject!.name == item &&
+                    sel.selectedMysqlObject!.kind == widget.objectKind;
                 return _PgTreeRow(
                   key: material.ValueKey(
                     'mysql-${widget.objectKind.name}-${widget.databaseName}-$item',
                   ),
                   label: item,
+                  isSelected: isSelected,
                   icon: widget.itemIcon,
                   iconSize: QueryaIconSizes.treeLeaf,
                   iconColor: QueryaTreeTokens.leafIconColor(

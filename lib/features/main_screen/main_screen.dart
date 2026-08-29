@@ -1010,12 +1010,9 @@ class _ConnectionsPanelSlot extends StatefulWidget {
 }
 
 class _ConnectionsPanelSlotState extends State<_ConnectionsPanelSlot> {
-  int? _selectedConnectionId;
-
   @override
   void initState() {
     super.initState();
-    _selectedConnectionId = widget.workspace.value.activeConnection?.id;
     widget.workspace.addListener(_onWorkspaceChanged);
   }
 
@@ -1026,17 +1023,21 @@ class _ConnectionsPanelSlotState extends State<_ConnectionsPanelSlot> {
   }
 
   void _onWorkspaceChanged() {
-    final next = widget.workspace.value.activeConnection?.id;
-    if (next != _selectedConnectionId) {
-      setState(() => _selectedConnectionId = next);
-    }
+    setState(() {});
   }
 
   @override
   material.Widget build(material.BuildContext context) {
+    final ws = widget.workspace.value;
     return ConnectionsPanel(
       key: widget.connectionsPanelKey,
-      selectedConnectionId: _selectedConnectionId,
+      selectedConnectionId: ws.activeConnection?.id,
+      selectedPostgresObject: ws.selectedPostgresObject,
+      selectedMysqlObject: ws.selectedMysqlObject,
+      selectedSqliteObject: ws.selectedSqliteObject,
+      selectedExtensionObject: ws.selectedExtensionObject,
+      selectedRedisDb: ws.activeRedisDb,
+      selectedMongoDb: ws.activeMongoDB,
       onConnectionSelected: widget.onConnectionSelected,
       onRedisDatabaseSelected: widget.onRedisDatabaseSelected,
       onMongoDBDatabaseSelected: widget.onMongoDBDatabaseSelected,
