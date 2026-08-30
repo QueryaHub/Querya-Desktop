@@ -296,6 +296,8 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       );
     }
     _dropLease();
+    _stagingBuffer?.dispose();
+    _stagingBuffer = null;
     _sqlController.dispose();
     super.dispose();
   }
@@ -388,6 +390,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         _rows = outRows;
         _affectedRows = result.affectedRows;
         _lastExecutedSql = userSql;
+        _stagingBuffer?.dispose();
         _stagingBuffer = cols.isNotEmpty
             ? DataGridStagingBuffer(columns: cols, rows: outRows)
             : null;
@@ -478,8 +481,10 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       await conn.execute(txSql, timeout: to);
 
       if (!mounted) return;
+      final newRows = _stagingBuffer!.effectiveRows;
+      _stagingBuffer?.dispose();
       setState(() {
-        _rows = _stagingBuffer!.effectiveRows;
+        _rows = newRows;
         _stagingBuffer = DataGridStagingBuffer(columns: _columns, rows: _rows);
         _savingChanges = false;
       });
