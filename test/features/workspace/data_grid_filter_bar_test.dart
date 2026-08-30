@@ -71,5 +71,99 @@ void main() {
       expect(currentFilter, 'stat');
       expect(find.text('status'), findsOneWidget);
     });
+
+    testWidgets('debounces rapid keystrokes and notifies only once after debounce duration', (tester) async {
+      final changeNotifications = <String>[];
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Material(
+            child: DataGridFilterBar(
+              filterText: '',
+              onFilterChanged: (text) => changeNotifications.add(text),
+              totalRowCount: 100,
+              filteredRowCount: 20,
+              columns: const ['id', 'name', 'status'],
+              debounceDuration: const Duration(milliseconds: 150),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Type first letter 'a'
+      await tester.enterText(find.byType(material.TextField), 'a');
+      await tester.pump(const Duration(milliseconds: 50));
+      // No notification yet
+      expect(changeNotifications, isEmpty);
+
+      // Type second letter 'ab' before timer expires
+      await tester.enterText(find.byType(material.TextField), 'ab');
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(changeNotifications, isEmpty);
+
+      // Type third letter 'abc'
+      await tester.enterText(find.byType(material.TextField), 'abc');
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(changeNotifications, isEmpty);
+
+      // Wait remaining debounce duration (100ms more => 150ms since last keystroke)
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(changeNotifications, ['abc']);
+    });
+
+    testWidgets('notifies immediately on submit without waiting for debounce duration', (tester) async {
+      final changeNotifications = <String>[];
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Material(
+            child: DataGridFilterBar(
+              filterText: '',
+              onFilterChanged: (text) => changeNotifications.add(text),
+              totalRowCount: 100,
+              filteredRowCount: 20,
+              columns: const ['id', 'name', 'status'],
+              debounceDuration: const Duration(milliseconds: 150),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(material.TextField), 'active');
+      // Submit immediately
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+
+      expect(changeNotifications, ['active']);
+    });
+
+    testWidgets('cancels pending timer and notifies empty on clear button tap', (tester) async {
+      final changeNotifications = <String>[];
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Material(
+            child: DataGridFilterBar(
+              filterText: 'prefilled',
+              onFilterChanged: (text) => changeNotifications.add(text),
+              totalRowCount: 100,
+              filteredRowCount: 10,
+              columns: const ['id', 'name', 'status'],
+              debounceDuration: const Duration(milliseconds: 150),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(material.Icons.close), findsOneWidget);
+
+      await tester.tap(find.byIcon(material.Icons.close));
+      await tester.pumpAndSettle();
+
+      expect(changeNotifications, ['']);
+    });
   });
 }

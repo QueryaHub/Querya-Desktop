@@ -1,3 +1,4 @@
+import 'dart:async' show Timer;
 import 'package:flutter/material.dart' as material;
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
@@ -118,6 +119,7 @@ class DataGridFilterBar extends material.StatefulWidget {
     required this.totalRowCount,
     required this.filteredRowCount,
     this.columns = const [],
+    this.debounceDuration = const Duration(milliseconds: 150),
   });
 
   final String filterText;
@@ -125,6 +127,7 @@ class DataGridFilterBar extends material.StatefulWidget {
   final int totalRowCount;
   final int filteredRowCount;
   final List<String> columns;
+  final Duration debounceDuration;
 
   @override
   material.State<DataGridFilterBar> createState() => _DataGridFilterBarState();
@@ -136,6 +139,7 @@ class _DataGridFilterBarState extends material.State<DataGridFilterBar> {
   material.OverlayEntry? _overlayEntry;
   List<FilterSuggestion> _suggestions = [];
   int _highlightedIndex = 0;
+  Timer? _debounceTimer;
 
   @override
   void initState() {
@@ -154,14 +158,30 @@ class _DataGridFilterBarState extends material.State<DataGridFilterBar> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _hideSuggestions();
     _controller.dispose();
     super.dispose();
   }
 
   void _onChanged(String val) {
-    widget.onFilterChanged(val);
     _updateSuggestions(val);
+    if (widget.debounceDuration == Duration.zero) {
+      widget.onFilterChanged(val);
+      return;
+    }
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(widget.debounceDuration, () {
+      if (mounted) {
+        widget.onFilterChanged(val);
+      }
+    });
+  }
+
+  void _onSubmitted(String val) {
+    _debounceTimer?.cancel();
+    _hideSuggestions();
+    widget.onFilterChanged(val);
   }
 
   void _updateSuggestions(String val) {
@@ -333,6 +353,7 @@ class _DataGridFilterBarState extends material.State<DataGridFilterBar> {
               child: material.TextField(
                 controller: _controller,
                 onChanged: _onChanged,
+                onSubmitted: _onSubmitted,
                 style: TextStyle(
                   fontSize: 12,
                   color: cs.foreground,
@@ -373,6 +394,7 @@ class _DataGridFilterBarState extends material.State<DataGridFilterBar> {
                 constraints: const material.BoxConstraints(minWidth: 20, minHeight: 20),
                 color: cs.mutedForeground,
                 onPressed: () {
+                  _debounceTimer?.cancel();
                   _controller.clear();
                   _hideSuggestions();
                   widget.onFilterChanged('');
