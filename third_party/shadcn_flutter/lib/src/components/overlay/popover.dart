@@ -11,8 +11,25 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 /// Manages the display, positioning, and lifecycle of popover overlays
 /// with support for alignment, constraints, and modal behavior.
 class PopoverOverlayHandler extends OverlayHandler {
+  /// Default animation duration when showing the popover.
+  final Duration? defaultShowDuration;
+
+  /// Default animation duration when dismissing the popover.
+  final Duration? defaultDismissDuration;
+
+  /// Animation curve when showing.
+  final Curve? showCurve;
+
+  /// Animation curve when dismissing.
+  final Curve? dismissCurve;
+
   /// Creates a [PopoverOverlayHandler].
-  const PopoverOverlayHandler();
+  const PopoverOverlayHandler({
+    this.defaultShowDuration,
+    this.defaultDismissDuration,
+    this.showCurve,
+    this.dismissCurve,
+  });
   @override
   OverlayCompleter<T> show<T>({
     required BuildContext context,
@@ -112,12 +129,15 @@ class PopoverOverlayHandler extends OverlayHandler {
                       value: isClosed.value ? 0.0 : 1.0,
                       initialValue: 0.0,
                       curve: isClosed.value
-                          ? const Interval(0, 2 / 3)
-                          : Curves.linear,
+                          ? (dismissCurve ?? const Interval(0, 2 / 3))
+                          : (showCurve ?? Curves.easeOutCubic),
                       duration: isClosed.value
-                          ? (showDuration ?? kDefaultDuration)
-                          : (dismissDuration ??
-                              const Duration(milliseconds: 100)),
+                          ? (dismissDuration ??
+                              defaultDismissDuration ??
+                              const Duration(milliseconds: 60))
+                          : (showDuration ??
+                              defaultShowDuration ??
+                              const Duration(milliseconds: 60)),
                       onEnd: (value) {
                         if (value == 0.0 && isClosed.value) {
                           popoverEntry.remove();
@@ -685,7 +705,7 @@ class PopoverOverlayWidgetState extends State<PopoverOverlayWidget>
                 offset: _offset,
                 margin: _margin?.optionallyResolve(context) ??
                     EdgeInsets.all(densityGap),
-                scale: tweenValue(0.9, 1.0, widget.animation.value),
+                scale: tweenValue(0.96, 1.0, widget.animation.value),
                 scaleAlignment: (widget.transitionAlignment ?? _alignment)
                     .optionallyResolve(context),
                 allowInvertVertical: _allowInvertVertical,
