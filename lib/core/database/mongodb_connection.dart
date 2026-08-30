@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:mongo_dart/mongo_dart.dart';
+import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
-import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
 
 /// MongoDB connection configuration and state.
 class MongoConnection {

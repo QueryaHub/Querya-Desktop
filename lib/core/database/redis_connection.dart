@@ -1,9 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
 import 'package:redis/redis.dart' as redis;
 
 /// Redis connection using the Dart redis package (no Java/JRE).

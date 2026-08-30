@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart' as material;
-import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
+import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Optional SSL certificate path fields (Root CA, client cert, client key).

@@ -1,41 +1,16 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart' as material;
-import 'package:querya_desktop/core/ui/querya_icons.dart';
+import 'package:querya_desktop/core/database/connection_type_choice.dart';
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/motion/querya_hover_surface.dart';
-import 'package:querya_desktop/features/connections/connection_type_choice.dart';
 import 'package:querya_desktop/features/connections/driver_icon.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
-/// Database type for built-in new connections.
-enum ConnectionType {
-  postgresql,
-  mysql,
-  redis,
-  mongodb,
-  sqlite,
-}
-
-extension ConnectionTypeX on ConnectionType {
-  String get label => switch (this) {
-        ConnectionType.postgresql => 'PostgreSQL',
-        ConnectionType.mysql => 'MySQL',
-        ConnectionType.redis => 'Redis',
-        ConnectionType.mongodb => 'MongoDB',
-        ConnectionType.sqlite => 'SQLite',
-      };
-  material.IconData get icon => QueryaIcons.connectionIcon(name);
-
-  /// Asset path for custom icon (from Downloads).
-  String? get iconAsset => QueryaIcons.connectionAsset(name);
-  bool get isSql =>
-      this == ConnectionType.postgresql ||
-      this == ConnectionType.mysql ||
-      this == ConnectionType.sqlite;
-}
+export 'package:querya_desktop/core/database/connection_type.dart';
+export 'package:querya_desktop/core/database/connection_type_choice.dart';
 
 enum _Category { all, sql, nosql }
 

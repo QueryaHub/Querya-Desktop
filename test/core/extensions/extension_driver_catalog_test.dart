@@ -1,11 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/database/connection_type.dart';
+import 'package:querya_desktop/core/database/connection_type_choice.dart';
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
 import 'package:querya_desktop/core/extensions/models/extension_contributions.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/extensions/models/extension_type.dart';
-import 'package:querya_desktop/features/connections/connection_type_choice.dart';
 import 'package:querya_desktop/features/connections/extension_connection_form.dart';
-import 'package:querya_desktop/features/connections/new_connection_dialog.dart';
 
 void main() {
   group('ExtensionDriverCatalog', () {
