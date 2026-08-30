@@ -474,6 +474,20 @@ void main() {
         resultsShell(
           child: const material.Scaffold(
             body: ResultsTab(
+              errorMessage: 'driver connection failed',
+              errorAction: material.Text('RESTART_ACTION_BUTTON'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('RESTART_ACTION_BUTTON'), findsOneWidget);
+      expect(find.textContaining('driver connection failed'), findsOneWidget);
+
+      await tester.pumpWidget(
+        resultsShell(
+          child: const material.Scaffold(
+            body: ResultsTab(
               columns: ['id'],
               rows: [
                 ['1'],

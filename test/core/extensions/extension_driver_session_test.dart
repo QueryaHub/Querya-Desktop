@@ -150,5 +150,23 @@ void main() {
       expect(limits.timeoutSeconds, 600);
       expect(limits.toJson()['timeout_seconds'], 600);
     });
+
+    test('restart disconnects active session and validates extension driver presence', () async {
+      const row = ConnectionRow(
+        id: 888,
+        type: 'postgresql',
+        name: 'PG',
+        createdAt: '2026-01-01T00:00:00Z',
+      );
+
+      await expectLater(
+        ExtensionDriverSession.instance.restart(row),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('not backed by an installed extension driver'),
+        )),
+      );
+    });
   });
 }

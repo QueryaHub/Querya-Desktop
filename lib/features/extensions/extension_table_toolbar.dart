@@ -23,6 +23,8 @@ class ExtensionTableToolbar extends material.StatelessWidget {
     this.onCopyFormat,
     this.onSaveFormat,
     this.onNavigateHome,
+    this.onRestartDriver,
+    this.isRestarting = false,
   });
 
   final String title;
@@ -42,6 +44,8 @@ class ExtensionTableToolbar extends material.StatelessWidget {
   final material.ValueChanged<DataExportFormat>? onCopyFormat;
   final material.ValueChanged<DataExportFormat>? onSaveFormat;
   final VoidCallback? onNavigateHome;
+  final VoidCallback? onRestartDriver;
+  final bool isRestarting;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -193,6 +197,26 @@ class ExtensionTableToolbar extends material.StatelessWidget {
                           child: const Text('Next'),
                         ),
                         const Gap(8),
+                        if (onRestartDriver != null) ...[
+                          OutlineButton(
+                            size: ButtonSize.small,
+                            onPressed: loading || isRestarting ? null : onRestartDriver,
+                            leading: isRestarting
+                                ? const material.SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: material.CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const material.Icon(
+                                    material.Icons.restart_alt_rounded,
+                                    size: 15,
+                                  ),
+                            child: Text(isRestarting ? 'Restarting...' : 'Restart Driver'),
+                          ),
+                          const Gap(4),
+                        ],
                         OutlineButton(
                           size: ButtonSize.small,
                           onPressed: loading ? null : onRefresh,

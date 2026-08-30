@@ -10,6 +10,7 @@ import 'package:querya_desktop/core/extensions/extension_driver_session.dart';
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/extensions/extension_driver_recovery_banner.dart';
 import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -44,6 +45,7 @@ class _ExtensionSqlWorkspaceState
   final ValueNotifier<double> _topFraction = ValueNotifier(0.6);
 
   bool _running = false;
+  bool _restartingDriver = false;
   String? _error;
   List<String> _columns = [];
   List<List<String>> _rows = [];
@@ -54,6 +56,52 @@ class _ExtensionSqlWorkspaceState
   double _editorFontSize = kDefaultSqlEditorFontSize;
 
   static const _previewRowLimit = 200;
+
+  bool get _isDriverError {
+    final err = _error;
+    if (err == null) return false;
+    return err.contains('PluginCrashedException') ||
+        err.contains('PluginDeadlockException') ||
+        err.contains('PluginProtocolTimeoutException') ||
+        err.contains('TimeoutException') ||
+        err.contains('SocketException') ||
+        err.contains('Broken pipe') ||
+        err.contains('JsonRpcStdioClient') ||
+        err.contains('Connection') ||
+        err.contains('is not started');
+  }
+
+  Future<void> _restartDriver() async {
+    if (_restartingDriver) return;
+    setState(() {
+      _restartingDriver = true;
+    });
+    try {
+      await ExtensionDriverSession.instance.restart(widget.connectionRow);
+      if (!mounted) return;
+      showAppToast(
+        context: context,
+        message: 'Driver restarted successfully',
+        variant: AppToastVariant.success,
+      );
+      setState(() {
+        _restartingDriver = false;
+        _error = null;
+      });
+      await _execute();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Driver restart failed: $e';
+        _restartingDriver = false;
+      });
+      showAppToast(
+        context: context,
+        message: 'Driver restart failed: $e',
+        variant: AppToastVariant.error,
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -313,6 +361,8 @@ class _ExtensionSqlWorkspaceState
                 connectionName: widget.connectionRow.name,
                 onExecute: _running ? null : () => unawaited(_execute()),
                 running: _running,
+                isRestarting: _restartingDriver,
+                onRestartDriver: _running ? null : () => unawaited(_restartDriver()),
                 onOpenSqlFile: () => unawaited(_openSqlFile()),
                 onSaveSqlFile: () => unawaited(_saveSqlFile()),
                 onOpenHistory: widget.connectionRow.id != null && !_running
@@ -355,6 +405,12 @@ class _ExtensionSqlWorkspaceState
                   errorMessage: _error,
                   isLoading: _running,
                   statusLine: _statusLine,
+                  errorAction: _isDriverError
+                      ? ExtensionDriverRecoveryBanner(
+                          onRestart: () => unawaited(_restartDriver()),
+                          isRestarting: _restartingDriver,
+                        )
+                      : null,
                 ),
               ),
             ],
@@ -373,6 +429,8 @@ class _ExtensionSqlToolbar extends material.StatelessWidget {
     required this.onOpenSqlFile,
     required this.onSaveSqlFile,
     this.onOpenHistory,
+    this.onRestartDriver,
+    this.isRestarting = false,
   });
 
   final String connectionName;
@@ -381,6 +439,8 @@ class _ExtensionSqlToolbar extends material.StatelessWidget {
   final VoidCallback onOpenSqlFile;
   final VoidCallback onSaveSqlFile;
   final VoidCallback? onOpenHistory;
+  final VoidCallback? onRestartDriver;
+  final bool isRestarting;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -394,6 +454,26 @@ class _ExtensionSqlToolbar extends material.StatelessWidget {
             child: Text('Query · $connectionName').semiBold().small(),
           ),
           const Spacer(),
+          if (onRestartDriver != null) ...[
+            IconButton.ghost(
+              onPressed: running || isRestarting ? null : onRestartDriver,
+              icon: isRestarting
+                  ? material.SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: material.CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: accent,
+                      ),
+                    )
+                  : material.Icon(
+                      material.Icons.restart_alt_rounded,
+                      size: 18,
+                      color: accent,
+                    ),
+            ),
+            const Gap(4),
+          ],
           IconButton.ghost(
             onPressed: running ? null : onOpenSqlFile,
             icon: material.Icon(

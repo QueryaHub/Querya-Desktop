@@ -35,6 +35,7 @@ class ResultsTab extends material.StatefulWidget {
     this.stagingBuffer,
     this.onApplyChanges,
     this.isSaving = false,
+    this.errorAction,
   });
 
   final List<String> columns;
@@ -47,6 +48,7 @@ class ResultsTab extends material.StatefulWidget {
   final DataGridStagingBuffer? stagingBuffer;
   final material.VoidCallback? onApplyChanges;
   final bool isSaving;
+  final material.Widget? errorAction;
 
   @override
   material.State<ResultsTab> createState() => _ResultsTabState();
@@ -118,13 +120,21 @@ class _ResultsTabState extends material.State<ResultsTab> {
     if (widget.errorMessage != null && widget.errorMessage!.isNotEmpty) {
       return material.KeyedSubtree(
         key: const material.ValueKey('results_mode_error'),
-        child: VirtualSelectableTextView(
-          text: widget.errorMessage!,
-          style: material.TextStyle(
-            fontFamily: 'monospace',
-            fontSize: 12,
-            color: Theme.of(context).colorScheme.destructive,
-          ),
+        child: material.Column(
+          crossAxisAlignment: material.CrossAxisAlignment.stretch,
+          children: [
+            if (widget.errorAction != null) widget.errorAction!,
+            material.Expanded(
+              child: VirtualSelectableTextView(
+                text: widget.errorMessage!,
+                style: material.TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.destructive,
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }

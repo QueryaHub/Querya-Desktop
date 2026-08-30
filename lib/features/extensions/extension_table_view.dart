@@ -5,6 +5,7 @@ import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/extensions/extension_driver_session.dart';
 import 'package:querya_desktop/core/extensions/models/extension_driver_capabilities.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/extensions/extension_driver_recovery_banner.dart';
 import 'package:querya_desktop/features/extensions/extension_table_toolbar.dart';
 import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/shared/services/data_export_service.dart';
@@ -52,11 +53,59 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
   DataGridStagingBuffer? _stagingBuffer;
   bool _isSaving = false;
 
+  bool _restartingDriver = false;
+
   String get _qualifiedName => '`${widget.database}`.`${widget.tableName}`';
 
   String get _whereClause {
     final text = _filterController.text.trim();
     return text.isEmpty ? '' : ' WHERE $text';
+  }
+
+  bool get _isDriverError {
+    final err = _error;
+    if (err == null) return false;
+    return err.contains('PluginCrashedException') ||
+        err.contains('PluginDeadlockException') ||
+        err.contains('PluginProtocolTimeoutException') ||
+        err.contains('TimeoutException') ||
+        err.contains('SocketException') ||
+        err.contains('Broken pipe') ||
+        err.contains('JsonRpcStdioClient') ||
+        err.contains('Connection') ||
+        err.contains('is not started');
+  }
+
+  Future<void> _restartDriver() async {
+    if (_restartingDriver) return;
+    setState(() {
+      _restartingDriver = true;
+    });
+    try {
+      await ExtensionDriverSession.instance.restart(widget.connectionRow);
+      if (!mounted) return;
+      showAppToast(
+        context: context,
+        message: 'Driver restarted successfully',
+        variant: AppToastVariant.success,
+      );
+      setState(() {
+        _restartingDriver = false;
+        _error = null;
+      });
+      await _loadPage(refreshCount: true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Driver restart failed: $e';
+        _restartingDriver = false;
+      });
+      showAppToast(
+        context: context,
+        message: 'Driver restart failed: $e',
+        variant: AppToastVariant.error,
+      );
+    }
   }
 
   @override
@@ -414,6 +463,8 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
           onGoPrevious: _previousPage,
           onGoNext: _nextPage,
           onRefresh: () => _loadPage(refreshCount: true),
+          onRestartDriver: () => unawaited(_restartDriver()),
+          isRestarting: _restartingDriver,
           onCopyFormat: (format) {
             unawaited(() async {
               await DataExportService.copyToClipboard(
@@ -495,6 +546,12 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
             stagingBuffer: _stagingBuffer,
             onApplyChanges: _stagingBuffer != null ? _onApplyChanges : null,
             isSaving: _isSaving,
+            errorAction: _isDriverError
+                ? ExtensionDriverRecoveryBanner(
+                    onRestart: () => unawaited(_restartDriver()),
+                    isRestarting: _restartingDriver,
+                  )
+                : null,
           ),
         ),
       ],
