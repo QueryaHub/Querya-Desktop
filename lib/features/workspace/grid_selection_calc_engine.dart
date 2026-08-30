@@ -1,5 +1,6 @@
 import 'dart:math' as math;
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' as foundation;
+import 'package:flutter/foundation.dart' show immutable;
 
 /// Aggregated statistical results for a selection of grid cell values.
 @immutable
@@ -93,6 +94,22 @@ class GridCalcStats {
 
 /// Calculation engine for computing stats (Count, Distinct, Sum, Avg, Median, Min, Max, StdDev) on grid selections.
 abstract final class GridSelectionCalcEngine {
+  /// Default threshold for offloading stats calculation to a background isolate.
+  static const int computeThreshold = 5000;
+
+  /// Computes statistics adaptively: synchronously for small lists (< [computeThreshold]),
+  /// and offloaded to a background isolate using [compute] for large selections.
+  static Future<GridCalcStats> computeAdaptive(
+    List<String> values, {
+    int threshold = computeThreshold,
+  }) async {
+    if (values.isEmpty) return GridCalcStats.empty;
+    if (values.length < threshold) {
+      return compute(values);
+    }
+    return foundation.compute(compute, values);
+  }
+
   /// Computes statistics for a list of string cell values.
   static GridCalcStats compute(List<String> values) {
     if (values.isEmpty) return GridCalcStats.empty;
