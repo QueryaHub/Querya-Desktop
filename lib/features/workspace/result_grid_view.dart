@@ -412,6 +412,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   List<List<String>> _sortedRows = const [];
 
   ResultGridCellCoordinate? _selectionAnchor;
+  ResultGridCellCoordinate? _selectionFocus;
   ResultGridSelection? _selection;
   ResultGridCellCoordinate? _editingCell;
 
@@ -453,6 +454,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
         _sortColumnIndex = null;
         _sortOrder = null;
         _selectionAnchor = null;
+        _selectionFocus = null;
         _selection = null;
         _editingCell = null;
         widget.onRowSelected?.call(null);
@@ -473,10 +475,16 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
 
   void _startEditing(int row, int column) {
     if (widget.stagingBuffer == null) return;
-    if (row < 0 || row >= _sortedRows.length || column < 0 || column >= widget.columns.length) return;
+    if (row < 0 ||
+        row >= _sortedRows.length ||
+        column < 0 ||
+        column >= widget.columns.length) {
+      return;
+    }
     setState(() {
       _editingCell = ResultGridCellCoordinate(row, column);
       _selectionAnchor = _editingCell;
+      _selectionFocus = _editingCell;
       _selection = ResultGridSelection(
         startRow: row,
         startColumn: column,
@@ -529,7 +537,8 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
             endColumn: column - 1,
           );
         } else if (row > 0) {
-          _editingCell = ResultGridCellCoordinate(row - 1, widget.columns.length - 1);
+          _editingCell =
+              ResultGridCellCoordinate(row - 1, widget.columns.length - 1);
           _selection = ResultGridSelection(
             startRow: row - 1,
             startColumn: widget.columns.length - 1,
@@ -566,7 +575,14 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
       } else {
         _editingCell = null;
       }
+      if (_editingCell != null) {
+        _selectionAnchor = _editingCell;
+        _selectionFocus = _editingCell;
+        widget.onRowSelected?.call(_editingCell!.row);
+        _scrollToCell(_editingCell!.row, _editingCell!.column);
+      }
     });
+    _notifySelectionAndFocus();
   }
 
   void _cancelEdit() {
@@ -683,12 +699,14 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     setState(() {
       final coord = ResultGridCellCoordinate(row, column);
       if (isShift && _selectionAnchor != null) {
+        _selectionFocus = coord;
         _selection = ResultGridSelection.fromPoints(
           anchor: _selectionAnchor!,
           focus: coord,
         );
       } else {
         _selectionAnchor = coord;
+        _selectionFocus = coord;
         _selection = ResultGridSelection(
           startRow: row,
           startColumn: column,
@@ -707,7 +725,9 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
       _copySelection();
     } else {
       setState(() {
-        _selectionAnchor = ResultGridCellCoordinate(row, column);
+        final coord = ResultGridCellCoordinate(row, column);
+        _selectionAnchor = coord;
+        _selectionFocus = coord;
         _selection = ResultGridSelection(
           startRow: row,
           startColumn: column,
@@ -763,6 +783,168 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
       scrollOffset: _scrollOffset,
       viewportWidth: viewportWidth,
     );
+  }
+
+  void _scrollToCell(int row, int col) {
+    if (!mounted) return;
+    final rowHeight = _scaledRowHeight(context);
+    final headerHeight = _scaledHeaderHeight(context);
+
+    // Vertical scroll
+    if (_verticalController.hasClients) {
+      final targetTop = row * rowHeight;
+      final targetBottom = targetTop + rowHeight;
+      final currentOffset = _verticalController.offset;
+      final viewportHeight =
+          _verticalController.position.viewportDimension - headerHeight;
+
+      if (targetTop < currentOffset) {
+        _verticalController.jumpTo(targetTop.clamp(
+          0.0,
+          _verticalController.position.maxScrollExtent,
+        ));
+      } else if (targetBottom > currentOffset + viewportHeight &&
+          viewportHeight > 0) {
+        final newOffset = (targetBottom - viewportHeight).clamp(
+          0.0,
+          _verticalController.position.maxScrollExtent,
+        );
+        _verticalController.jumpTo(newOffset);
+      }
+    }
+
+    // Horizontal scroll
+    if (_horizontalController.hasClients &&
+        col >= 0 &&
+        col < _columnWidths.length) {
+      final colLeft = _columnOffsets[col];
+      final colRight = colLeft + _columnWidths[col];
+      final currentOffset = _horizontalController.offset;
+      final viewportWidth = _horizontalController.position.viewportDimension;
+
+      if (colLeft < currentOffset) {
+        _horizontalController.jumpTo(colLeft.clamp(
+          0.0,
+          _horizontalController.position.maxScrollExtent,
+        ));
+      } else if (colRight > currentOffset + viewportWidth &&
+          viewportWidth > 0) {
+        final newOffset = (colRight - viewportWidth).clamp(
+          0.0,
+          _horizontalController.position.maxScrollExtent,
+        );
+        _horizontalController.jumpTo(newOffset);
+      }
+    }
+  }
+
+  void _navigateCell(int dRow, int dCol, {bool extendSelection = false}) {
+    if (_sortedRows.isEmpty || widget.columns.isEmpty) return;
+    if (_editingCell != null) return;
+
+    if (_selectionAnchor == null) {
+      setState(() {
+        _selectionAnchor = const ResultGridCellCoordinate(0, 0);
+        _selectionFocus = const ResultGridCellCoordinate(0, 0);
+        _selection = const ResultGridSelection(
+          startRow: 0,
+          startColumn: 0,
+          endRow: 0,
+          endColumn: 0,
+        );
+      });
+      widget.onRowSelected?.call(0);
+      _scrollToCell(0, 0);
+      _notifySelectionAndFocus();
+      return;
+    }
+
+    final currentFocus = _selectionFocus ?? _selectionAnchor!;
+    final newRow = (currentFocus.row + dRow).clamp(0, _sortedRows.length - 1);
+    final newCol =
+        (currentFocus.column + dCol).clamp(0, widget.columns.length - 1);
+    final newFocus = ResultGridCellCoordinate(newRow, newCol);
+
+    setState(() {
+      if (extendSelection) {
+        _selectionFocus = newFocus;
+        _selection = ResultGridSelection.fromPoints(
+          anchor: _selectionAnchor!,
+          focus: newFocus,
+        );
+      } else {
+        _selectionAnchor = newFocus;
+        _selectionFocus = newFocus;
+        _selection = ResultGridSelection(
+          startRow: newRow,
+          startColumn: newCol,
+          endRow: newRow,
+          endColumn: newCol,
+        );
+        widget.onRowSelected?.call(newRow);
+      }
+    });
+
+    _scrollToCell(newRow, newCol);
+    _notifySelectionAndFocus();
+  }
+
+  void _jumpToCell({int? row, int? column, bool extendSelection = false}) {
+    if (_sortedRows.isEmpty || widget.columns.isEmpty) return;
+    if (_editingCell != null) return;
+
+    final currentFocus = _selectionFocus ??
+        _selectionAnchor ??
+        const ResultGridCellCoordinate(0, 0);
+    final newRow = (row ?? currentFocus.row).clamp(0, _sortedRows.length - 1);
+    final newCol =
+        (column ?? currentFocus.column).clamp(0, widget.columns.length - 1);
+    final newFocus = ResultGridCellCoordinate(newRow, newCol);
+
+    setState(() {
+      if (extendSelection) {
+        _selectionAnchor ??= currentFocus;
+        _selectionFocus = newFocus;
+        _selection = ResultGridSelection.fromPoints(
+          anchor: _selectionAnchor!,
+          focus: newFocus,
+        );
+      } else {
+        _selectionAnchor = newFocus;
+        _selectionFocus = newFocus;
+        _selection = ResultGridSelection(
+          startRow: newRow,
+          startColumn: newCol,
+          endRow: newRow,
+          endColumn: newCol,
+        );
+        widget.onRowSelected?.call(newRow);
+      }
+    });
+
+    _scrollToCell(newRow, newCol);
+    _notifySelectionAndFocus();
+  }
+
+  void _selectAll() {
+    if (_sortedRows.isEmpty || widget.columns.isEmpty) return;
+    if (_editingCell != null) return;
+
+    setState(() {
+      _selectionAnchor = const ResultGridCellCoordinate(0, 0);
+      _selectionFocus = ResultGridCellCoordinate(
+        _sortedRows.length - 1,
+        widget.columns.length - 1,
+      );
+      _selection = ResultGridSelection(
+        startRow: 0,
+        startColumn: 0,
+        endRow: _sortedRows.length - 1,
+        endColumn: widget.columns.length - 1,
+      );
+    });
+
+    _notifySelectionAndFocus();
   }
 
   @override
@@ -840,7 +1022,9 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
             setState(() {
               _selection = null;
               _selectionAnchor = null;
+              _selectionFocus = null;
             });
+            _notifySelectionAndFocus();
           }
         },
         const material.SingleActivator(
@@ -883,6 +1067,127 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
             );
           }
         },
+
+        // Navigation: Arrows
+        const material.SingleActivator(LogicalKeyboardKey.arrowDown): () =>
+            _navigateCell(1, 0),
+        const material.SingleActivator(LogicalKeyboardKey.arrowUp): () =>
+            _navigateCell(-1, 0),
+        const material.SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+            _navigateCell(0, 1),
+        const material.SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+            _navigateCell(0, -1),
+
+        // Navigation: Shift + Arrows (range selection)
+        const material.SingleActivator(
+          LogicalKeyboardKey.arrowDown,
+          shift: true,
+        ): () => _navigateCell(1, 0, extendSelection: true),
+        const material.SingleActivator(
+          LogicalKeyboardKey.arrowUp,
+          shift: true,
+        ): () => _navigateCell(-1, 0, extendSelection: true),
+        const material.SingleActivator(
+          LogicalKeyboardKey.arrowRight,
+          shift: true,
+        ): () => _navigateCell(0, 1, extendSelection: true),
+        const material.SingleActivator(
+          LogicalKeyboardKey.arrowLeft,
+          shift: true,
+        ): () => _navigateCell(0, -1, extendSelection: true),
+
+        // Navigation: Home / End (column jump)
+        const material.SingleActivator(LogicalKeyboardKey.home): () =>
+            _jumpToCell(column: 0),
+        const material.SingleActivator(
+          LogicalKeyboardKey.home,
+          shift: true,
+        ): () => _jumpToCell(column: 0, extendSelection: true),
+        const material.SingleActivator(LogicalKeyboardKey.end): () =>
+            _jumpToCell(column: widget.columns.length - 1),
+        const material.SingleActivator(
+          LogicalKeyboardKey.end,
+          shift: true,
+        ): () => _jumpToCell(
+              column: widget.columns.length - 1,
+              extendSelection: true,
+            ),
+
+        // Navigation: Ctrl+Home / Ctrl+End (table start / end)
+        const material.SingleActivator(
+          LogicalKeyboardKey.home,
+          control: true,
+        ): () => _jumpToCell(row: 0, column: 0),
+        const material.SingleActivator(
+          LogicalKeyboardKey.home,
+          meta: true,
+        ): () => _jumpToCell(row: 0, column: 0),
+        const material.SingleActivator(
+          LogicalKeyboardKey.home,
+          control: true,
+          shift: true,
+        ): () => _jumpToCell(row: 0, column: 0, extendSelection: true),
+        const material.SingleActivator(
+          LogicalKeyboardKey.home,
+          meta: true,
+          shift: true,
+        ): () => _jumpToCell(row: 0, column: 0, extendSelection: true),
+        const material.SingleActivator(
+          LogicalKeyboardKey.end,
+          control: true,
+        ): () => _jumpToCell(
+              row: _sortedRows.length - 1,
+              column: widget.columns.length - 1,
+            ),
+        const material.SingleActivator(
+          LogicalKeyboardKey.end,
+          meta: true,
+        ): () => _jumpToCell(
+              row: _sortedRows.length - 1,
+              column: widget.columns.length - 1,
+            ),
+        const material.SingleActivator(
+          LogicalKeyboardKey.end,
+          control: true,
+          shift: true,
+        ): () => _jumpToCell(
+              row: _sortedRows.length - 1,
+              column: widget.columns.length - 1,
+              extendSelection: true,
+            ),
+        const material.SingleActivator(
+          LogicalKeyboardKey.end,
+          meta: true,
+          shift: true,
+        ): () => _jumpToCell(
+              row: _sortedRows.length - 1,
+              column: widget.columns.length - 1,
+              extendSelection: true,
+            ),
+
+        // Navigation: PageUp / PageDown
+        const material.SingleActivator(LogicalKeyboardKey.pageDown): () =>
+            _navigateCell(20, 0),
+        const material.SingleActivator(
+          LogicalKeyboardKey.pageDown,
+          shift: true,
+        ): () => _navigateCell(20, 0, extendSelection: true),
+        const material.SingleActivator(LogicalKeyboardKey.pageUp): () =>
+            _navigateCell(-20, 0),
+        const material.SingleActivator(
+          LogicalKeyboardKey.pageUp,
+          shift: true,
+        ): () => _navigateCell(-20, 0, extendSelection: true),
+
+        // Select All: Ctrl+A / Meta+A
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyA,
+          control: true,
+        ): () => _selectAll(),
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyA,
+          meta: true,
+        ): () => _selectAll(),
       },
       child: material.Focus(
         focusNode: _focusNode,
