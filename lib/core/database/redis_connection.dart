@@ -123,7 +123,9 @@ class RedisConnection {
     }
     final result = await _command!.send_object(['PING']);
     if (result == null || result.toString().toUpperCase() != 'PONG') {
-      await _conn?.close();
+      try {
+        await _conn?.close();
+      } catch (_) {}
       _conn = null;
       _command = null;
       throw RedisConnectionException('PING failed');
@@ -133,16 +135,23 @@ class RedisConnection {
   }
 
   Future<void> disconnect() async {
+    final wasConnected = _isConnected;
     _isConnected = false;
     _command = null;
     final c = _conn;
     _conn = null;
-    try {
-      await c?.close();
-    } catch (e) {
-      debugPrint('RedisConnection.disconnect: $e');
+    if (c != null && wasConnected) {
+      try {
+        await c.close();
+      } catch (e) {
+        if (e is! TypeError && !e.toString().contains('Null check operator')) {
+          debugPrint('RedisConnection.disconnect: $e');
+        }
+      }
     }
   }
+
+  Future<void> forceClose() => disconnect();
 
   Future<String> info() async {
     if (!isConnected || _command == null) {
@@ -464,10 +473,10 @@ class RedisConnectionTestFake extends RedisConnection {
     final c = _conn;
     _conn = null;
     _command = null;
-    try {
-      await c?.close();
-    } catch (e) {
-      debugPrint('RedisConnection.disconnect: $e');
+    if (c != null) {
+      try {
+        await c.close();
+      } catch (_) {}
     }
   }
 

@@ -82,6 +82,16 @@ void main() {
       await conn.disconnect();
       expect(conn.isConnected, false);
     });
+
+    test('forceClose delegates to disconnect cleanly', () async {
+      final conn = RedisConnection(
+        id: 1,
+        name: 'test',
+        host: 'localhost',
+      );
+      await conn.forceClose();
+      expect(conn.isConnected, false);
+    });
   });
 
   group('RedisConnection.info', () {
