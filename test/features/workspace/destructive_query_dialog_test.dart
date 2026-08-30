@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
-import 'package:querya_desktop/features/main_screen/destructive_query_dialog.dart';
+import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import '../../support/querya_theme_test_shell.dart';

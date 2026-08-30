@@ -2,7 +2,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/editor/querya_code_editor.dart';
 import 'package:querya_desktop/core/editor/querya_code_language.dart';
-import 'package:querya_desktop/features/main_screen/sql_editor_chrome.dart';
+import 'package:querya_desktop/features/workspace/sql_editor_chrome.dart';
 import 'package:querya_desktop/features/mysql/mysql_table_utils.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 

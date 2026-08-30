@@ -6,8 +6,7 @@ import 'package:querya_desktop/core/extensions/extension_driver_session.dart';
 import 'package:querya_desktop/core/extensions/models/extension_driver_capabilities.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/extensions/extension_table_toolbar.dart';
-import 'package:querya_desktop/features/main_screen/data_grid_staging_buffer.dart';
-import 'package:querya_desktop/features/main_screen/results_tab.dart';
+import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/shared/services/data_export_service.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 

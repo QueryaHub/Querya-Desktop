@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:querya_desktop/features/main_screen/data_grid_staging_buffer.dart';
-import 'package:querya_desktop/features/main_screen/grid_cell_editor.dart';
-import 'package:querya_desktop/features/main_screen/grid_cell_popover_inspector.dart';
-import 'package:querya_desktop/features/main_screen/result_grid_view.dart';
+import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
+import 'package:querya_desktop/features/workspace/grid_cell_editor.dart';
+import 'package:querya_desktop/features/workspace/grid_cell_popover_inspector.dart';
+import 'package:querya_desktop/features/workspace/result_grid_view.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import '../../support/querya_theme_test_shell.dart';

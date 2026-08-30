@@ -2,10 +2,10 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/motion/querya_fade_slide.dart';
 import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
-import 'package:querya_desktop/features/main_screen/data_grid_staging_buffer.dart';
-import 'package:querya_desktop/features/main_screen/data_grid_staging_toolbar.dart';
-import 'package:querya_desktop/features/main_screen/result_grid_view.dart';
-import 'package:querya_desktop/features/main_screen/results_tab.dart';
+import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
+import 'package:querya_desktop/features/workspace/data_grid_staging_toolbar.dart';
+import 'package:querya_desktop/features/workspace/result_grid_view.dart';
+import 'package:querya_desktop/features/workspace/results_tab.dart';
 
 import '../../support/querya_theme_test_shell.dart';
 

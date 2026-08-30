@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:querya_desktop/features/main_screen/data_grid_filter_bar.dart';
+import 'package:querya_desktop/features/workspace/data_grid_filter_bar.dart';
 
 import '../../support/querya_theme_test_shell.dart';
 
