@@ -281,5 +281,47 @@ void main() {
         'NULL',
       );
     });
+
+    test('formats binary and BLOB literals correctly across dialects', () {
+      // PostgreSQL bytea
+      expect(
+        TableMutationEngine.formatLiteral(
+          r'\xDEADBEEF',
+          SqlDialect.postgres,
+          dataTypeName: 'bytea',
+        ),
+        r"'\xDEADBEEF'::bytea",
+      );
+
+      // MySQL blob / varbinary
+      expect(
+        TableMutationEngine.formatLiteral(
+          '0x12AB',
+          SqlDialect.mysql,
+          dataTypeName: 'blob',
+        ),
+        "X'12AB'",
+      );
+
+      // SQLite blob
+      expect(
+        TableMutationEngine.formatLiteral(
+          "X'CAFE'",
+          SqlDialect.sqlite,
+          dataTypeName: 'blob',
+        ),
+        "X'CAFE'",
+      );
+
+      // NULL for binary
+      expect(
+        TableMutationEngine.formatLiteral(
+          'NULL',
+          SqlDialect.postgres,
+          dataTypeName: 'bytea',
+        ),
+        'NULL',
+      );
+    });
   });
 }
