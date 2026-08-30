@@ -60,6 +60,12 @@ class QueryaApp extends StatelessWidget {
                   themeMode: themeController.themeMode,
                   materialTheme: themeController.materialThemeFor(colorScheme),
                   debugShowCheckedModeBanner: false,
+                  menuHandler: const PopoverOverlayHandler(
+                    defaultShowDuration: Duration(milliseconds: 60),
+                    defaultDismissDuration: Duration(milliseconds: 50),
+                    showCurve: Curves.easeOutCubic,
+                    dismissCurve: Curves.easeIn,
+                  ),
                   enableThemeAnimation: themeAnimEnabled,
                   themeAnimationDuration: themeDuration,
                   themeAnimationCurve: themeCurve,

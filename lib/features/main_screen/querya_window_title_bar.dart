@@ -103,6 +103,7 @@ class QueryaWindowTitleBar extends StatelessWidget {
     final closeButtonColors = QueryaWindowTitleBar.closeButtonColors(context);
 
     final rowContent = Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         SizedBox(
           width: QueryaWindowTitleBar.titleBarLeadingInset(
@@ -390,10 +391,11 @@ class QueryaWindowTitleBar extends StatelessWidget {
 
     final inner = Row(
       children: [
+        rowContent,
         Expanded(
           child: useNativeWindowChrome
-              ? MoveWindow(child: rowContent)
-              : rowContent,
+              ? MoveWindow()
+              : const SizedBox(),
         ),
         Row(
           mainAxisSize: material.MainAxisSize.min,

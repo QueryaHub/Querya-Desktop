@@ -568,6 +568,7 @@ class MenuCheckbox extends StatelessWidget implements MenuItem {
 
 class _MenuButtonState extends State<MenuButton> {
   final ValueNotifier<List<MenuItem>> _children = ValueNotifier([]);
+  bool _justToggledOnTapDown = false;
 
   @override
   void initState() {
@@ -600,14 +601,16 @@ class _MenuButtonState extends State<MenuButton> {
     final isDialogOverlay = DialogOverlayHandler.isDialogOverlay(context);
     final isIndependentOverlay = isSheetOverlay || isDialogOverlay;
     void openSubMenu(BuildContext context, bool autofocus) {
-      menuGroupData!.closeOthers();
+      menuGroupData!.closeOthers(true);
       final overlayManager = OverlayManager.of(context);
+      final effectiveRegionGroupId =
+          menuGroupData.regionGroupId ?? menuGroupData.root;
       menuData!.popoverController.show(
         context: context,
-        regionGroupId: menuGroupData.regionGroupId,
+        regionGroupId: effectiveRegionGroupId,
         consumeOutsideTaps: false,
         dismissBackdropFocus: false,
-        modal: true,
+        modal: false,
         handler: MenuOverlayHandler(overlayManager),
         overlayBarrier: OverlayBarrier(
           borderRadius: BorderRadius.circular(theme.radiusMd),
@@ -633,7 +636,7 @@ class _MenuButtonState extends State<MenuButton> {
                       direction: menuGroupData.direction,
                       parent: menuGroupData,
                       onDismissed: menuGroupData.onDismissed,
-                      regionGroupId: menuGroupData.regionGroupId,
+                      regionGroupId: effectiveRegionGroupId,
                       subMenuOffset: compTheme?.subMenuOffset ??
                           Offset(densityGap, -densityGap * 0.625),
                       itemPadding: itemPadding,
@@ -685,7 +688,7 @@ class _MenuButtonState extends State<MenuButton> {
             return Data<MenuData>.boundary(
               child: Data<MenubarState>.boundary(
                 child: TapRegion(
-                  groupId: menuGroupData!.root,
+                  groupId: menuGroupData!.regionGroupId ?? menuGroupData.root,
                   child: AnimatedBuilder(
                       animation: menuData!.popoverController,
                       builder: (context, child) {
@@ -767,12 +770,31 @@ class _MenuButtonState extends State<MenuButton> {
                               subFocusState.unfocus();
                             }
                           },
+                          onTapDown: (details) {
+                            if (menuBarData != null &&
+                                widget.subMenu != null &&
+                                widget.subMenu!.isNotEmpty) {
+                              if (!menuData.popoverController.hasOpenPopover) {
+                                _justToggledOnTapDown = true;
+                                openSubMenu(context, false);
+                              } else {
+                                _justToggledOnTapDown = true;
+                                menuData.popoverController.close();
+                              }
+                            }
+                          },
                           onPressed: () {
+                            if (_justToggledOnTapDown) {
+                              _justToggledOnTapDown = false;
+                              return;
+                            }
                             widget.onPressed?.call(context);
                             if (widget.subMenu != null &&
                                 widget.subMenu!.isNotEmpty) {
                               if (!menuData.popoverController.hasOpenPopover) {
                                 openSubMenu(context, false);
+                              } else {
+                                menuData.popoverController.close();
                               }
                             } else {
                               if (widget.autoClose) {
@@ -863,9 +885,9 @@ class MenuGroupData {
   /// Closes all open popovers in child menu items.
   ///
   /// Iterates through children and closes any open submenu popovers.
-  void closeOthers() {
+  void closeOthers([bool immediate = false]) {
     for (final child in children) {
-      child.popoverController.close();
+      child.popoverController.close(immediate);
     }
   }
 
