@@ -705,7 +705,7 @@ class PopoverOverlayWidgetState extends State<PopoverOverlayWidget>
                 offset: _offset,
                 margin: _margin?.optionallyResolve(context) ??
                     EdgeInsets.all(densityGap),
-                scale: tweenValue(0.96, 1.0, widget.animation.value),
+                scale: tweenValue(0.98, 1.0, widget.animation.value),
                 scaleAlignment: (widget.transitionAlignment ?? _alignment)
                     .optionallyResolve(context),
                 allowInvertVertical: _allowInvertVertical,

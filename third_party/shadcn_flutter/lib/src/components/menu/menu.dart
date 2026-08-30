@@ -568,6 +568,7 @@ class MenuCheckbox extends StatelessWidget implements MenuItem {
 
 class _MenuButtonState extends State<MenuButton> {
   final ValueNotifier<List<MenuItem>> _children = ValueNotifier([]);
+  bool _justToggledOnTapDown = false;
 
   @override
   void initState() {
@@ -769,7 +770,24 @@ class _MenuButtonState extends State<MenuButton> {
                               subFocusState.unfocus();
                             }
                           },
+                          onTapDown: (details) {
+                            if (menuBarData != null &&
+                                widget.subMenu != null &&
+                                widget.subMenu!.isNotEmpty) {
+                              if (!menuData.popoverController.hasOpenPopover) {
+                                _justToggledOnTapDown = true;
+                                openSubMenu(context, false);
+                              } else {
+                                _justToggledOnTapDown = true;
+                                menuData.popoverController.close();
+                              }
+                            }
+                          },
                           onPressed: () {
+                            if (_justToggledOnTapDown) {
+                              _justToggledOnTapDown = false;
+                              return;
+                            }
                             widget.onPressed?.call(context);
                             if (widget.subMenu != null &&
                                 widget.subMenu!.isNotEmpty) {
