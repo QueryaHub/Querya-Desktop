@@ -102,6 +102,14 @@ class _ResultsTabState extends material.State<ResultsTab> {
   }
 
   @override
+  void dispose() {
+    _memoColumns = null;
+    _memoEffectiveRows = null;
+    _cachedFilteredRows = const [];
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return QueryaFadeSlide(
       alignment: material.Alignment.center,

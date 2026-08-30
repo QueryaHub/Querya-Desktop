@@ -470,6 +470,9 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     _horizontalController.dispose();
     _verticalController.dispose();
     _focusNode.dispose();
+    _sortedRows = const [];
+    _columnWidths = const [];
+    _columnOffsets = const [0];
     super.dispose();
   }
 

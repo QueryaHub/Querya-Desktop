@@ -124,6 +124,7 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
       _totalRows = null;
       _filterController.clear();
       _filterActive = false;
+      _stagingBuffer?.dispose();
       _stagingBuffer = null;
       unawaited(_loadPage(refreshCount: true));
     }
@@ -131,6 +132,8 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
 
   @override
   void dispose() {
+    _stagingBuffer?.dispose();
+    _stagingBuffer = null;
     _filterController.dispose();
     super.dispose();
   }
@@ -208,6 +211,7 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
         _columns = dataResult.columns;
         _rows = dataResult.rows;
         _loading = false;
+        _stagingBuffer?.dispose();
         if (!widget.isView && (_capabilities?.supportsMutations == true)) {
           _stagingBuffer =
               DataGridStagingBuffer(columns: _columns, rows: _rows);

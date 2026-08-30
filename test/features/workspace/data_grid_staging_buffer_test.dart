@@ -154,5 +154,22 @@ void main() {
       expect(plan.statements[2].type, MutationType.delete);
       expect(plan.statements[2].sql, 'DELETE FROM "public"."users" WHERE "id" = 3');
     });
+
+    test('dispose clears internal collections and prevents further listener notifications', () {
+      buffer.setCell(0, 1, 'Alice Modified');
+      buffer.addRow(['4', 'Diana', 'diana@test.com']);
+      buffer.toggleDeleteRow(2);
+
+      expect(buffer.isDirty, isTrue);
+      expect(buffer.changeCount, 3);
+
+      buffer.dispose();
+
+      expect(buffer.isDirty, isFalse);
+      expect(buffer.changeCount, 0);
+      expect(buffer.modifiedCellCount, 0);
+      expect(buffer.insertedRowCount, 0);
+      expect(buffer.deletedRowCount, 0);
+    });
   });
 }

@@ -315,5 +315,13 @@ class DataGridStagingBuffer extends ChangeNotifier {
     }
     return result;
   }
+
+  @override
+  void dispose() {
+    _modifiedCells.clear();
+    _insertedRows.clear();
+    _deletedRowIndices.clear();
+    super.dispose();
+  }
 }
 

@@ -125,6 +125,8 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         .removeListener(_appSettingsListener);
     _topFraction.dispose();
     _lease?.release();
+    _stagingBuffer?.dispose();
+    _stagingBuffer = null;
     _sqlController.dispose();
     super.dispose();
   }
@@ -206,6 +208,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         _rows = outRows;
         _affectedRows = null;
         _lastExecutedSql = userSql;
+        _stagingBuffer?.dispose();
         _stagingBuffer = cols.isNotEmpty
             ? DataGridStagingBuffer(columns: cols, rows: outRows)
             : null;
@@ -285,8 +288,10 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       }
 
       if (!mounted) return;
+      final newRows = _stagingBuffer!.effectiveRows;
+      _stagingBuffer?.dispose();
       setState(() {
-        _rows = _stagingBuffer!.effectiveRows;
+        _rows = newRows;
         _stagingBuffer = DataGridStagingBuffer(columns: _columns, rows: _rows);
         _savingChanges = false;
       });
