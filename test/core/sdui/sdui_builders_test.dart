@@ -359,5 +359,94 @@ void main() {
 
       expect(selected?.id, 'table.default.customers');
     });
+
+    testWidgets('highlights active node visually when selectedNodeId is provided',
+        (tester) async {
+      final schema = SduiTreeSchema.fromJson(const {
+        'roots': [
+          {
+            'id': 'table.analytics.events',
+            'label': 'events',
+            'node_type': 'table',
+          },
+          {
+            'id': 'table.analytics.users',
+            'label': 'users',
+            'node_type': 'table',
+          },
+        ],
+      });
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: SduiTreeBuilder(
+              schema: schema,
+              selectedNodeId: 'table.analytics.events',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Find the AnimatedContainers for the rows
+      final animatedContainers = tester.widgetList<material.AnimatedContainer>(
+        find.byType(material.AnimatedContainer),
+      ).toList();
+
+      expect(animatedContainers.length, greaterThanOrEqualTo(2));
+      final selectedDecoration = animatedContainers[0].decoration as material.BoxDecoration?;
+      final unselectedDecoration = animatedContainers[1].decoration as material.BoxDecoration?;
+
+      expect(selectedDecoration?.color, isNotNull);
+      expect(selectedDecoration?.border, isNotNull);
+      expect(unselectedDecoration?.border, isNull);
+    });
+
+    testWidgets('highlights active node visually when isNodeSelected predicate matches',
+        (tester) async {
+      final schema = SduiTreeSchema.fromJson(const {
+        'roots': [
+          {
+            'id': 'table.analytics.events',
+            'label': 'events',
+            'node_type': 'table',
+          },
+          {
+            'id': 'view.analytics.monthly_mv',
+            'label': 'monthly_mv',
+            'node_type': 'view',
+          },
+        ],
+      });
+
+      String? activeId = 'view.analytics.monthly_mv';
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.StatefulBuilder(
+            builder: (context, setState) {
+              return material.Scaffold(
+                body: SduiTreeBuilder(
+                  schema: schema,
+                  isNodeSelected: (node) => node.id == activeId,
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final animatedContainers = tester.widgetList<material.AnimatedContainer>(
+        find.byType(material.AnimatedContainer),
+      ).toList();
+
+      final eventsDec = animatedContainers[0].decoration as material.BoxDecoration?;
+      final mvDec = animatedContainers[1].decoration as material.BoxDecoration?;
+
+      expect(eventsDec?.border, isNull);
+      expect(mvDec?.border, isNotNull);
+    });
   });
 }
