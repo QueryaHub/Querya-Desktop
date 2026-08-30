@@ -26,3 +26,20 @@ class PluginProtocolTimeoutException implements Exception {
   @override
   String toString() => 'PluginProtocolTimeoutException: $message';
 }
+
+/// Thrown when the watchdog detects that the plugin process is deadlocked (ping timeout).
+class PluginDeadlockException implements Exception {
+  PluginDeadlockException({
+    required this.pluginId,
+    this.message,
+  });
+
+  final String pluginId;
+  final String? message;
+
+  @override
+  String toString() {
+    final detail = message == null ? '' : ': $message';
+    return 'PluginDeadlockException($pluginId)$detail';
+  }
+}

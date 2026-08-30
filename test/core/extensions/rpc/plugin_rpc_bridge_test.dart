@@ -8,6 +8,7 @@ import 'package:querya_desktop/core/extensions/models/extension_type.dart';
 import 'package:querya_desktop/core/extensions/models/sandbox_capabilities.dart';
 import 'package:querya_desktop/core/extensions/rpc/plugin_rpc_bridge.dart';
 import 'package:querya_desktop/core/extensions/rpc/plugin_rpc_exceptions.dart';
+import 'package:querya_desktop/core/extensions/sandbox/sandbox_log_paths.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_process_runner.dart';
 
 class _FakeProcess implements Process {
@@ -66,9 +67,11 @@ void main() {
 
   setUp(() async {
     tempBase = await Directory.systemTemp.createTemp('querya_rpc_bridge_');
+    SandboxLogPaths.mockLogsDirectory = tempBase;
   });
 
   tearDown(() async {
+    SandboxLogPaths.mockLogsDirectory = null;
     try {
       if (await tempBase.exists()) {
         await tempBase.delete(recursive: true);
@@ -314,6 +317,107 @@ void main() {
 
     expect(shutdownReceived, isTrue);
     expect(bridge.isStarted, isFalse);
+    await sub.cancel();
+  });
+
+  test('unexpected exit fires onProcessExited callback', () async {
+    final process = _FakeProcess();
+    final sub = process.stdinLines.listen((line) {
+      final req = jsonDecode(line) as Map<String, dynamic>;
+      if (req['method'] == 'system.handshake') {
+        process.reply({
+          'jsonrpc': '2.0',
+          'id': req['id'] as int,
+          'result': {'ok': true},
+        });
+      }
+    });
+
+    final runner = SandboxProcessRunner(
+      platformOverride: 'windows',
+      scratchBaseDirectory: tempBase,
+      processStarter: (
+        exe,
+        args, {
+        String? workingDirectory,
+        Map<String, String>? environment,
+        bool includeParentEnvironment = true,
+        bool runInShell = false,
+        ProcessStartMode mode = ProcessStartMode.normal,
+      }) async =>
+          process,
+    );
+
+    int? capturedExitCode;
+    final bridge = PluginRpcBridge(
+      processRunner: runner,
+      enableWatchdog: false,
+      enableStderrPipe: false,
+      onProcessExited: (code) {
+        capturedExitCode = code;
+      },
+    );
+
+    await bridge.start(
+      manifest: testManifest,
+      pluginExecutable: '/opt/driver',
+      allowUnsandboxedLaunch: true,
+    );
+
+    process.completeExit(137); // SIGKILL
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+
+    expect(capturedExitCode, 137);
+    expect(bridge.isStarted, isFalse);
+    await sub.cancel();
+  });
+
+  test('handshake timeout includes recent stderr output in exception', () async {
+    final process = _FakeProcess();
+    final sub = process.stdinLines.listen((_) {
+      process._stderrController.add(
+        utf8.encode('FATAL: libclickhouse.so not found\n'),
+      );
+    });
+
+    final runner = SandboxProcessRunner(
+      platformOverride: 'windows',
+      scratchBaseDirectory: tempBase,
+      processStarter: (
+        exe,
+        args, {
+        String? workingDirectory,
+        Map<String, String>? environment,
+        bool includeParentEnvironment = true,
+        bool runInShell = false,
+        ProcessStartMode mode = ProcessStartMode.normal,
+      }) async =>
+          process,
+    );
+
+    final bridge = PluginRpcBridge(
+      processRunner: runner,
+      handshakeTimeout: const Duration(milliseconds: 50),
+      enableWatchdog: false,
+      enableStderrPipe: true,
+    );
+
+    final startFuture = bridge.start(
+      manifest: testManifest,
+      pluginExecutable: '/opt/driver',
+      allowUnsandboxedLaunch: true,
+    );
+
+    await expectLater(
+      startFuture,
+      throwsA(
+        isA<PluginProtocolTimeoutException>().having(
+          (e) => e.message,
+          'message',
+          contains('FATAL: libclickhouse.so not found'),
+        ),
+      ),
+    );
     await sub.cancel();
   });
 }

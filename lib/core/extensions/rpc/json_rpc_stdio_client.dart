@@ -74,7 +74,17 @@ class JsonRpcStdioClient {
     };
 
     _stdin.writeln(jsonEncode(payload));
-    await _stdin.flush();
+    try {
+      await _stdin.flush().timeout(const Duration(seconds: 3));
+    } on TimeoutException {
+      _pending.remove(id);
+      throw TimeoutException(
+        'Failed to flush JSON-RPC request "$method" to plugin stdin within 3s',
+      );
+    } catch (e) {
+      _pending.remove(id);
+      rethrow;
+    }
 
     try {
       return await completer.future.timeout(requestTimeout);

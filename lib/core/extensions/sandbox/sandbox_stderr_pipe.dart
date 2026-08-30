@@ -39,6 +39,11 @@ class SandboxStderrPipe {
   final int maxCarryChars;
   final int maxSanitizeChars;
 
+  final List<String> _recentLines = [];
+
+  /// Rolling buffer of recent sanitized stderr lines (last 20 lines max).
+  List<String> get recentLines => List.unmodifiable(_recentLines);
+
   StreamSubscription<List<int>>? _subscription;
   final StringBuffer _carry = StringBuffer();
   int _carryLength = 0;
@@ -193,6 +198,10 @@ class SandboxStderrPipe {
         );
       }
       onSanitizedLine?.call(sanitized);
+      _recentLines.add(sanitized);
+      if (_recentLines.length > 20) {
+        _recentLines.removeAt(0);
+      }
       await log.appendLine(sanitized);
     } catch (e, st) {
       debugPrint('SandboxStderrPipe($pluginId) write failed: $e\n$st');

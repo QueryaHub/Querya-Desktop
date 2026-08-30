@@ -3,6 +3,7 @@ import 'package:querya_desktop/core/extensions/extension_driver_session.dart';
 import 'package:querya_desktop/core/extensions/models/extension_driver_capabilities.dart';
 import 'package:querya_desktop/core/extensions/models/extension_object_metadata.dart';
 import 'package:querya_desktop/core/extensions/models/extension_server_stats.dart';
+import 'package:querya_desktop/core/extensions/models/sandbox_capabilities.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 
 void main() {
@@ -135,6 +136,19 @@ void main() {
       expect(metadata.columns[0].isNullable, isFalse);
       expect(metadata.columns[0].comment, 'Primary ID');
       expect(metadata.properties['engine'], 'MergeTree');
+    });
+
+    test('ResourceLimits parses timeout_seconds correctly', () {
+      final limits = ResourceLimits.fromJson({
+        'memory_mb': 512,
+        'max_open_files': 128,
+        'timeout_seconds': 600,
+      });
+
+      expect(limits.memoryMb, 512);
+      expect(limits.maxOpenFiles, 128);
+      expect(limits.timeoutSeconds, 600);
+      expect(limits.toJson()['timeout_seconds'], 600);
     });
   });
 }
