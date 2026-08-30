@@ -119,5 +119,23 @@ void main() {
       await LocalDb.instance.removeConnection(connId);
       await LocalDb.instance.removeFolder('Concurrency Test Folder');
     });
+
+    test('deduplicates parallel cold-start open calls via single-flight memoization', () async {
+      // Close database to simulate completely cold state
+      await LocalDb.instance.close();
+
+      // Launch multiple simultaneous queries on a closed database
+      final parallelOperations = [
+        LocalDb.instance.getFolders(),
+        LocalDb.instance.getConnections(),
+        LocalDb.instance.getAppSetting('theme_preset'),
+        LocalDb.instance.getPragma('journal_mode'),
+      ];
+
+      final results = await Future.wait(parallelOperations);
+      expect(results[0], isA<List<String>>());
+      expect(results[1], isA<List<ConnectionRow>>());
+      expect(results[3].toString().toLowerCase(), equals('wal'));
+    });
   });
 }

@@ -33,6 +33,7 @@ class LocalDb {
 
   Database? _db;
   String? _cachedDbPath;
+  Future<Database>? _openFuture;
 
   static Future<void> initFfi() async {
     if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
@@ -42,6 +43,19 @@ class LocalDb {
 
   Future<Database> _open() async {
     if (_db != null && _db!.isOpen) return _db!;
+    if (_openFuture != null) return _openFuture!;
+
+    final future = _doOpen();
+    _openFuture = future;
+    try {
+      return await future;
+    } catch (_) {
+      _openFuture = null;
+      rethrow;
+    }
+  }
+
+  Future<Database> _doOpen() async {
     await initFfi();
     if (_cachedDbPath == null) {
       final dir = await AppDataRoot.applicationSupportDirectory();
@@ -49,7 +63,7 @@ class LocalDb {
       if (!await sub.exists()) await sub.create(recursive: true);
       _cachedDbPath = p.join(sub.path, _dbName);
     }
-    _db = await databaseFactoryFfi.openDatabase(
+    final db = await databaseFactoryFfi.openDatabase(
       _cachedDbPath!,
       options: OpenDatabaseOptions(
         version: _dbVersion,
@@ -63,7 +77,9 @@ class LocalDb {
         },
       ),
     );
-    return _db!;
+    _db = db;
+    _openFuture = null;
+    return db;
   }
 
   /// Queries an active PRAGMA setting from the database for verification and diagnostic purposes.
@@ -537,6 +553,7 @@ class LocalDb {
   }
 
   Future<void> close() async {
+    _openFuture = null;
     await _db?.close();
     _db = null;
     _cachedDbPath = null;
