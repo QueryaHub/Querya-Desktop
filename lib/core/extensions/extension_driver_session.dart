@@ -465,6 +465,16 @@ class ExtensionDriverSession {
     }
   }
 
+  /// Restarts the extension driver process for [row] by cleanly disconnecting
+  /// the active bridge and re-establishing the connection.
+  Future<PluginRpcBridge> restart(ConnectionRow row) async {
+    final id = row.id;
+    if (id != null) {
+      await disconnect(id);
+    }
+    return ensureConnected(row);
+  }
+
   Future<void> disconnectAll() async {
     final ids = _bridges.keys.toList();
     for (final id in ids) {
