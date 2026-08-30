@@ -5,10 +5,12 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:file_selector/file_selector.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
+import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/extensions/extension_driver_session.dart';
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/main_screen/destructive_query_dialog.dart';
 import 'package:querya_desktop/features/main_screen/query_editor_tab.dart';
 import 'package:querya_desktop/features/main_screen/results_tab.dart';
 import 'package:querya_desktop/features/main_screen/sql_editor_chrome.dart';
@@ -28,10 +30,12 @@ class ExtensionSqlWorkspace extends material.StatefulWidget {
     super.key,
     required this.connectionRow,
     this.selectedObject,
+    this.initialSql,
   });
 
   final ConnectionRow connectionRow;
   final ExtensionSelectedObject? selectedObject;
+  final String? initialSql;
 
   @override
   material.State<ExtensionSqlWorkspace> createState() =>
@@ -58,6 +62,9 @@ class _ExtensionSqlWorkspaceState
   @override
   void initState() {
     super.initState();
+    if (widget.initialSql != null && widget.initialSql!.isNotEmpty) {
+      _sqlController.text = widget.initialSql!;
+    }
     material.WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_loadWorkspaceSettings());
       _applySelectedObject();
@@ -135,6 +142,22 @@ class _ExtensionSqlWorkspaceState
       userSql = _sqlController.text.trim();
     }
     if (userSql.isEmpty) return;
+
+    final confirmDestructive =
+        await AppSettings.instance.getConfirmDestructiveOperations();
+    if (confirmDestructive) {
+      final inspection = DestructiveSqlDetector.inspect(userSql);
+      if (inspection.isDestructive) {
+        if (!mounted) return;
+        final confirmed = await showDestructiveQueryDialog(
+          context: context,
+          result: inspection,
+          sql: userSql,
+          connectionName: widget.connectionRow.name,
+        );
+        if (confirmed != true) return;
+      }
+    }
 
     setState(() {
       _running = true;
@@ -292,7 +315,7 @@ class _ExtensionSqlWorkspaceState
             children: [
               _ExtensionSqlToolbar(
                 connectionName: widget.connectionRow.name,
-                onExecute: _running ? null : _execute,
+                onExecute: _running ? null : () => unawaited(_execute()),
                 running: _running,
                 onOpenSqlFile: () => unawaited(_openSqlFile()),
                 onSaveSqlFile: () => unawaited(_saveSqlFile()),
@@ -357,7 +380,7 @@ class _ExtensionSqlToolbar extends material.StatelessWidget {
   });
 
   final String connectionName;
-  final Future<void> Function()? onExecute;
+  final VoidCallback? onExecute;
   final bool running;
   final VoidCallback onOpenSqlFile;
   final VoidCallback onSaveSqlFile;
