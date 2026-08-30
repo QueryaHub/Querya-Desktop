@@ -2,7 +2,6 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
 import 'package:querya_desktop/core/extensions/models/extension_contributions.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/features/connections/connection_type_choice.dart';
 import 'package:querya_desktop/features/connections/extension_connection_form.dart';
 import 'package:querya_desktop/features/connections/new_connection_dialog.dart';
 import 'package:querya_desktop/features/connections/sqlite_connection_form.dart';

@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:mysql_client/mysql_client.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
+import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
 
 /// Replaces the database in a `mysql://` / `mariadb://` URI (path or `database=`).
 String replaceDatabaseInMysqlConnectionString(
