@@ -52,7 +52,16 @@ class ExtensionDriverSession {
 
     final manifest = await _resolveManifestForRow(row);
     final hydrated = await _hydrateSecrets(row);
-    final bridge = await _startBridge(manifest);
+    late final PluginRpcBridge bridge;
+    bridge = await _startBridge(
+      manifest,
+      onProcessExited: (code) {
+        if (_bridges[id] == bridge) {
+          _bridges.remove(id);
+          _manifests.remove(id);
+        }
+      },
+    );
 
     try {
       await _injectAndConnect(bridge, connectionId: id, row: hydrated);
@@ -99,7 +108,10 @@ class ExtensionDriverSession {
     }
   }
 
-  Future<PluginRpcBridge> _startBridge(ExtensionManifest manifest) async {
+  Future<PluginRpcBridge> _startBridge(
+    ExtensionManifest manifest, {
+    void Function(int code)? onProcessExited,
+  }) async {
     final root = manifest.installPath;
     if (root == null || root.isEmpty) {
       throw StateError('Extension "${manifest.id}" has no install path');
@@ -127,7 +139,16 @@ class ExtensionDriverSession {
       }
     }
 
-    final bridge = bridgeFactory?.call() ?? PluginRpcBridge();
+    final manifestTimeoutSeconds =
+        manifest.sandbox?.resources.timeoutSeconds;
+    final bridge = bridgeFactory?.call() ??
+        PluginRpcBridge(
+          requestTimeout:
+              manifestTimeoutSeconds != null && manifestTimeoutSeconds > 0
+                  ? Duration(seconds: manifestTimeoutSeconds)
+                  : const Duration(seconds: 60),
+          onProcessExited: onProcessExited,
+        );
     await _startBridgeWithConsent(
       bridge: bridge,
       manifest: manifest,
