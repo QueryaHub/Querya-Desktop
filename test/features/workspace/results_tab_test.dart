@@ -808,5 +808,58 @@ void main() {
 
       expect(appliedChanges, 1);
     });
+
+    testWidgets('memoizes filtered rows across rebuilds when filterText and rows do not change', (tester) async {
+      final rows = [
+        ['1', 'Alice', 'Engineering'],
+        ['2', 'Bob', 'Marketing'],
+        ['3', 'Charlie', 'Engineering'],
+      ];
+
+      await tester.pumpWidget(
+        resultsShell(
+          child: material.Scaffold(
+            body: material.SizedBox(
+              width: 800,
+              height: 600,
+              child: ResultsTab(
+                columns: const ['id', 'name', 'department'],
+                rows: rows,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Alice'), findsOneWidget);
+      expect(find.text('Bob'), findsOneWidget);
+      expect(find.text('Charlie'), findsOneWidget);
+      expect(find.text('3 rows'), findsOneWidget);
+
+      // Open quick filter bar
+      await tester.tap(find.byTooltip('Toggle Quick Filter'));
+      await tester.pumpAndSettle();
+
+      // Enter filter text 'Engineering'
+      await tester.enterText(find.byType(material.TextField), 'Engineering');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Alice'), findsOneWidget);
+      expect(find.text('Charlie'), findsOneWidget);
+      expect(find.text('Bob'), findsNothing);
+      expect(find.text('2 of 3 rows'), findsOneWidget);
+
+      // Trigger a state change / rebuild (e.g. toggle value panel)
+      await tester.tap(find.byTooltip('Inspect Cell Panel'));
+      await tester.pumpAndSettle();
+
+      // Filtered rows should remain stable and correctly preserved
+      expect(find.text('Alice'), findsOneWidget);
+      expect(find.text('Charlie'), findsOneWidget);
+      expect(find.text('Bob'), findsNothing);
+      expect(find.text('2 of 3 rows'), findsOneWidget);
+    });
   });
 }
+

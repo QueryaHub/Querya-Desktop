@@ -66,6 +66,39 @@ class _ResultsTabState extends material.State<ResultsTab> {
 
   GridCalcStats _selectionStats = GridCalcStats.empty;
 
+  String? _memoFilterText;
+  List<String>? _memoColumns;
+  List<List<String>>? _memoEffectiveRows;
+  List<List<String>> _cachedFilteredRows = const [];
+
+  List<List<String>> _getFilteredRows(
+    List<List<String>> effectiveRows,
+    List<String> columns,
+  ) {
+    if (_memoFilterText == _filterText &&
+        identical(_memoEffectiveRows, effectiveRows) &&
+        identical(_memoColumns, columns)) {
+      return _cachedFilteredRows;
+    }
+
+    final filteredIndices = GridFilterEngine.filterRowIndices(
+      filterText: _filterText,
+      columns: columns,
+      rows: effectiveRows,
+    );
+
+    final filteredRows = filteredIndices.length == effectiveRows.length
+        ? effectiveRows
+        : filteredIndices.map((i) => effectiveRows[i]).toList();
+
+    _memoFilterText = _filterText;
+    _memoEffectiveRows = effectiveRows;
+    _memoColumns = columns;
+    _cachedFilteredRows = filteredRows;
+
+    return filteredRows;
+  }
+
   @override
   Widget build(BuildContext context) {
     return QueryaFadeSlide(
@@ -122,15 +155,7 @@ class _ResultsTabState extends material.State<ResultsTab> {
         ? widget.stagingBuffer!.effectiveRows
         : widget.rows;
 
-    final filteredIndices = GridFilterEngine.filterRowIndices(
-      filterText: _filterText,
-      columns: widget.columns,
-      rows: effectiveRows,
-    );
-
-    final filteredRows = filteredIndices.length == effectiveRows.length
-        ? effectiveRows
-        : filteredIndices.map((i) => effectiveRows[i]).toList();
+    final filteredRows = _getFilteredRows(effectiveRows, widget.columns);
 
     return material.CallbackShortcuts(
       bindings: {
