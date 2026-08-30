@@ -176,40 +176,52 @@ class MainScreenWorkspaceState {
   MainScreenWorkspaceState restoreLastSelectedObject() {
     final conn = activeConnection;
     if (conn == null) return this;
-    if (lastSelectedPostgresObject != null) {
-      final obj = lastSelectedPostgresObject!;
-      return selectPostgresObject(
-        conn,
-        obj.database,
-        obj.schema,
-        obj.name,
-        obj.kind,
-      );
-    }
-    if (lastSelectedMysqlObject != null) {
-      final obj = lastSelectedMysqlObject!;
-      return selectMysqlObject(
-        conn,
-        obj.database,
-        obj.name,
-        obj.kind,
-      );
-    }
-    if (lastSelectedSqliteObject != null) {
-      final obj = lastSelectedSqliteObject!;
-      return selectSqliteObject(
-        conn,
-        obj.name,
-        obj.kind,
-      );
-    }
-    if (lastSelectedExtensionObject != null) {
-      final obj = lastSelectedExtensionObject!;
-      return selectExtensionObject(
-        conn,
-        obj.database,
-        obj.name,
-      );
+    final type = conn.type.toLowerCase();
+    switch (type) {
+      case 'postgres':
+      case 'postgresql':
+        if (lastSelectedPostgresObject != null) {
+          final obj = lastSelectedPostgresObject!;
+          return selectPostgresObject(
+            conn,
+            obj.database,
+            obj.schema,
+            obj.name,
+            obj.kind,
+          );
+        }
+        break;
+      case 'mysql':
+        if (lastSelectedMysqlObject != null) {
+          final obj = lastSelectedMysqlObject!;
+          return selectMysqlObject(
+            conn,
+            obj.database,
+            obj.name,
+            obj.kind,
+          );
+        }
+        break;
+      case 'sqlite':
+        if (lastSelectedSqliteObject != null) {
+          final obj = lastSelectedSqliteObject!;
+          return selectSqliteObject(
+            conn,
+            obj.name,
+            obj.kind,
+          );
+        }
+        break;
+      default:
+        if (lastSelectedExtensionObject != null) {
+          final obj = lastSelectedExtensionObject!;
+          return selectExtensionObject(
+            conn,
+            obj.database,
+            obj.name,
+          );
+        }
+        break;
     }
     return this;
   }
@@ -240,9 +252,9 @@ class MainScreenWorkspaceState {
       selectedSqliteObject: null,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
       lastSelectedPostgresObject: pg,
-      lastSelectedMysqlObject: lastSelectedMysqlObject,
-      lastSelectedSqliteObject: lastSelectedSqliteObject,
-      lastSelectedExtensionObject: lastSelectedExtensionObject,
+      lastSelectedMysqlObject: null,
+      lastSelectedSqliteObject: null,
+      lastSelectedExtensionObject: null,
       isReadOnly: isReadOnly,
     );
   }
@@ -270,10 +282,10 @@ class MainScreenWorkspaceState {
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
       selectedSqliteObject: null,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
-      lastSelectedPostgresObject: lastSelectedPostgresObject,
+      lastSelectedPostgresObject: null,
       lastSelectedMysqlObject: my,
-      lastSelectedSqliteObject: lastSelectedSqliteObject,
-      lastSelectedExtensionObject: lastSelectedExtensionObject,
+      lastSelectedSqliteObject: null,
+      lastSelectedExtensionObject: null,
       isReadOnly: isReadOnly,
     );
   }
@@ -299,10 +311,10 @@ class MainScreenWorkspaceState {
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
       selectedSqliteObject: sq,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
-      lastSelectedPostgresObject: lastSelectedPostgresObject,
-      lastSelectedMysqlObject: lastSelectedMysqlObject,
+      lastSelectedPostgresObject: null,
+      lastSelectedMysqlObject: null,
       lastSelectedSqliteObject: sq,
-      lastSelectedExtensionObject: lastSelectedExtensionObject,
+      lastSelectedExtensionObject: null,
       isReadOnly: isReadOnly,
     );
   }
@@ -329,9 +341,9 @@ class MainScreenWorkspaceState {
       selectedSqliteObject: null,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
       selectedExtensionObject: ext,
-      lastSelectedPostgresObject: lastSelectedPostgresObject,
-      lastSelectedMysqlObject: lastSelectedMysqlObject,
-      lastSelectedSqliteObject: lastSelectedSqliteObject,
+      lastSelectedPostgresObject: null,
+      lastSelectedMysqlObject: null,
+      lastSelectedSqliteObject: null,
       lastSelectedExtensionObject: ext,
       isReadOnly: isReadOnly,
     );
@@ -350,10 +362,10 @@ class MainScreenWorkspaceState {
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
       selectedSqliteObject: null,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
-      lastSelectedPostgresObject: lastSelectedPostgresObject,
-      lastSelectedMysqlObject: lastSelectedMysqlObject,
-      lastSelectedSqliteObject: lastSelectedSqliteObject,
-      lastSelectedExtensionObject: lastSelectedExtensionObject,
+      lastSelectedPostgresObject: null,
+      lastSelectedMysqlObject: null,
+      lastSelectedSqliteObject: null,
+      lastSelectedExtensionObject: null,
       isReadOnly: isReadOnly,
     );
   }
@@ -372,10 +384,10 @@ class MainScreenWorkspaceState {
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
       selectedSqliteObject: null,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
-      lastSelectedPostgresObject: lastSelectedPostgresObject,
-      lastSelectedMysqlObject: lastSelectedMysqlObject,
-      lastSelectedSqliteObject: lastSelectedSqliteObject,
-      lastSelectedExtensionObject: lastSelectedExtensionObject,
+      lastSelectedPostgresObject: null,
+      lastSelectedMysqlObject: null,
+      lastSelectedSqliteObject: null,
+      lastSelectedExtensionObject: null,
       isReadOnly: isReadOnly,
     );
   }
