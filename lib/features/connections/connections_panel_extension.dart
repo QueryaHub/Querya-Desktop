@@ -139,6 +139,11 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final sel = _ConnectionsTreeSelectionScope.of(context);
+    final selectedExt = (sel != null &&
+            sel.selectedConnectionId == widget.connection.id)
+        ? sel.selectedExtensionObject
+        : null;
     final material.Widget iconWidget;
     if (_iconFilePath != null) {
       iconWidget = DriverIconImage(
@@ -322,6 +327,29 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
                               schema: _schema!,
                               fetchChildren: _fetchChildren,
                               onNodeSelected: _onNodeSelected,
+                              isNodeSelected: selectedExt == null
+                                  ? null
+                                  : (node) {
+                                      final metaDb = node.meta['database'] ??
+                                          node.meta['db'];
+                                      final metaName = node.meta['table'] ??
+                                          node.meta['tableName'] ??
+                                          node.meta['name'];
+                                      if (metaDb != null && metaName != null) {
+                                        if (metaDb == selectedExt.database &&
+                                            metaName == selectedExt.name) {
+                                          return true;
+                                        }
+                                      }
+                                      final parts = node.id.split('.');
+                                      if (parts.length >= 3) {
+                                        final db = parts[1];
+                                        final name = parts.sublist(2).join('.');
+                                        return db == selectedExt.database &&
+                                            name == selectedExt.name;
+                                      }
+                                      return false;
+                                    },
                               maxHeight: kConnectionTreeMaxVisibleRows *
                                   kConnectionTreeRowExtent,
                             ),
