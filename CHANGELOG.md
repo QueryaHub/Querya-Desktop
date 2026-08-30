@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.14] - 2026-08-30
+
+Near-instantaneous menubar dropdowns, native macOS PlatformMenuBar integration, destructive query confirmation safety modals, comprehensive memory optimizations (string interning, compact storage), grid keyboard navigation, rich cell inspector, and driver resilience hardening.
+
+### Added
+
+- **Instantaneous Menubar Dropdowns (#672, #673)** — Accelerated dropdown open animation to 60ms with `Curves.easeOutCubic`, eliminated initial pointer-down delay, unhindered titlebar dragging from gesture arena interference, and added toggle-close support.
+- **Native macOS PlatformMenuBar Integration (#612, #626)** — Full native macOS top system menu integration with standard application, file, edit, view, and window submenus.
+- **Destructive Query Confirmation Modal (#608, #622, #638, #641)** — Safety confirmation dialog for high-risk DDL and DML operations (`DROP`, `TRUNCATE`, bulk `DELETE`/`UPDATE` without `WHERE`) with SQL preview, detected operations list, and explicit acknowledgement check for core and extension workspaces.
+- **Full Data Grid Keyboard Navigation (#662, #664)** — Seamless keyboard traversal across virtual grid cells using arrow keys, Tab/Shift+Tab, Enter to commit, and Escape to cancel.
+- **Rich Cell Inspector Dialog (#663, #665)** — Dedicated multi-format modal inspector with tabbed views for raw text, JSON, XML/HTML, and binary/hex with word wrap toggle and copy actions.
+- **Binary & BLOB Support in DML (#658, #661)** — Added full support for binary BLOB data in cell editing, DML staging buffer, and dialect-specific SQL generation (`X'...'`, `\x...`).
+- **Extension Driver Crash Recovery & Restart UI (#667, #669)** — Visual driver crash banner with automatic heartbeat monitoring and one-click manual driver restart button.
+- **Interactive Welcome Tour Expansion (#606, #624)** — Expanded onboarding guide with 6 interactive steps, keyboard shortcuts reference matrix, and 1-click sample sandbox setup.
+- **Bi-Directional Navigation (#630, #635)** — Quick navigation links between database overview statistics, home view, and active tables.
+- **Active Selection Sync to Tree (#633, #637)** — Synchronized active table and view selection in tabs with the connections sidebar tree.
+- **Extension Driver SDUI Tree Selection Highlight (#639, #642)** — Visual selection highlighting for SDUI trees rendered by extension drivers.
+- **Querya Extension Driver Mutation Standard (#563, #628)** — Formalized mutation standard specification and test suite for extension drivers.
+
+### Changed & Performance
+
+- **String Interning Pool (#604, #625)** — Deduplicated low-cardinality string allocations in query result grids, slashing heap allocations during large dataset exploration.
+- **Compact Typed Storage & Lazy Cell Stringification (#605, #627)** — Compact memory representation for primitive column vectors, deferring string conversions until render.
+- **Schwartzian Transform Grid Sorting (#602, #615)** — Precomputed sort keys in `sortResultGridRows` to eliminate redundant comparisons during column header sorts.
+- **QuickSelect Median Calculation (#603, #616)** — O(N) median computation in `GridSelectionCalcEngine` instead of O(N log N) sorting.
+- **Background Selection Calculation Offloading (#652, #655)** — Offloaded massive cell selection statistics calculations to background compute workers to keep the UI at 60 FPS.
+- **DataGrid Filter Bar Debouncing (#651, #654)** — Debounced keystroke evaluation in the filter bar to avoid stutter during rapid filter typing.
+- **ResultsTab Filtering Memoization (#650, #653)** — Cached filtered row indices when filter predicates and dataset rows remain unchanged across rebuilds.
+- **Modularized Shared SQL Editor & Workbench (#646, #649)** — Clean modular decoupling of SQL editor tabs, query runners, and workbench state.
+- **Inverted Core Imports Cleanup (#644, #647)** — Eliminated circular/inverted core-to-feature dependencies and cleanly extracted connection models to core.
+- **App Lifecycle & Dispose Resource Cleanup (#670, #671)** — Hardened teardown of timer subscriptions, workers, and active sockets upon window closure.
+- **Connection Pool Delay Tuning (#597, #601)** — Reduced idle connection disposal delay to 4 seconds for rapid tab switching.
+
+### Fixed
+
+- **In-Memory Secret Scrubbing (#607, #623)** — Zeroed in-memory buffers for database passwords and sensitive connection parameters immediately after authentication.
+- **Redis Safe Disconnect & Socket Resilience (#657, #660)** — Protected Redis clients against unhandled socket close exceptions and connection teardown race conditions.
+- **SQLite WAL Mode & Busy Timeout (#611, #617, #656, #659)** — Enabled Write-Ahead Logging (WAL) and 5000ms busy timeout in LocalDb and SQLite workspaces to eliminate database lock errors.
+- **LocalDb Single-Flight Initialization (#645, #648)** — Guarded `LocalDb._open` against concurrent re-initialization race conditions.
+- **Plugin JSON-RPC Bridge Resilience (#666, #668)** — Added heartbeat ping-pong, buffered message queues, and graceful restart on extension pipe drops.
+- **SQL History Monotonic Ordering & Pruning (#629)** — Guaranteed monotonic ordering by auto-incrementing ID in query history queries and batch prune operations.
+- **Literal 'NULL' vs Database NULL Differentiation (#595, #599)** — Fixed DML preview and staging buffer improperly treating the literal text `'NULL'` as SQL `NULL`.
+- **DML Leading Zeroes Preservation (#594, #598)** — Prevented numeric string values (such as postal codes or phone numbers with leading zeroes) from being coerced to integers in generated DML.
+- **Missing Primary Key Warning in DML (#596, #600)** — Displayed explicit duplicate key warnings in the DML preview modal for tables lacking primary keys.
+- **Motion Wobble Harmonization (#631, #634)** — Harmonized workspace transition curves to eliminate dual-axis wobble during connection switching.
+- **MongoDB & Redis Breadcrumbs (#632, #636)** — Preserved persistent breadcrumbs and smooth transitions during NoSQL key and collection navigation.
+- **Focus Traversal in Connection Forms (#610, #621)** — Configured explicit `FocusTraversalGroup`s across multi-field connection dialogs.
+- **Light Theme Accent Contrast (#609, #619)** — Enhanced light theme accent and ring contrast ratios for WCAG compliance.
+- **Monospace Font Stack (#613, #618)** — Added Cascadia Code and Consolas to default monospace font fallback list.
+- **Linux GDK Log Spam (#614, #620)** — Suppressed benign synthetic pointer and cursor theme GDK warnings in Linux console logs.
+
+
 ## [0.4.13] - 2026-08-25
 
 Production-ready UI polish, complete interactive Data Grid editing suite, advanced query filtering, fluid collapsible navigation, and platform hardening.
