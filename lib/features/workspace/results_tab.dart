@@ -371,9 +371,23 @@ class _ResultsTabState extends material.State<ResultsTab> {
                         stagingBuffer: widget.stagingBuffer,
                         onRowSelected: (row) => setState(() => _selectedRowIndex = row),
                         onSelectionValuesChanged: (values) {
-                          setState(() {
-                            _selectionStats = GridSelectionCalcEngine.compute(values);
-                          });
+                          if (values.isEmpty) {
+                            setState(() => _selectionStats = GridCalcStats.empty);
+                            return;
+                          }
+                          if (values.length < GridSelectionCalcEngine.computeThreshold) {
+                            setState(() {
+                              _selectionStats = GridSelectionCalcEngine.compute(values);
+                            });
+                          } else {
+                            unawaited(
+                              GridSelectionCalcEngine.computeAdaptive(values).then((stats) {
+                                if (mounted) {
+                                  setState(() => _selectionStats = stats);
+                                }
+                              }),
+                            );
+                          }
                         },
                         onCellFocused: (colName, cellVal, rowIdx) {
                           setState(() {

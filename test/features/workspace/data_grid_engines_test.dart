@@ -209,6 +209,28 @@ void main() {
       final expectedEvenMedian = (evenParsed[499] + evenParsed[500]) / 2.0;
       expect(evenStats.median, equals(expectedEvenMedian));
     });
+
+    test('computeAdaptive returns empty stats for empty list', () async {
+      final stats = await GridSelectionCalcEngine.computeAdaptive(const []);
+      expect(stats, equals(GridCalcStats.empty));
+    });
+
+    test('computeAdaptive computes synchronously below threshold', () async {
+      final values = ['10', '20', '30'];
+      final stats = await GridSelectionCalcEngine.computeAdaptive(values, threshold: 10);
+      expect(stats.totalCount, 3);
+      expect(stats.sum, 60.0);
+      expect(stats.average, 20.0);
+    });
+
+    test('computeAdaptive computes via background isolate above threshold', () async {
+      final values = List<String>.generate(100, (i) => '$i');
+      final stats = await GridSelectionCalcEngine.computeAdaptive(values, threshold: 50);
+      expect(stats.totalCount, 100);
+      expect(stats.min, 0.0);
+      expect(stats.max, 99.0);
+      expect(stats.sum, 4950.0);
+    });
   });
 
   group('GridGroupingsEngine', () {
