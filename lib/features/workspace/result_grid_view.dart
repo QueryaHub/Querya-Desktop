@@ -592,7 +592,12 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   }
 
   Future<void> _openInspector(int row, int column) async {
-    if (row < 0 || row >= _sortedRows.length || column < 0 || column >= widget.columns.length) return;
+    if (row < 0 ||
+        row >= _sortedRows.length ||
+        column < 0 ||
+        column >= widget.columns.length) {
+      return;
+    }
     final colName = widget.columns[column];
     final currentVal = column < _sortedRows[row].length ? _sortedRows[row][column] : '';
     final result = await showGridCellInspectorDialog(
@@ -1050,6 +1055,22 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
         },
         const material.SingleActivator(
           LogicalKeyboardKey.space,
+        ): () {
+          if (_selection != null && _editingCell == null) {
+            _openInspector(_selection!.startRow, _selection!.startColumn);
+          }
+        },
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyI,
+          control: true,
+        ): () {
+          if (_selection != null && _editingCell == null) {
+            _openInspector(_selection!.startRow, _selection!.startColumn);
+          }
+        },
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyI,
+          meta: true,
         ): () {
           if (_selection != null && _editingCell == null) {
             _openInspector(_selection!.startRow, _selection!.startColumn);
