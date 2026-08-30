@@ -407,10 +407,15 @@ class _MongoDatabaseNode extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final sel = _ConnectionsTreeSelectionScope.of(context);
+    final isSelected = sel != null &&
+        sel.selectedConnectionId == connection.id &&
+        sel.selectedMongoDb == name;
     return material.Padding(
       padding: const material.EdgeInsets.only(left: 16, top: 2, bottom: 2),
       child: _PgTreeRow(
         label: name,
+        isSelected: isSelected,
         icon: QueryaIcons.database,
         iconSize: QueryaIconSizes.treeConnection,
         iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),

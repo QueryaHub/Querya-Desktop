@@ -3,6 +3,7 @@ import 'package:querya_desktop/core/extensions/extension_driver_session.dart';
 import 'package:querya_desktop/core/extensions/models/extension_driver_capabilities.dart';
 import 'package:querya_desktop/core/extensions/models/extension_object_metadata.dart';
 import 'package:querya_desktop/core/extensions/models/extension_server_stats.dart';
+import 'package:querya_desktop/core/extensions/models/sandbox_capabilities.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 
 void main() {
@@ -61,6 +62,8 @@ void main() {
         'supportsDDLInspection': true,
         'supportsPrivileges': false,
         'hasServerStats': true,
+        'supportsMutations': true,
+        'supportsBatchMutations': true,
       });
 
       expect(caps.supportsTransactions, isTrue);
@@ -68,6 +71,12 @@ void main() {
       expect(caps.supportsDDLInspection, isTrue);
       expect(caps.supportsPrivileges, isFalse);
       expect(caps.hasServerStats, isTrue);
+      expect(caps.supportsMutations, isTrue);
+      expect(caps.supportsBatchMutations, isTrue);
+
+      final json = caps.toJson();
+      expect(json['supportsMutations'], isTrue);
+      expect(json['supportsBatchMutations'], isTrue);
     });
 
     test('ExtensionServerStats.fromRpc normalizes metrics map', () {
@@ -127,6 +136,37 @@ void main() {
       expect(metadata.columns[0].isNullable, isFalse);
       expect(metadata.columns[0].comment, 'Primary ID');
       expect(metadata.properties['engine'], 'MergeTree');
+    });
+
+    test('ResourceLimits parses timeout_seconds correctly', () {
+      final limits = ResourceLimits.fromJson({
+        'memory_mb': 512,
+        'max_open_files': 128,
+        'timeout_seconds': 600,
+      });
+
+      expect(limits.memoryMb, 512);
+      expect(limits.maxOpenFiles, 128);
+      expect(limits.timeoutSeconds, 600);
+      expect(limits.toJson()['timeout_seconds'], 600);
+    });
+
+    test('restart disconnects active session and validates extension driver presence', () async {
+      const row = ConnectionRow(
+        id: 888,
+        type: 'postgresql',
+        name: 'PG',
+        createdAt: '2026-01-01T00:00:00Z',
+      );
+
+      await expectLater(
+        ExtensionDriverSession.instance.restart(row),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('not backed by an installed extension driver'),
+        )),
+      );
     });
   });
 }

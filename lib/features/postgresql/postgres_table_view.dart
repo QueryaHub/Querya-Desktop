@@ -19,6 +19,7 @@ class PostgresTableView extends material.StatefulWidget {
     this.isView = false,
     this.isMaterializedView = false,
     this.limit = kPostgresBrowseDefaultRowLimit,
+    this.onNavigateHome,
   });
 
   final ConnectionRow connectionRow;
@@ -26,6 +27,7 @@ class PostgresTableView extends material.StatefulWidget {
   final String schema;
   final String tableName;
   final bool isView;
+  final VoidCallback? onNavigateHome;
 
   /// When true, toolbar offers REFRESH MATERIALIZED VIEW and matview label.
   final bool isMaterializedView;
@@ -515,6 +517,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
             loading: _loading,
             canGoPrevious: _canGoPrevious,
             canGoNext: _canGoNext,
+            onNavigateHome: widget.onNavigateHome,
             onOpenSql: _openSqlEditor,
             onOpenPrivileges: _openPrivileges,
             onRefreshMaterializedView: _refreshMaterializedView,

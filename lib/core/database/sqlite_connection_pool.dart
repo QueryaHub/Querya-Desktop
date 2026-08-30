@@ -53,7 +53,7 @@ class SqliteConnectionPool {
     this.maxEntries = defaultMaxEntries,
   });
 
-  static const Duration defaultIdleDisposeDelay = Duration(seconds: 8);
+  static const Duration defaultIdleDisposeDelay = Duration(seconds: 4);
   static const int defaultMaxEntries = 32;
 
   final SqlitePoolConnectionFactory createAndConnect;

@@ -270,6 +270,7 @@ class _QueryaCodeEditorState extends State<QueryaCodeEditor> {
     final size = widget.fontSize ?? editor.fontSize;
     return material.TextStyle(
       fontFamily: editor.fontFamily,
+      fontFamilyFallback: editor.fontFamilyFallback,
       fontSize: size,
       color: editor.foreground,
       height: widget.language == QueryaCodeLanguage.json ? 1.5 : null,

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:mongo_dart/mongo_dart.dart';
-import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
+import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
+import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 
 /// MongoDB connection configuration and state.
 class MongoConnection {
@@ -10,42 +11,54 @@ class MongoConnection {
     required this.host,
     this.port = 27017,
     this.username,
-    this.password,
+    String? password,
     this.database,
     this.authSource,
     this.useSSL = false,
     this.replicaSet,
-    this.connectionString,
-  });
+    String? connectionString,
+  })  : _password = password,
+        _connectionString = connectionString;
 
   final int id;
   final String name;
   final String host;
   final int port;
   final String? username;
-  final String? password;
+  String? _password;
   final String? database;
   final String? authSource;
   final bool useSSL;
   final String? replicaSet;
-  final String? connectionString;
+  String? _connectionString;
+
+  String? get password => _password;
+  String? get connectionString => _connectionString;
 
   Db? _db;
   bool _isConnected = false;
 
+  /// Scrubs sensitive in-memory credentials once the network handshake completes.
+  void scrubCredentials() {
+    _password = null;
+    _connectionString = null;
+  }
+
   /// Builds MongoDB connection URI from configuration.
-  String buildConnectionUri() {
-    if (connectionString != null && connectionString!.isNotEmpty) {
-      return connectionString!;
+  String buildConnectionUri({String? pass, String? connStr}) {
+    final effectiveConnStr = connStr ?? _connectionString;
+    if (effectiveConnStr != null && effectiveConnStr.isNotEmpty) {
+      return effectiveConnStr;
     }
 
     final buffer = StringBuffer('mongodb://');
 
     // Add authentication if provided
+    final effectivePass = pass ?? _password;
     if (username != null && username!.isNotEmpty) {
       buffer.write(Uri.encodeComponent(username!));
-      if (password != null && password!.isNotEmpty) {
-        buffer.write(':${Uri.encodeComponent(password!)}');
+      if (effectivePass != null && effectivePass.isNotEmpty) {
+        buffer.write(':${Uri.encodeComponent(effectivePass)}');
       }
       buffer.write('@');
     }
@@ -86,8 +99,8 @@ class MongoConnection {
   /// exists, the method automatically adds `authSource=<original_db>` (defaults
   /// to `admin`) so that authentication succeeds on databases other than the
   /// one the user was created in.
-  String buildUriForDatabase(String databaseName) {
-    final baseUri = buildConnectionUri();
+  String buildUriForDatabase(String databaseName, {String? pass, String? connStr}) {
+    final baseUri = buildConnectionUri(pass: pass, connStr: connStr);
     final uri = Uri.parse(baseUri);
 
     // Determine the authSource that should be used.
@@ -120,11 +133,28 @@ class MongoConnection {
       return;
     }
 
+    var effectivePassword = _password;
+    var effectiveConnectionString = _connectionString;
+
+    if ((effectivePassword == null || effectivePassword.isEmpty) &&
+        (effectiveConnectionString == null || effectiveConnectionString.isEmpty) &&
+        id > 0) {
+      try {
+        final secrets = await ConnectionSecretsStore.readForConnection(id);
+        effectivePassword = secrets.password;
+        effectiveConnectionString = secrets.connectionString;
+      } catch (_) {}
+    }
+
     try {
-      final uri = await _effectiveMongoUri();
+      final uri = await _effectiveMongoUri(
+        pass: effectivePassword,
+        connStr: effectiveConnectionString,
+      );
       _db = await Db.create(uri);
       await _db!.open();
       _isConnected = true;
+      scrubCredentials();
     } catch (e) {
       _isConnected = false;
       _db = null;
@@ -132,8 +162,8 @@ class MongoConnection {
     }
   }
 
-  Future<String> _effectiveMongoUri() async {
-    final base = buildConnectionUri();
+  Future<String> _effectiveMongoUri({String? pass, String? connStr}) async {
+    final base = buildConnectionUri(pass: pass, connStr: connStr);
     final parsed = Uri.parse(base);
     final paths = extractSslCertificatePaths(parsed);
     final params = Map<String, String>.from(parsed.queryParameters);

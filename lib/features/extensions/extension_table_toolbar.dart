@@ -22,6 +22,9 @@ class ExtensionTableToolbar extends material.StatelessWidget {
     this.onCancelQuery,
     this.onCopyFormat,
     this.onSaveFormat,
+    this.onNavigateHome,
+    this.onRestartDriver,
+    this.isRestarting = false,
   });
 
   final String title;
@@ -40,6 +43,9 @@ class ExtensionTableToolbar extends material.StatelessWidget {
   final VoidCallback? onCancelQuery;
   final material.ValueChanged<DataExportFormat>? onCopyFormat;
   final material.ValueChanged<DataExportFormat>? onSaveFormat;
+  final VoidCallback? onNavigateHome;
+  final VoidCallback? onRestartDriver;
+  final bool isRestarting;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -58,6 +64,21 @@ class ExtensionTableToolbar extends material.StatelessWidget {
       ),
       child: material.Row(
         children: [
+          if (onNavigateHome != null) ...[
+            material.Tooltip(
+              message: 'Return to driver overview',
+              child: OutlineButton(
+                size: ButtonSize.small,
+                onPressed: onNavigateHome,
+                leading: const material.Icon(
+                  material.Icons.dns_outlined,
+                  size: 14,
+                ),
+                child: const Text('Driver'),
+              ),
+            ),
+            const Gap(10),
+          ],
           material.Icon(tableIcon, size: 18, color: cs.primary),
           const Gap(8),
           material.Expanded(
@@ -163,7 +184,7 @@ class ExtensionTableToolbar extends material.StatelessWidget {
                             material.Icons.chevron_left_rounded,
                             size: 16,
                           ),
-                          child: const Text('Back'),
+                          child: const Text('Prev'),
                         ),
                         const Gap(4),
                         OutlineButton(
@@ -176,6 +197,26 @@ class ExtensionTableToolbar extends material.StatelessWidget {
                           child: const Text('Next'),
                         ),
                         const Gap(8),
+                        if (onRestartDriver != null) ...[
+                          OutlineButton(
+                            size: ButtonSize.small,
+                            onPressed: loading || isRestarting ? null : onRestartDriver,
+                            leading: isRestarting
+                                ? const material.SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: material.CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const material.Icon(
+                                    material.Icons.restart_alt_rounded,
+                                    size: 15,
+                                  ),
+                            child: Text(isRestarting ? 'Restarting...' : 'Restart Driver'),
+                          ),
+                          const Gap(4),
+                        ],
                         OutlineButton(
                           size: ButtonSize.small,
                           onPressed: loading ? null : onRefresh,

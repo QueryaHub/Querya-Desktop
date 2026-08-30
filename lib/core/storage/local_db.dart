@@ -33,6 +33,7 @@ class LocalDb {
 
   Database? _db;
   String? _cachedDbPath;
+  Future<Database>? _openFuture;
 
   static Future<void> initFfi() async {
     if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
@@ -42,6 +43,19 @@ class LocalDb {
 
   Future<Database> _open() async {
     if (_db != null && _db!.isOpen) return _db!;
+    if (_openFuture != null) return _openFuture!;
+
+    final future = _doOpen();
+    _openFuture = future;
+    try {
+      return await future;
+    } catch (_) {
+      _openFuture = null;
+      rethrow;
+    }
+  }
+
+  Future<Database> _doOpen() async {
     await initFfi();
     if (_cachedDbPath == null) {
       final dir = await AppDataRoot.applicationSupportDirectory();
@@ -49,7 +63,7 @@ class LocalDb {
       if (!await sub.exists()) await sub.create(recursive: true);
       _cachedDbPath = p.join(sub.path, _dbName);
     }
-    _db = await databaseFactoryFfi.openDatabase(
+    final db = await databaseFactoryFfi.openDatabase(
       _cachedDbPath!,
       options: OpenDatabaseOptions(
         version: _dbVersion,
@@ -57,10 +71,25 @@ class LocalDb {
         onUpgrade: _onUpgrade,
         onOpen: (db) async {
           await db.execute('PRAGMA foreign_keys = ON');
+          await db.execute('PRAGMA journal_mode = WAL');
+          await db.execute('PRAGMA busy_timeout = 5000');
+          await db.execute('PRAGMA synchronous = NORMAL');
         },
       ),
     );
-    return _db!;
+    _db = db;
+    _openFuture = null;
+    return db;
+  }
+
+  /// Queries an active PRAGMA setting from the database for verification and diagnostic purposes.
+  Future<String> getPragma(String pragmaName) async {
+    final db = await _open();
+    final res = await db.rawQuery('PRAGMA $pragmaName');
+    if (res.isNotEmpty && res.first.values.isNotEmpty) {
+      return res.first.values.first.toString();
+    }
+    return '';
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -294,7 +323,7 @@ class LocalDb {
       '''
       SELECT id FROM sql_query_history
       WHERE connection_id = ? AND database_name IS NOT DISTINCT FROM ?
-      ORDER BY recorded_at ASC, id ASC
+      ORDER BY id ASC
       LIMIT ?
       ''',
       [connectionId, databaseName, excess],
@@ -327,7 +356,7 @@ class LocalDb {
       SELECT id, connection_id, database_name, sql_text, recorded_at
       FROM sql_query_history
       WHERE connection_id = ? AND database_name IS NOT DISTINCT FROM ?
-      ORDER BY recorded_at DESC, id DESC
+      ORDER BY id DESC
       LIMIT ?
       ''',
       [connectionId, dbKey, limit],
@@ -337,6 +366,7 @@ class LocalDb {
 
   /// Removes all history rows for [connectionId] (every database bucket).
   Future<void> clearSqlQueryHistoryForConnection(int connectionId) async {
+    _historyInsertCounts.removeWhere((k, _) => k.startsWith('$connectionId::'));
     final db = await _open();
     await db.delete(
       'sql_query_history',
@@ -350,8 +380,9 @@ class LocalDb {
     required int connectionId,
     String? databaseName,
   }) async {
-    final db = await _open();
     final dbKey = _normalizeHistoryDatabaseName(databaseName);
+    _historyInsertCounts.remove('$connectionId::${dbKey ?? ''}');
+    final db = await _open();
     await db.rawDelete(
       '''
       DELETE FROM sql_query_history
@@ -511,6 +542,7 @@ class LocalDb {
   /// Deletes a connection. SQLite deletion always proceeds even if the secure
   /// store delete fails (e.g. missing key or unavailable libsecret daemon).
   Future<void> removeConnection(int id) async {
+    _historyInsertCounts.removeWhere((k, _) => k.startsWith('$id::'));
     try {
       await ConnectionSecretsStore.deleteForConnection(id);
     } catch (_) {
@@ -521,6 +553,7 @@ class LocalDb {
   }
 
   Future<void> close() async {
+    _openFuture = null;
     await _db?.close();
     _db = null;
     _cachedDbPath = null;
@@ -696,4 +729,21 @@ class ConnectionRow {
       createdAt: createdAt ?? this.createdAt,
     );
   }
+
+  /// Whether in-memory password credentials are set.
+  bool get hasPassword => password != null && password!.isNotEmpty;
+
+  /// Whether in-memory connection URI credentials are set.
+  bool get hasConnectionString =>
+      connectionString != null && connectionString!.isNotEmpty;
+
+  /// Whether any in-memory secret credentials are held.
+  bool get hasSecrets => hasPassword || hasConnectionString;
+
+  /// Returns a clean copy of this [ConnectionRow] with all secret credentials
+  /// ([password] and [connectionString]) scrubbed to null.
+  ConnectionRow withoutSecrets() => copyWith(
+        clearPassword: true,
+        clearConnectionString: true,
+      );
 }

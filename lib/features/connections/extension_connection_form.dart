@@ -200,10 +200,12 @@ class _ExtensionConnectionFormContentState
         minWidth: 440,
       ),
       borderColor: theme.muted,
-      child: material.Column(
-        mainAxisSize: material.MainAxisSize.min,
-        crossAxisAlignment: material.CrossAxisAlignment.stretch,
-        children: [
+      child: material.FocusTraversalGroup(
+        policy: material.WidgetOrderTraversalPolicy(),
+        child: material.Column(
+          mainAxisSize: material.MainAxisSize.min,
+          crossAxisAlignment: material.CrossAxisAlignment.stretch,
+          children: [
             material.Padding(
               padding: const material.EdgeInsets.fromLTRB(24, 24, 24, 8),
               child: material.Column(
@@ -218,96 +220,103 @@ class _ExtensionConnectionFormContentState
               ),
             ),
             material.Flexible(
-              child: material.SingleChildScrollView(
-                padding: const material.EdgeInsets.fromLTRB(24, 8, 24, 8),
-                child: material.Column(
-                  crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                  children: [
-                    const Text('Connection name').small().muted(),
-                    const material.SizedBox(height: 4),
-                    TextField(
-                      controller: _nameController,
-                      placeholder: const Text('My ClickHouse'),
-                    ),
-                    const material.SizedBox(height: 16),
-                    if (_loading)
-                      const material.Padding(
-                        padding: material.EdgeInsets.all(24),
-                        child: material.Center(
-                          child: material.CircularProgressIndicator(),
-                        ),
-                      )
-                    else if (_loadError != null)
-                      Text(_loadError!).muted().small()
-                    else if (_schema != null)
-                      SduiFormBuilder(
-                        key: _formKey,
-                        schema: _schema!,
-                        initialValues: _initialValues,
-                        keepExistingSecrets: _isEditing,
+              child: material.FocusTraversalGroup(
+                policy: material.WidgetOrderTraversalPolicy(),
+                child: material.SingleChildScrollView(
+                  padding: const material.EdgeInsets.fromLTRB(24, 8, 24, 8),
+                  child: material.Column(
+                    crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                    children: [
+                      const Text('Connection name').small().muted(),
+                      const material.SizedBox(height: 4),
+                      TextField(
+                        controller: _nameController,
+                        placeholder: const Text('My ClickHouse'),
                       ),
-                    if (_testMessage != null) ...[
-                      const material.SizedBox(height: 12),
-                      material.SelectableText(
-                        _testMessage!,
-                        style: material.TextStyle(
-                          fontSize: 12,
-                          color: _testSucceeded
-                              ? material.Colors.green
-                              : theme.destructive,
+                      const material.SizedBox(height: 16),
+                      if (_loading)
+                        const material.Padding(
+                          padding: material.EdgeInsets.all(24),
+                          child: material.Center(
+                            child: material.CircularProgressIndicator(),
+                          ),
+                        )
+                      else if (_loadError != null)
+                        Text(_loadError!).muted().small()
+                      else if (_schema != null)
+                        SduiFormBuilder(
+                          key: _formKey,
+                          schema: _schema!,
+                          initialValues: _initialValues,
+                          keepExistingSecrets: _isEditing,
                         ),
-                      ),
+                      if (_testMessage != null) ...[
+                        const material.SizedBox(height: 12),
+                        material.SelectableText(
+                          _testMessage!,
+                          style: material.TextStyle(
+                            fontSize: 12,
+                            color: _testSucceeded
+                                ? material.Colors.green
+                                : theme.destructive,
+                          ),
+                        ),
+                      ],
                     ],
+                  ),
+                ),
+              ),
+            ),
+            material.FocusTraversalGroup(
+              policy: material.WidgetOrderTraversalPolicy(),
+              child: material.Container(
+                padding: const material.EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
+                ),
+                decoration: material.BoxDecoration(
+                  border: material.Border(
+                    top: material.BorderSide(
+                      color: theme.border.withValues(alpha: 0.3),
+                    ),
+                  ),
+                ),
+                child: material.Row(
+                  children: [
+                    OutlineButton(
+                      onPressed:
+                          _schema == null || _testing ? null : _testConnection,
+                      leading: _testing
+                          ? const material.SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: material.CircularProgressIndicator(
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const material.Icon(
+                              material.Icons.bolt_rounded,
+                              size: 16,
+                            ),
+                      child: const Text('Test Connection'),
+                    ),
+                    const Spacer(),
+                    GhostButton(
+                      onPressed: () => material.Navigator.of(context).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                    const material.SizedBox(width: 12),
+                    PrimaryButton(
+                      onPressed: _schema == null ? null : _save,
+                      child: const Text('Save'),
+                    ),
                   ],
                 ),
               ),
             ),
-            material.Container(
-              padding: const material.EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 16,
-              ),
-              decoration: material.BoxDecoration(
-                border: material.Border(
-                  top: material.BorderSide(
-                    color: theme.border.withValues(alpha: 0.3),
-                  ),
-                ),
-              ),
-              child: material.Row(
-                children: [
-                  OutlineButton(
-                    onPressed:
-                        _schema == null || _testing ? null : _testConnection,
-                    leading: _testing
-                        ? const material.SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: material.CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const material.Icon(
-                            material.Icons.bolt_rounded,
-                            size: 16,
-                          ),
-                    child: const Text('Test Connection'),
-                  ),
-                  const Spacer(),
-                  GhostButton(
-                    onPressed: () => material.Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
-                  ),
-                  const material.SizedBox(width: 12),
-                  PrimaryButton(
-                    onPressed: _schema == null ? null : _save,
-                    child: const Text('Save'),
-                  ),
-                ],
-              ),
-            ),
           ],
         ),
+      ),
     );
   }
 }

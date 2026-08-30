@@ -12,6 +12,7 @@ HighlighterTheme highlighterThemeFromQueryaEditor(
   final wrapper = TextStyle(
     color: editor.foreground,
     fontFamily: editor.fontFamily,
+    fontFamilyFallback: editor.fontFamilyFallback,
     fontSize: editor.fontSize,
   );
 

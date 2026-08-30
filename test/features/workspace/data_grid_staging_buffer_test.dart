@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
-import 'package:querya_desktop/features/main_screen/data_grid_staging_buffer.dart';
+import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 
 void main() {
   group('DataGridStagingBuffer', () {
@@ -121,6 +121,19 @@ void main() {
       expect(eff[3], ['4', 'David', 'david@test.com']);
     });
 
+    test('setCellNull and isCellNull handle explicit SQL NULL states', () {
+      expect(buffer.isCellNull(0, 1), isFalse);
+
+      buffer.setCellNull(0, 1);
+      expect(buffer.isDirty, isTrue);
+      expect(buffer.isCellNull(0, 1), isTrue);
+      expect(buffer.getCellValue(0, 1), 'NULL');
+
+      buffer.setCell(0, 1, 'NULL');
+      expect(buffer.isCellNull(0, 1), isFalse);
+      expect(buffer.getCellValue(0, 1), 'NULL');
+    });
+
     test('generateMutationPlan builds correct DML statements from staged modifications', () {
       buffer.setCell(0, 1, 'Alice Updated');
       buffer.addRow(['4', 'Diana', 'diana@test.com']);
@@ -140,6 +153,23 @@ void main() {
       expect(plan.statements[1].sql, 'INSERT INTO "public"."users" ("id", "name", "email") VALUES (4, \'Diana\', \'diana@test.com\')');
       expect(plan.statements[2].type, MutationType.delete);
       expect(plan.statements[2].sql, 'DELETE FROM "public"."users" WHERE "id" = 3');
+    });
+
+    test('dispose clears internal collections and prevents further listener notifications', () {
+      buffer.setCell(0, 1, 'Alice Modified');
+      buffer.addRow(['4', 'Diana', 'diana@test.com']);
+      buffer.toggleDeleteRow(2);
+
+      expect(buffer.isDirty, isTrue);
+      expect(buffer.changeCount, 3);
+
+      buffer.dispose();
+
+      expect(buffer.isDirty, isFalse);
+      expect(buffer.changeCount, 0);
+      expect(buffer.modifiedCellCount, 0);
+      expect(buffer.insertedRowCount, 0);
+      expect(buffer.deletedRowCount, 0);
     });
   });
 }

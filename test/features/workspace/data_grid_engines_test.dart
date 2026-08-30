@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:querya_desktop/features/main_screen/grid_filter_engine.dart';
-import 'package:querya_desktop/features/main_screen/grid_groupings_engine.dart';
-import 'package:querya_desktop/features/main_screen/grid_selection_calc_engine.dart';
+import 'package:querya_desktop/features/workspace/grid_filter_engine.dart';
+import 'package:querya_desktop/features/workspace/grid_groupings_engine.dart';
+import 'package:querya_desktop/features/workspace/grid_selection_calc_engine.dart';
 
 void main() {
   group('GridFilterEngine', () {
@@ -193,6 +193,43 @@ void main() {
       expect(stats.average, equals(30.25));
       expect(stats.min, equals(10.0));
       expect(stats.max, equals(50.5));
+    });
+
+    test('computes correct QuickSelect median for large odd and even selections (> 500)', () {
+      // Odd length > 500 (1001 items)
+      final oddData = List<String>.generate(1001, (i) => '${(i * 3) % 1000}');
+      final oddStats = GridSelectionCalcEngine.compute(oddData);
+      final oddParsed = oddData.map(double.parse).toList()..sort();
+      expect(oddStats.median, equals(oddParsed[500]));
+
+      // Even length > 500 (1000 items)
+      final evenData = List<String>.generate(1000, (i) => '${(i * 7) % 2000}');
+      final evenStats = GridSelectionCalcEngine.compute(evenData);
+      final evenParsed = evenData.map(double.parse).toList()..sort();
+      final expectedEvenMedian = (evenParsed[499] + evenParsed[500]) / 2.0;
+      expect(evenStats.median, equals(expectedEvenMedian));
+    });
+
+    test('computeAdaptive returns empty stats for empty list', () async {
+      final stats = await GridSelectionCalcEngine.computeAdaptive(const []);
+      expect(stats, equals(GridCalcStats.empty));
+    });
+
+    test('computeAdaptive computes synchronously below threshold', () async {
+      final values = ['10', '20', '30'];
+      final stats = await GridSelectionCalcEngine.computeAdaptive(values, threshold: 10);
+      expect(stats.totalCount, 3);
+      expect(stats.sum, 60.0);
+      expect(stats.average, 20.0);
+    });
+
+    test('computeAdaptive computes via background isolate above threshold', () async {
+      final values = List<String>.generate(100, (i) => '$i');
+      final stats = await GridSelectionCalcEngine.computeAdaptive(values, threshold: 50);
+      expect(stats.totalCount, 100);
+      expect(stats.min, 0.0);
+      expect(stats.max, 99.0);
+      expect(stats.sum, 4950.0);
     });
   });
 

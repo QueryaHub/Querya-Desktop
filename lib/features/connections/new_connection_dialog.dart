@@ -1,41 +1,16 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart' as material;
-import 'package:querya_desktop/core/ui/querya_icons.dart';
+import 'package:querya_desktop/core/database/connection_type_choice.dart';
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/motion/querya_hover_surface.dart';
-import 'package:querya_desktop/features/connections/connection_type_choice.dart';
 import 'package:querya_desktop/features/connections/driver_icon.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
-/// Database type for built-in new connections.
-enum ConnectionType {
-  postgresql,
-  mysql,
-  redis,
-  mongodb,
-  sqlite,
-}
-
-extension ConnectionTypeX on ConnectionType {
-  String get label => switch (this) {
-        ConnectionType.postgresql => 'PostgreSQL',
-        ConnectionType.mysql => 'MySQL',
-        ConnectionType.redis => 'Redis',
-        ConnectionType.mongodb => 'MongoDB',
-        ConnectionType.sqlite => 'SQLite',
-      };
-  material.IconData get icon => QueryaIcons.connectionIcon(name);
-
-  /// Asset path for custom icon (from Downloads).
-  String? get iconAsset => QueryaIcons.connectionAsset(name);
-  bool get isSql =>
-      this == ConnectionType.postgresql ||
-      this == ConnectionType.mysql ||
-      this == ConnectionType.sqlite;
-}
+export 'package:querya_desktop/core/database/connection_type.dart';
+export 'package:querya_desktop/core/database/connection_type_choice.dart';
 
 enum _Category { all, sql, nosql }
 
@@ -119,155 +94,167 @@ class _NewConnectionDialogContentState
           minHeight: math.min(320.0, dialogH),
         ),
         borderColor: theme.muted,
-        child: material.SizedBox(
-          height: dialogH,
-          child: material.Column(
-            mainAxisSize: material.MainAxisSize.min,
-            crossAxisAlignment: material.CrossAxisAlignment.stretch,
-            children: [
-              material.Padding(
-                padding:
-                    material.EdgeInsets.fromLTRB(headerPadH, 20, headerPadH, 8),
-                child: Column(
-                  crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                  children: [
-                    const Text('Select your database').large().semiBold(),
-                    const material.SizedBox(height: 6),
-                    const Text(
-                      'Create new database connection. Find your database driver in the list below.',
-                    ).muted().small(),
-                    const material.SizedBox(height: 12),
-                    material.Container(
-                      decoration: material.BoxDecoration(
-                        color: theme.muted.withValues(alpha: 0.2),
-                        borderRadius: material.BorderRadius.circular(8),
-                        border: material.Border.all(
-                            color: theme.border.withValues(alpha: 0.4)),
-                      ),
-                      padding: const material.EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 4),
-                      child: material.Row(
-                        children: [
-                          material.Icon(
-                            material.Icons.search_rounded,
-                            size: 20,
-                            color: theme.mutedForeground,
+        child: material.FocusTraversalGroup(
+          policy: material.WidgetOrderTraversalPolicy(),
+          child: material.SizedBox(
+            height: dialogH,
+            child: material.Column(
+              mainAxisSize: material.MainAxisSize.min,
+              crossAxisAlignment: material.CrossAxisAlignment.stretch,
+              children: [
+                material.FocusTraversalGroup(
+                  policy: material.WidgetOrderTraversalPolicy(),
+                  child: material.Padding(
+                    padding:
+                        material.EdgeInsets.fromLTRB(headerPadH, 20, headerPadH, 8),
+                    child: Column(
+                      crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                      children: [
+                        const Text('Select your database').large().semiBold(),
+                        const material.SizedBox(height: 6),
+                        const Text(
+                          'Create new database connection. Find your database driver in the list below.',
+                        ).muted().small(),
+                        const material.SizedBox(height: 12),
+                        material.Container(
+                          decoration: material.BoxDecoration(
+                            color: theme.muted.withValues(alpha: 0.2),
+                            borderRadius: material.BorderRadius.circular(8),
+                            border: material.Border.all(
+                                color: theme.border.withValues(alpha: 0.4)),
                           ),
-                          const material.SizedBox(width: 10),
-                          material.Expanded(
-                            child: TextField(
-                              controller: _searchController,
-                              placeholder: const Text('Search...'),
-                              onChanged: (v) => setState(() {
-                                _searchQuery = v;
-                                if (_selected != null &&
-                                    !_filteredTypes.any(
-                                        (t) => _sameChoice(t, _selected))) {
-                                  _selected = null;
-                                }
-                              }),
-                            ),
+                          padding: const material.EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 4),
+                          child: material.Row(
+                            children: [
+                              material.Icon(
+                                material.Icons.search_rounded,
+                                size: 20,
+                                color: theme.mutedForeground,
+                              ),
+                              const material.SizedBox(width: 10),
+                              material.Expanded(
+                                child: TextField(
+                                  controller: _searchController,
+                                  placeholder: const Text('Search...'),
+                                  onChanged: (v) => setState(() {
+                                    _searchQuery = v;
+                                    if (_selected != null &&
+                                        !_filteredTypes.any(
+                                            (t) => _sameChoice(t, _selected))) {
+                                      _selected = null;
+                                    }
+                                  }),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                        const material.SizedBox(height: 12),
+                        _FilterDropdowns(
+                          stackVertically: stackFilters,
+                          category: _category,
+                          selected: _selected,
+                          filteredTypes: _filteredTypes,
+                          onCategoryChanged: (category) {
+                            setState(() {
+                              _category = category;
+                              if (_selected != null &&
+                                  !_categoryTypes
+                                      .any((t) => _sameChoice(t, _selected))) {
+                                _selected = null;
+                              }
+                            });
+                          },
+                          onTypeChanged: (type) => setState(() => _selected = type),
+                        ),
+                      ],
                     ),
-                    const material.SizedBox(height: 12),
-                    _FilterDropdowns(
-                      stackVertically: stackFilters,
-                      category: _category,
-                      selected: _selected,
-                      filteredTypes: _filteredTypes,
-                      onCategoryChanged: (category) {
-                        setState(() {
-                          _category = category;
-                          if (_selected != null &&
-                              !_categoryTypes
-                                  .any((t) => _sameChoice(t, _selected))) {
-                            _selected = null;
-                          }
-                        });
-                      },
-                      onTypeChanged: (type) => setState(() => _selected = type),
-                    ),
-                  ],
-                ),
-              ),
-              material.Expanded(
-                child: material.LayoutBuilder(
-                  builder: (context, constraints) {
-                    const spacing = 12.0;
-                    final gridPad = dialogMaxW < 420 ? 12.0 : 16.0;
-                    final innerW =
-                        math.max(0.0, constraints.maxWidth - gridPad * 2);
-                    final crossAxisCount =
-                        WindowLayout.dbTypeGridCrossAxisCount(innerW);
-                    final cardHeight =
-                        WindowLayout.dbTypeCardHeight(context, crossAxisCount);
-                    final cardWidth = crossAxisCount > 0
-                        ? (innerW - spacing * (crossAxisCount - 1)) /
-                            crossAxisCount
-                        : innerW;
-                    final aspect =
-                        cardHeight > 0 ? cardWidth / cardHeight : 1.0;
-                    return material.Padding(
-                      padding: material.EdgeInsets.all(gridPad),
-                      child: _filteredTypes.isEmpty
-                          ? material.Center(
-                              child:
-                                  const Text('No databases match your search.')
-                                      .muted()
-                                      .small(),
-                            )
-                          : material.GridView.count(
-                              crossAxisCount: crossAxisCount,
-                              mainAxisSpacing: spacing,
-                              crossAxisSpacing: spacing,
-                              childAspectRatio: aspect.clamp(0.4, 4.0),
-                              shrinkWrap: true,
-                              physics: const material.ClampingScrollPhysics(),
-                              children: [
-                                for (final t in _filteredTypes)
-                                  _DbTypeCard(
-                                    choice: t,
-                                    theme: theme,
-                                    selected: _sameChoice(_selected, t),
-                                    onTap: () => setState(() => _selected = t),
-                                  ),
-                              ],
-                            ),
-                    );
-                  },
-                ),
-              ),
-              material.Container(
-                padding: material.EdgeInsets.symmetric(
-                  horizontal: headerPadH,
-                  vertical: 14,
-                ),
-                decoration: material.BoxDecoration(
-                  border: material.Border(
-                    top: material.BorderSide(
-                        color: theme.border.withValues(alpha: 0.3)),
                   ),
                 ),
-                child: material.Row(
-                  mainAxisAlignment: material.MainAxisAlignment.end,
-                  children: [
-                    GhostButton(
-                      onPressed: () => material.Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
+                material.Expanded(
+                  child: material.FocusTraversalGroup(
+                    policy: material.WidgetOrderTraversalPolicy(),
+                    child: material.LayoutBuilder(
+                      builder: (context, constraints) {
+                        const spacing = 12.0;
+                        final gridPad = dialogMaxW < 420 ? 12.0 : 16.0;
+                        final innerW =
+                            math.max(0.0, constraints.maxWidth - gridPad * 2);
+                        final crossAxisCount =
+                            WindowLayout.dbTypeGridCrossAxisCount(innerW);
+                        final cardHeight =
+                            WindowLayout.dbTypeCardHeight(context, crossAxisCount);
+                        final cardWidth = crossAxisCount > 0
+                            ? (innerW - spacing * (crossAxisCount - 1)) /
+                                crossAxisCount
+                            : innerW;
+                        final aspect =
+                            cardHeight > 0 ? cardWidth / cardHeight : 1.0;
+                        return material.Padding(
+                          padding: material.EdgeInsets.all(gridPad),
+                          child: _filteredTypes.isEmpty
+                              ? material.Center(
+                                  child:
+                                      const Text('No databases match your search.')
+                                          .muted()
+                                          .small(),
+                                )
+                              : material.GridView.count(
+                                  crossAxisCount: crossAxisCount,
+                                  mainAxisSpacing: spacing,
+                                  crossAxisSpacing: spacing,
+                                  childAspectRatio: aspect.clamp(0.4, 4.0),
+                                  shrinkWrap: true,
+                                  physics: const material.ClampingScrollPhysics(),
+                                  children: [
+                                    for (final t in _filteredTypes)
+                                      _DbTypeCard(
+                                        choice: t,
+                                        theme: theme,
+                                        selected: _sameChoice(_selected, t),
+                                        onTap: () => setState(() => _selected = t),
+                                      ),
+                                  ],
+                                ),
+                        );
+                      },
                     ),
-                    const material.SizedBox(width: 12),
-                    PrimaryButton(
-                      onPressed: _selected == null
-                          ? null
-                          : () => material.Navigator.of(context).pop(_selected),
-                      child: const Text('Next'),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+                material.FocusTraversalGroup(
+                  policy: material.WidgetOrderTraversalPolicy(),
+                  child: material.Container(
+                    padding: material.EdgeInsets.symmetric(
+                      horizontal: headerPadH,
+                      vertical: 14,
+                    ),
+                    decoration: material.BoxDecoration(
+                      border: material.Border(
+                        top: material.BorderSide(
+                            color: theme.border.withValues(alpha: 0.3)),
+                      ),
+                    ),
+                    child: material.Row(
+                      mainAxisAlignment: material.MainAxisAlignment.end,
+                      children: [
+                        GhostButton(
+                          onPressed: () => material.Navigator.of(context).pop(),
+                          child: const Text('Cancel'),
+                        ),
+                        const material.SizedBox(width: 12),
+                        PrimaryButton(
+                          onPressed: _selected == null
+                              ? null
+                              : () => material.Navigator.of(context).pop(_selected),
+                          child: const Text('Next'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

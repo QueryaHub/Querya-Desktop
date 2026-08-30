@@ -3,8 +3,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:mysql_client/mysql_client.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
+import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
+import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
 
 /// Replaces the database in a `mysql://` / `mariadb://` URI (path or `database=`).
 String replaceDatabaseInMysqlConnectionString(
@@ -38,11 +39,12 @@ class MysqlConnection {
     required this.host,
     this.port = 3306,
     this.username,
-    this.password,
+    String? password,
     this.database,
     this.useSSL = true,
-    this.connectionString,
-  });
+    String? connectionString,
+  })  : _password = password,
+        _connectionString = connectionString;
 
   factory MysqlConnection.fromConnectionRow(
     ConnectionRow row, {
@@ -66,20 +68,27 @@ class MysqlConnection {
   final String host;
   final int port;
   final String? username;
-  final String? password;
+  String? _password;
   final String? database;
   final bool useSSL;
-  final String? connectionString;
+  String? _connectionString;
+
+  String? get password => _password;
+  String? get connectionString => _connectionString;
 
   MySQLConnection? _conn;
   bool _isConnected = false;
 
   bool get isConnected => _isConnected && _conn != null;
 
-  bool get _usesConnectionString =>
-      connectionString != null && connectionString!.trim().isNotEmpty;
+  /// Scrubs sensitive in-memory credentials once the network handshake completes.
+  void scrubCredentials() {
+    _password = null;
+    _connectionString = null;
+  }
 
-
+  bool _usesConnectionString(String? connStr) =>
+      connStr != null && connStr.trim().isNotEmpty;
 
   /// MySQL identifier quoting (backticks).
   static String quoteIdentifier(String id) {
@@ -88,17 +97,31 @@ class MysqlConnection {
 
   Future<void> connect({int connectTimeoutMs = 10000}) async {
     if (_isConnected && _conn != null) return;
+
+    var effectivePassword = _password;
+    var effectiveConnectionString = _connectionString;
+
+    if ((effectivePassword == null || effectivePassword.isEmpty) &&
+        (effectiveConnectionString == null || effectiveConnectionString.isEmpty) &&
+        id > 0) {
+      try {
+        final secrets = await ConnectionSecretsStore.readForConnection(id);
+        effectivePassword = secrets.password;
+        effectiveConnectionString = secrets.connectionString;
+      } catch (_) {}
+    }
+
     try {
       final user = username ?? '';
-      final pass = password ?? '';
-      if (_usesConnectionString) {
+      final pass = effectivePassword ?? '';
+      if (_usesConnectionString(effectiveConnectionString)) {
         final dbName = database;
         final uriStr = dbName != null && dbName.isNotEmpty
             ? replaceDatabaseInMysqlConnectionString(
-                connectionString!.trim(),
+                effectiveConnectionString!.trim(),
                 dbName,
               )
-            : connectionString!.trim();
+            : effectiveConnectionString!.trim();
         final parsed = _parseMysqlUri(uriStr, fallbackSsl: useSSL);
         final sslPaths = extractSslCertificatePathsFromString(uriStr);
         final securityContext = buildSecurityContext(sslPaths);
@@ -113,21 +136,21 @@ class MysqlConnection {
         );
         await _conn!.connect(timeoutMs: connectTimeoutMs);
       } else {
-        final securityContext = buildSecurityContext(
-          extractSslCertificatePathsFromString(connectionString),
-        );
+        final sslPaths = extractSslCertificatePathsFromString(effectiveConnectionString);
+        final securityContext = buildSecurityContext(sslPaths);
         _conn = await MySQLConnection.createConnection(
           host: host,
           port: port,
           userName: user,
           password: pass,
-          secure: useSSL,
+          secure: useSSL || sslPaths.hasAny,
           databaseName: database,
           securityContext: securityContext,
         );
         await _conn!.connect(timeoutMs: connectTimeoutMs);
       }
       _isConnected = true;
+      scrubCredentials();
     } catch (e) {
       _isConnected = false;
       _conn = null;

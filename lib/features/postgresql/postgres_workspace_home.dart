@@ -16,11 +16,22 @@ class PostgresWorkspaceHome extends material.StatefulWidget {
     this.postgresSqlEditorContext,
     this.postgresSqlEditorContextToken = 0,
     this.sqlTabRequestToken = 0,
+    this.lastSelectedPostgresObject,
+    this.onRestoreLastSelectedObject,
     this.isReadOnly = false,
   });
 
   final ConnectionRow connectionRow;
   final bool isReadOnly;
+
+  /// Remembers the last visited table/view for 1-click return.
+  final ({
+    String database,
+    String schema,
+    String name,
+    PostgresObjectKind kind
+  })? lastSelectedPostgresObject;
+  final VoidCallback? onRestoreLastSelectedObject;
 
   /// Set when opening SQL from the tree (e.g. "Open in SQL") to seed session DB + template.
   final ({
@@ -126,6 +137,19 @@ class _PostgresWorkspaceHomeState
                   material.Icons.lock_outline_rounded,
                   size: 14,
                   color: theme.colorScheme.mutedForeground,
+                ),
+              ],
+              if (widget.lastSelectedPostgresObject != null &&
+                  widget.onRestoreLastSelectedObject != null) ...[
+                const Gap(12),
+                OutlineButton(
+                  size: ButtonSize.small,
+                  onPressed: widget.onRestoreLastSelectedObject,
+                  leading: const material.Icon(
+                    material.Icons.table_chart_outlined,
+                    size: 14,
+                  ),
+                  child: Text('Return to ${widget.lastSelectedPostgresObject!.name}'),
                 ),
               ],
               const Spacer(),

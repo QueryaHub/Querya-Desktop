@@ -14,12 +14,14 @@ class SqliteTableView extends material.StatefulWidget {
     required this.tableName,
     this.isView = false,
     this.limit = _defaultLimit,
+    this.onNavigateHome,
   });
 
   final ConnectionRow connectionRow;
   final String tableName;
   final bool isView;
   final int limit;
+  final VoidCallback? onNavigateHome;
 
   @override
   material.State<SqliteTableView> createState() => _SqliteTableViewState();
@@ -449,6 +451,21 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
             ),
             child: material.Row(
               children: [
+                if (widget.onNavigateHome != null) ...[
+                  material.Tooltip(
+                    message: 'Return to overview',
+                    child: OutlineButton(
+                      size: ButtonSize.small,
+                      onPressed: widget.onNavigateHome,
+                      leading: const material.Icon(
+                        material.Icons.dns_outlined,
+                        size: 14,
+                      ),
+                      child: const Text('Overview'),
+                    ),
+                  ),
+                  const Gap(10),
+                ],
                 material.Icon(
                   widget.isView
                       ? material.Icons.view_agenda_rounded
@@ -530,7 +547,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
                                   material.Icons.chevron_left_rounded,
                                   size: 16,
                                 ),
-                                child: const Text('Back'),
+                                child: const Text('Prev'),
                               ),
                               const Gap(4),
                               OutlineButton(

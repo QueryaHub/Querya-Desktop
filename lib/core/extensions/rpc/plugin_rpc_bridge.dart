@@ -18,11 +18,12 @@ import 'package:querya_desktop/core/extensions/sandbox/sandbox_auto_recovery.dar
 class PluginRpcBridge {
   PluginRpcBridge({
     SandboxProcessRunner? processRunner,
-    this.handshakeTimeout = const Duration(seconds: 3),
+    this.handshakeTimeout = const Duration(seconds: 6),
     this.shutdownTimeout = const Duration(seconds: 3),
     this.requestTimeout = const Duration(seconds: 30),
     this.enableWatchdog = true,
     this.enableStderrPipe = true,
+    this.onProcessExited,
     SandboxSecurityAudit? audit,
     SandboxAutoRecovery? recovery,
   })  : _runner = processRunner ?? SandboxProcessRunner(),
@@ -35,6 +36,7 @@ class PluginRpcBridge {
   final Duration requestTimeout;
   final bool enableWatchdog;
   final bool enableStderrPipe;
+  final void Function(int exitCode)? onProcessExited;
   final SandboxSecurityAudit? _audit;
   final SandboxAutoRecovery _recovery;
 
@@ -125,6 +127,11 @@ class PluginRpcBridge {
               pluginId: handle.pluginId,
               detail: 'watchdog deadlock',
             ));
+            _failPending(PluginDeadlockException(
+              pluginId: handle.pluginId,
+              message: 'Watchdog detected plugin deadlock (ping timeout)',
+            ));
+            unawaited(_disposeLocal(keepRecovery: true));
           }
         },
       );
@@ -138,9 +145,13 @@ class PluginRpcBridge {
       _recovery.recordSuccess();
       return result;
     } on TimeoutException {
+      final recent = _stderrPipe?.recentLines ?? const [];
+      final stderrTail = recent.isNotEmpty
+          ? '\nStderr output:\n${recent.join('\n')}'
+          : '';
       await _forceKill();
       throw PluginProtocolTimeoutException(
-        'system.handshake timed out after $handshakeTimeout',
+        'system.handshake timed out after $handshakeTimeout$stderrTail',
       );
     }
   }
@@ -212,6 +223,7 @@ class PluginRpcBridge {
       pluginId: _handle?.pluginId ?? 'unknown',
       exitCode: code,
     ));
+    onProcessExited?.call(code);
     unawaited(_disposeLocal(keepRecovery: true));
   }
 

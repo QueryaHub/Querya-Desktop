@@ -20,6 +20,10 @@ class MainScreenWorkspaceState {
     this.selectedSqliteObject,
     this.sqliteSqlTabRequestToken = 0,
     this.selectedExtensionObject,
+    this.lastSelectedPostgresObject,
+    this.lastSelectedMysqlObject,
+    this.lastSelectedSqliteObject,
+    this.lastSelectedExtensionObject,
     this.isReadOnly = false,
   });
 
@@ -61,6 +65,31 @@ class MainScreenWorkspaceState {
     String database,
     String name,
   })? selectedExtensionObject;
+
+  /// Remembers the last visited table/view for the active connection to support 1-click return from stats.
+  final ({
+    String database,
+    String schema,
+    String name,
+    PostgresObjectKind kind
+  })? lastSelectedPostgresObject;
+
+  final ({
+    String database,
+    String name,
+    MysqlObjectKind kind
+  })? lastSelectedMysqlObject;
+
+  final ({
+    String name,
+    SqliteObjectKind kind
+  })? lastSelectedSqliteObject;
+
+  final ({
+    String database,
+    String name,
+  })? lastSelectedExtensionObject;
+
   final bool isReadOnly;
 
   static const empty = MainScreenWorkspaceState();
@@ -79,11 +108,16 @@ class MainScreenWorkspaceState {
       selectedSqliteObject: selectedSqliteObject,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
       selectedExtensionObject: selectedExtensionObject,
+      lastSelectedPostgresObject: lastSelectedPostgresObject,
+      lastSelectedMysqlObject: lastSelectedMysqlObject,
+      lastSelectedSqliteObject: lastSelectedSqliteObject,
+      lastSelectedExtensionObject: lastSelectedExtensionObject,
       isReadOnly: !isReadOnly,
     );
   }
 
   MainScreenWorkspaceState selectConnection(ConnectionRow connection) {
+    final same = activeConnection?.id == connection.id;
     return MainScreenWorkspaceState(
       activeConnection: connection,
       activeRedisDb: null,
@@ -97,8 +131,99 @@ class MainScreenWorkspaceState {
       selectedSqliteObject: null,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
       selectedExtensionObject: null,
+      lastSelectedPostgresObject:
+          same ? (selectedPostgresObject ?? lastSelectedPostgresObject) : null,
+      lastSelectedMysqlObject:
+          same ? (selectedMysqlObject ?? lastSelectedMysqlObject) : null,
+      lastSelectedSqliteObject:
+          same ? (selectedSqliteObject ?? lastSelectedSqliteObject) : null,
+      lastSelectedExtensionObject: same
+          ? (selectedExtensionObject ?? lastSelectedExtensionObject)
+          : null,
       isReadOnly: false,
     );
+  }
+
+  /// Clears the active table/view selection to show server stats/home, but retains
+  /// the reference in [lastSelectedPostgresObject] etc. so users can return in 1 click.
+  MainScreenWorkspaceState unselectActiveObject() {
+    return MainScreenWorkspaceState(
+      activeConnection: activeConnection,
+      activeRedisDb: activeRedisDb,
+      activeMongoDB: activeMongoDB,
+      selectedPostgresObject: null,
+      postgresSqlTabRequestToken: postgresSqlTabRequestToken,
+      postgresSqlEditorContext: postgresSqlEditorContext,
+      postgresSqlEditorContextToken: postgresSqlEditorContextToken,
+      selectedMysqlObject: null,
+      mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
+      selectedSqliteObject: null,
+      sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
+      selectedExtensionObject: null,
+      lastSelectedPostgresObject:
+          selectedPostgresObject ?? lastSelectedPostgresObject,
+      lastSelectedMysqlObject:
+          selectedMysqlObject ?? lastSelectedMysqlObject,
+      lastSelectedSqliteObject:
+          selectedSqliteObject ?? lastSelectedSqliteObject,
+      lastSelectedExtensionObject:
+          selectedExtensionObject ?? lastSelectedExtensionObject,
+      isReadOnly: isReadOnly,
+    );
+  }
+
+  /// Restores the last visited table/view for the active connection.
+  MainScreenWorkspaceState restoreLastSelectedObject() {
+    final conn = activeConnection;
+    if (conn == null) return this;
+    final type = conn.type.toLowerCase();
+    switch (type) {
+      case 'postgres':
+      case 'postgresql':
+        if (lastSelectedPostgresObject != null) {
+          final obj = lastSelectedPostgresObject!;
+          return selectPostgresObject(
+            conn,
+            obj.database,
+            obj.schema,
+            obj.name,
+            obj.kind,
+          );
+        }
+        break;
+      case 'mysql':
+        if (lastSelectedMysqlObject != null) {
+          final obj = lastSelectedMysqlObject!;
+          return selectMysqlObject(
+            conn,
+            obj.database,
+            obj.name,
+            obj.kind,
+          );
+        }
+        break;
+      case 'sqlite':
+        if (lastSelectedSqliteObject != null) {
+          final obj = lastSelectedSqliteObject!;
+          return selectSqliteObject(
+            conn,
+            obj.name,
+            obj.kind,
+          );
+        }
+        break;
+      default:
+        if (lastSelectedExtensionObject != null) {
+          final obj = lastSelectedExtensionObject!;
+          return selectExtensionObject(
+            conn,
+            obj.database,
+            obj.name,
+          );
+        }
+        break;
+    }
+    return this;
   }
 
   MainScreenWorkspaceState selectPostgresObject(
@@ -108,16 +233,17 @@ class MainScreenWorkspaceState {
     String name,
     PostgresObjectKind kind,
   ) {
+    final pg = (
+      database: database,
+      schema: schema,
+      name: name,
+      kind: kind,
+    );
     return MainScreenWorkspaceState(
       activeConnection: connection,
       activeRedisDb: null,
       activeMongoDB: null,
-      selectedPostgresObject: (
-        database: database,
-        schema: schema,
-        name: name,
-        kind: kind,
-      ),
+      selectedPostgresObject: pg,
       postgresSqlTabRequestToken: postgresSqlTabRequestToken,
       postgresSqlEditorContext: null,
       postgresSqlEditorContextToken: 0,
@@ -125,6 +251,10 @@ class MainScreenWorkspaceState {
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
       selectedSqliteObject: null,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
+      lastSelectedPostgresObject: pg,
+      lastSelectedMysqlObject: null,
+      lastSelectedSqliteObject: null,
+      lastSelectedExtensionObject: null,
       isReadOnly: isReadOnly,
     );
   }
@@ -135,6 +265,11 @@ class MainScreenWorkspaceState {
     String name,
     MysqlObjectKind kind,
   ) {
+    final my = (
+      database: database,
+      name: name,
+      kind: kind,
+    );
     return MainScreenWorkspaceState(
       activeConnection: connection,
       activeRedisDb: null,
@@ -143,14 +278,14 @@ class MainScreenWorkspaceState {
       postgresSqlTabRequestToken: postgresSqlTabRequestToken,
       postgresSqlEditorContext: null,
       postgresSqlEditorContextToken: 0,
-      selectedMysqlObject: (
-        database: database,
-        name: name,
-        kind: kind,
-      ),
+      selectedMysqlObject: my,
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
       selectedSqliteObject: null,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
+      lastSelectedPostgresObject: null,
+      lastSelectedMysqlObject: my,
+      lastSelectedSqliteObject: null,
+      lastSelectedExtensionObject: null,
       isReadOnly: isReadOnly,
     );
   }
@@ -160,6 +295,10 @@ class MainScreenWorkspaceState {
     String name,
     SqliteObjectKind kind,
   ) {
+    final sq = (
+      name: name,
+      kind: kind,
+    );
     return MainScreenWorkspaceState(
       activeConnection: connection,
       activeRedisDb: null,
@@ -170,11 +309,12 @@ class MainScreenWorkspaceState {
       postgresSqlEditorContextToken: 0,
       selectedMysqlObject: null,
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
-      selectedSqliteObject: (
-        name: name,
-        kind: kind,
-      ),
+      selectedSqliteObject: sq,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
+      lastSelectedPostgresObject: null,
+      lastSelectedMysqlObject: null,
+      lastSelectedSqliteObject: sq,
+      lastSelectedExtensionObject: null,
       isReadOnly: isReadOnly,
     );
   }
@@ -184,6 +324,10 @@ class MainScreenWorkspaceState {
     String database,
     String name,
   ) {
+    final ext = (
+      database: database,
+      name: name,
+    );
     return MainScreenWorkspaceState(
       activeConnection: connection,
       activeRedisDb: null,
@@ -196,10 +340,11 @@ class MainScreenWorkspaceState {
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
       selectedSqliteObject: null,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
-      selectedExtensionObject: (
-        database: database,
-        name: name,
-      ),
+      selectedExtensionObject: ext,
+      lastSelectedPostgresObject: null,
+      lastSelectedMysqlObject: null,
+      lastSelectedSqliteObject: null,
+      lastSelectedExtensionObject: ext,
       isReadOnly: isReadOnly,
     );
   }
@@ -217,6 +362,10 @@ class MainScreenWorkspaceState {
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
       selectedSqliteObject: null,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
+      lastSelectedPostgresObject: null,
+      lastSelectedMysqlObject: null,
+      lastSelectedSqliteObject: null,
+      lastSelectedExtensionObject: null,
       isReadOnly: isReadOnly,
     );
   }
@@ -235,6 +384,10 @@ class MainScreenWorkspaceState {
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
       selectedSqliteObject: null,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
+      lastSelectedPostgresObject: null,
+      lastSelectedMysqlObject: null,
+      lastSelectedSqliteObject: null,
+      lastSelectedExtensionObject: null,
       isReadOnly: isReadOnly,
     );
   }
@@ -294,6 +447,10 @@ class MainScreenWorkspaceState {
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
       selectedSqliteObject: null,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
+      lastSelectedPostgresObject: seed ?? lastSelectedPostgresObject,
+      lastSelectedMysqlObject: lastSelectedMysqlObject,
+      lastSelectedSqliteObject: lastSelectedSqliteObject,
+      lastSelectedExtensionObject: lastSelectedExtensionObject,
       isReadOnly: isReadOnly,
     );
   }
@@ -311,6 +468,10 @@ class MainScreenWorkspaceState {
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken + 1,
       selectedSqliteObject: null,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
+      lastSelectedPostgresObject: lastSelectedPostgresObject,
+      lastSelectedMysqlObject: lastSelectedMysqlObject,
+      lastSelectedSqliteObject: lastSelectedSqliteObject,
+      lastSelectedExtensionObject: lastSelectedExtensionObject,
       isReadOnly: isReadOnly,
     );
   }
@@ -328,6 +489,10 @@ class MainScreenWorkspaceState {
       mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
       selectedSqliteObject: null,
       sqliteSqlTabRequestToken: sqliteSqlTabRequestToken + 1,
+      lastSelectedPostgresObject: lastSelectedPostgresObject,
+      lastSelectedMysqlObject: lastSelectedMysqlObject,
+      lastSelectedSqliteObject: lastSelectedSqliteObject,
+      lastSelectedExtensionObject: lastSelectedExtensionObject,
       isReadOnly: isReadOnly,
     );
   }
@@ -349,6 +514,11 @@ class MainScreenWorkspaceState {
         sqliteSqlTabRequestToken == other.sqliteSqlTabRequestToken &&
         _extensionEquals(
             selectedExtensionObject, other.selectedExtensionObject) &&
+        _pgEquals(lastSelectedPostgresObject, other.lastSelectedPostgresObject) &&
+        _mysqlEquals(lastSelectedMysqlObject, other.lastSelectedMysqlObject) &&
+        _sqliteEquals(lastSelectedSqliteObject, other.lastSelectedSqliteObject) &&
+        _extensionEquals(
+            lastSelectedExtensionObject, other.lastSelectedExtensionObject) &&
         isReadOnly == other.isReadOnly;
   }
 

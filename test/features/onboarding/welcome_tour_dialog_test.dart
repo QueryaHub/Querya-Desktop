@@ -44,7 +44,7 @@ void main() {
     }
   });
 
-  testWidgets('WelcomeTourDialog displays steps and allows navigation through all 4 slides',
+  testWidgets('WelcomeTourDialog displays steps and allows navigation through all 6 slides',
       (tester) async {
     await tester.pumpWidget(
       queryaThemeTestShell(
@@ -57,7 +57,7 @@ void main() {
 
     // Slide 1: Connect in Seconds
     expect(find.text('Welcome to Querya'), findsOneWidget);
-    expect(find.text('Step 1 of 4'), findsOneWidget);
+    expect(find.text('Step 1 of 6'), findsOneWidget);
     expect(find.text('Connect in Seconds'), findsOneWidget);
     expect(find.byKey(const Key('welcome_tour_skip_button')), findsOneWidget);
     expect(find.byKey(const Key('welcome_tour_next_button')), findsOneWidget);
@@ -66,7 +66,7 @@ void main() {
     await tester.tap(find.byKey(const Key('welcome_tour_next_button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Step 2 of 4'), findsOneWidget);
+    expect(find.text('Step 2 of 6'), findsOneWidget);
     expect(find.text('Fluid Sidebar & Navigation'), findsOneWidget);
     expect(find.byKey(const Key('welcome_tour_prev_button')), findsOneWidget);
 
@@ -74,23 +74,37 @@ void main() {
     await tester.tap(find.byKey(const Key('welcome_tour_next_button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Step 3 of 4'), findsOneWidget);
-    expect(find.text('Interactive SQL & 2D Grid'), findsOneWidget);
+    expect(find.text('Step 3 of 6'), findsOneWidget);
+    expect(find.text('Pro SQL Editor & Workspaces'), findsOneWidget);
 
     // Click Next -> Slide 4
     await tester.tap(find.byKey(const Key('welcome_tour_next_button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Step 4 of 4'), findsOneWidget);
-    expect(find.text('Zero-Trust Security & Playground'), findsOneWidget);
+    expect(find.text('Step 4 of 6'), findsOneWidget);
+    expect(find.text('Interactive 2D Grid & DML Staging'), findsOneWidget);
+
+    // Click Next -> Slide 5
+    await tester.tap(find.byKey(const Key('welcome_tour_next_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Step 5 of 6'), findsOneWidget);
+    expect(find.text('Compound Filter Bar & Quick Calc'), findsOneWidget);
+
+    // Click Next -> Slide 6 (Hotkeys Matrix)
+    await tester.tap(find.byKey(const Key('welcome_tour_next_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Step 6 of 6'), findsOneWidget);
+    expect(find.text('Keyboard Shortcuts Cheat Sheet'), findsOneWidget);
     expect(find.text('Get Started'), findsOneWidget);
 
-    // Click Back -> Slide 3
+    // Click Back -> Slide 5
     await tester.tap(find.byKey(const Key('welcome_tour_prev_button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Step 3 of 4'), findsOneWidget);
-    expect(find.text('Interactive SQL & 2D Grid'), findsOneWidget);
+    expect(find.text('Step 5 of 6'), findsOneWidget);
+    expect(find.text('Compound Filter Bar & Quick Calc'), findsOneWidget);
   });
 
   testWidgets('WelcomeTourDialog launches demo playground on action button tap',
@@ -108,15 +122,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Advance to slide 4
-    await tester.tap(find.byKey(const Key('welcome_tour_next_button')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('welcome_tour_next_button')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('welcome_tour_next_button')));
-    await tester.pumpAndSettle();
+    // Advance to slide 6 (Playground & Hotkeys)
+    for (var i = 0; i < 5; i++) {
+      await tester.tap(find.byKey(const Key('welcome_tour_next_button')));
+      await tester.pumpAndSettle();
+    }
 
-    expect(find.text('Step 4 of 4'), findsOneWidget);
+    expect(find.text('Step 6 of 6'), findsOneWidget);
     expect(find.byKey(const Key('welcome_tour_demo_button')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('welcome_tour_demo_button')));

@@ -347,6 +347,7 @@ class _RedisDatabasesNode extends material.StatelessWidget {
             itemBuilder: (context, index) {
               final db = databases[index];
               return _RedisDatabaseNode(
+                connection: connection,
                 index: db.index,
                 keys: db.keys,
                 onTap: () => onDatabaseTap?.call(db.index),
@@ -361,11 +362,13 @@ class _RedisDatabasesNode extends material.StatelessWidget {
 
 class _RedisDatabaseNode extends StatelessWidget {
   const _RedisDatabaseNode({
+    required this.connection,
     required this.index,
     required this.keys,
     required this.onTap,
   });
 
+  final ConnectionRow connection;
   final int index;
   final int keys;
   final VoidCallback onTap;
@@ -373,10 +376,15 @@ class _RedisDatabaseNode extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final sel = _ConnectionsTreeSelectionScope.of(context);
+    final isSelected = sel != null &&
+        sel.selectedConnectionId == connection.id &&
+        sel.selectedRedisDb == index;
     return material.Padding(
       padding: const material.EdgeInsets.only(left: 16),
       child: _PgTreeRow(
         label: 'db$index',
+        isSelected: isSelected,
         icon: QueryaIcons.database,
         iconSize: QueryaIconSizes.treeConnection,
         iconColor: keys > 0

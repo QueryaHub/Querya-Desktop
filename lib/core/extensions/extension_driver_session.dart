@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
+import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
 import 'package:querya_desktop/core/extensions/extension_support.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
@@ -51,7 +52,16 @@ class ExtensionDriverSession {
 
     final manifest = await _resolveManifestForRow(row);
     final hydrated = await _hydrateSecrets(row);
-    final bridge = await _startBridge(manifest);
+    late final PluginRpcBridge bridge;
+    bridge = await _startBridge(
+      manifest,
+      onProcessExited: (code) {
+        if (_bridges[id] == bridge) {
+          _bridges.remove(id);
+          _manifests.remove(id);
+        }
+      },
+    );
 
     try {
       await _injectAndConnect(bridge, connectionId: id, row: hydrated);
@@ -98,7 +108,10 @@ class ExtensionDriverSession {
     }
   }
 
-  Future<PluginRpcBridge> _startBridge(ExtensionManifest manifest) async {
+  Future<PluginRpcBridge> _startBridge(
+    ExtensionManifest manifest, {
+    void Function(int code)? onProcessExited,
+  }) async {
     final root = manifest.installPath;
     if (root == null || root.isEmpty) {
       throw StateError('Extension "${manifest.id}" has no install path');
@@ -126,7 +139,16 @@ class ExtensionDriverSession {
       }
     }
 
-    final bridge = bridgeFactory?.call() ?? PluginRpcBridge();
+    final manifestTimeoutSeconds =
+        manifest.sandbox?.resources.timeoutSeconds;
+    final bridge = bridgeFactory?.call() ??
+        PluginRpcBridge(
+          requestTimeout:
+              manifestTimeoutSeconds != null && manifestTimeoutSeconds > 0
+                  ? Duration(seconds: manifestTimeoutSeconds)
+                  : const Duration(seconds: 60),
+          onProcessExited: onProcessExited,
+        );
     await _startBridgeWithConsent(
       bridge: bridge,
       manifest: manifest,
@@ -378,6 +400,53 @@ class ExtensionDriverSession {
     }
   }
 
+  /// Queries table schema metadata (column types, nullability, PKs) via `db.getTableSchema`.
+  Future<TableSchemaMeta> getTableSchema(
+    ConnectionRow row, {
+    required String database,
+    String? schema,
+    required String tableName,
+  }) async {
+    final bridge = await ensureConnected(row);
+    try {
+      final result = await bridge.sendRequest('db.getTableSchema', {
+        'connectionId': row.id,
+        'database': database,
+        if (schema != null && schema.isNotEmpty) 'schema': schema,
+        'tableName': tableName,
+      });
+      if (result is Map) {
+        return TableSchemaMeta.fromJson(Map<String, dynamic>.from(result));
+      }
+      return TableSchemaMeta(tableName: tableName, schema: schema);
+    } catch (e) {
+      debugPrint('ExtensionDriverSession getTableSchema fallback ($e)');
+      return TableSchemaMeta(tableName: tableName, schema: schema);
+    }
+  }
+
+  /// Executes batch data mutations (insert, update, delete) via `db.mutate`.
+  Future<Map<String, dynamic>> mutate(
+    ConnectionRow row, {
+    required String database,
+    String? schema,
+    required String tableName,
+    required List<Map<String, dynamic>> mutations,
+  }) async {
+    final bridge = await ensureConnected(row);
+    final result = await bridge.sendRequest('db.mutate', {
+      'connectionId': row.id,
+      'database': database,
+      if (schema != null && schema.isNotEmpty) 'schema': schema,
+      'tableName': tableName,
+      'mutations': mutations,
+    });
+    if (result is Map) {
+      return Map<String, dynamic>.from(result);
+    }
+    return {'success': true, 'affectedRows': mutations.length};
+  }
+
   Future<void> disconnect(int connectionId) async {
     final bridge = _bridges.remove(connectionId);
     _manifests.remove(connectionId);
@@ -394,6 +463,16 @@ class ExtensionDriverSession {
     } catch (e) {
       debugPrint('ExtensionDriverSession shutdown: $e');
     }
+  }
+
+  /// Restarts the extension driver process for [row] by cleanly disconnecting
+  /// the active bridge and re-establishing the connection.
+  Future<PluginRpcBridge> restart(ConnectionRow row) async {
+    final id = row.id;
+    if (id != null) {
+      await disconnect(id);
+    }
+    return ensureConnected(row);
   }
 
   Future<void> disconnectAll() async {

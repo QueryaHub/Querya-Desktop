@@ -41,7 +41,7 @@ void main() {
       expect(find.text('Rows 1–200 of 5,000'), findsOneWidget);
       expect(find.text('DDL'), findsOneWidget);
       expect(find.text('Filter'), findsOneWidget);
-      expect(find.text('Back'), findsOneWidget);
+      expect(find.text('Prev'), findsOneWidget);
       expect(find.text('Next'), findsOneWidget);
       expect(find.text('Refresh'), findsOneWidget);
 
@@ -53,8 +53,8 @@ void main() {
       await tester.tap(find.text('Filter'));
       expect(filterToggled, isTrue);
 
-      await tester.ensureVisible(find.text('Back'));
-      await tester.tap(find.text('Back'), warnIfMissed: false);
+      await tester.ensureVisible(find.text('Prev'));
+      await tester.tap(find.text('Prev'), warnIfMissed: false);
       expect(prevClicked, isTrue);
 
       await tester.ensureVisible(find.text('Next'));

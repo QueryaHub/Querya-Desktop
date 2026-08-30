@@ -118,6 +118,7 @@ class ResourceLimits {
   const ResourceLimits({
     this.memoryMb = defaultMemoryMb,
     this.maxOpenFiles = defaultMaxOpenFiles,
+    this.timeoutSeconds,
   });
 
   static const defaultMemoryMb = 256;
@@ -129,16 +130,21 @@ class ResourceLimits {
   /// Maximum number of open file descriptors (`ulimit -n`).
   final int maxOpenFiles;
 
+  /// Optional custom request/query timeout declared in manifest, in seconds.
+  final int? timeoutSeconds;
+
   factory ResourceLimits.fromJson(Map<String, dynamic> json) {
     return ResourceLimits(
       memoryMb: json['memory_mb'] as int? ?? defaultMemoryMb,
       maxOpenFiles: json['max_open_files'] as int? ?? defaultMaxOpenFiles,
+      timeoutSeconds: json['timeout_seconds'] as int?,
     );
   }
 
   Map<String, dynamic> toJson() => {
         'memory_mb': memoryMb,
         'max_open_files': maxOpenFiles,
+        if (timeoutSeconds != null) 'timeout_seconds': timeoutSeconds,
       };
 }
 

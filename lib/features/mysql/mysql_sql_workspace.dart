@@ -6,6 +6,7 @@ import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:file_selector/file_selector.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
+import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
 import 'package:querya_desktop/core/database/result_row_string_convert.dart';
 import 'package:querya_desktop/core/database/sql_table_target_extractor.dart';
@@ -15,12 +16,7 @@ import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
-import 'package:querya_desktop/features/main_screen/data_grid_staging_buffer.dart';
-import 'package:querya_desktop/features/main_screen/dml_preview_dialog.dart';
-import 'package:querya_desktop/features/main_screen/query_editor_tab.dart';
-import 'package:querya_desktop/features/main_screen/results_tab.dart';
-import 'package:querya_desktop/features/main_screen/sql_editor_chrome.dart';
-import 'package:querya_desktop/features/main_screen/sql_query_history_dialog.dart';
+import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Ad-hoc SQL editor + results for MySQL / MariaDB.
@@ -153,6 +149,8 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       );
     }
     _lease?.release();
+    _stagingBuffer?.dispose();
+    _stagingBuffer = null;
     _sqlController.dispose();
     super.dispose();
   }
@@ -166,6 +164,22 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       userSql = _sqlController.text.trim();
     }
     if (userSql.isEmpty) return;
+
+    final confirmDestructive =
+        await AppSettings.instance.getConfirmDestructiveOperations();
+    if (confirmDestructive) {
+      final inspection = DestructiveSqlDetector.inspect(userSql);
+      if (inspection.isDestructive) {
+        if (!mounted) return;
+        final confirmed = await showDestructiveQueryDialog(
+          context: context,
+          result: inspection,
+          sql: userSql,
+          connectionName: widget.connectionRow.name,
+        );
+        if (confirmed != true) return;
+      }
+    }
 
     setState(() {
       _running = true;
@@ -232,6 +246,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
         _rows = outRows;
         _affectedRows = affected;
         _lastExecutedSql = userSql;
+        _stagingBuffer?.dispose();
         _stagingBuffer = cols.isNotEmpty
             ? DataGridStagingBuffer(columns: cols, rows: outRows)
             : null;
@@ -313,8 +328,10 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       }
 
       if (!mounted) return;
+      final newRows = _stagingBuffer!.effectiveRows;
+      _stagingBuffer?.dispose();
       setState(() {
-        _rows = _stagingBuffer!.effectiveRows;
+        _rows = newRows;
         _stagingBuffer = DataGridStagingBuffer(columns: _columns, rows: _rows);
         _savingChanges = false;
       });

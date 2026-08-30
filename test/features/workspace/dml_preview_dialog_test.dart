@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
-import 'package:querya_desktop/features/main_screen/dml_preview_dialog.dart';
+import 'package:querya_desktop/features/workspace/dml_preview_dialog.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import '../../support/querya_theme_test_shell.dart';
@@ -100,6 +100,28 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(result, isTrue);
+    });
+
+    testWidgets('shows warning banner when plan has no primary key and updates rows', (tester) async {
+      const noPkPlan = TableMutationPlan(
+        dialect: SqlDialect.postgres,
+        tableName: 'tags',
+        schema: 'public',
+        hasPrimaryKey: false,
+        statements: [
+          TableMutationStatement(
+            type: MutationType.update,
+            sql: 'UPDATE "public"."tags" SET "name" = \'val\' WHERE "name" = \'old\'',
+            description: 'Update row 1',
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(buildTestDialog(plan: noPkPlan));
+      await tester.tap(find.text('Open Dialog'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('No Primary Key detected'), findsOneWidget);
     });
   });
 }

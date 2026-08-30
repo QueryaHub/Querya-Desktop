@@ -1,8 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
+import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
 import 'package:redis/redis.dart' as redis;
 
 /// Redis connection using the Dart redis package (no Java/JRE).
@@ -13,10 +14,11 @@ class RedisConnection {
     required this.host,
     this.port = 6379,
     this.username,
-    this.password,
+    String? password,
     this.useSSL = false,
-    this.connectionString,
-  });
+    String? connectionString,
+  })  : _password = password,
+        _connectionString = connectionString;
 
   factory RedisConnection.fromConnectionRow(ConnectionRow row) {
     final uriText = row.connectionString?.trim();
@@ -62,9 +64,12 @@ class RedisConnection {
   final String host;
   final int port;
   final String? username;
-  final String? password;
+  String? _password;
   final bool useSSL;
-  final String? connectionString;
+  String? _connectionString;
+
+  String? get password => _password;
+  String? get connectionString => _connectionString;
 
   redis.RedisConnection? _conn;
   redis.Command? _command;
@@ -72,10 +77,31 @@ class RedisConnection {
 
   bool get isConnected => _isConnected && _command != null;
 
+  /// Scrubs sensitive in-memory credentials once the network handshake completes.
+  void scrubCredentials() {
+    _password = null;
+    _connectionString = null;
+  }
+
   Future<void> connect() async {
     if (_isConnected && _command != null) return;
+
+    var effectivePassword = _password;
+    var effectiveConnectionString = _connectionString;
+
+    if ((effectivePassword == null || effectivePassword.isEmpty) &&
+        (effectiveConnectionString == null || effectiveConnectionString.isEmpty) &&
+        id > 0) {
+      try {
+        final secrets = await ConnectionSecretsStore.readForConnection(id);
+        effectivePassword = secrets.password;
+        effectiveConnectionString = secrets.connectionString;
+      } catch (_) {}
+    }
+
     _conn = redis.RedisConnection();
-    final sslPaths = extractSslCertificatePathsFromString(connectionString);
+    final sslPaths =
+        extractSslCertificatePathsFromString(effectiveConnectionString);
     final secure = useSSL || sslPaths.hasAny;
     if (secure) {
       final context = buildSecurityContext(sslPaths);
@@ -88,34 +114,44 @@ class RedisConnection {
     } else {
       _command = await _conn!.connect(host, port);
     }
-    if (password != null && password!.isNotEmpty) {
+    if (effectivePassword != null && effectivePassword.isNotEmpty) {
       if (username != null && username!.trim().isNotEmpty) {
-        await _command!.send_object(['AUTH', username!.trim(), password!]);
+        await _command!.send_object(['AUTH', username!.trim(), effectivePassword]);
       } else {
-        await _command!.send_object(['AUTH', password]);
+        await _command!.send_object(['AUTH', effectivePassword]);
       }
     }
     final result = await _command!.send_object(['PING']);
     if (result == null || result.toString().toUpperCase() != 'PONG') {
-      await _conn?.close();
+      try {
+        await _conn?.close();
+      } catch (_) {}
       _conn = null;
       _command = null;
       throw RedisConnectionException('PING failed');
     }
     _isConnected = true;
+    scrubCredentials();
   }
 
   Future<void> disconnect() async {
+    final wasConnected = _isConnected;
     _isConnected = false;
     _command = null;
     final c = _conn;
     _conn = null;
-    try {
-      await c?.close();
-    } catch (e) {
-      debugPrint('RedisConnection.disconnect: $e');
+    if (c != null && wasConnected) {
+      try {
+        await c.close();
+      } catch (e) {
+        if (e is! TypeError && !e.toString().contains('Null check operator')) {
+          debugPrint('RedisConnection.disconnect: $e');
+        }
+      }
     }
   }
+
+  Future<void> forceClose() => disconnect();
 
   Future<String> info() async {
     if (!isConnected || _command == null) {
@@ -437,10 +473,10 @@ class RedisConnectionTestFake extends RedisConnection {
     final c = _conn;
     _conn = null;
     _command = null;
-    try {
-      await c?.close();
-    } catch (e) {
-      debugPrint('RedisConnection.disconnect: $e');
+    if (c != null) {
+      try {
+        await c.close();
+      } catch (_) {}
     }
   }
 

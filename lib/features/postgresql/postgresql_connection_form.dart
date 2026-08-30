@@ -420,9 +420,11 @@ class _PostgresConnectionFormContentState
         maxHeight: WindowLayout.connectionFormMaxHeight,
       ),
       borderColor: theme.muted,
-      child: material.Column(
-        crossAxisAlignment: material.CrossAxisAlignment.stretch,
-        children: [
+      child: material.FocusTraversalGroup(
+        policy: material.WidgetOrderTraversalPolicy(),
+        child: material.Column(
+          crossAxisAlignment: material.CrossAxisAlignment.stretch,
+          children: [
             // Header
             material.Padding(
               padding: const material.EdgeInsets.fromLTRB(24, 24, 24, 16),
@@ -464,168 +466,199 @@ class _PostgresConnectionFormContentState
             const material.Divider(height: 1),
             // Form body
             material.Expanded(
-              child: material.SingleChildScrollView(
-                padding: const material.EdgeInsets.all(24),
-                child: material.Column(
-                  crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                  children: [
-                    // Connection Name
-                    const Text('Connection Name').small().semiBold(),
-                    const Gap(8),
-                    TextField(
-                      controller: _nameController,
-                      placeholder: const Text('My PostgreSQL Server'),
-                    ),
-                    const Gap(16),
-                    const Text('Connection URI (optional)').small().semiBold(),
-                    const Gap(4),
-                    const Text(
-                      'If set, overrides Host / Port / Database below.',
-                    ).muted().small(),
-                    const Gap(4),
-                    const Text(
-                      'Supported query params include sslmode (disable, require, '
-                      'verify-ca, verify-full), connect_timeout and query_timeout '
-                      '(seconds). If sslmode is omitted, Use SSL/TLS below applies.',
-                    ).muted().small(),
-                    const Gap(8),
-                    TextField(
-                      controller: _connectionStringController,
-                      placeholder: const Text(
-                        'postgresql://user:pass@host:5432/dbname?sslmode=require',
+              child: material.FocusTraversalGroup(
+                policy: material.WidgetOrderTraversalPolicy(),
+                child: material.SingleChildScrollView(
+                  padding: const material.EdgeInsets.all(24),
+                  child: material.Column(
+                    crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                    children: [
+                      // Connection Name
+                      const Text('Connection Name').small().semiBold(),
+                      const Gap(8),
+                      TextField(
+                        controller: _nameController,
+                        placeholder: const Text('My PostgreSQL Server'),
                       ),
-                    ),
-                    const Gap(16),
-                    // Host + Port
-                    material.Row(
-                      children: [
-                        material.Expanded(
-                          flex: 3,
-                          child: material.Column(
-                            crossAxisAlignment:
-                                material.CrossAxisAlignment.stretch,
-                            mainAxisSize: material.MainAxisSize.min,
-                            children: [
-                              const Text('Host').small().semiBold(),
-                              const Gap(8),
-                              TextField(
-                                controller: _hostController,
-                                placeholder: const Text('localhost'),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Gap(12),
-                        material.Expanded(
-                          flex: 1,
-                          child: material.Column(
-                            crossAxisAlignment:
-                                material.CrossAxisAlignment.stretch,
-                            mainAxisSize: material.MainAxisSize.min,
-                            children: [
-                              const Text('Port').small().semiBold(),
-                              const Gap(8),
-                              TextField(
-                                controller: _portController,
-                                placeholder: const Text('5432'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Gap(16),
-                    // Database
-                    const Text('Database').small().semiBold(),
-                    const Gap(8),
-                    TextField(
-                      controller: _databaseController,
-                      placeholder: const Text('postgres'),
-                    ),
-                    const Gap(16),
-                    // Username
-                    const Text('Username').small().semiBold(),
-                    const Gap(8),
-                    TextField(
-                      controller: _usernameController,
-                      placeholder: const Text('postgres'),
-                    ),
-                    const Gap(16),
-                    // Password
-                    const Text('Password').small().semiBold(),
-                    const Gap(8),
-                    material.Stack(
-                      children: [
-                        TextField(
-                          controller: _passwordController,
-                          placeholder: Text(
-                            _isEditing
-                                ? 'Leave blank to keep existing'
-                                : 'Password',
-                          ),
-                          obscureText: !_showPassword,
-                        ),
-                        material.Positioned(
-                          right: 8,
-                          top: 0,
-                          bottom: 0,
-                          child: material.Center(
-                            child: material.IconButton(
-                              icon: material.Icon(
-                                _showPassword
-                                    ? material.Icons.visibility_off
-                                    : material.Icons.visibility,
-                                size: 20,
-                              ),
-                              onPressed: () => setState(
-                                  () => _showPassword = !_showPassword),
-                              padding: material.EdgeInsets.zero,
-                              constraints: const material.BoxConstraints(),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Gap(16),
-                    // SSL toggle
-                    material.Row(
-                      children: [
-                        material.Checkbox(
-                          value: _useSSL,
-                          onChanged: (v) =>
-                              setState(() => _useSSL = v ?? false),
-                        ),
-                        const Gap(8),
-                        const Text('Use SSL/TLS').small(),
-                      ],
-                    ),
-                    if (_useSSL) ...[
                       const Gap(16),
-                      const Text('SSL Certificates (optional)')
-                          .small()
-                          .semiBold(),
+                      const Text('Connection URI (optional)').small().semiBold(),
                       const Gap(4),
                       const Text(
-                        'Root CA, client certificate, and client key are '
-                        'appended to the connection URI.',
+                        'If set, overrides Host / Port / Database below.',
+                      ).muted().small(),
+                      const Gap(4),
+                      const Text(
+                        'Supported query params include sslmode (disable, require, '
+                        'verify-ca, verify-full), connect_timeout and query_timeout '
+                        '(seconds). If sslmode is omitted, Use SSL/TLS below applies.',
                       ).muted().small(),
                       const Gap(8),
-                      _buildSslFileField(
-                        label: 'Root CA / SSL Root Certificate',
-                        controller: _sslRootCertController,
+                      TextField(
+                        controller: _connectionStringController,
+                        placeholder: const Text(
+                          'postgresql://user:pass@host:5432/dbname?sslmode=require',
+                        ),
                       ),
+                      const Gap(16),
+                      // Host and Port Row
+                      material.Row(
+                        crossAxisAlignment: material.CrossAxisAlignment.start,
+                        children: [
+                          material.Expanded(
+                            flex: 3,
+                            child: material.Column(
+                              crossAxisAlignment:
+                                  material.CrossAxisAlignment.stretch,
+                              children: [
+                                const Text('Host').small().semiBold(),
+                                const Gap(8),
+                                TextField(
+                                  controller: _hostController,
+                                  placeholder: const Text('localhost'),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Gap(16),
+                          material.Expanded(
+                            flex: 2,
+                            child: material.Column(
+                              crossAxisAlignment:
+                                  material.CrossAxisAlignment.stretch,
+                              children: [
+                                const Text('Port').small().semiBold(),
+                                const Gap(8),
+                                TextField(
+                                  controller: _portController,
+                                  placeholder: const Text('5432'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Gap(16),
+                      // Database
+                      const Text('Database').small().semiBold(),
                       const Gap(8),
-                      _buildSslFileField(
-                        label: 'SSL Client Certificate',
-                        controller: _sslCertController,
+                      TextField(
+                        controller: _databaseController,
+                        placeholder: const Text('postgres'),
                       ),
-                      const Gap(8),
-                      _buildSslFileField(
-                        label: 'SSL Client Key',
-                        controller: _sslKeyController,
+                      const Gap(16),
+                      // Username and Password Row
+                      material.Row(
+                        crossAxisAlignment: material.CrossAxisAlignment.start,
+                        children: [
+                          material.Expanded(
+                            child: material.Column(
+                              crossAxisAlignment:
+                                  material.CrossAxisAlignment.stretch,
+                              children: [
+                                const Text('Username').small().semiBold(),
+                                const Gap(8),
+                                TextField(
+                                  controller: _usernameController,
+                                  placeholder: const Text('postgres'),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Gap(16),
+                          material.Expanded(
+                            child: material.Column(
+                              crossAxisAlignment:
+                                  material.CrossAxisAlignment.stretch,
+                              children: [
+                                const Text('Password').small().semiBold(),
+                                const Gap(8),
+                                material.Stack(
+                                  children: [
+                                    TextField(
+                                      controller: _passwordController,
+                                      placeholder: Text(
+                                        _isEditing
+                                            ? 'Leave blank to keep existing'
+                                            : 'Password',
+                                      ),
+                                      obscureText: !_showPassword,
+                                    ),
+                                    material.Positioned(
+                                      right: 8,
+                                      top: 0,
+                                      bottom: 0,
+                                      child: material.Center(
+                                        child: material.IconButton(
+                                          icon: material.Icon(
+                                            _showPassword
+                                                ? material.Icons.visibility_off
+                                                : material.Icons.visibility,
+                                            size: 20,
+                                          ),
+                                          onPressed: () => setState(
+                                              () => _showPassword = !_showPassword),
+                                          padding: material.EdgeInsets.zero,
+                                          constraints: const material.BoxConstraints(),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
+                      const Gap(16),
+                      // SSL/TLS Toggle
+                      material.Row(
+                        children: [
+                          material.Checkbox(
+                            value: _useSSL,
+                            onChanged: (v) =>
+                                setState(() => _useSSL = v ?? false),
+                          ),
+                          const Gap(8),
+                          const Text('Use SSL/TLS').small(),
+                        ],
+                      ),
+                      if (_useSSL) ...[
+                        const Gap(16),
+                        material.FocusTraversalGroup(
+                          policy: material.WidgetOrderTraversalPolicy(),
+                          child: material.Column(
+                            crossAxisAlignment:
+                                material.CrossAxisAlignment.stretch,
+                            children: [
+                              const Text('SSL Certificates (optional)')
+                                  .small()
+                                  .semiBold(),
+                              const Gap(4),
+                              const Text(
+                                'Root CA, client certificate, and client key are '
+                                'appended to the connection URI.',
+                              ).muted().small(),
+                              const Gap(8),
+                              _buildSslFileField(
+                                label: 'Root CA / SSL Root Certificate',
+                                controller: _sslRootCertController,
+                              ),
+                              const Gap(8),
+                              _buildSslFileField(
+                                label: 'SSL Client Certificate',
+                                controller: _sslCertController,
+                              ),
+                              const Gap(8),
+                              _buildSslFileField(
+                                label: 'SSL Client Key',
+                                controller: _sslKeyController,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -698,68 +731,72 @@ class _PostgresConnectionFormContentState
                 ),
               ),
             // Footer — Wrap avoids overflow on narrow viewports (e.g. in tests)
-            material.Container(
-              padding: const material.EdgeInsets.symmetric(
-                  horizontal: 24, vertical: 16),
-              child: ValueListenableBuilder<bool>(
-                valueListenable: _formValidNotifier.listenable,
-                builder: (context, formValid, _) {
-                  return material.Wrap(
-                    spacing: 12,
-                    runSpacing: 8,
-                    alignment: material.WrapAlignment.spaceBetween,
-                    children: [
-                      OutlineButton(
-                        onPressed:
-                            formValid && !_isTesting ? _testConnection : null,
-                        leading: _isTesting
-                            ? material.SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: material.CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: theme.primary,
+            material.FocusTraversalGroup(
+              policy: material.WidgetOrderTraversalPolicy(),
+              child: material.Container(
+                padding: const material.EdgeInsets.symmetric(
+                    horizontal: 24, vertical: 16),
+                child: ValueListenableBuilder<bool>(
+                  valueListenable: _formValidNotifier.listenable,
+                  builder: (context, formValid, _) {
+                    return material.Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      alignment: material.WrapAlignment.spaceBetween,
+                      children: [
+                        OutlineButton(
+                          onPressed:
+                              formValid && !_isTesting ? _testConnection : null,
+                          leading: _isTesting
+                              ? material.SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: material.CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: theme.primary,
+                                  ),
+                                )
+                              : material.Icon(
+                                  material.Icons.link_rounded,
+                                  size: 18,
+                                  color: formValid
+                                      ? theme.primary
+                                      : theme.mutedForeground,
                                 ),
-                              )
-                            : material.Icon(
-                                material.Icons.link_rounded,
-                                size: 18,
-                                color: formValid
-                                    ? theme.primary
-                                    : theme.mutedForeground,
-                              ),
-                        child: Text(
-                          'Test Connection',
-                          style: material.TextStyle(
-                            fontWeight: material.FontWeight.w500,
-                            color: formValid
-                                ? theme.primary
-                                : theme.mutedForeground,
+                          child: Text(
+                            'Test Connection',
+                            style: material.TextStyle(
+                              fontWeight: material.FontWeight.w500,
+                              color: formValid
+                                  ? theme.primary
+                                  : theme.mutedForeground,
+                            ),
                           ),
                         ),
-                      ),
-                      material.Row(
-                        mainAxisSize: material.MainAxisSize.min,
-                        children: [
-                          GhostButton(
-                            onPressed: () =>
-                                material.Navigator.of(context).pop(),
-                            child: const Text('Cancel'),
-                          ),
-                          const Gap(12),
-                          PrimaryButton(
-                            onPressed: formValid ? _save : null,
-                            child: const Text('Save'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  );
-                },
+                        material.Row(
+                          mainAxisSize: material.MainAxisSize.min,
+                          children: [
+                            GhostButton(
+                              onPressed: () =>
+                                  material.Navigator.of(context).pop(),
+                              child: const Text('Cancel'),
+                            ),
+                            const Gap(12),
+                            PrimaryButton(
+                              onPressed: formValid ? _save : null,
+                              child: const Text('Save'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ),
             ),
           ],
         ),
+      ),
     );
   }
 }

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:querya_desktop/features/main_screen/grid_data_type_validator.dart';
+import 'package:querya_desktop/features/workspace/grid_data_type_validator.dart';
 
 void main() {
   group('GridDataTypeValidator', () {
@@ -75,10 +75,20 @@ void main() {
       );
     });
 
+    test('validates binary / blob / bytea types', () {
+      expect(GridDataTypeValidator.validate(r'\xDEADBEEF', dataTypeName: 'bytea'), isNull);
+      expect(GridDataTypeValidator.validate('0x12AB', dataTypeName: 'blob'), isNull);
+      expect(GridDataTypeValidator.validate("X'CAFE'", dataTypeName: 'binary'), isNull);
+      expect(GridDataTypeValidator.validate('DEADBEEF', dataTypeName: 'varbinary'), isNull);
+      expect(GridDataTypeValidator.validate('not_hex', dataTypeName: 'blob'), isNotNull);
+      expect(GridDataTypeValidator.validate('123', dataTypeName: 'bytea'), isNotNull); // odd length hex
+    });
+
     test('allows empty and NULL values regardless of type', () {
       expect(GridDataTypeValidator.validate('', dataTypeName: 'int'), isNull);
       expect(GridDataTypeValidator.validate('NULL', dataTypeName: 'uuid'), isNull);
       expect(GridDataTypeValidator.validate('null', dataTypeName: 'json'), isNull);
+      expect(GridDataTypeValidator.validate('NULL', dataTypeName: 'blob'), isNull);
     });
   });
 }

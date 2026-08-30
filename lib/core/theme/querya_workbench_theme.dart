@@ -51,15 +51,15 @@ class QueryaWorkbenchTheme {
     gitUntracked: Color(0xFF2EB88A),
   );
 
-  /// Built-in light preset (slate-like canvas, cyan brand accent).
+  /// Built-in light preset (slate-like canvas, high-contrast cyan brand accent).
   static const QueryaWorkbenchTheme lightDefault = QueryaWorkbenchTheme(
     canvas: Color(0xFFFAFAFA),
     surface: Color(0xFFFFFFFF),
     sidebarBackground: Color(0xFFF4F4F5),
     editorBackground: Color(0xFFFFFFFF),
     borderSubtle: Color(0xFFE4E4E7),
-    accent: QueryaColors.accentCyan,
-    onAccent: QueryaColors.onAccent,
+    accent: QueryaColors.accentCyanLight,
+    onAccent: Color(0xFFFFFFFF),
     mutedForeground: Color(0xFF64748B),
     destructive: Color(0xFFDC2626),
     success: Color(0xFF16A34A),

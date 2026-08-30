@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:querya_desktop/features/main_screen/data_grid_staging_buffer.dart';
-import 'package:querya_desktop/features/main_screen/grid_cell_editor.dart';
-import 'package:querya_desktop/features/main_screen/grid_cell_popover_inspector.dart';
-import 'package:querya_desktop/features/main_screen/result_grid_view.dart';
+import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
+import 'package:querya_desktop/features/workspace/grid_cell_editor.dart';
+import 'package:querya_desktop/features/workspace/grid_cell_popover_inspector.dart';
+import 'package:querya_desktop/features/workspace/result_grid_view.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import '../../support/querya_theme_test_shell.dart';
@@ -171,6 +171,123 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(result, 'NULL');
+    });
+
+    testWidgets('formats XML content in dialog', (tester) async {
+      String? result;
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Builder(
+            builder: (context) => material.ElevatedButton(
+              onPressed: () async {
+                result = await showGridCellInspectorDialog(
+                  context: context,
+                  columnName: 'payload',
+                  initialValue: '<root><item id="1">data</item></root>',
+                  rowIndex: 0,
+                );
+              },
+              child: const Text('Open Dialog'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Open Dialog'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Format XML'), findsOneWidget);
+
+      await tester.tap(find.text('Format XML'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Apply'));
+      await tester.pumpAndSettle();
+
+      expect(result, isNotNull);
+      expect(result!.contains('\n'), isTrue);
+      expect(result!.contains('  <item'), isTrue);
+    });
+
+    testWidgets('formats Hex BLOB content in dialog', (tester) async {
+      String? result;
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Builder(
+            builder: (context) => material.ElevatedButton(
+              onPressed: () async {
+                result = await showGridCellInspectorDialog(
+                  context: context,
+                  columnName: 'bin_data',
+                  initialValue: r'\xdeadbeef1234',
+                  rowIndex: 0,
+                );
+              },
+              child: const Text('Open Dialog'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Open Dialog'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Format Hex'), findsOneWidget);
+
+      await tester.tap(find.text('Format Hex'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Apply'));
+      await tester.pumpAndSettle();
+
+      expect(result, r'\x DE AD BE EF 12 34');
+    });
+
+    testWidgets('toggles wrap and applies with Ctrl+Enter shortcut', (tester) async {
+      String? result;
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Builder(
+            builder: (context) => material.ElevatedButton(
+              onPressed: () async {
+                result = await showGridCellInspectorDialog(
+                  context: context,
+                  columnName: 'notes',
+                  initialValue: 'Hello world',
+                  rowIndex: 0,
+                );
+              },
+              child: const Text('Open Dialog'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Open Dialog'));
+      await tester.pumpAndSettle();
+
+      // Toggle wrap
+      expect(find.text('Wrap'), findsOneWidget);
+      await tester.tap(find.text('Wrap'));
+      await tester.pumpAndSettle();
+      expect(find.text('No Wrap'), findsOneWidget);
+
+      // Verify metrics info text rendered
+      expect(find.textContaining('1 line · 11 chars'), findsOneWidget);
+
+      // Send Ctrl+Enter to apply
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+
+      expect(result, 'Hello world');
     });
   });
 

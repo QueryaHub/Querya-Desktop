@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' as material
         Alignment,
         Container,
         EdgeInsets,
+        Offset,
         Padding,
         Center,
         Icon,
@@ -54,6 +55,12 @@ class WorkspacePanel extends StatefulWidget {
     this.sqliteSqlTabRequestToken = 0,
     this.selectedExtensionObject,
     this.extensionSqlTabRequestToken = 0,
+    this.lastSelectedPostgresObject,
+    this.lastSelectedMysqlObject,
+    this.lastSelectedSqliteObject,
+    this.lastSelectedExtensionObject,
+    this.onNavigateHome,
+    this.onRestoreLastSelectedObject,
     this.isReadOnly = false,
     this.onRequestNewConnection,
     this.onRequestNewConnectionFromUrl,
@@ -123,6 +130,36 @@ class WorkspacePanel extends StatefulWidget {
 
   /// Incremented by [MainScreen] to switch the Extension home view to the SQL tab.
   final int extensionSqlTabRequestToken;
+
+  /// Last selected objects for 1-click return from stats.
+  final ({
+    String database,
+    String schema,
+    String name,
+    PostgresObjectKind kind
+  })? lastSelectedPostgresObject;
+
+  final ({
+    String database,
+    String name,
+    MysqlObjectKind kind
+  })? lastSelectedMysqlObject;
+
+  final ({
+    String name,
+    SqliteObjectKind kind
+  })? lastSelectedSqliteObject;
+
+  final ({
+    String database,
+    String name,
+  })? lastSelectedExtensionObject;
+
+  /// Callback to return to the active connection's stats / overview home.
+  final VoidCallback? onNavigateHome;
+
+  /// Callback to restore the last selected table / object view.
+  final VoidCallback? onRestoreLastSelectedObject;
 
   /// Empty-state hero: primary CTA to add a connection.
   final void Function()? onRequestNewConnection;
@@ -205,6 +242,8 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
             postgresSqlEditorContextToken:
                 widget.postgresSqlEditorContextToken,
             sqlTabRequestToken: widget.postgresSqlTabRequestToken,
+            lastSelectedPostgresObject: widget.lastSelectedPostgresObject,
+            onRestoreLastSelectedObject: widget.onRestoreLastSelectedObject,
             isReadOnly: widget.isReadOnly,
           ),
           object: pg == null
@@ -212,6 +251,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
               : buildPostgresObjectWorkspace(
                   connection: activeConn,
                   pg: pg,
+                  onNavigateHome: widget.onNavigateHome,
                 ),
         );
         break;
@@ -239,6 +279,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
               database: my.database,
               tableName: my.name,
               isView: my.kind == MysqlObjectKind.view,
+              onNavigateHome: widget.onNavigateHome,
             );
           }
         }
@@ -248,6 +289,8 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
             key: ValueKey('mysql_home_${activeConn.id}'),
             connectionRow: activeConn,
             sqlTabRequestToken: widget.mysqlSqlTabRequestToken,
+            lastSelectedMysqlObject: widget.lastSelectedMysqlObject,
+            onRestoreLastSelectedObject: widget.onRestoreLastSelectedObject,
             isReadOnly: widget.isReadOnly,
           ),
           object: mysqlObject,
@@ -295,6 +338,8 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
             key: ValueKey('sqlite_home_${activeConn.id}'),
             connectionRow: activeConn,
             sqlTabRequestToken: widget.sqliteSqlTabRequestToken,
+            lastSelectedSqliteObject: widget.lastSelectedSqliteObject,
+            onRestoreLastSelectedObject: widget.onRestoreLastSelectedObject,
             isReadOnly: widget.isReadOnly,
           ),
           object: sq == null
@@ -306,6 +351,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
                   connectionRow: activeConn,
                   tableName: sq.name,
                   isView: sq.kind == SqliteObjectKind.view,
+                  onNavigateHome: widget.onNavigateHome,
                 ),
         );
         break;
@@ -318,6 +364,8 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
               key: ValueKey('ext_home_${activeConn.id}'),
               connectionRow: activeConn,
               sqlTabRequestToken: widget.extensionSqlTabRequestToken,
+              lastSelectedExtensionObject: widget.lastSelectedExtensionObject,
+              onRestoreLastSelectedObject: widget.onRestoreLastSelectedObject,
               isReadOnly: widget.isReadOnly,
             ),
             object: obj == null
@@ -329,6 +377,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
                     connectionRow: activeConn,
                     database: obj.database,
                     tableName: obj.name,
+                    onNavigateHome: widget.onNavigateHome,
                   ),
           );
         }
@@ -372,10 +421,12 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
     required material.Widget? object,
   }) {
     return QueryaSwitchingBody(
+      slide: material.Offset.zero,
       index: showingObject ? 1 : 0,
       children: [
         home,
         QueryaFadeSlide(
+          offset: const material.Offset(0, 0.015),
           child: object ??
               const material.SizedBox.expand(
                 key: ValueKey('workspace_object_placeholder'),

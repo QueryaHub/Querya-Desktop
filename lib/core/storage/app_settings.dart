@@ -129,6 +129,7 @@ abstract final class AppSettingsKeys {
   static const checkForUpdatesOnStartup = 'check_for_updates_on_startup';
   static const updateDismissedVersion = 'update_dismissed_version';
   static const hasCompletedWelcomeTour = 'has_completed_welcome_tour';
+  static const confirmDestructiveOperations = 'confirm_destructive_operations';
 }
 
 /// Bumps [listenable] when any preference is persisted (theme, legacy listeners).
@@ -234,6 +235,23 @@ class AppSettings {
     await LocalDb.instance.setAppSetting(
       AppSettingsKeys.sqlEditorFontSizePoints,
       clamped.toString(),
+    );
+    SqlWorkspaceSettingsRevision.bump();
+  }
+
+  /// Whether the SQL editor prompts for confirmation before executing DROP / TRUNCATE.
+  Future<bool> getConfirmDestructiveOperations() async {
+    final v = await LocalDb.instance.getAppSetting(
+      AppSettingsKeys.confirmDestructiveOperations,
+    );
+    if (v == null || v.isEmpty) return true;
+    return v.toLowerCase() == 'true' || v == '1';
+  }
+
+  Future<void> setConfirmDestructiveOperations(bool enable) async {
+    await LocalDb.instance.setAppSetting(
+      AppSettingsKeys.confirmDestructiveOperations,
+      enable.toString(),
     );
     SqlWorkspaceSettingsRevision.bump();
   }

@@ -21,12 +21,16 @@ class SduiTreeBuilder extends material.StatefulWidget {
     required this.schema,
     this.fetchChildren,
     this.onNodeSelected,
+    this.selectedNodeId,
+    this.isNodeSelected,
     this.maxHeight,
   });
 
   final SduiTreeSchema schema;
   final SduiFetchTreeChildren? fetchChildren;
   final void Function(SduiTreeNode node)? onNodeSelected;
+  final String? selectedNodeId;
+  final bool Function(SduiTreeNode node)? isNodeSelected;
 
   /// When set, the tree scrolls inside a height cap (sidebar use).
   final double? maxHeight;
@@ -199,89 +203,121 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
 
   material.Widget _buildNodeRow(SduiTreeNode node, {required int depth}) {
     final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
     final muted = theme.colorScheme.mutedForeground;
     final canExpand = node.expandable || node.hasChildren;
     final isExpanded = _expanded.contains(node.id);
     final isLoading = _loading.contains(node.id);
     final nodeKind = _resolveNodeKind(node);
     final isBrowsable = nodeKind == 'table' || nodeKind == 'view';
+    final isSelected = (widget.selectedNodeId != null &&
+            node.id == widget.selectedNodeId) ||
+        (widget.isNodeSelected != null && widget.isNodeSelected!(node));
+
     // Same hierarchy as native trees (#476 / #497) — no separate sduiNode size.
     final iconSize =
         canExpand ? QueryaIconSizes.treeGroup : QueryaIconSizes.treeLeaf;
-    final iconColor = isBrowsable
-        ? QueryaTreeTokens.leafIconColor(theme.colorScheme.primary)
-        : muted;
+    final iconColor = isSelected
+        ? primary
+        : (isBrowsable
+            ? QueryaTreeTokens.leafIconColor(primary)
+            : muted);
     final rowLeft =
         8.0 + depth * QueryaTreeTokens.indent + (canExpand ? 0 : 4.0);
 
-    final row = material.InkWell(
-      onTap: () {
-        if (isBrowsable) {
-          widget.onNodeSelected?.call(node);
-        } else if (canExpand) {
-          _toggleExpand(node);
-        }
-      },
-      borderRadius: material.BorderRadius.circular(4),
-      child: material.Padding(
-        padding: material.EdgeInsets.only(
-          left: rowLeft,
-          right: 8,
-        ),
-        child: material.Row(
-          children: [
-            if (canExpand)
-              material.MouseRegion(
-                cursor: material.SystemMouseCursors.click,
-                child: material.GestureDetector(
-                  behavior: material.HitTestBehavior.opaque,
-                  onTap: () => _toggleExpand(node),
-                  child: material.Padding(
-                    padding: const material.EdgeInsets.all(2),
-                    child: material.AnimatedRotation(
-                      turns: isExpanded ? 0.25 : 0,
-                      duration: context.motionDuration(QueryaMotion.treeExpand),
-                      curve: context.motionCurve(QueryaMotion.treeExpandCurve),
-                      child: material.Icon(
-                        QueryaIcons.expandClosed,
-                        size: QueryaIconSizes.treeExpand,
-                        color: muted,
+    final row = material.AnimatedContainer(
+      duration: context.motionDuration(QueryaMotion.fast),
+      curve: context.motionCurve(QueryaMotion.standardCurve),
+      decoration: material.BoxDecoration(
+        color: isSelected
+            ? primary.withValues(alpha: 0.12)
+            : material.Colors.transparent,
+        borderRadius: material.BorderRadius.circular(4),
+        border: isSelected
+            ? material.Border.all(
+                color: primary.withValues(alpha: 0.35),
+                width: 1,
+              )
+            : null,
+      ),
+      child: material.Material(
+        color: material.Colors.transparent,
+        child: material.InkWell(
+          onTap: () {
+            if (isBrowsable) {
+              widget.onNodeSelected?.call(node);
+            } else if (canExpand) {
+              _toggleExpand(node);
+            }
+          },
+          borderRadius: material.BorderRadius.circular(4),
+          child: material.Padding(
+            padding: material.EdgeInsets.only(
+              left: rowLeft,
+              right: 8,
+            ),
+            child: material.Row(
+              children: [
+                if (canExpand)
+                  material.MouseRegion(
+                    cursor: material.SystemMouseCursors.click,
+                    child: material.GestureDetector(
+                      behavior: material.HitTestBehavior.opaque,
+                      onTap: () => _toggleExpand(node),
+                      child: material.Padding(
+                        padding: const material.EdgeInsets.all(2),
+                        child: material.AnimatedRotation(
+                          turns: isExpanded ? 0.25 : 0,
+                          duration:
+                              context.motionDuration(QueryaMotion.treeExpand),
+                          curve:
+                              context.motionCurve(QueryaMotion.treeExpandCurve),
+                          child: material.Icon(
+                            QueryaIcons.expandClosed,
+                            size: QueryaIconSizes.treeExpand,
+                            color: muted,
+                          ),
+                        ),
                       ),
+                    ),
+                  )
+                else
+                  const material.SizedBox(width: QueryaIconSizes.treeExpand + 4),
+                if (isLoading)
+                  const material.SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: material.CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  material.Icon(
+                    QueryaIcons.sduiNodeIcon(
+                      node.icon,
+                      expandable: node.expandable,
+                    ),
+                    size: iconSize,
+                    color: iconColor,
+                  ),
+                const Gap(8),
+                material.Expanded(
+                  child: material.Text(
+                    node.label,
+                    overflow: material.TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: material.TextStyle(
+                      fontSize: 11,
+                      color: isSelected
+                          ? primary
+                          : (isBrowsable ? theme.colorScheme.foreground : muted),
+                      fontWeight: (isSelected || isBrowsable)
+                          ? material.FontWeight.w600
+                          : null,
                     ),
                   ),
                 ),
-              )
-            else
-              const material.SizedBox(width: QueryaIconSizes.treeExpand + 4),
-            if (isLoading)
-              const material.SizedBox(
-                width: 14,
-                height: 14,
-                child: material.CircularProgressIndicator(strokeWidth: 2),
-              )
-            else
-              material.Icon(
-                QueryaIcons.sduiNodeIcon(
-                  node.icon,
-                  expandable: node.expandable,
-                ),
-                size: iconSize,
-                color: iconColor,
-              ),
-            const Gap(8),
-            material.Expanded(
-              child: material.Text(
-                node.label,
-                overflow: material.TextOverflow.ellipsis,
-                maxLines: 1,
-                style: material.TextStyle(
-                  fontSize: 11,
-                  color: isBrowsable ? theme.colorScheme.foreground : muted,
-                  fontWeight: isBrowsable ? material.FontWeight.w600 : null,
-                ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

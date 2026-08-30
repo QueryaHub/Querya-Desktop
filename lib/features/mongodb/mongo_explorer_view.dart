@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
+import 'package:querya_desktop/core/motion/querya_switching_body.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
@@ -20,7 +21,7 @@ class _Crumb {
   final _Level level;
 }
 
-enum _Level { databases, collections, documents, document }
+enum _Level { databases, collections, documents, document, stats }
 
 // ─── Main explorer widget ───────────────────────────────────────────────────
 
@@ -174,10 +175,16 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
       final id = _selectedDocument!['_id']?.toString() ?? 'Document';
       list.add(_Crumb(id, _Level.document));
     }
+    if (_showStats) {
+      list.add(const _Crumb('Statistics', _Level.stats));
+    }
     return list;
   }
 
   void _onCrumbTap(_Crumb crumb) {
+    if (_showStats && crumb.level != _Level.stats) {
+      setState(() => _showStats = false);
+    }
     switch (crumb.level) {
       case _Level.databases:
         _navigateToDatabases();
@@ -187,6 +194,8 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
         _navigateToDocuments();
       case _Level.document:
         break; // Already on the document
+      case _Level.stats:
+        break;
     }
   }
 
@@ -247,16 +256,6 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
     final conn = _connection;
     if (conn == null) return const material.SizedBox.shrink();
 
-    // Statistics mode — render MongoStatsView full-screen
-    if (_showStats) {
-      return MongoStatsView(
-        key: ValueKey('stats_${widget.connectionRow.id}'),
-        connectionRow: widget.connectionRow,
-        connection: conn,
-        onBack: () => setState(() => _showStats = false),
-      );
-    }
-
     return material.Container(
       color: cs.background,
       child: material.Column(
@@ -267,11 +266,25 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
             crumbs: _crumbs,
             onCrumbTap: _onCrumbTap,
             onRefresh: () => setState(() => _refreshToken++),
-            onStats: () => setState(() => _showStats = true),
+            onStats: () => setState(() => _showStats = !_showStats),
           ),
           const Divider(height: 1),
-          // Content
-          material.Expanded(child: _buildContent(conn)),
+          // Content with fluid cross-fade morph between explorer and stats
+          material.Expanded(
+            child: QueryaSwitchingBody(
+              slide: material.Offset.zero,
+              index: _showStats ? 1 : 0,
+              children: [
+                _buildContent(conn),
+                MongoStatsView(
+                  key: ValueKey('stats_${widget.connectionRow.id}'),
+                  connectionRow: widget.connectionRow,
+                  connection: conn,
+                  onBack: () => setState(() => _showStats = false),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

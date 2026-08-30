@@ -69,6 +69,13 @@ void main() {
       expect(conn.isConnected, false);
     });
 
+    test('configures PRAGMA busy_timeout to 5000 on connection open', () async {
+      await conn.connect();
+      final res = await conn.execute('PRAGMA busy_timeout');
+      expect(res, isNotEmpty);
+      expect(res.first['timeout'], 5000);
+    });
+
     test('testConnection connects, queries and cleans up', () async {
       final ok = await conn.testConnection();
       expect(ok, true);

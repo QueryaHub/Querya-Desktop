@@ -1,10 +1,13 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/extensions/extension_driver_session.dart';
+import 'package:querya_desktop/core/extensions/models/extension_driver_capabilities.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/extensions/extension_driver_recovery_banner.dart';
 import 'package:querya_desktop/features/extensions/extension_table_toolbar.dart';
-import 'package:querya_desktop/features/main_screen/results_tab.dart';
+import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/shared/services/data_export_service.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -19,6 +22,7 @@ class ExtensionTableView extends material.StatefulWidget {
     required this.tableName,
     this.isView = false,
     this.pageSize = _defaultPageSize,
+    this.onNavigateHome,
   });
 
   final ConnectionRow connectionRow;
@@ -26,6 +30,7 @@ class ExtensionTableView extends material.StatefulWidget {
   final String tableName;
   final bool isView;
   final int pageSize;
+  final VoidCallback? onNavigateHome;
 
   @override
   material.State<ExtensionTableView> createState() =>
@@ -44,11 +49,63 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
   bool _filterActive = false;
   final _filterController = material.TextEditingController();
 
+  ExtensionDriverCapabilities? _capabilities;
+  DataGridStagingBuffer? _stagingBuffer;
+  bool _isSaving = false;
+
+  bool _restartingDriver = false;
+
   String get _qualifiedName => '`${widget.database}`.`${widget.tableName}`';
 
   String get _whereClause {
     final text = _filterController.text.trim();
     return text.isEmpty ? '' : ' WHERE $text';
+  }
+
+  bool get _isDriverError {
+    final err = _error;
+    if (err == null) return false;
+    return err.contains('PluginCrashedException') ||
+        err.contains('PluginDeadlockException') ||
+        err.contains('PluginProtocolTimeoutException') ||
+        err.contains('TimeoutException') ||
+        err.contains('SocketException') ||
+        err.contains('Broken pipe') ||
+        err.contains('JsonRpcStdioClient') ||
+        err.contains('Connection') ||
+        err.contains('is not started');
+  }
+
+  Future<void> _restartDriver() async {
+    if (_restartingDriver) return;
+    setState(() {
+      _restartingDriver = true;
+    });
+    try {
+      await ExtensionDriverSession.instance.restart(widget.connectionRow);
+      if (!mounted) return;
+      showAppToast(
+        context: context,
+        message: 'Driver restarted successfully',
+        variant: AppToastVariant.success,
+      );
+      setState(() {
+        _restartingDriver = false;
+        _error = null;
+      });
+      await _loadPage(refreshCount: true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Driver restart failed: $e';
+        _restartingDriver = false;
+      });
+      showAppToast(
+        context: context,
+        message: 'Driver restart failed: $e',
+        variant: AppToastVariant.error,
+      );
+    }
   }
 
   @override
@@ -67,12 +124,16 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
       _totalRows = null;
       _filterController.clear();
       _filterActive = false;
+      _stagingBuffer?.dispose();
+      _stagingBuffer = null;
       unawaited(_loadPage(refreshCount: true));
     }
   }
 
   @override
   void dispose() {
+    _stagingBuffer?.dispose();
+    _stagingBuffer = null;
     _filterController.dispose();
     super.dispose();
   }
@@ -123,9 +184,7 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
             _updateStatusLine();
           });
         }
-      } catch (_) {
-        // Ignore count errors on stream or schema tables that do not support count queries
-      }
+      } catch (_) {}
     }
   }
 
@@ -139,6 +198,9 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
     });
 
     try {
+      _capabilities ??= await ExtensionDriverSession.instance
+          .getCapabilities(widget.connectionRow);
+
       final dataResult = await ExtensionDriverSession.instance.query(
         widget.connectionRow,
         'SELECT * FROM $_qualifiedName$_whereClause LIMIT ${widget.pageSize} OFFSET $_offset',
@@ -149,6 +211,13 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
         _columns = dataResult.columns;
         _rows = dataResult.rows;
         _loading = false;
+        _stagingBuffer?.dispose();
+        if (!widget.isView && (_capabilities?.supportsMutations == true)) {
+          _stagingBuffer =
+              DataGridStagingBuffer(columns: _columns, rows: _rows);
+        } else {
+          _stagingBuffer = null;
+        }
         _updateStatusLine();
       });
 
@@ -160,6 +229,122 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
         _loading = false;
         _updateStatusLine();
       });
+    }
+  }
+
+  Future<void> _onApplyChanges() async {
+    final buffer = _stagingBuffer;
+    if (buffer == null || !buffer.isDirty) return;
+
+    setState(() => _isSaving = true);
+    try {
+      final schema = await ExtensionDriverSession.instance.getTableSchema(
+        widget.connectionRow,
+        database: widget.database,
+        tableName: widget.tableName,
+      );
+
+      final mutations = <Map<String, dynamic>>[];
+
+      // 1. Updates
+      for (final entry in buffer.modifiedCells.entries) {
+        final rowIndex = entry.key;
+        final colMap = entry.value;
+        final origRow = buffer.originalRows[rowIndex];
+
+        final whereMap = <String, dynamic>{};
+        if (schema.primaryKeys.isNotEmpty) {
+          for (final pk in schema.primaryKeys) {
+            final idx = _columns.indexOf(pk);
+            if (idx != -1 && idx < origRow.length) {
+              whereMap[pk] = origRow[idx];
+            }
+          }
+        } else {
+          for (var c = 0; c < _columns.length; c++) {
+            whereMap[_columns[c]] = c < origRow.length ? origRow[c] : null;
+          }
+        }
+
+        final setMap = <String, dynamic>{};
+        for (final colEntry in colMap.entries) {
+          final colName = _columns[colEntry.key];
+          final val = colEntry.value;
+          setMap[colName] =
+              val == TableMutationEngine.kNullSentinel ? null : val;
+        }
+
+        mutations.add({
+          'type': 'update',
+          'where': whereMap,
+          'set': setMap,
+        });
+      }
+
+      // 2. Inserts
+      for (final row in buffer.insertedRows) {
+        final valuesMap = <String, dynamic>{};
+        for (var c = 0; c < _columns.length; c++) {
+          final val = c < row.length ? row[c] : null;
+          valuesMap[_columns[c]] = (val == null ||
+                  val == TableMutationEngine.kNullSentinel ||
+                  val == 'NULL')
+              ? null
+              : val;
+        }
+        mutations.add({
+          'type': 'insert',
+          'values': valuesMap,
+        });
+      }
+
+      // 3. Deletes
+      for (final rowIndex in buffer.deletedRowIndices) {
+        final origRow = buffer.originalRows[rowIndex];
+        final whereMap = <String, dynamic>{};
+        if (schema.primaryKeys.isNotEmpty) {
+          for (final pk in schema.primaryKeys) {
+            final idx = _columns.indexOf(pk);
+            if (idx != -1 && idx < origRow.length) {
+              whereMap[pk] = origRow[idx];
+            }
+          }
+        } else {
+          for (var c = 0; c < _columns.length; c++) {
+            whereMap[_columns[c]] = c < origRow.length ? origRow[c] : null;
+          }
+        }
+        mutations.add({
+          'type': 'delete',
+          'where': whereMap,
+        });
+      }
+
+      if (mutations.isNotEmpty) {
+        final res = await ExtensionDriverSession.instance.mutate(
+          widget.connectionRow,
+          database: widget.database,
+          tableName: widget.tableName,
+          mutations: mutations,
+        );
+        if (!mounted) return;
+        final count = res['affectedRows'] ?? mutations.length;
+        showAppToast(
+          context: context,
+          message: 'Successfully applied $count mutation(s).',
+          variant: AppToastVariant.success,
+        );
+        unawaited(_loadPage(refreshCount: true));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      showAppToast(
+        context: context,
+        message: 'Failed to apply mutations: $e',
+        variant: AppToastVariant.error,
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -270,6 +455,7 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
           loading: _loading,
           canGoPrevious: _canGoBack && !_loading,
           canGoNext: _canGoForward && !_loading,
+          onNavigateHome: widget.onNavigateHome,
           filterActive: _filterActive || _filterController.text.isNotEmpty,
           filterText: _filterController.text,
           onToggleFilter: () {
@@ -281,6 +467,8 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
           onGoPrevious: _previousPage,
           onGoNext: _nextPage,
           onRefresh: () => _loadPage(refreshCount: true),
+          onRestartDriver: () => unawaited(_restartDriver()),
+          isRestarting: _restartingDriver,
           onCopyFormat: (format) {
             unawaited(() async {
               await DataExportService.copyToClipboard(
@@ -359,6 +547,15 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
             isLoading: _loading,
             statusLine: _statusLine,
             showExportToolbar: false,
+            stagingBuffer: _stagingBuffer,
+            onApplyChanges: _stagingBuffer != null ? _onApplyChanges : null,
+            isSaving: _isSaving,
+            errorAction: _isDriverError
+                ? ExtensionDriverRecoveryBanner(
+                    onRestart: () => unawaited(_restartDriver()),
+                    isRestarting: _restartingDriver,
+                  )
+                : null,
           ),
         ),
       ],

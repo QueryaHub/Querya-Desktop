@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/sql_table_target_extractor.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
-import 'package:querya_desktop/features/main_screen/data_grid_staging_buffer.dart';
-import 'package:querya_desktop/features/main_screen/grid_filter_engine.dart';
-import 'package:querya_desktop/features/main_screen/grid_groupings_engine.dart';
-import 'package:querya_desktop/features/main_screen/grid_selection_calc_engine.dart';
+import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
+import 'package:querya_desktop/features/workspace/grid_filter_engine.dart';
+import 'package:querya_desktop/features/workspace/grid_groupings_engine.dart';
+import 'package:querya_desktop/features/workspace/grid_selection_calc_engine.dart';
 
 void main() {
   group('Data Grid End-to-End Integration Tests', () {
