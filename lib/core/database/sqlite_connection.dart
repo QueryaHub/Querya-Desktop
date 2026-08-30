@@ -45,6 +45,7 @@ class SqliteConnection {
         options: OpenDatabaseOptions(
           readOnly: readOnly,
           onOpen: (db) async {
+            await db.execute('PRAGMA busy_timeout = 5000');
             if (!readOnly) {
               await db.execute('PRAGMA foreign_keys = ON');
             }
