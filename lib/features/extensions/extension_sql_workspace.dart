@@ -10,11 +10,7 @@ import 'package:querya_desktop/core/extensions/extension_driver_session.dart';
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/features/main_screen/destructive_query_dialog.dart';
-import 'package:querya_desktop/features/main_screen/query_editor_tab.dart';
-import 'package:querya_desktop/features/main_screen/results_tab.dart';
-import 'package:querya_desktop/features/main_screen/sql_editor_chrome.dart';
-import 'package:querya_desktop/features/main_screen/sql_query_history_dialog.dart';
+import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Table/view selected in the sidebar tree of an extension connection.

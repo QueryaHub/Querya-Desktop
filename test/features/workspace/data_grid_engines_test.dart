@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:querya_desktop/features/main_screen/grid_filter_engine.dart';
-import 'package:querya_desktop/features/main_screen/grid_groupings_engine.dart';
-import 'package:querya_desktop/features/main_screen/grid_selection_calc_engine.dart';
+import 'package:querya_desktop/features/workspace/grid_filter_engine.dart';
+import 'package:querya_desktop/features/workspace/grid_groupings_engine.dart';
+import 'package:querya_desktop/features/workspace/grid_selection_calc_engine.dart';
 
 void main() {
   group('GridFilterEngine', () {

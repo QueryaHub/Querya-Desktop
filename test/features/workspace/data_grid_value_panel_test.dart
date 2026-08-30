@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:querya_desktop/features/main_screen/data_grid_value_panel.dart';
-import 'package:querya_desktop/features/main_screen/xml_html_formatter.dart';
+import 'package:querya_desktop/features/workspace/data_grid_value_panel.dart';
+import 'package:querya_desktop/features/workspace/xml_html_formatter.dart';
 
 import '../../support/querya_theme_test_shell.dart';
 

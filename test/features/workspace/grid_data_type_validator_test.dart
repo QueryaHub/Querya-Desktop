@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:querya_desktop/features/main_screen/grid_data_type_validator.dart';
+import 'package:querya_desktop/features/workspace/grid_data_type_validator.dart';
 
 void main() {
   group('GridDataTypeValidator', () {
