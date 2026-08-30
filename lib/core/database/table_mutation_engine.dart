@@ -129,6 +129,17 @@ abstract final class TableMutationEngine {
         lower.contains('number');
   }
 
+  static bool _isBinaryType(String dataTypeName) {
+    final lower = dataTypeName.toLowerCase().trim();
+    return lower.contains('blob') ||
+        lower.contains('bytea') ||
+        lower.contains('binary') ||
+        lower.contains('varbinary') ||
+        lower == 'raw' ||
+        lower == 'image' ||
+        lower.startsWith('bit');
+  }
+
   static const String kNullSentinel = '\u0000__QUERYA_NULL__\u0000';
 
   /// Formats a cell string value safely as an SQL literal or `NULL`.
@@ -146,6 +157,30 @@ abstract final class TableMutationEngine {
     final trimmed = value.trim();
 
     if (dataTypeName != null && dataTypeName.isNotEmpty) {
+      if (_isBinaryType(dataTypeName)) {
+        if (trimmed == 'NULL' || trimmed == 'null') {
+          return 'NULL';
+        }
+        var hex = trimmed;
+        if (hex.startsWith(r'\x') ||
+            hex.startsWith(r'\X') ||
+            hex.startsWith('0x') ||
+            hex.startsWith('0X')) {
+          hex = hex.substring(2);
+        } else if ((hex.startsWith("x'") || hex.startsWith("X'")) &&
+            hex.endsWith("'")) {
+          hex = hex.substring(2, hex.length - 1);
+        }
+        final cleanHex = hex.replaceAll(RegExp(r'[^0-9a-fA-F]'), '');
+        switch (dialect) {
+          case SqlDialect.postgres:
+            return "'\\x$cleanHex'::bytea";
+          case SqlDialect.mysql:
+          case SqlDialect.sqlite:
+            return "X'$cleanHex'";
+        }
+      }
+
       if (_isTextType(dataTypeName)) {
         // String columns: preserve literal 'NULL' or 'null' as a text string
         final escaped = value.replaceAll("'", "''");

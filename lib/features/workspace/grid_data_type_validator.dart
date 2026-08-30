@@ -99,6 +99,29 @@ abstract final class GridDataTypeValidator {
       return null;
     }
 
+    // Binary / BLOB / Bytea
+    if (type.contains('blob') ||
+        type.contains('bytea') ||
+        type.contains('binary') ||
+        type.contains('varbinary') ||
+        type == 'raw' ||
+        type == 'image') {
+      var hex = value.trim();
+      if (hex.startsWith(r'\x') ||
+          hex.startsWith(r'\X') ||
+          hex.startsWith('0x') ||
+          hex.startsWith('0X')) {
+        hex = hex.substring(2);
+      } else if ((hex.startsWith("x'") || hex.startsWith("X'")) &&
+          hex.endsWith("'")) {
+        hex = hex.substring(2, hex.length - 1);
+      }
+      if (!RegExp(r'^[0-9a-fA-F]*$').hasMatch(hex) || hex.length.isOdd) {
+        return 'Expected valid hex string (e.g. \\xDEADBEEF, 0x12AB, or DEADBEEF)';
+      }
+      return null;
+    }
+
     return null;
   }
 }
