@@ -232,73 +232,75 @@ class _GridCellInspectorDialogState
           alt: true,
         ): _setNull,
       },
-      child: material.Dialog(
-        backgroundColor: cs.card,
-        shape: material.RoundedRectangleBorder(
-          borderRadius: material.BorderRadius.circular(8),
-          side: material.BorderSide(color: cs.border, width: 1),
+      child: QueryaDialogCard(
+        constraints: const material.BoxConstraints(
+          minWidth: 520,
+          maxWidth: 760,
+          minHeight: 400,
+          maxHeight: 580,
         ),
-        child: material.ConstrainedBox(
-          constraints: const material.BoxConstraints(
-            minWidth: 520,
-            maxWidth: 760,
-            minHeight: 400,
-            maxHeight: 580,
-          ),
-          child: material.Padding(
-            padding: const material.EdgeInsets.all(16),
-            child: material.Column(
-              crossAxisAlignment: material.CrossAxisAlignment.stretch,
-              children: [
-                // Header
-                material.Row(
-                  children: [
-                    material.Icon(
-                      material.Icons.data_object_rounded,
-                      size: 18,
-                      color: cs.primary,
+        child: material.Padding(
+          padding: const material.EdgeInsets.all(16),
+          child: material.Column(
+            crossAxisAlignment: material.CrossAxisAlignment.stretch,
+            children: [
+              // Header
+              material.Row(
+                children: [
+                  material.Icon(
+                    material.Icons.data_object_rounded,
+                    size: 18,
+                    color: cs.primary,
+                  ),
+                  const Gap(8),
+                  material.Expanded(
+                    child: Text(
+                      'Edit ${widget.columnName}$rowLabel',
+                    ).semiBold(),
+                  ),
+                  if (_isJson()) ...[
+                    GhostButton(
+                      density: ButtonDensity.compact,
+                      onPressed: _formatJson,
+                      leading: const material.Icon(
+                        material.Icons.format_align_left_rounded,
+                        size: 14,
+                      ),
+                      child: const Text('Format JSON'),
                     ),
-                    const Gap(8),
-                    material.Expanded(
-                      child: Text(
-                        'Edit ${widget.columnName}$rowLabel',
-                      ).semiBold(),
+                    const Gap(6),
+                    GhostButton(
+                      density: ButtonDensity.compact,
+                      onPressed: _minifyJson,
+                      leading: const material.Icon(
+                        material.Icons.compress_rounded,
+                        size: 14,
+                      ),
+                      child: const Text('Minify'),
                     ),
-                    if (_isJson()) ...[
-                      GhostButton(
-                        density: ButtonDensity.compact,
-                        onPressed: _formatJson,
-                        leading: const material.Icon(
-                          material.Icons.format_align_left_rounded,
-                          size: 14,
-                        ),
-                        child: const Text('Format JSON'),
+                    const Gap(6),
+                  ],
+                  if (_isXml()) ...[
+                    GhostButton(
+                      density: ButtonDensity.compact,
+                      onPressed: _formatXml,
+                      leading: const material.Icon(
+                        material.Icons.code_rounded,
+                        size: 14,
                       ),
-                      const Gap(6),
-                      GhostButton(
-                        density: ButtonDensity.compact,
-                        onPressed: _minifyJson,
-                        leading: const material.Icon(
-                          material.Icons.compress_rounded,
-                          size: 14,
-                        ),
-                        child: const Text('Minify'),
-                      ),
-                      const Gap(6),
-                    ],
-                    if (_isXml()) ...[
-                      GhostButton(
-                        density: ButtonDensity.compact,
-                        onPressed: _formatXml,
-                        leading: const material.Icon(
-                          material.Icons.code_rounded,
-                          size: 14,
-                        ),
-                        child: const Text('Format XML'),
-                      ),
-                      const Gap(6),
-                    ],
-                    if (_isHex()) ...[
+                      child: const Text('Format XML'),
+                    ),
+                    const Gap(6),
+                  ],
+                  IconButton.ghost(
+                    density: ButtonDensity.compact,
+                    onPressed: () => material.Navigator.of(context).pop(null),
+                    icon: const material.Icon(
+                      material.Icons.close_rounded,
+                      size: 16,
+                    ),
+                  ),
+                  if (_isHex()) ...[
                       GhostButton(
                         density: ButtonDensity.compact,
                         onPressed: _formatHex,
@@ -435,7 +437,6 @@ class _GridCellInspectorDialogState
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 }

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
-import 'package:querya_desktop/shared/widgets/app_dialog.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Opens a confirmation dialog when destructive SQL statements (DROP, TRUNCATE, etc.)
 /// are detected before execution.
@@ -59,24 +58,15 @@ class _DestructiveQueryDialogState extends material.State<_DestructiveQueryDialo
     final isDark = theme.brightness == Brightness.dark;
     final isCritical = widget.result.maxRiskLevel == 'CRITICAL';
 
-    return material.Dialog(
-      backgroundColor: cs.card,
-      shape: material.RoundedRectangleBorder(
-        borderRadius: material.BorderRadius.circular(8),
-        side: material.BorderSide(
-          color: cs.destructive.withValues(alpha: isDark ? 0.6 : 0.4),
-          width: 1.5,
-        ),
+    return QueryaDialogCard(
+      borderColor: cs.destructive.withValues(alpha: isDark ? 0.6 : 0.4),
+      constraints: const material.BoxConstraints(
+        minWidth: 540,
+        maxWidth: 680,
+        minHeight: 440,
+        maxHeight: 580,
       ),
       child: material.FocusTraversalGroup(
-        policy: material.WidgetOrderTraversalPolicy(),
-        child: material.ConstrainedBox(
-          constraints: const material.BoxConstraints(
-            minWidth: 540,
-            maxWidth: 680,
-            minHeight: 440,
-            maxHeight: 580,
-          ),
           child: material.SizedBox(
             height: 540,
             child: material.Padding(
@@ -300,7 +290,6 @@ class _DestructiveQueryDialogState extends material.State<_DestructiveQueryDialo
             ),
           ),
         ),
-      ),
       ),
     );
   }
