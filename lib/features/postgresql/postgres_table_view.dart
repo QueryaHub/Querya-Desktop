@@ -55,6 +55,8 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
 
   /// Zero-based offset for LIMIT/OFFSET pagination.
   int _offset = 0;
+  String? _sortColumn;
+  bool _sortAscending = true;
 
   /// When true, [dataSql] comes from [_customSql] (no pagination).
   bool _customSqlActive = false;
@@ -77,6 +79,8 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         oldWidget.schema != widget.schema ||
         oldWidget.tableName != widget.tableName ||
         oldWidget.isMaterializedView != widget.isMaterializedView) {
+      _sortColumn = null;
+      _sortAscending = true;
       _customSqlActive = false;
       _customSql = null;
       _disconnectCurrent();
@@ -152,7 +156,29 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
   String _browseDataSql() {
     final schemaQ = quotePostgresIdentifier(widget.schema);
     final tableQ = quotePostgresIdentifier(widget.tableName);
-    return 'SELECT * FROM $schemaQ.$tableQ LIMIT ${widget.limit} OFFSET $_offset';
+    final orderBy = _sortColumn != null
+        ? ' ORDER BY ${quotePostgresIdentifier(_sortColumn!)} ${_sortAscending ? "ASC" : "DESC"}'
+        : '';
+    return 'SELECT * FROM $schemaQ.$tableQ$orderBy LIMIT ${widget.limit} OFFSET $_offset';
+  }
+
+  void _toggleSort(String columnName) {
+    if (_loading || _customSqlActive) return;
+    setState(() {
+      if (_sortColumn == columnName) {
+        if (_sortAscending) {
+          _sortAscending = false;
+        } else {
+          _sortColumn = null;
+          _sortAscending = true;
+        }
+      } else {
+        _sortColumn = columnName;
+        _sortAscending = true;
+      }
+      _offset = 0;
+    });
+    _fetch();
   }
 
   /// [refreshCount] runs `COUNT(*)` (e.g. first load or Refresh). Pagination only runs SELECT.
@@ -663,19 +689,45 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
   }
 
   material.Widget _headerCell(ColorScheme cs, String name) {
+    final isSorted = !_customSqlActive && _sortColumn == name;
     return material.Expanded(
-      child: material.Container(
-        padding: const material.EdgeInsets.symmetric(horizontal: 10),
-        alignment: material.Alignment.centerLeft,
-        child: material.Text(
-          name,
-          style: material.TextStyle(
-            fontSize: 12,
-            fontWeight: material.FontWeight.w600,
-            color: cs.foreground,
+      child: material.MouseRegion(
+        cursor: !_customSqlActive
+            ? material.SystemMouseCursors.click
+            : material.SystemMouseCursors.basic,
+        child: material.GestureDetector(
+          behavior: material.HitTestBehavior.opaque,
+          onTap: () => _toggleSort(name),
+          child: material.Container(
+            padding: const material.EdgeInsets.symmetric(horizontal: 10),
+            alignment: material.Alignment.centerLeft,
+            child: material.Row(
+              children: [
+                material.Expanded(
+                  child: material.Text(
+                    name,
+                    style: material.TextStyle(
+                      fontSize: 12,
+                      fontWeight: material.FontWeight.w600,
+                      color: isSorted ? cs.primary : cs.foreground,
+                    ),
+                    overflow: material.TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+                if (isSorted) ...[
+                  const Gap(4),
+                  material.Icon(
+                    _sortAscending
+                        ? material.Icons.arrow_upward_rounded
+                        : material.Icons.arrow_downward_rounded,
+                    size: 14,
+                    color: cs.primary,
+                  ),
+                ],
+              ],
+            ),
           ),
-          overflow: material.TextOverflow.ellipsis,
-          maxLines: 1,
         ),
       ),
     );

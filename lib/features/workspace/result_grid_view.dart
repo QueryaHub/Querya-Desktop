@@ -501,14 +501,31 @@ class _SortKey implements Comparable<_SortKey> {
   }
 }
 
+/// Result of sorting rows in [VirtualResultGrid], preserving model indices.
+class SortedResultGridData {
+  final List<List<String>> rows;
+  final List<int> sortedToModelIndices;
+
+  const SortedResultGridData({
+    required this.rows,
+    required this.sortedToModelIndices,
+  });
+}
+
 /// Sorts rows by the specified column index with natural numeric / temporal / lexicographic comparison.
 /// Uses Schwartzian transform (Decorate-Sort-Undecorate) to precompute sort keys in O(N) time.
-List<List<String>> sortResultGridRows({
+/// Returns [SortedResultGridData] containing sorted rows and their corresponding model indices.
+SortedResultGridData sortResultGridRowsWithIndices({
   required List<List<String>> rows,
   required int columnIndex,
   required ResultGridSortOrder order,
 }) {
-  if (rows.isEmpty || columnIndex < 0) return rows;
+  if (rows.isEmpty || columnIndex < 0) {
+    return SortedResultGridData(
+      rows: rows,
+      sortedToModelIndices: List<int>.generate(rows.length, (i) => i, growable: false),
+    );
+  }
   final n = rows.length;
 
   final keys = List<_SortKey>.generate(n, (i) {
@@ -524,7 +541,24 @@ List<List<String>> sortResultGridRows({
     return order == ResultGridSortOrder.ascending ? cmp : -cmp;
   });
 
-  return List<List<String>>.generate(n, (i) => rows[indices[i]], growable: false);
+  final sortedRows = List<List<String>>.generate(n, (i) => rows[indices[i]], growable: false);
+  return SortedResultGridData(
+    rows: sortedRows,
+    sortedToModelIndices: indices,
+  );
+}
+
+/// Sorts rows by the specified column index with natural numeric / temporal / lexicographic comparison.
+List<List<String>> sortResultGridRows({
+  required List<List<String>> rows,
+  required int columnIndex,
+  required ResultGridSortOrder order,
+}) {
+  return sortResultGridRowsWithIndices(
+    rows: rows,
+    columnIndex: columnIndex,
+    order: order,
+  ).rows;
 }
 
 /// Virtualized read-only or interactive grid for SQL query results (rows + columns).
@@ -566,6 +600,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   int? _sortColumnIndex;
   ResultGridSortOrder? _sortOrder;
   List<List<String>> _sortedRows = const [];
+  List<int> _sortedToModelIndices = const [];
 
   ResultGridCellCoordinate? _selectionAnchor;
   ResultGridCellCoordinate? _selectionFocus;
@@ -627,6 +662,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     _verticalController.dispose();
     _focusNode.dispose();
     _sortedRows = const [];
+    _sortedToModelIndices = const [];
     _columnWidths = const [];
     _columnOffsets = const [0];
     super.dispose();
@@ -653,6 +689,13 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     });
   }
 
+  int _toModelRowIndex(int visualRow) {
+    if (visualRow >= 0 && visualRow < _sortedToModelIndices.length) {
+      return _sortedToModelIndices[visualRow];
+    }
+    return visualRow;
+  }
+
   void _commitEdit(
     int row,
     int column,
@@ -663,7 +706,8 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     bool movePrevRow = false,
   }) {
     if (widget.stagingBuffer != null) {
-      widget.stagingBuffer!.setCell(row, column, value);
+      final modelRow = _toModelRowIndex(row);
+      widget.stagingBuffer!.setCell(modelRow, column, value);
     }
     setState(() {
       if (moveNextCol) {
@@ -846,12 +890,15 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     final rows = _baseRows;
     if (_sortColumnIndex == null || _sortOrder == null) {
       _sortedRows = rows;
+      _sortedToModelIndices = List<int>.generate(rows.length, (i) => i, growable: false);
     } else {
-      _sortedRows = sortResultGridRows(
+      final sortedData = sortResultGridRowsWithIndices(
         rows: rows,
         columnIndex: _sortColumnIndex!,
         order: _sortOrder!,
       );
+      _sortedRows = sortedData.rows;
+      _sortedToModelIndices = sortedData.sortedToModelIndices;
     }
   }
 
@@ -882,14 +929,16 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
       if (r >= 0 && r < rows.length && c >= 0 && c < widget.columns.length) {
         final colName = widget.columns[c];
         final val = c < rows[r].length ? rows[r][c] : '';
-        widget.onCellFocused!(colName, val, r);
+        final modelRow = _toModelRowIndex(r);
+        widget.onCellFocused!(colName, val, modelRow);
       }
     }
   }
 
   void _onCellTap(int row, int column, {bool isShift = false}) {
     _focusNode.requestFocus();
-    widget.onRowSelected?.call(row);
+    final modelRow = _toModelRowIndex(row);
+    widget.onRowSelected?.call(modelRow);
     setState(() {
       final coord = ResultGridCellCoordinate(row, column);
       if (isShift && _selectionAnchor != null) {
@@ -1028,8 +1077,9 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
         ? _selection!
         : ResultGridSelection(startRow: row, startColumn: col, endRow: row, endColumn: col);
     for (var r = sel.startRow; r <= sel.endRow; r++) {
+      final modelRow = _toModelRowIndex(r);
       for (var c = sel.startColumn; c <= sel.endColumn; c++) {
-        widget.stagingBuffer!.setCellNull(r, c);
+        widget.stagingBuffer!.setCellNull(modelRow, c);
       }
     }
   }
@@ -1040,8 +1090,9 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
         ? _selection!
         : ResultGridSelection(startRow: row, startColumn: col, endRow: row, endColumn: col);
     for (var r = sel.startRow; r <= sel.endRow; r++) {
+      final modelRow = _toModelRowIndex(r);
       for (var c = sel.startColumn; c <= sel.endColumn; c++) {
-        widget.stagingBuffer!.setCell(r, c, '');
+        widget.stagingBuffer!.setCell(modelRow, c, '');
       }
     }
   }
@@ -1052,8 +1103,9 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
         ? _selection!
         : ResultGridSelection(startRow: row, startColumn: col, endRow: row, endColumn: col);
     for (var r = sel.startRow; r <= sel.endRow; r++) {
+      final modelRow = _toModelRowIndex(r);
       for (var c = sel.startColumn; c <= sel.endColumn; c++) {
-        widget.stagingBuffer!.revertCell(r, c);
+        widget.stagingBuffer!.revertCell(modelRow, c);
       }
     }
   }
@@ -1066,12 +1118,12 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
 
   void _handleToggleDeleteRow(int row) {
     if (widget.stagingBuffer == null || row >= _sortedRows.length) return;
-    widget.stagingBuffer!.toggleDeleteRow(row);
+    widget.stagingBuffer!.toggleDeleteRow(_toModelRowIndex(row));
   }
 
   void _handleRevertRow(int row) {
     if (widget.stagingBuffer == null || row >= _sortedRows.length) return;
-    widget.stagingBuffer!.revertRow(row);
+    widget.stagingBuffer!.revertRow(_toModelRowIndex(row));
   }
 
   List<double> _computeColumnWidths() {
@@ -1618,6 +1670,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
                                 return _DataRow(
                                   key: ValueKey('result-row-$rowIndex'),
                                   rowIndex: rowIndex,
+                                  modelRowIndex: _toModelRowIndex(rowIndex),
                                   row: row,
                                   columns: widget.columns,
                                   columnWidths: displayWidths,
@@ -1833,6 +1886,7 @@ class _DataRow extends material.StatelessWidget {
   const _DataRow({
     super.key,
     required this.rowIndex,
+    required this.modelRowIndex,
     required this.row,
     required this.columns,
     required this.columnWidths,
@@ -1862,6 +1916,7 @@ class _DataRow extends material.StatelessWidget {
   });
 
   final int rowIndex;
+  final int modelRowIndex;
   final List<String> row;
   final List<String> columns;
   final List<double> columnWidths;
@@ -1905,7 +1960,7 @@ class _DataRow extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final rowStatus = stagingBuffer?.getRowStatus(rowIndex) ?? StagedRowStatus.unchanged;
+    final rowStatus = stagingBuffer?.getRowStatus(modelRowIndex) ?? StagedRowStatus.unchanged;
 
     return material.RepaintBoundary(
       child: material.SizedBox(
@@ -1924,7 +1979,7 @@ class _DataRow extends material.StatelessWidget {
                 colorScheme: colorScheme,
                 striped: striped,
                 rowStatus: rowStatus,
-                cellStatus: stagingBuffer?.getCellStatus(rowIndex, c) ?? StagedCellStatus.clean,
+                cellStatus: stagingBuffer?.getCellStatus(modelRowIndex, c) ?? StagedCellStatus.clean,
                 isSelected: selection?.contains(rowIndex, c) ?? false,
                 isEditing: editingCell?.row == rowIndex && editingCell?.column == c,
                 isSelectionTop: selection != null &&

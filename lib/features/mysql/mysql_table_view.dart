@@ -46,6 +46,8 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
   int _rowsOnPage = 0;
   int? _totalRowCount;
   int _offset = 0;
+  String? _sortColumn;
+  bool _sortAscending = true;
   bool _customSqlActive = false;
   String? _customSql;
 
@@ -59,7 +61,29 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
   }
 
   String _browseDataSql() {
-    return 'SELECT * FROM ${_qualifiedFrom()} LIMIT ${widget.limit} OFFSET $_offset';
+    final orderBy = _sortColumn != null
+        ? ' ORDER BY ${MysqlConnection.quoteIdentifier(_sortColumn!)} ${_sortAscending ? "ASC" : "DESC"}'
+        : '';
+    return 'SELECT * FROM ${_qualifiedFrom()}$orderBy LIMIT ${widget.limit} OFFSET $_offset';
+  }
+
+  void _toggleSort(String columnName) {
+    if (_loading || _customSqlActive) return;
+    setState(() {
+      if (_sortColumn == columnName) {
+        if (_sortAscending) {
+          _sortAscending = false;
+        } else {
+          _sortColumn = null;
+          _sortAscending = true;
+        }
+      } else {
+        _sortColumn = columnName;
+        _sortAscending = true;
+      }
+      _offset = 0;
+    });
+    _fetch();
   }
 
   @override
@@ -75,6 +99,8 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
         oldWidget.database != widget.database ||
         oldWidget.tableName != widget.tableName ||
         oldWidget.isView != widget.isView) {
+      _sortColumn = null;
+      _sortAscending = true;
       _customSqlActive = false;
       _customSql = null;
       _disconnectCurrent(interruptIfBusy: true);
@@ -743,19 +769,45 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
   }
 
   material.Widget _headerCell(ColorScheme cs, String name) {
+    final isSorted = !_customSqlActive && _sortColumn == name;
     return material.Expanded(
-      child: material.Container(
-        padding: const material.EdgeInsets.symmetric(horizontal: 10),
-        alignment: material.Alignment.centerLeft,
-        child: material.Text(
-          name,
-          style: material.TextStyle(
-            fontSize: 12,
-            fontWeight: material.FontWeight.w600,
-            color: cs.foreground,
+      child: material.MouseRegion(
+        cursor: !_customSqlActive
+            ? material.SystemMouseCursors.click
+            : material.SystemMouseCursors.basic,
+        child: material.GestureDetector(
+          behavior: material.HitTestBehavior.opaque,
+          onTap: () => _toggleSort(name),
+          child: material.Container(
+            padding: const material.EdgeInsets.symmetric(horizontal: 10),
+            alignment: material.Alignment.centerLeft,
+            child: material.Row(
+              children: [
+                material.Expanded(
+                  child: material.Text(
+                    name,
+                    style: material.TextStyle(
+                      fontSize: 12,
+                      fontWeight: material.FontWeight.w600,
+                      color: isSorted ? cs.primary : cs.foreground,
+                    ),
+                    overflow: material.TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+                if (isSorted) ...[
+                  const Gap(4),
+                  material.Icon(
+                    _sortAscending
+                        ? material.Icons.arrow_upward_rounded
+                        : material.Icons.arrow_downward_rounded,
+                    size: 14,
+                    color: cs.primary,
+                  ),
+                ],
+              ],
+            ),
           ),
-          overflow: material.TextOverflow.ellipsis,
-          maxLines: 1,
         ),
       ),
     );
