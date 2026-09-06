@@ -54,7 +54,12 @@ import 'package:flutter/material.dart' as material
         ClampingScrollPhysics,
         CallbackShortcuts,
         SingleActivator,
-        AnimatedContainer;
+        AnimatedContainer,
+        TextField,
+        InputDecoration,
+        InputBorder,
+        TextEditingController,
+        FocusNode;
 import 'package:flutter/services.dart'
     show Clipboard, ClipboardData, LogicalKeyboardKey;
 import 'package:querya_desktop/core/database/mongodb_service.dart';
@@ -154,6 +159,107 @@ material.Widget lazyConnectionTreeList({
       itemBuilder: itemBuilder,
     ),
   );
+}
+
+/// Compact inline search/filter input for an expanded tree object group (e.g. Tables, Views).
+class TreeObjectFilterBar extends material.StatelessWidget {
+  const TreeObjectFilterBar({
+    super.key,
+    required this.controller,
+    required this.hintText,
+    required this.onChanged,
+    required this.onClear,
+    required this.filteredCount,
+    required this.totalCount,
+  });
+
+  final material.TextEditingController controller;
+  final String hintText;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+  final int filteredCount;
+  final int totalCount;
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    final theme = Theme.of(context);
+    final isFiltered = controller.text.trim().isNotEmpty;
+
+    return material.Padding(
+      padding: const material.EdgeInsets.only(
+        left: 26,
+        right: 12,
+        top: 3,
+        bottom: 4,
+      ),
+      child: material.Container(
+        height: 24,
+        padding: const material.EdgeInsets.symmetric(horizontal: 6),
+        decoration: material.BoxDecoration(
+          color: theme.colorScheme.muted.withValues(alpha: 0.22),
+          borderRadius: material.BorderRadius.circular(4),
+          border: material.Border.all(
+            color: isFiltered
+                ? theme.colorScheme.primary.withValues(alpha: 0.5)
+                : theme.colorScheme.border.withValues(alpha: 0.25),
+            width: 1,
+          ),
+        ),
+        child: material.Row(
+          children: [
+            material.Icon(
+              material.Icons.search_rounded,
+              size: 12,
+              color: isFiltered
+                ? theme.colorScheme.primary
+                : theme.colorScheme.mutedForeground,
+            ),
+            const Gap(5),
+            material.Expanded(
+              child: material.TextField(
+                controller: controller,
+                onChanged: onChanged,
+                style: material.TextStyle(
+                  fontSize: 11,
+                  color: theme.colorScheme.foreground,
+                ),
+                decoration: material.InputDecoration(
+                  hintText: hintText,
+                  hintStyle: material.TextStyle(
+                    fontSize: 11,
+                    color: theme.colorScheme.mutedForeground.withValues(alpha: 0.6),
+                  ),
+                  border: material.InputBorder.none,
+                  isDense: true,
+                  contentPadding: material.EdgeInsets.zero,
+                ),
+              ),
+            ),
+            if (isFiltered) ...[
+              material.Text(
+                '$filteredCount/$totalCount',
+                style: material.TextStyle(
+                  fontSize: 10,
+                  fontWeight: material.FontWeight.w600,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+              const Gap(4),
+              material.GestureDetector(
+                behavior: material.HitTestBehavior.opaque,
+                onTap: onClear,
+                child: material.Icon(
+                  material.Icons.close_rounded,
+                  size: 12,
+                  color: theme.colorScheme.mutedForeground,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// Inherited scope providing the active connection and object selection down the connections tree.
@@ -302,6 +408,10 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
   final Set<String> _expandedFolders = {};
   final Set<int> _expandedConnections = {};
 
+  final _searchController = material.TextEditingController();
+  final _searchFocusNode = material.FocusNode();
+  String _searchQuery = '';
+
   /// Ignores stale [setState] when multiple [_loadData] runs overlap (e.g. tests).
   int _loadDataGeneration = 0;
 
@@ -311,6 +421,19 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     if (!widget.skipInitialDbLoadForTest) {
       _loadData();
     }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
+
+  /// For testing global search filtering.
+  void setSearchQueryForTest(String query) {
+    _searchController.text = query;
+    setState(() => _searchQuery = query);
   }
 
   /// Reloads folders and connections from [LocalDb] / [FoldersStorage].
@@ -600,13 +723,40 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final q = _searchQuery.trim().toLowerCase();
+
+    final filteredConnections = q.isEmpty
+        ? _connections
+        : _connections.where((c) {
+            final nameMatch = c.name.toLowerCase().contains(q);
+            final hostMatch =
+                c.host != null && c.host!.toLowerCase().contains(q);
+            final dbMatch = c.databaseName != null &&
+                c.databaseName!.toLowerCase().contains(q);
+            final typeMatch = c.type.toLowerCase().contains(q);
+            return nameMatch || hostMatch || dbMatch || typeMatch;
+          }).toList();
+
+    final matchingFolderIds = filteredConnections
+        .map((c) => c.folderId)
+        .whereType<int>()
+        .toSet();
+    final filteredFolders = q.isEmpty
+        ? _folders
+        : _folders.where((f) {
+            final nameMatch = f.toLowerCase().contains(q);
+            final id = _folderIdByName[f];
+            final hasConnections = id != null && matchingFolderIds.contains(id);
+            return nameMatch || hasConnections;
+          }).toList();
 
     // Connections without a folder
     final rootConnections =
-        _connections.where((c) => c.folderId == null).toList();
-    final showEmptyState = _connections.isEmpty && _folders.isEmpty;
+        filteredConnections.where((c) => c.folderId == null).toList();
+    final showEmptyState =
+        filteredConnections.isEmpty && filteredFolders.isEmpty;
     final topLevelCount =
-        _folders.length + rootConnections.length + (showEmptyState ? 1 : 0);
+        filteredFolders.length + rootConnections.length + (showEmptyState ? 1 : 0);
 
     return _ConnectionsTreeSelectionScope(
       selectedConnectionId: widget.selectedConnectionId,
@@ -616,97 +766,193 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
       selectedExtensionObject: widget.selectedExtensionObject,
       selectedRedisDb: widget.selectedRedisDb,
       selectedMongoDb: widget.selectedMongoDb,
-      child: material.Container(
-      decoration: material.BoxDecoration(
-        color: theme.colorScheme.background,
-        border: material.Border(
-          right: material.BorderSide(
-            color: theme.colorScheme.border.withValues(alpha: 0.28),
-            width: 1,
-          ),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: material.CrossAxisAlignment.stretch,
-        children: [
-          material.Padding(
-            padding: const material.EdgeInsets.fromLTRB(20, 24, 16, 16),
-            child: material.Text(
-              'SERVERS',
-              style: material.TextStyle(
-                fontFamily: QueryaTypography.mono,
-                fontSize: 11,
-                letterSpacing: 0.85,
-                fontWeight: material.FontWeight.w600,
-                color: theme.colorScheme.mutedForeground,
+      child: material.CallbackShortcuts(
+        bindings: {
+          const material.SingleActivator(LogicalKeyboardKey.keyF, control: true):
+              () => _searchFocusNode.requestFocus(),
+          const material.SingleActivator(LogicalKeyboardKey.keyF, meta: true):
+              () => _searchFocusNode.requestFocus(),
+        },
+        child: material.Container(
+          decoration: material.BoxDecoration(
+            color: theme.colorScheme.background,
+            border: material.Border(
+              right: material.BorderSide(
+                color: theme.colorScheme.border.withValues(alpha: 0.28),
+                width: 1,
               ),
             ),
           ),
-          Divider(
-              height: 1,
-              color: theme.colorScheme.border.withValues(alpha: 0.22)),
-          Expanded(
-            child: material.RepaintBoundary(
-              child: material.CustomScrollView(
-                slivers: [
-                  material.SliverPadding(
-                    padding: const material.EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 12),
-                    sliver: material.SliverList(
-                      delegate: material.SliverChildBuilderDelegate(
-                        (context, index) {
-                          if (showEmptyState && index == 0) {
-                            return const material.Padding(
-                              padding: material.EdgeInsets.only(top: 8),
-                              child: _EmptyState(message: 'No connections yet'),
-                            );
-                          }
-                          final folderOffset = showEmptyState ? 1 : 0;
-                          final folderIndex = index - folderOffset;
-                          if (folderIndex < _folders.length) {
-                            final name = _folders[folderIndex];
-                            return _FolderTile(
-                              name: name,
-                              initiallyExpanded:
-                                  _expandedFolders.contains(name),
-                              onExpansionCommitted: (folderName, expanded) {
-                                if (expanded) {
-                                  _expandedFolders.add(folderName);
-                                } else {
-                                  _expandedFolders.remove(folderName);
-                                }
-                              },
-                              connections: _connections
-                                  .where((c) =>
-                                      c.folderId == _folderIdByName[name])
-                                  .toList(),
-                              onRemove: () async {
-                                await FoldersStorage.instance.remove(name);
-                                await _loadData();
-                              },
-                              onNewConnection: (folderName) async {
-                                final folderId = await LocalDb.instance
-                                    .getFolderIdByName(folderName);
-                                await _createConnection(folderId: folderId);
-                              },
-                              iconForType: QueryaIcons.connectionIcon,
-                              onRemoveConnection: _removeConnection,
-                              onConnectionTap: widget.onConnectionSelected,
-                              onRedisDatabaseTap:
-                                  widget.onRedisDatabaseSelected,
-                              onMongoDBDatabaseTap:
-                                  widget.onMongoDBDatabaseSelected,
-                              buildConnectionTile: _buildConnectionTile,
-                            );
-                          }
-                          final connIndex = folderIndex - _folders.length;
-                          return _buildConnectionTile(
-                              rootConnections[connIndex]);
-                        },
-                        childCount: topLevelCount,
+          child: Column(
+            crossAxisAlignment: material.CrossAxisAlignment.stretch,
+            children: [
+              material.Padding(
+                padding: const material.EdgeInsets.fromLTRB(20, 24, 16, 12),
+                child: material.Row(
+                  children: [
+                    material.Expanded(
+                      child: material.Text(
+                        'SERVERS',
+                        style: material.TextStyle(
+                          fontFamily: QueryaTypography.mono,
+                          fontSize: 11,
+                          letterSpacing: 0.85,
+                          fontWeight: material.FontWeight.w600,
+                          color: theme.colorScheme.mutedForeground,
+                        ),
                       ),
                     ),
+                    if (_connections.isNotEmpty)
+                      material.Text(
+                        q.isEmpty
+                            ? '${_connections.length}'
+                            : '${filteredConnections.length}/${_connections.length}',
+                        style: material.TextStyle(
+                          fontSize: 10,
+                          fontWeight: material.FontWeight.w600,
+                          color: theme.colorScheme.mutedForeground,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              material.Padding(
+                padding: const material.EdgeInsets.fromLTRB(16, 0, 16, 10),
+                child: material.Container(
+                  height: 28,
+                  padding: const material.EdgeInsets.symmetric(horizontal: 8),
+                  decoration: material.BoxDecoration(
+                    color: theme.colorScheme.muted.withValues(alpha: 0.22),
+                    borderRadius: material.BorderRadius.circular(6),
+                    border: material.Border.all(
+                      color: q.isNotEmpty
+                          ? theme.colorScheme.primary.withValues(alpha: 0.5)
+                          : theme.colorScheme.border.withValues(alpha: 0.25),
+                      width: 1,
+                    ),
                   ),
+                  child: material.Row(
+                    children: [
+                      material.Icon(
+                        material.Icons.search_rounded,
+                        size: 14,
+                        color: q.isNotEmpty
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.mutedForeground,
+                      ),
+                      const Gap(6),
+                      material.Expanded(
+                        child: material.TextField(
+                          controller: _searchController,
+                          focusNode: _searchFocusNode,
+                          onChanged: (val) =>
+                              setState(() => _searchQuery = val),
+                          style: material.TextStyle(
+                            fontSize: 12,
+                            color: theme.colorScheme.foreground,
+                          ),
+                          decoration: material.InputDecoration(
+                            hintText: 'Filter connections... (Ctrl+F)',
+                            hintStyle: material.TextStyle(
+                              fontSize: 12,
+                              color: theme.colorScheme.mutedForeground
+                                  .withValues(alpha: 0.6),
+                            ),
+                            border: material.InputBorder.none,
+                            isDense: true,
+                            contentPadding: material.EdgeInsets.zero,
+                          ),
+                        ),
+                      ),
+                      if (q.isNotEmpty) ...[
+                        material.GestureDetector(
+                          behavior: material.HitTestBehavior.opaque,
+                          onTap: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                          child: material.Icon(
+                            material.Icons.close_rounded,
+                            size: 14,
+                            color: theme.colorScheme.mutedForeground,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              Divider(
+                height: 1,
+                color: theme.colorScheme.border.withValues(alpha: 0.22),
+              ),
+              Expanded(
+                child: material.RepaintBoundary(
+                  child: material.CustomScrollView(
+                    slivers: [
+                      material.SliverPadding(
+                        padding: const material.EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 12),
+                        sliver: material.SliverList(
+                          delegate: material.SliverChildBuilderDelegate(
+                            (context, index) {
+                              if (showEmptyState && index == 0) {
+                                return material.Padding(
+                                  padding: const material.EdgeInsets.only(top: 8),
+                                  child: _EmptyState(
+                                    message: q.isNotEmpty
+                                        ? 'No connections match "$_searchQuery"'
+                                        : 'No connections yet',
+                                  ),
+                                );
+                              }
+                              final folderOffset = showEmptyState ? 1 : 0;
+                              final folderIndex = index - folderOffset;
+                              if (folderIndex < filteredFolders.length) {
+                                final name = filteredFolders[folderIndex];
+                                return _FolderTile(
+                                  name: name,
+                                  initiallyExpanded: q.isNotEmpty ||
+                                      _expandedFolders.contains(name),
+                                  onExpansionCommitted: (folderName, expanded) {
+                                    if (expanded) {
+                                      _expandedFolders.add(folderName);
+                                    } else {
+                                      _expandedFolders.remove(folderName);
+                                    }
+                                  },
+                                  connections: filteredConnections
+                                      .where((c) =>
+                                          c.folderId == _folderIdByName[name])
+                                      .toList(),
+                                  onRemove: () async {
+                                    await FoldersStorage.instance.remove(name);
+                                    await _loadData();
+                                  },
+                                  onNewConnection: (folderName) async {
+                                    final folderId = await LocalDb.instance
+                                        .getFolderIdByName(folderName);
+                                    await _createConnection(folderId: folderId);
+                                  },
+                                  iconForType: QueryaIcons.connectionIcon,
+                                  onRemoveConnection: _removeConnection,
+                                  onConnectionTap: widget.onConnectionSelected,
+                                  onRedisDatabaseTap:
+                                      widget.onRedisDatabaseSelected,
+                                  onMongoDBDatabaseTap:
+                                      widget.onMongoDBDatabaseSelected,
+                                  buildConnectionTile: _buildConnectionTile,
+                                );
+                              }
+                              final connIndex =
+                                  folderIndex - filteredFolders.length;
+                              return _buildConnectionTile(
+                                  rootConnections[connIndex]);
+                            },
+                            childCount: topLevelCount,
+                          ),
+                        ),
+                      ),
                   material.SliverFillRemaining(
                     hasScrollBody: false,
                     child: ContextMenu(
@@ -755,6 +1001,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         ],
       ),
     ),
-  );
+  ),
+);
 }
 }
