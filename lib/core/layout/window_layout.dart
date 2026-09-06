@@ -16,8 +16,8 @@ abstract class WindowLayout {
   static const double connectionFormMongoMaxHeight = 820;
 
   /// Preferences / settings dialog.
-  static const double preferencesDialogMaxWidth = 600;
-  static const double preferencesDialogMinWidth = 420;
+  static const double preferencesDialogMaxWidth = 760;
+  static const double preferencesDialogMinWidth = 480;
   static const double preferencesDialogMaxHeight = 760;
 
   /// Horizontal inset for modal dialogs (clamped by screen).
