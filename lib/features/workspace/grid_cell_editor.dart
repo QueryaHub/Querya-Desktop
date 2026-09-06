@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
+import 'package:querya_desktop/core/motion/querya_motion.dart';
+import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/features/workspace/grid_data_type_validator.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
@@ -130,7 +132,9 @@ class _GridCellEditorState extends material.State<GridCellEditor> {
     final cs = Theme.of(context).colorScheme;
     final hasError = _validationError != null;
 
-    return material.Container(
+    return material.AnimatedContainer(
+      duration: context.motionDuration(QueryaMotion.fast),
+      curve: context.motionCurve(QueryaMotion.enter),
       width: widget.width,
       height: widget.height,
       decoration: material.BoxDecoration(

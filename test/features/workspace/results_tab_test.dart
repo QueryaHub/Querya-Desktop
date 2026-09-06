@@ -860,15 +860,14 @@ void main() {
       await tester.tap(find.text('score'));
       await tester.pumpAndSettle();
 
-      // Arrow down icon should appear
-      expect(find.byIcon(material.Icons.arrow_downward_rounded), findsOneWidget);
+      // Arrow up icon should remain (rotated 180 deg for descending)
+      expect(find.byIcon(material.Icons.arrow_upward_rounded), findsOneWidget);
 
       // Tap again -> Reset to natural order
       await tester.tap(find.text('score'));
       await tester.pumpAndSettle();
 
       expect(find.byIcon(material.Icons.arrow_upward_rounded), findsNothing);
-      expect(find.byIcon(material.Icons.arrow_downward_rounded), findsNothing);
     });
 
     testWidgets('renders DataGridStagingToolbar and updates on add/delete/revert',
@@ -1089,7 +1088,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Export ▾'), findsOneWidget);
-      expect(find.text('Copy ▾'), findsOneWidget);
+      expect(find.text('Save File ▾'), findsOneWidget);
     });
 
     testWidgets('ResultsTab toggles filter bar and closes it when close button or Escape is triggered', (tester) async {
