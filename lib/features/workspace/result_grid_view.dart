@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:flutter/gestures.dart' show kSecondaryMouseButton;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart'
     show Clipboard, ClipboardData, HardwareKeyboard, LogicalKeyboardKey;
@@ -232,9 +234,17 @@ class ResultGridSelection {
   int get columnCount => endColumn - startColumn + 1;
 
   /// Formats selected cell values as a Tab-Separated Values (TSV) string.
-  String toTsv(List<List<String>> rows) {
+  /// If [columns] is provided, prepends a header row for the selected column range.
+  String toTsv(List<List<String>> rows, {List<String>? columns}) {
     if (rows.isEmpty) return '';
     final buffer = StringBuffer();
+    if (columns != null && columns.isNotEmpty) {
+      final headerCells = <String>[];
+      for (var c = startColumn; c <= endColumn; c++) {
+        headerCells.add(c < columns.length ? columns[c] : '');
+      }
+      buffer.writeln(headerCells.join('\t'));
+    }
     for (var r = startRow; r <= endRow; r++) {
       if (r < 0 || r >= rows.length) continue;
       final rowData = rows[r];
@@ -248,24 +258,70 @@ class ResultGridSelection {
   }
 
   /// Formats selected cell values as a CSV string.
-  String toCsv(List<List<String>> rows) {
+  /// If [columns] is provided, prepends a header row for the selected column range.
+  String toCsv(List<List<String>> rows, {List<String>? columns}) {
     if (rows.isEmpty) return '';
     final buffer = StringBuffer();
+    if (columns != null && columns.isNotEmpty) {
+      final headerCells = <String>[];
+      for (var c = startColumn; c <= endColumn; c++) {
+        final col = c < columns.length ? columns[c] : '';
+        headerCells.add(_escapeCsv(col));
+      }
+      buffer.writeln(headerCells.join(','));
+    }
     for (var r = startRow; r <= endRow; r++) {
       if (r < 0 || r >= rows.length) continue;
       final rowData = rows[r];
       final cells = <String>[];
       for (var c = startColumn; c <= endColumn; c++) {
         final val = c < rowData.length ? rowData[c] : '';
-        if (val.contains(',') || val.contains('"') || val.contains('\n')) {
-          cells.add('"${val.replaceAll('"', '""')}"');
-        } else {
-          cells.add(val);
-        }
+        cells.add(_escapeCsv(val));
       }
       buffer.writeln(cells.join(','));
     }
     return buffer.toString().trimRight();
+  }
+
+  /// Formats selected cell values as a formatted JSON string.
+  /// Returns a JSON object for single-row selection, or a JSON array for multi-row selection.
+  String toJson(List<String> columns, List<List<String>> rows) {
+    if (rows.isEmpty || columns.isEmpty) return '[]';
+    final result = <Map<String, dynamic>>[];
+    for (var r = startRow; r <= endRow; r++) {
+      if (r < 0 || r >= rows.length) continue;
+      final rowData = rows[r];
+      final map = <String, dynamic>{};
+      for (var c = startColumn; c <= endColumn; c++) {
+        final colName = c < columns.length ? columns[c] : 'col_$c';
+        final val = c < rowData.length ? rowData[c] : '';
+        if (val == 'NULL') {
+          map[colName] = null;
+        } else if (int.tryParse(val) != null) {
+          map[colName] = int.parse(val);
+        } else if (double.tryParse(val) != null) {
+          map[colName] = double.parse(val);
+        } else if (val.toLowerCase() == 'true') {
+          map[colName] = true;
+        } else if (val.toLowerCase() == 'false') {
+          map[colName] = false;
+        } else {
+          map[colName] = val;
+        }
+      }
+      result.add(map);
+    }
+    if (result.length == 1) {
+      return const JsonEncoder.withIndent('  ').convert(result.first);
+    }
+    return const JsonEncoder.withIndent('  ').convert(result);
+  }
+
+  static String _escapeCsv(String val) {
+    if (val.contains(',') || val.contains('"') || val.contains('\n') || val.contains('\r')) {
+      return '"${val.replaceAll('"', '""')}"';
+    }
+    return val;
   }
 
   @override
@@ -383,6 +439,7 @@ class VirtualResultGrid extends material.StatefulWidget {
     this.onRowSelected,
     this.onSelectionValuesChanged,
     this.onCellFocused,
+    this.onFilterRequested,
   });
 
   final List<String> columns;
@@ -391,6 +448,7 @@ class VirtualResultGrid extends material.StatefulWidget {
   final material.ValueChanged<int?>? onRowSelected;
   final material.ValueChanged<List<String>>? onSelectionValuesChanged;
   final void Function(String columnName, String cellValue, int rowIndex)? onCellFocused;
+  final void Function(String filterExpression)? onFilterRequested;
 
   @override
   material.State<VirtualResultGrid> createState() => _VirtualResultGridState();
@@ -730,7 +788,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     _focusNode.requestFocus();
     widget.onRowSelected?.call(row);
     if (_selection != null && _selection!.contains(row, column)) {
-      _copySelection();
+      // Keep existing selection intact so context menu operates on whole selection if clicked inside
     } else {
       setState(() {
         final coord = ResultGridCellCoordinate(row, column);
@@ -744,18 +802,148 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
         );
       });
       _notifySelectionAndFocus();
-      _copySelection();
     }
   }
 
-  void _copySelection({bool asCsv = false}) {
+  void _copySelection({bool withHeaders = false, bool asCsv = false, bool asJson = false}) {
     if (_selection == null) return;
-    final text = asCsv
-        ? _selection!.toCsv(_sortedRows)
-        : _selection!.toTsv(_sortedRows);
+    _copySelectionData(
+      _selection!,
+      withHeaders: withHeaders,
+      asCsv: asCsv,
+      asJson: asJson,
+    );
+  }
+
+  void _handleCopyCell(
+    int row,
+    int column, {
+    bool withHeaders = false,
+    bool asCsv = false,
+    bool asJson = false,
+  }) {
+    final sel = (_selection != null && _selection!.contains(row, column))
+        ? _selection!
+        : ResultGridSelection(
+            startRow: row,
+            startColumn: column,
+            endRow: row,
+            endColumn: column,
+          );
+    _copySelectionData(
+      sel,
+      withHeaders: withHeaders,
+      asCsv: asCsv,
+      asJson: asJson,
+    );
+  }
+
+  void _copySelectionData(
+    ResultGridSelection sel, {
+    bool withHeaders = false,
+    bool asCsv = false,
+    bool asJson = false,
+  }) {
+    if (_sortedRows.isEmpty) return;
+    String text;
+    if (asJson) {
+      text = sel.toJson(widget.columns, _sortedRows);
+    } else if (asCsv) {
+      text = sel.toCsv(
+        _sortedRows,
+        columns: withHeaders ? widget.columns : null,
+      );
+    } else {
+      text = sel.toTsv(
+        _sortedRows,
+        columns: withHeaders ? widget.columns : null,
+      );
+    }
     if (text.isNotEmpty) {
       Clipboard.setData(ClipboardData(text: text));
     }
+  }
+
+  void _handleFilterByValue(int row, int col, {required bool invert}) {
+    if (widget.onFilterRequested == null) return;
+    if (col >= widget.columns.length || row >= _sortedRows.length) return;
+    final colName = widget.columns[col];
+    final rowData = _sortedRows[row];
+    final cellVal = col < rowData.length ? rowData[col] : '';
+
+    String expr;
+    if (cellVal == 'NULL') {
+      expr = invert ? '$colName IS NOT NULL' : '$colName IS NULL';
+    } else if (num.tryParse(cellVal) != null) {
+      expr = invert ? '$colName != $cellVal' : '$colName = $cellVal';
+    } else {
+      final escaped = cellVal.replaceAll("'", "''");
+      expr = invert ? "$colName != '$escaped'" : "$colName = '$escaped'";
+    }
+    widget.onFilterRequested!(expr);
+  }
+
+  void _handleFilterComparison(int row, int col, String operator) {
+    if (widget.onFilterRequested == null) return;
+    if (col >= widget.columns.length || row >= _sortedRows.length) return;
+    final colName = widget.columns[col];
+    final rowData = _sortedRows[row];
+    final cellVal = col < rowData.length ? rowData[col] : '';
+    if (num.tryParse(cellVal) == null) return;
+
+    widget.onFilterRequested!('$colName $operator $cellVal');
+  }
+
+  void _handleSetNull(int row, int col) {
+    if (widget.stagingBuffer == null) return;
+    final sel = (_selection != null && _selection!.contains(row, col))
+        ? _selection!
+        : ResultGridSelection(startRow: row, startColumn: col, endRow: row, endColumn: col);
+    for (var r = sel.startRow; r <= sel.endRow; r++) {
+      for (var c = sel.startColumn; c <= sel.endColumn; c++) {
+        widget.stagingBuffer!.setCellNull(r, c);
+      }
+    }
+  }
+
+  void _handleSetEmpty(int row, int col) {
+    if (widget.stagingBuffer == null) return;
+    final sel = (_selection != null && _selection!.contains(row, col))
+        ? _selection!
+        : ResultGridSelection(startRow: row, startColumn: col, endRow: row, endColumn: col);
+    for (var r = sel.startRow; r <= sel.endRow; r++) {
+      for (var c = sel.startColumn; c <= sel.endColumn; c++) {
+        widget.stagingBuffer!.setCell(r, c, '');
+      }
+    }
+  }
+
+  void _handleRevertCell(int row, int col) {
+    if (widget.stagingBuffer == null) return;
+    final sel = (_selection != null && _selection!.contains(row, col))
+        ? _selection!
+        : ResultGridSelection(startRow: row, startColumn: col, endRow: row, endColumn: col);
+    for (var r = sel.startRow; r <= sel.endRow; r++) {
+      for (var c = sel.startColumn; c <= sel.endColumn; c++) {
+        widget.stagingBuffer!.revertCell(r, c);
+      }
+    }
+  }
+
+  void _handleDuplicateRow(int row) {
+    if (widget.stagingBuffer == null || row >= _sortedRows.length) return;
+    final rowData = _sortedRows[row];
+    widget.stagingBuffer!.addRow(List<String>.from(rowData));
+  }
+
+  void _handleToggleDeleteRow(int row) {
+    if (widget.stagingBuffer == null || row >= _sortedRows.length) return;
+    widget.stagingBuffer!.toggleDeleteRow(row);
+  }
+
+  void _handleRevertRow(int row) {
+    if (widget.stagingBuffer == null || row >= _sortedRows.length) return;
+    widget.stagingBuffer!.revertRow(row);
   }
 
   List<double> _computeColumnWidths() {
@@ -977,6 +1165,32 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
           control: true,
         ): () => _copySelection(),
         const material.SingleActivator(
+          LogicalKeyboardKey.keyC,
+          meta: true,
+          shift: true,
+        ): () => _copySelection(withHeaders: true),
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyC,
+          control: true,
+          shift: true,
+        ): () => _copySelection(withHeaders: true),
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyD,
+          control: true,
+        ): () {
+          if (widget.stagingBuffer != null && _selection != null) {
+            _handleDuplicateRow(_selection!.startRow);
+          }
+        },
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyD,
+          meta: true,
+        ): () {
+          if (widget.stagingBuffer != null && _selection != null) {
+            _handleDuplicateRow(_selection!.startRow);
+          }
+        },
+        const material.SingleActivator(
           LogicalKeyboardKey.insert,
           control: true,
         ): () => widget.stagingBuffer?.addRow(),
@@ -1084,11 +1298,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
           alt: true,
         ): () {
           if (_selection != null && widget.stagingBuffer != null) {
-            widget.stagingBuffer!.setCell(
-              _selection!.startRow,
-              _selection!.startColumn,
-              'NULL',
-            );
+            _handleSetNull(_selection!.startRow, _selection!.startColumn);
           }
         },
 
@@ -1273,6 +1483,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
                                   key: ValueKey('result-row-$rowIndex'),
                                   rowIndex: rowIndex,
                                   row: row,
+                                  columns: widget.columns,
                                   columnWidths: displayWidths,
                                   window: window,
                                   height: rowHeight,
@@ -1281,12 +1492,22 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
                                   selection: _selection,
                                   stagingBuffer: widget.stagingBuffer,
                                   editingCell: _editingCell,
+                                  canFilter: widget.onFilterRequested != null,
                                   onCellTap: _onCellTap,
                                   onCellDoubleTap: _startEditing,
                                   onCellSecondaryTap: _onCellSecondaryTap,
                                   onCommitEdit: _commitEdit,
                                   onCancelEdit: _cancelEdit,
                                   onOpenInspector: _openInspector,
+                                  onCopyCell: _handleCopyCell,
+                                  onFilterByValue: _handleFilterByValue,
+                                  onFilterComparison: _handleFilterComparison,
+                                  onSetNull: _handleSetNull,
+                                  onSetEmpty: _handleSetEmpty,
+                                  onRevertCell: _handleRevertCell,
+                                  onDuplicateRow: _handleDuplicateRow,
+                                  onToggleDeleteRow: _handleToggleDeleteRow,
+                                  onRevertRow: _handleRevertRow,
                                 );
                               },
                             ),
@@ -1465,6 +1686,7 @@ class _DataRow extends material.StatelessWidget {
     super.key,
     required this.rowIndex,
     required this.row,
+    required this.columns,
     required this.columnWidths,
     required this.window,
     required this.height,
@@ -1473,16 +1695,27 @@ class _DataRow extends material.StatelessWidget {
     this.selection,
     this.stagingBuffer,
     this.editingCell,
+    this.canFilter = false,
     this.onCellTap,
     this.onCellDoubleTap,
     this.onCellSecondaryTap,
     this.onCommitEdit,
     this.onCancelEdit,
     this.onOpenInspector,
+    this.onCopyCell,
+    this.onFilterByValue,
+    this.onFilterComparison,
+    this.onSetNull,
+    this.onSetEmpty,
+    this.onRevertCell,
+    this.onDuplicateRow,
+    this.onToggleDeleteRow,
+    this.onRevertRow,
   });
 
   final int rowIndex;
   final List<String> row;
+  final List<String> columns;
   final List<double> columnWidths;
   final ResultGridColumnWindow window;
   final double height;
@@ -1491,6 +1724,7 @@ class _DataRow extends material.StatelessWidget {
   final ResultGridSelection? selection;
   final DataGridStagingBuffer? stagingBuffer;
   final ResultGridCellCoordinate? editingCell;
+  final bool canFilter;
   final void Function(int row, int col, {bool isShift})? onCellTap;
   final void Function(int row, int col)? onCellDoubleTap;
   final void Function(int row, int col)? onCellSecondaryTap;
@@ -1505,6 +1739,21 @@ class _DataRow extends material.StatelessWidget {
   })? onCommitEdit;
   final material.VoidCallback? onCancelEdit;
   final void Function(int row, int col)? onOpenInspector;
+  final void Function(
+    int row,
+    int col, {
+    bool withHeaders,
+    bool asJson,
+    bool asCsv,
+  })? onCopyCell;
+  final void Function(int row, int col, {required bool invert})? onFilterByValue;
+  final void Function(int row, int col, String operator)? onFilterComparison;
+  final void Function(int row, int col)? onSetNull;
+  final void Function(int row, int col)? onSetEmpty;
+  final void Function(int row, int col)? onRevertCell;
+  final void Function(int row)? onDuplicateRow;
+  final void Function(int row)? onToggleDeleteRow;
+  final void Function(int row)? onRevertRow;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -1521,6 +1770,7 @@ class _DataRow extends material.StatelessWidget {
               _GridCell(
                 row: rowIndex,
                 column: c,
+                columnName: c < columns.length ? columns[c] : '',
                 text: c < row.length ? row[c] : '',
                 width: columnWidths[c],
                 colorScheme: colorScheme,
@@ -1541,12 +1791,23 @@ class _DataRow extends material.StatelessWidget {
                 isSelectionRight: selection != null &&
                     selection!.contains(rowIndex, c) &&
                     c == selection!.endColumn,
+                canFilter: canFilter,
+                hasStagingBuffer: stagingBuffer != null,
                 onTap: onCellTap,
                 onDoubleTap: onCellDoubleTap,
                 onSecondaryTap: onCellSecondaryTap,
                 onCommitEdit: onCommitEdit,
                 onCancelEdit: onCancelEdit,
                 onOpenInspector: onOpenInspector,
+                onCopyCell: onCopyCell,
+                onFilterByValue: onFilterByValue,
+                onFilterComparison: onFilterComparison,
+                onSetNull: onSetNull,
+                onSetEmpty: onSetEmpty,
+                onRevertCell: onRevertCell,
+                onDuplicateRow: onDuplicateRow,
+                onToggleDeleteRow: onToggleDeleteRow,
+                onRevertRow: onRevertRow,
               ),
             if (window.trailingWidth > 0)
               material.SizedBox(width: window.trailingWidth),
@@ -1561,6 +1822,7 @@ class _GridCell extends material.StatelessWidget {
   const _GridCell({
     required this.row,
     required this.column,
+    this.columnName = '',
     required this.text,
     required this.width,
     required this.colorScheme,
@@ -1573,16 +1835,28 @@ class _GridCell extends material.StatelessWidget {
     this.isSelectionBottom = false,
     this.isSelectionLeft = false,
     this.isSelectionRight = false,
+    this.canFilter = false,
+    this.hasStagingBuffer = false,
     this.onTap,
     this.onDoubleTap,
     this.onSecondaryTap,
     this.onCommitEdit,
     this.onCancelEdit,
     this.onOpenInspector,
+    this.onCopyCell,
+    this.onFilterByValue,
+    this.onFilterComparison,
+    this.onSetNull,
+    this.onSetEmpty,
+    this.onRevertCell,
+    this.onDuplicateRow,
+    this.onToggleDeleteRow,
+    this.onRevertRow,
   });
 
   final int row;
   final int column;
+  final String columnName;
   final String text;
   final double width;
   final ColorScheme colorScheme;
@@ -1595,6 +1869,8 @@ class _GridCell extends material.StatelessWidget {
   final bool isSelectionBottom;
   final bool isSelectionLeft;
   final bool isSelectionRight;
+  final bool canFilter;
+  final bool hasStagingBuffer;
   final void Function(int row, int col, {bool isShift})? onTap;
   final void Function(int row, int col)? onDoubleTap;
   final void Function(int row, int col)? onSecondaryTap;
@@ -1609,6 +1885,140 @@ class _GridCell extends material.StatelessWidget {
   })? onCommitEdit;
   final material.VoidCallback? onCancelEdit;
   final void Function(int row, int col)? onOpenInspector;
+  final void Function(
+    int row,
+    int col, {
+    bool withHeaders,
+    bool asJson,
+    bool asCsv,
+  })? onCopyCell;
+  final void Function(int row, int col, {required bool invert})? onFilterByValue;
+  final void Function(int row, int col, String operator)? onFilterComparison;
+  final void Function(int row, int col)? onSetNull;
+  final void Function(int row, int col)? onSetEmpty;
+  final void Function(int row, int col)? onRevertCell;
+  final void Function(int row)? onDuplicateRow;
+  final void Function(int row)? onToggleDeleteRow;
+  final void Function(int row)? onRevertRow;
+
+  List<MenuItem> _buildContextMenuItems(material.BuildContext context) {
+    final preview = text.length > 24 ? '${text.substring(0, 22)}…' : text;
+    final isNull = text == 'NULL';
+    final numVal = num.tryParse(text);
+
+    return [
+      MenuButton(
+        leading: const material.Icon(material.Icons.content_copy_rounded, size: 16),
+        trailing: const material.Text('Ctrl+C', style: material.TextStyle(fontSize: 11)),
+        onPressed: (_) => onCopyCell?.call(row, column),
+        child: const material.Text('Copy Value'),
+      ),
+      MenuButton(
+        leading: const material.Icon(material.Icons.table_chart_outlined, size: 16),
+        trailing: const material.Text('Ctrl+Shift+C', style: material.TextStyle(fontSize: 11)),
+        onPressed: (_) => onCopyCell?.call(row, column, withHeaders: true),
+        child: const material.Text('Copy with Headers'),
+      ),
+      MenuButton(
+        leading: const material.Icon(material.Icons.data_object_rounded, size: 16),
+        onPressed: (_) => onCopyCell?.call(row, column, asJson: true),
+        child: const material.Text('Copy as JSON'),
+      ),
+      MenuButton(
+        leading: const material.Icon(material.Icons.grid_on_rounded, size: 16),
+        onPressed: (_) => onCopyCell?.call(row, column, asCsv: true),
+        child: const material.Text('Copy as CSV'),
+      ),
+      if (canFilter && columnName.isNotEmpty) ...[
+        const MenuDivider(),
+        MenuButton(
+          leading: const material.Icon(material.Icons.filter_alt_outlined, size: 16),
+          onPressed: (_) => onFilterByValue?.call(row, column, invert: false),
+          child: material.Text(
+            isNull
+                ? 'Filter by NULL ($columnName IS NULL)'
+                : 'Filter by Value ($columnName = $preview)',
+          ),
+        ),
+        MenuButton(
+          leading: const material.Icon(material.Icons.filter_alt_off_outlined, size: 16),
+          onPressed: (_) => onFilterByValue?.call(row, column, invert: true),
+          child: material.Text(
+            isNull
+                ? 'Filter Out NULL ($columnName IS NOT NULL)'
+                : 'Filter Out ($columnName != $preview)',
+          ),
+        ),
+        if (numVal != null) ...[
+          MenuButton(
+            leading: const material.Icon(material.Icons.chevron_right_rounded, size: 16),
+            onPressed: (_) => onFilterComparison?.call(row, column, '>'),
+            child: material.Text('Filter > $text ($columnName > $text)'),
+          ),
+          MenuButton(
+            leading: const material.Icon(material.Icons.chevron_left_rounded, size: 16),
+            onPressed: (_) => onFilterComparison?.call(row, column, '<'),
+            child: material.Text('Filter < $text ($columnName < $text)'),
+          ),
+        ],
+      ],
+      const MenuDivider(),
+      MenuButton(
+        leading: const material.Icon(material.Icons.visibility_outlined, size: 16),
+        trailing: const material.Text('Ctrl+I', style: material.TextStyle(fontSize: 11)),
+        onPressed: (_) => onOpenInspector?.call(row, column),
+        child: const material.Text('Inspect Cell Value…'),
+      ),
+      if (hasStagingBuffer) ...[
+        MenuButton(
+          leading: const material.Icon(material.Icons.remove_circle_outline_rounded, size: 16),
+          trailing: const material.Text('Alt+N', style: material.TextStyle(fontSize: 11)),
+          onPressed: (_) => onSetNull?.call(row, column),
+          child: const material.Text('Set NULL'),
+        ),
+        MenuButton(
+          leading: const material.Icon(material.Icons.format_clear_rounded, size: 16),
+          onPressed: (_) => onSetEmpty?.call(row, column),
+          child: const material.Text('Set to Empty String'),
+        ),
+        if (cellStatus == StagedCellStatus.modified)
+          MenuButton(
+            leading: const material.Icon(material.Icons.undo_rounded, size: 16),
+            onPressed: (_) => onRevertCell?.call(row, column),
+            child: const material.Text('Revert Cell Changes'),
+          ),
+        const MenuDivider(),
+        MenuButton(
+          leading: const material.Icon(material.Icons.content_paste_go_rounded, size: 16),
+          trailing: const material.Text('Ctrl+D', style: material.TextStyle(fontSize: 11)),
+          onPressed: (_) => onDuplicateRow?.call(row),
+          child: const material.Text('Duplicate Row'),
+        ),
+        MenuButton(
+          leading: material.Icon(
+            rowStatus == StagedRowStatus.deleted
+                ? material.Icons.restore_from_trash_rounded
+                : material.Icons.delete_outline_rounded,
+            size: 16,
+            color: rowStatus == StagedRowStatus.deleted ? null : colorScheme.destructive,
+          ),
+          onPressed: (_) => onToggleDeleteRow?.call(row),
+          child: material.Text(
+            rowStatus == StagedRowStatus.deleted ? 'Restore Deleted Row' : 'Delete Row',
+            style: material.TextStyle(
+              color: rowStatus == StagedRowStatus.deleted ? null : colorScheme.destructive,
+            ),
+          ),
+        ),
+        if (rowStatus == StagedRowStatus.modified || rowStatus == StagedRowStatus.deleted)
+          MenuButton(
+            leading: const material.Icon(material.Icons.restore_rounded, size: 16),
+            onPressed: (_) => onRevertRow?.call(row),
+            child: const material.Text('Revert Row Changes'),
+          ),
+      ],
+    ];
+  }
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -1722,20 +2132,28 @@ class _GridCell extends material.StatelessWidget {
       onDoubleTap: () {
         onDoubleTap?.call(row, column);
       },
-      onSecondaryTap: () {
-        onSecondaryTap?.call(row, column);
-      },
       child: cell,
     );
 
-    if (text.length < ResultGridMetrics.tooltipMinLength) {
-      return interactiveCell;
+    material.Widget content = interactiveCell;
+    if (text.length >= ResultGridMetrics.tooltipMinLength) {
+      content = material.Tooltip(
+        message: text,
+        waitDuration: kQueryaTooltipWait,
+        child: content,
+      );
     }
 
-    return material.Tooltip(
-      message: text,
-      waitDuration: kQueryaTooltipWait,
-      child: interactiveCell,
+    return material.Listener(
+      onPointerDown: (event) {
+        if (event.buttons == kSecondaryMouseButton) {
+          onSecondaryTap?.call(row, column);
+        }
+      },
+      child: ContextMenu(
+        items: _buildContextMenuItems(context),
+        child: content,
+      ),
     );
   }
 }
