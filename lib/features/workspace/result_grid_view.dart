@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart'
     show Clipboard, ClipboardData, HardwareKeyboard, LogicalKeyboardKey;
@@ -12,7 +14,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 abstract final class ResultGridMetrics {
   static const double rowHeight = 36;
   static const double headerHeight = 36;
-  static const double minColumnWidth = 120;
+  static const double minColumnWidth = 56;
   static const double maxColumnWidth = 280;
   static const int columnWidthSampleRows = 40;
   static const int tooltipMinLength = 48;
@@ -82,15 +84,111 @@ List<double> computeResultGridColumnWidths({
   final sample = rows.length < sampleRowCount ? rows.length : sampleRowCount;
 
   for (var c = 0; c < columns.length; c++) {
-    var maxChars = columns[c].length;
+    final headerWidth = columns[c].length * 7.5 + 38.0;
+    var maxRowChars = 0;
     for (var r = 0; r < sample; r++) {
-      if (c < rows[r].length && rows[r][c].length > maxChars) {
-        maxChars = rows[r][c].length;
+      if (c < rows[r].length && rows[r][c].length > maxRowChars) {
+        maxRowChars = rows[r][c].length;
       }
     }
-    widths[c] = (maxChars * 7.5 + 24).clamp(minWidth, maxWidth);
+    final contentWidth = maxRowChars * 7.5 + 24.0;
+    final naturalWidth = math.max(headerWidth, contentWidth);
+    widths[c] = naturalWidth.clamp(minWidth, maxWidth);
   }
   return widths;
+}
+
+/// Distributes spare viewport width adaptively to columns that benefit from expansion,
+/// avoiding artificial stretching of compact columns.
+List<double> distributeResultGridSpareWidth({
+  required List<double> columnWidths,
+  required List<String> columns,
+  required List<List<String>> rows,
+  required double availableWidth,
+  double maxColumnWidth = ResultGridMetrics.maxColumnWidth,
+  int sampleRowCount = ResultGridMetrics.columnWidthSampleRows,
+}) {
+  if (columnWidths.isEmpty || columns.isEmpty) return columnWidths;
+
+  final totalInitial = columnWidths.fold<double>(0.0, (sum, w) => sum + w);
+  final spare = availableWidth - totalInitial;
+  if (spare <= 0.5) return columnWidths;
+
+  final sample = rows.length < sampleRowCount ? rows.length : sampleRowCount;
+  final desiredWidths = List<double>.filled(columns.length, 0);
+
+  for (var c = 0; c < columns.length; c++) {
+    final headerWidth = columns[c].length * 7.5 + 38.0;
+    var maxRowChars = 0;
+    for (var r = 0; r < sample; r++) {
+      if (c < rows[r].length && rows[r][c].length > maxRowChars) {
+        maxRowChars = rows[r][c].length;
+      }
+    }
+    final contentWidth = maxRowChars * 7.5 + 24.0;
+    desiredWidths[c] = math.max(headerWidth, contentWidth);
+  }
+
+  // Deficit columns: columns whose desired width exceeds the clamped initial width
+  final deficits = List<double>.filled(columns.length, 0);
+  var totalDeficit = 0.0;
+  for (var c = 0; c < columns.length; c++) {
+    if (desiredWidths[c] > columnWidths[c]) {
+      final def = desiredWidths[c] - columnWidths[c];
+      deficits[c] = def;
+      totalDeficit += def;
+    }
+  }
+
+  final result = List<double>.from(columnWidths);
+
+  if (totalDeficit > 0) {
+    if (spare <= totalDeficit) {
+      final ratio = spare / totalDeficit;
+      for (var c = 0; c < columns.length; c++) {
+        if (deficits[c] > 0) {
+          result[c] += deficits[c] * ratio;
+        }
+      }
+      return result;
+    } else {
+      for (var c = 0; c < columns.length; c++) {
+        if (deficits[c] > 0) {
+          result[c] += deficits[c];
+        }
+      }
+      final remainingSpare = spare - totalDeficit;
+      _distributeRemainingSpare(result, remainingSpare);
+      return result;
+    }
+  } else {
+    _distributeRemainingSpare(result, spare);
+    return result;
+  }
+}
+
+void _distributeRemainingSpare(List<double> widths, double spare) {
+  final weights = List<double>.filled(widths.length, 0);
+  var totalWeight = 0.0;
+  for (var i = 0; i < widths.length; i++) {
+    if (widths[i] > 110) {
+      final w = widths[i] - 100;
+      weights[i] = w;
+      totalWeight += w;
+    }
+  }
+
+  if (totalWeight <= 0) {
+    return;
+  }
+
+  final ratio = spare / totalWeight;
+  for (var i = 0; i < widths.length; i++) {
+    if (weights[i] > 0) {
+      final extra = math.min(weights[i] * ratio, 120.0);
+      widths[i] += extra;
+    }
+  }
 }
 
 /// Prefix sums: `offsets[i]` = sum of widths `[0, i)`.
@@ -630,6 +728,36 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
       final newWidth = (_columnWidths[index] + delta).clamp(minWidth, maxWidth);
       _columnWidths = List<double>.from(_columnWidths);
       _columnWidths[index] = newWidth;
+      _columnOffsets = computeResultGridColumnOffsets(_columnWidths);
+      _widthsNeedUpdate = false;
+    });
+  }
+
+  void _onColumnAutoFit(int index) {
+    if (index < 0 ||
+        index >= widget.columns.length ||
+        index >= _columnWidths.length) {
+      return;
+    }
+    final headerWidth = widget.columns[index].length * 7.5 + 38.0;
+    var maxRowChars = 0;
+    final sampleCount = math.min(_baseRows.length, 200);
+    for (var r = 0; r < sampleCount; r++) {
+      if (index < _baseRows[r].length &&
+          _baseRows[r][index].length > maxRowChars) {
+        maxRowChars = _baseRows[r][index].length;
+      }
+    }
+    final contentWidth = maxRowChars * 7.5 + 24.0;
+    final naturalWidth = math.max(headerWidth, contentWidth);
+    final minWidth = context.scaled(ResultGridMetrics.minColumnWidth);
+    final maxWidth = context.scaled(ResultGridMetrics.maxColumnWidth * 3);
+    final autoFitWidth = naturalWidth.clamp(minWidth, maxWidth);
+
+    setState(() {
+      _userHasResized = true;
+      _columnWidths = List<double>.from(_columnWidths);
+      _columnWidths[index] = autoFitWidth;
       _columnOffsets = computeResultGridColumnOffsets(_columnWidths);
       _widthsNeedUpdate = false;
     });
@@ -1225,10 +1353,17 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
               if (!_userHasResized &&
                   tableWidth < availableWidth &&
                   _columnWidths.isNotEmpty) {
-                final extraPerCol =
-                    (availableWidth - tableWidth) / _columnWidths.length;
-                displayWidths = [for (final w in _columnWidths) w + extraPerCol];
-                tableWidth = availableWidth;
+                displayWidths = distributeResultGridSpareWidth(
+                  columnWidths: _columnWidths,
+                  columns: widget.columns,
+                  rows: _baseRows,
+                  availableWidth: availableWidth,
+                  maxColumnWidth:
+                      context.scaled(ResultGridMetrics.maxColumnWidth),
+                );
+                final distributedWidth =
+                    displayWidths.fold<double>(0.0, (sum, w) => sum + w);
+                tableWidth = math.max(distributedWidth, availableWidth);
               } else if (tableWidth < availableWidth) {
                 tableWidth = availableWidth;
               }
@@ -1257,6 +1392,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
                           sortOrder: _sortOrder,
                           onSortColumn: _toggleSort,
                           onResizeColumn: _onColumnResize,
+                          onAutoFitColumn: _onColumnAutoFit,
                         ),
                         material.Expanded(
                           child: material.Scrollbar(
@@ -1316,6 +1452,7 @@ class _HeaderRow extends material.StatelessWidget {
     this.sortOrder,
     this.onSortColumn,
     this.onResizeColumn,
+    this.onAutoFitColumn,
   });
 
   final List<String> columns;
@@ -1327,6 +1464,7 @@ class _HeaderRow extends material.StatelessWidget {
   final ResultGridSortOrder? sortOrder;
   final material.ValueChanged<int>? onSortColumn;
   final void Function(int index, double delta)? onResizeColumn;
+  final void Function(int index)? onAutoFitColumn;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -1354,6 +1492,9 @@ class _HeaderRow extends material.StatelessWidget {
               onResize: onResizeColumn != null
                   ? (delta) => onResizeColumn!(i, delta)
                   : null,
+              onAutoFit: onAutoFitColumn != null
+                  ? () => onAutoFitColumn!(i)
+                  : null,
             ),
           if (window.trailingWidth > 0)
             material.SizedBox(width: window.trailingWidth),
@@ -1371,6 +1512,7 @@ class _HeaderCell extends material.StatelessWidget {
     this.sortOrder,
     this.onSort,
     this.onResize,
+    this.onAutoFit,
   });
 
   final String text;
@@ -1379,6 +1521,7 @@ class _HeaderCell extends material.StatelessWidget {
   final ResultGridSortOrder? sortOrder;
   final material.VoidCallback? onSort;
   final material.ValueChanged<double>? onResize;
+  final material.VoidCallback? onAutoFit;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -1415,11 +1558,15 @@ class _HeaderCell extends material.StatelessWidget {
                   child: material.Row(
                     children: [
                       material.Expanded(
-                        child: material.Text(
-                          text,
-                          style: style,
-                          overflow: material.TextOverflow.ellipsis,
-                          maxLines: 1,
+                        child: material.Tooltip(
+                          message: text,
+                          waitDuration: kQueryaTooltipWait,
+                          child: material.Text(
+                            text,
+                            style: style,
+                            overflow: material.TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
                         ),
                       ),
                       if (sortOrder != null) ...[
@@ -1438,19 +1585,20 @@ class _HeaderCell extends material.StatelessWidget {
               ),
             ),
           ),
-          if (onResize != null)
+          if (onResize != null || onAutoFit != null)
             material.Positioned(
-              right: -4,
+              right: -5,
               top: 0,
               bottom: 0,
-              width: 10,
+              width: 12,
               child: material.MouseRegion(
                 cursor: material.SystemMouseCursors.resizeColumn,
                 child: material.GestureDetector(
                   behavior: material.HitTestBehavior.translucent,
-                  onHorizontalDragUpdate: (details) {
-                    onResize!(details.delta.dx);
-                  },
+                  onDoubleTap: onAutoFit,
+                  onHorizontalDragUpdate: onResize != null
+                      ? (details) => onResize!(details.delta.dx)
+                      : null,
                 ),
               ),
             ),
