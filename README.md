@@ -9,19 +9,20 @@
 [![Release Status](https://github.com/QueryaHub/Querya-Desktop/actions/workflows/release.yml/badge.svg)](https://github.com/QueryaHub/Querya-Desktop/actions/workflows/release.yml)
 [![Latest Release](https://img.shields.io/github/v/release/QueryaHub/Querya-Desktop?color=brightgreen&label=release)](https://github.com/QueryaHub/Querya-Desktop/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Open Source](https://img.shields.io/badge/Open%20Source-100%25-brightgreen.svg)](LICENSE)
 [![Flutter Desktop](https://img.shields.io/badge/Built%20with-Flutter%203-02569B?logo=flutter)](https://flutter.dev)
 [![Platforms](https://img.shields.io/badge/Platforms-Linux%20%7C%20Windows%20%7C%20macOS-informational?logo=linux&logoColor=white)](#installation)
-[![Security: Hardware Encrypted](https://img.shields.io/badge/Security-OS%20Vault%20Encrypted-success)](#enterprise-security--privacy)
-[![Zero Telemetry](https://img.shields.io/badge/Telemetry-Zero%20%28100%25%20Private%29-blueviolet)](#enterprise-security--privacy)
+[![Security: Hardware Encrypted](https://img.shields.io/badge/Security-OS%20Vault%20Encrypted-success)](#security--privacy)
+[![Zero Telemetry](https://img.shields.io/badge/Telemetry-Zero%20%28100%25%20Private%29-blueviolet)](#security--privacy)
 
 <p align="center">
-  <a href="#executive-overview">Overview</a> •
+  <a href="#overview">Overview</a> •
   <a href="#key-capabilities">Key Capabilities</a> •
   <a href="#supported-engines">Supported Engines</a> •
   <a href="#feature-matrix">Feature Matrix</a> •
   <a href="#installation">Installation</a> •
   <a href="#architecture">Architecture</a> •
-  <a href="#enterprise-security--privacy">Security & Privacy</a> •
+  <a href="#security--privacy">Security & Privacy</a> •
   <a href="#documentation">Docs</a>
 </p>
 
@@ -29,9 +30,9 @@
 
 ---
 
-## Executive Overview
+## Overview
 
-**Querya Desktop** is an enterprise-grade database management studio engineered from the ground up for speed, safety, and developer ergonomics. Built on Flutter and Dart, Querya provides a native, hardware-accelerated desktop experience across **Linux**, **Windows**, and **macOS** with zero JVM overhead and zero external telemetry.
+**Querya Desktop** is a modern, open-source database management studio engineered from the ground up for speed, safety, and developer ergonomics. Built on Flutter and Dart, Querya provides a native, hardware-accelerated desktop experience across **Linux**, **Windows**, and **macOS** with zero JVM overhead and zero external telemetry.
 
 Whether you are navigating multi-million row datasets, authoring complex analytical SQL, inspecting nested NoSQL documents, or managing distributed key-value caches, Querya provides a unified, cohesive, and distraction-free interface.
 
@@ -66,19 +67,19 @@ Whether you are navigating multi-million row datasets, authoring complex analyti
 - **Structured Pretty-Printers:** Inspect complex cell values in dedicated preview panes with automatic formatting and syntax validation for **JSON**, **XML**, and **HTML**.
 - **Raw Hex / Binary Viewer:** Inspect BLOBs, binary hashes, and raw payloads with side-by-side hex and ASCII representations.
 
-### 🔒 Enterprise Security & Privacy First
+### 🔒 Security & Privacy by Design
 - **Hardware-Backed Credential Vaults:** Connection passwords and keys are never stored in plaintext. Querya integrates directly with native OS credential stores (**Freedesktop Secret Service / Keyring** on Linux, **Apple Keychain** on macOS, and **Windows DPAPI Credential Manager**).
 - **In-Memory Secret Scrubbing:** Sensitive credentials are cleansed from memory after connection handshakes.
 - **Air-Gapped & Zero Telemetry:** Absolutely zero telemetry, zero analytics, and zero external calls. Your database credentials and queries never leave your local machine.
 
 ### 🔌 Native & Pluggable Driver Architecture
 - **Pure Native Drivers:** High-performance built-in drivers for PostgreSQL, MySQL/MariaDB, SQLite, Redis, and MongoDB with no external runtime dependencies or JDBC configurations.
-- **JSON-RPC 2.0 Driver Sandbox:** Extend Querya with custom community or enterprise proprietary database drivers via sandboxed standard I/O RPC bridges.
+- **JSON-RPC 2.0 Driver Sandbox:** Extend Querya with custom community or proprietary database drivers via sandboxed standard I/O RPC bridges.
 
 ### 🎨 Desktop Ergonomics & Custom Themes
 - **OS File Associations:** Native file handler integration with `.sql`, `.db`, `.sqlite`, and `.sqlite3` files. Double-click any database or SQL script in your file manager to open it immediately.
 - **Comprehensive Keymap:** Complete keyboard navigation for executing queries, switching tabs, focusing panels, and searching objects.
-- **VS Code Theme Importer:** Import any `.json` VS Code theme or choose from bundled enterprise dark/light palettes.
+- **VS Code Theme Importer:** Import any `.json` VS Code theme or choose from bundled dark/light palettes.
 
 ---
 
@@ -196,9 +197,9 @@ For detailed component documentation and sequence diagrams, refer to **[Architec
 
 ---
 
-## Enterprise Security & Privacy
-
-Querya is designed for strict compliance with enterprise security postures and air-gapped network policies:
+## Security & Privacy
+ 
+Querya is engineered with complete open-source transparency, strict privacy, and air-gapped security by design:
 
 1. **Native OS Credential Stores:** Credentials are never written to disk in plain text or reversible base64. They are delegated to:
    - **Linux:** Freedesktop Secret Service API (`libsecret` / GNOME Keyring / KWallet).
