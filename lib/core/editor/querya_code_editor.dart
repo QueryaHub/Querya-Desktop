@@ -31,6 +31,8 @@ class QueryaCodeEditor extends StatefulWidget {
     this.contentPadding,
     this.textAlignVertical,
     this.enableHighlighting = true,
+    this.autofocus = false,
+    this.focusNode,
   });
 
   final material.TextEditingController? controller;
@@ -50,6 +52,8 @@ class QueryaCodeEditor extends StatefulWidget {
 
   /// When true and [language] is SQL/JSON, uses [syntax_highlight] if initialized.
   final bool enableHighlighting;
+  final bool autofocus;
+  final FocusNode? focusNode;
 
   @override
   State<QueryaCodeEditor> createState() => _QueryaCodeEditorState();
@@ -302,6 +306,8 @@ class _QueryaCodeEditorState extends State<QueryaCodeEditor> {
     if (widget.variant == QueryaCodeEditorVariant.material) {
       return material.TextField(
         controller: controller,
+        focusNode: widget.focusNode,
+        autofocus: widget.autofocus,
         readOnly: widget.readOnly,
         maxLines: widget.expands ? null : widget.maxLines,
         expands: widget.expands,
@@ -319,6 +325,8 @@ class _QueryaCodeEditorState extends State<QueryaCodeEditor> {
 
     return TextField(
       controller: controller,
+      focusNode: widget.focusNode,
+      autofocus: widget.autofocus,
       readOnly: widget.readOnly,
       maxLines: widget.expands ? null : widget.maxLines,
       expands: widget.expands,

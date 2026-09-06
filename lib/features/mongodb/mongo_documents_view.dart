@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
+import 'package:querya_desktop/core/editor/querya_code_editor.dart';
+import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
@@ -395,6 +397,7 @@ class _DocumentCardState extends State<_DocumentCard> {
   bool _expanded = false;
   late String _keysPreviewText;
   String? _prettyJsonCache;
+  material.TextEditingController? _jsonController;
 
   @override
   void initState() {
@@ -408,7 +411,15 @@ class _DocumentCardState extends State<_DocumentCard> {
     if (!identical(oldWidget.document, widget.document)) {
       _keysPreviewText = _computeKeysPreview(widget.document);
       _prettyJsonCache = null;
+      _jsonController?.dispose();
+      _jsonController = null;
     }
+  }
+
+  @override
+  void dispose() {
+    _jsonController?.dispose();
+    super.dispose();
   }
 
   void _toggleExpanded() {
@@ -495,12 +506,26 @@ class _DocumentCardState extends State<_DocumentCard> {
               padding: const material.EdgeInsets.only(
                   left: 16, right: 16, bottom: 10),
               child: _expanded
-                  ? material.SelectableText(
-                      _prettyJsonCache ?? '',
-                      style: material.TextStyle(
+                  ? material.Container(
+                      constraints:
+                          const material.BoxConstraints(maxHeight: 320),
+                      decoration: material.BoxDecoration(
+                        color: cs.muted.withValues(alpha: 0.15),
+                        borderRadius: material.BorderRadius.circular(6),
+                        border: material.Border.all(
+                          color: cs.border.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: QueryaCodeEditor(
+                        controller: _jsonController ??=
+                            material.TextEditingController(
+                          text: _prettyJsonCache ?? '',
+                        ),
+                        language: QueryaCodeLanguage.json,
+                        readOnly: true,
                         fontSize: 12,
-                        fontFamily: 'monospace',
-                        color: scs.mutedForeground,
+                        variant: QueryaCodeEditorVariant.material,
+                        contentPadding: const material.EdgeInsets.all(10),
                       ),
                     )
                   : Text(
