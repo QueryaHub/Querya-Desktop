@@ -55,6 +55,7 @@ class DataGridStagingToolbar extends StatelessWidget {
                 _ToolbarButton(
                   label: 'Add Row',
                   icon: material.Icons.add_rounded,
+                  tooltip: 'Add new row (Ctrl+Insert / Cmd+N)',
                   onPressed: isSaving ? null : () => stagingBuffer.addRow(),
                 ),
                 const Gap(4),
@@ -68,6 +69,9 @@ class DataGridStagingToolbar extends StatelessWidget {
                   color: isSelectedDeleted
                       ? cs.primary
                       : (hasSelectedRow ? cs.destructive : null),
+                  tooltip: isSelectedDeleted
+                      ? 'Restore marked row'
+                      : 'Mark row for deletion (Ctrl+Delete / Cmd+Backspace)',
                   onPressed: isSaving || !hasSelectedRow
                       ? null
                       : () => stagingBuffer.toggleDeleteRow(selectedRow),
@@ -80,6 +84,7 @@ class DataGridStagingToolbar extends StatelessWidget {
                     label: 'Revert All',
                     icon: material.Icons.undo_rounded,
                     color: cs.mutedForeground,
+                    tooltip: 'Revert all unstaged edits (Ctrl+Z / Cmd+Z)',
                     onPressed: isSaving ? null : () => stagingBuffer.revertAll(),
                   ),
                   const Gap(6),
@@ -135,56 +140,62 @@ class DataGridStagingToolbar extends StatelessWidget {
                 const Gap(12),
 
                 // Save Changes button
-                material.MouseRegion(
-                  cursor: (isDirty && !isSaving)
-                      ? material.SystemMouseCursors.click
-                      : material.SystemMouseCursors.basic,
-                  child: material.GestureDetector(
-                    behavior: material.HitTestBehavior.opaque,
-                    onTap: isDirty && !isSaving ? onApplyChanges : null,
-                    child: material.Container(
-                      padding: const material.EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: material.BoxDecoration(
-                        color: isDirty
-                            ? cs.primary
-                            : cs.muted.withValues(alpha: 0.4),
-                        borderRadius: material.BorderRadius.circular(4),
-                      ),
-                      child: material.Row(
-                        mainAxisSize: material.MainAxisSize.min,
-                        children: [
-                          if (isSaving)
-                            material.SizedBox(
-                              width: 12,
-                              height: 12,
-                              child: material.CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: cs.primaryForeground,
+                material.Tooltip(
+                  message: isDirty
+                      ? 'Commit staged changes to database (Ctrl+S / Cmd+S)'
+                      : 'No pending changes to commit',
+                  waitDuration: const Duration(milliseconds: 400),
+                  child: material.MouseRegion(
+                    cursor: (isDirty && !isSaving)
+                        ? material.SystemMouseCursors.click
+                        : material.SystemMouseCursors.basic,
+                    child: material.GestureDetector(
+                      behavior: material.HitTestBehavior.opaque,
+                      onTap: isDirty && !isSaving ? onApplyChanges : null,
+                      child: material.Container(
+                        padding: const material.EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: material.BoxDecoration(
+                          color: isDirty
+                              ? cs.primary
+                              : cs.muted.withValues(alpha: 0.4),
+                          borderRadius: material.BorderRadius.circular(4),
+                        ),
+                        child: material.Row(
+                          mainAxisSize: material.MainAxisSize.min,
+                          children: [
+                            if (isSaving)
+                              material.SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: material.CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: cs.primaryForeground,
+                                ),
+                              )
+                            else
+                              material.Icon(
+                                material.Icons.save_rounded,
+                                size: 14,
+                                color: isDirty
+                                    ? cs.primaryForeground
+                                    : cs.mutedForeground,
                               ),
-                            )
-                          else
-                            material.Icon(
-                              material.Icons.save_rounded,
-                              size: 14,
-                              color: isDirty
-                                  ? cs.primaryForeground
-                                  : cs.mutedForeground,
+                            const Gap(5),
+                            material.Text(
+                              isSaving ? 'Saving…' : 'Save Changes',
+                              style: material.TextStyle(
+                                fontSize: 12,
+                                fontWeight: material.FontWeight.w500,
+                                color: isDirty
+                                    ? cs.primaryForeground
+                                    : cs.mutedForeground,
+                              ),
                             ),
-                          const Gap(5),
-                          material.Text(
-                            isSaving ? 'Saving…' : 'Save Changes',
-                            style: material.TextStyle(
-                              fontSize: 12,
-                              fontWeight: material.FontWeight.w500,
-                              color: isDirty
-                                  ? cs.primaryForeground
-                                  : cs.mutedForeground,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -198,49 +209,66 @@ class DataGridStagingToolbar extends StatelessWidget {
   }
 }
 
-class _ToolbarButton extends material.StatelessWidget {
+class _ToolbarButton extends material.StatefulWidget {
   const _ToolbarButton({
     required this.label,
     required this.icon,
     this.onPressed,
     this.color,
+    this.tooltip,
   });
 
   final String label;
   final material.IconData icon;
   final material.VoidCallback? onPressed;
   final material.Color? color;
+  final String? tooltip;
+
+  @override
+  material.State<_ToolbarButton> createState() => _ToolbarButtonState();
+}
+
+class _ToolbarButtonState extends material.State<_ToolbarButton> {
+  bool _isHovered = false;
 
   @override
   material.Widget build(material.BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final enabled = onPressed != null;
-    final fg = color ?? cs.foreground;
+    final enabled = widget.onPressed != null;
+    final fg = widget.color ?? cs.foreground;
 
-    return material.MouseRegion(
+    material.Widget button = material.MouseRegion(
       cursor: enabled
           ? material.SystemMouseCursors.click
           : material.SystemMouseCursors.basic,
+      onEnter: enabled ? (_) => setState(() => _isHovered = true) : null,
+      onExit: enabled ? (_) => setState(() => _isHovered = false) : null,
       child: material.GestureDetector(
-        onTap: onPressed,
+        onTap: widget.onPressed,
         behavior: material.HitTestBehavior.opaque,
         child: material.Opacity(
           opacity: enabled ? 1.0 : 0.4,
-          child: material.Container(
+          child: material.AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
             padding: const material.EdgeInsets.symmetric(
               horizontal: 8,
               vertical: 4,
             ),
             decoration: material.BoxDecoration(
+              color: enabled && _isHovered
+                  ? (widget.color != null
+                      ? widget.color!.withValues(alpha: 0.12)
+                      : cs.muted.withValues(alpha: 0.5))
+                  : material.Colors.transparent,
               borderRadius: material.BorderRadius.circular(4),
             ),
             child: material.Row(
               mainAxisSize: material.MainAxisSize.min,
               children: [
-                material.Icon(icon, size: 14, color: fg),
+                material.Icon(widget.icon, size: 14, color: fg),
                 const material.SizedBox(width: 4),
                 material.Text(
-                  label,
+                  widget.label,
                   style: material.TextStyle(
                     fontSize: 12,
                     fontWeight: material.FontWeight.w500,
@@ -253,5 +281,15 @@ class _ToolbarButton extends material.StatelessWidget {
         ),
       ),
     );
+
+    if (widget.tooltip != null) {
+      button = material.Tooltip(
+        message: widget.tooltip!,
+        waitDuration: const Duration(milliseconds: 400),
+        child: button,
+      );
+    }
+
+    return button;
   }
 }
