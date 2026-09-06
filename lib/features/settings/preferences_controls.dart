@@ -101,6 +101,63 @@ class PreferencesCheckboxRow extends StatelessWidget {
   }
 }
 
+/// Leading title/subtitle with a trailing [material.Switch] for Preferences.
+class PreferencesSwitchRow extends StatelessWidget {
+  const PreferencesSwitchRow({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    required this.title,
+    this.subtitle,
+    this.enabled = true,
+  });
+
+  final bool value;
+  final material.ValueChanged<bool>? onChanged;
+  final material.Widget title;
+  final material.Widget? subtitle;
+  final bool enabled;
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    final isInteractive = enabled && onChanged != null;
+
+    return material.Material(
+      type: material.MaterialType.transparency,
+      child: material.InkWell(
+        onTap: isInteractive ? () => onChanged!(!value) : null,
+        borderRadius: material.BorderRadius.circular(6),
+        child: material.Padding(
+          padding: const material.EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+          child: material.Row(
+            crossAxisAlignment: material.CrossAxisAlignment.center,
+            children: [
+              material.Expanded(
+                child: material.Column(
+                  crossAxisAlignment: material.CrossAxisAlignment.start,
+                  mainAxisSize: material.MainAxisSize.min,
+                  children: [
+                    title,
+                    if (subtitle != null) ...[
+                      const material.SizedBox(height: 2),
+                      subtitle!,
+                    ],
+                  ],
+                ),
+              ),
+              const material.SizedBox(width: 16),
+              material.Switch(
+                value: value,
+                onChanged: isInteractive ? onChanged : null,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Label + full-width control row for Preferences (uniform dropdown width).
 class PreferencesFieldRow extends StatelessWidget {
   const PreferencesFieldRow({
