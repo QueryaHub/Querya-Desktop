@@ -414,6 +414,18 @@ class _ResultsTabState extends material.State<ResultsTab> {
                             _focusedRowIndex = rowIdx;
                           });
                         },
+                        onFilterRequested: (filterExpr) {
+                          setState(() {
+                            _showFilterBar = true;
+                            if (_filterText.trim().isEmpty) {
+                              _filterText = filterExpr;
+                            } else if (_filterText.contains(' OR ') || _filterText.contains(' or ')) {
+                              _filterText = '($_filterText) AND $filterExpr';
+                            } else {
+                              _filterText = '$_filterText AND $filterExpr';
+                            }
+                          });
+                        },
                       ),
                     ),
 
