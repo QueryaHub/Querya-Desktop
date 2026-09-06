@@ -35,5 +35,6 @@ class SqlQueryTabSession {
   void dispose() {
     controller.dispose();
     topFraction.dispose();
+    stagingBuffer?.dispose();
   }
 }

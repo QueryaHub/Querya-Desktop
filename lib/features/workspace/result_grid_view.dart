@@ -339,7 +339,8 @@ class ResultGridSelection {
     if (columns != null && columns.isNotEmpty) {
       final headerCells = <String>[];
       for (var c = startColumn; c <= endColumn; c++) {
-        headerCells.add(c < columns.length ? columns[c] : '');
+        final col = c < columns.length ? columns[c] : '';
+        headerCells.add(_escapeTsv(col));
       }
       buffer.writeln(headerCells.join('\t'));
     }
@@ -348,7 +349,8 @@ class ResultGridSelection {
       final rowData = rows[r];
       final cells = <String>[];
       for (var c = startColumn; c <= endColumn; c++) {
-        cells.add(c < rowData.length ? rowData[c] : '');
+        final val = c < rowData.length ? rowData[c] : '';
+        cells.add(_escapeTsv(val));
       }
       buffer.writeln(cells.join('\t'));
     }
@@ -395,6 +397,9 @@ class ResultGridSelection {
         final val = c < rowData.length ? rowData[c] : '';
         if (val == 'NULL') {
           map[colName] = null;
+        } else if (RegExp(r'^0\d+$').hasMatch(val.trim())) {
+          // Preserve numeric strings with leading zeros (e.g. '01234', '007')
+          map[colName] = val;
         } else if (int.tryParse(val) != null) {
           map[colName] = int.parse(val);
         } else if (double.tryParse(val) != null) {
@@ -413,6 +418,13 @@ class ResultGridSelection {
       return const JsonEncoder.withIndent('  ').convert(result.first);
     }
     return const JsonEncoder.withIndent('  ').convert(result);
+  }
+
+  static String _escapeTsv(String val) {
+    if (val.contains('\t') || val.contains('\n') || val.contains('\r') || val.contains('"')) {
+      return '"${val.replaceAll('"', '""')}"';
+    }
+    return val;
   }
 
   static String _escapeCsv(String val) {
@@ -568,6 +580,7 @@ class VirtualResultGrid extends material.StatefulWidget {
     required this.columns,
     required this.rows,
     this.stagingBuffer,
+    this.rowIndicesMapping,
     this.onRowSelected,
     this.onSelectionValuesChanged,
     this.onCellFocused,
@@ -577,6 +590,7 @@ class VirtualResultGrid extends material.StatefulWidget {
   final List<String> columns;
   final List<List<String>> rows;
   final DataGridStagingBuffer? stagingBuffer;
+  final List<int>? rowIndicesMapping;
   final material.ValueChanged<int?>? onRowSelected;
   final material.ValueChanged<List<String>>? onSelectionValuesChanged;
   final void Function(String columnName, String cellValue, int rowIndex)? onCellFocused;
@@ -638,7 +652,8 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     }
     if (oldWidget.columns != widget.columns ||
         oldWidget.rows != widget.rows ||
-        oldWidget.stagingBuffer != widget.stagingBuffer) {
+        oldWidget.stagingBuffer != widget.stagingBuffer ||
+        oldWidget.rowIndicesMapping != widget.rowIndicesMapping) {
       _widthsNeedUpdate = true;
       if (oldWidget.columns != widget.columns) {
         _userHasResized = false;
@@ -810,7 +825,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
       rowIndex: row,
     );
     if (result != null && widget.stagingBuffer != null) {
-      widget.stagingBuffer!.setCell(row, column, result);
+      widget.stagingBuffer!.setCell(_toModelRowIndex(row), column, result);
     }
   }
 
@@ -883,14 +898,22 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     });
   }
 
-  List<List<String>> get _baseRows =>
-      widget.stagingBuffer?.effectiveRows ?? widget.rows;
+  List<List<String>> get _baseRows {
+    if (widget.rowIndicesMapping != null) {
+      return widget.rows;
+    }
+    return widget.stagingBuffer?.effectiveRows ?? widget.rows;
+  }
 
   void _updateSortedRows() {
     final rows = _baseRows;
     if (_sortColumnIndex == null || _sortOrder == null) {
       _sortedRows = rows;
-      _sortedToModelIndices = List<int>.generate(rows.length, (i) => i, growable: false);
+      if (widget.rowIndicesMapping != null) {
+        _sortedToModelIndices = List<int>.from(widget.rowIndicesMapping!);
+      } else {
+        _sortedToModelIndices = List<int>.generate(rows.length, (i) => i, growable: false);
+      }
     } else {
       final sortedData = sortResultGridRowsWithIndices(
         rows: rows,
@@ -898,7 +921,14 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
         order: _sortOrder!,
       );
       _sortedRows = sortedData.rows;
-      _sortedToModelIndices = sortedData.sortedToModelIndices;
+      if (widget.rowIndicesMapping != null) {
+        final mapping = widget.rowIndicesMapping!;
+        _sortedToModelIndices = sortedData.sortedToModelIndices
+            .map((i) => i < mapping.length ? mapping[i] : i)
+            .toList(growable: false);
+      } else {
+        _sortedToModelIndices = sortedData.sortedToModelIndices;
+      }
     }
   }
 
@@ -1387,7 +1417,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
           control: true,
         ): () {
           if (widget.stagingBuffer != null && _selection != null) {
-            widget.stagingBuffer!.toggleDeleteRow(_selection!.startRow);
+            widget.stagingBuffer!.toggleDeleteRow(_toModelRowIndex(_selection!.startRow));
           }
         },
         const material.SingleActivator(
@@ -1395,7 +1425,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
           meta: true,
         ): () {
           if (widget.stagingBuffer != null && _selection != null) {
-            widget.stagingBuffer!.toggleDeleteRow(_selection!.startRow);
+            widget.stagingBuffer!.toggleDeleteRow(_toModelRowIndex(_selection!.startRow));
           }
         },
         const material.SingleActivator(
@@ -1403,7 +1433,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
           control: true,
         ): () {
           if (widget.stagingBuffer != null && _selection != null) {
-            widget.stagingBuffer!.revertRow(_selection!.startRow);
+            widget.stagingBuffer!.revertRow(_toModelRowIndex(_selection!.startRow));
           }
         },
         const material.SingleActivator(
@@ -1411,7 +1441,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
           meta: true,
         ): () {
           if (widget.stagingBuffer != null && _selection != null) {
-            widget.stagingBuffer!.revertRow(_selection!.startRow);
+            widget.stagingBuffer!.revertRow(_toModelRowIndex(_selection!.startRow));
           }
         },
         const material.SingleActivator(

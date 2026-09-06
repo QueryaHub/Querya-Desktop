@@ -999,6 +999,73 @@ void main() {
       expect(find.text('Bob'), findsNothing);
       expect(find.text('2 of 3 rows'), findsOneWidget);
     });
+
+    testWidgets('filters rows and mutates correct underlying row when StagingBuffer is attached', (tester) async {
+      final buffer = DataGridStagingBuffer(
+        columns: const ['id', 'name', 'department'],
+        rows: const [
+          ['1', 'Alice', 'Engineering'],
+          ['2', 'Bob', 'Marketing'],
+          ['3', 'Charlie', 'Engineering'],
+        ],
+      );
+
+      await tester.pumpWidget(
+        resultsShell(
+          child: material.Scaffold(
+            body: material.SizedBox(
+              width: 800,
+              height: 600,
+              child: ResultsTab(
+                columns: const ['id', 'name', 'department'],
+                rows: buffer.effectiveRows,
+                stagingBuffer: buffer,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Alice'), findsOneWidget);
+      expect(find.text('Bob'), findsOneWidget);
+      expect(find.text('Charlie'), findsOneWidget);
+
+      // Open quick filter bar
+      await tester.tap(find.byTooltip('Toggle Quick Filter'));
+      await tester.pumpAndSettle();
+
+      // Enter filter 'Bob'
+      await tester.enterText(find.byType(material.TextField), 'Bob');
+      await tester.pumpAndSettle();
+
+      // Only Bob should be displayed in the grid
+      final bobGridCell = find.descendant(
+        of: find.byType(VirtualResultGrid),
+        matching: find.text('Bob'),
+      );
+      expect(bobGridCell, findsOneWidget);
+      expect(find.text('Alice'), findsNothing);
+      expect(find.text('Charlie'), findsNothing);
+
+      // Tap Bob cell to select the row
+      await tester.tap(bobGridCell);
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pumpAndSettle();
+
+      // Tap 'Delete Row' on the staging toolbar
+      final deleteBtn = find.text('Delete Row');
+      expect(deleteBtn, findsOneWidget);
+      await tester.tap(deleteBtn);
+      await tester.pumpAndSettle();
+
+      // Verify that underlying buffer index 1 (Bob's row) was marked deleted, NOT Alice (index 0)
+      expect(buffer.getRowStatus(1), equals(StagedRowStatus.deleted));
+      expect(buffer.getRowStatus(0), equals(StagedRowStatus.unchanged));
+      expect(buffer.getRowStatus(2), equals(StagedRowStatus.unchanged));
+
+      buffer.dispose();
+    });
   });
 }
 
