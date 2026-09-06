@@ -85,6 +85,38 @@ void main() {
       expect(result.rows[2][1], equals('100'));
       expect(result.sortedToModelIndices, equals([2, 1, 0]));
     });
+
+    test('sortResultGridRowsWithIndicesAdaptive correctly sorts below and above isolate threshold', () async {
+      final rows = [
+        ['3', 'Charlie'],
+        ['1', 'Alice'],
+        ['2', 'Bob'],
+      ];
+
+      // Below threshold (synchronous branch)
+      final resSync = await sortResultGridRowsWithIndicesAdaptive(
+        rows: rows,
+        columnIndex: 0,
+        order: ResultGridSortOrder.ascending,
+        threshold: 10,
+      );
+      expect(resSync.rows[0][1], equals('Alice'));
+      expect(resSync.rows[1][1], equals('Bob'));
+      expect(resSync.rows[2][1], equals('Charlie'));
+      expect(resSync.sortedToModelIndices, equals([1, 2, 0]));
+
+      // Above threshold (isolate compute branch)
+      final resCompute = await sortResultGridRowsWithIndicesAdaptive(
+        rows: rows,
+        columnIndex: 0,
+        order: ResultGridSortOrder.ascending,
+        threshold: 2,
+      );
+      expect(resCompute.rows[0][1], equals('Alice'));
+      expect(resCompute.rows[1][1], equals('Bob'));
+      expect(resCompute.rows[2][1], equals('Charlie'));
+      expect(resCompute.sortedToModelIndices, equals([1, 2, 0]));
+    });
   });
 
   group('VirtualResultGrid active sorting staging mutation integrity', () {

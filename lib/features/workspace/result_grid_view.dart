@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' as foundation;
 import 'package:flutter/gestures.dart' show kSecondaryMouseButton;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart'
@@ -573,6 +574,50 @@ List<List<String>> sortResultGridRows({
   ).rows;
 }
 
+/// Default threshold for offloading data grid sorting to a background isolate.
+const int kSortIsolateThreshold = 3000;
+
+class _SortIsolateParams {
+  final List<List<String>> rows;
+  final int columnIndex;
+  final ResultGridSortOrder order;
+
+  const _SortIsolateParams({
+    required this.rows,
+    required this.columnIndex,
+    required this.order,
+  });
+}
+
+SortedResultGridData _sortResultGridRowsWithIndicesIsolate(_SortIsolateParams params) {
+  return sortResultGridRowsWithIndices(
+    rows: params.rows,
+    columnIndex: params.columnIndex,
+    order: params.order,
+  );
+}
+
+/// Adaptive sort function that executes synchronously for small lists (< [kSortIsolateThreshold]),
+/// and offloads to a background isolate for large datasets to keep UI fluid.
+Future<SortedResultGridData> sortResultGridRowsWithIndicesAdaptive({
+  required List<List<String>> rows,
+  required int columnIndex,
+  required ResultGridSortOrder order,
+  int threshold = kSortIsolateThreshold,
+}) async {
+  if (rows.length < threshold) {
+    return sortResultGridRowsWithIndices(
+      rows: rows,
+      columnIndex: columnIndex,
+      order: order,
+    );
+  }
+  return foundation.compute(
+    _sortResultGridRowsWithIndicesIsolate,
+    _SortIsolateParams(rows: rows, columnIndex: columnIndex, order: order),
+  );
+}
+
 /// Virtualized read-only or interactive grid for SQL query results (rows + columns).
 class VirtualResultGrid extends material.StatefulWidget {
   const VirtualResultGrid({
@@ -613,6 +658,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
 
   int? _sortColumnIndex;
   ResultGridSortOrder? _sortOrder;
+  int _sortVersion = 0;
   List<List<String>> _sortedRows = const [];
   List<int> _sortedToModelIndices = const [];
 
@@ -856,13 +902,14 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
         index >= _columnWidths.length) {
       return;
     }
+    final rows = _baseRows;
     final headerWidth = widget.columns[index].length * 7.5 + 38.0;
     var maxRowChars = 0;
-    final sampleCount = math.min(_baseRows.length, 200);
+    final sampleCount = math.min(rows.length, 200);
     for (var r = 0; r < sampleCount; r++) {
-      if (index < _baseRows[r].length &&
-          _baseRows[r][index].length > maxRowChars) {
-        maxRowChars = _baseRows[r][index].length;
+      if (index < rows[r].length &&
+          rows[r][index].length > maxRowChars) {
+        maxRowChars = rows[r][index].length;
       }
     }
     final contentWidth = maxRowChars * 7.5 + 24.0;
@@ -905,7 +952,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     return widget.stagingBuffer?.effectiveRows ?? widget.rows;
   }
 
-  void _updateSortedRows() {
+  void _updateSortedRows({bool asyncIfLarge = true}) {
     final rows = _baseRows;
     if (_sortColumnIndex == null || _sortOrder == null) {
       _sortedRows = rows;
@@ -914,21 +961,52 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
       } else {
         _sortedToModelIndices = List<int>.generate(rows.length, (i) => i, growable: false);
       }
+      return;
+    }
+
+    final sortCol = _sortColumnIndex!;
+    final sortOrd = _sortOrder!;
+    final version = ++_sortVersion;
+
+    if (asyncIfLarge && rows.length >= kSortIsolateThreshold) {
+      foundation.compute(
+        _sortResultGridRowsWithIndicesIsolate,
+        _SortIsolateParams(rows: rows, columnIndex: sortCol, order: sortOrd),
+      ).then((sortedData) {
+        if (!mounted || version != _sortVersion) return;
+        setState(() {
+          _applySortedData(sortedData, rows);
+        });
+      }).catchError((_) {
+        if (!mounted || version != _sortVersion) return;
+        setState(() {
+          final fallback = sortResultGridRowsWithIndices(
+            rows: rows,
+            columnIndex: sortCol,
+            order: sortOrd,
+          );
+          _applySortedData(fallback, rows);
+        });
+      });
     } else {
       final sortedData = sortResultGridRowsWithIndices(
         rows: rows,
-        columnIndex: _sortColumnIndex!,
-        order: _sortOrder!,
+        columnIndex: sortCol,
+        order: sortOrd,
       );
-      _sortedRows = sortedData.rows;
-      if (widget.rowIndicesMapping != null) {
-        final mapping = widget.rowIndicesMapping!;
-        _sortedToModelIndices = sortedData.sortedToModelIndices
-            .map((i) => i < mapping.length ? mapping[i] : i)
-            .toList(growable: false);
-      } else {
-        _sortedToModelIndices = sortedData.sortedToModelIndices;
-      }
+      _applySortedData(sortedData, rows);
+    }
+  }
+
+  void _applySortedData(SortedResultGridData sortedData, List<List<String>> rows) {
+    _sortedRows = sortedData.rows;
+    if (widget.rowIndicesMapping != null) {
+      final mapping = widget.rowIndicesMapping!;
+      _sortedToModelIndices = sortedData.sortedToModelIndices
+          .map((i) => i < mapping.length ? mapping[i] : i)
+          .toList(growable: false);
+    } else {
+      _sortedToModelIndices = sortedData.sortedToModelIndices;
     }
   }
 

@@ -41,6 +41,9 @@ class DataGridStagingBuffer extends ChangeNotifier {
   /// Baseline row indices marked for deletion.
   final Set<int> _deletedRowIndices = {};
 
+  /// Cached unmodifiable effective rows snapshot to avoid redundant allocations.
+  List<List<String>>? _cachedEffectiveRows;
+
   List<String> get columns => _originalColumns;
   List<List<String>> get originalRows => _originalRows;
 
@@ -169,12 +172,14 @@ class DataGridStagingBuffer extends ChangeNotifier {
           if (_modifiedCells[row]!.isEmpty) {
             _modifiedCells.remove(row);
           }
+          _cachedEffectiveRows = null;
           notifyListeners();
         }
       } else {
         final rowMap = _modifiedCells.putIfAbsent(row, () => <int, String>{});
         if (rowMap[col] != value) {
           rowMap[col] = value;
+          _cachedEffectiveRows = null;
           notifyListeners();
         }
       }
@@ -186,6 +191,7 @@ class DataGridStagingBuffer extends ChangeNotifier {
         }
         if (_insertedRows[insertIdx][col] != value) {
           _insertedRows[insertIdx][col] = value;
+          _cachedEffectiveRows = null;
           notifyListeners();
         }
       }
@@ -198,6 +204,7 @@ class DataGridStagingBuffer extends ChangeNotifier {
         ? List<String>.from(initialValues)
         : List<String>.filled(_originalColumns.length, '');
     _insertedRows.add(row);
+    _cachedEffectiveRows = null;
     notifyListeners();
     return totalRowCount - 1;
   }
@@ -207,6 +214,7 @@ class DataGridStagingBuffer extends ChangeNotifier {
     final insertIdx = row - _originalRows.length;
     if (insertIdx >= 0 && insertIdx < _insertedRows.length) {
       _insertedRows.removeAt(insertIdx);
+      _cachedEffectiveRows = null;
       notifyListeners();
     }
   }
@@ -220,6 +228,7 @@ class DataGridStagingBuffer extends ChangeNotifier {
       } else {
         _deletedRowIndices.add(row);
       }
+      _cachedEffectiveRows = null;
       notifyListeners();
     } else {
       removeInsertedRow(row);
@@ -233,6 +242,7 @@ class DataGridStagingBuffer extends ChangeNotifier {
         if (_modifiedCells[row]!.isEmpty) {
           _modifiedCells.remove(row);
         }
+        _cachedEffectiveRows = null;
         notifyListeners();
       }
     }
@@ -245,7 +255,10 @@ class DataGridStagingBuffer extends ChangeNotifier {
       var changed = false;
       if (_modifiedCells.remove(row) != null) changed = true;
       if (_deletedRowIndices.remove(row)) changed = true;
-      if (changed) notifyListeners();
+      if (changed) {
+        _cachedEffectiveRows = null;
+        notifyListeners();
+      }
     } else {
       removeInsertedRow(row);
     }
@@ -257,6 +270,7 @@ class DataGridStagingBuffer extends ChangeNotifier {
     _modifiedCells.clear();
     _insertedRows.clear();
     _deletedRowIndices.clear();
+    _cachedEffectiveRows = null;
     notifyListeners();
   }
 
@@ -296,24 +310,36 @@ class DataGridStagingBuffer extends ChangeNotifier {
   }
 
   /// Returns the full list of effective rows (original with modifications applied + inserted rows).
+  ///
+  /// Optimized for zero allocations when [isDirty] is false, and caches
+  /// the effective row list to prevent breaking widget memoization.
   List<List<String>> get effectiveRows {
+    if (!isDirty) {
+      return _originalRows;
+    }
+    if (_cachedEffectiveRows != null) {
+      return _cachedEffectiveRows!;
+    }
     final result = <List<String>>[];
     for (var r = 0; r < _originalRows.length; r++) {
-      final row = List<String>.from(_originalRows[r]);
       final mods = _modifiedCells[r];
       if (mods != null) {
+        final row = List<String>.from(_originalRows[r]);
         for (final entry in mods.entries) {
           if (entry.key < row.length) {
             row[entry.key] = entry.value;
           }
         }
+        result.add(row);
+      } else {
+        result.add(_originalRows[r]);
       }
-      result.add(row);
     }
     for (final ins in _insertedRows) {
-      result.add(List<String>.from(ins));
+      result.add(ins);
     }
-    return result;
+    _cachedEffectiveRows = List.unmodifiable(result);
+    return _cachedEffectiveRows!;
   }
 
   @override
@@ -321,6 +347,7 @@ class DataGridStagingBuffer extends ChangeNotifier {
     _modifiedCells.clear();
     _insertedRows.clear();
     _deletedRowIndices.clear();
+    _cachedEffectiveRows = null;
     super.dispose();
   }
 }
