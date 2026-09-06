@@ -134,6 +134,45 @@ void main() {
       expect(decoded[1]['name'], equals('Bob, Jr.'));
       expect(decoded[1]['score'], equals(80));
     });
+
+    test('toTsv escapes cells with tabs, newlines, and quotes', () {
+      final rowsWithSpecialChars = [
+        ['1', 'Line1\nLine2', 'Tab\there', 'Quoted "value"'],
+      ];
+      const sel = ResultGridSelection(
+        startRow: 0,
+        startColumn: 0,
+        endRow: 0,
+        endColumn: 3,
+      );
+
+      final tsv = sel.toTsv(rowsWithSpecialChars);
+      expect(
+        tsv,
+        equals('1\t"Line1\nLine2"\t"Tab\there"\t"Quoted ""value"""'),
+      );
+    });
+
+    test('toJson preserves strings with leading zeros', () {
+      final rowsWithLeadingZeros = [
+        ['007', '01234', '0', '42'],
+      ];
+      const cols = ['agent_id', 'zip', 'zero_num', 'plain_num'];
+      const sel = ResultGridSelection(
+        startRow: 0,
+        startColumn: 0,
+        endRow: 0,
+        endColumn: 3,
+      );
+
+      final jsonStr = sel.toJson(cols, rowsWithLeadingZeros);
+      final decoded = jsonDecode(jsonStr) as Map<String, dynamic>;
+
+      expect(decoded['agent_id'], equals('007'));
+      expect(decoded['zip'], equals('01234'));
+      expect(decoded['zero_num'], equals(0));
+      expect(decoded['plain_num'], equals(42));
+    });
   });
 
   group('VirtualResultGrid Non-Destructive Secondary Click', () {
