@@ -16,14 +16,10 @@ void showSqlQueryHistoryDialog({
 }) {
   showAppDialog<void>(
     context: context,
-    builder: (ctx) => material.Dialog(
-      backgroundColor: material.Colors.transparent,
-      insetPadding: WindowLayout.dialogSymmetricInsets(ctx),
-      child: _SqlQueryHistoryDialogContent(
-        connectionId: connectionId,
-        databaseName: databaseName,
-        sqlController: sqlController,
-      ),
+    builder: (ctx) => _SqlQueryHistoryDialogContent(
+      connectionId: connectionId,
+      databaseName: databaseName,
+      sqlController: sqlController,
     ),
   );
 }
@@ -87,21 +83,37 @@ class _SqlQueryHistoryDialogContentState
   Future<void> _confirmClear() async {
     final ok = await showAppDialog<bool>(
       context: context,
-      builder: (ctx) => material.AlertDialog(
-        title: const material.Text('Clear query history?'),
-        content: const material.Text(
-          'Removes saved SQL for this connection and database. This cannot be undone.',
+      builder: (ctx) => QueryaDialogCard(
+        constraints: const material.BoxConstraints(maxWidth: 400),
+        child: material.Padding(
+          padding: const material.EdgeInsets.all(20),
+          child: material.Column(
+            mainAxisSize: material.MainAxisSize.min,
+            crossAxisAlignment: material.CrossAxisAlignment.start,
+            children: [
+              Text('Clear query history?').semiBold().large(),
+              const Gap(8),
+              const Text(
+                'Removes saved SQL for this connection and database. This cannot be undone.',
+              ).muted().small(),
+              const Gap(20),
+              material.Row(
+                mainAxisAlignment: material.MainAxisAlignment.end,
+                children: [
+                  GhostButton(
+                    onPressed: () => material.Navigator.of(ctx).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  const Gap(8),
+                  DestructiveButton(
+                    onPressed: () => material.Navigator.of(ctx).pop(true),
+                    child: const Text('Clear'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        actions: [
-          material.TextButton(
-            onPressed: () => material.Navigator.of(ctx).pop(false),
-            child: const material.Text('Cancel'),
-          ),
-          material.TextButton(
-            onPressed: () => material.Navigator.of(ctx).pop(true),
-            child: const material.Text('Clear'),
-          ),
-        ],
       ),
     );
     if (ok != true || !mounted) return;
@@ -125,23 +137,15 @@ class _SqlQueryHistoryDialogContentState
   @override
   material.Widget build(material.BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final radius = Theme.of(context).radiusXxl;
-    return material.Container(
+    return QueryaDialogCard(
       constraints: WindowLayout.dialogConstraints(
         context,
         maxWidth: 520,
         minWidth: 320,
         maxHeight: 440,
       ),
-      decoration: material.BoxDecoration(
-        color: scheme.popover,
-        borderRadius: material.BorderRadius.circular(radius),
-        border: material.Border.all(color: scheme.muted),
-      ),
-      child: material.ClipRRect(
-        borderRadius: material.BorderRadius.circular(radius),
-        child: material.Column(
-          crossAxisAlignment: material.CrossAxisAlignment.stretch,
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
           children: [
             material.Padding(
               padding: const material.EdgeInsets.fromLTRB(20, 20, 20, 8),
@@ -253,7 +257,6 @@ class _SqlQueryHistoryDialogContentState
             ),
           ],
         ),
-      ),
     );
   }
 }

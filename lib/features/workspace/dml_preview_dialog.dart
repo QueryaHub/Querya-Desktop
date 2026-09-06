@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
-import 'package:querya_desktop/shared/widgets/app_dialog.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Opens the DML Preview and Confirmation dialog before executing staged changes.
 ///
@@ -65,20 +64,15 @@ class _DmlPreviewDialogState extends material.State<_DmlPreviewDialog> {
     final isDark = theme.brightness == Brightness.dark;
     final sql = widget.plan.toTransactionSql();
 
-    return material.Dialog(
-      backgroundColor: cs.card,
-      shape: material.RoundedRectangleBorder(
-        borderRadius: material.BorderRadius.circular(8),
-        side: material.BorderSide(color: cs.border, width: 1),
+    return QueryaDialogCard(
+      constraints: const material.BoxConstraints(
+        minWidth: 560,
+        maxWidth: 720,
+        minHeight: 380,
+        maxHeight: 580,
       ),
-      child: material.ConstrainedBox(
-        constraints: const material.BoxConstraints(
-          minWidth: 540,
-          maxWidth: 680,
-          minHeight: 380,
-          maxHeight: 580,
-        ),
-        child: material.Padding(
+      child: material.FocusTraversalGroup(
+          child: material.Padding(
           padding: const material.EdgeInsets.all(18),
           child: material.Column(
             mainAxisSize: material.MainAxisSize.min,

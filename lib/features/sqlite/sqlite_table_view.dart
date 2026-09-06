@@ -247,30 +247,42 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
       if (!mounted) return;
       await showAppDialog<void>(
         context: context,
-        builder: (ctx) => material.AlertDialog(
-          title: material.Text(
-              '${widget.isView ? "View" : "Table"} DDL · ${widget.tableName}'),
-          content: material.SizedBox(
-            width: 600,
-            height: 400,
-            child: material.Container(
-              decoration: SqlEditorChrome.inlineFieldDecorationFromContext(ctx),
-              child: QueryaCodeEditor(
-                controller: material.TextEditingController(text: ddl),
-                language: QueryaCodeLanguage.sql,
-                readOnly: true,
-                fontSize: 12,
-                variant: QueryaCodeEditorVariant.material,
-                contentPadding: const material.EdgeInsets.all(12),
-              ),
+        builder: (ctx) => QueryaDialogCard(
+          constraints: const material.BoxConstraints(maxWidth: 640, maxHeight: 500),
+          child: material.Padding(
+            padding: const material.EdgeInsets.all(20),
+            child: material.Column(
+              mainAxisSize: material.MainAxisSize.min,
+              crossAxisAlignment: material.CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${widget.isView ? "View" : "Table"} DDL · ${widget.tableName}',
+                ).semiBold().large(),
+                const Gap(16),
+                material.Expanded(
+                  child: material.Container(
+                    decoration: SqlEditorChrome.inlineFieldDecorationFromContext(ctx),
+                    child: QueryaCodeEditor(
+                      controller: material.TextEditingController(text: ddl),
+                      language: QueryaCodeLanguage.sql,
+                      readOnly: true,
+                      fontSize: 12,
+                      variant: QueryaCodeEditorVariant.material,
+                      contentPadding: const material.EdgeInsets.all(12),
+                    ),
+                  ),
+                ),
+                const Gap(16),
+                material.Align(
+                  alignment: material.Alignment.centerRight,
+                  child: OutlineButton(
+                    onPressed: () => material.Navigator.of(ctx).pop(),
+                    child: const Text('Close'),
+                  ),
+                ),
+              ],
             ),
           ),
-          actions: [
-            material.TextButton(
-              onPressed: () => material.Navigator.of(ctx).pop(),
-              child: const material.Text('Close'),
-            ),
-          ],
         ),
       );
     } catch (e) {
