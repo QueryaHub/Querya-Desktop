@@ -270,123 +270,144 @@ class _PreferencesAppearanceSectionState
           const PreferencesHint(
             'Full enables all animations. Reduced cuts durations in half. Off disables all transitions.',
           ),
-          const material.SizedBox(height: 12),
-          material.Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              OutlineButton(
-                onPressed: (_importing || _installingFromUrl)
-                    ? null
-                    : () => unawaited(_pickAndImportTheme()),
-                child: material.Row(
-                  mainAxisSize: material.MainAxisSize.min,
+          const material.SizedBox(height: 16),
+          material.Container(
+            padding: const material.EdgeInsets.all(14),
+            decoration: material.BoxDecoration(
+              color: Theme.of(context).colorScheme.muted.withValues(alpha: 0.14),
+              borderRadius: material.BorderRadius.circular(8),
+              border: material.Border.all(
+                color: Theme.of(context).colorScheme.border.withValues(alpha: 0.25),
+              ),
+            ),
+            child: material.Column(
+              crossAxisAlignment: material.CrossAxisAlignment.start,
+              children: [
+                const Text('Theme Actions').semiBold().small().foreground(),
+                const material.SizedBox(height: 4),
+                const PreferencesHint(
+                  'Import themes from disk, install from verified HTTPS endpoints, or explore your local folder.',
+                ),
+                const material.SizedBox(height: 10),
+                material.Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    const material.Icon(
-                      material.Icons.file_open_outlined,
-                      size: 14,
+                    OutlineButton(
+                      onPressed: (_importing || _installingFromUrl)
+                          ? null
+                          : () => unawaited(_pickAndImportTheme()),
+                      child: material.Row(
+                        mainAxisSize: material.MainAxisSize.min,
+                        children: [
+                          const material.Icon(
+                            material.Icons.file_open_outlined,
+                            size: 14,
+                          ),
+                          const material.SizedBox(width: 6),
+                          material.Text(
+                            _importing ? 'Importing…' : 'Import theme…',
+                          ),
+                        ],
+                      ),
                     ),
-                    const material.SizedBox(width: 6),
-                    material.Text(
-                      _importing ? 'Importing…' : 'Import theme…',
+                    OutlineButton(
+                      onPressed: (_importing || _installingFromUrl || refreshingThemes)
+                          ? null
+                          : () => unawaited(_installThemeFromUrl()),
+                      child: material.Row(
+                        mainAxisSize: material.MainAxisSize.min,
+                        children: [
+                          const material.Icon(
+                            material.Icons.download_rounded,
+                            size: 14,
+                          ),
+                          const material.SizedBox(width: 6),
+                          material.Text(
+                            _installingFromUrl ? 'Installing…' : 'Install from URL…',
+                          ),
+                        ],
+                      ),
+                    ),
+                    OutlineButton(
+                      onPressed: (_importing || _installingFromUrl || refreshingThemes)
+                          ? null
+                          : () => unawaited(_refreshThemes()),
+                      child: material.Row(
+                        mainAxisSize: material.MainAxisSize.min,
+                        children: [
+                          const material.Icon(
+                            material.Icons.refresh_rounded,
+                            size: 14,
+                          ),
+                          const material.SizedBox(width: 6),
+                          material.Text(
+                            refreshingThemes ? 'Refreshing…' : 'Refresh themes',
+                          ),
+                        ],
+                      ),
+                    ),
+                    OutlineButton(
+                      onPressed:
+                          (_importing || _installingFromUrl || _openingThemesFolder)
+                              ? null
+                              : () => unawaited(_openThemesFolder()),
+                      child: material.Row(
+                        mainAxisSize: material.MainAxisSize.min,
+                        children: [
+                          const material.Icon(
+                            material.Icons.folder_open_outlined,
+                            size: 14,
+                          ),
+                          const material.SizedBox(width: 6),
+                          material.Text(
+                            _openingThemesFolder
+                                ? 'Opening…'
+                                : 'Open themes folder',
+                          ),
+                        ],
+                      ),
+                    ),
+                    OutlineButton(
+                      onPressed: () => unawaited(_resetAppearance()),
+                      child: const material.Row(
+                        mainAxisSize: material.MainAxisSize.min,
+                        children: [
+                          material.Icon(
+                            material.Icons.restart_alt_rounded,
+                            size: 14,
+                          ),
+                          material.SizedBox(width: 6),
+                          Text('Reset appearance'),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-              ),
-              OutlineButton(
-                onPressed: (_importing || _installingFromUrl || refreshingThemes)
-                    ? null
-                    : () => unawaited(_installThemeFromUrl()),
-                child: material.Row(
-                  mainAxisSize: material.MainAxisSize.min,
-                  children: [
-                    const material.Icon(
-                      material.Icons.download_rounded,
-                      size: 14,
+                if (_importError != null) ...[
+                  const material.SizedBox(height: 8),
+                  material.Text(
+                    _importError!,
+                    style: material.TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.destructive,
                     ),
-                    const material.SizedBox(width: 6),
-                    material.Text(
-                      _installingFromUrl ? 'Installing…' : 'Install from URL…',
+                  ),
+                ],
+                if (_folderOpenError != null) ...[
+                  const material.SizedBox(height: 8),
+                  material.Text(
+                    _folderOpenError!,
+                    style: material.TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.destructive,
                     ),
-                  ],
-                ),
-              ),
-              OutlineButton(
-                onPressed: (_importing || _installingFromUrl || refreshingThemes)
-                    ? null
-                    : () => unawaited(_refreshThemes()),
-                child: material.Row(
-                  mainAxisSize: material.MainAxisSize.min,
-                  children: [
-                    const material.Icon(
-                      material.Icons.refresh_rounded,
-                      size: 14,
-                    ),
-                    const material.SizedBox(width: 6),
-                    material.Text(
-                      refreshingThemes ? 'Refreshing…' : 'Refresh themes',
-                    ),
-                  ],
-                ),
-              ),
-              OutlineButton(
-                onPressed:
-                    (_importing || _installingFromUrl || _openingThemesFolder)
-                        ? null
-                        : () => unawaited(_openThemesFolder()),
-                child: material.Row(
-                  mainAxisSize: material.MainAxisSize.min,
-                  children: [
-                    const material.Icon(
-                      material.Icons.folder_open_outlined,
-                      size: 14,
-                    ),
-                    const material.SizedBox(width: 6),
-                    material.Text(
-                      _openingThemesFolder
-                          ? 'Opening…'
-                          : 'Open themes folder',
-                    ),
-                  ],
-                ),
-              ),
-              OutlineButton(
-                onPressed: () => unawaited(_resetAppearance()),
-                child: const material.Row(
-                  mainAxisSize: material.MainAxisSize.min,
-                  children: [
-                    material.Icon(
-                      material.Icons.restart_alt_rounded,
-                      size: 14,
-                    ),
-                    material.SizedBox(width: 6),
-                    Text('Reset appearance'),
-                  ],
-                ),
-              ),
-            ],
+                  ),
+                ],
+              ],
+            ),
           ),
-          if (_importError != null) ...[
-            const material.SizedBox(height: 8),
-            material.Text(
-              _importError!,
-              style: material.TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.destructive,
-              ),
-            ),
-          ],
-          if (_folderOpenError != null) ...[
-            const material.SizedBox(height: 8),
-            material.Text(
-              _folderOpenError!,
-              style: material.TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.destructive,
-              ),
-            ),
-          ],
-          const material.SizedBox(height: 4),
+          const material.SizedBox(height: 6),
           const PreferencesHint(
             'Import copies a theme into the themes folder. '
             'Install from URL requires HTTPS and optional SHA-256 verification. '
