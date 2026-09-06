@@ -53,4 +53,16 @@ void main() {
       ),
     );
   });
+
+  test(
+      'dbTypeGridCrossAxisCount returns correct column counts across thresholds',
+      () {
+    expect(WindowLayout.dbTypeGridCrossAxisCount(700), 4);
+    expect(WindowLayout.dbTypeGridCrossAxisCount(620), 4);
+    expect(WindowLayout.dbTypeGridCrossAxisCount(600), 3);
+    expect(WindowLayout.dbTypeGridCrossAxisCount(440), 3);
+    expect(WindowLayout.dbTypeGridCrossAxisCount(300), 2);
+    expect(WindowLayout.dbTypeGridCrossAxisCount(260), 2);
+    expect(WindowLayout.dbTypeGridCrossAxisCount(200), 1);
+  });
 }

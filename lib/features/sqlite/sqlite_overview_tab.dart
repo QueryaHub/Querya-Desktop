@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
@@ -133,7 +134,6 @@ class _SqliteOverviewTabState extends material.State<SqliteOverviewTab> {
   @override
   material.Widget build(material.BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final width = material.MediaQuery.sizeOf(context).width;
 
     if (_loading && _overview == null) {
       return material.Center(
@@ -195,23 +195,29 @@ class _SqliteOverviewTabState extends material.State<SqliteOverviewTab> {
       color: cs.background,
       child: material.RefreshIndicator(
         onRefresh: _fetch,
-        child: material.SingleChildScrollView(
-          physics: const material.AlwaysScrollableScrollPhysics(),
-          padding: const material.EdgeInsets.all(24),
-          child: material.SizedBox(
-            width: width,
-            child: material.Column(
-              mainAxisSize: material.MainAxisSize.min,
-              crossAxisAlignment: material.CrossAxisAlignment.stretch,
-              children: [
-                _header(context),
-                const Gap(24),
-                _summaryChips(context, versionStr, sizeStr, journalStr, pageCount, pageSize),
-                const Gap(24),
-                _tablesCard(context),
-              ],
-            ),
-          ),
+        child: material.LayoutBuilder(
+          builder: (context, constraints) {
+            final contentWidth = math.max(0.0, constraints.maxWidth - 48);
+            return material.SingleChildScrollView(
+              physics: const material.AlwaysScrollableScrollPhysics(),
+              padding: const material.EdgeInsets.all(24),
+              child: material.SizedBox(
+                width: contentWidth,
+                child: material.Column(
+                  mainAxisSize: material.MainAxisSize.min,
+                  crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                  children: [
+                    _header(context),
+                    const Gap(24),
+                    _summaryChips(context, versionStr, sizeStr, journalStr,
+                        pageCount, pageSize),
+                    const Gap(24),
+                    _tablesCard(context),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
