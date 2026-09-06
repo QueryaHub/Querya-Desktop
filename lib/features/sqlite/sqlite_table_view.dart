@@ -2,7 +2,10 @@ import 'dart:async' show unawaited;
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
 import 'package:querya_desktop/core/database/sqlite_service.dart';
+import 'package:querya_desktop/core/editor/querya_code_editor.dart';
+import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/workspace/sql_editor_chrome.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 const _defaultLimit = 200;
@@ -224,11 +227,15 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
           content: material.SizedBox(
             width: 600,
             height: 400,
-            child: material.SingleChildScrollView(
-              child: material.SelectableText(
-                ddl,
-                style: const material.TextStyle(
-                    fontFamily: 'monospace', fontSize: 13),
+            child: material.Container(
+              decoration: SqlEditorChrome.inlineFieldDecorationFromContext(ctx),
+              child: QueryaCodeEditor(
+                controller: material.TextEditingController(text: ddl),
+                language: QueryaCodeLanguage.sql,
+                readOnly: true,
+                fontSize: 12,
+                variant: QueryaCodeEditorVariant.material,
+                contentPadding: const material.EdgeInsets.all(12),
               ),
             ),
           ),

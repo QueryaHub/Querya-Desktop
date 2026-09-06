@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
+import 'package:querya_desktop/core/editor/querya_code_editor.dart';
+import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/features/workspace/xml_html_formatter.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -46,6 +48,23 @@ class _GridCellInspectorDialogState
   late final material.TextEditingController _controller;
   bool _isNull = false;
   bool _wordWrap = true;
+
+  QueryaCodeLanguage get _detectedLanguage {
+    final t = _controller.text.trimLeft();
+    if (t.startsWith('{') || t.startsWith('[')) {
+      return QueryaCodeLanguage.json;
+    }
+    final upper = t.toUpperCase();
+    if (upper.startsWith('SELECT ') ||
+        upper.startsWith('INSERT ') ||
+        upper.startsWith('UPDATE ') ||
+        upper.startsWith('CREATE ') ||
+        upper.startsWith('DELETE ') ||
+        upper.startsWith('WITH ')) {
+      return QueryaCodeLanguage.sql;
+    }
+    return QueryaCodeLanguage.plain;
+  }
 
   @override
   void initState() {
@@ -342,42 +361,29 @@ class _GridCellInspectorDialogState
                             ),
                           )
                         : _wordWrap
-                            ? material.TextField(
+                            ? QueryaCodeEditor(
                                 controller: _controller,
-                                maxLines: null,
-                                expands: true,
+                                language: _detectedLanguage,
                                 autofocus: true,
-                                style: const material.TextStyle(
-                                  fontFamily: 'monospace',
-                                  fontSize: 12,
-                                ),
-                                decoration: const material.InputDecoration(
-                                  border: material.InputBorder.none,
-                                  contentPadding: material.EdgeInsets.all(12),
-                                  hintText: 'Enter cell value…',
-                                ),
+                                fontSize: 12,
+                                variant: QueryaCodeEditorVariant.material,
+                                hintText: 'Enter cell value…',
+                                contentPadding:
+                                    const material.EdgeInsets.all(12),
                               )
                             : material.SingleChildScrollView(
                                 scrollDirection: material.Axis.horizontal,
-                                child: material.SingleChildScrollView(
-                                  scrollDirection: material.Axis.vertical,
-                                  child: material.SizedBox(
-                                    width: 3000,
-                                    child: material.TextField(
-                                      controller: _controller,
-                                      maxLines: null,
-                                      autofocus: true,
-                                      style: const material.TextStyle(
-                                        fontFamily: 'monospace',
-                                        fontSize: 12,
-                                      ),
-                                      decoration: const material.InputDecoration(
-                                        border: material.InputBorder.none,
-                                        contentPadding:
-                                            material.EdgeInsets.all(12),
-                                        hintText: 'Enter cell value…',
-                                      ),
-                                    ),
+                                child: material.SizedBox(
+                                  width: 3000,
+                                  child: QueryaCodeEditor(
+                                    controller: _controller,
+                                    language: _detectedLanguage,
+                                    autofocus: true,
+                                    fontSize: 12,
+                                    variant: QueryaCodeEditorVariant.material,
+                                    hintText: 'Enter cell value…',
+                                    contentPadding:
+                                        const material.EdgeInsets.all(12),
                                   ),
                                 ),
                               ),

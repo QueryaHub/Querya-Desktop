@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/mysql_service.dart';
+import 'package:querya_desktop/core/editor/querya_code_editor.dart';
+import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/widgets/virtual_selectable_text_view.dart';
+import 'package:querya_desktop/features/workspace/sql_editor_chrome.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Displays MySQL routine DDL (`SHOW CREATE PROCEDURE` / `SHOW CREATE FUNCTION`).
@@ -27,7 +30,7 @@ class _MysqlRoutineViewState extends material.State<MysqlRoutineView> {
   MysqlLease? _lease;
   bool _loading = true;
   String? _error;
-  String? _ddlText;
+  material.TextEditingController? _ddlController;
 
   @override
   void initState() {
@@ -50,6 +53,7 @@ class _MysqlRoutineViewState extends material.State<MysqlRoutineView> {
 
   @override
   void dispose() {
+    _ddlController?.dispose();
     _lease?.release();
     super.dispose();
   }
@@ -59,7 +63,6 @@ class _MysqlRoutineViewState extends material.State<MysqlRoutineView> {
     setState(() {
       _loading = true;
       _error = null;
-      _ddlText = null;
     });
 
     try {
@@ -100,8 +103,12 @@ class _MysqlRoutineViewState extends material.State<MysqlRoutineView> {
         }
       }
 
+      final resolvedDdl =
+          ddl ?? rs.rows.first.colAt(1) ?? '-- No definition returned';
+      _ddlController?.dispose();
+      _ddlController = material.TextEditingController(text: resolvedDdl);
+
       setState(() {
-        _ddlText = ddl ?? rs.rows.first.colAt(1) ?? '-- No definition returned';
         _loading = false;
       });
     } catch (e) {
@@ -173,11 +180,20 @@ class _MysqlRoutineViewState extends material.State<MysqlRoutineView> {
           )
         else
           material.Expanded(
-            child: VirtualSelectableTextView(
-              text: _ddlText ?? '',
-              style: const material.TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 13,
+            child: material.Padding(
+              padding: const material.EdgeInsets.all(12),
+              child: material.Container(
+                decoration: SqlEditorChrome.inlineFieldDecorationFromContext(
+                  context,
+                ),
+                child: QueryaCodeEditor(
+                  controller: _ddlController,
+                  language: QueryaCodeLanguage.sql,
+                  readOnly: true,
+                  fontSize: 12,
+                  variant: QueryaCodeEditorVariant.material,
+                  contentPadding: const material.EdgeInsets.all(12),
+                ),
               ),
             ),
           ),

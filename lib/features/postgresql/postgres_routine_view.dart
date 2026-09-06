@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
+import 'package:querya_desktop/core/editor/querya_code_editor.dart';
+import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/core/widgets/virtual_selectable_text_view.dart';
+import 'package:querya_desktop/features/workspace/sql_editor_chrome.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Shows [pg_get_functiondef] for each overload of a PostgreSQL function.
@@ -31,6 +33,7 @@ class _PostgresRoutineViewState extends material.State<PostgresRoutineView> {
   bool _loading = true;
   String? _error;
   List<PgFunctionOverload> _overloads = [];
+  final List<material.TextEditingController> _definitionControllers = [];
   final _scrollController = material.ScrollController();
 
   @override
@@ -53,6 +56,10 @@ class _PostgresRoutineViewState extends material.State<PostgresRoutineView> {
 
   @override
   void dispose() {
+    for (final c in _definitionControllers) {
+      c.dispose();
+    }
+    _definitionControllers.clear();
     _scrollController.dispose();
     _disconnectCurrent(interruptIfBusy: true);
     super.dispose();
@@ -95,6 +102,15 @@ class _PostgresRoutineViewState extends material.State<PostgresRoutineView> {
         widget.routineName,
       );
       if (!mounted) return;
+      for (final c in _definitionControllers) {
+        c.dispose();
+      }
+      _definitionControllers.clear();
+      for (final o in list) {
+        _definitionControllers.add(
+          material.TextEditingController(text: o.definition),
+        );
+      }
       setState(() {
         _overloads = list;
         _loading = false;
@@ -236,23 +252,20 @@ class _PostgresRoutineViewState extends material.State<PostgresRoutineView> {
                         ),
                       material.Container(
                         width: double.infinity,
-                        padding: const material.EdgeInsets.all(12),
-                        decoration: material.BoxDecoration(
-                          color: cs.muted.withValues(alpha: 0.15),
-                          borderRadius: material.BorderRadius.circular(8),
-                          border: material.Border.all(
-                            color: cs.border.withValues(alpha: 0.4),
-                          ),
+                        decoration:
+                            SqlEditorChrome.inlineFieldDecorationFromContext(
+                          context,
                         ),
-                        child: VirtualSelectableTextView(
-                          text: _overloads[i].definition,
-                          padding: material.EdgeInsets.zero,
-                          style: material.TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 12,
-                            height: 1.45,
-                            color: cs.foreground,
-                          ),
+                        child: QueryaCodeEditor(
+                          controller: i < _definitionControllers.length
+                              ? _definitionControllers[i]
+                              : null,
+                          language: QueryaCodeLanguage.sql,
+                          readOnly: true,
+                          expands: false,
+                          fontSize: 12,
+                          variant: QueryaCodeEditorVariant.material,
+                          contentPadding: const material.EdgeInsets.all(12),
                         ),
                       ),
                     ],
