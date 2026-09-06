@@ -7,6 +7,8 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart'
     show Clipboard, ClipboardData, HardwareKeyboard, LogicalKeyboardKey;
 import 'package:querya_desktop/core/layout/ui_scale.dart';
+import 'package:querya_desktop/core/motion/querya_motion.dart';
+import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/core/ui/querya_tooltip.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/features/workspace/grid_cell_editor.dart';
@@ -667,19 +669,31 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   ResultGridSelection? _selection;
   ResultGridCellCoordinate? _editingCell;
 
+  int _lastKnownStagedRowCount = -1;
+
   @override
   void initState() {
     super.initState();
     _horizontalController.addListener(_onHorizontalScroll);
     widget.stagingBuffer?.addListener(_onStagingBufferChanged);
+    _lastKnownStagedRowCount = _baseRows.length;
     _updateSortedRows();
   }
 
   void _onStagingBufferChanged() {
     if (!mounted) return;
+    final currentRows = _baseRows;
+    final rowCountChanged = _lastKnownStagedRowCount == -1 ||
+        currentRows.length != _lastKnownStagedRowCount;
+    _lastKnownStagedRowCount = currentRows.length;
+
     setState(() {
-      _updateSortedRows();
-      _widthsNeedUpdate = true;
+      if (_sortColumnIndex != null || rowCountChanged) {
+        _updateSortedRows();
+      }
+      if (rowCountChanged) {
+        _widthsNeedUpdate = true;
+      }
     });
   }
 
@@ -1953,12 +1967,15 @@ class _HeaderCell extends material.StatelessWidget {
                       ),
                       if (sortOrder != null) ...[
                         const Gap(4),
-                        material.Icon(
-                          sortOrder == ResultGridSortOrder.ascending
-                              ? material.Icons.arrow_upward_rounded
-                              : material.Icons.arrow_downward_rounded,
-                          size: 14,
-                          color: colorScheme.primary,
+                        material.AnimatedRotation(
+                          turns: sortOrder == ResultGridSortOrder.ascending ? 0.0 : 0.5,
+                          duration: context.motionDuration(QueryaMotion.fast),
+                          curve: context.motionCurve(QueryaMotion.enter),
+                          child: material.Icon(
+                            material.Icons.arrow_upward_rounded,
+                            size: 14,
+                            color: colorScheme.primary,
+                          ),
                         ),
                       ],
                     ],

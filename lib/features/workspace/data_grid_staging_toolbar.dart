@@ -249,7 +249,8 @@ class _ToolbarButtonState extends material.State<_ToolbarButton> {
         child: material.Opacity(
           opacity: enabled ? 1.0 : 0.4,
           child: material.AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
+            duration: context.motionDuration(QueryaMotion.fast),
+            curve: context.motionCurve(QueryaMotion.enter),
             padding: const material.EdgeInsets.symmetric(
               horizontal: 8,
               vertical: 4,

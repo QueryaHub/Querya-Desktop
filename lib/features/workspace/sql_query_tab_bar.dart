@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/features/workspace/sql_query_tab_session.dart';
-import 'package:querya_desktop/shared/widgets/app_dialog.dart';
-import 'package:querya_desktop/shared/widgets/querya_tab_strip.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Lightweight query tab strip rendered above the SQL editor workspace.
 class SqlQueryTabBar extends material.StatelessWidget {
@@ -65,49 +63,39 @@ Future<bool?> showUnsavedTabChangesDialog({
   return showAppDialog<bool>(
     context: context,
     builder: (ctx) {
-      final theme = Theme.of(ctx);
-      final cs = theme.colorScheme;
-
-      return material.Dialog(
-        backgroundColor: cs.card,
-        shape: material.RoundedRectangleBorder(
-          borderRadius: material.BorderRadius.circular(8),
-          side: material.BorderSide(color: cs.border, width: 1),
-        ),
-        child: material.ConstrainedBox(
-          constraints: const material.BoxConstraints(maxWidth: 420),
-          child: material.Padding(
-            padding: const material.EdgeInsets.all(20),
-            child: material.Column(
-              mainAxisSize: material.MainAxisSize.min,
-              crossAxisAlignment: material.CrossAxisAlignment.start,
-              children: [
-                Text('Unsaved Changes in "$tabTitle"').semiBold().large(),
-                const Gap(8),
-                const Text(
-                  'This query tab contains staged database changes that have not been applied yet. Closing the tab will discard these changes.',
-                ).muted().small(),
-                const Gap(20),
-                material.Align(
-                  alignment: material.Alignment.centerRight,
-                  child: material.Wrap(
-                    alignment: material.WrapAlignment.end,
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      OutlineButton(
-                        onPressed: () => material.Navigator.of(ctx).pop(false),
-                        child: const Text('Cancel'),
-                      ),
-                      DestructiveButton(
-                        onPressed: () => material.Navigator.of(ctx).pop(true),
-                        child: const Text('Discard & Close'),
-                      ),
-                    ],
-                  ),
+      return QueryaDialogCard(
+        constraints: const material.BoxConstraints(maxWidth: 420),
+        child: material.Padding(
+          padding: const material.EdgeInsets.all(20),
+          child: material.Column(
+            mainAxisSize: material.MainAxisSize.min,
+            crossAxisAlignment: material.CrossAxisAlignment.start,
+            children: [
+              Text('Unsaved Changes in "$tabTitle"').semiBold().large(),
+              const Gap(8),
+              const Text(
+                'This query tab contains staged database changes that have not been applied yet. Closing the tab will discard these changes.',
+              ).muted().small(),
+              const Gap(20),
+              material.Align(
+                alignment: material.Alignment.centerRight,
+                child: material.Wrap(
+                  alignment: material.WrapAlignment.end,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlineButton(
+                      onPressed: () => material.Navigator.of(ctx).pop(false),
+                      child: const Text('Cancel'),
+                    ),
+                    DestructiveButton(
+                      onPressed: () => material.Navigator.of(ctx).pop(true),
+                      child: const Text('Discard & Close'),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       );
