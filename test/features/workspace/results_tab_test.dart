@@ -1066,6 +1066,128 @@ void main() {
 
       buffer.dispose();
     });
+
+    testWidgets('ResultsTab renders Export ▾ button with file export options', (tester) async {
+      final rows = [
+        ['1', 'Alice'],
+      ];
+
+      await tester.pumpWidget(
+        resultsShell(
+          child: material.Scaffold(
+            body: material.SizedBox(
+              width: 800,
+              height: 600,
+              child: ResultsTab(
+                columns: const ['id', 'name'],
+                rows: rows,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Export ▾'), findsOneWidget);
+      expect(find.text('Copy ▾'), findsOneWidget);
+    });
+
+    testWidgets('ResultsTab toggles filter bar and closes it when close button or Escape is triggered', (tester) async {
+      final rows = [
+        ['1', 'Alice'],
+        ['2', 'Bob'],
+      ];
+
+      await tester.pumpWidget(
+        resultsShell(
+          child: material.Scaffold(
+            body: material.SizedBox(
+              width: 800,
+              height: 600,
+              child: ResultsTab(
+                columns: const ['id', 'name'],
+                rows: rows,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Open filter bar via filter icon in results tab toolbar
+      final filterIcon = find.byIcon(material.Icons.filter_alt_outlined);
+      expect(filterIcon, findsOneWidget);
+      await tester.tap(filterIcon);
+      await tester.pumpAndSettle();
+
+      // Filter input is now present
+      expect(find.byType(material.TextField), findsOneWidget);
+
+      // Close button with 'Close filter (Esc)' tooltip is present
+      final closeBtn = find.byTooltip('Close filter (Esc)');
+      expect(closeBtn, findsOneWidget);
+
+      // Tapping close button closes the filter bar
+      await tester.tap(closeBtn);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(material.TextField), findsNothing);
+    });
+
+    testWidgets('DataGridStagingToolbar provides tooltips with keyboard shortcuts', (tester) async {
+      final buffer = DataGridStagingBuffer(
+        columns: ['id', 'name'],
+        rows: [
+          ['1', 'Alice'],
+          ['2', 'Bob'],
+        ],
+      );
+
+      await tester.pumpWidget(
+        resultsShell(
+          child: material.Scaffold(
+            body: material.SizedBox(
+              width: 800,
+              height: 100,
+              child: DataGridStagingToolbar(
+                stagingBuffer: buffer,
+                selectedRowIndex: 0,
+                onApplyChanges: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byTooltip('Add new row (Ctrl+Insert / Cmd+N)'),
+        findsOneWidget,
+      );
+      expect(
+        find.byTooltip('Mark row for deletion (Ctrl+Delete / Cmd+Backspace)'),
+        findsOneWidget,
+      );
+      expect(
+        find.byTooltip('No pending changes to commit'),
+        findsOneWidget,
+      );
+
+      // Add a row to make it dirty
+      buffer.addRow();
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byTooltip('Revert all unstaged edits (Ctrl+Z / Cmd+Z)'),
+        findsOneWidget,
+      );
+      expect(
+        find.byTooltip('Commit staged changes to database (Ctrl+S / Cmd+S)'),
+        findsOneWidget,
+      );
+
+      buffer.dispose();
+    });
   });
 }
 

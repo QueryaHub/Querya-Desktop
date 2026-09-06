@@ -344,8 +344,8 @@ class _ResultsTabState extends material.State<ResultsTab> {
                   ),
                   const Gap(6),
                   ExportMenuButton(
-                    label: 'Save ▾',
-                    icon: material.Icons.save_alt_rounded,
+                    label: 'Export ▾',
+                    icon: material.Icons.file_download_outlined,
                     isSave: true,
                     onSelected: (format) {
                       unawaited(() async {
@@ -374,6 +374,10 @@ class _ResultsTabState extends material.State<ResultsTab> {
             totalRowCount: effectiveRows.length,
             filteredRowCount: filteredRows.length,
             columns: widget.columns,
+            onClose: () => setState(() {
+              _showFilterBar = false;
+              _filterText = '';
+            }),
           ),
 
         // Main Grid Body / Groupings View + Side Panel

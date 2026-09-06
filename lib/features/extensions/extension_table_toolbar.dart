@@ -158,8 +158,8 @@ class ExtensionTableToolbar extends material.StatelessWidget {
                         if (onSaveFormat != null) ...[
                           const Gap(4),
                           ExportMenuButton(
-                            label: 'Save ▾',
-                            icon: material.Icons.save_alt_rounded,
+                            label: 'Export ▾',
+                            icon: material.Icons.file_download_outlined,
                             isSave: true,
                             onSelected: onSaveFormat!,
                           ),
