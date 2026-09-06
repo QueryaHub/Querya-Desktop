@@ -121,6 +121,32 @@ void main() {
       expect(eff[3], ['4', 'David', 'david@test.com']);
     });
 
+    test('effectiveRows returns identical reference when clean and caches unmodifiable list when dirty', () {
+      // When clean, effectiveRows returns the exact baseline instance (zero allocation)
+      final cleanRows1 = buffer.effectiveRows;
+      final cleanRows2 = buffer.effectiveRows;
+      expect(identical(cleanRows1, buffer.originalRows), isTrue);
+      expect(identical(cleanRows1, cleanRows2), isTrue);
+
+      // When dirty, effectiveRows caches the calculated list
+      buffer.setCell(0, 1, 'Alice Cached');
+      final dirtyRows1 = buffer.effectiveRows;
+      final dirtyRows2 = buffer.effectiveRows;
+      expect(identical(dirtyRows1, dirtyRows2), isTrue);
+      expect(dirtyRows1[0][1], 'Alice Cached');
+
+      // Subsequent mutation invalidates cache
+      buffer.setCell(1, 1, 'Bob New');
+      final dirtyRows3 = buffer.effectiveRows;
+      expect(identical(dirtyRows1, dirtyRows3), isFalse);
+      expect(dirtyRows3[1][1], 'Bob New');
+
+      // Reverting to clean returns baseline rows again
+      buffer.revertAll();
+      final revertedRows = buffer.effectiveRows;
+      expect(identical(revertedRows, buffer.originalRows), isTrue);
+    });
+
     test('setCellNull and isCellNull handle explicit SQL NULL states', () {
       expect(buffer.isCellNull(0, 1), isFalse);
 

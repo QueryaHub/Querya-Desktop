@@ -29,6 +29,8 @@ class _DataGridGroupingsViewState
   bool _sortAscending = false;
   final Set<String> _expandedKeys = {};
 
+  List<GroupedCategory> _cachedGroups = const [];
+
   @override
   void initState() {
     super.initState();
@@ -37,25 +39,15 @@ class _DataGridGroupingsViewState
       // Pick first numeric-looking column as default target for sum/avg if available
       _aggTargetColIndex = 1;
     }
+    _recomputeGroups();
   }
 
-  @override
-  void didUpdateWidget(covariant DataGridGroupingsView oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.columns != widget.columns) {
-      if (_selectedColIndices.isEmpty && widget.columns.isNotEmpty) {
-        _selectedColIndices = [0];
-      } else {
-        _selectedColIndices.removeWhere((idx) => idx >= widget.columns.length);
-        if (_selectedColIndices.isEmpty && widget.columns.isNotEmpty) {
-          _selectedColIndices = [0];
-        }
-      }
+  void _recomputeGroups() {
+    if (widget.columns.isEmpty || widget.rows.isEmpty) {
+      _cachedGroups = const [];
+      return;
     }
-  }
-
-  void _exportPivot() {
-    final groups = GridGroupingsEngine.buildGroups(
+    _cachedGroups = GridGroupingsEngine.buildGroups(
       groupColIndices: _selectedColIndices,
       rows: widget.rows,
       aggConfig: GroupAggregationConfig(
@@ -65,7 +57,31 @@ class _DataGridGroupingsViewState
       sortBy: _sortBy,
       sortAscending: _sortAscending,
     );
+  }
 
+  @override
+  void didUpdateWidget(covariant DataGridGroupingsView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    var colIndicesChanged = false;
+    if (oldWidget.columns != widget.columns) {
+      if (_selectedColIndices.isEmpty && widget.columns.isNotEmpty) {
+        _selectedColIndices = [0];
+        colIndicesChanged = true;
+      } else {
+        _selectedColIndices.removeWhere((idx) => idx >= widget.columns.length);
+        if (_selectedColIndices.isEmpty && widget.columns.isNotEmpty) {
+          _selectedColIndices = [0];
+        }
+        colIndicesChanged = true;
+      }
+    }
+    if (colIndicesChanged || oldWidget.rows != widget.rows) {
+      _recomputeGroups();
+    }
+  }
+
+  void _exportPivot() {
+    final groups = _cachedGroups;
     final groupName = _selectedColIndices.isNotEmpty
         ? widget.columns[_selectedColIndices.first]
         : 'Group';
@@ -90,16 +106,7 @@ class _DataGridGroupingsViewState
     }
 
     final cs = Theme.of(context).colorScheme;
-    final groups = GridGroupingsEngine.buildGroups(
-      groupColIndices: _selectedColIndices,
-      rows: widget.rows,
-      aggConfig: GroupAggregationConfig(
-        aggType: _aggType,
-        targetColIndex: _aggTargetColIndex,
-      ),
-      sortBy: _sortBy,
-      sortAscending: _sortAscending,
-    );
+    final groups = _cachedGroups;
 
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
@@ -148,6 +155,7 @@ class _DataGridGroupingsViewState
                       setState(() {
                         _selectedColIndices = [idx];
                         _expandedKeys.clear();
+                        _recomputeGroups();
                       });
                     }
                   },
@@ -179,7 +187,10 @@ class _DataGridGroupingsViewState
                   }).toList(),
                   onChanged: (val) {
                     if (val != null) {
-                      setState(() => _aggType = val);
+                      setState(() {
+                        _aggType = val;
+                        _recomputeGroups();
+                      });
                     }
                   },
                 ),
@@ -201,7 +212,10 @@ class _DataGridGroupingsViewState
                     }),
                     onChanged: (idx) {
                       if (idx != null) {
-                        setState(() => _aggTargetColIndex = idx);
+                        setState(() {
+                          _aggTargetColIndex = idx;
+                          _recomputeGroups();
+                        });
                       }
                     },
                   ),
@@ -233,7 +247,10 @@ class _DataGridGroupingsViewState
                   }).toList(),
                   onChanged: (val) {
                     if (val != null) {
-                      setState(() => _sortBy = val);
+                      setState(() {
+                        _sortBy = val;
+                        _recomputeGroups();
+                      });
                     }
                   },
                 ),
@@ -247,7 +264,10 @@ class _DataGridGroupingsViewState
                   padding: material.EdgeInsets.zero,
                   constraints: const material.BoxConstraints(minWidth: 24, minHeight: 24),
                   color: cs.mutedForeground,
-                  onPressed: () => setState(() => _sortAscending = !_sortAscending),
+                  onPressed: () => setState(() {
+                    _sortAscending = !_sortAscending;
+                    _recomputeGroups();
+                  }),
                 ),
 
                 const Gap(8),

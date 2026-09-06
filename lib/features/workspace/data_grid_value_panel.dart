@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
@@ -42,19 +43,30 @@ class _DataGridValuePanelState extends material.State<DataGridValuePanel> {
   ValuePanelLanguage _selectedLanguage = ValuePanelLanguage.auto;
   String? _validationError;
   bool _wordWrap = true;
+  Timer? _debounceTimer;
 
   @override
   void initState() {
     super.initState();
     _controller = material.TextEditingController(text: _formatInitialValue(widget.cellValue));
-    _controller.addListener(_validateContent);
+    _controller.addListener(_onTextChanged);
     _validateContent();
+  }
+
+  void _onTextChanged() {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 150), () {
+      if (mounted) {
+        _validateContent();
+      }
+    });
   }
 
   @override
   void didUpdateWidget(covariant DataGridValuePanel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.cellValue != widget.cellValue) {
+      _debounceTimer?.cancel();
       _controller.text = _formatInitialValue(widget.cellValue);
       _validateContent();
     }
@@ -62,7 +74,8 @@ class _DataGridValuePanelState extends material.State<DataGridValuePanel> {
 
   @override
   void dispose() {
-    _controller.removeListener(_validateContent);
+    _debounceTimer?.cancel();
+    _controller.removeListener(_onTextChanged);
     _controller.dispose();
     super.dispose();
   }
