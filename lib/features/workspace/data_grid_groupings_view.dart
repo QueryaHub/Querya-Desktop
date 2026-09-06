@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
+import 'package:querya_desktop/core/motion/querya_animated_expand.dart';
+import 'package:querya_desktop/core/motion/querya_motion.dart';
+import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/features/workspace/grid_groupings_engine.dart';
 import 'package:querya_desktop/features/workspace/result_grid_view.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -318,12 +321,15 @@ class _DataGridGroupingsViewState
                       ),
                       child: material.Row(
                         children: [
-                          material.Icon(
-                            isExpanded
-                                ? material.Icons.keyboard_arrow_down_rounded
-                                : material.Icons.keyboard_arrow_right_rounded,
-                            size: 18,
-                            color: cs.mutedForeground,
+                          material.AnimatedRotation(
+                            turns: isExpanded ? 0.25 : 0.0,
+                            duration: context.motionDuration(QueryaMotion.treeExpand),
+                            curve: context.motionCurve(QueryaMotion.treeExpandCurve),
+                            child: material.Icon(
+                              material.Icons.keyboard_arrow_right_rounded,
+                              size: 18,
+                              color: cs.mutedForeground,
+                            ),
                           ),
                           const Gap(8),
                           material.Expanded(
@@ -381,8 +387,9 @@ class _DataGridGroupingsViewState
                   ),
 
                   // Expanded sub-grid
-                  if (isExpanded)
-                    material.Container(
+                  QueryaAnimatedExpand(
+                    expanded: isExpanded,
+                    child: material.Container(
                       height: 220,
                       margin: const material.EdgeInsets.only(
                         left: 28,
@@ -393,13 +400,13 @@ class _DataGridGroupingsViewState
                         border: material.Border.all(
                           color: cs.border.withValues(alpha: 0.4),
                         ),
-                        borderRadius: material.BorderRadius.circular(6),
                       ),
                       child: VirtualResultGrid(
                         columns: widget.columns,
                         rows: group.rows,
                       ),
                     ),
+                  ),
                 ],
               );
             },

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
+import 'package:querya_desktop/core/motion/querya_motion.dart';
+import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/features/workspace/grid_selection_calc_engine.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
@@ -14,14 +16,16 @@ class DataGridCalcBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (stats.totalCount <= 1 && !stats.hasNumericStats) {
-      return const material.SizedBox.shrink();
-    }
-
+    final visible = stats.totalCount > 1 || stats.hasNumericStats;
     final cs = Theme.of(context).colorScheme;
+    final duration = context.motionDuration(QueryaMotion.fast);
+    final curve = context.motionCurve(QueryaMotion.enter);
 
-    return material.Container(
-      height: 26,
+    return AnimatedContainer(
+      duration: duration,
+      curve: curve,
+      height: visible ? 26 : 0,
+      clipBehavior: Clip.hardEdge,
       padding: const material.EdgeInsets.symmetric(horizontal: 10),
       decoration: material.BoxDecoration(
         color: cs.card,
