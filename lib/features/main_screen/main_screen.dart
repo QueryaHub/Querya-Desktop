@@ -138,6 +138,51 @@ class _MainScreenState extends State<MainScreen> {
       return true;
     }
 
+    // New Query Tab: Ctrl+T / Cmd+T (Physical T, Logical T, Russian 'е')
+    final isKeyT = physical == PhysicalKeyboardKey.keyT ||
+        logical == LogicalKeyboardKey.keyT ||
+        logical == const LogicalKeyboardKey(0x00000435); // Russian 'е'
+    if (isCmdOrCtrl && !isShift && !isAlt && isKeyT) {
+      final ctx = FocusManager.instance.primaryFocus?.context ?? context;
+      final handled = Actions.maybeInvoke(ctx, const NewSqlIntent());
+      if (handled == null) {
+        SqlEditorCommandBridge.instance.invokeNew();
+      }
+      return true;
+    }
+
+    // Close Query Tab: Ctrl+W / Cmd+W (Physical W, Logical W, Russian 'ц')
+    final isKeyW = physical == PhysicalKeyboardKey.keyW ||
+        logical == LogicalKeyboardKey.keyW ||
+        logical == const LogicalKeyboardKey(0x00000446); // Russian 'ц'
+    if (isCmdOrCtrl && !isShift && !isAlt && isKeyW) {
+      final ctx = FocusManager.instance.primaryFocus?.context ?? context;
+      final handled = Actions.maybeInvoke(ctx, const CloseSqlTabIntent());
+      if (handled == null) {
+        SqlEditorCommandBridge.instance.invokeCloseTab();
+      }
+      return true;
+    }
+
+    // Next / Prev Tab: Ctrl+Tab / Ctrl+Shift+Tab
+    final isTab = physical == PhysicalKeyboardKey.tab ||
+        logical == LogicalKeyboardKey.tab;
+    if (isCmdOrCtrl && !isAlt && isTab) {
+      final ctx = FocusManager.instance.primaryFocus?.context ?? context;
+      if (isShift) {
+        final handled = Actions.maybeInvoke(ctx, const PrevSqlTabIntent());
+        if (handled == null) {
+          SqlEditorCommandBridge.instance.invokePrevTab();
+        }
+      } else {
+        final handled = Actions.maybeInvoke(ctx, const NextSqlTabIntent());
+        if (handled == null) {
+          SqlEditorCommandBridge.instance.invokeNextTab();
+        }
+      }
+      return true;
+    }
+
     // 4. Open SQL: Ctrl+O / Cmd+O (Physical O, Logical O, Russian 'щ')
     final isKeyO = physical == PhysicalKeyboardKey.keyO ||
         logical == LogicalKeyboardKey.keyO ||

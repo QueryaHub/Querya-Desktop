@@ -11,3 +11,15 @@ class OpenSqlIntent extends Intent {
 class SaveSqlIntent extends Intent {
   const SaveSqlIntent();
 }
+
+class CloseSqlTabIntent extends Intent {
+  const CloseSqlTabIntent();
+}
+
+class NextSqlTabIntent extends Intent {
+  const NextSqlTabIntent();
+}
+
+class PrevSqlTabIntent extends Intent {
+  const PrevSqlTabIntent();
+}

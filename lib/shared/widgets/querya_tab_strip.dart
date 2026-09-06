@@ -20,11 +20,17 @@ class QueryaTabStrip extends material.StatefulWidget {
     required this.labels,
     required this.selectedIndex,
     required this.onSelected,
+    this.onClose,
+    this.onAdd,
+    this.canClose,
   }) : assert(labels.length > 0);
 
   final List<String> labels;
   final int selectedIndex;
   final material.ValueChanged<int> onSelected;
+  final material.ValueChanged<int>? onClose;
+  final material.VoidCallback? onAdd;
+  final bool Function(int index)? canClose;
 
   @override
   material.State<QueryaTabStrip> createState() => _QueryaTabStripState();
@@ -175,61 +181,116 @@ class _QueryaTabStripState extends material.State<QueryaTabStrip>
 
     final tabs = material.Row(
       mainAxisSize: material.MainAxisSize.min,
-      children: List.generate(widget.labels.length, (index) {
-        final selected = widget.selectedIndex == index;
-        final focused = _focused[index];
-        final label = widget.labels[index];
-        return material.Padding(
-          padding: material.EdgeInsets.only(left: index == 0 ? 0 : 6),
-          child: material.KeyedSubtree(
-            key: _tabKeys[index],
-            child: material.Focus(
-              focusNode: _focusNodes[index],
-              onFocusChange: (value) =>
-                  setState(() => _focused[index] = value),
-              onKeyEvent: (_, event) => _onKeyEvent(index, event),
-              child: material.Semantics(
-                button: true,
-                selected: selected,
-                label: label,
-                onTap: () => _selectAndFocus(index),
-                child: material.ExcludeSemantics(
-                  child: material.MouseRegion(
-                    cursor: material.SystemMouseCursors.click,
-                    child: material.GestureDetector(
-                      excludeFromSemantics: true,
-                      behavior: material.HitTestBehavior.opaque,
-                      onTap: () => _selectAndFocus(index),
-                      child: material.AnimatedContainer(
-                        key: material.ValueKey('querya_tab_$label'),
-                        duration: context.motionDuration(QueryaMotion.fast),
-                        curve: context.motionCurve(QueryaMotion.enter),
-                        padding: const material.EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: material.BoxDecoration(
-                          color: material.Colors.transparent,
-                          borderRadius: material.BorderRadius.circular(6),
-                          border: material.Border.all(
-                            color: focused
-                                ? colors.ring
-                                : material.Colors.transparent,
-                            width: 2,
+      children: [
+        ...List.generate(widget.labels.length, (index) {
+          final selected = widget.selectedIndex == index;
+          final focused = _focused[index];
+          final label = widget.labels[index];
+          final showClose = widget.onClose != null &&
+              (widget.canClose == null || widget.canClose!(index));
+          return material.Padding(
+            padding: material.EdgeInsets.only(left: index == 0 ? 0 : 6),
+            child: material.KeyedSubtree(
+              key: _tabKeys[index],
+              child: material.Focus(
+                focusNode: _focusNodes[index],
+                onFocusChange: (value) =>
+                    setState(() => _focused[index] = value),
+                onKeyEvent: (_, event) => _onKeyEvent(index, event),
+                child: material.Semantics(
+                  button: true,
+                  selected: selected,
+                  label: label,
+                  onTap: () => _selectAndFocus(index),
+                  child: material.ExcludeSemantics(
+                    child: material.MouseRegion(
+                      cursor: material.SystemMouseCursors.click,
+                      child: material.GestureDetector(
+                        excludeFromSemantics: true,
+                        behavior: material.HitTestBehavior.opaque,
+                        onTap: () => _selectAndFocus(index),
+                        child: material.AnimatedContainer(
+                          key: material.ValueKey('querya_tab_$label'),
+                          duration: context.motionDuration(QueryaMotion.fast),
+                          curve: context.motionCurve(QueryaMotion.enter),
+                          padding: material.EdgeInsets.symmetric(
+                            horizontal: showClose ? 10 : 12,
+                            vertical: 8,
+                          ),
+                          decoration: material.BoxDecoration(
+                            color: material.Colors.transparent,
+                            borderRadius: material.BorderRadius.circular(6),
+                            border: material.Border.all(
+                              color: focused
+                                  ? colors.ring
+                                  : material.Colors.transparent,
+                              width: 2,
+                            ),
+                          ),
+                          child: material.Row(
+                            mainAxisSize: material.MainAxisSize.min,
+                            children: [
+                              selected
+                                  ? Text(label).small().semiBold()
+                                  : Text(label).small().muted(),
+                              if (showClose) ...[
+                                const Gap(6),
+                                material.MouseRegion(
+                                  cursor: material.SystemMouseCursors.click,
+                                  child: material.GestureDetector(
+                                    behavior: material.HitTestBehavior.opaque,
+                                    onTap: () => widget.onClose!(index),
+                                    child: material.Container(
+                                      padding: const material.EdgeInsets.all(1),
+                                      decoration: material.BoxDecoration(
+                                        borderRadius:
+                                            material.BorderRadius.circular(4),
+                                      ),
+                                      child: material.Icon(
+                                        material.Icons.close_rounded,
+                                        size: 13,
+                                        color: selected
+                                            ? colors.foreground
+                                            : colors.mutedForeground,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
-                        child: selected
-                            ? Text(label).small().semiBold()
-                            : Text(label).small().muted(),
                       ),
                     ),
                   ),
                 ),
               ),
             ),
+          );
+        }),
+        if (widget.onAdd != null) ...[
+          const Gap(4),
+          material.MouseRegion(
+            cursor: material.SystemMouseCursors.click,
+            child: material.GestureDetector(
+              behavior: material.HitTestBehavior.opaque,
+              onTap: widget.onAdd,
+              child: material.Container(
+                key: const material.ValueKey('querya_tab_add_button'),
+                padding: const material.EdgeInsets.all(6),
+                decoration: material.BoxDecoration(
+                  borderRadius: material.BorderRadius.circular(6),
+                ),
+                child: material.Icon(
+                  material.Icons.add_rounded,
+                  size: 16,
+                  color: colors.mutedForeground,
+                ),
+              ),
+            ),
           ),
-        );
-      }),
+        ],
+      ],
     );
 
     return material.KeyedSubtree(

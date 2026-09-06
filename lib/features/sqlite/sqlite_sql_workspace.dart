@@ -34,20 +34,13 @@ class SqliteSqlWorkspace extends material.StatefulWidget {
 }
 
 class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
-  final _sqlController = material.TextEditingController();
-  final ValueNotifier<double> _topFraction = ValueNotifier(0.65);
+  final List<SqlQueryTabSession> _sessions = [];
+  int _activeSessionIndex = 0;
+  int _nextSessionId = 1;
+
+  SqlQueryTabSession get _activeSession => _sessions[_activeSessionIndex];
 
   SqliteLease? _lease;
-
-  bool _running = false;
-  String? _error;
-  List<String> _columns = [];
-  List<List<String>> _rows = [];
-  int? _affectedRows;
-  String? _statusLine;
-  DataGridStagingBuffer? _stagingBuffer;
-  String? _lastExecutedSql;
-  bool _savingChanges = false;
 
   int _resultMaxRows = kDefaultSqlResultMaxRows;
   int _historyMaxEntries = kDefaultSqlHistoryMaxEntries;
@@ -58,6 +51,12 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
   @override
   void initState() {
     super.initState();
+    _sessions.add(
+      SqlQueryTabSession(
+        id: 'sqlite_tab_1',
+        title: 'Query 1',
+      ),
+    );
     _appSettingsListener = () {
       unawaited(_loadWorkspaceSettings());
     };
@@ -72,13 +71,72 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
     if (!mounted) return;
     SqlEditorCommandBridge.instance.register(
       connectionId: widget.connectionRow.id,
-      onNew: () => _sqlController.clear(),
+      onNew: _addNewTab,
       onOpen: () => unawaited(_openSqlFile()),
       onSave: () => unawaited(_saveSqlFile()),
+      onCloseTab: () {
+        if (_sessions.length > 1) {
+          unawaited(_closeTab(_activeSessionIndex));
+        }
+      },
+      onNextTab: _nextTab,
+      onPrevTab: _prevTab,
       onExecute: () {
-        if (!_running) unawaited(_execute());
+        if (!_activeSession.running) unawaited(_execute(_activeSession));
       },
     );
+  }
+
+  void _addNewTab({String? initialSql, String? title, String? filePath}) {
+    setState(() {
+      _nextSessionId++;
+      final session = SqlQueryTabSession(
+        id: 'sqlite_tab_$_nextSessionId',
+        title: title ?? 'Query $_nextSessionId',
+        initialSql: initialSql,
+        filePath: filePath,
+        initialFraction:
+            _sessions.isNotEmpty ? _activeSession.topFraction.value : 0.65,
+      );
+      _sessions.add(session);
+      _activeSessionIndex = _sessions.length - 1;
+    });
+  }
+
+  Future<void> _closeTab(int index) async {
+    if (index < 0 || index >= _sessions.length) return;
+    if (_sessions.length <= 1) return;
+    final session = _sessions[index];
+    if (session.stagingBuffer != null && session.stagingBuffer!.isDirty) {
+      final confirmed = await showUnsavedTabChangesDialog(
+        context: context,
+        tabTitle: session.title,
+      );
+      if (confirmed != true) return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _sessions.removeAt(index);
+      session.dispose();
+      if (_activeSessionIndex >= _sessions.length) {
+        _activeSessionIndex = _sessions.length - 1;
+      }
+    });
+  }
+
+  void _nextTab() {
+    if (_sessions.length <= 1) return;
+    setState(() {
+      _activeSessionIndex = (_activeSessionIndex + 1) % _sessions.length;
+    });
+  }
+
+  void _prevTab() {
+    if (_sessions.length <= 1) return;
+    setState(() {
+      _activeSessionIndex =
+          (_activeSessionIndex - 1 + _sessions.length) % _sessions.length;
+    });
   }
 
   @override
@@ -123,21 +181,22 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         .unregister(connectionId: widget.connectionRow.id);
     SqlWorkspaceSettingsRevision.listenable
         .removeListener(_appSettingsListener);
-    _topFraction.dispose();
     _lease?.release();
-    _stagingBuffer?.dispose();
-    _stagingBuffer = null;
-    _sqlController.dispose();
+    for (final s in _sessions) {
+      s.dispose();
+    }
+    _sessions.clear();
     super.dispose();
   }
 
-  Future<void> _execute() async {
-    final selection = _sqlController.selection;
+  Future<void> _execute([SqlQueryTabSession? targetSession]) async {
+    final session = targetSession ?? _activeSession;
+    final selection = session.controller.selection;
     String userSql;
     if (selection.isValid && !selection.isCollapsed) {
-      userSql = selection.textInside(_sqlController.text).trim();
+      userSql = selection.textInside(session.controller.text).trim();
     } else {
-      userSql = _sqlController.text.trim();
+      userSql = session.controller.text.trim();
     }
     if (userSql.isEmpty) return;
 
@@ -158,12 +217,12 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
     }
 
     setState(() {
-      _running = true;
-      _error = null;
-      _columns = [];
-      _rows = [];
-      _affectedRows = null;
-      _statusLine = null;
+      session.running = true;
+      session.error = null;
+      session.columns = [];
+      session.rows = [];
+      session.affectedRows = null;
+      session.statusLine = null;
     });
 
     try {
@@ -172,8 +231,8 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       if (conn == null || !conn.isConnected) {
         if (mounted) {
           setState(() {
-            _error = 'Could not connect to SQLite.';
-            _running = false;
+            session.error = 'Could not connect to SQLite.';
+            session.running = false;
           });
         }
         return;
@@ -204,22 +263,22 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       final outRows = await convertResultRowsToStringsAdaptive(rawRows);
 
       setState(() {
-        _columns = cols;
-        _rows = outRows;
-        _affectedRows = null;
-        _lastExecutedSql = userSql;
-        _stagingBuffer?.dispose();
-        _stagingBuffer = cols.isNotEmpty
+        session.columns = cols;
+        session.rows = outRows;
+        session.affectedRows = null;
+        session.lastExecutedSql = userSql;
+        session.stagingBuffer?.dispose();
+        session.stagingBuffer = cols.isNotEmpty
             ? DataGridStagingBuffer(columns: cols, rows: outRows)
             : null;
         if (cols.isEmpty && outRows.isEmpty) {
-          _statusLine = 'Command completed.';
+          session.statusLine = 'Command completed.';
         } else if (truncated || (injectedLimit && results.length >= cap)) {
-          _statusLine = 'Showing first $cap row(s) (result capped).';
+          session.statusLine = 'Showing first $cap row(s) (result capped).';
         } else {
-          _statusLine = '${results.length} row(s).';
+          session.statusLine = '${results.length} row(s).';
         }
-        _running = false;
+        session.running = false;
       });
 
       final cid = widget.connectionRow.id;
@@ -237,34 +296,41 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       unawaited(_lease?.connection.forceClose());
       if (mounted) {
         setState(() {
-          _error = 'Query timed out: ${e.message ?? e}';
-          _running = false;
+          session.error = 'Query timed out: ${e.message ?? e}';
+          session.running = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
-          _running = false;
+          session.error = e.toString();
+          session.running = false;
         });
       }
     }
   }
 
-  Future<void> _applyStagedChanges() async {
-    if (_stagingBuffer == null || !_stagingBuffer!.isDirty || _savingChanges) return;
-    final target = _lastExecutedSql != null ? SqlTableTargetExtractor.extract(_lastExecutedSql!) : null;
+  Future<void> _applyStagedChanges([SqlQueryTabSession? targetSession]) async {
+    final session = targetSession ?? _activeSession;
+    if (session.stagingBuffer == null ||
+        !session.stagingBuffer!.isDirty ||
+        session.savingChanges) {
+      return;
+    }
+    final target = session.lastExecutedSql != null
+        ? SqlTableTargetExtractor.extract(session.lastExecutedSql!)
+        : null;
     final tableName = target?.tableName ?? 'table';
 
-    setState(() => _savingChanges = true);
+    setState(() => session.savingChanges = true);
     try {
-      final plan = _stagingBuffer!.generateMutationPlan(
+      final plan = session.stagingBuffer!.generateMutationPlan(
         dialect: SqlDialect.sqlite,
         tableName: tableName,
         schema: target?.schema,
       );
       if (plan.isEmpty) {
-        setState(() => _savingChanges = false);
+        setState(() => session.savingChanges = false);
         return;
       }
 
@@ -273,7 +339,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         plan: plan,
       );
       if (confirmed != true) {
-        setState(() => _savingChanges = false);
+        setState(() => session.savingChanges = false);
         return;
       }
 
@@ -288,16 +354,17 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       }
 
       if (!mounted) return;
-      final newRows = _stagingBuffer!.effectiveRows;
-      _stagingBuffer?.dispose();
+      final newRows = session.stagingBuffer!.effectiveRows;
+      session.stagingBuffer?.dispose();
       setState(() {
-        _rows = newRows;
-        _stagingBuffer = DataGridStagingBuffer(columns: _columns, rows: _rows);
-        _savingChanges = false;
+        session.rows = newRows;
+        session.stagingBuffer =
+            DataGridStagingBuffer(columns: session.columns, rows: session.rows);
+        session.savingChanges = false;
       });
     } catch (e) {
       if (mounted) {
-        setState(() => _savingChanges = false);
+        setState(() => session.savingChanges = false);
         await showAppDialog<void>(
           context: context,
           builder: (ctx) => material.AlertDialog(
@@ -328,10 +395,18 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       if (file == null) return;
       final text = await file.readAsString();
       if (!mounted) return;
-      _sqlController.value = material.TextEditingValue(
-        text: text,
-        selection: material.TextSelection.collapsed(offset: text.length),
-      );
+      final session = _activeSession;
+      if (session.controller.text.trim().isEmpty && session.rows.isEmpty) {
+        session.controller.value = material.TextEditingValue(
+          text: text,
+          selection: material.TextSelection.collapsed(offset: text.length),
+        );
+        session.title = file.name;
+        session.filePath = file.path;
+        setState(() {});
+      } else {
+        _addNewTab(initialSql: text, title: file.name, filePath: file.path);
+      }
     } catch (e) {
       if (!mounted) return;
       showAppToast(
@@ -344,16 +419,41 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
 
   Future<void> _saveSqlFile() async {
     try {
-      final name = 'query_${DateTime.now().toIso8601String().replaceAll(':', '-')}.sql';
+      final session = _activeSession;
+      final existingPath = session.filePath;
+      if (existingPath != null && existingPath.isNotEmpty) {
+        await File(existingPath).writeAsString(session.controller.text);
+        if (!mounted) return;
+        showAppToast(
+          context: context,
+          message: 'Saved ${session.title}',
+          variant: AppToastVariant.success,
+        );
+        return;
+      }
+
+      final suggested = session.title.endsWith('.sql')
+          ? session.title
+          : '${session.title}.sql';
       final location = await getSaveLocation(
         acceptedTypeGroups: const [
           XTypeGroup(label: 'SQL', extensions: ['sql']),
         ],
-        suggestedName: name,
+        suggestedName: suggested,
       );
       final path = location?.path;
       if (path == null || path.isEmpty) return;
-      await File(path).writeAsString(_sqlController.text);
+      await File(path).writeAsString(session.controller.text);
+      if (!mounted) return;
+      setState(() {
+        session.filePath = path;
+        session.title = File(path).uri.pathSegments.last;
+      });
+      showAppToast(
+        context: context,
+        message: 'Saved to ${session.title}',
+        variant: AppToastVariant.success,
+      );
     } catch (e) {
       if (!mounted) return;
       showAppToast(
@@ -366,13 +466,31 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context);
-
     return Actions(
       actions: <Type, Action<Intent>>{
         NewSqlIntent: CallbackAction<NewSqlIntent>(
           onInvoke: (intent) {
-            _sqlController.clear();
+            _addNewTab();
+            return null;
+          },
+        ),
+        CloseSqlTabIntent: CallbackAction<CloseSqlTabIntent>(
+          onInvoke: (intent) {
+            if (_sessions.length > 1) {
+              unawaited(_closeTab(_activeSessionIndex));
+            }
+            return null;
+          },
+        ),
+        NextSqlTabIntent: CallbackAction<NextSqlTabIntent>(
+          onInvoke: (intent) {
+            _nextTab();
+            return null;
+          },
+        ),
+        PrevSqlTabIntent: CallbackAction<PrevSqlTabIntent>(
+          onInvoke: (intent) {
+            _prevTab();
             return null;
           },
         ),
@@ -391,110 +509,150 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       },
       child: material.CallbackShortcuts(
         bindings: {
+          const material.SingleActivator(LogicalKeyboardKey.keyT, control: true): _addNewTab,
+          const material.SingleActivator(LogicalKeyboardKey.keyT, meta: true): _addNewTab,
+          const material.SingleActivator(LogicalKeyboardKey.keyW, control: true): () {
+            if (_sessions.length > 1) unawaited(_closeTab(_activeSessionIndex));
+          },
+          const material.SingleActivator(LogicalKeyboardKey.keyW, meta: true): () {
+            if (_sessions.length > 1) unawaited(_closeTab(_activeSessionIndex));
+          },
+          const material.SingleActivator(LogicalKeyboardKey.tab, control: true): _nextTab,
+          const material.SingleActivator(LogicalKeyboardKey.tab, control: true, shift: true): _prevTab,
           const material.SingleActivator(LogicalKeyboardKey.f5): () {
-            if (!_running) unawaited(_execute());
+            if (!_activeSession.running) unawaited(_execute(_activeSession));
           },
           const material.SingleActivator(
             LogicalKeyboardKey.enter,
             control: true,
           ): () {
-            if (!_running) unawaited(_execute());
+            if (!_activeSession.running) unawaited(_execute(_activeSession));
           },
           const material.SingleActivator(
             LogicalKeyboardKey.enter,
             meta: true,
           ): () {
-            if (!_running) unawaited(_execute());
+            if (!_activeSession.running) unawaited(_execute(_activeSession));
           },
           const material.SingleActivator(
             LogicalKeyboardKey.numpadEnter,
             control: true,
           ): () {
-            if (!_running) unawaited(_execute());
+            if (!_activeSession.running) unawaited(_execute(_activeSession));
           },
           const material.SingleActivator(
             LogicalKeyboardKey.numpadEnter,
             meta: true,
           ): () {
-            if (!_running) unawaited(_execute());
+            if (!_activeSession.running) unawaited(_execute(_activeSession));
           },
           const material.SingleActivator(
             LogicalKeyboardKey.keyR,
             control: true,
           ): () {
-            if (!_running) unawaited(_execute());
+            if (!_activeSession.running) unawaited(_execute(_activeSession));
           },
           const material.SingleActivator(
             LogicalKeyboardKey.keyR,
             meta: true,
           ): () {
-            if (!_running) unawaited(_execute());
+            if (!_activeSession.running) unawaited(_execute(_activeSession));
           },
         },
         child: material.Focus(
           autofocus: true,
-          child: VerticalSplitPane(
-            fraction: _topFraction,
-            maxFraction: 0.85,
-            top: material.Column(
-              crossAxisAlignment: material.CrossAxisAlignment.stretch,
-              children: [
-                _SqliteSqlToolbar(
-                  onExecute: _running ? null : _execute,
-                  running: _running,
-                  onOpenPreferences: () => showPreferencesDialog(context),
-                  onOpenHistory: widget.connectionRow.id != null && !_running
-                      ? () {
-                          showSqlQueryHistoryDialog(
-                            context: context,
-                            connectionId: widget.connectionRow.id!,
-                            databaseName: widget.connectionRow.databaseName,
-                            sqlController: _sqlController,
-                          );
-                        }
-                      : null,
+          child: material.Column(
+            crossAxisAlignment: material.CrossAxisAlignment.stretch,
+            children: [
+              SqlQueryTabBar(
+                sessions: _sessions,
+                selectedIndex: _activeSessionIndex,
+                onSelect: (index) => setState(() => _activeSessionIndex = index),
+                onAdd: _addNewTab,
+                onClose: _sessions.length > 1
+                    ? (index) => unawaited(_closeTab(index))
+                    : null,
+              ),
+              material.Expanded(
+                child: material.IndexedStack(
+                  index: _activeSessionIndex,
+                  children: [
+                    for (final session in _sessions)
+                      _buildSessionPane(context, session),
+                  ],
                 ),
-                const Divider(height: 1),
-                material.Expanded(
-                  child: QueryEditorTab(
-                    controller: _sqlController,
-                    fontSize: _editorFontSize,
-                  ),
-                ),
-              ],
-            ),
-            bottom: material.Column(
-              crossAxisAlignment: material.CrossAxisAlignment.stretch,
-              children: [
-                material.Container(
-                  constraints: const material.BoxConstraints(minHeight: 44),
-                  padding: const material.EdgeInsets.symmetric(
-                    horizontal: 12,
-                  ),
-                  decoration: material.BoxDecoration(
-                    color: theme.colorScheme.muted.withValues(alpha: 0.6),
-                  ),
-                  alignment: material.Alignment.centerLeft,
-                  child: const Text('Data Output').semiBold().small(),
-                ),
-                const Divider(height: 1),
-                material.Expanded(
-                  child: ResultsTab(
-                    columns: _columns,
-                    rows: _rows,
-                    errorMessage: _error,
-                    isLoading: _running,
-                    affectedRows: _affectedRows,
-                    statusLine: _statusLine,
-                    stagingBuffer: _stagingBuffer,
-                    onApplyChanges: widget.isReadOnly ? null : _applyStagedChanges,
-                    isSaving: _savingChanges,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
+      ),
+    );
+  }
+
+  material.Widget _buildSessionPane(
+    material.BuildContext context,
+    SqlQueryTabSession session,
+  ) {
+    final theme = Theme.of(context);
+    return VerticalSplitPane(
+      fraction: session.topFraction,
+      maxFraction: 0.85,
+      top: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
+          _SqliteSqlToolbar(
+            onExecute: session.running ? null : () => _execute(session),
+            running: session.running,
+            onOpenPreferences: () => showPreferencesDialog(context),
+            onOpenHistory: widget.connectionRow.id != null && !session.running
+                ? () {
+                    showSqlQueryHistoryDialog(
+                      context: context,
+                      connectionId: widget.connectionRow.id!,
+                      databaseName: widget.connectionRow.databaseName,
+                      sqlController: session.controller,
+                    );
+                  }
+                : null,
+          ),
+          const Divider(height: 1),
+          material.Expanded(
+            child: QueryEditorTab(
+              controller: session.controller,
+              fontSize: _editorFontSize,
+            ),
+          ),
+        ],
+      ),
+      bottom: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
+          material.Container(
+            constraints: const material.BoxConstraints(minHeight: 44),
+            padding: const material.EdgeInsets.symmetric(
+              horizontal: 12,
+            ),
+            decoration: material.BoxDecoration(
+              color: theme.colorScheme.muted.withValues(alpha: 0.6),
+            ),
+            alignment: material.Alignment.centerLeft,
+            child: const Text('Data Output').semiBold().small(),
+          ),
+          const Divider(height: 1),
+          material.Expanded(
+            child: ResultsTab(
+              columns: session.columns,
+              rows: session.rows,
+              errorMessage: session.error,
+              isLoading: session.running,
+              affectedRows: session.affectedRows,
+              statusLine: session.statusLine,
+              stagingBuffer: session.stagingBuffer,
+              onApplyChanges: widget.isReadOnly ? null : () => _applyStagedChanges(session),
+              isSaving: session.savingChanges,
+            ),
+          ),
+        ],
       ),
     );
   }
