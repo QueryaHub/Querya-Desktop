@@ -153,5 +153,22 @@ void main() {
       expect(find.textContaining('watched automatically'), findsOneWidget);
       expect(find.text('Edit theme colors…'), findsOneWidget);
     });
+
+    testWidgets('renders PreferencesSwitchRow for animate theme changes',
+        (tester) async {
+      await pumpSection(tester);
+
+      expect(find.text('Animate theme changes'), findsOneWidget);
+      expect(
+        find.textContaining('Smooth transitions when switching dark/light'),
+        findsOneWidget,
+      );
+      expect(find.byType(material.Switch), findsOneWidget);
+
+      await tester.tap(find.text('Animate theme changes'));
+      await tester.pump();
+
+      expect(ThemeController.instance.themeAnimationEnabled, isTrue);
+    });
   });
 }
