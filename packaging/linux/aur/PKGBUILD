@@ -2,7 +2,7 @@
 # AUR package — installs the official Release portable Linux zip under /opt.
 # pkgver is synced by version-bump.yml; CI publishes real sha256sums on Release.
 pkgname=querya-desktop
-pkgver=0.4.15
+pkgver=0.4.16
 pkgrel=1
 pkgdesc="Multi-database desktop client (PostgreSQL, MySQL, Redis, MongoDB, SQLite)"
 arch=('x86_64')
