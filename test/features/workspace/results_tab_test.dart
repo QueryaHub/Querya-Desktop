@@ -61,6 +61,87 @@ void main() {
       ).single;
       expect(long, greaterThan(short));
     });
+
+    test(
+        'computes compact width for short columns like id and app_id below 100px',
+        () {
+      final widths = computeResultGridColumnWidths(
+        columns: const ['id', 'app_id'],
+        rows: [
+          ['1', '292030'],
+          ['2', '292031'],
+        ],
+      );
+      expect(widths, hasLength(2));
+      expect(widths[0], lessThanOrEqualTo(60));
+      expect(widths[1], lessThan(100));
+    });
+  });
+
+  group('distributeResultGridSpareWidth', () {
+    test(
+        'allocates spare width to deficit column and keeps compact column untouched',
+        () {
+      final columns = ['app_id', 'country', 'description'];
+      final rows = [
+        ['292030', 'kz', 'x' * 100],
+      ];
+      final initialWidths = computeResultGridColumnWidths(
+        columns: columns,
+        rows: rows,
+      );
+      expect(initialWidths[0], lessThan(100));
+      expect(initialWidths[2], equals(280.0));
+
+      final distributed = distributeResultGridSpareWidth(
+        columnWidths: initialWidths,
+        columns: columns,
+        rows: rows,
+        availableWidth: 1000.0,
+      );
+
+      // app_id must not be stretched
+      expect(distributed[0], equals(initialWidths[0]));
+      // country must not be stretched
+      expect(distributed[1], equals(initialWidths[1]));
+      // description should receive spare width to show more content
+      expect(distributed[2], greaterThan(280.0));
+    });
+
+    test('does not bloat compact columns when all columns already fit', () {
+      final columns = ['id', 'code', 'status'];
+      final rows = [
+        ['1', 'kz', 'active'],
+      ];
+      final initialWidths = computeResultGridColumnWidths(
+        columns: columns,
+        rows: rows,
+      );
+
+      final distributed = distributeResultGridSpareWidth(
+        columnWidths: initialWidths,
+        columns: columns,
+        rows: rows,
+        availableWidth: 1200.0,
+      );
+
+      expect(distributed[0], equals(initialWidths[0]));
+      expect(distributed[1], equals(initialWidths[1]));
+      expect(distributed[2], equals(initialWidths[2]));
+    });
+
+    test('returns original widths when availableWidth <= total initial width', () {
+      final initial = [80.0, 120.0, 200.0];
+      final result = distributeResultGridSpareWidth(
+        columnWidths: initial,
+        columns: const ['a', 'b', 'c'],
+        rows: const [
+          ['1', '2', '3'],
+        ],
+        availableWidth: 350.0,
+      );
+      expect(result, equals(initial));
+    });
   });
 
   group('sortResultGridRows', () {
@@ -700,6 +781,50 @@ void main() {
       // Column headers and rows remain stable and rendered
       expect(find.text('alice'), findsOneWidget);
       expect(find.text('bob'), findsOneWidget);
+    });
+
+    testWidgets(
+        'allows auto-fitting column width on header divider double-tap',
+        (tester) async {
+      await tester.pumpWidget(
+        resultsShell(
+          child: const material.Scaffold(
+            body: material.SizedBox(
+              width: 800,
+              height: 400,
+              child: VirtualResultGrid(
+                columns: ['id', 'summary'],
+                rows: [
+                  ['1', 'A short summary'],
+                  [
+                    '2',
+                    'An extraordinarily long text payload that definitely requires more space to view completely'
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final resizeRegions = find.byWidgetPredicate(
+        (w) =>
+            w is material.MouseRegion &&
+            w.cursor == material.SystemMouseCursors.resizeColumn,
+      );
+      expect(resizeRegions, findsNWidgets(2));
+
+      // Double-tap the second column's divider handle to trigger auto-fit
+      final secondHandle = resizeRegions.at(1);
+      final center = tester.getCenter(secondHandle);
+      await tester.tapAt(center);
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tapAt(center);
+      await tester.pumpAndSettle();
+
+      expect(find.text('id'), findsOneWidget);
+      expect(find.text('summary'), findsOneWidget);
     });
 
     testWidgets('allows sorting by clicking column headers in VirtualResultGrid',
