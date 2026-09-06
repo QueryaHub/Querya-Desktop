@@ -205,7 +205,6 @@ class _NewConnectionDialogContentState
                                   mainAxisSpacing: spacing,
                                   crossAxisSpacing: spacing,
                                   childAspectRatio: aspect.clamp(0.4, 4.0),
-                                  shrinkWrap: true,
                                   physics: const material.ClampingScrollPhysics(),
                                   children: [
                                     for (final t in _filteredTypes)

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/ui/querya_icons.dart';
 import 'package:querya_desktop/features/help/about_dialog.dart';
 
 import '../../support/querya_theme_test_shell.dart';
@@ -22,6 +23,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Querya'), findsOneWidget);
+      expect(find.byIcon(QueryaIcons.database), findsOneWidget);
       expect(find.textContaining('Version'), findsOneWidget);
       expect(find.text('Licensed under the MIT License.'), findsOneWidget);
       expect(find.text('View repository'), findsOneWidget);

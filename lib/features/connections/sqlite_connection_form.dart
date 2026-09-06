@@ -183,9 +183,8 @@ class _SqliteConnectionFormContentState
   @override
   material.Widget build(material.BuildContext context) {
     final theme = context.colors;
-    final dialogMaxW = WindowLayout.newConnectionDialogMaxWidth(context);
+    const dialogMaxW = WindowLayout.connectionFormMaxWidth;
     final dialogH = WindowLayout.newConnectionDialogHeight(context);
-    final scrollH = dialogH - 120.0; // Subtract header and footer heights
 
     return material.SizedBox(
       width: dialogMaxW,
@@ -220,10 +219,7 @@ class _SqliteConnectionFormContentState
                 ),
               ),
               // Form body
-              material.ConstrainedBox(
-                constraints: material.BoxConstraints(
-                  maxHeight: scrollH,
-                ),
+              material.Flexible(
                 child: material.FocusTraversalGroup(
                   policy: material.WidgetOrderTraversalPolicy(),
                   child: material.SingleChildScrollView(

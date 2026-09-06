@@ -106,14 +106,16 @@ abstract class WindowLayout {
 
   /// Grid area width (right of sidebar, inner padding applied separately).
   static int dbTypeGridCrossAxisCount(double gridInnerWidth) {
-    if (gridInnerWidth >= 460) return 4;
-    if (gridInnerWidth >= 240) return 2;
+    if (gridInnerWidth >= 620) return 4;
+    if (gridInnerWidth >= 440) return 3;
+    if (gridInnerWidth >= 260) return 2;
     return 1;
   }
 
   static double dbTypeCardHeight(BuildContext context, int crossAxisCount) {
     final base = switch (crossAxisCount) {
       4 => 144.0,
+      3 => 140.0,
       2 => 138.0,
       _ => 132.0,
     };

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/motion/ticker_gated_polling.dart';
@@ -200,7 +201,6 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     }
 
     final cs = Theme.of(context).colorScheme;
-    final width = MediaQuery.sizeOf(context).width;
 
     if (_loading) {
       return material.Center(
@@ -279,67 +279,73 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
       color: cs.background,
       child: material.RefreshIndicator(
         onRefresh: _refreshNow,
-        child: material.SingleChildScrollView(
-          physics: const material.AlwaysScrollableScrollPhysics(),
-          padding: const material.EdgeInsets.all(24),
-          child: material.SizedBox(
-            width: width,
-            child: material.Column(
-              mainAxisSize: material.MainAxisSize.min,
-              crossAxisAlignment: material.CrossAxisAlignment.stretch,
-              children: [
-                _header(context),
-                const Gap(24),
-                _summaryChips(context, status),
-                const Gap(24),
-                _gridRow(
-                  _memoryCard(context, status),
-                  _operationsCard(context, status),
-                ),
-                const Gap(16),
-                _gridRow(
-                  _connectionsCard(context, status),
-                  _networkCard(context, status),
-                ),
-                const Gap(24),
-                _sectionCard(context, 'Server', _extractServerInfo(status)),
-                const Gap(12),
-                material.LayoutBuilder(
-                  builder: (context, constraints) {
-                    final wide = constraints.maxWidth >= 900;
-                    final storage = _extractStorageInfo(status);
-                    final replication = _extractReplicationInfo(status);
-                    if (!wide) {
-                      return material.Column(
-                        crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                        children: [
-                          _sectionCard(context, 'Storage', storage),
-                          const Gap(12),
-                          _sectionCard(context, 'Replication', replication),
-                        ],
-                      );
-                    }
-                    return material.Row(
-                      crossAxisAlignment: material.CrossAxisAlignment.start,
-                      children: [
-                        material.Expanded(
-                          child: _sectionCard(context, 'Storage', storage),
-                        ),
-                        const Gap(16),
-                        material.Expanded(
-                          child:
+        child: material.LayoutBuilder(
+          builder: (context, constraints) {
+            final contentWidth = math.max(0.0, constraints.maxWidth - 48);
+            return material.SingleChildScrollView(
+              physics: const material.AlwaysScrollableScrollPhysics(),
+              padding: const material.EdgeInsets.all(24),
+              child: material.SizedBox(
+                width: contentWidth,
+                child: material.Column(
+                  mainAxisSize: material.MainAxisSize.min,
+                  crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                  children: [
+                    _header(context),
+                    const Gap(24),
+                    _summaryChips(context, status),
+                    const Gap(24),
+                    _gridRow(
+                      _memoryCard(context, status),
+                      _operationsCard(context, status),
+                    ),
+                    const Gap(16),
+                    _gridRow(
+                      _connectionsCard(context, status),
+                      _networkCard(context, status),
+                    ),
+                    const Gap(24),
+                    _sectionCard(context, 'Server', _extractServerInfo(status)),
+                    const Gap(12),
+                    material.LayoutBuilder(
+                      builder: (context, constraints) {
+                        final wide = constraints.maxWidth >= 900;
+                        final storage = _extractStorageInfo(status);
+                        final replication = _extractReplicationInfo(status);
+                        if (!wide) {
+                          return material.Column(
+                            crossAxisAlignment:
+                                material.CrossAxisAlignment.stretch,
+                            children: [
+                              _sectionCard(context, 'Storage', storage),
+                              const Gap(12),
                               _sectionCard(context, 'Replication', replication),
-                        ),
-                      ],
-                    );
-                  },
+                            ],
+                          );
+                        }
+                        return material.Row(
+                          crossAxisAlignment: material.CrossAxisAlignment.start,
+                          children: [
+                            material.Expanded(
+                              child: _sectionCard(context, 'Storage', storage),
+                            ),
+                            const Gap(16),
+                            material.Expanded(
+                              child:
+                                  _sectionCard(context, 'Replication', replication),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                    const Gap(12),
+                    _sectionCard(
+                        context, 'WiredTiger', _extractWiredTigerInfo(status)),
+                  ],
                 ),
-                const Gap(12),
-                _sectionCard(
-                    context, 'WiredTiger', _extractWiredTigerInfo(status)),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
