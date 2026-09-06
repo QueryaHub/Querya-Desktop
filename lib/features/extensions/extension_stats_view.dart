@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/extensions/extension_driver_session.dart';
@@ -124,7 +125,6 @@ class _ExtensionStatsViewState extends material.State<ExtensionStatsView> {
     );
 
     final cs = Theme.of(context).colorScheme;
-    final width = MediaQuery.sizeOf(context).width;
 
     if (_loading) {
       return material.Center(
@@ -178,28 +178,33 @@ class _ExtensionStatsViewState extends material.State<ExtensionStatsView> {
       color: cs.background,
       child: material.RefreshIndicator(
         onRefresh: _fetch,
-        child: material.SingleChildScrollView(
-          physics: const material.AlwaysScrollableScrollPhysics(),
-          padding: const material.EdgeInsets.all(24),
-          child: material.SizedBox(
-            width: width,
-            child: material.Column(
-              mainAxisSize: material.MainAxisSize.min,
-              crossAxisAlignment: material.CrossAxisAlignment.stretch,
-              children: [
-                _header(context),
-                const Gap(24),
-                _summaryChips(context, stats),
-                const Gap(24),
-                if (stats.databaseSizes.isNotEmpty) ...[
-                  _databasesCard(context, stats),
-                  const Gap(24),
-                ],
-                if (stats.extraMetrics.isNotEmpty)
-                  _extraMetricsCard(context, stats),
-              ],
-            ),
-          ),
+        child: material.LayoutBuilder(
+          builder: (context, constraints) {
+            final contentWidth = math.max(0.0, constraints.maxWidth - 48);
+            return material.SingleChildScrollView(
+              physics: const material.AlwaysScrollableScrollPhysics(),
+              padding: const material.EdgeInsets.all(24),
+              child: material.SizedBox(
+                width: contentWidth,
+                child: material.Column(
+                  mainAxisSize: material.MainAxisSize.min,
+                  crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                  children: [
+                    _header(context),
+                    const Gap(24),
+                    _summaryChips(context, stats),
+                    const Gap(24),
+                    if (stats.databaseSizes.isNotEmpty) ...[
+                      _databasesCard(context, stats),
+                      const Gap(24),
+                    ],
+                    if (stats.extraMetrics.isNotEmpty)
+                      _extraMetricsCard(context, stats),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ),
     );

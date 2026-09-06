@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/motion/ticker_gated_polling.dart';
@@ -147,7 +148,6 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
     );
 
     final cs = Theme.of(context).colorScheme;
-    final width = MediaQuery.sizeOf(context).width;
 
     if (_loading) {
       return material.Center(
@@ -207,33 +207,41 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
       color: cs.background,
       child: material.RefreshIndicator(
         onRefresh: _fetch,
-        child: material.SingleChildScrollView(
-          physics: const material.AlwaysScrollableScrollPhysics(),
-          padding: const material.EdgeInsets.all(24),
-          child: material.SizedBox(
-            width: width,
-            child: material.Column(
-              mainAxisSize: material.MainAxisSize.min,
-              crossAxisAlignment: material.CrossAxisAlignment.stretch,
-              children: [
-                _header(context),
-                const Gap(24),
-                _summaryChips(context, stats),
-                const Gap(24),
-                _gridRow(
-                  _connectionsCard(context, stats),
-                  _queriesCard(context, stats),
+        child: material.LayoutBuilder(
+          builder: (context, constraints) {
+            final contentWidth = math.max(0.0, constraints.maxWidth - 48);
+            final isNarrow = contentWidth < 560;
+            return material.SingleChildScrollView(
+              physics: const material.AlwaysScrollableScrollPhysics(),
+              padding: const material.EdgeInsets.all(24),
+              child: material.SizedBox(
+                width: contentWidth,
+                child: material.Column(
+                  mainAxisSize: material.MainAxisSize.min,
+                  crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                  children: [
+                    _header(context),
+                    const Gap(24),
+                    _summaryChips(context, stats),
+                    const Gap(24),
+                    _gridRow(
+                      _connectionsCard(context, stats),
+                      _queriesCard(context, stats),
+                      isNarrow: isNarrow,
+                    ),
+                    const Gap(16),
+                    _gridRow(
+                      _networkCard(context, stats),
+                      _settingsCard(context, stats),
+                      isNarrow: isNarrow,
+                    ),
+                    const Gap(24),
+                    _databasesCard(context, stats),
+                  ],
                 ),
-                const Gap(16),
-                _gridRow(
-                  _networkCard(context, stats),
-                  _settingsCard(context, stats),
-                ),
-                const Gap(24),
-                _databasesCard(context, stats),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -289,7 +297,21 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
     );
   }
 
-  material.Widget _gridRow(material.Widget left, material.Widget right) {
+  material.Widget _gridRow(
+    material.Widget left,
+    material.Widget right, {
+    bool isNarrow = false,
+  }) {
+    if (isNarrow) {
+      return material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
+          left,
+          const Gap(16),
+          right,
+        ],
+      );
+    }
     return material.IntrinsicHeight(
       child: material.Row(
         crossAxisAlignment: material.CrossAxisAlignment.stretch,

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/motion/ticker_gated_polling.dart';
@@ -164,7 +165,6 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
     );
 
     final cs = Theme.of(context).colorScheme;
-    final width = MediaQuery.sizeOf(context).width;
 
     if (_loading) {
       return material.Center(
@@ -218,33 +218,50 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
       color: cs.background,
       child: material.RefreshIndicator(
         onRefresh: _fetch,
-        child: material.SingleChildScrollView(
-          physics: const material.AlwaysScrollableScrollPhysics(),
-          padding: const material.EdgeInsets.all(24),
-          child: material.SizedBox(
-            width: width,
-            child: material.Column(
-              mainAxisSize: material.MainAxisSize.min,
-              crossAxisAlignment: material.CrossAxisAlignment.stretch,
-              children: [
-                _header(context),
-                const Gap(24),
-                _summaryChips(context, stats),
-                const Gap(24),
-                material.Row(
-                  crossAxisAlignment: material.CrossAxisAlignment.start,
+        child: material.LayoutBuilder(
+          builder: (context, constraints) {
+            final contentWidth = math.max(0.0, constraints.maxWidth - 48);
+            final isNarrow = contentWidth < 560;
+            return material.SingleChildScrollView(
+              physics: const material.AlwaysScrollableScrollPhysics(),
+              padding: const material.EdgeInsets.all(24),
+              child: material.SizedBox(
+                width: contentWidth,
+                child: material.Column(
+                  mainAxisSize: material.MainAxisSize.min,
+                  crossAxisAlignment: material.CrossAxisAlignment.stretch,
                   children: [
-                    material.Expanded(child: _connectionsCard(context, stats)),
+                    _header(context),
+                    const Gap(24),
+                    _summaryChips(context, stats),
+                    const Gap(24),
+                    if (isNarrow)
+                      material.Column(
+                        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                        children: [
+                          _connectionsCard(context, stats),
+                          const Gap(16),
+                          _serverSettingsCard(context, stats),
+                        ],
+                      )
+                    else
+                      material.Row(
+                        crossAxisAlignment: material.CrossAxisAlignment.start,
+                        children: [
+                          material.Expanded(
+                              child: _connectionsCard(context, stats)),
+                          const Gap(16),
+                          material.Expanded(
+                              child: _serverSettingsCard(context, stats)),
+                        ],
+                      ),
                     const Gap(16),
-                    material.Expanded(
-                        child: _serverSettingsCard(context, stats)),
+                    _databasesCard(context, stats),
                   ],
                 ),
-                const Gap(16),
-                _databasesCard(context, stats),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
