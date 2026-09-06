@@ -52,6 +52,21 @@ class QueryaHighlightController extends TextEditingController {
       return TextSpan(style: style, children: [_cachedSpan!]);
     }
 
+    if (text.length < kSyntaxHighlightIsolateThreshold) {
+      final highlighter =
+          brightness == Brightness.light ? lightHighlighter : darkHighlighter;
+      try {
+        final span = highlighter.highlight(text);
+        _cachedSpan = span;
+        _cachedText = text;
+        _cachedBrightness = brightness;
+        _debounceTimer?.cancel();
+        return TextSpan(style: style, children: [span]);
+      } catch (_) {
+        // Fall back to isolate or unhighlighted text on unexpected parsing error.
+      }
+    }
+
     _scheduleIsolateHighlight(
       text: text,
       brightness: brightness,
@@ -59,9 +74,7 @@ class QueryaHighlightController extends TextEditingController {
       style: style,
     );
 
-    if (_cachedSpan != null &&
-        _cachedText == text &&
-        _cachedBrightness == brightness) {
+    if (_cachedSpan != null) {
       return TextSpan(style: style, children: [_cachedSpan!]);
     }
 
@@ -112,6 +125,8 @@ class QueryaHighlightController extends TextEditingController {
       _cachedText = text;
       _cachedBrightness = brightness;
       notifyListeners();
+    }).catchError((Object error, StackTrace stack) {
+      // In case of syntax highlight failure, keep cached or plain text without crashing.
     });
   }
 

@@ -1,5 +1,6 @@
 import 'dart:async' show Timer;
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/services.dart' show KeyDownEvent, LogicalKeyboardKey;
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// Kind of filter autocomplete suggestion.
@@ -120,6 +121,7 @@ class DataGridFilterBar extends material.StatefulWidget {
     required this.filteredRowCount,
     this.columns = const [],
     this.debounceDuration = const Duration(milliseconds: 150),
+    this.onClose,
   });
 
   final String filterText;
@@ -128,6 +130,7 @@ class DataGridFilterBar extends material.StatefulWidget {
   final int filteredRowCount;
   final List<String> columns;
   final Duration debounceDuration;
+  final material.VoidCallback? onClose;
 
   @override
   material.State<DataGridFilterBar> createState() => _DataGridFilterBarState();
@@ -135,6 +138,7 @@ class DataGridFilterBar extends material.StatefulWidget {
 
 class _DataGridFilterBarState extends material.State<DataGridFilterBar> {
   late final material.TextEditingController _controller;
+  late final material.FocusNode _focusNode;
   final _layerLink = material.LayerLink();
   material.OverlayEntry? _overlayEntry;
   List<FilterSuggestion> _suggestions = [];
@@ -145,6 +149,7 @@ class _DataGridFilterBarState extends material.State<DataGridFilterBar> {
   void initState() {
     super.initState();
     _controller = material.TextEditingController(text: widget.filterText);
+    _focusNode = material.FocusNode();
   }
 
   @override
@@ -161,6 +166,7 @@ class _DataGridFilterBarState extends material.State<DataGridFilterBar> {
     _debounceTimer?.cancel();
     _hideSuggestions();
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -207,7 +213,6 @@ class _DataGridFilterBarState extends material.State<DataGridFilterBar> {
     _overlayEntry = material.OverlayEntry(
       builder: (context) {
         final cs = Theme.of(context).colorScheme;
-        final isDark = Theme.of(context).brightness == Brightness.dark;
 
         return material.Positioned(
           width: 320,
@@ -218,14 +223,12 @@ class _DataGridFilterBarState extends material.State<DataGridFilterBar> {
             child: material.Material(
               elevation: 4,
               borderRadius: material.BorderRadius.circular(6),
-              color: isDark
-                  ? const material.Color(0xFF1E1E22)
-                  : const material.Color(0xFFFFFFFF),
+              color: cs.popover,
               child: material.Container(
                 decoration: material.BoxDecoration(
                   borderRadius: material.BorderRadius.circular(6),
                   border: material.Border.all(
-                    color: cs.border.withValues(alpha: 0.6),
+                    color: cs.border,
                   ),
                 ),
                 constraints: const material.BoxConstraints(maxHeight: 200),
@@ -250,10 +253,10 @@ class _DataGridFilterBarState extends material.State<DataGridFilterBar> {
                           children: [
                             _buildSuggestionIcon(s.kind, cs),
                             const Gap(8),
-                            Text(s.text).semiBold().small(),
+                            Text(s.text, style: TextStyle(color: cs.popoverForeground)).semiBold().small(),
                             const Spacer(),
                             if (s.description.isNotEmpty)
-                              Text(s.description).muted().xSmall(),
+                              Text(s.description, style: TextStyle(color: cs.mutedForeground)).xSmall(),
                           ],
                         ),
                       ),
@@ -350,23 +353,49 @@ class _DataGridFilterBarState extends material.State<DataGridFilterBar> {
             ),
             const Gap(6),
             material.Expanded(
-              child: material.TextField(
-                controller: _controller,
-                onChanged: _onChanged,
-                onSubmitted: _onSubmitted,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: cs.foreground,
-                ),
-                decoration: material.InputDecoration(
-                  hintText: 'Filter results... (e.g. "active", "status = ACTIVE", "amount > 100")',
-                  hintStyle: TextStyle(
+              child: material.Focus(
+                onKeyEvent: (node, event) {
+                  if (event is KeyDownEvent &&
+                      event.logicalKey == LogicalKeyboardKey.escape) {
+                    if (_overlayEntry != null) {
+                      _hideSuggestions();
+                      return material.KeyEventResult.handled;
+                    }
+                    if (widget.onClose != null) {
+                      _debounceTimer?.cancel();
+                      _hideSuggestions();
+                      widget.onClose?.call();
+                      return material.KeyEventResult.handled;
+                    } else if (_controller.text.isNotEmpty) {
+                      _debounceTimer?.cancel();
+                      _controller.clear();
+                      _hideSuggestions();
+                      widget.onFilterChanged('');
+                      return material.KeyEventResult.handled;
+                    }
+                  }
+                  return material.KeyEventResult.ignored;
+                },
+                child: material.TextField(
+                  controller: _controller,
+                  focusNode: _focusNode,
+                  autofocus: true,
+                  onChanged: _onChanged,
+                  onSubmitted: _onSubmitted,
+                  style: TextStyle(
                     fontSize: 12,
-                    color: cs.mutedForeground.withValues(alpha: 0.7),
+                    color: cs.foreground,
                   ),
-                  border: material.InputBorder.none,
-                  isDense: true,
-                  contentPadding: material.EdgeInsets.zero,
+                  decoration: material.InputDecoration(
+                    hintText: 'Filter results... (e.g. "active", "status = ACTIVE", "amount > 100")',
+                    hintStyle: TextStyle(
+                      fontSize: 12,
+                      color: cs.mutedForeground.withValues(alpha: 0.7),
+                    ),
+                    border: material.InputBorder.none,
+                    isDense: true,
+                    contentPadding: material.EdgeInsets.zero,
+                  ),
                 ),
               ),
             ),
@@ -389,15 +418,36 @@ class _DataGridFilterBarState extends material.State<DataGridFilterBar> {
               ),
               const Gap(4),
               material.IconButton(
-                icon: const material.Icon(material.Icons.close, size: 14),
+                icon: material.Icon(
+                  widget.onClose != null
+                      ? material.Icons.clear_rounded
+                      : material.Icons.close,
+                  size: 14,
+                ),
                 padding: material.EdgeInsets.zero,
                 constraints: const material.BoxConstraints(minWidth: 20, minHeight: 20),
                 color: cs.mutedForeground,
+                tooltip: 'Clear filter',
                 onPressed: () {
                   _debounceTimer?.cancel();
                   _controller.clear();
                   _hideSuggestions();
                   widget.onFilterChanged('');
+                },
+              ),
+            ],
+            if (widget.onClose != null) ...[
+              const Gap(2),
+              material.IconButton(
+                icon: const material.Icon(material.Icons.close, size: 14),
+                padding: material.EdgeInsets.zero,
+                constraints: const material.BoxConstraints(minWidth: 20, minHeight: 20),
+                color: cs.mutedForeground,
+                tooltip: 'Close filter (Esc)',
+                onPressed: () {
+                  _debounceTimer?.cancel();
+                  _hideSuggestions();
+                  widget.onClose?.call();
                 },
               ),
             ],

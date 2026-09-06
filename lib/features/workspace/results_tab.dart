@@ -72,6 +72,7 @@ class _ResultsTabState extends material.State<ResultsTab> {
   List<String>? _memoColumns;
   List<List<String>>? _memoEffectiveRows;
   List<List<String>> _cachedFilteredRows = const [];
+  List<int>? _cachedFilteredIndices;
 
   List<List<String>> _getFilteredRows(
     List<List<String>> effectiveRows,
@@ -89,7 +90,8 @@ class _ResultsTabState extends material.State<ResultsTab> {
       rows: effectiveRows,
     );
 
-    final filteredRows = filteredIndices.length == effectiveRows.length
+    final isFiltered = filteredIndices.length != effectiveRows.length;
+    final filteredRows = !isFiltered
         ? effectiveRows
         : filteredIndices.map((i) => effectiveRows[i]).toList();
 
@@ -97,6 +99,7 @@ class _ResultsTabState extends material.State<ResultsTab> {
     _memoEffectiveRows = effectiveRows;
     _memoColumns = columns;
     _cachedFilteredRows = filteredRows;
+    _cachedFilteredIndices = isFiltered ? filteredIndices : null;
 
     return filteredRows;
   }
@@ -106,6 +109,7 @@ class _ResultsTabState extends material.State<ResultsTab> {
     _memoColumns = null;
     _memoEffectiveRows = null;
     _cachedFilteredRows = const [];
+    _cachedFilteredIndices = null;
     super.dispose();
   }
 
@@ -340,8 +344,8 @@ class _ResultsTabState extends material.State<ResultsTab> {
                   ),
                   const Gap(6),
                   ExportMenuButton(
-                    label: 'Save ▾',
-                    icon: material.Icons.save_alt_rounded,
+                    label: 'Export ▾',
+                    icon: material.Icons.file_download_outlined,
                     isSave: true,
                     onSelected: (format) {
                       unawaited(() async {
@@ -370,6 +374,10 @@ class _ResultsTabState extends material.State<ResultsTab> {
             totalRowCount: effectiveRows.length,
             filteredRowCount: filteredRows.length,
             columns: widget.columns,
+            onClose: () => setState(() {
+              _showFilterBar = false;
+              _filterText = '';
+            }),
           ),
 
         // Main Grid Body / Groupings View + Side Panel
@@ -387,6 +395,7 @@ class _ResultsTabState extends material.State<ResultsTab> {
                         columns: widget.columns,
                         rows: filteredRows,
                         stagingBuffer: widget.stagingBuffer,
+                        rowIndicesMapping: _cachedFilteredIndices,
                         onRowSelected: (row) => setState(() => _selectedRowIndex = row),
                         onSelectionValuesChanged: (values) {
                           if (values.isEmpty) {
@@ -412,6 +421,18 @@ class _ResultsTabState extends material.State<ResultsTab> {
                             _focusedColumnName = colName;
                             _focusedCellValue = cellVal;
                             _focusedRowIndex = rowIdx;
+                          });
+                        },
+                        onFilterRequested: (filterExpr) {
+                          setState(() {
+                            _showFilterBar = true;
+                            if (_filterText.trim().isEmpty) {
+                              _filterText = filterExpr;
+                            } else if (_filterText.contains(' OR ') || _filterText.contains(' or ')) {
+                              _filterText = '($_filterText) AND $filterExpr';
+                            } else {
+                              _filterText = '$_filterText AND $filterExpr';
+                            }
                           });
                         },
                       ),

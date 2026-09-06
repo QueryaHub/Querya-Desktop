@@ -13,6 +13,7 @@ import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
 import 'package:querya_desktop/core/layout/querya_split_handle.dart';
 import 'package:querya_desktop/core/motion/querya_spring.dart';
 import 'package:querya_desktop/core/motion/querya_spring_controller.dart';
+import 'package:querya_desktop/core/platform/file_launch_service.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/extensions/sandbox/unsandboxed_launch_consent_gate.dart';
@@ -63,9 +64,14 @@ class _MainScreenState extends State<MainScreen> {
       final completed = await AppSettings.instance.getHasCompletedWelcomeTour();
       if (!completed && mounted) {
         final connections = await LocalDb.instance.getConnections();
-        if (connections.isEmpty && mounted) {
+        if (connections.isEmpty &&
+            mounted &&
+            !FileLaunchService.instance.hasPendingTarget) {
           _onOpenWelcomeTour();
         }
+      }
+      if (mounted) {
+        await _handlePendingFileLaunch();
       }
     });
   }
@@ -134,6 +140,51 @@ class _MainScreenState extends State<MainScreen> {
       } else {
         // Ctrl+N: New Database Connection
         unawaited(_onNewDatabaseConnectionFromMenu());
+      }
+      return true;
+    }
+
+    // New Query Tab: Ctrl+T / Cmd+T (Physical T, Logical T, Russian 'е')
+    final isKeyT = physical == PhysicalKeyboardKey.keyT ||
+        logical == LogicalKeyboardKey.keyT ||
+        logical == const LogicalKeyboardKey(0x00000435); // Russian 'е'
+    if (isCmdOrCtrl && !isShift && !isAlt && isKeyT) {
+      final ctx = FocusManager.instance.primaryFocus?.context ?? context;
+      final handled = Actions.maybeInvoke(ctx, const NewSqlIntent());
+      if (handled == null) {
+        SqlEditorCommandBridge.instance.invokeNew();
+      }
+      return true;
+    }
+
+    // Close Query Tab: Ctrl+W / Cmd+W (Physical W, Logical W, Russian 'ц')
+    final isKeyW = physical == PhysicalKeyboardKey.keyW ||
+        logical == LogicalKeyboardKey.keyW ||
+        logical == const LogicalKeyboardKey(0x00000446); // Russian 'ц'
+    if (isCmdOrCtrl && !isShift && !isAlt && isKeyW) {
+      final ctx = FocusManager.instance.primaryFocus?.context ?? context;
+      final handled = Actions.maybeInvoke(ctx, const CloseSqlTabIntent());
+      if (handled == null) {
+        SqlEditorCommandBridge.instance.invokeCloseTab();
+      }
+      return true;
+    }
+
+    // Next / Prev Tab: Ctrl+Tab / Ctrl+Shift+Tab
+    final isTab = physical == PhysicalKeyboardKey.tab ||
+        logical == LogicalKeyboardKey.tab;
+    if (isCmdOrCtrl && !isAlt && isTab) {
+      final ctx = FocusManager.instance.primaryFocus?.context ?? context;
+      if (isShift) {
+        final handled = Actions.maybeInvoke(ctx, const PrevSqlTabIntent());
+        if (handled == null) {
+          SqlEditorCommandBridge.instance.invokePrevTab();
+        }
+      } else {
+        final handled = Actions.maybeInvoke(ctx, const NextSqlTabIntent());
+        if (handled == null) {
+          SqlEditorCommandBridge.instance.invokeNextTab();
+        }
       }
       return true;
     }
@@ -356,6 +407,63 @@ class _MainScreenState extends State<MainScreen> {
       _workspace.value = _workspace.value.selectConnection(demoConn);
       _onSqliteOpenSqlWorkspace(demoConn);
     } catch (_) {}
+  }
+
+  Future<void> _handlePendingFileLaunch() async {
+    final targets = FileLaunchService.instance.consumePendingTargets();
+    if (targets.isEmpty || !mounted) return;
+
+    for (final target in targets) {
+      if (!mounted) return;
+      try {
+        if (target.kind == FileLaunchKind.sqlite) {
+          final conn = await FileLaunchService.instance
+              .resolveOrRegisterSqliteConnection(target);
+          if (!mounted) return;
+          await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
+          _workspace.value = _workspace.value.selectConnection(conn);
+          _onSqliteOpenSqlWorkspace(conn);
+        } else if (target.kind == FileLaunchKind.sql) {
+          final sql = await FileLaunchService.instance.readSqlContent(target);
+          if (!mounted) return;
+
+          var conn = _workspace.value.activeConnection;
+          if (conn == null) {
+            final connections = await LocalDb.instance.getConnections();
+            if (connections.isNotEmpty) {
+              conn = connections.first;
+            } else {
+              final scratchRow = ConnectionRow(
+                name: 'Local Scratch (${target.fileName})',
+                type: 'sqlite',
+                host: '',
+                createdAt: DateTime.now().toUtc().toIso8601String(),
+              );
+              final id = await LocalDb.instance.addConnection(scratchRow);
+              conn = scratchRow.copyWith(id: id);
+              await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
+            }
+          }
+
+          if (mounted) {
+            _workspace.value = _workspace.value.selectConnection(conn);
+            _openSqlWorkspaceForConnection(conn);
+            SqlEditorCommandBridge.instance.openFileWithContent(
+              sql: sql,
+              filePath: target.path,
+              title: target.fileName,
+            );
+          }
+        }
+      } catch (e) {
+        if (!mounted) return;
+        showAppToast(
+          context: context,
+          message: 'Failed to open file "${target.fileName}": $e',
+          variant: AppToastVariant.error,
+        );
+      }
+    }
   }
 
   @override

@@ -1,3 +1,8 @@
+import 'dart:convert';
+import 'dart:math' as math;
+
+import 'package:flutter/foundation.dart' as foundation;
+import 'package:flutter/gestures.dart' show kSecondaryMouseButton;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart'
     show Clipboard, ClipboardData, HardwareKeyboard, LogicalKeyboardKey;
@@ -12,7 +17,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 abstract final class ResultGridMetrics {
   static const double rowHeight = 36;
   static const double headerHeight = 36;
-  static const double minColumnWidth = 120;
+  static const double minColumnWidth = 56;
   static const double maxColumnWidth = 280;
   static const int columnWidthSampleRows = 40;
   static const int tooltipMinLength = 48;
@@ -82,15 +87,111 @@ List<double> computeResultGridColumnWidths({
   final sample = rows.length < sampleRowCount ? rows.length : sampleRowCount;
 
   for (var c = 0; c < columns.length; c++) {
-    var maxChars = columns[c].length;
+    final headerWidth = columns[c].length * 7.5 + 38.0;
+    var maxRowChars = 0;
     for (var r = 0; r < sample; r++) {
-      if (c < rows[r].length && rows[r][c].length > maxChars) {
-        maxChars = rows[r][c].length;
+      if (c < rows[r].length && rows[r][c].length > maxRowChars) {
+        maxRowChars = rows[r][c].length;
       }
     }
-    widths[c] = (maxChars * 7.5 + 24).clamp(minWidth, maxWidth);
+    final contentWidth = maxRowChars * 7.5 + 24.0;
+    final naturalWidth = math.max(headerWidth, contentWidth);
+    widths[c] = naturalWidth.clamp(minWidth, maxWidth);
   }
   return widths;
+}
+
+/// Distributes spare viewport width adaptively to columns that benefit from expansion,
+/// avoiding artificial stretching of compact columns.
+List<double> distributeResultGridSpareWidth({
+  required List<double> columnWidths,
+  required List<String> columns,
+  required List<List<String>> rows,
+  required double availableWidth,
+  double maxColumnWidth = ResultGridMetrics.maxColumnWidth,
+  int sampleRowCount = ResultGridMetrics.columnWidthSampleRows,
+}) {
+  if (columnWidths.isEmpty || columns.isEmpty) return columnWidths;
+
+  final totalInitial = columnWidths.fold<double>(0.0, (sum, w) => sum + w);
+  final spare = availableWidth - totalInitial;
+  if (spare <= 0.5) return columnWidths;
+
+  final sample = rows.length < sampleRowCount ? rows.length : sampleRowCount;
+  final desiredWidths = List<double>.filled(columns.length, 0);
+
+  for (var c = 0; c < columns.length; c++) {
+    final headerWidth = columns[c].length * 7.5 + 38.0;
+    var maxRowChars = 0;
+    for (var r = 0; r < sample; r++) {
+      if (c < rows[r].length && rows[r][c].length > maxRowChars) {
+        maxRowChars = rows[r][c].length;
+      }
+    }
+    final contentWidth = maxRowChars * 7.5 + 24.0;
+    desiredWidths[c] = math.max(headerWidth, contentWidth);
+  }
+
+  // Deficit columns: columns whose desired width exceeds the clamped initial width
+  final deficits = List<double>.filled(columns.length, 0);
+  var totalDeficit = 0.0;
+  for (var c = 0; c < columns.length; c++) {
+    if (desiredWidths[c] > columnWidths[c]) {
+      final def = desiredWidths[c] - columnWidths[c];
+      deficits[c] = def;
+      totalDeficit += def;
+    }
+  }
+
+  final result = List<double>.from(columnWidths);
+
+  if (totalDeficit > 0) {
+    if (spare <= totalDeficit) {
+      final ratio = spare / totalDeficit;
+      for (var c = 0; c < columns.length; c++) {
+        if (deficits[c] > 0) {
+          result[c] += deficits[c] * ratio;
+        }
+      }
+      return result;
+    } else {
+      for (var c = 0; c < columns.length; c++) {
+        if (deficits[c] > 0) {
+          result[c] += deficits[c];
+        }
+      }
+      final remainingSpare = spare - totalDeficit;
+      _distributeRemainingSpare(result, remainingSpare);
+      return result;
+    }
+  } else {
+    _distributeRemainingSpare(result, spare);
+    return result;
+  }
+}
+
+void _distributeRemainingSpare(List<double> widths, double spare) {
+  final weights = List<double>.filled(widths.length, 0);
+  var totalWeight = 0.0;
+  for (var i = 0; i < widths.length; i++) {
+    if (widths[i] > 110) {
+      final w = widths[i] - 100;
+      weights[i] = w;
+      totalWeight += w;
+    }
+  }
+
+  if (totalWeight <= 0) {
+    return;
+  }
+
+  final ratio = spare / totalWeight;
+  for (var i = 0; i < widths.length; i++) {
+    if (weights[i] > 0) {
+      final extra = math.min(weights[i] * ratio, 120.0);
+      widths[i] += extra;
+    }
+  }
 }
 
 /// Prefix sums: `offsets[i]` = sum of widths `[0, i)`.
@@ -232,15 +333,25 @@ class ResultGridSelection {
   int get columnCount => endColumn - startColumn + 1;
 
   /// Formats selected cell values as a Tab-Separated Values (TSV) string.
-  String toTsv(List<List<String>> rows) {
+  /// If [columns] is provided, prepends a header row for the selected column range.
+  String toTsv(List<List<String>> rows, {List<String>? columns}) {
     if (rows.isEmpty) return '';
     final buffer = StringBuffer();
+    if (columns != null && columns.isNotEmpty) {
+      final headerCells = <String>[];
+      for (var c = startColumn; c <= endColumn; c++) {
+        final col = c < columns.length ? columns[c] : '';
+        headerCells.add(_escapeTsv(col));
+      }
+      buffer.writeln(headerCells.join('\t'));
+    }
     for (var r = startRow; r <= endRow; r++) {
       if (r < 0 || r >= rows.length) continue;
       final rowData = rows[r];
       final cells = <String>[];
       for (var c = startColumn; c <= endColumn; c++) {
-        cells.add(c < rowData.length ? rowData[c] : '');
+        final val = c < rowData.length ? rowData[c] : '';
+        cells.add(_escapeTsv(val));
       }
       buffer.writeln(cells.join('\t'));
     }
@@ -248,24 +359,80 @@ class ResultGridSelection {
   }
 
   /// Formats selected cell values as a CSV string.
-  String toCsv(List<List<String>> rows) {
+  /// If [columns] is provided, prepends a header row for the selected column range.
+  String toCsv(List<List<String>> rows, {List<String>? columns}) {
     if (rows.isEmpty) return '';
     final buffer = StringBuffer();
+    if (columns != null && columns.isNotEmpty) {
+      final headerCells = <String>[];
+      for (var c = startColumn; c <= endColumn; c++) {
+        final col = c < columns.length ? columns[c] : '';
+        headerCells.add(_escapeCsv(col));
+      }
+      buffer.writeln(headerCells.join(','));
+    }
     for (var r = startRow; r <= endRow; r++) {
       if (r < 0 || r >= rows.length) continue;
       final rowData = rows[r];
       final cells = <String>[];
       for (var c = startColumn; c <= endColumn; c++) {
         final val = c < rowData.length ? rowData[c] : '';
-        if (val.contains(',') || val.contains('"') || val.contains('\n')) {
-          cells.add('"${val.replaceAll('"', '""')}"');
-        } else {
-          cells.add(val);
-        }
+        cells.add(_escapeCsv(val));
       }
       buffer.writeln(cells.join(','));
     }
     return buffer.toString().trimRight();
+  }
+
+  /// Formats selected cell values as a formatted JSON string.
+  /// Returns a JSON object for single-row selection, or a JSON array for multi-row selection.
+  String toJson(List<String> columns, List<List<String>> rows) {
+    if (rows.isEmpty || columns.isEmpty) return '[]';
+    final result = <Map<String, dynamic>>[];
+    for (var r = startRow; r <= endRow; r++) {
+      if (r < 0 || r >= rows.length) continue;
+      final rowData = rows[r];
+      final map = <String, dynamic>{};
+      for (var c = startColumn; c <= endColumn; c++) {
+        final colName = c < columns.length ? columns[c] : 'col_$c';
+        final val = c < rowData.length ? rowData[c] : '';
+        if (val == 'NULL') {
+          map[colName] = null;
+        } else if (RegExp(r'^0\d+$').hasMatch(val.trim())) {
+          // Preserve numeric strings with leading zeros (e.g. '01234', '007')
+          map[colName] = val;
+        } else if (int.tryParse(val) != null) {
+          map[colName] = int.parse(val);
+        } else if (double.tryParse(val) != null) {
+          map[colName] = double.parse(val);
+        } else if (val.toLowerCase() == 'true') {
+          map[colName] = true;
+        } else if (val.toLowerCase() == 'false') {
+          map[colName] = false;
+        } else {
+          map[colName] = val;
+        }
+      }
+      result.add(map);
+    }
+    if (result.length == 1) {
+      return const JsonEncoder.withIndent('  ').convert(result.first);
+    }
+    return const JsonEncoder.withIndent('  ').convert(result);
+  }
+
+  static String _escapeTsv(String val) {
+    if (val.contains('\t') || val.contains('\n') || val.contains('\r') || val.contains('"')) {
+      return '"${val.replaceAll('"', '""')}"';
+    }
+    return val;
+  }
+
+  static String _escapeCsv(String val) {
+    if (val.contains(',') || val.contains('"') || val.contains('\n') || val.contains('\r')) {
+      return '"${val.replaceAll('"', '""')}"';
+    }
+    return val;
   }
 
   @override
@@ -347,14 +514,31 @@ class _SortKey implements Comparable<_SortKey> {
   }
 }
 
+/// Result of sorting rows in [VirtualResultGrid], preserving model indices.
+class SortedResultGridData {
+  final List<List<String>> rows;
+  final List<int> sortedToModelIndices;
+
+  const SortedResultGridData({
+    required this.rows,
+    required this.sortedToModelIndices,
+  });
+}
+
 /// Sorts rows by the specified column index with natural numeric / temporal / lexicographic comparison.
 /// Uses Schwartzian transform (Decorate-Sort-Undecorate) to precompute sort keys in O(N) time.
-List<List<String>> sortResultGridRows({
+/// Returns [SortedResultGridData] containing sorted rows and their corresponding model indices.
+SortedResultGridData sortResultGridRowsWithIndices({
   required List<List<String>> rows,
   required int columnIndex,
   required ResultGridSortOrder order,
 }) {
-  if (rows.isEmpty || columnIndex < 0) return rows;
+  if (rows.isEmpty || columnIndex < 0) {
+    return SortedResultGridData(
+      rows: rows,
+      sortedToModelIndices: List<int>.generate(rows.length, (i) => i, growable: false),
+    );
+  }
   final n = rows.length;
 
   final keys = List<_SortKey>.generate(n, (i) {
@@ -370,7 +554,68 @@ List<List<String>> sortResultGridRows({
     return order == ResultGridSortOrder.ascending ? cmp : -cmp;
   });
 
-  return List<List<String>>.generate(n, (i) => rows[indices[i]], growable: false);
+  final sortedRows = List<List<String>>.generate(n, (i) => rows[indices[i]], growable: false);
+  return SortedResultGridData(
+    rows: sortedRows,
+    sortedToModelIndices: indices,
+  );
+}
+
+/// Sorts rows by the specified column index with natural numeric / temporal / lexicographic comparison.
+List<List<String>> sortResultGridRows({
+  required List<List<String>> rows,
+  required int columnIndex,
+  required ResultGridSortOrder order,
+}) {
+  return sortResultGridRowsWithIndices(
+    rows: rows,
+    columnIndex: columnIndex,
+    order: order,
+  ).rows;
+}
+
+/// Default threshold for offloading data grid sorting to a background isolate.
+const int kSortIsolateThreshold = 3000;
+
+class _SortIsolateParams {
+  final List<List<String>> rows;
+  final int columnIndex;
+  final ResultGridSortOrder order;
+
+  const _SortIsolateParams({
+    required this.rows,
+    required this.columnIndex,
+    required this.order,
+  });
+}
+
+SortedResultGridData _sortResultGridRowsWithIndicesIsolate(_SortIsolateParams params) {
+  return sortResultGridRowsWithIndices(
+    rows: params.rows,
+    columnIndex: params.columnIndex,
+    order: params.order,
+  );
+}
+
+/// Adaptive sort function that executes synchronously for small lists (< [kSortIsolateThreshold]),
+/// and offloads to a background isolate for large datasets to keep UI fluid.
+Future<SortedResultGridData> sortResultGridRowsWithIndicesAdaptive({
+  required List<List<String>> rows,
+  required int columnIndex,
+  required ResultGridSortOrder order,
+  int threshold = kSortIsolateThreshold,
+}) async {
+  if (rows.length < threshold) {
+    return sortResultGridRowsWithIndices(
+      rows: rows,
+      columnIndex: columnIndex,
+      order: order,
+    );
+  }
+  return foundation.compute(
+    _sortResultGridRowsWithIndicesIsolate,
+    _SortIsolateParams(rows: rows, columnIndex: columnIndex, order: order),
+  );
 }
 
 /// Virtualized read-only or interactive grid for SQL query results (rows + columns).
@@ -380,17 +625,21 @@ class VirtualResultGrid extends material.StatefulWidget {
     required this.columns,
     required this.rows,
     this.stagingBuffer,
+    this.rowIndicesMapping,
     this.onRowSelected,
     this.onSelectionValuesChanged,
     this.onCellFocused,
+    this.onFilterRequested,
   });
 
   final List<String> columns;
   final List<List<String>> rows;
   final DataGridStagingBuffer? stagingBuffer;
+  final List<int>? rowIndicesMapping;
   final material.ValueChanged<int?>? onRowSelected;
   final material.ValueChanged<List<String>>? onSelectionValuesChanged;
   final void Function(String columnName, String cellValue, int rowIndex)? onCellFocused;
+  final void Function(String filterExpression)? onFilterRequested;
 
   @override
   material.State<VirtualResultGrid> createState() => _VirtualResultGridState();
@@ -409,7 +658,9 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
 
   int? _sortColumnIndex;
   ResultGridSortOrder? _sortOrder;
+  int _sortVersion = 0;
   List<List<String>> _sortedRows = const [];
+  List<int> _sortedToModelIndices = const [];
 
   ResultGridCellCoordinate? _selectionAnchor;
   ResultGridCellCoordinate? _selectionFocus;
@@ -447,7 +698,8 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     }
     if (oldWidget.columns != widget.columns ||
         oldWidget.rows != widget.rows ||
-        oldWidget.stagingBuffer != widget.stagingBuffer) {
+        oldWidget.stagingBuffer != widget.stagingBuffer ||
+        oldWidget.rowIndicesMapping != widget.rowIndicesMapping) {
       _widthsNeedUpdate = true;
       if (oldWidget.columns != widget.columns) {
         _userHasResized = false;
@@ -471,6 +723,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     _verticalController.dispose();
     _focusNode.dispose();
     _sortedRows = const [];
+    _sortedToModelIndices = const [];
     _columnWidths = const [];
     _columnOffsets = const [0];
     super.dispose();
@@ -497,6 +750,13 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     });
   }
 
+  int _toModelRowIndex(int visualRow) {
+    if (visualRow >= 0 && visualRow < _sortedToModelIndices.length) {
+      return _sortedToModelIndices[visualRow];
+    }
+    return visualRow;
+  }
+
   void _commitEdit(
     int row,
     int column,
@@ -507,7 +767,8 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     bool movePrevRow = false,
   }) {
     if (widget.stagingBuffer != null) {
-      widget.stagingBuffer!.setCell(row, column, value);
+      final modelRow = _toModelRowIndex(row);
+      widget.stagingBuffer!.setCell(modelRow, column, value);
     }
     setState(() {
       if (moveNextCol) {
@@ -610,7 +871,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
       rowIndex: row,
     );
     if (result != null && widget.stagingBuffer != null) {
-      widget.stagingBuffer!.setCell(row, column, result);
+      widget.stagingBuffer!.setCell(_toModelRowIndex(row), column, result);
     }
   }
 
@@ -635,6 +896,37 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     });
   }
 
+  void _onColumnAutoFit(int index) {
+    if (index < 0 ||
+        index >= widget.columns.length ||
+        index >= _columnWidths.length) {
+      return;
+    }
+    final rows = _baseRows;
+    final headerWidth = widget.columns[index].length * 7.5 + 38.0;
+    var maxRowChars = 0;
+    final sampleCount = math.min(rows.length, 200);
+    for (var r = 0; r < sampleCount; r++) {
+      if (index < rows[r].length &&
+          rows[r][index].length > maxRowChars) {
+        maxRowChars = rows[r][index].length;
+      }
+    }
+    final contentWidth = maxRowChars * 7.5 + 24.0;
+    final naturalWidth = math.max(headerWidth, contentWidth);
+    final minWidth = context.scaled(ResultGridMetrics.minColumnWidth);
+    final maxWidth = context.scaled(ResultGridMetrics.maxColumnWidth * 3);
+    final autoFitWidth = naturalWidth.clamp(minWidth, maxWidth);
+
+    setState(() {
+      _userHasResized = true;
+      _columnWidths = List<double>.from(_columnWidths);
+      _columnWidths[index] = autoFitWidth;
+      _columnOffsets = computeResultGridColumnOffsets(_columnWidths);
+      _widthsNeedUpdate = false;
+    });
+  }
+
   void _toggleSort(int columnIndex) {
     if (columnIndex < 0 || columnIndex >= widget.columns.length) return;
     setState(() {
@@ -653,19 +945,68 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     });
   }
 
-  List<List<String>> get _baseRows =>
-      widget.stagingBuffer?.effectiveRows ?? widget.rows;
+  List<List<String>> get _baseRows {
+    if (widget.rowIndicesMapping != null) {
+      return widget.rows;
+    }
+    return widget.stagingBuffer?.effectiveRows ?? widget.rows;
+  }
 
-  void _updateSortedRows() {
+  void _updateSortedRows({bool asyncIfLarge = true}) {
     final rows = _baseRows;
     if (_sortColumnIndex == null || _sortOrder == null) {
       _sortedRows = rows;
+      if (widget.rowIndicesMapping != null) {
+        _sortedToModelIndices = List<int>.from(widget.rowIndicesMapping!);
+      } else {
+        _sortedToModelIndices = List<int>.generate(rows.length, (i) => i, growable: false);
+      }
+      return;
+    }
+
+    final sortCol = _sortColumnIndex!;
+    final sortOrd = _sortOrder!;
+    final version = ++_sortVersion;
+
+    if (asyncIfLarge && rows.length >= kSortIsolateThreshold) {
+      foundation.compute(
+        _sortResultGridRowsWithIndicesIsolate,
+        _SortIsolateParams(rows: rows, columnIndex: sortCol, order: sortOrd),
+      ).then((sortedData) {
+        if (!mounted || version != _sortVersion) return;
+        setState(() {
+          _applySortedData(sortedData, rows);
+        });
+      }).catchError((_) {
+        if (!mounted || version != _sortVersion) return;
+        setState(() {
+          final fallback = sortResultGridRowsWithIndices(
+            rows: rows,
+            columnIndex: sortCol,
+            order: sortOrd,
+          );
+          _applySortedData(fallback, rows);
+        });
+      });
     } else {
-      _sortedRows = sortResultGridRows(
+      final sortedData = sortResultGridRowsWithIndices(
         rows: rows,
-        columnIndex: _sortColumnIndex!,
-        order: _sortOrder!,
+        columnIndex: sortCol,
+        order: sortOrd,
       );
+      _applySortedData(sortedData, rows);
+    }
+  }
+
+  void _applySortedData(SortedResultGridData sortedData, List<List<String>> rows) {
+    _sortedRows = sortedData.rows;
+    if (widget.rowIndicesMapping != null) {
+      final mapping = widget.rowIndicesMapping!;
+      _sortedToModelIndices = sortedData.sortedToModelIndices
+          .map((i) => i < mapping.length ? mapping[i] : i)
+          .toList(growable: false);
+    } else {
+      _sortedToModelIndices = sortedData.sortedToModelIndices;
     }
   }
 
@@ -696,14 +1037,16 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
       if (r >= 0 && r < rows.length && c >= 0 && c < widget.columns.length) {
         final colName = widget.columns[c];
         final val = c < rows[r].length ? rows[r][c] : '';
-        widget.onCellFocused!(colName, val, r);
+        final modelRow = _toModelRowIndex(r);
+        widget.onCellFocused!(colName, val, modelRow);
       }
     }
   }
 
   void _onCellTap(int row, int column, {bool isShift = false}) {
     _focusNode.requestFocus();
-    widget.onRowSelected?.call(row);
+    final modelRow = _toModelRowIndex(row);
+    widget.onRowSelected?.call(modelRow);
     setState(() {
       final coord = ResultGridCellCoordinate(row, column);
       if (isShift && _selectionAnchor != null) {
@@ -730,7 +1073,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     _focusNode.requestFocus();
     widget.onRowSelected?.call(row);
     if (_selection != null && _selection!.contains(row, column)) {
-      _copySelection();
+      // Keep existing selection intact so context menu operates on whole selection if clicked inside
     } else {
       setState(() {
         final coord = ResultGridCellCoordinate(row, column);
@@ -744,18 +1087,151 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
         );
       });
       _notifySelectionAndFocus();
-      _copySelection();
     }
   }
 
-  void _copySelection({bool asCsv = false}) {
+  void _copySelection({bool withHeaders = false, bool asCsv = false, bool asJson = false}) {
     if (_selection == null) return;
-    final text = asCsv
-        ? _selection!.toCsv(_sortedRows)
-        : _selection!.toTsv(_sortedRows);
+    _copySelectionData(
+      _selection!,
+      withHeaders: withHeaders,
+      asCsv: asCsv,
+      asJson: asJson,
+    );
+  }
+
+  void _handleCopyCell(
+    int row,
+    int column, {
+    bool withHeaders = false,
+    bool asCsv = false,
+    bool asJson = false,
+  }) {
+    final sel = (_selection != null && _selection!.contains(row, column))
+        ? _selection!
+        : ResultGridSelection(
+            startRow: row,
+            startColumn: column,
+            endRow: row,
+            endColumn: column,
+          );
+    _copySelectionData(
+      sel,
+      withHeaders: withHeaders,
+      asCsv: asCsv,
+      asJson: asJson,
+    );
+  }
+
+  void _copySelectionData(
+    ResultGridSelection sel, {
+    bool withHeaders = false,
+    bool asCsv = false,
+    bool asJson = false,
+  }) {
+    if (_sortedRows.isEmpty) return;
+    String text;
+    if (asJson) {
+      text = sel.toJson(widget.columns, _sortedRows);
+    } else if (asCsv) {
+      text = sel.toCsv(
+        _sortedRows,
+        columns: withHeaders ? widget.columns : null,
+      );
+    } else {
+      text = sel.toTsv(
+        _sortedRows,
+        columns: withHeaders ? widget.columns : null,
+      );
+    }
     if (text.isNotEmpty) {
       Clipboard.setData(ClipboardData(text: text));
     }
+  }
+
+  void _handleFilterByValue(int row, int col, {required bool invert}) {
+    if (widget.onFilterRequested == null) return;
+    if (col >= widget.columns.length || row >= _sortedRows.length) return;
+    final colName = widget.columns[col];
+    final rowData = _sortedRows[row];
+    final cellVal = col < rowData.length ? rowData[col] : '';
+
+    String expr;
+    if (cellVal == 'NULL') {
+      expr = invert ? '$colName IS NOT NULL' : '$colName IS NULL';
+    } else if (num.tryParse(cellVal) != null) {
+      expr = invert ? '$colName != $cellVal' : '$colName = $cellVal';
+    } else {
+      final escaped = cellVal.replaceAll("'", "''");
+      expr = invert ? "$colName != '$escaped'" : "$colName = '$escaped'";
+    }
+    widget.onFilterRequested!(expr);
+  }
+
+  void _handleFilterComparison(int row, int col, String operator) {
+    if (widget.onFilterRequested == null) return;
+    if (col >= widget.columns.length || row >= _sortedRows.length) return;
+    final colName = widget.columns[col];
+    final rowData = _sortedRows[row];
+    final cellVal = col < rowData.length ? rowData[col] : '';
+    if (num.tryParse(cellVal) == null) return;
+
+    widget.onFilterRequested!('$colName $operator $cellVal');
+  }
+
+  void _handleSetNull(int row, int col) {
+    if (widget.stagingBuffer == null) return;
+    final sel = (_selection != null && _selection!.contains(row, col))
+        ? _selection!
+        : ResultGridSelection(startRow: row, startColumn: col, endRow: row, endColumn: col);
+    for (var r = sel.startRow; r <= sel.endRow; r++) {
+      final modelRow = _toModelRowIndex(r);
+      for (var c = sel.startColumn; c <= sel.endColumn; c++) {
+        widget.stagingBuffer!.setCellNull(modelRow, c);
+      }
+    }
+  }
+
+  void _handleSetEmpty(int row, int col) {
+    if (widget.stagingBuffer == null) return;
+    final sel = (_selection != null && _selection!.contains(row, col))
+        ? _selection!
+        : ResultGridSelection(startRow: row, startColumn: col, endRow: row, endColumn: col);
+    for (var r = sel.startRow; r <= sel.endRow; r++) {
+      final modelRow = _toModelRowIndex(r);
+      for (var c = sel.startColumn; c <= sel.endColumn; c++) {
+        widget.stagingBuffer!.setCell(modelRow, c, '');
+      }
+    }
+  }
+
+  void _handleRevertCell(int row, int col) {
+    if (widget.stagingBuffer == null) return;
+    final sel = (_selection != null && _selection!.contains(row, col))
+        ? _selection!
+        : ResultGridSelection(startRow: row, startColumn: col, endRow: row, endColumn: col);
+    for (var r = sel.startRow; r <= sel.endRow; r++) {
+      final modelRow = _toModelRowIndex(r);
+      for (var c = sel.startColumn; c <= sel.endColumn; c++) {
+        widget.stagingBuffer!.revertCell(modelRow, c);
+      }
+    }
+  }
+
+  void _handleDuplicateRow(int row) {
+    if (widget.stagingBuffer == null || row >= _sortedRows.length) return;
+    final rowData = _sortedRows[row];
+    widget.stagingBuffer!.addRow(List<String>.from(rowData));
+  }
+
+  void _handleToggleDeleteRow(int row) {
+    if (widget.stagingBuffer == null || row >= _sortedRows.length) return;
+    widget.stagingBuffer!.toggleDeleteRow(_toModelRowIndex(row));
+  }
+
+  void _handleRevertRow(int row) {
+    if (widget.stagingBuffer == null || row >= _sortedRows.length) return;
+    widget.stagingBuffer!.revertRow(_toModelRowIndex(row));
   }
 
   List<double> _computeColumnWidths() {
@@ -977,6 +1453,32 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
           control: true,
         ): () => _copySelection(),
         const material.SingleActivator(
+          LogicalKeyboardKey.keyC,
+          meta: true,
+          shift: true,
+        ): () => _copySelection(withHeaders: true),
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyC,
+          control: true,
+          shift: true,
+        ): () => _copySelection(withHeaders: true),
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyD,
+          control: true,
+        ): () {
+          if (widget.stagingBuffer != null && _selection != null) {
+            _handleDuplicateRow(_selection!.startRow);
+          }
+        },
+        const material.SingleActivator(
+          LogicalKeyboardKey.keyD,
+          meta: true,
+        ): () {
+          if (widget.stagingBuffer != null && _selection != null) {
+            _handleDuplicateRow(_selection!.startRow);
+          }
+        },
+        const material.SingleActivator(
           LogicalKeyboardKey.insert,
           control: true,
         ): () => widget.stagingBuffer?.addRow(),
@@ -993,7 +1495,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
           control: true,
         ): () {
           if (widget.stagingBuffer != null && _selection != null) {
-            widget.stagingBuffer!.toggleDeleteRow(_selection!.startRow);
+            widget.stagingBuffer!.toggleDeleteRow(_toModelRowIndex(_selection!.startRow));
           }
         },
         const material.SingleActivator(
@@ -1001,7 +1503,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
           meta: true,
         ): () {
           if (widget.stagingBuffer != null && _selection != null) {
-            widget.stagingBuffer!.toggleDeleteRow(_selection!.startRow);
+            widget.stagingBuffer!.toggleDeleteRow(_toModelRowIndex(_selection!.startRow));
           }
         },
         const material.SingleActivator(
@@ -1009,7 +1511,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
           control: true,
         ): () {
           if (widget.stagingBuffer != null && _selection != null) {
-            widget.stagingBuffer!.revertRow(_selection!.startRow);
+            widget.stagingBuffer!.revertRow(_toModelRowIndex(_selection!.startRow));
           }
         },
         const material.SingleActivator(
@@ -1017,7 +1519,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
           meta: true,
         ): () {
           if (widget.stagingBuffer != null && _selection != null) {
-            widget.stagingBuffer!.revertRow(_selection!.startRow);
+            widget.stagingBuffer!.revertRow(_toModelRowIndex(_selection!.startRow));
           }
         },
         const material.SingleActivator(
@@ -1084,11 +1586,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
           alt: true,
         ): () {
           if (_selection != null && widget.stagingBuffer != null) {
-            widget.stagingBuffer!.setCell(
-              _selection!.startRow,
-              _selection!.startColumn,
-              'NULL',
-            );
+            _handleSetNull(_selection!.startRow, _selection!.startColumn);
           }
         },
 
@@ -1225,10 +1723,17 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
               if (!_userHasResized &&
                   tableWidth < availableWidth &&
                   _columnWidths.isNotEmpty) {
-                final extraPerCol =
-                    (availableWidth - tableWidth) / _columnWidths.length;
-                displayWidths = [for (final w in _columnWidths) w + extraPerCol];
-                tableWidth = availableWidth;
+                displayWidths = distributeResultGridSpareWidth(
+                  columnWidths: _columnWidths,
+                  columns: widget.columns,
+                  rows: _baseRows,
+                  availableWidth: availableWidth,
+                  maxColumnWidth:
+                      context.scaled(ResultGridMetrics.maxColumnWidth),
+                );
+                final distributedWidth =
+                    displayWidths.fold<double>(0.0, (sum, w) => sum + w);
+                tableWidth = math.max(distributedWidth, availableWidth);
               } else if (tableWidth < availableWidth) {
                 tableWidth = availableWidth;
               }
@@ -1257,6 +1762,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
                           sortOrder: _sortOrder,
                           onSortColumn: _toggleSort,
                           onResizeColumn: _onColumnResize,
+                          onAutoFitColumn: _onColumnAutoFit,
                         ),
                         material.Expanded(
                           child: material.Scrollbar(
@@ -1272,7 +1778,9 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
                                 return _DataRow(
                                   key: ValueKey('result-row-$rowIndex'),
                                   rowIndex: rowIndex,
+                                  modelRowIndex: _toModelRowIndex(rowIndex),
                                   row: row,
+                                  columns: widget.columns,
                                   columnWidths: displayWidths,
                                   window: window,
                                   height: rowHeight,
@@ -1281,12 +1789,22 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
                                   selection: _selection,
                                   stagingBuffer: widget.stagingBuffer,
                                   editingCell: _editingCell,
+                                  canFilter: widget.onFilterRequested != null,
                                   onCellTap: _onCellTap,
                                   onCellDoubleTap: _startEditing,
                                   onCellSecondaryTap: _onCellSecondaryTap,
                                   onCommitEdit: _commitEdit,
                                   onCancelEdit: _cancelEdit,
                                   onOpenInspector: _openInspector,
+                                  onCopyCell: _handleCopyCell,
+                                  onFilterByValue: _handleFilterByValue,
+                                  onFilterComparison: _handleFilterComparison,
+                                  onSetNull: _handleSetNull,
+                                  onSetEmpty: _handleSetEmpty,
+                                  onRevertCell: _handleRevertCell,
+                                  onDuplicateRow: _handleDuplicateRow,
+                                  onToggleDeleteRow: _handleToggleDeleteRow,
+                                  onRevertRow: _handleRevertRow,
                                 );
                               },
                             ),
@@ -1316,6 +1834,7 @@ class _HeaderRow extends material.StatelessWidget {
     this.sortOrder,
     this.onSortColumn,
     this.onResizeColumn,
+    this.onAutoFitColumn,
   });
 
   final List<String> columns;
@@ -1327,6 +1846,7 @@ class _HeaderRow extends material.StatelessWidget {
   final ResultGridSortOrder? sortOrder;
   final material.ValueChanged<int>? onSortColumn;
   final void Function(int index, double delta)? onResizeColumn;
+  final void Function(int index)? onAutoFitColumn;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -1354,6 +1874,9 @@ class _HeaderRow extends material.StatelessWidget {
               onResize: onResizeColumn != null
                   ? (delta) => onResizeColumn!(i, delta)
                   : null,
+              onAutoFit: onAutoFitColumn != null
+                  ? () => onAutoFitColumn!(i)
+                  : null,
             ),
           if (window.trailingWidth > 0)
             material.SizedBox(width: window.trailingWidth),
@@ -1371,6 +1894,7 @@ class _HeaderCell extends material.StatelessWidget {
     this.sortOrder,
     this.onSort,
     this.onResize,
+    this.onAutoFit,
   });
 
   final String text;
@@ -1379,6 +1903,7 @@ class _HeaderCell extends material.StatelessWidget {
   final ResultGridSortOrder? sortOrder;
   final material.VoidCallback? onSort;
   final material.ValueChanged<double>? onResize;
+  final material.VoidCallback? onAutoFit;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -1415,11 +1940,15 @@ class _HeaderCell extends material.StatelessWidget {
                   child: material.Row(
                     children: [
                       material.Expanded(
-                        child: material.Text(
-                          text,
-                          style: style,
-                          overflow: material.TextOverflow.ellipsis,
-                          maxLines: 1,
+                        child: material.Tooltip(
+                          message: text,
+                          waitDuration: kQueryaTooltipWait,
+                          child: material.Text(
+                            text,
+                            style: style,
+                            overflow: material.TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
                         ),
                       ),
                       if (sortOrder != null) ...[
@@ -1438,19 +1967,20 @@ class _HeaderCell extends material.StatelessWidget {
               ),
             ),
           ),
-          if (onResize != null)
+          if (onResize != null || onAutoFit != null)
             material.Positioned(
-              right: -4,
+              right: -5,
               top: 0,
               bottom: 0,
-              width: 10,
+              width: 12,
               child: material.MouseRegion(
                 cursor: material.SystemMouseCursors.resizeColumn,
                 child: material.GestureDetector(
                   behavior: material.HitTestBehavior.translucent,
-                  onHorizontalDragUpdate: (details) {
-                    onResize!(details.delta.dx);
-                  },
+                  onDoubleTap: onAutoFit,
+                  onHorizontalDragUpdate: onResize != null
+                      ? (details) => onResize!(details.delta.dx)
+                      : null,
                 ),
               ),
             ),
@@ -1464,7 +1994,9 @@ class _DataRow extends material.StatelessWidget {
   const _DataRow({
     super.key,
     required this.rowIndex,
+    required this.modelRowIndex,
     required this.row,
+    required this.columns,
     required this.columnWidths,
     required this.window,
     required this.height,
@@ -1473,16 +2005,28 @@ class _DataRow extends material.StatelessWidget {
     this.selection,
     this.stagingBuffer,
     this.editingCell,
+    this.canFilter = false,
     this.onCellTap,
     this.onCellDoubleTap,
     this.onCellSecondaryTap,
     this.onCommitEdit,
     this.onCancelEdit,
     this.onOpenInspector,
+    this.onCopyCell,
+    this.onFilterByValue,
+    this.onFilterComparison,
+    this.onSetNull,
+    this.onSetEmpty,
+    this.onRevertCell,
+    this.onDuplicateRow,
+    this.onToggleDeleteRow,
+    this.onRevertRow,
   });
 
   final int rowIndex;
+  final int modelRowIndex;
   final List<String> row;
+  final List<String> columns;
   final List<double> columnWidths;
   final ResultGridColumnWindow window;
   final double height;
@@ -1491,6 +2035,7 @@ class _DataRow extends material.StatelessWidget {
   final ResultGridSelection? selection;
   final DataGridStagingBuffer? stagingBuffer;
   final ResultGridCellCoordinate? editingCell;
+  final bool canFilter;
   final void Function(int row, int col, {bool isShift})? onCellTap;
   final void Function(int row, int col)? onCellDoubleTap;
   final void Function(int row, int col)? onCellSecondaryTap;
@@ -1505,10 +2050,25 @@ class _DataRow extends material.StatelessWidget {
   })? onCommitEdit;
   final material.VoidCallback? onCancelEdit;
   final void Function(int row, int col)? onOpenInspector;
+  final void Function(
+    int row,
+    int col, {
+    bool withHeaders,
+    bool asJson,
+    bool asCsv,
+  })? onCopyCell;
+  final void Function(int row, int col, {required bool invert})? onFilterByValue;
+  final void Function(int row, int col, String operator)? onFilterComparison;
+  final void Function(int row, int col)? onSetNull;
+  final void Function(int row, int col)? onSetEmpty;
+  final void Function(int row, int col)? onRevertCell;
+  final void Function(int row)? onDuplicateRow;
+  final void Function(int row)? onToggleDeleteRow;
+  final void Function(int row)? onRevertRow;
 
   @override
   material.Widget build(material.BuildContext context) {
-    final rowStatus = stagingBuffer?.getRowStatus(rowIndex) ?? StagedRowStatus.unchanged;
+    final rowStatus = stagingBuffer?.getRowStatus(modelRowIndex) ?? StagedRowStatus.unchanged;
 
     return material.RepaintBoundary(
       child: material.SizedBox(
@@ -1521,12 +2081,13 @@ class _DataRow extends material.StatelessWidget {
               _GridCell(
                 row: rowIndex,
                 column: c,
+                columnName: c < columns.length ? columns[c] : '',
                 text: c < row.length ? row[c] : '',
                 width: columnWidths[c],
                 colorScheme: colorScheme,
                 striped: striped,
                 rowStatus: rowStatus,
-                cellStatus: stagingBuffer?.getCellStatus(rowIndex, c) ?? StagedCellStatus.clean,
+                cellStatus: stagingBuffer?.getCellStatus(modelRowIndex, c) ?? StagedCellStatus.clean,
                 isSelected: selection?.contains(rowIndex, c) ?? false,
                 isEditing: editingCell?.row == rowIndex && editingCell?.column == c,
                 isSelectionTop: selection != null &&
@@ -1541,12 +2102,23 @@ class _DataRow extends material.StatelessWidget {
                 isSelectionRight: selection != null &&
                     selection!.contains(rowIndex, c) &&
                     c == selection!.endColumn,
+                canFilter: canFilter,
+                hasStagingBuffer: stagingBuffer != null,
                 onTap: onCellTap,
                 onDoubleTap: onCellDoubleTap,
                 onSecondaryTap: onCellSecondaryTap,
                 onCommitEdit: onCommitEdit,
                 onCancelEdit: onCancelEdit,
                 onOpenInspector: onOpenInspector,
+                onCopyCell: onCopyCell,
+                onFilterByValue: onFilterByValue,
+                onFilterComparison: onFilterComparison,
+                onSetNull: onSetNull,
+                onSetEmpty: onSetEmpty,
+                onRevertCell: onRevertCell,
+                onDuplicateRow: onDuplicateRow,
+                onToggleDeleteRow: onToggleDeleteRow,
+                onRevertRow: onRevertRow,
               ),
             if (window.trailingWidth > 0)
               material.SizedBox(width: window.trailingWidth),
@@ -1561,6 +2133,7 @@ class _GridCell extends material.StatelessWidget {
   const _GridCell({
     required this.row,
     required this.column,
+    this.columnName = '',
     required this.text,
     required this.width,
     required this.colorScheme,
@@ -1573,16 +2146,28 @@ class _GridCell extends material.StatelessWidget {
     this.isSelectionBottom = false,
     this.isSelectionLeft = false,
     this.isSelectionRight = false,
+    this.canFilter = false,
+    this.hasStagingBuffer = false,
     this.onTap,
     this.onDoubleTap,
     this.onSecondaryTap,
     this.onCommitEdit,
     this.onCancelEdit,
     this.onOpenInspector,
+    this.onCopyCell,
+    this.onFilterByValue,
+    this.onFilterComparison,
+    this.onSetNull,
+    this.onSetEmpty,
+    this.onRevertCell,
+    this.onDuplicateRow,
+    this.onToggleDeleteRow,
+    this.onRevertRow,
   });
 
   final int row;
   final int column;
+  final String columnName;
   final String text;
   final double width;
   final ColorScheme colorScheme;
@@ -1595,6 +2180,8 @@ class _GridCell extends material.StatelessWidget {
   final bool isSelectionBottom;
   final bool isSelectionLeft;
   final bool isSelectionRight;
+  final bool canFilter;
+  final bool hasStagingBuffer;
   final void Function(int row, int col, {bool isShift})? onTap;
   final void Function(int row, int col)? onDoubleTap;
   final void Function(int row, int col)? onSecondaryTap;
@@ -1609,6 +2196,140 @@ class _GridCell extends material.StatelessWidget {
   })? onCommitEdit;
   final material.VoidCallback? onCancelEdit;
   final void Function(int row, int col)? onOpenInspector;
+  final void Function(
+    int row,
+    int col, {
+    bool withHeaders,
+    bool asJson,
+    bool asCsv,
+  })? onCopyCell;
+  final void Function(int row, int col, {required bool invert})? onFilterByValue;
+  final void Function(int row, int col, String operator)? onFilterComparison;
+  final void Function(int row, int col)? onSetNull;
+  final void Function(int row, int col)? onSetEmpty;
+  final void Function(int row, int col)? onRevertCell;
+  final void Function(int row)? onDuplicateRow;
+  final void Function(int row)? onToggleDeleteRow;
+  final void Function(int row)? onRevertRow;
+
+  List<MenuItem> _buildContextMenuItems(material.BuildContext context) {
+    final preview = text.length > 24 ? '${text.substring(0, 22)}…' : text;
+    final isNull = text == 'NULL';
+    final numVal = num.tryParse(text);
+
+    return [
+      MenuButton(
+        leading: const material.Icon(material.Icons.content_copy_rounded, size: 16),
+        trailing: const material.Text('Ctrl+C', style: material.TextStyle(fontSize: 11)),
+        onPressed: (_) => onCopyCell?.call(row, column),
+        child: const material.Text('Copy Value'),
+      ),
+      MenuButton(
+        leading: const material.Icon(material.Icons.table_chart_outlined, size: 16),
+        trailing: const material.Text('Ctrl+Shift+C', style: material.TextStyle(fontSize: 11)),
+        onPressed: (_) => onCopyCell?.call(row, column, withHeaders: true),
+        child: const material.Text('Copy with Headers'),
+      ),
+      MenuButton(
+        leading: const material.Icon(material.Icons.data_object_rounded, size: 16),
+        onPressed: (_) => onCopyCell?.call(row, column, asJson: true),
+        child: const material.Text('Copy as JSON'),
+      ),
+      MenuButton(
+        leading: const material.Icon(material.Icons.grid_on_rounded, size: 16),
+        onPressed: (_) => onCopyCell?.call(row, column, asCsv: true),
+        child: const material.Text('Copy as CSV'),
+      ),
+      if (canFilter && columnName.isNotEmpty) ...[
+        const MenuDivider(),
+        MenuButton(
+          leading: const material.Icon(material.Icons.filter_alt_outlined, size: 16),
+          onPressed: (_) => onFilterByValue?.call(row, column, invert: false),
+          child: material.Text(
+            isNull
+                ? 'Filter by NULL ($columnName IS NULL)'
+                : 'Filter by Value ($columnName = $preview)',
+          ),
+        ),
+        MenuButton(
+          leading: const material.Icon(material.Icons.filter_alt_off_outlined, size: 16),
+          onPressed: (_) => onFilterByValue?.call(row, column, invert: true),
+          child: material.Text(
+            isNull
+                ? 'Filter Out NULL ($columnName IS NOT NULL)'
+                : 'Filter Out ($columnName != $preview)',
+          ),
+        ),
+        if (numVal != null) ...[
+          MenuButton(
+            leading: const material.Icon(material.Icons.chevron_right_rounded, size: 16),
+            onPressed: (_) => onFilterComparison?.call(row, column, '>'),
+            child: material.Text('Filter > $text ($columnName > $text)'),
+          ),
+          MenuButton(
+            leading: const material.Icon(material.Icons.chevron_left_rounded, size: 16),
+            onPressed: (_) => onFilterComparison?.call(row, column, '<'),
+            child: material.Text('Filter < $text ($columnName < $text)'),
+          ),
+        ],
+      ],
+      const MenuDivider(),
+      MenuButton(
+        leading: const material.Icon(material.Icons.visibility_outlined, size: 16),
+        trailing: const material.Text('Ctrl+I', style: material.TextStyle(fontSize: 11)),
+        onPressed: (_) => onOpenInspector?.call(row, column),
+        child: const material.Text('Inspect Cell Value…'),
+      ),
+      if (hasStagingBuffer) ...[
+        MenuButton(
+          leading: const material.Icon(material.Icons.remove_circle_outline_rounded, size: 16),
+          trailing: const material.Text('Alt+N', style: material.TextStyle(fontSize: 11)),
+          onPressed: (_) => onSetNull?.call(row, column),
+          child: const material.Text('Set NULL'),
+        ),
+        MenuButton(
+          leading: const material.Icon(material.Icons.format_clear_rounded, size: 16),
+          onPressed: (_) => onSetEmpty?.call(row, column),
+          child: const material.Text('Set to Empty String'),
+        ),
+        if (cellStatus == StagedCellStatus.modified)
+          MenuButton(
+            leading: const material.Icon(material.Icons.undo_rounded, size: 16),
+            onPressed: (_) => onRevertCell?.call(row, column),
+            child: const material.Text('Revert Cell Changes'),
+          ),
+        const MenuDivider(),
+        MenuButton(
+          leading: const material.Icon(material.Icons.content_paste_go_rounded, size: 16),
+          trailing: const material.Text('Ctrl+D', style: material.TextStyle(fontSize: 11)),
+          onPressed: (_) => onDuplicateRow?.call(row),
+          child: const material.Text('Duplicate Row'),
+        ),
+        MenuButton(
+          leading: material.Icon(
+            rowStatus == StagedRowStatus.deleted
+                ? material.Icons.restore_from_trash_rounded
+                : material.Icons.delete_outline_rounded,
+            size: 16,
+            color: rowStatus == StagedRowStatus.deleted ? null : colorScheme.destructive,
+          ),
+          onPressed: (_) => onToggleDeleteRow?.call(row),
+          child: material.Text(
+            rowStatus == StagedRowStatus.deleted ? 'Restore Deleted Row' : 'Delete Row',
+            style: material.TextStyle(
+              color: rowStatus == StagedRowStatus.deleted ? null : colorScheme.destructive,
+            ),
+          ),
+        ),
+        if (rowStatus == StagedRowStatus.modified || rowStatus == StagedRowStatus.deleted)
+          MenuButton(
+            leading: const material.Icon(material.Icons.restore_rounded, size: 16),
+            onPressed: (_) => onRevertRow?.call(row),
+            child: const material.Text('Revert Row Changes'),
+          ),
+      ],
+    ];
+  }
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -1722,20 +2443,28 @@ class _GridCell extends material.StatelessWidget {
       onDoubleTap: () {
         onDoubleTap?.call(row, column);
       },
-      onSecondaryTap: () {
-        onSecondaryTap?.call(row, column);
-      },
       child: cell,
     );
 
-    if (text.length < ResultGridMetrics.tooltipMinLength) {
-      return interactiveCell;
+    material.Widget content = interactiveCell;
+    if (text.length >= ResultGridMetrics.tooltipMinLength) {
+      content = material.Tooltip(
+        message: text,
+        waitDuration: kQueryaTooltipWait,
+        child: content,
+      );
     }
 
-    return material.Tooltip(
-      message: text,
-      waitDuration: kQueryaTooltipWait,
-      child: interactiveCell,
+    return material.Listener(
+      onPointerDown: (event) {
+        if (event.buttons == kSecondaryMouseButton) {
+          onSecondaryTap?.call(row, column);
+        }
+      },
+      child: ContextMenu(
+        items: _buildContextMenuItems(context),
+        child: content,
+      ),
     );
   }
 }

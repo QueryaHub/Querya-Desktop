@@ -17,4 +17,6 @@ export 'result_grid_view.dart';
 export 'results_tab.dart';
 export 'sql_editor_chrome.dart';
 export 'sql_query_history_dialog.dart';
+export 'sql_query_tab_bar.dart';
+export 'sql_query_tab_session.dart';
 export 'xml_html_formatter.dart';

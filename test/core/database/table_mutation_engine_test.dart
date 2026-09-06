@@ -323,5 +323,34 @@ void main() {
         'NULL',
       );
     });
+
+    test('escapes backslashes in MySQL dialect string literals', () {
+      // Path with backslashes in MySQL
+      expect(
+        TableMutationEngine.formatLiteral(
+          r'C:\Program Files\App\',
+          SqlDialect.mysql,
+        ),
+        r"'C:\\Program Files\\App\\'",
+      );
+
+      // Trailing backslash with single quote
+      expect(
+        TableMutationEngine.formatLiteral(
+          r"test\'end",
+          SqlDialect.mysql,
+        ),
+        r"'test\\''end'",
+      );
+
+      // Postgres does not escape backslashes with double backslash
+      expect(
+        TableMutationEngine.formatLiteral(
+          r'C:\Program Files\',
+          SqlDialect.postgres,
+        ),
+        r"'C:\Program Files\'",
+      );
+    });
   });
 }

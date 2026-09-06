@@ -372,10 +372,30 @@ class _SqliteObjectGroup extends StatefulWidget {
 
 class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
   bool _expanded = false;
+  final _filterController = material.TextEditingController();
+  String _filter = '';
+  final Set<String> _pinnedItems = {};
+
+  @override
+  void dispose() {
+    _filterController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final query = _filter.trim().toLowerCase();
+    final matching = query.isEmpty
+        ? widget.items
+        : widget.items.where((it) => it.toLowerCase().contains(query)).toList();
+    final sorted = [
+      ...matching.where((it) => _pinnedItems.contains(it)),
+      ...matching.where((it) => !_pinnedItems.contains(it)),
+    ];
+
+    final showFilter = widget.items.length >= 8 || _filter.isNotEmpty;
+
     return material.Padding(
       padding: const material.EdgeInsets.only(bottom: 2),
       child: material.Column(
@@ -383,7 +403,9 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
         mainAxisSize: material.MainAxisSize.min,
         children: [
           _PgTreeRow(
-            label: '${widget.label} (${widget.items.length})',
+            label: _filter.isEmpty
+                ? '${widget.label} (${widget.items.length})'
+                : '${widget.label} (${sorted.length}/${widget.items.length})',
             leading: material.AnimatedRotation(
               turns: _expanded ? 0.25 : 0,
               duration: context.motionDuration(QueryaMotion.treeExpand),
@@ -408,47 +430,85 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
           ),
           QueryaAnimatedExpand(
             expanded: _expanded,
-            child: lazyConnectionTreeList(
-              context: context,
-              itemCount: widget.items.length,
-              itemExtent: kConnectionTreeRowExtent,
-              padding: const material.EdgeInsets.only(left: 26),
-              itemBuilder: (context, index) {
-                final item = widget.items[index];
-                final sel = _ConnectionsTreeSelectionScope.of(context);
-                final isSelected = sel != null &&
-                    sel.selectedConnectionId == widget.connection.id &&
-                    sel.selectedSqliteObject != null &&
-                    sel.selectedSqliteObject!.name == item &&
-                    sel.selectedSqliteObject!.kind == widget.objectKind;
-                return _PgTreeRow(
-                  key: material.ValueKey(
-                    'sqlite-${widget.objectKind.name}-$item',
+            child: material.Column(
+              crossAxisAlignment: material.CrossAxisAlignment.stretch,
+              mainAxisSize: material.MainAxisSize.min,
+              children: [
+                if (showFilter)
+                  TreeObjectFilterBar(
+                    controller: _filterController,
+                    hintText: 'Filter ${widget.label.toLowerCase()}...',
+                    onChanged: (val) => setState(() => _filter = val),
+                    onClear: () => setState(() {
+                      _filter = '';
+                      _filterController.clear();
+                    }),
+                    filteredCount: sorted.length,
+                    totalCount: widget.items.length,
                   ),
-                  label: item,
-                  isSelected: isSelected,
-                  icon: widget.itemIcon,
-                  iconSize: QueryaIconSizes.treeLeaf,
-                  iconColor: QueryaTreeTokens.leafIconColor(
-                    theme.colorScheme.primary,
+                if (sorted.isEmpty && widget.items.isNotEmpty)
+                  material.Padding(
+                    padding: const material.EdgeInsets.only(
+                        left: 26, top: 4, bottom: 6),
+                    child: Text('No matching ${widget.label.toLowerCase()}')
+                        .muted()
+                        .xSmall(),
+                  )
+                else
+                  lazyConnectionTreeList(
+                    context: context,
+                    itemCount: sorted.length,
+                    itemExtent: kConnectionTreeRowExtent,
+                    padding: const material.EdgeInsets.only(left: 26),
+                    itemBuilder: (context, index) {
+                      final item = sorted[index];
+                      final isPinned = _pinnedItems.contains(item);
+                      final sel = _ConnectionsTreeSelectionScope.of(context);
+                      final isSelected = sel != null &&
+                          sel.selectedConnectionId == widget.connection.id &&
+                          sel.selectedSqliteObject != null &&
+                          sel.selectedSqliteObject!.name == item &&
+                          sel.selectedSqliteObject!.kind == widget.objectKind;
+                      return _PgTreeRow(
+                        key: material.ValueKey(
+                          'sqlite-${widget.objectKind.name}-$item',
+                        ),
+                        label: item,
+                        isSelected: isSelected,
+                        isPinned: isPinned,
+                        onTogglePin: () {
+                          setState(() {
+                            if (isPinned) {
+                              _pinnedItems.remove(item);
+                            } else {
+                              _pinnedItems.add(item);
+                            }
+                          });
+                        },
+                        icon: widget.itemIcon,
+                        iconSize: QueryaIconSizes.treeLeaf,
+                        iconColor: QueryaTreeTokens.leafIconColor(
+                          theme.colorScheme.primary,
+                        ),
+                        textStyle: material.TextStyle(
+                          fontSize: 11,
+                          color: theme.colorScheme.foreground,
+                        ),
+                        verticalPadding: 2,
+                        onTap: widget.onItemTap != null
+                            ? () => widget.onItemTap!(item)
+                            : null,
+                        connection: widget.connection,
+                        openSqlName: item,
+                        onContextRefresh: widget.onRefresh,
+                        onOpenSqlWorkspace: widget.onOpenSqlWorkspace != null
+                            ? (conn, {database, schema, name, kind}) =>
+                                widget.onOpenSqlWorkspace!(conn)
+                            : null,
+                      );
+                    },
                   ),
-                  textStyle: material.TextStyle(
-                    fontSize: 11,
-                    color: theme.colorScheme.foreground,
-                  ),
-                  verticalPadding: 2,
-                  onTap: widget.onItemTap != null
-                      ? () => widget.onItemTap!(item)
-                      : null,
-                  connection: widget.connection,
-                  openSqlName: item,
-                  onContextRefresh: widget.onRefresh,
-                  onOpenSqlWorkspace: widget.onOpenSqlWorkspace != null
-                      ? (conn, {database, schema, name, kind}) =>
-                          widget.onOpenSqlWorkspace!(conn)
-                      : null,
-                );
-              },
+              ],
             ),
           ),
         ],

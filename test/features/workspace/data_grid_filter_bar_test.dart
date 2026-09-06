@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/features/workspace/data_grid_filter_bar.dart';
 
@@ -165,5 +166,59 @@ void main() {
 
       expect(changeNotifications, ['']);
     });
+
+    testWidgets('shows close button when empty and onClose is provided, invokes onClose on tap', (tester) async {
+      bool closed = false;
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Material(
+            child: DataGridFilterBar(
+              filterText: '',
+              onFilterChanged: (_) {},
+              totalRowCount: 100,
+              filteredRowCount: 100,
+              columns: const ['id', 'name', 'status'],
+              onClose: () => closed = true,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final closeBtn = find.byTooltip('Close filter (Esc)');
+      expect(closeBtn, findsOneWidget);
+
+      await tester.tap(closeBtn);
+      await tester.pumpAndSettle();
+
+      expect(closed, isTrue);
+    });
+
+    testWidgets('handles Escape key by invoking onClose when empty', (tester) async {
+      bool closed = false;
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Material(
+            child: DataGridFilterBar(
+              filterText: '',
+              onFilterChanged: (_) {},
+              totalRowCount: 100,
+              filteredRowCount: 100,
+              columns: const ['id', 'name', 'status'],
+              onClose: () => closed = true,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+
+      expect(closed, isTrue);
+    });
   });
 }
+

@@ -16,8 +16,8 @@ abstract class WindowLayout {
   static const double connectionFormMongoMaxHeight = 820;
 
   /// Preferences / settings dialog.
-  static const double preferencesDialogMaxWidth = 600;
-  static const double preferencesDialogMinWidth = 420;
+  static const double preferencesDialogMaxWidth = 760;
+  static const double preferencesDialogMinWidth = 480;
   static const double preferencesDialogMaxHeight = 760;
 
   /// Horizontal inset for modal dialogs (clamped by screen).
@@ -106,14 +106,16 @@ abstract class WindowLayout {
 
   /// Grid area width (right of sidebar, inner padding applied separately).
   static int dbTypeGridCrossAxisCount(double gridInnerWidth) {
-    if (gridInnerWidth >= 460) return 4;
-    if (gridInnerWidth >= 240) return 2;
+    if (gridInnerWidth >= 620) return 4;
+    if (gridInnerWidth >= 440) return 3;
+    if (gridInnerWidth >= 260) return 2;
     return 1;
   }
 
   static double dbTypeCardHeight(BuildContext context, int crossAxisCount) {
     final base = switch (crossAxisCount) {
       4 => 144.0,
+      3 => 140.0,
       2 => 138.0,
       _ => 132.0,
     };

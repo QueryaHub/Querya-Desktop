@@ -61,6 +61,87 @@ void main() {
       ).single;
       expect(long, greaterThan(short));
     });
+
+    test(
+        'computes compact width for short columns like id and app_id below 100px',
+        () {
+      final widths = computeResultGridColumnWidths(
+        columns: const ['id', 'app_id'],
+        rows: [
+          ['1', '292030'],
+          ['2', '292031'],
+        ],
+      );
+      expect(widths, hasLength(2));
+      expect(widths[0], lessThanOrEqualTo(60));
+      expect(widths[1], lessThan(100));
+    });
+  });
+
+  group('distributeResultGridSpareWidth', () {
+    test(
+        'allocates spare width to deficit column and keeps compact column untouched',
+        () {
+      final columns = ['app_id', 'country', 'description'];
+      final rows = [
+        ['292030', 'kz', 'x' * 100],
+      ];
+      final initialWidths = computeResultGridColumnWidths(
+        columns: columns,
+        rows: rows,
+      );
+      expect(initialWidths[0], lessThan(100));
+      expect(initialWidths[2], equals(280.0));
+
+      final distributed = distributeResultGridSpareWidth(
+        columnWidths: initialWidths,
+        columns: columns,
+        rows: rows,
+        availableWidth: 1000.0,
+      );
+
+      // app_id must not be stretched
+      expect(distributed[0], equals(initialWidths[0]));
+      // country must not be stretched
+      expect(distributed[1], equals(initialWidths[1]));
+      // description should receive spare width to show more content
+      expect(distributed[2], greaterThan(280.0));
+    });
+
+    test('does not bloat compact columns when all columns already fit', () {
+      final columns = ['id', 'code', 'status'];
+      final rows = [
+        ['1', 'kz', 'active'],
+      ];
+      final initialWidths = computeResultGridColumnWidths(
+        columns: columns,
+        rows: rows,
+      );
+
+      final distributed = distributeResultGridSpareWidth(
+        columnWidths: initialWidths,
+        columns: columns,
+        rows: rows,
+        availableWidth: 1200.0,
+      );
+
+      expect(distributed[0], equals(initialWidths[0]));
+      expect(distributed[1], equals(initialWidths[1]));
+      expect(distributed[2], equals(initialWidths[2]));
+    });
+
+    test('returns original widths when availableWidth <= total initial width', () {
+      final initial = [80.0, 120.0, 200.0];
+      final result = distributeResultGridSpareWidth(
+        columnWidths: initial,
+        columns: const ['a', 'b', 'c'],
+        rows: const [
+          ['1', '2', '3'],
+        ],
+        availableWidth: 350.0,
+      );
+      expect(result, equals(initial));
+    });
   });
 
   group('sortResultGridRows', () {
@@ -702,6 +783,50 @@ void main() {
       expect(find.text('bob'), findsOneWidget);
     });
 
+    testWidgets(
+        'allows auto-fitting column width on header divider double-tap',
+        (tester) async {
+      await tester.pumpWidget(
+        resultsShell(
+          child: const material.Scaffold(
+            body: material.SizedBox(
+              width: 800,
+              height: 400,
+              child: VirtualResultGrid(
+                columns: ['id', 'summary'],
+                rows: [
+                  ['1', 'A short summary'],
+                  [
+                    '2',
+                    'An extraordinarily long text payload that definitely requires more space to view completely'
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final resizeRegions = find.byWidgetPredicate(
+        (w) =>
+            w is material.MouseRegion &&
+            w.cursor == material.SystemMouseCursors.resizeColumn,
+      );
+      expect(resizeRegions, findsNWidgets(2));
+
+      // Double-tap the second column's divider handle to trigger auto-fit
+      final secondHandle = resizeRegions.at(1);
+      final center = tester.getCenter(secondHandle);
+      await tester.tapAt(center);
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tapAt(center);
+      await tester.pumpAndSettle();
+
+      expect(find.text('id'), findsOneWidget);
+      expect(find.text('summary'), findsOneWidget);
+    });
+
     testWidgets('allows sorting by clicking column headers in VirtualResultGrid',
         (tester) async {
       await tester.pumpWidget(
@@ -873,6 +998,195 @@ void main() {
       expect(find.text('Charlie'), findsOneWidget);
       expect(find.text('Bob'), findsNothing);
       expect(find.text('2 of 3 rows'), findsOneWidget);
+    });
+
+    testWidgets('filters rows and mutates correct underlying row when StagingBuffer is attached', (tester) async {
+      final buffer = DataGridStagingBuffer(
+        columns: const ['id', 'name', 'department'],
+        rows: const [
+          ['1', 'Alice', 'Engineering'],
+          ['2', 'Bob', 'Marketing'],
+          ['3', 'Charlie', 'Engineering'],
+        ],
+      );
+
+      await tester.pumpWidget(
+        resultsShell(
+          child: material.Scaffold(
+            body: material.SizedBox(
+              width: 800,
+              height: 600,
+              child: ResultsTab(
+                columns: const ['id', 'name', 'department'],
+                rows: buffer.effectiveRows,
+                stagingBuffer: buffer,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Alice'), findsOneWidget);
+      expect(find.text('Bob'), findsOneWidget);
+      expect(find.text('Charlie'), findsOneWidget);
+
+      // Open quick filter bar
+      await tester.tap(find.byTooltip('Toggle Quick Filter'));
+      await tester.pumpAndSettle();
+
+      // Enter filter 'Bob'
+      await tester.enterText(find.byType(material.TextField), 'Bob');
+      await tester.pumpAndSettle();
+
+      // Only Bob should be displayed in the grid
+      final bobGridCell = find.descendant(
+        of: find.byType(VirtualResultGrid),
+        matching: find.text('Bob'),
+      );
+      expect(bobGridCell, findsOneWidget);
+      expect(find.text('Alice'), findsNothing);
+      expect(find.text('Charlie'), findsNothing);
+
+      // Tap Bob cell to select the row
+      await tester.tap(bobGridCell);
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pumpAndSettle();
+
+      // Tap 'Delete Row' on the staging toolbar
+      final deleteBtn = find.text('Delete Row');
+      expect(deleteBtn, findsOneWidget);
+      await tester.tap(deleteBtn);
+      await tester.pumpAndSettle();
+
+      // Verify that underlying buffer index 1 (Bob's row) was marked deleted, NOT Alice (index 0)
+      expect(buffer.getRowStatus(1), equals(StagedRowStatus.deleted));
+      expect(buffer.getRowStatus(0), equals(StagedRowStatus.unchanged));
+      expect(buffer.getRowStatus(2), equals(StagedRowStatus.unchanged));
+
+      buffer.dispose();
+    });
+
+    testWidgets('ResultsTab renders Export ▾ button with file export options', (tester) async {
+      final rows = [
+        ['1', 'Alice'],
+      ];
+
+      await tester.pumpWidget(
+        resultsShell(
+          child: material.Scaffold(
+            body: material.SizedBox(
+              width: 800,
+              height: 600,
+              child: ResultsTab(
+                columns: const ['id', 'name'],
+                rows: rows,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Export ▾'), findsOneWidget);
+      expect(find.text('Copy ▾'), findsOneWidget);
+    });
+
+    testWidgets('ResultsTab toggles filter bar and closes it when close button or Escape is triggered', (tester) async {
+      final rows = [
+        ['1', 'Alice'],
+        ['2', 'Bob'],
+      ];
+
+      await tester.pumpWidget(
+        resultsShell(
+          child: material.Scaffold(
+            body: material.SizedBox(
+              width: 800,
+              height: 600,
+              child: ResultsTab(
+                columns: const ['id', 'name'],
+                rows: rows,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Open filter bar via filter icon in results tab toolbar
+      final filterIcon = find.byIcon(material.Icons.filter_alt_outlined);
+      expect(filterIcon, findsOneWidget);
+      await tester.tap(filterIcon);
+      await tester.pumpAndSettle();
+
+      // Filter input is now present
+      expect(find.byType(material.TextField), findsOneWidget);
+
+      // Close button with 'Close filter (Esc)' tooltip is present
+      final closeBtn = find.byTooltip('Close filter (Esc)');
+      expect(closeBtn, findsOneWidget);
+
+      // Tapping close button closes the filter bar
+      await tester.tap(closeBtn);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(material.TextField), findsNothing);
+    });
+
+    testWidgets('DataGridStagingToolbar provides tooltips with keyboard shortcuts', (tester) async {
+      final buffer = DataGridStagingBuffer(
+        columns: ['id', 'name'],
+        rows: [
+          ['1', 'Alice'],
+          ['2', 'Bob'],
+        ],
+      );
+
+      await tester.pumpWidget(
+        resultsShell(
+          child: material.Scaffold(
+            body: material.SizedBox(
+              width: 800,
+              height: 100,
+              child: DataGridStagingToolbar(
+                stagingBuffer: buffer,
+                selectedRowIndex: 0,
+                onApplyChanges: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byTooltip('Add new row (Ctrl+Insert / Cmd+N)'),
+        findsOneWidget,
+      );
+      expect(
+        find.byTooltip('Mark row for deletion (Ctrl+Delete / Cmd+Backspace)'),
+        findsOneWidget,
+      );
+      expect(
+        find.byTooltip('No pending changes to commit'),
+        findsOneWidget,
+      );
+
+      // Add a row to make it dirty
+      buffer.addRow();
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byTooltip('Revert all unstaged edits (Ctrl+Z / Cmd+Z)'),
+        findsOneWidget,
+      );
+      expect(
+        find.byTooltip('Commit staged changes to database (Ctrl+S / Cmd+S)'),
+        findsOneWidget,
+      );
+
+      buffer.dispose();
     });
   });
 }

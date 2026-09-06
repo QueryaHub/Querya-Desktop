@@ -183,8 +183,7 @@ abstract final class TableMutationEngine {
 
       if (_isTextType(dataTypeName)) {
         // String columns: preserve literal 'NULL' or 'null' as a text string
-        final escaped = value.replaceAll("'", "''");
-        return "'$escaped'";
+        return _formatStringLiteral(value, dialect);
       }
 
       if (_isBoolType(dataTypeName)) {
@@ -216,8 +215,7 @@ abstract final class TableMutationEngine {
     // Fallback heuristic:
     // Leading zeros with more digits (e.g. '01234', '007') are preserved as strings
     if (RegExp(r'^0\d+$').hasMatch(trimmed)) {
-      final escaped = value.replaceAll("'", "''");
-      return "'$escaped'";
+      return _formatStringLiteral(value, dialect);
     }
 
     // Number literals (integer or floating point, e.g. '123', '0', '0.45', '-5.2')
@@ -233,8 +231,16 @@ abstract final class TableMutationEngine {
       return dialect == SqlDialect.sqlite ? '0' : 'FALSE';
     }
 
-    // String literal with single quote escape
-    final escaped = value.replaceAll("'", "''");
+    // String literal with single quote escape and MySQL backslash escape
+    return _formatStringLiteral(value, dialect);
+  }
+
+  static String _formatStringLiteral(String value, SqlDialect dialect) {
+    var escaped = value;
+    if (dialect == SqlDialect.mysql) {
+      escaped = escaped.replaceAll(r'\', r'\\');
+    }
+    escaped = escaped.replaceAll("'", "''");
     return "'$escaped'";
   }
 

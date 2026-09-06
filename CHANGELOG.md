@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.15] - 2026-09-06
+
+Multi-tab SQL workspace sessions, content-aware adaptive column sizing and auto-fit in data grid, rich cell context menus, desktop file associations (.sql, .sqlite) with CLI open-with handling, categorized Master-Detail preferences with Keymap reference and theme editor modal, server-side column sorting in table views, connection tree quick search and pinning, and comprehensive UI freeze and isolate performance optimizations.
+
+### Added
+
+- **Multi-Tab SQL Workspace (#679, PR #684)** — Full support for multiple independent query sessions per connection with tab strip (`SqlQueryTabBar`), separate editor state, split panel sizing, query history, result grids, and DML staging buffers with `IndexedStack` state preservation and tab shortcuts (`Ctrl+T`, `Ctrl+W`, `Ctrl+Tab`, `Ctrl+Shift+Tab`).
+- **Adaptive Content-Aware Column Sizing & Auto-Fit (#676, PR #681)** — Dynamic header-based minimum column widths (56px) without inflating compact columns (`id`, `status`), weighted distribution of excess viewport width in favor of long text fields (`name`, `description`), and double-click (`onDoubleTap`) on column header dividers for instantaneous content-aware auto-fit.
+- **Data Grid Cell Context Menu & Non-Destructive Actions (#678, PR #683)** — Native right-click context menu with TSV/JSON/CSV copy formats (`Copy Value`, `Copy with Headers`, `Copy as JSON/CSV`), instant filter bridge (`Filter by this value`, `Filter out this value`), value inspector access (`Ctrl+I`), setting explicit `NULL` (`Alt+N`), and reverting cell changes.
+- **Desktop File Associations & Open-With Handlers (#694, PR #695)** — Native file associations and Open-With support for SQL scripts (`.sql`) and SQLite databases (`.db`, `.sqlite`, `.sqlite3`) on Linux (`.desktop`, `%F`), macOS (`Info.plist`), and Windows (Inno Setup / Registry) via `FileLaunchService`.
+- **Master-Detail Categorized Preferences Dialog (#686, #687, #688, #689, PR #690, #691, #692, #693)** — Modern two-pane Master-Detail preferences layout with sidebar categories (`General`, `Appearance`, `SQL & Editor`, `Data Grid`, `Extensions`, `Keymap`, `About & Storage`), global search (`Ctrl+F`), deep-linking, unified `PreferencesSwitchRow` toggles, update channel selector (Stable / Beta), interactive Keyboard Shortcuts (Keymap) reference matrix, and a dedicated visual Theme Editor modal window.
+- **Connection Tree Quick Search, Filtering & Pinning (#680, PR #685)** — Global quick search in sidebar connections tree (`Ctrl+F` / `Cmd+F`) with auto-expanding matching folders, compact inline `TreeObjectFilterBar` for filtering tables/views/procedures in large schemas, and table/view pinning (⭐) with automatic top-of-list sorting.
+- **Interactive Server-Side Column Sorting (#696, PR #697)** — Tri-state interactive server-side sorting (ASC -> DESC -> Natural) in SQLite, PostgreSQL, and MySQL table views with model row index mapping preservation in `VirtualResultGrid`.
+- **UI/UX Polishing for Data Grid, Filter Bar & Staging (#700, PR #701)** — Semantic theme color tokens for filter suggestions (`cs.popover`, `cs.popoverForeground`, `cs.border`), disambiguated `Export ▾` menu vs `Save Changes` button, keyboard shortcut tooltips (`Ctrl+Insert`, `Ctrl+Delete`, `Ctrl+Z`, `Ctrl+S`), and quick filter bar close button / `Escape` dismiss handling.
+
+### Changed & Performance
+
+- **Elimination of UI Freezes & Isolate Performance Optimizations (#702, PR #703)** — Adaptive background isolate offloading for large table sorting (`sortResultGridRowsWithIndicesAdaptive`, $N \ge 3000$) with version tokenization, zero-allocation clean reads and caching in `DataGridStagingBuffer.effectiveRows`, caching of groupings tree in `DataGridGroupingsView` outside of `build()`, and 150ms debounced JSON/XML validation in `DataGridValuePanel`.
+- **Universal Syntax Highlighting & Flicker-Free Editor (#694, PR #695)** — Enhanced SQL tokenizer and eliminated visual flicker during typing in `QueryaCodeEditor`.
+
+### Fixed
+
+- **Latent Bug Fixes & Stability (#677, #698, PR #682, #699)** — Resolved layout overflows and bottom padding breaks across SQLite forms and database overview screens, fixed MySQL/MariaDB backslash escaping in DML generator, prevented memory leaks on Staging Buffer disposal and debounce timers, validated unclosed string literals in SQL filter AST parser, and sanitized pipe characters and quotes in Markdown and SQL INSERT export formats.
+
 ## [0.4.14] - 2026-08-30
 
 Near-instantaneous menubar dropdowns, native macOS PlatformMenuBar integration, destructive query confirmation safety modals, comprehensive memory optimizations (string interning, compact storage), grid keyboard navigation, rich cell inspector, and driver resilience hardening.

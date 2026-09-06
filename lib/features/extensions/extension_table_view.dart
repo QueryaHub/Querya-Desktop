@@ -2,6 +2,8 @@ import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
+import 'package:querya_desktop/core/editor/querya_code_editor.dart';
+import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/core/extensions/extension_driver_session.dart';
 import 'package:querya_desktop/core/extensions/models/extension_driver_capabilities.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -392,11 +394,15 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
           content: material.SizedBox(
             width: 600,
             height: 400,
-            child: material.SingleChildScrollView(
-              child: material.SelectableText(
-                ddlText,
-                style: const material.TextStyle(
-                    fontFamily: 'monospace', fontSize: 13),
+            child: material.Container(
+              decoration: SqlEditorChrome.inlineFieldDecorationFromContext(ctx),
+              child: QueryaCodeEditor(
+                controller: material.TextEditingController(text: ddlText),
+                language: QueryaCodeLanguage.sql,
+                readOnly: true,
+                fontSize: 12,
+                variant: QueryaCodeEditorVariant.material,
+                contentPadding: const material.EdgeInsets.all(12),
               ),
             ),
           ),

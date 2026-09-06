@@ -68,5 +68,34 @@ void main() {
       await tester.pumpAndSettle();
       expect(updatedVal, isNotNull);
     });
+
+    testWidgets('debounces validation parsing on text input changes', (tester) async {
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Material(
+            child: DataGridValuePanel(
+              columnName: 'json_col',
+              cellValue: '{"valid":true}',
+              rowIndex: 0,
+              onClose: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Initially no validation error
+      expect(find.textContaining('Invalid JSON'), findsNothing);
+
+      // Enter invalid JSON (trailing comma) into editor
+      await tester.enterText(find.byType(material.TextField), '{"invalid": true,}');
+      await tester.pump(const Duration(milliseconds: 50));
+      // Before 150ms debounce fires, error is not yet shown
+      expect(find.textContaining('Invalid JSON'), findsNothing);
+
+      // Advance clock past 150ms debounce
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.textContaining('Invalid JSON'), findsOneWidget);
+    });
   });
 }

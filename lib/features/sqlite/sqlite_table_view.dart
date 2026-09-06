@@ -2,7 +2,10 @@ import 'dart:async' show unawaited;
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
 import 'package:querya_desktop/core/database/sqlite_service.dart';
+import 'package:querya_desktop/core/editor/querya_code_editor.dart';
+import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/workspace/sql_editor_chrome.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 const _defaultLimit = 200;
@@ -39,6 +42,8 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
   int _rowsOnPage = 0;
   int? _totalRowCount;
   int _offset = 0;
+  String? _sortColumn;
+  bool _sortAscending = true;
 
   final _verticalController = material.ScrollController();
   final _horizontalController = material.ScrollController();
@@ -48,7 +53,29 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
   }
 
   String _browseDataSql() {
-    return 'SELECT * FROM ${_qualifiedFrom()} LIMIT ${widget.limit} OFFSET $_offset';
+    final orderBy = _sortColumn != null
+        ? ' ORDER BY ${SqliteConnection.quoteIdentifier(_sortColumn!)} ${_sortAscending ? "ASC" : "DESC"}'
+        : '';
+    return 'SELECT * FROM ${_qualifiedFrom()}$orderBy LIMIT ${widget.limit} OFFSET $_offset';
+  }
+
+  void _toggleSort(String columnName) {
+    if (_loading) return;
+    setState(() {
+      if (_sortColumn == columnName) {
+        if (_sortAscending) {
+          _sortAscending = false;
+        } else {
+          _sortColumn = null;
+          _sortAscending = true;
+        }
+      } else {
+        _sortColumn = columnName;
+        _sortAscending = true;
+      }
+      _offset = 0;
+    });
+    unawaited(_fetch());
   }
 
   @override
@@ -63,6 +90,8 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     if (oldWidget.connectionRow.id != widget.connectionRow.id ||
         oldWidget.tableName != widget.tableName ||
         oldWidget.isView != widget.isView) {
+      _sortColumn = null;
+      _sortAscending = true;
       _disconnectCurrent();
       _connectAndLoad();
     }
@@ -224,11 +253,15 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
           content: material.SizedBox(
             width: 600,
             height: 400,
-            child: material.SingleChildScrollView(
-              child: material.SelectableText(
-                ddl,
-                style: const material.TextStyle(
-                    fontFamily: 'monospace', fontSize: 13),
+            child: material.Container(
+              decoration: SqlEditorChrome.inlineFieldDecorationFromContext(ctx),
+              child: QueryaCodeEditor(
+                controller: material.TextEditingController(text: ddl),
+                language: QueryaCodeLanguage.sql,
+                readOnly: true,
+                fontSize: 12,
+                variant: QueryaCodeEditorVariant.material,
+                contentPadding: const material.EdgeInsets.all(12),
               ),
             ),
           ),
@@ -296,25 +329,49 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
   }
 
   material.Widget _headerCell(ColorScheme cs, String name) {
+    final isSorted = _sortColumn == name;
     return material.Expanded(
-      child: material.Container(
-        padding: const material.EdgeInsets.symmetric(horizontal: 10),
-        alignment: material.Alignment.centerLeft,
-        decoration: material.BoxDecoration(
-          border: material.Border(
-            right: material.BorderSide(
-              color: cs.border.withValues(alpha: 0.22),
-              width: 1,
+      child: material.MouseRegion(
+        cursor: material.SystemMouseCursors.click,
+        child: material.GestureDetector(
+          behavior: material.HitTestBehavior.opaque,
+          onTap: () => _toggleSort(name),
+          child: material.Container(
+            padding: const material.EdgeInsets.symmetric(horizontal: 10),
+            alignment: material.Alignment.centerLeft,
+            decoration: material.BoxDecoration(
+              border: material.Border(
+                right: material.BorderSide(
+                  color: cs.border.withValues(alpha: 0.22),
+                  width: 1,
+                ),
+              ),
             ),
-          ),
-        ),
-        child: material.Text(
-          name,
-          overflow: material.TextOverflow.ellipsis,
-          style: material.TextStyle(
-            fontSize: 12,
-            fontWeight: material.FontWeight.w600,
-            color: cs.foreground,
+            child: material.Row(
+              children: [
+                material.Expanded(
+                  child: material.Text(
+                    name,
+                    overflow: material.TextOverflow.ellipsis,
+                    style: material.TextStyle(
+                      fontSize: 12,
+                      fontWeight: material.FontWeight.w600,
+                      color: isSorted ? cs.primary : cs.foreground,
+                    ),
+                  ),
+                ),
+                if (isSorted) ...[
+                  const Gap(4),
+                  material.Icon(
+                    _sortAscending
+                        ? material.Icons.arrow_upward_rounded
+                        : material.Icons.arrow_downward_rounded,
+                    size: 14,
+                    color: cs.primary,
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),

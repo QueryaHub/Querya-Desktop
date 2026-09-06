@@ -151,205 +151,270 @@ class _PreferencesAppearanceSectionState
         final themes = c.availableThemes;
         final refreshingThemes = c.isLoadingAvailableThemes;
 
-    return material.Column(
-      crossAxisAlignment: material.CrossAxisAlignment.start,
-      children: [
-        const Text('Appearance').semiBold().small().foreground(),
-        const material.SizedBox(height: 8),
-        PreferencesFieldRow(
-          label: 'Theme mode',
-          control: PreferencesDropdownMenu<ThemeMode>(
-            value: c.themeMode,
-            onSelected: (v) {
-              if (v != null) unawaited(_setThemeMode(v));
-            },
-            entries: const [
-              material.DropdownMenuEntry(
-                value: ThemeMode.dark,
-                label: 'Dark',
-              ),
-              material.DropdownMenuEntry(
-                value: ThemeMode.light,
-                label: 'Light',
-              ),
-              material.DropdownMenuEntry(
-                value: ThemeMode.system,
-                label: 'System',
-              ),
-            ],
+    return material.SingleChildScrollView(
+      primary: false,
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.start,
+        children: [
+          const Text('Appearance').semiBold().small().foreground(),
+          const material.SizedBox(height: 8),
+          PreferencesFieldRow(
+            label: 'Theme mode',
+            control: PreferencesDropdownMenu<ThemeMode>(
+              value: c.themeMode,
+              onSelected: (v) {
+                if (v != null) unawaited(_setThemeMode(v));
+              },
+              entries: const [
+                material.DropdownMenuEntry(
+                  value: ThemeMode.system,
+                  label: 'System (match OS)',
+                ),
+                material.DropdownMenuEntry(
+                  value: ThemeMode.dark,
+                  label: 'Dark',
+                ),
+                material.DropdownMenuEntry(
+                  value: ThemeMode.light,
+                  label: 'Light',
+                ),
+              ],
+            ),
           ),
-        ),
-        const material.SizedBox(height: 12),
-        PreferencesFieldRow(
-          label: 'Theme',
-          control: ThemePickerButton(
-            themes: themes,
-            selectedThemeId: c.effectiveSelectedThemeId,
-            expandToParent: true,
-            isLoading: refreshingThemes,
-            onSelected: (id) => unawaited(_setThemeById(id)),
-            onPreviewTheme: _previewThemeById,
+          const material.SizedBox(height: 12),
+          PreferencesFieldRow(
+            label: 'Theme',
+            control: ThemePickerButton(
+              themes: themes,
+              selectedThemeId: c.effectiveSelectedThemeId,
+              expandToParent: true,
+              isLoading: refreshingThemes,
+              onSelected: (id) => unawaited(_setThemeById(id)),
+              onPreviewTheme: _previewThemeById,
+            ),
           ),
-        ),
-        if (c.selectedThemeLoadError != null) ...[
+          if (c.selectedThemeLoadError != null) ...[
+            const material.SizedBox(height: 8),
+            material.Padding(
+              padding: material.EdgeInsets.only(
+                left: context.scaled(kPreferencesLabelWidth) + 12,
+              ),
+              child: material.Text(
+                c.selectedThemeLoadError!,
+                style: material.TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.destructive,
+                ),
+              ),
+            ),
+          ],
           const material.SizedBox(height: 8),
           material.Padding(
             padding: material.EdgeInsets.only(
               left: context.scaled(kPreferencesLabelWidth) + 12,
             ),
-            child: material.Text(
-              c.selectedThemeLoadError!,
-              style: material.TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.destructive,
-              ),
+            child: const PreferencesHint(
+              'Themes are loaded from the app support themes folder. '
+              'Drop .json or .jsonc files there; the folder is watched automatically '
+              'or use Refresh themes.',
             ),
           ),
-        ],
-        const material.SizedBox(height: 8),
-        material.Padding(
-          padding: material.EdgeInsets.only(left: context.scaled(kPreferencesLabelWidth) + 12),
-          child: const PreferencesHint(
-            'Themes are loaded from the app support themes folder. '
-            'Drop .json or .jsonc files there; the folder is watched automatically '
-            'or use Refresh themes.',
+          const ThemeEditorSection(),
+          const material.SizedBox(height: 12),
+          const PreferencesFieldRow(
+            label: 'Interface scale',
+            hint:
+                'Snap to presets (75%, 85%, 90%, 100% …). Hold Shift for 1% fine control.',
+            control: InterfaceScaleSlider(),
           ),
-        ),
-        const ThemeEditorSection(),
-        const material.SizedBox(height: 12),
-        const PreferencesFieldRow(
-          label: 'Interface scale',
-          hint:
-              'Snap to presets (75%, 85%, 90%, 100% …). Hold Shift for 1% fine control.',
-          control: InterfaceScaleSlider(),
-        ),
-        const material.SizedBox(height: 12),
-        PreferencesFieldRow(
-          label: 'Animate theme changes',
-          control: material.Builder(
-            builder: (context) {
-              final h = QueryaDropdownTokens.scaledTriggerHeight(context);
-              return material.SizedBox(
-                height: h,
-                child: material.Align(
-                  alignment: material.Alignment.centerLeft,
-                  child: material.Switch(
-                    value: c.themeAnimationEnabled,
-                    onChanged: (v) => unawaited(_setThemeAnimation(v)),
-                  ),
+          const material.SizedBox(height: 12),
+          PreferencesSwitchRow(
+            value: c.themeAnimationEnabled,
+            title: const Text('Animate theme changes').small(),
+            subtitle: const Text(
+              'Smooth transitions when switching dark/light or presets. Requires Motion Full or Reduced.',
+            ).muted().xSmall(),
+            onChanged: (v) => unawaited(_setThemeAnimation(v)),
+          ),
+          const material.SizedBox(height: 12),
+          PreferencesFieldRow(
+            label: 'Motion',
+            control: material.ListenableBuilder(
+              listenable: QueryaMotionController.instance,
+              builder: (context, __) {
+                final controller = QueryaMotionController.instance;
+                return PreferencesDropdownMenu<QueryaMotionLevel>(
+                  value: controller.level,
+                  onSelected: (v) {
+                    if (v != null) unawaited(controller.setLevel(v));
+                  },
+                  entries: const [
+                    material.DropdownMenuEntry(
+                      value: QueryaMotionLevel.full,
+                      label: 'Full',
+                    ),
+                    material.DropdownMenuEntry(
+                      value: QueryaMotionLevel.reduced,
+                      label: 'Reduced',
+                    ),
+                    material.DropdownMenuEntry(
+                      value: QueryaMotionLevel.off,
+                      label: 'Off',
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+          const material.SizedBox(height: 4),
+          const PreferencesHint(
+            'Full enables all animations. Reduced cuts durations in half. Off disables all transitions.',
+          ),
+          const material.SizedBox(height: 16),
+          material.Container(
+            padding: const material.EdgeInsets.all(14),
+            decoration: material.BoxDecoration(
+              color: Theme.of(context).colorScheme.muted.withValues(alpha: 0.14),
+              borderRadius: material.BorderRadius.circular(8),
+              border: material.Border.all(
+                color: Theme.of(context).colorScheme.border.withValues(alpha: 0.25),
+              ),
+            ),
+            child: material.Column(
+              crossAxisAlignment: material.CrossAxisAlignment.start,
+              children: [
+                const Text('Theme Actions').semiBold().small().foreground(),
+                const material.SizedBox(height: 4),
+                const PreferencesHint(
+                  'Import themes from disk, install from verified HTTPS endpoints, or explore your local folder.',
                 ),
-              );
-            },
-          ),
-        ),
-        const material.SizedBox(height: 4),
-        const PreferencesHint(
-          'Smooth transitions when switching dark/light or presets. Off by default '
-          'for stability. Also requires Motion Full or Reduced (Off snaps themes).',
-        ),
-        const material.SizedBox(height: 12),
-        PreferencesFieldRow(
-          label: 'Motion',
-          control: material.ListenableBuilder(
-            listenable: QueryaMotionController.instance,
-            builder: (context, __) {
-              final controller = QueryaMotionController.instance;
-              return PreferencesDropdownMenu<QueryaMotionLevel>(
-                value: controller.level,
-                onSelected: (v) {
-                  if (v != null) unawaited(controller.setLevel(v));
-                },
-                entries: const [
-                  material.DropdownMenuEntry(
-                    value: QueryaMotionLevel.full,
-                    label: 'Full',
-                  ),
-                  material.DropdownMenuEntry(
-                    value: QueryaMotionLevel.reduced,
-                    label: 'Reduced',
-                  ),
-                  material.DropdownMenuEntry(
-                    value: QueryaMotionLevel.off,
-                    label: 'Off',
+                const material.SizedBox(height: 10),
+                material.Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlineButton(
+                      onPressed: (_importing || _installingFromUrl)
+                          ? null
+                          : () => unawaited(_pickAndImportTheme()),
+                      child: material.Row(
+                        mainAxisSize: material.MainAxisSize.min,
+                        children: [
+                          const material.Icon(
+                            material.Icons.file_open_outlined,
+                            size: 14,
+                          ),
+                          const material.SizedBox(width: 6),
+                          material.Text(
+                            _importing ? 'Importing…' : 'Import theme…',
+                          ),
+                        ],
+                      ),
+                    ),
+                    OutlineButton(
+                      onPressed: (_importing || _installingFromUrl || refreshingThemes)
+                          ? null
+                          : () => unawaited(_installThemeFromUrl()),
+                      child: material.Row(
+                        mainAxisSize: material.MainAxisSize.min,
+                        children: [
+                          const material.Icon(
+                            material.Icons.download_rounded,
+                            size: 14,
+                          ),
+                          const material.SizedBox(width: 6),
+                          material.Text(
+                            _installingFromUrl ? 'Installing…' : 'Install from URL…',
+                          ),
+                        ],
+                      ),
+                    ),
+                    OutlineButton(
+                      onPressed: (_importing || _installingFromUrl || refreshingThemes)
+                          ? null
+                          : () => unawaited(_refreshThemes()),
+                      child: material.Row(
+                        mainAxisSize: material.MainAxisSize.min,
+                        children: [
+                          const material.Icon(
+                            material.Icons.refresh_rounded,
+                            size: 14,
+                          ),
+                          const material.SizedBox(width: 6),
+                          material.Text(
+                            refreshingThemes ? 'Refreshing…' : 'Refresh themes',
+                          ),
+                        ],
+                      ),
+                    ),
+                    OutlineButton(
+                      onPressed:
+                          (_importing || _installingFromUrl || _openingThemesFolder)
+                              ? null
+                              : () => unawaited(_openThemesFolder()),
+                      child: material.Row(
+                        mainAxisSize: material.MainAxisSize.min,
+                        children: [
+                          const material.Icon(
+                            material.Icons.folder_open_outlined,
+                            size: 14,
+                          ),
+                          const material.SizedBox(width: 6),
+                          material.Text(
+                            _openingThemesFolder
+                                ? 'Opening…'
+                                : 'Open themes folder',
+                          ),
+                        ],
+                      ),
+                    ),
+                    OutlineButton(
+                      onPressed: () => unawaited(_resetAppearance()),
+                      child: const material.Row(
+                        mainAxisSize: material.MainAxisSize.min,
+                        children: [
+                          material.Icon(
+                            material.Icons.restart_alt_rounded,
+                            size: 14,
+                          ),
+                          material.SizedBox(width: 6),
+                          Text('Reset appearance'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (_importError != null) ...[
+                  const material.SizedBox(height: 8),
+                  material.Text(
+                    _importError!,
+                    style: material.TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.destructive,
+                    ),
                   ),
                 ],
-              );
-            },
+                if (_folderOpenError != null) ...[
+                  const material.SizedBox(height: 8),
+                  material.Text(
+                    _folderOpenError!,
+                    style: material.TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.destructive,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
-        ),
-        const material.SizedBox(height: 4),
-        const PreferencesHint(
-          'Full enables all animations. Reduced cuts durations in half. Off disables all transitions.',
-        ),
-        const material.SizedBox(height: 12),
-        material.Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            OutlineButton(
-              onPressed: (_importing || _installingFromUrl)
-                  ? null
-                  : () => unawaited(_pickAndImportTheme()),
-              child: material.Text(_importing ? 'Importing…' : 'Import theme…'),
-            ),
-            OutlineButton(
-              onPressed: (_importing || _installingFromUrl || refreshingThemes)
-                  ? null
-                  : () => unawaited(_installThemeFromUrl()),
-              child: material.Text(
-                _installingFromUrl ? 'Installing…' : 'Install from URL…',
-              ),
-            ),
-            OutlineButton(
-              onPressed: (_importing || _installingFromUrl || refreshingThemes)
-                  ? null
-                  : () => unawaited(_refreshThemes()),
-              child: material.Text(
-                refreshingThemes ? 'Refreshing…' : 'Refresh themes',
-              ),
-            ),
-            OutlineButton(
-              onPressed:
-                  (_importing || _installingFromUrl || _openingThemesFolder)
-                      ? null
-                      : () => unawaited(_openThemesFolder()),
-              child: material.Text(
-                _openingThemesFolder ? 'Opening…' : 'Open themes folder',
-              ),
-            ),
-            OutlineButton(
-              onPressed: () => unawaited(_resetAppearance()),
-              child: const Text('Reset appearance'),
-            ),
-          ],
-        ),
-        if (_importError != null) ...[
-          const material.SizedBox(height: 8),
-          material.Text(
-            _importError!,
-            style: material.TextStyle(
-              fontSize: 12,
-              color: Theme.of(context).colorScheme.destructive,
-            ),
+          const material.SizedBox(height: 6),
+          const PreferencesHint(
+            'Import copies a theme into the themes folder. '
+            'Install from URL requires HTTPS and optional SHA-256 verification. '
+            'VS Code JSON/JSONC (.colors subset) and Querya custom JSON are supported.',
           ),
         ],
-        if (_folderOpenError != null) ...[
-          const material.SizedBox(height: 8),
-          material.Text(
-            _folderOpenError!,
-            style: material.TextStyle(
-              fontSize: 12,
-              color: Theme.of(context).colorScheme.destructive,
-            ),
-          ),
-        ],
-        const material.SizedBox(height: 4),
-        const PreferencesHint(
-          'Import copies a theme into the themes folder. '
-          'Install from URL requires HTTPS and optional SHA-256 verification. '
-          'VS Code JSON/JSONC (.colors subset) and Querya custom JSON are supported.',
-        ),
-      ],
+      ),
     );
   },
 );
