@@ -91,7 +91,7 @@ class _SqlQueryHistoryDialogContentState
             mainAxisSize: material.MainAxisSize.min,
             crossAxisAlignment: material.CrossAxisAlignment.start,
             children: [
-              Text('Clear query history?').semiBold().large(),
+              const Text('Clear query history?').semiBold().large(),
               const Gap(8),
               const Text(
                 'Removes saved SQL for this connection and database. This cannot be undone.',

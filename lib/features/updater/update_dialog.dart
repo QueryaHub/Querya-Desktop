@@ -3,8 +3,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/window_layout.dart';
-import 'package:querya_desktop/core/motion/querya_motion.dart';
-import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/core/updater/app_updater_service.dart';
 import 'package:querya_desktop/core/updater/update_manifest.dart';
 import 'package:querya_desktop/features/updater/update_changelog_view.dart';

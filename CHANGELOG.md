@@ -7,12 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.4.15] - 2026-09-06
+## [0.4.15] - 2026-09-07
 
-Multi-tab SQL workspace sessions, content-aware adaptive column sizing and auto-fit in data grid, rich cell context menus, desktop file associations (.sql, .sqlite) with CLI open-with handling, categorized Master-Detail preferences with Keymap reference and theme editor modal, server-side column sorting in table views, connection tree quick search and pinning, and comprehensive UI freeze and isolate performance optimizations.
+Multi-tab SQL workspace sessions, fluid motion transitions, cohesive dialog UI system, content-aware adaptive column sizing and auto-fit in data grid, rich cell context menus, desktop file associations (.sql, .sqlite) with CLI open-with handling, categorized Master-Detail preferences with Keymap reference and theme editor modal, server-side column sorting in table views, connection tree quick search and pinning, and comprehensive UI freeze and isolate performance optimizations.
 
 ### Added
 
+- **Fluid Motion Transitions & Micro-Interactions (#707, #708, #709)** — Smooth cross-fade and scale tab switching in `SqlQueryTabBar`, springy hover feedback on buttons, cards, and tree items, and refined modal dialog entry/exit animations.
+- **Cohesive UI Dialog Card System (#710, #711, #712)** — Standardized modal architecture across workspace and schema dialogs using `QueryaDialogCard`, unifying header titles, action footers, and border radii.
 - **Multi-Tab SQL Workspace (#679, PR #684)** — Full support for multiple independent query sessions per connection with tab strip (`SqlQueryTabBar`), separate editor state, split panel sizing, query history, result grids, and DML staging buffers with `IndexedStack` state preservation and tab shortcuts (`Ctrl+T`, `Ctrl+W`, `Ctrl+Tab`, `Ctrl+Shift+Tab`).
 - **Adaptive Content-Aware Column Sizing & Auto-Fit (#676, PR #681)** — Dynamic header-based minimum column widths (56px) without inflating compact columns (`id`, `status`), weighted distribution of excess viewport width in favor of long text fields (`name`, `description`), and double-click (`onDoubleTap`) on column header dividers for instantaneous content-aware auto-fit.
 - **Data Grid Cell Context Menu & Non-Destructive Actions (#678, PR #683)** — Native right-click context menu with TSV/JSON/CSV copy formats (`Copy Value`, `Copy with Headers`, `Copy as JSON/CSV`), instant filter bridge (`Filter by this value`, `Filter out this value`), value inspector access (`Ctrl+I`), setting explicit `NULL` (`Alt+N`), and reverting cell changes.
@@ -24,6 +26,7 @@ Multi-tab SQL workspace sessions, content-aware adaptive column sizing and auto-
 
 ### Changed & Performance
 
+- **Staging Buffer & Huge Result Performance Optimizations (#706)** — Optimized staging diff resolution for large dataset modifications, avoiding unnecessary buffer cloning during high-throughput updates.
 - **Elimination of UI Freezes & Isolate Performance Optimizations (#702, PR #703)** — Adaptive background isolate offloading for large table sorting (`sortResultGridRowsWithIndicesAdaptive`, $N \ge 3000$) with version tokenization, zero-allocation clean reads and caching in `DataGridStagingBuffer.effectiveRows`, caching of groupings tree in `DataGridGroupingsView` outside of `build()`, and 150ms debounced JSON/XML validation in `DataGridValuePanel`.
 - **Universal Syntax Highlighting & Flicker-Free Editor (#694, PR #695)** — Enhanced SQL tokenizer and eliminated visual flicker during typing in `QueryaCodeEditor`.
 

@@ -390,7 +390,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
                 mainAxisSize: material.MainAxisSize.min,
                 crossAxisAlignment: material.CrossAxisAlignment.start,
                 children: [
-                  Text('Save Changes Failed').semiBold().large(),
+                  const Text('Save Changes Failed').semiBold().large(),
                   const Gap(8),
                   Text(e.toString()).muted().small(),
                   const Gap(20),

@@ -428,7 +428,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
                 mainAxisSize: material.MainAxisSize.min,
                 crossAxisAlignment: material.CrossAxisAlignment.start,
                 children: [
-                  Text('Save Changes Failed').semiBold().large(),
+                  const Text('Save Changes Failed').semiBold().large(),
                   const Gap(8),
                   Text(e.toString()).muted().small(),
                   const Gap(20),

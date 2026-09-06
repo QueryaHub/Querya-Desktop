@@ -592,7 +592,7 @@ Future<void> _showSaveFileErrorDialog(material.BuildContext context) {
           mainAxisSize: material.MainAxisSize.min,
           crossAxisAlignment: material.CrossAxisAlignment.start,
           children: [
-            Text('Could not save file').semiBold().large(),
+            const Text('Could not save file').semiBold().large(),
             const Gap(8),
             const Text(
               'The file could not be saved. Please check folder permissions or disk space.',

@@ -14,7 +14,6 @@ import 'package:flutter/material.dart' as material
         Widget,
         Column;
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
-import 'package:querya_desktop/core/motion/querya_fade_slide.dart';
 import 'package:querya_desktop/core/motion/querya_switching_body.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
