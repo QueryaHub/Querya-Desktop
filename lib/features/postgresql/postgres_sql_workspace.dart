@@ -128,6 +128,21 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       },
       onNextTab: _nextTab,
       onPrevTab: _prevTab,
+      onOpenWithContent: (sql, filePath, title) {
+        if (!mounted) return;
+        final session = _activeSession;
+        if (session.controller.text.trim().isEmpty && session.rows.isEmpty) {
+          session.controller.value = material.TextEditingValue(
+            text: sql,
+            selection: material.TextSelection.collapsed(offset: sql.length),
+          );
+          session.title = title;
+          session.filePath = filePath;
+          setState(() {});
+        } else {
+          _addNewTab(initialSql: sql, title: title, filePath: filePath);
+        }
+      },
     );
   }
 

@@ -9,13 +9,15 @@ import 'core/editor/syntax_highlight_service.dart';
 import 'core/layout/ui_scale_controller.dart';
 import 'core/motion/display_refresh_service.dart';
 import 'core/motion/querya_motion_controller.dart';
+import 'core/platform/file_launch_service.dart';
 import 'core/storage/local_db.dart';
 import 'core/theme/theme_controller.dart';
 import 'features/updater/update_controller.dart';
 
-void main() async {
+void main([List<String> args = const []]) async {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
+    FileLaunchService.instance.processLaunchArguments(args);
 
     FlutterError.onError = (details) {
       FlutterError.presentError(details);
