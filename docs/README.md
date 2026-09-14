@@ -33,6 +33,7 @@ Index of Querya Desktop documentation, grouped by audience.
 - [Theme parser implementation plan](theme-parser-implementation-tasks.md) — task breakdown and architecture.
 - [Theme parser GitHub issues](theme-parser-github-issues.md) — issue templates for epic #96–#125.
 - [Marketplace extensions spec](market-tech.md) — extensions manager and marketplace integration.
+- [UI Parity & Command Palette GitHub issues](ui-parity-and-command-palette-issues.md) — issue templates for UI consistency, status bar, and command palette.
 
 ## Archive
 

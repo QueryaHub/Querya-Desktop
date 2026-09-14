@@ -23,6 +23,7 @@ import 'package:querya_desktop/features/connections/new_connection_url_dialog.da
 import 'package:querya_desktop/features/connections/connections_panel.dart';
 import 'package:querya_desktop/features/connections/sqlite_connection_form.dart';
 import 'package:querya_desktop/features/main_screen/connections_panel_width_persist.dart';
+import 'package:querya_desktop/features/main_screen/querya_status_bar.dart';
 import 'package:querya_desktop/features/main_screen/querya_window_title_bar.dart';
 import 'package:querya_desktop/features/macos/querya_platform_menu_bar.dart';
 import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
@@ -694,6 +695,20 @@ class _MainScreenState extends State<MainScreen> {
                         onRequestOpenTour: _onOpenWelcomeTour,
                         onOpenConnection: _onConnectionSelected,
                       ),
+                    ),
+                    ValueListenableBuilder<bool>(
+                      valueListenable: _isSidebarVisible,
+                      builder: (context, isSidebarVisible, _) {
+                        return QueryaStatusBar(
+                          activeConnection: workspace.activeConnection,
+                          isReadOnly: workspace.isReadOnly,
+                          isSidebarVisible: isSidebarVisible,
+                          onToggleSidebar: () =>
+                              _splitKey.currentState?.toggleSidebar(),
+                          onOpenPreferences: () =>
+                              showPreferencesDialog(context),
+                        );
+                      },
                     ),
                   ],
                 ),

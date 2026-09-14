@@ -92,7 +92,12 @@ class _ExtensionWorkspaceHomeState
           ),
           child: material.Row(
             children: [
-              Text(widget.connectionRow.name).semiBold().small(),
+              material.Flexible(
+                child: Text(widget.connectionRow.name)
+                    .semiBold()
+                    .small()
+                    .ellipsis(),
+              ),
               if (widget.isReadOnly) ...[
                 const Gap(6),
                 material.Icon(
@@ -116,7 +121,7 @@ class _ExtensionWorkspaceHomeState
               ],
               const Spacer(),
               QueryaTabStrip(
-                labels: const ['Server', 'SQL'],
+                labels: const ['Overview', 'SQL'],
                 selectedIndex: _tab,
                 onSelected: (index) => unawaited(_selectTab(index)),
               ),
