@@ -682,50 +682,54 @@ class _MysqlObjectGroupState extends State<_MysqlObjectGroup> {
                     itemBuilder: (context, index) {
                       final item = sorted[index];
                       final isPinned = _pinnedItems.contains(item);
-                      final sel = _ConnectionsTreeSelectionScope.of(context);
-                      final isSelected = sel != null &&
-                          sel.selectedConnectionId == widget.connection.id &&
-                          sel.selectedMysqlObject != null &&
-                          sel.selectedMysqlObject!.database == widget.databaseName &&
-                          sel.selectedMysqlObject!.name == item &&
-                          sel.selectedMysqlObject!.kind == widget.objectKind;
-                      return QueryaConnectionTreeRow(
-                        key: material.ValueKey(
-                          'mysql-${widget.objectKind.name}-${widget.databaseName}-$item',
-                        ),
-                        label: item,
-                        isSelected: isSelected,
-                        isPinned: isPinned,
-                        onTogglePin: () {
-                          setState(() {
-                            if (isPinned) {
-                              _pinnedItems.remove(item);
-                            } else {
-                              _pinnedItems.add(item);
-                            }
-                          });
+                      return _ConnectionsTreeSelectionBuilder<bool>(
+                        select: (sel) =>
+                            sel.selectedConnectionId == widget.connection.id &&
+                            sel.selectedMysqlObject != null &&
+                            sel.selectedMysqlObject!.database ==
+                                widget.databaseName &&
+                            sel.selectedMysqlObject!.name == item &&
+                            sel.selectedMysqlObject!.kind == widget.objectKind,
+                        builder: (context, isSelected) {
+                          return QueryaConnectionTreeRow(
+                            key: material.ValueKey(
+                              'mysql-${widget.objectKind.name}-${widget.databaseName}-$item',
+                            ),
+                            label: item,
+                            isSelected: isSelected,
+                            isPinned: isPinned,
+                            onTogglePin: () {
+                              setState(() {
+                                if (isPinned) {
+                                  _pinnedItems.remove(item);
+                                } else {
+                                  _pinnedItems.add(item);
+                                }
+                              });
+                            },
+                            icon: widget.itemIcon,
+                            iconSize: QueryaIconSizes.treeLeaf,
+                            iconColor: QueryaTreeTokens.leafIconColor(
+                              theme.colorScheme.primary,
+                            ),
+                            textStyle: material.TextStyle(
+                              fontSize: 11,
+                              color: theme.colorScheme.foreground,
+                            ),
+                            verticalPadding: 2,
+                            onTap: widget.onItemTap != null
+                                ? () => widget.onItemTap!(item)
+                                : null,
+                            connection: widget.connection,
+                            openSqlDatabase: widget.databaseName,
+                            openSqlName: item,
+                            onContextRefresh: widget.onRefresh,
+                            onOpenSqlWorkspace: widget.onOpenSqlWorkspace != null
+                                ? (conn, {database, schema, name, kind}) =>
+                                    widget.onOpenSqlWorkspace!(conn)
+                                : null,
+                          );
                         },
-                        icon: widget.itemIcon,
-                        iconSize: QueryaIconSizes.treeLeaf,
-                        iconColor: QueryaTreeTokens.leafIconColor(
-                          theme.colorScheme.primary,
-                        ),
-                        textStyle: material.TextStyle(
-                          fontSize: 11,
-                          color: theme.colorScheme.foreground,
-                        ),
-                        verticalPadding: 2,
-                        onTap: widget.onItemTap != null
-                            ? () => widget.onItemTap!(item)
-                            : null,
-                        connection: widget.connection,
-                        openSqlDatabase: widget.databaseName,
-                        openSqlName: item,
-                        onContextRefresh: widget.onRefresh,
-                        onOpenSqlWorkspace: widget.onOpenSqlWorkspace != null
-                            ? (conn, {database, schema, name, kind}) =>
-                                widget.onOpenSqlWorkspace!(conn)
-                            : null,
                       );
                     },
                   ),

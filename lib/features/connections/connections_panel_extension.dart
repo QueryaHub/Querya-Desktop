@@ -139,11 +139,6 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final sel = _ConnectionsTreeSelectionScope.of(context);
-    final selectedExt = (sel != null &&
-            sel.selectedConnectionId == widget.connection.id)
-        ? sel.selectedExtensionObject
-        : null;
     final material.Widget iconWidget;
     if (_iconFilePath != null) {
       iconWidget = DriverIconImage(
@@ -297,7 +292,8 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
                     )
                   else if (_schema != null)
                     material.Padding(
-                      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.underConnection),
+                      padding: const material.EdgeInsets.only(
+                          left: QueryaTreeTokens.underConnection),
                       child: _schema!.roots.isEmpty
                           ? material.Padding(
                               padding: const material.EdgeInsets.fromLTRB(
@@ -306,36 +302,53 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
                                 'No databases found on this server.',
                               ).muted().small(),
                             )
-                          : SduiTreeBuilder(
-                              schema: _schema!,
-                              connection: widget.connection,
-                              fetchChildren: _fetchChildren,
-                              onNodeSelected: _onNodeSelected,
-                              isNodeSelected: selectedExt == null
-                                  ? null
-                                  : (node) {
-                                      final metaDb = node.meta['database'] ??
-                                          node.meta['db'];
-                                      final metaName = node.meta['table'] ??
-                                          node.meta['tableName'] ??
-                                          node.meta['name'];
-                                      if (metaDb != null && metaName != null) {
-                                        if (metaDb == selectedExt.database &&
-                                            metaName == selectedExt.name) {
-                                          return true;
-                                        }
-                                      }
-                                      final parts = node.id.split('.');
-                                      if (parts.length >= 3) {
-                                        final db = parts[1];
-                                        final name = parts.sublist(2).join('.');
-                                        return db == selectedExt.database &&
-                                            name == selectedExt.name;
-                                      }
-                                      return false;
-                                    },
-                              maxHeight: kConnectionTreeMaxVisibleRows *
-                                  kConnectionTreeRowExtent,
+                          : _ConnectionsTreeSelectionBuilder<
+                              ({String database, String name})?>(
+                              select: (sel) =>
+                                  sel.selectedConnectionId ==
+                                          widget.connection.id
+                                      ? sel.selectedExtensionObject
+                                      : null,
+                              builder: (context, selectedExt) {
+                                return SduiTreeBuilder(
+                                  schema: _schema!,
+                                  connection: widget.connection,
+                                  fetchChildren: _fetchChildren,
+                                  onNodeSelected: _onNodeSelected,
+                                  isNodeSelected: selectedExt == null
+                                      ? null
+                                      : (node) {
+                                          final metaDb =
+                                              node.meta['database'] ??
+                                                  node.meta['db'];
+                                          final metaName =
+                                              node.meta['table'] ??
+                                                  node.meta['tableName'] ??
+                                                  node.meta['name'];
+                                          if (metaDb != null &&
+                                              metaName != null) {
+                                            if (metaDb ==
+                                                    selectedExt.database &&
+                                                metaName == selectedExt.name) {
+                                              return true;
+                                            }
+                                          }
+                                          final parts = node.id.split('.');
+                                          if (parts.length >= 3) {
+                                            final db = parts[1];
+                                            final name =
+                                                parts.sublist(2).join('.');
+                                            return db ==
+                                                    selectedExt.database &&
+                                                name == selectedExt.name;
+                                          }
+                                          return false;
+                                        },
+                                  maxHeight:
+                                      kConnectionTreeMaxVisibleRows *
+                                          kConnectionTreeRowExtent,
+                                );
+                              },
                             ),
                     ),
                 ],

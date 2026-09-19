@@ -853,52 +853,57 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
                     itemBuilder: (context, index) {
                       final item = sorted[index];
                       final isPinned = _pinnedItems.contains(item);
-                      final sel = _ConnectionsTreeSelectionScope.of(context);
-                      final isSelected = sel != null &&
-                          sel.selectedConnectionId == widget.connection.id &&
-                          sel.selectedPostgresObject != null &&
-                          sel.selectedPostgresObject!.database ==
-                              widget.databaseName &&
-                          sel.selectedPostgresObject!.schema ==
-                              widget.schemaName &&
-                          sel.selectedPostgresObject!.name == item &&
-                          sel.selectedPostgresObject!.kind == widget.objectKind;
-                      return QueryaConnectionTreeRow(
-                        key: material.ValueKey(
-                          'pg-${widget.objectKind.name}-${widget.databaseName}-${widget.schemaName}-$item',
-                        ),
-                        label: item,
-                        isSelected: isSelected,
-                        isPinned: isPinned,
-                        onTogglePin: () {
-                          setState(() {
-                            if (isPinned) {
-                              _pinnedItems.remove(item);
-                            } else {
-                              _pinnedItems.add(item);
-                            }
-                          });
+                      return _ConnectionsTreeSelectionBuilder<bool>(
+                        select: (sel) =>
+                            sel.selectedConnectionId == widget.connection.id &&
+                            sel.selectedPostgresObject != null &&
+                            sel.selectedPostgresObject!.database ==
+                                widget.databaseName &&
+                            sel.selectedPostgresObject!.schema ==
+                                widget.schemaName &&
+                            sel.selectedPostgresObject!.name == item &&
+                            sel.selectedPostgresObject!.kind ==
+                                widget.objectKind,
+                        builder: (context, isSelected) {
+                          return QueryaConnectionTreeRow(
+                            key: material.ValueKey(
+                              'pg-${widget.objectKind.name}-${widget.databaseName}-${widget.schemaName}-$item',
+                            ),
+                            label: item,
+                            isSelected: isSelected,
+                            isPinned: isPinned,
+                            onTogglePin: () {
+                              setState(() {
+                                if (isPinned) {
+                                  _pinnedItems.remove(item);
+                                } else {
+                                  _pinnedItems.add(item);
+                                }
+                              });
+                            },
+                            icon: widget.itemIcon,
+                            iconSize: QueryaIconSizes.treeLeaf,
+                            iconColor: QueryaTreeTokens.leafIconColor(
+                              theme.colorScheme.primary,
+                            ),
+                            textStyle: material.TextStyle(
+                              fontSize: 11,
+                              color: theme.colorScheme.foreground,
+                            ),
+                            verticalPadding: 2,
+                            onTap: widget.onItemTap != null
+                                ? () => widget.onItemTap!(item)
+                                : null,
+                            connection: widget.connection,
+                            onContextRefresh: widget.onRefresh,
+                            onOpenSqlWorkspace:
+                                widget.onPostgresOpenSqlWorkspace,
+                            openSqlDatabase: widget.databaseName,
+                            openSqlSchema: widget.schemaName,
+                            openSqlName: item,
+                            openSqlKind: widget.objectKind,
+                          );
                         },
-                        icon: widget.itemIcon,
-                        iconSize: QueryaIconSizes.treeLeaf,
-                        iconColor: QueryaTreeTokens.leafIconColor(
-                          theme.colorScheme.primary,
-                        ),
-                        textStyle: material.TextStyle(
-                          fontSize: 11,
-                          color: theme.colorScheme.foreground,
-                        ),
-                        verticalPadding: 2,
-                        onTap: widget.onItemTap != null
-                            ? () => widget.onItemTap!(item)
-                            : null,
-                        connection: widget.connection,
-                        onContextRefresh: widget.onRefresh,
-                        onOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
-                        openSqlDatabase: widget.databaseName,
-                        openSqlSchema: widget.schemaName,
-                        openSqlName: item,
-                        openSqlKind: widget.objectKind,
                       );
                     },
                   ),
