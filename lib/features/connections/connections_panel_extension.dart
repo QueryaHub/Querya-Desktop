@@ -281,40 +281,17 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
                 mainAxisSize: material.MainAxisSize.min,
                 children: [
                   if (_loading)
-                    material.Padding(
-                      padding: const material.EdgeInsets.only(
-                        left: 28,
-                        top: 4,
-                        bottom: 4,
-                      ),
-                      child: material.Row(
-                        children: [
-                          const material.SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: material.CircularProgressIndicator(
-                              strokeWidth: 1.5,
-                            ),
-                          ),
-                          const Gap(8),
-                          const Text('Loading...').muted().xSmall(),
-                        ],
-                      ),
-                    )
+                    const ConnectionTreeLoadingRow.connection()
                   else if (_error != null)
                     TreeLoadError(
                       title: 'Could not load extension tree',
                       message: _error!,
-                      padding: const material.EdgeInsets.only(
-                        left: 28,
-                        top: 4,
-                        bottom: 8,
-                      ),
+                      padding: QueryaTreeTokens.errorPaddingConnection,
                       onRetry: _loadTree,
                     )
                   else if (_schema != null)
                     material.Padding(
-                      padding: const material.EdgeInsets.only(left: 20),
+                      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.underConnection),
                       child: _schema!.roots.isEmpty
                           ? material.Padding(
                               padding: const material.EdgeInsets.fromLTRB(

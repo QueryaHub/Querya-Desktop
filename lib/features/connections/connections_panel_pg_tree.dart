@@ -332,7 +332,7 @@ class _PgDatabasesNodeState extends State<_PgDatabasesNode> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return material.Padding(
-      padding: const material.EdgeInsets.only(left: 20),
+      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.underConnection),
       child: material.Column(
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
@@ -460,7 +460,7 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return material.Padding(
-      padding: const material.EdgeInsets.only(left: 16),
+      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent),
       child: material.Column(
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
@@ -518,22 +518,7 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
                   onContextRefresh: _loadSchemas,
                 ),
                 if (_loading)
-                  material.Padding(
-                    padding: const material.EdgeInsets.only(
-                        left: 24, top: 2, bottom: 2),
-                    child: material.Row(
-                      children: [
-                        const material.SizedBox(
-                          width: 10,
-                          height: 10,
-                          child: material.CircularProgressIndicator(
-                              strokeWidth: 1.5),
-                        ),
-                        const Gap(6),
-                        const Text('Loading...').muted().xSmall(),
-                      ],
-                    ),
-                  )
+                  const ConnectionTreeLoadingRow.nested()
                 else if (_error != null)
                   TreeLoadError(
                     title: 'Could not load schemas',
@@ -591,7 +576,7 @@ class _PgDbToolRow extends material.StatelessWidget {
     final theme = Theme.of(context);
     final muted = theme.colorScheme.mutedForeground;
     return material.Padding(
-      padding: const material.EdgeInsets.only(left: 16, top: 2, bottom: 2),
+      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent, top: 2, bottom: 2),
       child: _PgTreeRow(
         label: label,
         icon: icon,
@@ -657,7 +642,7 @@ class _PgSchemasNodeState extends State<_PgSchemasNode> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return material.Padding(
-      padding: const material.EdgeInsets.only(left: 16),
+      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent),
       child: material.Column(
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
@@ -851,22 +836,7 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
               crossAxisAlignment: material.CrossAxisAlignment.stretch,
               children: [
                 if (_loading)
-                  material.Padding(
-                    padding: const material.EdgeInsets.only(
-                        left: 24, top: 2, bottom: 2),
-                    child: material.Row(
-                      children: [
-                        const material.SizedBox(
-                          width: 10,
-                          height: 10,
-                          child: material.CircularProgressIndicator(
-                              strokeWidth: 1.5),
-                        ),
-                        const Gap(6),
-                        const Text('Loading...').muted().xSmall(),
-                      ],
-                    ),
-                  )
+                  const ConnectionTreeLoadingRow.nested()
                 else if (_error != null)
                   TreeLoadError(
                     title: 'Could not load objects',
@@ -1064,7 +1034,7 @@ class _PgSchemaToolRow extends material.StatelessWidget {
     final theme = Theme.of(context);
     final muted = theme.colorScheme.mutedForeground;
     return material.Padding(
-      padding: const material.EdgeInsets.only(left: 16, top: 2, bottom: 2),
+      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent, top: 2, bottom: 2),
       child: _PgTreeRow(
         label: label,
         icon: icon,
@@ -1154,7 +1124,7 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
     final showFilter = widget.items.length >= 8 || _filter.isNotEmpty;
 
     return material.Padding(
-      padding: const material.EdgeInsets.only(left: 16),
+      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent),
       child: material.Column(
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
@@ -1206,8 +1176,7 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
                   ),
                 if (sorted.isEmpty && widget.items.isNotEmpty)
                   material.Padding(
-                    padding: const material.EdgeInsets.only(
-                        left: 26, top: 4, bottom: 6),
+                    padding: QueryaTreeTokens.emptyFilterPadding,
                     child: Text('No matching ${widget.label.toLowerCase()}')
                         .muted()
                         .xSmall(),
@@ -1217,7 +1186,7 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
                     context: context,
                     itemCount: sorted.length,
                     itemExtent: kConnectionTreeRowExtent,
-                    padding: const material.EdgeInsets.only(left: 26),
+                    padding: const material.EdgeInsets.only(left: QueryaTreeTokens.leafList),
                     itemBuilder: (context, index) {
                       final item = sorted[index];
                       final isPinned = _pinnedItems.contains(item);

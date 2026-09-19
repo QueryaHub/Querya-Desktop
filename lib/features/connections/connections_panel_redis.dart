@@ -258,31 +258,12 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
                 crossAxisAlignment: material.CrossAxisAlignment.stretch,
                 children: [
                   if (_loading)
-                    material.Padding(
-                      padding: const material.EdgeInsets.only(
-                          left: 28, top: 4, bottom: 4),
-                      child: material.Row(
-                        children: [
-                          const material.SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: material.CircularProgressIndicator(
-                                strokeWidth: 1.5),
-                          ),
-                          const Gap(8),
-                          const Text('Loading...').muted().xSmall(),
-                        ],
-                      ),
-                    ),
+                    const ConnectionTreeLoadingRow.connection(),
                   if (_error != null)
                     TreeLoadError(
                       title: 'Could not load Redis info',
                       message: _error!,
-                      padding: const material.EdgeInsets.only(
-                        left: 28,
-                        top: 4,
-                        bottom: 4,
-                      ),
+                      padding: QueryaTreeTokens.errorPaddingConnection,
                       onRetry: _loadDatabases,
                     ),
                   if (_databases.isNotEmpty)
@@ -322,7 +303,7 @@ class _RedisDatabasesNode extends material.StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return material.Padding(
-      padding: const material.EdgeInsets.only(left: 20),
+      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.underConnection),
       child: material.Column(
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
@@ -381,7 +362,7 @@ class _RedisDatabaseNode extends StatelessWidget {
         sel.selectedConnectionId == connection.id &&
         sel.selectedRedisDb == index;
     return material.Padding(
-      padding: const material.EdgeInsets.only(left: 16),
+      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent),
       child: _PgTreeRow(
         label: 'db$index',
         isSelected: isSelected,
