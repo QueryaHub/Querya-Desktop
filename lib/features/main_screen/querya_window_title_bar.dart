@@ -6,7 +6,9 @@ import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/connections/driver_manager_dialog.dart';
+import 'package:querya_desktop/core/actions/querya_command_host.dart';
 import 'package:querya_desktop/features/command_palette/command_palette_dialog.dart';
+import 'package:querya_desktop/features/command_palette/quick_switcher_dialog.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/extensions/presentation/pages/extension_manager_dialog.dart';
 import 'package:querya_desktop/features/help/about_dialog.dart';
@@ -227,6 +229,24 @@ class QueryaWindowTitleBar extends StatelessWidget {
                               ).xSmall().muted(),
                               onPressed: (ctx) => showCommandPalette(ctx),
                               child: const Text('Command Palette…'),
+                            ),
+                            MenuButton(
+                              leading: const material.Icon(
+                                material.Icons.swap_horiz_rounded,
+                                size: 18,
+                              ),
+                              trailing: Text(
+                                Platform.isMacOS ? 'Cmd+K' : 'Ctrl+K',
+                              ).xSmall().muted(),
+                              onPressed: (ctx) {
+                                final host = QueryaCommandHost.maybeOf(ctx);
+                                if (host?.onShowQuickSwitcher != null) {
+                                  host!.onShowQuickSwitcher!('');
+                                } else {
+                                  showQuickSwitcher(ctx);
+                                }
+                              },
+                              child: const Text('Go to Object…'),
                             ),
                             MenuButton(
                               leading: const material.Icon(

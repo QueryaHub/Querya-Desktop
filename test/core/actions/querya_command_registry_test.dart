@@ -130,6 +130,29 @@ void main() {
     expect(ran, 1);
   });
 
+  testWidgets('go to object enabled under QueryaCommandHost', (tester) async {
+    registry.ensureCoreDefaults();
+    var opened = 0;
+    await tester.pumpWidget(
+      QueryaCommandHost(
+        onShowQuickSwitcher: (_) => opened++,
+        child: MaterialApp(
+          home: Builder(
+            builder: (context) {
+              expect(
+                registry.getAvailableCommands(context).map((c) => c.id),
+                contains('querya.goto.object'),
+              );
+              registry['querya.goto.object']!.execute(context);
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      ),
+    );
+    expect(opened, 1);
+  });
+
   testWidgets('toggle sidebar enabled under QueryaCommandHost', (tester) async {
     registry.ensureCoreDefaults();
     var toggled = 0;

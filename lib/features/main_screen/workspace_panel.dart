@@ -69,6 +69,7 @@ class WorkspacePanel extends StatefulWidget {
     this.onRequestLaunchDemo,
     this.onRequestOpenTour,
     this.onOpenConnection,
+    this.initialMongoCollection,
   });
 
   final VoidCallback? onRequestLaunchDemo;
@@ -161,6 +162,9 @@ class WorkspacePanel extends StatefulWidget {
 
   /// Last Redis database index for 1-click return from stats.
   final int? lastSelectedRedisDb;
+
+  /// Collection to open in [MongoExplorerView] after Quick Switcher jump.
+  final String? initialMongoCollection;
 
   /// Callback to return to the active connection's stats / overview home.
   final VoidCallback? onNavigateHome;
@@ -319,6 +323,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
                   key: ValueKey('mongo_${activeConn.id}_db_$mongoDb'),
                   connectionRow: activeConn,
                   database: mongoDb,
+                  initialCollection: widget.initialMongoCollection,
                 ),
         );
         break;

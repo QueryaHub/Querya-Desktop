@@ -396,6 +396,27 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
         _loading = false;
         _error = null;
       });
+      final cacheId = widget.connection.id;
+      if (cacheId != null) {
+        QueryaSchemaObjectCache.instance.merge(
+          cacheId,
+          QueryaSchemaObjectCache.scopeMysql(widget.databaseName),
+          [
+            for (final name in tables)
+              QueryaSchemaObject.mysql(
+                database: widget.databaseName,
+                name: name,
+                kind: QueryaSchemaObjectKind.table,
+              ),
+            for (final name in views)
+              QueryaSchemaObject.mysql(
+                database: widget.databaseName,
+                name: name,
+                kind: QueryaSchemaObjectKind.view,
+              ),
+          ],
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {

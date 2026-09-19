@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/actions/querya_command.dart';
+import 'package:querya_desktop/core/actions/querya_command_host.dart';
 import 'package:querya_desktop/core/actions/querya_command_registry.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
+import 'package:querya_desktop/features/command_palette/command_match_highlight.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Opens the Command Palette (`Ctrl/Cmd+P`). Motion Off snaps via [showAppDialog].
@@ -49,9 +51,27 @@ class _CommandPaletteDialogState extends State<CommandPaletteDialog> {
     super.dispose();
   }
 
+  bool get _objectPrefix {
+    final t = _controller.text;
+    return t.startsWith('#') || t.startsWith('@');
+  }
+
+  String get _objectQuery =>
+      _objectPrefix ? _controller.text.substring(1) : '';
+
   List<QueryaCommand> get _hits {
+    if (_objectPrefix) return const [];
     final ctx = widget.hostContext.mounted ? widget.hostContext : context;
     return QueryaCommandRegistry.instance.search(_controller.text, context: ctx);
+  }
+
+  void _openQuickSwitcher() {
+    Navigator.of(context).pop();
+    final target =
+        widget.hostContext.mounted ? widget.hostContext : context;
+    QueryaCommandHost.maybeOf(target)
+        ?.onShowQuickSwitcher
+        ?.call(_objectQuery);
   }
 
   void _run(QueryaCommand command) {
@@ -89,7 +109,11 @@ class _CommandPaletteDialogState extends State<CommandPaletteDialog> {
           const SingleActivator(LogicalKeyboardKey.arrowDown): () => _move(1),
           const SingleActivator(LogicalKeyboardKey.arrowUp): () => _move(-1),
           const SingleActivator(LogicalKeyboardKey.enter): () {
-            if (hits.isNotEmpty) _run(hits[selectedIndex]);
+            if (_objectPrefix) {
+              _openQuickSwitcher();
+            } else if (hits.isNotEmpty) {
+              _run(hits[selectedIndex]);
+            }
           },
         },
         child: SizedBox(
@@ -105,13 +129,19 @@ class _CommandPaletteDialogState extends State<CommandPaletteDialog> {
                   autofocus: true,
                   placeholder: const Text('Type a command…'),
                   onSubmitted: (_) {
-                    if (hits.isNotEmpty) _run(hits[selectedIndex]);
+                    if (_objectPrefix) {
+                      _openQuickSwitcher();
+                    } else if (hits.isNotEmpty) {
+                      _run(hits[selectedIndex]);
+                    }
                   },
                 ),
               ),
               const Divider(),
               Expanded(
-                child: hits.isEmpty
+                child: _objectPrefix
+                    ? _PrefixHint(query: _objectQuery, onOpen: _openQuickSwitcher)
+                    : hits.isEmpty
                     ? const Center(
                         child: Padding(
                           padding: EdgeInsets.all(24),
@@ -148,7 +178,7 @@ class _CommandPaletteDialogState extends State<CommandPaletteDialog> {
                                       const Gap(8),
                                     ],
                                     Expanded(
-                                      child: _HighlightedLabel(
+                                      child: CommandMatchHighlight(
                                         text: command.title,
                                         query: _controller.text,
                                       ),
@@ -173,37 +203,24 @@ class _CommandPaletteDialogState extends State<CommandPaletteDialog> {
   }
 }
 
-class _HighlightedLabel extends StatelessWidget {
-  const _HighlightedLabel({
-    required this.text,
-    required this.query,
-  });
+class _PrefixHint extends StatelessWidget {
+  const _PrefixHint({required this.query, required this.onOpen});
 
-  final String text;
   final String query;
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
-    final q = query.trim();
-    if (q.isEmpty) return Text(text);
-    final lower = text.toLowerCase();
-    final needle = q.toLowerCase();
-    final index = lower.indexOf(needle);
-    if (index < 0) return Text(text);
-    final theme = Theme.of(context).colorScheme;
-    return Text.rich(
-      TextSpan(
-        children: [
-          TextSpan(text: text.substring(0, index)),
-          TextSpan(
-            text: text.substring(index, index + needle.length),
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: theme.primary,
-            ),
-          ),
-          TextSpan(text: text.substring(index + needle.length)),
-        ],
+    final label = query.trim().isEmpty
+        ? 'Open Quick Switcher'
+        : 'Go to “${query.trim()}”';
+    return material.InkWell(
+      onTap: onOpen,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(label),
+        ),
       ),
     );
   }

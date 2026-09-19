@@ -51,6 +51,25 @@ List<QueryaCommand> queryaCoreCommands() {
           QueryaCommandHost.maybeOf(context)?.onToggleSidebar?.call(),
     ),
     QueryaCommand(
+      id: 'querya.goto.object',
+      title: 'Go to Table or View…',
+      category: 'Navigation',
+      icon: Icons.search_rounded,
+      shortcutLabel: 'Ctrl+K',
+      aliases: const [
+        'quick switcher',
+        'goto',
+        'table',
+        'jump',
+        '#',
+        '@',
+      ],
+      isEnabled: (context) =>
+          QueryaCommandHost.maybeOf(context)?.onShowQuickSwitcher != null,
+      execute: (context) =>
+          QueryaCommandHost.maybeOf(context)?.onShowQuickSwitcher?.call(''),
+    ),
+    QueryaCommand(
       id: 'querya.app.preferences',
       title: 'Open Preferences',
       category: 'Application',

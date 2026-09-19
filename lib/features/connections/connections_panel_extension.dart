@@ -100,6 +100,14 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
         _schema = schema;
         _loading = false;
       });
+      final cacheId = widget.connection.id;
+      if (cacheId != null) {
+        QueryaSchemaObjectCache.instance.merge(
+          cacheId,
+          QueryaSchemaObjectCache.scopeExtension(),
+          flattenExtensionTree(schema),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
