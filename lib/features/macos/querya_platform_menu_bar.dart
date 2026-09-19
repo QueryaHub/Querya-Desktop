@@ -4,7 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/actions/querya_command_host.dart';
 import '../command_palette/command_palette_dialog.dart';
+import '../command_palette/quick_switcher_dialog.dart';
 import '../settings/preferences_dialog.dart';
 
 /// Native macOS top menu bar integration via Flutter's [PlatformMenuBar].
@@ -73,6 +75,21 @@ class QueryaPlatformMenuBar extends StatelessWidget {
                     meta: true,
                   ),
                   onSelected: () => showCommandPalette(context),
+                ),
+                PlatformMenuItem(
+                  label: 'Go to Object...',
+                  shortcut: const SingleActivator(
+                    LogicalKeyboardKey.keyK,
+                    meta: true,
+                  ),
+                  onSelected: () {
+                    final host = QueryaCommandHost.maybeOf(context);
+                    if (host?.onShowQuickSwitcher != null) {
+                      host!.onShowQuickSwitcher!('');
+                    } else {
+                      showQuickSwitcher(context);
+                    }
+                  },
                 ),
                 PlatformMenuItem(
                   label: 'Preferences...',

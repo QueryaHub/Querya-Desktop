@@ -55,6 +55,9 @@ import 'package:flutter/material.dart' as material
         TextEditingController,
         FocusNode;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
+import 'package:querya_desktop/core/actions/querya_schema_object.dart';
+import 'package:querya_desktop/core/actions/querya_schema_object_cache.dart';
+import 'package:querya_desktop/core/actions/querya_schema_object_loader.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';

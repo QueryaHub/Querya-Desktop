@@ -441,6 +441,36 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
         _loaded = true;
         _error = null;
       });
+      final cacheId = widget.connection.id;
+      if (cacheId != null) {
+        QueryaSchemaObjectCache.instance.merge(
+          cacheId,
+          QueryaSchemaObjectCache.scopePostgres(widget.databaseName),
+          [
+            for (final name in tables)
+              QueryaSchemaObject.postgres(
+                database: widget.databaseName,
+                schema: widget.schemaName,
+                name: name,
+                kind: QueryaSchemaObjectKind.table,
+              ),
+            for (final name in views)
+              QueryaSchemaObject.postgres(
+                database: widget.databaseName,
+                schema: widget.schemaName,
+                name: name,
+                kind: QueryaSchemaObjectKind.view,
+              ),
+            for (final name in matviews)
+              QueryaSchemaObject.postgres(
+                database: widget.databaseName,
+                schema: widget.schemaName,
+                name: name,
+                kind: QueryaSchemaObjectKind.materializedView,
+              ),
+          ],
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {

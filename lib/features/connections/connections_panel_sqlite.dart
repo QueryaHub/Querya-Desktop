@@ -96,6 +96,25 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
         _views = views;
         _loading = false;
       });
+      final cacheId = widget.connection.id;
+      if (cacheId != null) {
+        QueryaSchemaObjectCache.instance.merge(
+          cacheId,
+          QueryaSchemaObjectCache.scopeSqlite(),
+          [
+            for (final name in tables)
+              QueryaSchemaObject.sqlite(
+                name: name,
+                kind: QueryaSchemaObjectKind.table,
+              ),
+            for (final name in views)
+              QueryaSchemaObject.sqlite(
+                name: name,
+                kind: QueryaSchemaObjectKind.view,
+              ),
+          ],
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {

@@ -6,7 +6,10 @@ import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/actions/querya_command_host.dart';
+import 'package:querya_desktop/core/actions/querya_schema_object.dart';
+import 'package:querya_desktop/core/actions/querya_schema_object_loader.dart';
 import 'package:querya_desktop/features/command_palette/command_palette_dialog.dart';
+import 'package:querya_desktop/features/command_palette/quick_switcher_dialog.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/actions/sql_editor_global_actions.dart';
@@ -54,6 +57,7 @@ class _MainScreenState extends State<MainScreen> {
       ValueNotifier(MainScreenWorkspaceState.empty);
   final ValueNotifier<bool> _isSidebarVisible = ValueNotifier(true);
   bool _openingConnectionDialog = false;
+  String? _pendingMongoCollection;
 
   @override
   void initState() {
@@ -140,6 +144,16 @@ class _MainScreenState extends State<MainScreen> {
     if (isCmdOrCtrl && !isShift && !isAlt && isKeyP) {
       final ctx = FocusManager.instance.primaryFocus?.context ?? context;
       unawaited(showCommandPalette(ctx));
+      return true;
+    }
+
+    // Quick Switcher: Ctrl+K / Cmd+K (Physical K, Logical K, Russian 'л')
+    final isKeyK = physical == PhysicalKeyboardKey.keyK ||
+        logical == LogicalKeyboardKey.keyK ||
+        logical == const LogicalKeyboardKey(0x0000043b) || // л
+        logical == const LogicalKeyboardKey(0x0000041b); // Л
+    if (isCmdOrCtrl && !isShift && !isAlt && isKeyK) {
+      _openQuickSwitcher();
       return true;
     }
 
@@ -253,6 +267,7 @@ class _MainScreenState extends State<MainScreen> {
     _workspace.value = _workspace.value.selectConnection(connection);
     if (prevId != connection.id) {
       QueryaShellStatus.instance.clear();
+      _pendingMongoCollection = null;
     }
     final id = connection.id;
     if (id != null) {
@@ -344,6 +359,84 @@ class _MainScreenState extends State<MainScreen> {
       database,
       name,
     );
+  }
+
+  void _openQuickSwitcher([String query = '']) {
+    final ctx = FocusManager.instance.primaryFocus?.context ?? context;
+    final ws = _workspace.value;
+    final conn = ws.activeConnection;
+    unawaited(showQuickSwitcher(
+      ctx,
+      initialQuery: query,
+      load: () => QueryaSchemaObjectLoader.load(
+        connection: conn,
+        database: ws.selectedPostgresObject?.database ??
+            ws.selectedMysqlObject?.database ??
+            ws.selectedExtensionObject?.database ??
+            conn?.databaseName,
+        mongoDatabase: ws.activeMongoDB ?? conn?.databaseName,
+      ),
+    ));
+  }
+
+  void _onOpenSchemaObject(QueryaSchemaObject object) {
+    final conn = _workspace.value.activeConnection;
+    if (conn == null) return;
+    final type = conn.type.toLowerCase();
+    switch (object.kind) {
+      case QueryaSchemaObjectKind.table:
+      case QueryaSchemaObjectKind.view:
+      case QueryaSchemaObjectKind.materializedView:
+        if (type == 'postgres' || type == 'postgresql') {
+          _onPostgresObjectSelected(
+            conn,
+            object.database ?? conn.databaseName ?? '',
+            object.schema ?? 'public',
+            object.name,
+            switch (object.kind) {
+              QueryaSchemaObjectKind.view => PostgresObjectKind.view,
+              QueryaSchemaObjectKind.materializedView =>
+                PostgresObjectKind.materializedView,
+              _ => PostgresObjectKind.table,
+            },
+          );
+          return;
+        }
+        if (type == 'mysql') {
+          _onMysqlObjectSelected(
+            conn,
+            object.database ?? conn.databaseName ?? '',
+            object.name,
+            object.kind == QueryaSchemaObjectKind.view
+                ? MysqlObjectKind.view
+                : MysqlObjectKind.table,
+          );
+          return;
+        }
+        if (type == 'sqlite') {
+          _onSqliteObjectSelected(
+            conn,
+            object.name,
+            object.kind == QueryaSchemaObjectKind.view
+                ? SqliteObjectKind.view
+                : SqliteObjectKind.table,
+          );
+          return;
+        }
+        if (conn.isExtensionDriver) {
+          _onExtensionObjectSelected(
+            conn,
+            object.database ?? conn.databaseName ?? '',
+            object.name,
+          );
+        }
+      case QueryaSchemaObjectKind.collection:
+        setState(() => _pendingMongoCollection = object.name);
+        _onMongoDBDatabaseSelected(
+          conn,
+          object.database ?? conn.databaseName ?? '',
+        );
+    }
   }
 
   void _openSqlWorkspaceForConnection(ConnectionRow connection) {
@@ -495,6 +588,8 @@ class _MainScreenState extends State<MainScreen> {
         return QueryaCommandHost(
           onToggleSidebar: () => _splitKey.currentState?.toggleSidebar(),
           onNewConnection: () => unawaited(_onNewDatabaseConnectionFromMenu()),
+          onShowQuickSwitcher: _openQuickSwitcher,
+          onOpenSchemaObject: _onOpenSchemaObject,
           child: FocusScope(
           autofocus: true,
           child: material.CallbackShortcuts(
@@ -583,6 +678,14 @@ class _MainScreenState extends State<MainScreen> {
                 LogicalKeyboardKey.keyP,
                 meta: true,
               ): () => unawaited(showCommandPalette(context)),
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyK,
+                control: true,
+              ): () => _openQuickSwitcher(),
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyK,
+                meta: true,
+              ): () => _openQuickSwitcher(),
 
               // Welcome Tour & Tutorial: F1 / Cmd+Shift+H / Ctrl+Shift+H
               const material.SingleActivator(
@@ -725,6 +828,7 @@ class _MainScreenState extends State<MainScreen> {
                         onRequestLaunchDemo: _onLaunchDemoPlayground,
                         onRequestOpenTour: _onOpenWelcomeTour,
                         onOpenConnection: _onConnectionSelected,
+                        initialMongoCollection: _pendingMongoCollection,
                       ),
                     ),
                     ValueListenableBuilder<bool>(
@@ -789,6 +893,7 @@ class _MainContentSplit extends StatefulWidget {
     this.onRequestOpenTour,
     required this.onOpenConnection,
     this.onSidebarVisibilityChanged,
+    this.initialMongoCollection,
   });
 
   final GlobalKey<ConnectionsPanelState> connectionsPanelKey;
@@ -826,6 +931,7 @@ class _MainContentSplit extends StatefulWidget {
   final VoidCallback onRequestNewConnection;
   final VoidCallback onRequestNewConnectionFromUrl;
   final VoidCallback onRequestOpenSqlite;
+  final String? initialMongoCollection;
   final VoidCallback? onRequestLaunchDemo;
   final VoidCallback? onRequestOpenTour;
   final void Function(ConnectionRow) onOpenConnection;
@@ -1112,6 +1218,7 @@ class _MainContentSplitState extends State<_MainContentSplit>
                       onRequestLaunchDemo: widget.onRequestLaunchDemo,
                       onRequestOpenTour: widget.onRequestOpenTour,
                       onOpenConnection: widget.onOpenConnection,
+                      initialMongoCollection: widget.initialMongoCollection,
                     );
                   },
                 ),
