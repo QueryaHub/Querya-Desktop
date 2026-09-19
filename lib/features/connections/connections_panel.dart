@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show ValueNotifier, immutable;
 import 'package:flutter/material.dart' as material
     show
         AlertDialog,
@@ -256,43 +257,161 @@ class TreeObjectFilterBar extends material.StatelessWidget {
 }
 
 /// Inherited scope providing the active connection and object selection down the connections tree.
+///
+/// The [listenable] is obtained via [listenableOf] **without** registering an
+/// InheritedWidget dependency. Leaves should use [_ConnectionsTreeSelectionBuilder]
+/// so only rows whose selected slice changes call [State.setState].
 class _ConnectionsTreeSelectionScope extends InheritedWidget {
   const _ConnectionsTreeSelectionScope({
-    required this.selectedConnectionId,
-    required this.selectedPostgresObject,
-    required this.selectedMysqlObject,
-    required this.selectedSqliteObject,
-    required this.selectedExtensionObject,
-    required this.selectedRedisDb,
-    required this.selectedMongoDb,
+    required this.listenable,
     required super.child,
   });
 
+  final ValueNotifier<_ConnectionsTreeSelection> listenable;
+
+  static ValueNotifier<_ConnectionsTreeSelection>? listenableOf(
+    material.BuildContext context,
+  ) {
+    return context
+        .getInheritedWidgetOfExactType<_ConnectionsTreeSelectionScope>()
+        ?.listenable;
+  }
+
+  @override
+  bool updateShouldNotify(_ConnectionsTreeSelectionScope oldWidget) {
+    return listenable != oldWidget.listenable;
+  }
+}
+
+@immutable
+class _ConnectionsTreeSelection {
+  const _ConnectionsTreeSelection({
+    this.selectedConnectionId,
+    this.selectedPostgresObject,
+    this.selectedMysqlObject,
+    this.selectedSqliteObject,
+    this.selectedExtensionObject,
+    this.selectedRedisDb,
+    this.selectedMongoDb,
+  });
+
+  static const empty = _ConnectionsTreeSelection();
+
   final int? selectedConnectionId;
-  final ({String database, String schema, String name, PostgresObjectKind kind})?
-      selectedPostgresObject;
-  final ({String database, String name, MysqlObjectKind kind})?
-      selectedMysqlObject;
+  final ({
+    String database,
+    String schema,
+    String name,
+    PostgresObjectKind kind
+  })? selectedPostgresObject;
+  final ({
+    String database,
+    String name,
+    MysqlObjectKind kind
+  })? selectedMysqlObject;
   final ({String name, SqliteObjectKind kind})? selectedSqliteObject;
   final ({String database, String name})? selectedExtensionObject;
   final int? selectedRedisDb;
   final String? selectedMongoDb;
 
-  static _ConnectionsTreeSelectionScope? of(material.BuildContext context) {
-    return context
-        .dependOnInheritedWidgetOfExactType<_ConnectionsTreeSelectionScope>();
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is _ConnectionsTreeSelection &&
+        selectedConnectionId == other.selectedConnectionId &&
+        selectedPostgresObject == other.selectedPostgresObject &&
+        selectedMysqlObject == other.selectedMysqlObject &&
+        selectedSqliteObject == other.selectedSqliteObject &&
+        selectedExtensionObject == other.selectedExtensionObject &&
+        selectedRedisDb == other.selectedRedisDb &&
+        selectedMongoDb == other.selectedMongoDb;
   }
 
   @override
-  bool updateShouldNotify(_ConnectionsTreeSelectionScope oldWidget) {
-    return selectedConnectionId != oldWidget.selectedConnectionId ||
-        selectedPostgresObject != oldWidget.selectedPostgresObject ||
-        selectedMysqlObject != oldWidget.selectedMysqlObject ||
-        selectedSqliteObject != oldWidget.selectedSqliteObject ||
-        selectedExtensionObject != oldWidget.selectedExtensionObject ||
-        selectedRedisDb != oldWidget.selectedRedisDb ||
-        selectedMongoDb != oldWidget.selectedMongoDb;
+  int get hashCode => Object.hash(
+        selectedConnectionId,
+        selectedPostgresObject,
+        selectedMysqlObject,
+        selectedSqliteObject,
+        selectedExtensionObject,
+        selectedRedisDb,
+        selectedMongoDb,
+      );
+}
+
+/// Rebuilds only when [select] yields a new value (`==`), avoiding full-tree
+/// InheritedWidget fan-out on every selection change.
+class _ConnectionsTreeSelectionBuilder<T> extends StatefulWidget {
+  const _ConnectionsTreeSelectionBuilder({
+    required this.select,
+    required this.builder,
+  });
+
+  final T Function(_ConnectionsTreeSelection selection) select;
+  final material.Widget Function(material.BuildContext context, T selected)
+      builder;
+
+  @override
+  State<_ConnectionsTreeSelectionBuilder<T>> createState() =>
+      _ConnectionsTreeSelectionBuilderState<T>();
+}
+
+class _ConnectionsTreeSelectionBuilderState<T>
+    extends State<_ConnectionsTreeSelectionBuilder<T>> {
+  ValueNotifier<_ConnectionsTreeSelection>? _listenable;
+  late T _slice;
+  var _hasSlice = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final next = _ConnectionsTreeSelectionScope.listenableOf(context);
+    if (!identical(_listenable, next)) {
+      _listenable?.removeListener(_onSelectionChanged);
+      _listenable = next;
+      _listenable?.addListener(_onSelectionChanged);
+    }
+    final computed = _compute();
+    if (!_hasSlice) {
+      _slice = computed;
+      _hasSlice = true;
+    } else if (computed != _slice) {
+      setState(() => _slice = computed);
+    }
   }
+
+  @override
+  void didUpdateWidget(covariant _ConnectionsTreeSelectionBuilder<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.select != widget.select) {
+      final next = _compute();
+      if (next != _slice) {
+        setState(() => _slice = next);
+      }
+    }
+  }
+
+  T _compute() {
+    final value = _listenable?.value ?? _ConnectionsTreeSelection.empty;
+    return widget.select(value);
+  }
+
+  void _onSelectionChanged() {
+    final next = _compute();
+    if (next != _slice) {
+      setState(() => _slice = next);
+    }
+  }
+
+  @override
+  void dispose() {
+    _listenable?.removeListener(_onSelectionChanged);
+    super.dispose();
+  }
+
+  @override
+  material.Widget build(material.BuildContext context) =>
+      widget.builder(context, _slice);
 }
 
 /// Left panel: Browser tree (pgAdmin-style). Uses shadcn layout widgets.
@@ -408,19 +527,44 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
   /// Ignores stale [setState] when multiple [_loadData] runs overlap (e.g. tests).
   int _loadDataGeneration = 0;
 
+  late final ValueNotifier<_ConnectionsTreeSelection> _treeSelection;
+
   @override
   void initState() {
     super.initState();
+    _treeSelection = ValueNotifier(_selectionFromWidget());
     if (!widget.skipInitialDbLoadForTest) {
       _loadData();
     }
   }
 
   @override
+  void didUpdateWidget(covariant ConnectionsPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final next = _selectionFromWidget();
+    if (next != _treeSelection.value) {
+      _treeSelection.value = next;
+    }
+  }
+
+  @override
   void dispose() {
+    _treeSelection.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  _ConnectionsTreeSelection _selectionFromWidget() {
+    return _ConnectionsTreeSelection(
+      selectedConnectionId: widget.selectedConnectionId,
+      selectedPostgresObject: widget.selectedPostgresObject,
+      selectedMysqlObject: widget.selectedMysqlObject,
+      selectedSqliteObject: widget.selectedSqliteObject,
+      selectedExtensionObject: widget.selectedExtensionObject,
+      selectedRedisDb: widget.selectedRedisDb,
+      selectedMongoDb: widget.selectedMongoDb,
+    );
   }
 
   /// For testing global search filtering.
@@ -752,13 +896,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         filteredFolders.length + rootConnections.length + (showEmptyState ? 1 : 0);
 
     return _ConnectionsTreeSelectionScope(
-      selectedConnectionId: widget.selectedConnectionId,
-      selectedPostgresObject: widget.selectedPostgresObject,
-      selectedMysqlObject: widget.selectedMysqlObject,
-      selectedSqliteObject: widget.selectedSqliteObject,
-      selectedExtensionObject: widget.selectedExtensionObject,
-      selectedRedisDb: widget.selectedRedisDb,
-      selectedMongoDb: widget.selectedMongoDb,
+      listenable: _treeSelection,
       child: material.CallbackShortcuts(
         bindings: {
           const material.SingleActivator(LogicalKeyboardKey.keyF, control: true):

@@ -448,48 +448,51 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
                     itemBuilder: (context, index) {
                       final item = sorted[index];
                       final isPinned = _pinnedItems.contains(item);
-                      final sel = _ConnectionsTreeSelectionScope.of(context);
-                      final isSelected = sel != null &&
-                          sel.selectedConnectionId == widget.connection.id &&
-                          sel.selectedSqliteObject != null &&
-                          sel.selectedSqliteObject!.name == item &&
-                          sel.selectedSqliteObject!.kind == widget.objectKind;
-                      return QueryaConnectionTreeRow(
-                        key: material.ValueKey(
-                          'sqlite-${widget.objectKind.name}-$item',
-                        ),
-                        label: item,
-                        isSelected: isSelected,
-                        isPinned: isPinned,
-                        onTogglePin: () {
-                          setState(() {
-                            if (isPinned) {
-                              _pinnedItems.remove(item);
-                            } else {
-                              _pinnedItems.add(item);
-                            }
-                          });
+                      return _ConnectionsTreeSelectionBuilder<bool>(
+                        select: (sel) =>
+                            sel.selectedConnectionId == widget.connection.id &&
+                            sel.selectedSqliteObject != null &&
+                            sel.selectedSqliteObject!.name == item &&
+                            sel.selectedSqliteObject!.kind == widget.objectKind,
+                        builder: (context, isSelected) {
+                          return QueryaConnectionTreeRow(
+                            key: material.ValueKey(
+                              'sqlite-${widget.objectKind.name}-$item',
+                            ),
+                            label: item,
+                            isSelected: isSelected,
+                            isPinned: isPinned,
+                            onTogglePin: () {
+                              setState(() {
+                                if (isPinned) {
+                                  _pinnedItems.remove(item);
+                                } else {
+                                  _pinnedItems.add(item);
+                                }
+                              });
+                            },
+                            icon: widget.itemIcon,
+                            iconSize: QueryaIconSizes.treeLeaf,
+                            iconColor: QueryaTreeTokens.leafIconColor(
+                              theme.colorScheme.primary,
+                            ),
+                            textStyle: material.TextStyle(
+                              fontSize: 11,
+                              color: theme.colorScheme.foreground,
+                            ),
+                            verticalPadding: 2,
+                            onTap: widget.onItemTap != null
+                                ? () => widget.onItemTap!(item)
+                                : null,
+                            connection: widget.connection,
+                            openSqlName: item,
+                            onContextRefresh: widget.onRefresh,
+                            onOpenSqlWorkspace: widget.onOpenSqlWorkspace != null
+                                ? (conn, {database, schema, name, kind}) =>
+                                    widget.onOpenSqlWorkspace!(conn)
+                                : null,
+                          );
                         },
-                        icon: widget.itemIcon,
-                        iconSize: QueryaIconSizes.treeLeaf,
-                        iconColor: QueryaTreeTokens.leafIconColor(
-                          theme.colorScheme.primary,
-                        ),
-                        textStyle: material.TextStyle(
-                          fontSize: 11,
-                          color: theme.colorScheme.foreground,
-                        ),
-                        verticalPadding: 2,
-                        onTap: widget.onItemTap != null
-                            ? () => widget.onItemTap!(item)
-                            : null,
-                        connection: widget.connection,
-                        openSqlName: item,
-                        onContextRefresh: widget.onRefresh,
-                        onOpenSqlWorkspace: widget.onOpenSqlWorkspace != null
-                            ? (conn, {database, schema, name, kind}) =>
-                                widget.onOpenSqlWorkspace!(conn)
-                            : null,
                       );
                     },
                   ),

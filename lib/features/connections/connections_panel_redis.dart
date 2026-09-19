@@ -342,40 +342,43 @@ class _RedisDatabaseNode extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final sel = _ConnectionsTreeSelectionScope.of(context);
-    final isSelected = sel != null &&
-        sel.selectedConnectionId == connection.id &&
-        sel.selectedRedisDb == index;
-    return material.Padding(
-      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent),
-      child: QueryaConnectionTreeRow(
-        label: 'db$index',
-        isSelected: isSelected,
-        icon: QueryaIcons.database,
-        iconSize: QueryaIconSizes.treeConnection,
-        iconColor: keys > 0
-            ? theme.colorScheme.primary.withValues(alpha: 0.7)
-            : theme.colorScheme.mutedForeground.withValues(alpha: 0.5),
-        trailing: keys > 0
-            ? material.Text(
-                '$keys',
-                style: material.TextStyle(
-                  fontSize: 10,
-                  color: theme.colorScheme.mutedForeground,
-                ),
-              )
-            : null,
-        textStyle: material.TextStyle(
-          fontSize: 12,
-          color: keys > 0
-              ? theme.colorScheme.foreground
-              : theme.colorScheme.mutedForeground,
-        ),
-        verticalPadding: 3,
-        onTap: onTap,
-        connection: connection,
-        onContextRefresh: onRefreshDatabases,
-      ),
+    return _ConnectionsTreeSelectionBuilder<bool>(
+      select: (sel) =>
+          sel.selectedConnectionId == connection.id &&
+          sel.selectedRedisDb == index,
+      builder: (context, isSelected) {
+        return material.Padding(
+          padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent),
+          child: QueryaConnectionTreeRow(
+            label: 'db$index',
+            isSelected: isSelected,
+            icon: QueryaIcons.database,
+            iconSize: QueryaIconSizes.treeConnection,
+            iconColor: keys > 0
+                ? theme.colorScheme.primary.withValues(alpha: 0.7)
+                : theme.colorScheme.mutedForeground.withValues(alpha: 0.5),
+            trailing: keys > 0
+                ? material.Text(
+                    '$keys',
+                    style: material.TextStyle(
+                      fontSize: 10,
+                      color: theme.colorScheme.mutedForeground,
+                    ),
+                  )
+                : null,
+            textStyle: material.TextStyle(
+              fontSize: 12,
+              color: keys > 0
+                  ? theme.colorScheme.foreground
+                  : theme.colorScheme.mutedForeground,
+            ),
+            verticalPadding: 3,
+            onTap: onTap,
+            connection: connection,
+            onContextRefresh: onRefreshDatabases,
+          ),
+        );
+      },
     );
   }
 }

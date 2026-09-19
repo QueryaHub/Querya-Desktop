@@ -368,30 +368,34 @@ class _MongoDatabaseNode extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final sel = _ConnectionsTreeSelectionScope.of(context);
-    final isSelected = sel != null &&
-        sel.selectedConnectionId == connection.id &&
-        sel.selectedMongoDb == name;
-    return material.Padding(
-      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent, top: 2, bottom: 2),
-      child: QueryaConnectionTreeRow(
-        label: name,
-        isSelected: isSelected,
-        icon: QueryaIcons.database,
-        iconSize: QueryaIconSizes.treeConnection,
-        iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
-        textStyle: material.TextStyle(
-          fontSize: 12,
-          color: theme.colorScheme.foreground,
-        ),
-        verticalPadding: 3,
-        onTap: onTap,
-        connection: connection,
-        onContextRefresh: onRefreshDatabases,
-        onOpenSqlWorkspace: null,
-        onContextDelete: onDelete,
-        contextDeleteLabel: 'Delete database',
-      ),
+    return _ConnectionsTreeSelectionBuilder<bool>(
+      select: (sel) =>
+          sel.selectedConnectionId == connection.id &&
+          sel.selectedMongoDb == name,
+      builder: (context, isSelected) {
+        return material.Padding(
+          padding: const material.EdgeInsets.only(
+              left: QueryaTreeTokens.indent, top: 2, bottom: 2),
+          child: QueryaConnectionTreeRow(
+            label: name,
+            isSelected: isSelected,
+            icon: QueryaIcons.database,
+            iconSize: QueryaIconSizes.treeConnection,
+            iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
+            textStyle: material.TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.foreground,
+            ),
+            verticalPadding: 3,
+            onTap: onTap,
+            connection: connection,
+            onContextRefresh: onRefreshDatabases,
+            onOpenSqlWorkspace: null,
+            onContextDelete: onDelete,
+            contextDeleteLabel: 'Delete database',
+          ),
+        );
+      },
     );
   }
 }
