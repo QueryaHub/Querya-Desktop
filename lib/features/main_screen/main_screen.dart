@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
+import 'package:querya_desktop/core/actions/querya_command_host.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/actions/sql_editor_global_actions.dart';
@@ -479,7 +480,10 @@ class _MainScreenState extends State<MainScreen> {
     return ValueListenableBuilder<MainScreenWorkspaceState>(
       valueListenable: _workspace,
       builder: (context, workspace, _) {
-        return FocusScope(
+        return QueryaCommandHost(
+          onToggleSidebar: () => _splitKey.currentState?.toggleSidebar(),
+          onNewConnection: () => unawaited(_onNewDatabaseConnectionFromMenu()),
+          child: FocusScope(
           autofocus: true,
           child: material.CallbackShortcuts(
             bindings: {
@@ -733,6 +737,7 @@ class _MainScreenState extends State<MainScreen> {
             ),
             ),
           ),
+        ),
         ),
       );
     },

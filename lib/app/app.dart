@@ -1,3 +1,4 @@
+import 'package:querya_desktop/core/actions/querya_command_registry.dart';
 import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/layout/ui_scale_controller.dart';
 import 'package:querya_desktop/core/motion/querya_motion_controller.dart';
@@ -15,6 +16,7 @@ class QueryaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    QueryaCommandRegistry.instance.ensureCoreDefaults();
     final themeController = ThemeController.instance;
     final uiScaleController = UiScaleController.instance;
     final motionController = QueryaMotionController.instance;
