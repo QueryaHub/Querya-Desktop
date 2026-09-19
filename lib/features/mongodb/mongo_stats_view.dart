@@ -20,6 +20,8 @@ class MongoStatsView extends material.StatefulWidget {
     required this.connectionRow,
     this.connection,
     this.onBack,
+    this.lastSelectedMongoDb,
+    this.onRestoreLastSelectedObject,
   });
 
   final ConnectionRow connectionRow;
@@ -30,6 +32,10 @@ class MongoStatsView extends material.StatefulWidget {
 
   /// Called when the user taps the "back to explorer" button.
   final material.VoidCallback? onBack;
+
+  /// Remembers the last visited database for 1-click return from stats.
+  final String? lastSelectedMongoDb;
+  final material.VoidCallback? onRestoreLastSelectedObject;
 
   @override
   material.State<MongoStatsView> createState() => _MongoStatsViewState();
@@ -396,6 +402,16 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
           alignment: material.WrapAlignment.end,
           crossAxisAlignment: material.WrapCrossAlignment.center,
           children: [
+            if (widget.lastSelectedMongoDb != null &&
+                widget.onRestoreLastSelectedObject != null)
+              OutlineButton(
+                onPressed: widget.onRestoreLastSelectedObject,
+                leading: const material.Icon(
+                  material.Icons.folder_outlined,
+                  size: 18,
+                ),
+                child: Text('Return to ${widget.lastSelectedMongoDb}'),
+              ),
             if (widget.onBack != null)
               OutlineButton(
                 onPressed: widget.onBack,

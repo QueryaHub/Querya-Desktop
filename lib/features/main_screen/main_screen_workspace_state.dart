@@ -24,6 +24,8 @@ class MainScreenWorkspaceState {
     this.lastSelectedMysqlObject,
     this.lastSelectedSqliteObject,
     this.lastSelectedExtensionObject,
+    this.lastSelectedMongoDb,
+    this.lastSelectedRedisDb,
     this.isReadOnly = false,
   });
 
@@ -90,6 +92,12 @@ class MainScreenWorkspaceState {
     String name,
   })? lastSelectedExtensionObject;
 
+  /// Last MongoDB database opened for 1-click return from server stats.
+  final String? lastSelectedMongoDb;
+
+  /// Last Redis database index opened for 1-click return from server stats.
+  final int? lastSelectedRedisDb;
+
   final bool isReadOnly;
 
   static const empty = MainScreenWorkspaceState();
@@ -112,6 +120,8 @@ class MainScreenWorkspaceState {
       lastSelectedMysqlObject: lastSelectedMysqlObject,
       lastSelectedSqliteObject: lastSelectedSqliteObject,
       lastSelectedExtensionObject: lastSelectedExtensionObject,
+      lastSelectedMongoDb: lastSelectedMongoDb,
+      lastSelectedRedisDb: lastSelectedRedisDb,
       isReadOnly: !isReadOnly,
     );
   }
@@ -140,17 +150,21 @@ class MainScreenWorkspaceState {
       lastSelectedExtensionObject: same
           ? (selectedExtensionObject ?? lastSelectedExtensionObject)
           : null,
+      lastSelectedMongoDb:
+          same ? (activeMongoDB ?? lastSelectedMongoDb) : null,
+      lastSelectedRedisDb:
+          same ? (activeRedisDb ?? lastSelectedRedisDb) : null,
       isReadOnly: false,
     );
   }
 
-  /// Clears the active table/view selection to show server stats/home, but retains
+  /// Clears the active table/view/db selection to show server stats/home, but retains
   /// the reference in [lastSelectedPostgresObject] etc. so users can return in 1 click.
   MainScreenWorkspaceState unselectActiveObject() {
     return MainScreenWorkspaceState(
       activeConnection: activeConnection,
-      activeRedisDb: activeRedisDb,
-      activeMongoDB: activeMongoDB,
+      activeRedisDb: null,
+      activeMongoDB: null,
       selectedPostgresObject: null,
       postgresSqlTabRequestToken: postgresSqlTabRequestToken,
       postgresSqlEditorContext: postgresSqlEditorContext,
@@ -168,6 +182,8 @@ class MainScreenWorkspaceState {
           selectedSqliteObject ?? lastSelectedSqliteObject,
       lastSelectedExtensionObject:
           selectedExtensionObject ?? lastSelectedExtensionObject,
+      lastSelectedMongoDb: activeMongoDB ?? lastSelectedMongoDb,
+      lastSelectedRedisDb: activeRedisDb ?? lastSelectedRedisDb,
       isReadOnly: isReadOnly,
     );
   }
@@ -210,6 +226,16 @@ class MainScreenWorkspaceState {
             obj.name,
             obj.kind,
           );
+        }
+        break;
+      case 'mongodb':
+        if (lastSelectedMongoDb != null) {
+          return selectMongoDb(conn, lastSelectedMongoDb!);
+        }
+        break;
+      case 'redis':
+        if (lastSelectedRedisDb != null) {
+          return selectRedisDb(conn, lastSelectedRedisDb!);
         }
         break;
       default:
@@ -255,6 +281,8 @@ class MainScreenWorkspaceState {
       lastSelectedMysqlObject: null,
       lastSelectedSqliteObject: null,
       lastSelectedExtensionObject: null,
+      lastSelectedMongoDb: null,
+      lastSelectedRedisDb: null,
       isReadOnly: isReadOnly,
     );
   }
@@ -286,6 +314,8 @@ class MainScreenWorkspaceState {
       lastSelectedMysqlObject: my,
       lastSelectedSqliteObject: null,
       lastSelectedExtensionObject: null,
+      lastSelectedMongoDb: null,
+      lastSelectedRedisDb: null,
       isReadOnly: isReadOnly,
     );
   }
@@ -315,6 +345,8 @@ class MainScreenWorkspaceState {
       lastSelectedMysqlObject: null,
       lastSelectedSqliteObject: sq,
       lastSelectedExtensionObject: null,
+      lastSelectedMongoDb: null,
+      lastSelectedRedisDb: null,
       isReadOnly: isReadOnly,
     );
   }
@@ -345,6 +377,8 @@ class MainScreenWorkspaceState {
       lastSelectedMysqlObject: null,
       lastSelectedSqliteObject: null,
       lastSelectedExtensionObject: ext,
+      lastSelectedMongoDb: null,
+      lastSelectedRedisDb: null,
       isReadOnly: isReadOnly,
     );
   }
@@ -366,6 +400,8 @@ class MainScreenWorkspaceState {
       lastSelectedMysqlObject: null,
       lastSelectedSqliteObject: null,
       lastSelectedExtensionObject: null,
+      lastSelectedMongoDb: null,
+      lastSelectedRedisDb: db,
       isReadOnly: isReadOnly,
     );
   }
@@ -388,6 +424,8 @@ class MainScreenWorkspaceState {
       lastSelectedMysqlObject: null,
       lastSelectedSqliteObject: null,
       lastSelectedExtensionObject: null,
+      lastSelectedMongoDb: database,
+      lastSelectedRedisDb: null,
       isReadOnly: isReadOnly,
     );
   }
@@ -451,6 +489,8 @@ class MainScreenWorkspaceState {
       lastSelectedMysqlObject: lastSelectedMysqlObject,
       lastSelectedSqliteObject: lastSelectedSqliteObject,
       lastSelectedExtensionObject: lastSelectedExtensionObject,
+      lastSelectedMongoDb: lastSelectedMongoDb,
+      lastSelectedRedisDb: lastSelectedRedisDb,
       isReadOnly: isReadOnly,
     );
   }
@@ -472,6 +512,8 @@ class MainScreenWorkspaceState {
       lastSelectedMysqlObject: lastSelectedMysqlObject,
       lastSelectedSqliteObject: lastSelectedSqliteObject,
       lastSelectedExtensionObject: lastSelectedExtensionObject,
+      lastSelectedMongoDb: lastSelectedMongoDb,
+      lastSelectedRedisDb: lastSelectedRedisDb,
       isReadOnly: isReadOnly,
     );
   }
@@ -493,6 +535,8 @@ class MainScreenWorkspaceState {
       lastSelectedMysqlObject: lastSelectedMysqlObject,
       lastSelectedSqliteObject: lastSelectedSqliteObject,
       lastSelectedExtensionObject: lastSelectedExtensionObject,
+      lastSelectedMongoDb: lastSelectedMongoDb,
+      lastSelectedRedisDb: lastSelectedRedisDb,
       isReadOnly: isReadOnly,
     );
   }
@@ -519,11 +563,13 @@ class MainScreenWorkspaceState {
         _sqliteEquals(lastSelectedSqliteObject, other.lastSelectedSqliteObject) &&
         _extensionEquals(
             lastSelectedExtensionObject, other.lastSelectedExtensionObject) &&
+        lastSelectedMongoDb == other.lastSelectedMongoDb &&
+        lastSelectedRedisDb == other.lastSelectedRedisDb &&
         isReadOnly == other.isReadOnly;
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
         activeConnection?.id,
         activeRedisDb,
         activeMongoDB,
@@ -566,8 +612,37 @@ class MainScreenWorkspaceState {
                 selectedExtensionObject!.database,
                 selectedExtensionObject!.name,
               ),
+        lastSelectedPostgresObject == null
+            ? 0
+            : Object.hash(
+                lastSelectedPostgresObject!.database,
+                lastSelectedPostgresObject!.schema,
+                lastSelectedPostgresObject!.name,
+                lastSelectedPostgresObject!.kind,
+              ),
+        lastSelectedMysqlObject == null
+            ? 0
+            : Object.hash(
+                lastSelectedMysqlObject!.database,
+                lastSelectedMysqlObject!.name,
+                lastSelectedMysqlObject!.kind,
+              ),
+        lastSelectedSqliteObject == null
+            ? 0
+            : Object.hash(
+                lastSelectedSqliteObject!.name,
+                lastSelectedSqliteObject!.kind,
+              ),
+        lastSelectedExtensionObject == null
+            ? 0
+            : Object.hash(
+                lastSelectedExtensionObject!.database,
+                lastSelectedExtensionObject!.name,
+              ),
+        lastSelectedMongoDb,
+        lastSelectedRedisDb,
         isReadOnly,
-      );
+      ]);
 }
 
 bool _extensionEquals(

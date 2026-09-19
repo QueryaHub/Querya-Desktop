@@ -43,6 +43,8 @@ class RedisView extends material.StatefulWidget {
     required this.connectionRow,
     this.connection,
     this.onBack,
+    this.lastSelectedRedisDb,
+    this.onRestoreLastSelectedObject,
   });
 
   final ConnectionRow connectionRow;
@@ -53,6 +55,10 @@ class RedisView extends material.StatefulWidget {
 
   /// Called when the user taps the "back to explorer" button.
   final material.VoidCallback? onBack;
+
+  /// Remembers the last visited database index for 1-click return from stats.
+  final int? lastSelectedRedisDb;
+  final material.VoidCallback? onRestoreLastSelectedObject;
 
   @override
   material.State<RedisView> createState() => _RedisViewState();
@@ -379,6 +385,18 @@ class _RedisViewState extends material.State<RedisView> {
             ],
           ),
         ),
+        if (widget.lastSelectedRedisDb != null &&
+            widget.onRestoreLastSelectedObject != null) ...[
+          OutlineButton(
+            onPressed: widget.onRestoreLastSelectedObject,
+            leading: const material.Icon(
+              material.Icons.memory_outlined,
+              size: 18,
+            ),
+            child: Text('Return to db${widget.lastSelectedRedisDb}'),
+          ),
+          const Gap(8),
+        ],
         if (widget.onBack != null) ...[
           OutlineButton(
             onPressed: widget.onBack,
