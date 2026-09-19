@@ -253,6 +253,7 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
             // Expanded database children — ALL 16 databases
             QueryaAnimatedExpand(
               expanded: _expanded,
+              estimatedChildCount: _databases.length,
               child: material.Column(
                 mainAxisSize: material.MainAxisSize.min,
                 crossAxisAlignment: material.CrossAxisAlignment.stretch,

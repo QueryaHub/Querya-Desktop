@@ -180,6 +180,7 @@ class _ConnectionDatabasesFolderState
           ),
           QueryaAnimatedExpand(
             expanded: _expanded,
+            estimatedChildCount: widget.databaseCount,
             child: widget.child,
           ),
         ],

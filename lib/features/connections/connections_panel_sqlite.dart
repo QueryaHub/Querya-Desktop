@@ -249,6 +249,7 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
             ),
             QueryaAnimatedExpand(
               expanded: _expanded,
+              estimatedChildCount: _tables.length + _views.length,
               child: material.Column(
                 mainAxisSize: material.MainAxisSize.min,
                 crossAxisAlignment: material.CrossAxisAlignment.stretch,
@@ -414,6 +415,7 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
           ),
           QueryaAnimatedExpand(
             expanded: _expanded,
+            estimatedChildCount: widget.items.length,
             child: material.Column(
               crossAxisAlignment: material.CrossAxisAlignment.stretch,
               mainAxisSize: material.MainAxisSize.min,
