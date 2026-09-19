@@ -1,11 +1,8 @@
-import 'package:flutter/foundation.dart' show ValueNotifier, immutable;
 import 'package:flutter/material.dart' as material
     show
         AlertDialog,
-        BoxConstraints,
         BuildContext,
         Column,
-        ConstrainedBox,
         Container,
         BoxDecoration,
         Border,
@@ -138,10 +135,8 @@ material.Widget lazyConnectionTreeList({
     return const material.SizedBox.shrink();
   }
 
-  final useVirtualizedLeaves =
-      itemExtent != null && itemCount > eagerThreshold;
-
-  if (!useVirtualizedLeaves) {
+  final rowExtent = itemExtent;
+  if (rowExtent == null || itemCount <= eagerThreshold) {
     final pad = padding;
     final column = material.Column(
       mainAxisSize: material.MainAxisSize.min,
@@ -154,7 +149,6 @@ material.Widget lazyConnectionTreeList({
     return material.Padding(padding: pad, child: column);
   }
 
-  final rowExtent = itemExtent!;
   return material.SizedBox(
     height: maxVisibleRows * rowExtent,
     child: material.ListView.builder(
