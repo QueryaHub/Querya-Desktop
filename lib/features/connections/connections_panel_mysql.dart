@@ -295,46 +295,26 @@ class _MysqlDatabasesNode extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context);
-    return material.Padding(
-      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.underConnection),
-      child: material.Column(
-        crossAxisAlignment: material.CrossAxisAlignment.start,
-        mainAxisSize: material.MainAxisSize.min,
-        children: [
-          _PgTreeRow(
-            label: 'Databases (${databases.length})',
-            icon: QueryaIcons.databasesFolder,
-            iconSize: QueryaIconSizes.treeConnection,
-            iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
-            textStyle: material.TextStyle(
-              fontSize: 12,
-              color: theme.colorScheme.foreground,
-            ),
-            verticalPadding: 4,
-            onTap: null,
+    return ConnectionDatabasesFolder(
+      connection: connection,
+      databaseCount: databases.length,
+      onRefresh: onRefreshDatabases,
+      onOpenSql: onMysqlOpenSqlWorkspace == null
+          ? null
+          : () => onMysqlOpenSqlWorkspace!(connection),
+      child: lazyConnectionTreeList(
+        context: context,
+        itemCount: databases.length,
+        itemBuilder: (context, index) {
+          final db = databases[index];
+          return _MysqlDatabaseNode(
+            key: material.ValueKey('mysql-db-${connection.id ?? 0}-$db'),
             connection: connection,
-            onContextRefresh: onRefreshDatabases,
-            onOpenSqlWorkspace: onMysqlOpenSqlWorkspace == null
-                ? null
-                : (c, {database, schema, name, kind}) =>
-                    onMysqlOpenSqlWorkspace!(c),
-          ),
-          lazyConnectionTreeList(
-            context: context,
-            itemCount: databases.length,
-            itemBuilder: (context, index) {
-              final db = databases[index];
-              return _MysqlDatabaseNode(
-                key: material.ValueKey('mysql-db-${connection.id ?? 0}-$db'),
-                connection: connection,
-                databaseName: db,
-                onMysqlObjectSelected: onMysqlObjectSelected,
-                onMysqlOpenSqlWorkspace: onMysqlOpenSqlWorkspace,
-              );
-            },
-          ),
-        ],
+            databaseName: db,
+            onMysqlObjectSelected: onMysqlObjectSelected,
+            onMysqlOpenSqlWorkspace: onMysqlOpenSqlWorkspace,
+          );
+        },
       ),
     );
   }

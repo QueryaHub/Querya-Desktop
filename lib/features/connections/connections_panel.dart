@@ -80,6 +80,7 @@ import 'package:querya_desktop/core/ui/querya_icons.dart';
 import 'package:querya_desktop/core/ui/querya_tooltip.dart';
 import 'package:querya_desktop/core/ui/querya_tree_tokens.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
+import 'package:querya_desktop/features/connections/connection_databases_folder.dart';
 import 'package:querya_desktop/features/connections/driver_icon.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/core/database/redis_service.dart';

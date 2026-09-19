@@ -301,41 +301,22 @@ class _RedisDatabasesNode extends material.StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return material.Padding(
-      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.underConnection),
-      child: material.Column(
-        crossAxisAlignment: material.CrossAxisAlignment.start,
-        mainAxisSize: material.MainAxisSize.min,
-        children: [
-          _PgTreeRow(
-            label: 'Databases (${databases.length})',
-            icon: QueryaIcons.databasesFolder,
-            iconSize: QueryaIconSizes.treeConnection,
-            iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
-            textStyle: material.TextStyle(
-              fontSize: 12,
-              color: theme.colorScheme.foreground,
-            ),
-            verticalPadding: 4,
-            onTap: null,
+    return ConnectionDatabasesFolder(
+      connection: connection,
+      databaseCount: databases.length,
+      onRefresh: onRefreshDatabases,
+      child: lazyConnectionTreeList(
+        context: context,
+        itemCount: databases.length,
+        itemBuilder: (context, index) {
+          final db = databases[index];
+          return _RedisDatabaseNode(
             connection: connection,
-            onContextRefresh: onRefreshDatabases,
-          ),
-          lazyConnectionTreeList(
-            context: context,
-            itemCount: databases.length,
-            itemBuilder: (context, index) {
-              final db = databases[index];
-              return _RedisDatabaseNode(
-                connection: connection,
-                index: db.index,
-                keys: db.keys,
-                onTap: () => onDatabaseTap?.call(db.index),
-              );
-            },
-          ),
-        ],
+            index: db.index,
+            keys: db.keys,
+            onTap: () => onDatabaseTap?.call(db.index),
+          );
+        },
       ),
     );
   }

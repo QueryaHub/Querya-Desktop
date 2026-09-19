@@ -1,6 +1,6 @@
 part of 'package:querya_desktop/features/connections/connections_panel.dart';
 
-class _PgDatabasesNode extends StatefulWidget {
+class _PgDatabasesNode extends StatelessWidget {
   const _PgDatabasesNode({
     required this.connection,
     required this.databases,
@@ -22,7 +22,30 @@ class _PgDatabasesNode extends StatefulWidget {
   final VoidCallback onRefreshDatabases;
 
   @override
-  State<_PgDatabasesNode> createState() => _PgDatabasesNodeState();
+  Widget build(BuildContext context) {
+    return ConnectionDatabasesFolder(
+      connection: connection,
+      databaseCount: databases.length,
+      onRefresh: onRefreshDatabases,
+      onOpenSql: onPostgresOpenSqlWorkspace == null
+          ? null
+          : () => onPostgresOpenSqlWorkspace!(connection),
+      child: lazyConnectionTreeList(
+        context: context,
+        itemCount: databases.length,
+        itemBuilder: (context, index) {
+          final db = databases[index];
+          return _PgDatabaseNode(
+            key: material.ValueKey('pg-db-${connection.id ?? 0}-$db'),
+            connection: connection,
+            databaseName: db,
+            onPostgresObjectSelected: onPostgresObjectSelected,
+            onPostgresOpenSqlWorkspace: onPostgresOpenSqlWorkspace,
+          );
+        },
+      ),
+    );
+  }
 }
 
 /// Ellipsis label; tooltip when the name is long enough to likely truncate.
@@ -321,68 +344,6 @@ class _PgTreeRow extends material.StatelessWidget {
       button: true,
       expanded: expanded,
       child: menu,
-    );
-  }
-}
-
-class _PgDatabasesNodeState extends State<_PgDatabasesNode> {
-  bool _expanded = true;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return material.Padding(
-      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.underConnection),
-      child: material.Column(
-        crossAxisAlignment: material.CrossAxisAlignment.start,
-        mainAxisSize: material.MainAxisSize.min,
-        children: [
-          _PgTreeRow(
-            label: 'Databases (${widget.databases.length})',
-            leading: material.AnimatedRotation(
-              turns: _expanded ? 0.25 : 0,
-              duration: context.motionDuration(QueryaMotion.treeExpand),
-              curve: context.motionCurve(QueryaMotion.treeExpandCurve),
-              child: material.Icon(
-                QueryaIcons.expandClosed,
-                size: QueryaIconSizes.treeExpand,
-                color: theme.colorScheme.mutedForeground,
-              ),
-            ),
-            icon: QueryaIcons.databasesFolder,
-            iconSize: QueryaIconSizes.treeConnection,
-            iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
-            textStyle: material.TextStyle(
-              fontSize: 12,
-              color: theme.colorScheme.foreground,
-            ),
-            verticalPadding: 4,
-            expanded: _expanded,
-            onTap: () => setState(() => _expanded = !_expanded),
-            connection: widget.connection,
-            onContextRefresh: widget.onRefreshDatabases,
-            onOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
-          ),
-          QueryaAnimatedExpand(
-            expanded: _expanded,
-            child: lazyConnectionTreeList(
-              context: context,
-              itemCount: widget.databases.length,
-              itemBuilder: (context, index) {
-                final db = widget.databases[index];
-                return _PgDatabaseNode(
-                  key: material.ValueKey(
-                      'pg-db-${widget.connection.id ?? 0}-$db'),
-                  connection: widget.connection,
-                  databaseName: db,
-                  onPostgresObjectSelected: widget.onPostgresObjectSelected,
-                  onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
-                );
-              },
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
