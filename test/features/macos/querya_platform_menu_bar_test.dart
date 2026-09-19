@@ -135,7 +135,11 @@ void main() {
       expect(tourInvoked, isTrue);
 
       final prefGroup = appMenu.menus.whereType<PlatformMenuItemGroup>().first;
-      final prefItem = prefGroup.members.whereType<PlatformMenuItem>().first;
+      final appItems = prefGroup.members.whereType<PlatformMenuItem>().toList();
+      expect(appItems.any((m) => m.label == 'Command Palette...'), isTrue);
+      expect(appItems.any((m) => m.label == 'Go to Object...'), isTrue);
+      final prefItem =
+          appItems.firstWhere((m) => m.label == 'Preferences...');
       prefItem.onSelected?.call();
       expect(preferencesInvoked, isTrue);
     });

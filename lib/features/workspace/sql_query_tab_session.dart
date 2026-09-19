@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/actions/sql_script_format.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 
 /// A stateful query session inside an SQL workspace.
@@ -31,6 +32,20 @@ class SqlQueryTabSession {
   String? lastExecutedSql;
   bool savingChanges = false;
   bool isModified = false;
+
+  void formatSql() {
+    final next = formatSqlScript(controller.text);
+    controller.value = material.TextEditingValue(
+      text: next,
+      selection: material.TextSelection.collapsed(offset: next.length),
+    );
+    isModified = true;
+  }
+
+  void clearSql() {
+    controller.clear();
+    isModified = true;
+  }
 
   void dispose() {
     controller.dispose();

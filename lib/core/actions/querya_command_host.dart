@@ -9,6 +9,13 @@ class QueryaCommandHost extends InheritedWidget {
     this.onNewConnection,
     this.onShowQuickSwitcher,
     this.onOpenSchemaObject,
+    this.onGoHome,
+    this.onCloseWorkspace,
+    this.onConnect,
+    this.onDisconnect,
+    this.onReconnect,
+    this.onToggleReadOnly,
+    this.onOpenWelcomeTour,
     required super.child,
   });
 
@@ -21,6 +28,14 @@ class QueryaCommandHost extends InheritedWidget {
   /// Same path as tapping a tree leaf (grid / explorer).
   final void Function(QueryaSchemaObject object)? onOpenSchemaObject;
 
+  final VoidCallback? onGoHome;
+  final VoidCallback? onCloseWorkspace;
+  final VoidCallback? onConnect;
+  final VoidCallback? onDisconnect;
+  final VoidCallback? onReconnect;
+  final VoidCallback? onToggleReadOnly;
+  final VoidCallback? onOpenWelcomeTour;
+
   static QueryaCommandHost? maybeOf(BuildContext context) {
     return context.dependOnInheritedWidgetOfExactType<QueryaCommandHost>();
   }
@@ -30,6 +45,13 @@ class QueryaCommandHost extends InheritedWidget {
     return onToggleSidebar != oldWidget.onToggleSidebar ||
         onNewConnection != oldWidget.onNewConnection ||
         onShowQuickSwitcher != oldWidget.onShowQuickSwitcher ||
-        onOpenSchemaObject != oldWidget.onOpenSchemaObject;
+        onOpenSchemaObject != oldWidget.onOpenSchemaObject ||
+        onGoHome != oldWidget.onGoHome ||
+        onCloseWorkspace != oldWidget.onCloseWorkspace ||
+        onConnect != oldWidget.onConnect ||
+        onDisconnect != oldWidget.onDisconnect ||
+        onReconnect != oldWidget.onReconnect ||
+        onToggleReadOnly != oldWidget.onToggleReadOnly ||
+        onOpenWelcomeTour != oldWidget.onOpenWelcomeTour;
   }
 }

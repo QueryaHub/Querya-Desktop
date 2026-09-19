@@ -129,6 +129,14 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       },
       onNextTab: _nextTab,
       onPrevTab: _prevTab,
+      onFormat: () {
+        _activeSession.formatSql();
+        setState(() {});
+      },
+      onClear: () {
+        _activeSession.clearSql();
+        setState(() {});
+      },
       onOpenWithContent: (sql, filePath, title) {
         if (!mounted) return;
         final session = _activeSession;
