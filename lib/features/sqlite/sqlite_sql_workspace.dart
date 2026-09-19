@@ -14,6 +14,7 @@ import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/ui/querya_shell_status.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -239,6 +240,8 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       session.affectedRows = null;
       session.statusLine = null;
     });
+    QueryaShellStatus.instance.beginBusy(message: 'Running query…');
+    final sw = Stopwatch()..start();
 
     try {
       await _ensureLease();
@@ -249,6 +252,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
             session.error = 'Could not connect to SQLite.';
             session.running = false;
           });
+          QueryaShellStatus.instance.endBusy();
         }
         return;
       }
@@ -296,6 +300,14 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         session.running = false;
       });
 
+      sw.stop();
+      QueryaShellStatus.instance.reportQueryResult(
+        duration: sw.elapsed,
+        rowCount: outRows.length,
+        columnCount: cols.length,
+        message: session.statusLine,
+      );
+
       final cid = widget.connectionRow.id;
       if (cid != null) {
         unawaited(
@@ -314,6 +326,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
           session.error = 'Query timed out: ${e.message ?? e}';
           session.running = false;
         });
+        QueryaShellStatus.instance.endBusy();
       }
     } catch (e) {
       if (mounted) {
@@ -321,6 +334,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
           session.error = e.toString();
           session.running = false;
         });
+        QueryaShellStatus.instance.endBusy();
       }
     }
   }

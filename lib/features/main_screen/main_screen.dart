@@ -22,7 +22,9 @@ import 'package:querya_desktop/features/connections/connection_creation_flow.dar
 import 'package:querya_desktop/features/connections/new_connection_url_dialog.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
 import 'package:querya_desktop/features/connections/sqlite_connection_form.dart';
+import 'package:querya_desktop/core/ui/querya_shell_status.dart';
 import 'package:querya_desktop/features/main_screen/connections_panel_width_persist.dart';
+import 'package:querya_desktop/features/main_screen/querya_status_bar.dart';
 import 'package:querya_desktop/features/main_screen/querya_window_title_bar.dart';
 import 'package:querya_desktop/features/macos/querya_platform_menu_bar.dart';
 import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
@@ -234,7 +236,11 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _onConnectionSelected(ConnectionRow connection) {
+    final prevId = _workspace.value.activeConnection?.id;
     _workspace.value = _workspace.value.selectConnection(connection);
+    if (prevId != connection.id) {
+      QueryaShellStatus.instance.clear();
+    }
     final id = connection.id;
     if (id != null) {
       unawaited(AppSettings.instance.recordRecentConnection(id));
@@ -389,6 +395,7 @@ class _MainScreenState extends State<MainScreen> {
 
   void _onGoHome() {
     _workspace.value = MainScreenWorkspaceState.empty;
+    QueryaShellStatus.instance.clear();
   }
 
   void _onOpenWelcomeTour() {
@@ -694,6 +701,31 @@ class _MainScreenState extends State<MainScreen> {
                         onRequestOpenTour: _onOpenWelcomeTour,
                         onOpenConnection: _onConnectionSelected,
                       ),
+                    ),
+                    ValueListenableBuilder<bool>(
+                      valueListenable: _isSidebarVisible,
+                      builder: (context, isSidebarVisible, _) {
+                        return ListenableBuilder(
+                          listenable: QueryaShellStatus.instance,
+                          builder: (context, _) {
+                            final status = QueryaShellStatus.instance;
+                            return QueryaStatusBar(
+                              activeConnection: workspace.activeConnection,
+                              isReadOnly: workspace.isReadOnly,
+                              isSidebarVisible: isSidebarVisible,
+                              onToggleSidebar: () =>
+                                  _splitKey.currentState?.toggleSidebar(),
+                              onOpenPreferences: () =>
+                                  showPreferencesDialog(context),
+                              isBusy: status.isBusy,
+                              statusMessage: status.statusMessage,
+                              rowCount: status.rowCount,
+                              columnCount: status.columnCount,
+                              lastQueryDuration: status.lastQueryDuration,
+                            );
+                          },
+                        );
+                      },
                     ),
                   ],
                 ),
