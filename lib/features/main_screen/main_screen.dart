@@ -1012,11 +1012,20 @@ class _MainContentSplitState extends State<_MainContentSplit>
       vsync: this,
       value: kDefaultConnectionsPanelWidth,
       spring: _sidebarSpring,
-      cubicDuration: const Duration(milliseconds: 160),
-      cubicCurve: Curves.easeOutCubic,
+      cubicDuration: QueryaMotion.sidebarCubic,
+      cubicCurve: QueryaMotion.enter,
     );
     _widthSpring.addListener(_onWidthSpringChanged);
     unawaited(_restoreState());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _widthSpring.cubicDuration =
+        context.motionDuration(QueryaMotion.sidebarCubic);
+    _widthSpring.cubicCurve = context.motionCurve(QueryaMotion.enter);
+    _widthSpring.useSprings = QueryaSpring.springsEnabled(context);
   }
 
   Future<void> _restoreState() async {

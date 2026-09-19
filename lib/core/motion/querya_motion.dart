@@ -24,6 +24,10 @@ abstract final class QueryaMotion {
   /// this duration so one gesture does not finish on two clocks (#480).
   static const Duration treeExpand = standard;
 
+  /// Sidebar width cubic when springs are off (#741). Shorter than [standard]
+  /// so Reduced / spring-off toggle stays snappy (~160 ms).
+  static const Duration sidebarCubic = Duration(milliseconds: 160);
+
   /// Elements appearing (decelerate).
   static const Curve enter = Curves.easeOutCubic;
 

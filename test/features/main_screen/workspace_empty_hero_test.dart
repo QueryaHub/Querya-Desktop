@@ -237,6 +237,29 @@ void main() {
     expect(find.text('Recent connections'), findsOneWidget);
   });
 
+  testWidgets('Motion Off makes quick-start hover instant', (tester) async {
+    await tester.pumpWidget(
+      heroShell(
+        level: QueryaMotionLevel.off,
+        child: const material.SizedBox(
+          width: 900,
+          height: 700,
+          child: WorkspaceEmptyHero(
+            onNewConnection: _noop,
+            recentConnections: [],
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final hover = tester.widgetList<material.AnimatedContainer>(
+      find.byKey(const material.ValueKey('empty_hero_hover_row')),
+    );
+    expect(hover, isNotEmpty);
+    expect(hover.every((w) => w.duration == Duration.zero), isTrue);
+  });
+
   testWidgets('recent list staggers on first paint then reaches full opacity',
       (tester) async {
     const second = ConnectionRow(

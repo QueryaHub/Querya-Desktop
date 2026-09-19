@@ -490,7 +490,8 @@ class _InteractiveQuickStartRowState extends State<_InteractiveQuickStartRow> {
       child: material.GestureDetector(
         onTap: widget.onTap,
         child: material.AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
+          key: const material.ValueKey('empty_hero_hover_row'),
+          duration: context.motionDuration(QueryaMotion.fast),
           padding: const material.EdgeInsets.symmetric(
             horizontal: 12,
             vertical: 10,
