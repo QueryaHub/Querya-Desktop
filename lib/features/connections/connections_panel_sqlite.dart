@@ -386,7 +386,7 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
         children: [
-          _PgTreeRow(
+          QueryaConnectionTreeRow(
             label: _filter.isEmpty
                 ? '${widget.label} (${widget.items.length})'
                 : '${widget.label} (${sorted.length}/${widget.items.length})',
@@ -452,7 +452,7 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
                           sel.selectedSqliteObject != null &&
                           sel.selectedSqliteObject!.name == item &&
                           sel.selectedSqliteObject!.kind == widget.objectKind;
-                      return _PgTreeRow(
+                      return QueryaConnectionTreeRow(
                         key: material.ValueKey(
                           'sqlite-${widget.objectKind.name}-$item',
                         ),

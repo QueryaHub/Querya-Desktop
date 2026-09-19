@@ -40,8 +40,6 @@ import 'package:flutter/material.dart' as material
         Semantics,
         StatelessWidget,
         Colors,
-        Tooltip,
-        Color,
         Padding,
         Widget,
         Navigator,
@@ -53,14 +51,12 @@ import 'package:flutter/material.dart' as material
         ClampingScrollPhysics,
         CallbackShortcuts,
         SingleActivator,
-        AnimatedContainer,
         TextField,
         InputDecoration,
         InputBorder,
         TextEditingController,
         FocusNode;
-import 'package:flutter/services.dart'
-    show Clipboard, ClipboardData, LogicalKeyboardKey;
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
@@ -77,11 +73,11 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/core/ui/querya_icon_sizes.dart';
 import 'package:querya_desktop/core/ui/querya_icons.dart';
-import 'package:querya_desktop/core/ui/querya_tooltip.dart';
 import 'package:querya_desktop/core/ui/querya_tree_tokens.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
 import 'package:querya_desktop/features/connections/connection_databases_folder.dart';
 import 'package:querya_desktop/features/connections/driver_icon.dart';
+import 'package:querya_desktop/features/connections/querya_connection_tree_row.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/core/database/redis_service.dart';
 import 'package:querya_desktop/app/app_shutdown.dart';

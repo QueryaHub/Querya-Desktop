@@ -415,7 +415,7 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
         children: [
-          _PgTreeRow(
+          QueryaConnectionTreeRow(
             label: widget.databaseName,
             leading: material.AnimatedRotation(
               turns: _expanded ? 0.25 : 0,
@@ -620,7 +620,7 @@ class _MysqlObjectGroupState extends State<_MysqlObjectGroup> {
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
         children: [
-          _PgTreeRow(
+          QueryaConnectionTreeRow(
             label: _filter.isEmpty
                 ? '${widget.label} (${widget.items.length})'
                 : '${widget.label} (${sorted.length}/${widget.items.length})',
@@ -687,7 +687,7 @@ class _MysqlObjectGroupState extends State<_MysqlObjectGroup> {
                           sel.selectedMysqlObject!.database == widget.databaseName &&
                           sel.selectedMysqlObject!.name == item &&
                           sel.selectedMysqlObject!.kind == widget.objectKind;
-                      return _PgTreeRow(
+                      return QueryaConnectionTreeRow(
                         key: material.ValueKey(
                           'mysql-${widget.objectKind.name}-${widget.databaseName}-$item',
                         ),

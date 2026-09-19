@@ -373,7 +373,7 @@ class _MongoDatabaseNode extends StatelessWidget {
         sel.selectedMongoDb == name;
     return material.Padding(
       padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent, top: 2, bottom: 2),
-      child: _PgTreeRow(
+      child: QueryaConnectionTreeRow(
         label: name,
         isSelected: isSelected,
         icon: QueryaIcons.database,

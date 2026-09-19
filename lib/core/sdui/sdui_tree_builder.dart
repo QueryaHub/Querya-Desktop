@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/sdui/sdui_tree_schema.dart';
+import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/ui/querya_icon_sizes.dart';
 import 'package:querya_desktop/core/ui/querya_icons.dart';
 import 'package:querya_desktop/core/ui/querya_tree_tokens.dart';
+import 'package:querya_desktop/features/connections/querya_connection_tree_row.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Renders a sidebar-style tree from an SDUI schema with lazy expansion.
 ///
 /// Visible rows are flattened into a [ListView.builder] so only viewport
 /// rows are built (large schemas no longer create a full widget Column).
-/// Expand chevrons and height morph share [QueryaMotion.treeExpand] /
-/// [QueryaMotion.treeExpandCurve]. Height morph via [QueryaAnimatedExpand] is
-/// not used on the flat virtualized row list (nested expand would fight
-/// `ListView` itemExtent); chevron timing still matches native trees.
+/// Row chrome matches native [QueryaConnectionTreeRow] (selection, gaps,
+/// bold-when-selected, keyboard expand, context menu).
 class SduiTreeBuilder extends material.StatefulWidget {
   const SduiTreeBuilder({
     super.key,
@@ -22,6 +22,7 @@ class SduiTreeBuilder extends material.StatefulWidget {
     this.selectedNodeId,
     this.isNodeSelected,
     this.maxHeight,
+    this.connection,
   });
 
   final SduiTreeSchema schema;
@@ -33,6 +34,9 @@ class SduiTreeBuilder extends material.StatefulWidget {
   /// When set, the tree scrolls inside a height cap (sidebar use).
   final double? maxHeight;
 
+  /// Optional connection for tree context menus (Refresh / Copy name).
+  final ConnectionRow? connection;
+
   @override
   material.State<SduiTreeBuilder> createState() => SduiTreeBuilderState();
 }
@@ -40,13 +44,15 @@ class SduiTreeBuilder extends material.StatefulWidget {
 class _VisibleRow {
   const _VisibleRow.node(this.node, this.depth)
       : error = null,
+        parent = null,
         isError = false;
 
-  const _VisibleRow.error(this.error, this.depth)
+  const _VisibleRow.error(this.error, this.depth, this.parent)
       : node = null,
         isError = true;
 
   final SduiTreeNode? node;
+  final SduiTreeNode? parent;
   final int depth;
   final String? error;
   final bool isError;
@@ -127,6 +133,19 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
     }
   }
 
+  Future<void> _retryExpand(SduiTreeNode node) async {
+    setState(() {
+      _expandErrors.remove(node.id);
+      _loaded.remove(node.id);
+      _roots = _replaceNode(
+        _roots,
+        node.id,
+        (n) => n.copyWith(children: const []),
+      );
+    });
+    await _onExpand(node);
+  }
+
   List<SduiTreeNode> _replaceNode(
     List<SduiTreeNode> nodes,
     String id,
@@ -150,7 +169,7 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
       if (!_expanded.contains(node.id)) return;
       final err = _expandErrors[node.id];
       if (err != null) {
-        out.add(_VisibleRow.error(err, depth));
+        out.add(_VisibleRow.error(err, depth, node));
       }
       for (final child in node.children) {
         walk(child, depth + 1);
@@ -176,10 +195,12 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
       itemBuilder: (context, index) {
         final row = rows[index];
         if (row.isError) {
+          final parent = row.parent!;
           return TreeLoadError(
             title: 'Could not expand',
             message: row.error!,
             padding: QueryaTreeTokens.errorPaddingForDepth(row.depth),
+            onRetry: () => _retryExpand(parent),
           );
         }
         return _buildNodeRow(row.node!, depth: row.depth);
@@ -207,7 +228,6 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
             node.id == widget.selectedNodeId) ||
         (widget.isNodeSelected != null && widget.isNodeSelected!(node));
 
-    // Same hierarchy as native trees (#476 / #497) — no separate sduiNode size.
     final iconSize =
         canExpand ? QueryaIconSizes.treeGroup : QueryaIconSizes.treeLeaf;
     final iconColor = isSelected
@@ -218,109 +238,58 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
     final rowLeft =
         8.0 + depth * QueryaTreeTokens.indent + (canExpand ? 0 : 4.0);
 
-    final row = material.AnimatedContainer(
-      duration: context.motionDuration(QueryaMotion.fast),
-      curve: context.motionCurve(QueryaMotion.standardCurve),
-      decoration: material.BoxDecoration(
-        color: isSelected
-            ? primary.withValues(alpha: 0.12)
-            : material.Colors.transparent,
-        borderRadius: material.BorderRadius.circular(4),
-        border: isSelected
-            ? material.Border.all(
-                color: primary.withValues(alpha: 0.35),
-                width: 1,
+    final leading = canExpand
+        ? material.AnimatedRotation(
+            turns: isExpanded ? 0.25 : 0,
+            duration: context.motionDuration(QueryaMotion.treeExpand),
+            curve: context.motionCurve(QueryaMotion.treeExpandCurve),
+            child: material.Icon(
+              QueryaIcons.expandClosed,
+              size: QueryaIconSizes.treeExpand,
+              color: muted,
+            ),
+          )
+        : const material.SizedBox(width: QueryaIconSizes.treeExpand);
+
+    return material.Padding(
+      padding: material.EdgeInsets.only(left: rowLeft),
+      child: QueryaConnectionTreeRow(
+        label: node.label,
+        isSelected: isSelected,
+        leading: leading,
+        icon: isLoading
+            ? null
+            : QueryaIcons.sduiNodeIcon(
+                node.icon,
+                expandable: node.expandable,
+              ),
+        iconWidget: isLoading
+            ? const material.SizedBox(
+                width: QueryaTreeTokens.spinnerNested,
+                height: QueryaTreeTokens.spinnerNested,
+                child: material.CircularProgressIndicator(
+                  strokeWidth: QueryaTreeTokens.spinnerStroke,
+                ),
               )
             : null,
-      ),
-      child: material.Material(
-        color: material.Colors.transparent,
-        child: material.InkWell(
-          onTap: () {
-            if (isBrowsable) {
-              widget.onNodeSelected?.call(node);
-            } else if (canExpand) {
-              _toggleExpand(node);
-            }
-          },
-          borderRadius: material.BorderRadius.circular(4),
-          child: material.Padding(
-            padding: material.EdgeInsets.only(
-              left: rowLeft,
-              right: 8,
-            ),
-            child: material.Row(
-              children: [
-                if (canExpand)
-                  material.MouseRegion(
-                    cursor: material.SystemMouseCursors.click,
-                    child: material.GestureDetector(
-                      behavior: material.HitTestBehavior.opaque,
-                      onTap: () => _toggleExpand(node),
-                      child: material.Padding(
-                        padding: const material.EdgeInsets.all(2),
-                        child: material.AnimatedRotation(
-                          turns: isExpanded ? 0.25 : 0,
-                          duration:
-                              context.motionDuration(QueryaMotion.treeExpand),
-                          curve:
-                              context.motionCurve(QueryaMotion.treeExpandCurve),
-                          child: material.Icon(
-                            QueryaIcons.expandClosed,
-                            size: QueryaIconSizes.treeExpand,
-                            color: muted,
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  const material.SizedBox(width: QueryaIconSizes.treeExpand + 4),
-                if (isLoading)
-                  const material.SizedBox(
-                    width: QueryaTreeTokens.spinnerInline,
-                    height: QueryaTreeTokens.spinnerInline,
-                    child: material.CircularProgressIndicator(
-                      strokeWidth: QueryaTreeTokens.spinnerStrokeInline,
-                    ),
-                  )
-                else
-                  material.Icon(
-                    QueryaIcons.sduiNodeIcon(
-                      node.icon,
-                      expandable: node.expandable,
-                    ),
-                    size: iconSize,
-                    color: iconColor,
-                  ),
-                const Gap(8),
-                material.Expanded(
-                  child: material.Text(
-                    node.label,
-                    overflow: material.TextOverflow.ellipsis,
-                    maxLines: 1,
-                    style: material.TextStyle(
-                      fontSize: 11,
-                      color: isSelected
-                          ? primary
-                          : (isBrowsable ? theme.colorScheme.foreground : muted),
-                      fontWeight: (isSelected || isBrowsable)
-                          ? material.FontWeight.w600
-                          : null,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+        iconSize: iconSize,
+        iconColor: iconColor,
+        textStyle: material.TextStyle(
+          fontSize: 11,
+          color: isBrowsable ? theme.colorScheme.foreground : muted,
         ),
+        verticalPadding: 3,
+        expanded: canExpand ? isExpanded : null,
+        onTap: () {
+          if (isBrowsable) {
+            widget.onNodeSelected?.call(node);
+          } else if (canExpand) {
+            _toggleExpand(node);
+          }
+        },
+        connection: widget.connection,
+        onContextRefresh: canExpand ? () => _retryExpand(node) : null,
       ),
-    );
-    if (!canExpand) return row;
-    return material.Semantics(
-      button: true,
-      expanded: isExpanded,
-      child: row,
     );
   }
 

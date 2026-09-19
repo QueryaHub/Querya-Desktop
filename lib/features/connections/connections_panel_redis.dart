@@ -347,7 +347,7 @@ class _RedisDatabaseNode extends StatelessWidget {
         sel.selectedRedisDb == index;
     return material.Padding(
       padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent),
-      child: _PgTreeRow(
+      child: QueryaConnectionTreeRow(
         label: 'db$index',
         isSelected: isSelected,
         icon: QueryaIcons.database,
