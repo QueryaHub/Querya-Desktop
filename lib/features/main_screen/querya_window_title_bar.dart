@@ -6,6 +6,7 @@ import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/connections/driver_manager_dialog.dart';
+import 'package:querya_desktop/features/command_palette/command_palette_dialog.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/extensions/presentation/pages/extension_manager_dialog.dart';
 import 'package:querya_desktop/features/help/about_dialog.dart';
@@ -216,6 +217,17 @@ class QueryaWindowTitleBar extends StatelessWidget {
                         ),
                         MenuButton(
                           subMenu: [
+                            MenuButton(
+                              leading: const material.Icon(
+                                material.Icons.search_rounded,
+                                size: 18,
+                              ),
+                              trailing: Text(
+                                Platform.isMacOS ? 'Cmd+P' : 'Ctrl+P',
+                              ).xSmall().muted(),
+                              onPressed: (ctx) => showCommandPalette(ctx),
+                              child: const Text('Command Palette…'),
+                            ),
                             MenuButton(
                               leading: const material.Icon(
                                 material.Icons.tune_rounded,

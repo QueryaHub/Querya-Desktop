@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../command_palette/command_palette_dialog.dart';
 import '../settings/preferences_dialog.dart';
 
 /// Native macOS top menu bar integration via Flutter's [PlatformMenuBar].
@@ -65,6 +66,14 @@ class QueryaPlatformMenuBar extends StatelessWidget {
               ),
             PlatformMenuItemGroup(
               members: [
+                PlatformMenuItem(
+                  label: 'Command Palette...',
+                  shortcut: const SingleActivator(
+                    LogicalKeyboardKey.keyP,
+                    meta: true,
+                  ),
+                  onSelected: () => showCommandPalette(context),
+                ),
                 PlatformMenuItem(
                   label: 'Preferences...',
                   shortcut: const SingleActivator(
