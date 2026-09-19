@@ -373,9 +373,9 @@ class _MongoDatabaseNode extends StatelessWidget {
           sel.selectedConnectionId == connection.id &&
           sel.selectedMongoDb == name,
       builder: (context, isSelected) {
-        return material.Padding(
-          padding: const material.EdgeInsets.only(
-              left: QueryaTreeTokens.indent, top: 2, bottom: 2),
+        return QueryaTreeIndentGuide(
+          depth: 1,
+          padding: const material.EdgeInsets.only(top: 2, bottom: 2),
           child: QueryaConnectionTreeRow(
             label: name,
             isSelected: isSelected,

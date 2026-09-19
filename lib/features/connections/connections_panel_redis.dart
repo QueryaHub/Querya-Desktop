@@ -347,8 +347,8 @@ class _RedisDatabaseNode extends StatelessWidget {
           sel.selectedConnectionId == connection.id &&
           sel.selectedRedisDb == index,
       builder: (context, isSelected) {
-        return material.Padding(
-          padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent),
+        return QueryaTreeIndentGuide(
+          depth: 1,
           child: QueryaConnectionTreeRow(
             label: 'db$index',
             isSelected: isSelected,

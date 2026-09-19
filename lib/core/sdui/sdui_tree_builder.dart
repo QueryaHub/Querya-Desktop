@@ -3,6 +3,7 @@ import 'package:querya_desktop/core/sdui/sdui_tree_schema.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/ui/querya_icon_sizes.dart';
 import 'package:querya_desktop/core/ui/querya_icons.dart';
+import 'package:querya_desktop/core/ui/querya_tree_indent_guide.dart';
 import 'package:querya_desktop/core/ui/querya_tree_tokens.dart';
 import 'package:querya_desktop/features/connections/querya_connection_tree_row.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -235,9 +236,6 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
         : (isBrowsable
             ? QueryaTreeTokens.leafIconColor(primary)
             : muted);
-    final rowLeft =
-        8.0 + depth * QueryaTreeTokens.indent + (canExpand ? 0 : 4.0);
-
     final leading = canExpand
         ? material.AnimatedRotation(
             turns: isExpanded ? 0.25 : 0,
@@ -251,8 +249,9 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
           )
         : const material.SizedBox(width: QueryaIconSizes.treeExpand);
 
-    return material.Padding(
-      padding: material.EdgeInsets.only(left: rowLeft),
+    return QueryaTreeIndentGuide(
+      depth: depth,
+      leading: 8.0 + (canExpand ? 0 : 4.0),
       child: QueryaConnectionTreeRow(
         label: node.label,
         isSelected: isSelected,

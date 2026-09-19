@@ -264,8 +264,8 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
                       onRetry: _loadTables,
                     ),
                   if (!_loading && _error == null)
-                    material.Padding(
-                      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent),
+                    QueryaTreeIndentGuide(
+                      depth: 1,
                       child: material.Column(
                         crossAxisAlignment: material.CrossAxisAlignment.start,
                         children: [
@@ -440,11 +440,13 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
                         .xSmall(),
                   )
                 else
-                  lazyConnectionTreeList(
+                  QueryaTreeIndentGuide(
+                    depth: 1,
+                    leading: QueryaTreeTokens.leafList - QueryaTreeTokens.indent,
+                    child: lazyConnectionTreeList(
                     context: context,
                     itemCount: sorted.length,
                     itemExtent: kConnectionTreeRowExtent,
-                    padding: const material.EdgeInsets.only(left: QueryaTreeTokens.leafList),
                     itemBuilder: (context, index) {
                       final item = sorted[index];
                       final isPinned = _pinnedItems.contains(item);
@@ -495,6 +497,7 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
                         },
                       );
                     },
+                  ),
                   ),
               ],
             ),

@@ -410,8 +410,8 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return material.Padding(
-      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent),
+    return QueryaTreeIndentGuide(
+      depth: 1,
       child: material.Column(
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
@@ -463,8 +463,8 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
                     _views.isNotEmpty ||
                     _procedures.isNotEmpty ||
                     _functions.isNotEmpty)
-                  material.Padding(
-                    padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent),
+                  QueryaTreeIndentGuide(
+                    depth: 1,
                     child: material.Column(
                       crossAxisAlignment: material.CrossAxisAlignment.start,
                       children: [
@@ -674,11 +674,13 @@ class _MysqlObjectGroupState extends State<_MysqlObjectGroup> {
                         .xSmall(),
                   )
                 else
-                  lazyConnectionTreeList(
+                  QueryaTreeIndentGuide(
+                    depth: 1,
+                    leading: QueryaTreeTokens.leafList - QueryaTreeTokens.indent,
+                    child: lazyConnectionTreeList(
                     context: context,
                     itemCount: sorted.length,
                     itemExtent: kConnectionTreeRowExtent,
-                    padding: const material.EdgeInsets.only(left: QueryaTreeTokens.leafList),
                     itemBuilder: (context, index) {
                       final item = sorted[index];
                       final isPinned = _pinnedItems.contains(item);
@@ -732,6 +734,7 @@ class _MysqlObjectGroupState extends State<_MysqlObjectGroup> {
                         },
                       );
                     },
+                  ),
                   ),
               ],
             ),
