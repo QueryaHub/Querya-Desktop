@@ -6,6 +6,7 @@ import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/actions/querya_command_host.dart';
+import 'package:querya_desktop/features/command_palette/command_palette_dialog.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/actions/sql_editor_global_actions.dart';
@@ -128,6 +129,17 @@ class _MainScreenState extends State<MainScreen> {
         logical == const LogicalKeyboardKey(0x00000438); // Russian 'и'
     if (isCmdOrCtrl && !isShift && !isAlt && isKeyB) {
       _splitKey.currentState?.toggleSidebar();
+      return true;
+    }
+
+    // Command Palette: Ctrl+P / Cmd+P (Physical P, Logical P, Russian 'з')
+    final isKeyP = physical == PhysicalKeyboardKey.keyP ||
+        logical == LogicalKeyboardKey.keyP ||
+        logical == const LogicalKeyboardKey(0x00000437) || // з
+        logical == const LogicalKeyboardKey(0x00000417); // З
+    if (isCmdOrCtrl && !isShift && !isAlt && isKeyP) {
+      final ctx = FocusManager.instance.primaryFocus?.context ?? context;
+      unawaited(showCommandPalette(ctx));
       return true;
     }
 
@@ -562,6 +574,15 @@ class _MainScreenState extends State<MainScreen> {
                 LogicalKeyboardKey.keyB,
                 meta: true,
               ): () => _splitKey.currentState?.toggleSidebar(),
+
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyP,
+                control: true,
+              ): () => unawaited(showCommandPalette(context)),
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyP,
+                meta: true,
+              ): () => unawaited(showCommandPalette(context)),
 
               // Welcome Tour & Tutorial: F1 / Cmd+Shift+H / Ctrl+Shift+H
               const material.SingleActivator(
