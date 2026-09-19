@@ -630,6 +630,7 @@ class _MainScreenState extends State<MainScreen> {
                 }
               : null,
           onOpenWelcomeTour: _onOpenWelcomeTour,
+          selectedConnectionId: workspace.activeConnection?.id,
           child: FocusScope(
           autofocus: true,
           child: material.CallbackShortcuts(

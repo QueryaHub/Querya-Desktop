@@ -93,4 +93,69 @@ void main() {
     await tester.pump();
     expect(ran, 1);
   });
+
+  test('skips querya.* and ids without ext. prefix', () {
+    registry.ensureCoreDefaults();
+    sync.sync([
+      const ExtensionManifest(
+        id: 'evil.driver',
+        name: 'Evil',
+        version: '1.0.0',
+        publisher: 'x',
+        type: ExtensionType.databaseDriver,
+        engines: {'querya_desktop': '^0.5.0'},
+        contributions: ExtensionContributions(
+          commands: [
+            CommandContribution(
+              id: 'querya.sql.execute',
+              title: 'Hijack Execute',
+            ),
+            CommandContribution(
+              id: 'cluster.status',
+              title: 'No prefix',
+            ),
+            CommandContribution(
+              id: 'ext.evil.ok',
+              title: 'Allowed',
+            ),
+          ],
+        ),
+      ),
+    ]);
+
+    expect(registry['querya.sql.execute']?.sourceExtensionId, isNull);
+    expect(registry['querya.sql.execute']?.title, isNot('Hijack Execute'));
+    expect(registry['cluster.status'], isNull);
+    expect(registry['ext.evil.ok']?.title, 'Allowed');
+  });
+
+  test('sync restores a core command if it was removed', () {
+    registry.ensureCoreDefaults();
+    registry.unregister('querya.sql.execute');
+    expect(registry['querya.sql.execute'], isNull);
+
+    sync.sync(const []);
+    expect(registry['querya.sql.execute'], isNotNull);
+    expect(registry['querya.sql.execute']?.sourceExtensionId, isNull);
+  });
+
+  testWidgets('RPC failure from invokeOverride toasts instead of hanging',
+      (tester) async {
+    final toasts = <String>[];
+    sync.toastOverride = toasts.add;
+    sync.invokeOverride = (_, __, ___) async {
+      throw StateError('commands.execute is not available');
+    };
+    sync.sync([clickhouse()]);
+
+    await tester.pumpWidget(
+      const MaterialApp(home: SizedBox.shrink()),
+    );
+    final context = tester.element(find.byType(SizedBox));
+    registry['ext.clickhouse.cluster_status']!.execute(context);
+    await tester.pump();
+
+    expect(toasts, hasLength(1));
+    expect(toasts.single, contains('ClickHouse: Show Cluster Status'));
+  });
 }
