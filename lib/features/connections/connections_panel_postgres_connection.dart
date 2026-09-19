@@ -234,6 +234,7 @@ class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
             ),
             QueryaAnimatedExpand(
               expanded: _expanded,
+              estimatedChildCount: _databases.length,
               child: material.Column(
                 mainAxisSize: material.MainAxisSize.min,
                 crossAxisAlignment: material.CrossAxisAlignment.stretch,

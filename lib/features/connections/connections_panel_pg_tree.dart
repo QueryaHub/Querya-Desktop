@@ -335,6 +335,7 @@ class _PgSchemasNodeState extends State<_PgSchemasNode> {
           ),
           QueryaAnimatedExpand(
             expanded: _expanded,
+            estimatedChildCount: widget.schemas.length,
             child: lazyConnectionTreeList(
               context: context,
               itemCount: widget.schemas.length,
@@ -819,6 +820,7 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
           ),
           QueryaAnimatedExpand(
             expanded: _expanded,
+            estimatedChildCount: widget.items.length,
             child: material.Column(
               crossAxisAlignment: material.CrossAxisAlignment.stretch,
               mainAxisSize: material.MainAxisSize.min,

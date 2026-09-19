@@ -239,6 +239,7 @@ class _MysqlConnectionTileState extends State<_MysqlConnectionTile> {
             ),
             QueryaAnimatedExpand(
               expanded: _expanded,
+              estimatedChildCount: _databases.length,
               child: material.Column(
                 mainAxisSize: material.MainAxisSize.min,
                 crossAxisAlignment: material.CrossAxisAlignment.stretch,
@@ -648,6 +649,7 @@ class _MysqlObjectGroupState extends State<_MysqlObjectGroup> {
           ),
           QueryaAnimatedExpand(
             expanded: _expanded,
+            estimatedChildCount: widget.items.length,
             child: material.Column(
               crossAxisAlignment: material.CrossAxisAlignment.stretch,
               mainAxisSize: material.MainAxisSize.min,

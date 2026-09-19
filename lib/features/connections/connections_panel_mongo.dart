@@ -276,6 +276,7 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
             // Expanded database children
             QueryaAnimatedExpand(
               expanded: _expanded,
+              estimatedChildCount: _databases.length,
               child: material.Column(
                 mainAxisSize: material.MainAxisSize.min,
                 crossAxisAlignment: material.CrossAxisAlignment.stretch,

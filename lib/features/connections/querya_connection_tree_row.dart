@@ -115,21 +115,9 @@ class QueryaConnectionTreeRow extends material.StatelessWidget {
           const material.SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
               onTap!(),
       },
-      child: material.AnimatedContainer(
-        duration: context.motionDuration(QueryaMotion.fast),
-        curve: context.motionCurve(QueryaMotion.standardCurve),
-        decoration: material.BoxDecoration(
-          color: isSelected
-              ? primary.withValues(alpha: 0.12)
-              : material.Colors.transparent,
-          borderRadius: material.BorderRadius.circular(4),
-          border: isSelected
-              ? material.Border.all(
-                  color: primary.withValues(alpha: 0.35),
-                  width: 1,
-                )
-              : null,
-        ),
+      child: _selectionChrome(
+        context: context,
+        primary: primary,
         child: material.Material(
           color: material.Colors.transparent,
           child: material.InkWell(
@@ -325,6 +313,37 @@ class QueryaConnectionTreeRow extends material.StatelessWidget {
       button: true,
       expanded: expanded,
       child: menu,
+    );
+  }
+
+  /// Selection fill: [AnimatedContainer] on Full motion, instant [DecoratedBox]
+  /// when Motion Off / OS reduce-motion (no leftover animation controllers).
+  material.Widget _selectionChrome({
+    required material.BuildContext context,
+    required material.Color primary,
+    required material.Widget child,
+  }) {
+    final decoration = material.BoxDecoration(
+      color: isSelected
+          ? primary.withValues(alpha: 0.12)
+          : material.Colors.transparent,
+      borderRadius: material.BorderRadius.circular(4),
+      border: isSelected
+          ? material.Border.all(
+              color: primary.withValues(alpha: 0.35),
+              width: 1,
+            )
+          : null,
+    );
+    final duration = context.motionDuration(QueryaMotion.fast);
+    if (duration == Duration.zero) {
+      return material.DecoratedBox(decoration: decoration, child: child);
+    }
+    return material.AnimatedContainer(
+      duration: duration,
+      curve: context.motionCurve(QueryaMotion.standardCurve),
+      decoration: decoration,
+      child: child,
     );
   }
 }
