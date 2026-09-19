@@ -120,8 +120,8 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return material.Padding(
-      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent),
+    return QueryaTreeIndentGuide(
+      depth: 1,
       child: material.Column(
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
@@ -236,8 +236,9 @@ class _PgDbToolRow extends material.StatelessWidget {
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context);
     final muted = theme.colorScheme.mutedForeground;
-    return material.Padding(
-      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent, top: 2, bottom: 2),
+    return QueryaTreeIndentGuide(
+      depth: 1,
+      padding: const material.EdgeInsets.only(top: 2, bottom: 2),
       child: QueryaConnectionTreeRow(
         label: label,
         icon: icon,
@@ -302,8 +303,8 @@ class _PgSchemasNodeState extends State<_PgSchemasNode> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return material.Padding(
-      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent),
+    return QueryaTreeIndentGuide(
+      depth: 1,
       child: material.Column(
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
@@ -460,8 +461,8 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return material.Padding(
-      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent),
+    return QueryaTreeIndentGuide(
+      depth: 1,
       child: material.Column(
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
@@ -695,8 +696,9 @@ class _PgSchemaToolRow extends material.StatelessWidget {
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context);
     final muted = theme.colorScheme.mutedForeground;
-    return material.Padding(
-      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent, top: 2, bottom: 2),
+    return QueryaTreeIndentGuide(
+      depth: 1,
+      padding: const material.EdgeInsets.only(top: 2, bottom: 2),
       child: QueryaConnectionTreeRow(
         label: label,
         icon: icon,
@@ -785,8 +787,8 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
 
     final showFilter = widget.items.length >= 8 || _filter.isNotEmpty;
 
-    return material.Padding(
-      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent),
+    return QueryaTreeIndentGuide(
+      depth: 1,
       child: material.Column(
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
@@ -845,11 +847,13 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
                         .xSmall(),
                   )
                 else
-                  lazyConnectionTreeList(
+                  QueryaTreeIndentGuide(
+                    depth: 1,
+                    leading: QueryaTreeTokens.leafList - QueryaTreeTokens.indent,
+                    child: lazyConnectionTreeList(
                     context: context,
                     itemCount: sorted.length,
                     itemExtent: kConnectionTreeRowExtent,
-                    padding: const material.EdgeInsets.only(left: QueryaTreeTokens.leafList),
                     itemBuilder: (context, index) {
                       final item = sorted[index];
                       final isPinned = _pinnedItems.contains(item);
@@ -906,6 +910,7 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
                         },
                       );
                     },
+                  ),
                   ),
               ],
             ),

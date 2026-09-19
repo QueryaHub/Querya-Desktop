@@ -71,6 +71,7 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/core/ui/querya_icon_sizes.dart';
 import 'package:querya_desktop/core/ui/querya_icons.dart';
+import 'package:querya_desktop/core/ui/querya_tree_indent_guide.dart';
 import 'package:querya_desktop/core/ui/querya_tree_tokens.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
 import 'package:querya_desktop/features/connections/connection_databases_folder.dart';
@@ -925,7 +926,13 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
             crossAxisAlignment: material.CrossAxisAlignment.stretch,
             children: [
               material.Padding(
-                padding: const material.EdgeInsets.fromLTRB(20, 24, 16, 12),
+                key: const material.ValueKey('connections-servers-header'),
+                padding: const material.EdgeInsets.fromLTRB(
+                  20,
+                  QueryaTreeTokens.serversHeaderTop,
+                  16,
+                  12,
+                ),
                 child: material.Row(
                   children: [
                     material.Expanded(
@@ -941,14 +948,24 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                       ),
                     ),
                     if (_connections.isNotEmpty)
-                      material.Text(
-                        q.isEmpty
-                            ? '${_connections.length}'
-                            : '${filteredConnections.length}/${_connections.length}',
-                        style: material.TextStyle(
-                          fontSize: 10,
-                          fontWeight: material.FontWeight.w600,
-                          color: theme.colorScheme.mutedForeground,
+                      material.Container(
+                        padding: const material.EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 1,
+                        ),
+                        decoration: material.BoxDecoration(
+                          color: theme.colorScheme.muted.withValues(alpha: 0.28),
+                          borderRadius: material.BorderRadius.circular(8),
+                        ),
+                        child: material.Text(
+                          q.isEmpty
+                              ? '${_connections.length}'
+                              : '${filteredConnections.length}/${_connections.length}',
+                          style: material.TextStyle(
+                            fontSize: 10,
+                            fontWeight: material.FontWeight.w600,
+                            color: theme.colorScheme.mutedForeground,
+                          ),
                         ),
                       ),
                   ],

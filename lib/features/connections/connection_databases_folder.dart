@@ -4,6 +4,7 @@ import 'package:flutter/services.dart'
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/ui/querya_icon_sizes.dart';
 import 'package:querya_desktop/core/ui/querya_icons.dart';
+import 'package:querya_desktop/core/ui/querya_tree_indent_guide.dart';
 import 'package:querya_desktop/core/ui/querya_tree_tokens.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -164,10 +165,9 @@ class _ConnectionDatabasesFolderState
       child: row,
     );
 
-    return material.Padding(
-      padding: const material.EdgeInsets.only(
-        left: QueryaTreeTokens.underConnection,
-      ),
+    return QueryaTreeIndentGuide(
+      depth: 1,
+      step: QueryaTreeTokens.underConnection,
       child: material.Column(
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,

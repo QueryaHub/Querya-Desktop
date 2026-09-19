@@ -11,6 +11,18 @@ abstract final class QueryaTreeTokens {
   /// Leaf list indent (tables / views under an object folder).
   static const double leafList = 26;
 
+  /// Compact **SERVERS** header top padding (UI-05).
+  static const double serversHeaderTop = 12;
+
+  /// Indent-guide stroke (UI-05).
+  static const double guideWidth = 1;
+
+  /// Horizontal offset of the guide inside each indent band.
+  static const double guideInset = 8;
+
+  /// Guide line alpha on [QueryaWorkbenchTheme.borderSubtle] / outline.
+  static const double guideAlpha = 0.15;
+
   /// Loading / error inset under a connection expand (databases load).
   static const double errorConnection = 28;
 

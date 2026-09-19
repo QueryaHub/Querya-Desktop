@@ -6,6 +6,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:querya_desktop/core/storage/folders_storage.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/app_theme.dart';
+import 'package:querya_desktop/core/ui/querya_tree_tokens.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
@@ -389,6 +390,36 @@ void main() {
       await tester.pump();
 
       expect(find.byType(ConnectionsPanel), findsOneWidget);
+    });
+
+    testWidgets('SERVERS header uses compact top padding (UI-05)',
+        (tester) async {
+      await pumpWidgetWithSurfaceSize(
+        tester,
+        const material.Size(400, 600),
+        ShadcnApp(
+          theme: AppTheme.dark,
+          darkTheme: AppTheme.dark,
+          themeMode: ThemeMode.dark,
+          home: const material.SizedBox(
+            width: 400,
+            height: 600,
+            child: ConnectionsPanel(
+              skipInitialDbLoadForTest: true,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final padding = tester.widget<material.Padding>(
+        find.byKey(const material.ValueKey('connections-servers-header')),
+      );
+      expect(
+        padding.padding.resolve(material.TextDirection.ltr).top,
+        QueryaTreeTokens.serversHeaderTop,
+      );
+      expect(find.text('SERVERS'), findsOneWidget);
     });
   });
 }
