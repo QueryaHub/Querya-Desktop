@@ -84,11 +84,50 @@ class DriverContribution {
       };
 }
 
-/// `contributions` block from an extension manifest.
+/// A Command Palette action declared under `contributions.commands`
+/// or the VS Code-style `contributes.commands` alias.
+class CommandContribution {
+  const CommandContribution({
+    required this.id,
+    required this.title,
+    this.category,
+    this.aliases = const [],
+  });
+
+  final String id;
+  final String title;
+  final String? category;
+  final List<String> aliases;
+
+  factory CommandContribution.fromJson(Map<String, dynamic> json) {
+    final aliasesRaw = json['aliases'];
+    return CommandContribution(
+      id: '${json['id'] ?? ''}'.trim(),
+      title: '${json['title'] ?? json['id'] ?? ''}'.trim(),
+      category: json['category'] as String?,
+      aliases: aliasesRaw is List
+          ? [for (final a in aliasesRaw) '$a']
+          : const [],
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        if (category != null) 'category': category,
+        if (aliases.isNotEmpty) 'aliases': aliases,
+      };
+}
+
+/// `contributions` / `contributes` block from an extension manifest.
 class ExtensionContributions {
-  const ExtensionContributions({this.drivers = const []});
+  const ExtensionContributions({
+    this.drivers = const [],
+    this.commands = const [],
+  });
 
   final List<DriverContribution> drivers;
+  final List<CommandContribution> commands;
 
   factory ExtensionContributions.fromJson(Map<String, dynamic> json) {
     final driversRaw = json['drivers'];
@@ -104,13 +143,45 @@ class ExtensionContributions {
         }
       }
     }
-    return ExtensionContributions(drivers: drivers);
+    return ExtensionContributions(
+      drivers: drivers,
+      commands: parseCommandList(json['commands']),
+    );
+  }
+
+  static List<CommandContribution> parseCommandList(Object? raw) {
+    final commands = <CommandContribution>[];
+    if (raw is! List) return commands;
+    for (final item in raw) {
+      if (item is Map<String, dynamic>) {
+        commands.add(CommandContribution.fromJson(item));
+      } else if (item is Map) {
+        commands.add(
+          CommandContribution.fromJson(Map<String, dynamic>.from(item)),
+        );
+      }
+    }
+    return commands.where((c) => c.id.isNotEmpty && c.title.isNotEmpty).toList();
+  }
+
+  static ExtensionContributions merge(
+    ExtensionContributions? a,
+    ExtensionContributions? b,
+  ) {
+    if (a == null) return b ?? const ExtensionContributions();
+    if (b == null) return a;
+    return ExtensionContributions(
+      drivers: [...a.drivers, ...b.drivers],
+      commands: [...a.commands, ...b.commands],
+    );
   }
 
   Map<String, dynamic> toJson() => {
         if (drivers.isNotEmpty)
           'drivers': drivers.map((d) => d.toJson()).toList(),
+        if (commands.isNotEmpty)
+          'commands': commands.map((c) => c.toJson()).toList(),
       };
 
-  bool get isEmpty => drivers.isEmpty;
+  bool get isEmpty => drivers.isEmpty && commands.isEmpty;
 }

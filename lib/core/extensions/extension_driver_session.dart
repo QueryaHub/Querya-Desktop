@@ -33,6 +33,16 @@ class ExtensionDriverSession {
   bool isConnected(int connectionId) =>
       _bridges[connectionId]?.isStarted == true;
 
+  /// Live plugin process for [extensionId], if a connection already started it.
+  PluginRpcBridge? activeBridgeForExtension(String extensionId) {
+    for (final entry in _bridges.entries) {
+      if (_manifests[entry.key]?.id == extensionId && entry.value.isStarted) {
+        return entry.value;
+      }
+    }
+    return null;
+  }
+
   /// Starts the plugin (if needed), injects credentials, and calls `db.connect`.
   Future<PluginRpcBridge> ensureConnected(ConnectionRow row) async {
     final id = row.id;

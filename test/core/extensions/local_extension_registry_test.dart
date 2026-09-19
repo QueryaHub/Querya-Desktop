@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
+import 'package:querya_desktop/core/actions/querya_command_registry.dart';
+import 'package:querya_desktop/core/extensions/extension_command_sync.dart';
 import 'package:querya_desktop/core/extensions/extension_paths.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/extensions/models/extension_type.dart';
@@ -12,11 +14,15 @@ void main() {
     late Directory tempDir;
 
     setUp(() async {
+      ExtensionCommandSync.instance.resetForTest();
+      QueryaCommandRegistry.instance.resetForTest();
       tempDir = await Directory.systemTemp.createTemp('querya_extensions_test');
       ExtensionPaths.mockExtensionsDirectory = tempDir;
     });
 
     tearDown(() async {
+      ExtensionCommandSync.instance.resetForTest();
+      QueryaCommandRegistry.instance.resetForTest();
       ExtensionPaths.mockExtensionsDirectory = null;
       if (await tempDir.exists()) {
         await tempDir.delete(recursive: true);
@@ -135,6 +141,42 @@ void main() {
       await file.delete();
       final manifests = await LocalExtensionRegistry.instance.load();
       expect(manifests.length, 1, reason: 'Should return cached result');
+    });
+
+    test('registers contributes.commands on load and drops them on uninstall',
+        () async {
+      final extDir = Directory(p.join(tempDir.path, 'clickhouse'));
+      await extDir.create();
+      await File(p.join(extDir.path, 'manifest.json')).writeAsString(jsonEncode({
+        'id': 'queryahub.clickhouse-driver',
+        'name': 'ClickHouse Driver',
+        'version': '1.0.0',
+        'publisher': 'QueryaHub',
+        'type': 'theme',
+        'engines': {'querya_desktop': '^0.5.0'},
+        'contributes': {
+          'commands': [
+            {
+              'id': 'ext.clickhouse.cluster_status',
+              'title': 'ClickHouse: Show Cluster Status',
+              'category': 'ClickHouse',
+            }
+          ],
+        },
+      }));
+
+      await LocalExtensionRegistry.instance.reload();
+      expect(
+        QueryaCommandRegistry.instance['ext.clickhouse.cluster_status']?.title,
+        'ClickHouse: Show Cluster Status',
+      );
+
+      await extDir.delete(recursive: true);
+      await LocalExtensionRegistry.instance.reload();
+      expect(
+        QueryaCommandRegistry.instance['ext.clickhouse.cluster_status'],
+        isNull,
+      );
     });
   });
 }
