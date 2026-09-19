@@ -16,6 +16,7 @@ import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/ui/querya_shell_status.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_utils.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
@@ -417,6 +418,8 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       session.affectedRows = null;
       session.statusLine = null;
     });
+    QueryaShellStatus.instance.beginBusy(message: 'Running query…');
+    final sw = Stopwatch()..start();
 
     try {
       await _ensureLease();
@@ -427,6 +430,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
             session.error = 'Could not connect to PostgreSQL.';
             session.running = false;
           });
+          QueryaShellStatus.instance.endBusy();
         }
         return;
       }
@@ -484,6 +488,13 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         }
         session.running = false;
       });
+      sw.stop();
+      QueryaShellStatus.instance.reportQueryResult(
+        duration: sw.elapsed,
+        rowCount: outRows.length,
+        columnCount: cols.length,
+        message: session.statusLine,
+      );
       final cid = widget.connectionRow.id;
       if (cid != null) {
         unawaited(
@@ -502,6 +513,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
           session.error = 'Query timed out: ${e.message ?? e}';
           session.running = false;
         });
+        QueryaShellStatus.instance.endBusy();
       }
     } on pg.ServerException catch (e) {
       if (mounted) {
@@ -509,6 +521,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
           session.error = e.message;
           session.running = false;
         });
+        QueryaShellStatus.instance.endBusy();
       }
     } catch (e) {
       if (mounted) {
@@ -516,6 +529,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
           session.error = e.toString();
           session.running = false;
         });
+        QueryaShellStatus.instance.endBusy();
       }
     } finally {
       await _refreshTxStatus();

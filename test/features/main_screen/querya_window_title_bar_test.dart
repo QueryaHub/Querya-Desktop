@@ -1,6 +1,7 @@
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/core/theme/querya_workbench_theme.dart';
 import 'package:querya_desktop/features/main_screen/querya_window_title_bar.dart';
@@ -134,7 +135,7 @@ void main() {
     );
   });
 
-  testWidgets('read-only state is persistently visible in title bar',
+  testWidgets('QueryaReadOnlyBadge widget still renders for goldens',
       (tester) async {
     await tester.pumpWidget(
       queryaThemeTestShell(
@@ -150,6 +151,31 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Read-only'), findsWidgets);
+  });
+
+  testWidgets('title bar does not show Read-only badge (status bar owns it)',
+      (tester) async {
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.SizedBox(
+          width: 1000,
+          child: QueryaWindowTitleBar(
+            onNewDatabaseConnection: () async {},
+            onNewDatabaseConnectionFromUrl: () async {},
+            activeConnection: ConnectionRow(
+              id: 1,
+              name: 'DB',
+              type: 'postgresql',
+              createdAt: DateTime.now().toIso8601String(),
+            ),
+            isReadOnly: true,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const Key('title_bar_read_only_badge')), findsNothing);
   });
 
   testWidgets('toggle sidebar button calls onToggleSidebar when pressed',

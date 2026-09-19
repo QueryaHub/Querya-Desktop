@@ -2,7 +2,6 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/extensions/extension_workspace_home.dart';
-import 'package:querya_desktop/shared/widgets/querya_tab_strip.dart';
 
 import '../../support/querya_theme_test_shell.dart';
 

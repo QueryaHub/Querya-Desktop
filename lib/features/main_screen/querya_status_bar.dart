@@ -9,10 +9,8 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Obsidian/IDE standard bottom status bar.
 ///
-/// Displays:
-/// - Active connection status, protocol, host, and read-only lock.
-/// - Background operation activity.
-/// - Execution time / latency, row/column counts, and encoding.
+/// Displays active connection, read-only lock, busy state, last query
+/// duration, and result row/column counts (via [QueryaShellStatus]).
 class QueryaStatusBar extends material.StatelessWidget {
   const QueryaStatusBar({
     super.key,
@@ -48,7 +46,7 @@ class QueryaStatusBar extends material.StatelessWidget {
     return material.Container(
       height: context.scaled(26),
       decoration: material.BoxDecoration(
-        color: wb.canvas,
+        color: wb.surface,
         border: material.Border(
           top: material.BorderSide(
             color: wb.borderSubtle.withValues(alpha: 0.22),
@@ -64,6 +62,7 @@ class QueryaStatusBar extends material.StatelessWidget {
             material.Tooltip(
               message: 'Toggle Sidebar (${isMac ? "Cmd+B" : "Ctrl+B"})',
               child: material.InkWell(
+                key: const material.Key('status_bar_toggle_sidebar'),
                 onTap: onToggleSidebar,
                 borderRadius: material.BorderRadius.circular(3),
                 child: material.Padding(
@@ -198,7 +197,7 @@ class QueryaStatusBar extends material.StatelessWidget {
 
           const Gap(12),
 
-          // 4. Right status metrics: execution time, rows/cols, encoding
+          // Right status metrics: execution time, rows/cols
           if (lastQueryDuration != null) ...[
             material.Row(
               mainAxisSize: material.MainAxisSize.min,
@@ -219,9 +218,11 @@ class QueryaStatusBar extends material.StatelessWidget {
                 ),
               ],
             ),
-            const Gap(8),
-            _vDivider(wb.borderSubtle),
-            const Gap(8),
+            if (rowCount != null || onOpenPreferences != null) ...[
+              const Gap(8),
+              _vDivider(wb.borderSubtle),
+              const Gap(8),
+            ],
           ],
 
           if (rowCount != null) ...[
@@ -244,25 +245,19 @@ class QueryaStatusBar extends material.StatelessWidget {
                 ),
               ],
             ),
-            const Gap(8),
-            _vDivider(wb.borderSubtle),
-            const Gap(8),
+            if (onOpenPreferences != null) ...[
+              const Gap(8),
+              _vDivider(wb.borderSubtle),
+              const Gap(6),
+            ],
           ],
 
-          // Encoding tag
-          material.Text(
-            'UTF-8',
-            style: material.TextStyle(
-              fontSize: 10,
-              fontFamily: QueryaTypography.mono,
-              color: wb.mutedForeground.withValues(alpha: 0.7),
-            ),
-          ),
-
           if (onOpenPreferences != null) ...[
-            const Gap(8),
-            _vDivider(wb.borderSubtle),
-            const Gap(6),
+            if (lastQueryDuration == null && rowCount == null) ...[
+              const Gap(8),
+              _vDivider(wb.borderSubtle),
+              const Gap(6),
+            ],
             material.Tooltip(
               message: 'Preferences (${isMac ? "Cmd+," : "Ctrl+,"})',
               child: material.InkWell(

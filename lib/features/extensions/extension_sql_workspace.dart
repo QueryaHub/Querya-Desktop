@@ -11,6 +11,7 @@ import 'package:querya_desktop/core/extensions/extension_driver_session.dart';
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/ui/querya_shell_status.dart';
 import 'package:querya_desktop/features/extensions/extension_driver_recovery_banner.dart';
 import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -295,6 +296,8 @@ class _ExtensionSqlWorkspaceState
       session.rows = [];
       session.statusLine = null;
     });
+    QueryaShellStatus.instance.beginBusy(message: 'Running query…');
+    final sw = Stopwatch()..start();
 
     try {
       final result = await ExtensionDriverSession.instance.query(
@@ -319,6 +322,16 @@ class _ExtensionSqlWorkspaceState
         }
         session.running = false;
       });
+      sw.stop();
+      final duration = result.elapsedMs != null
+          ? Duration(milliseconds: result.elapsedMs!)
+          : sw.elapsed;
+      QueryaShellStatus.instance.reportQueryResult(
+        duration: duration,
+        rowCount: result.rows.length,
+        columnCount: result.columns.length,
+        message: session.statusLine,
+      );
 
       final cid = widget.connectionRow.id;
       if (cid != null) {
@@ -337,6 +350,7 @@ class _ExtensionSqlWorkspaceState
           session.error = e.toString();
           session.running = false;
         });
+        QueryaShellStatus.instance.endBusy();
       }
     }
   }

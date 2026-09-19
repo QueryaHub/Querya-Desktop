@@ -400,8 +400,6 @@ class QueryaWindowTitleBar extends StatelessWidget {
         Row(
           mainAxisSize: material.MainAxisSize.min,
           children: [
-            if (activeConnection != null && isReadOnly)
-              const QueryaReadOnlyBadge(),
             UpdateAvailableBadge(controller: UpdateController.instance),
             if (useNativeWindowChrome &&
                 QueryaWindowTitleBar.showBitsdojoWindowButtons(
@@ -424,7 +422,10 @@ class QueryaWindowTitleBar extends StatelessWidget {
   }
 }
 
-/// Persistent title-bar indicator for a read-only workspace.
+/// Compact read-only badge (kept for goldens / isolated tests).
+///
+/// The live title bar no longer shows this — read-only lives on
+/// [QueryaStatusBar] (#715 / UI-04).
 class QueryaReadOnlyBadge extends StatelessWidget {
   const QueryaReadOnlyBadge({super.key});
 
