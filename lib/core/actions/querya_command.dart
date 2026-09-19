@@ -12,6 +12,7 @@ class QueryaCommand {
     this.shortcutLabel,
     this.aliases = const [],
     this.isEnabled,
+    this.sourceExtensionId,
   });
 
   /// Stable id (`querya.sql.execute`, `ext.clickhouse.cluster_status`).
@@ -29,6 +30,9 @@ class QueryaCommand {
 
   /// When null, the command is always available.
   final bool Function(BuildContext context)? isEnabled;
+
+  /// Package id when this command came from an extension manifest (CP-05).
+  final String? sourceExtensionId;
 
   final void Function(BuildContext context) execute;
 

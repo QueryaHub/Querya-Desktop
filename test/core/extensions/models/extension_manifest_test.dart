@@ -91,6 +91,7 @@ void main() {
 
       expect(manifest.capabilities?.databaseDriver, isTrue);
       expect(manifest.capabilities?.sduiForms, isTrue);
+      expect(manifest.contributedCommands, isEmpty);
       expect(manifest.contributedDrivers, hasLength(1));
       final driver = manifest.contributedDrivers.first;
       expect(driver.driverId, 'clickhouse');
@@ -98,6 +99,55 @@ void main() {
       expect(driver.defaultPort, 8123);
       expect(driver.connectionFormSchema, 'assets/connection_form.json');
       expect(manifest.sandbox?.engine, SandboxEngine.process);
+    });
+
+    test('parses contributes.commands and contributions.commands', () {
+      final json = {
+        'id': 'queryahub.clickhouse-driver',
+        'name': 'ClickHouse Database Driver',
+        'version': '1.0.0',
+        'publisher': 'QueryaHub',
+        'type': 'database_driver',
+        'engines': {'querya_desktop': '^0.5.0'},
+        'contributions': {
+          'drivers': [
+            {
+              'driverId': 'clickhouse',
+              'displayName': 'ClickHouse',
+            }
+          ],
+          'commands': [
+            {
+              'id': 'ext.clickhouse.cluster_status',
+              'title': 'ClickHouse: Show Cluster Status',
+              'category': 'ClickHouse',
+            }
+          ],
+        },
+        'contributes': {
+          'commands': [
+            {
+              'id': 'ext.clickhouse.export_parquet',
+              'title': 'ClickHouse: Export Parquet',
+              'aliases': ['parquet'],
+            }
+          ],
+        },
+      };
+
+      final manifest = ExtensionManifest.fromJson(json);
+      expect(manifest.contributedCommands.map((c) => c.id), [
+        'ext.clickhouse.cluster_status',
+        'ext.clickhouse.export_parquet',
+      ]);
+      expect(manifest.contributedCommands.first.category, 'ClickHouse');
+      expect(manifest.contributedCommands.last.aliases, ['parquet']);
+
+      final again = ExtensionManifest.fromJson(manifest.toJson());
+      expect(
+        again.contributedCommands.map((c) => c.id),
+        contains('ext.clickhouse.cluster_status'),
+      );
     });
 
     test('toJson round-trips contributions and capabilities', () {
