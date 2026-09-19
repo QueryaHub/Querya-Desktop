@@ -36,7 +36,6 @@ import 'package:flutter/material.dart' as material
         Text,
         TextOverflow,
         Expanded,
-        CircularProgressIndicator,
         Material,
         Semantics,
         StatelessWidget,
