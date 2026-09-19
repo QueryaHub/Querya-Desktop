@@ -113,10 +113,17 @@ const double kConnectionTreeRowExtent = 28;
 /// Build all rows inline when the list is short.
 const int kConnectionTreeEagerThreshold = 24;
 
-/// Max rows visible before nested list scrolls (virtualized via [ListView.builder]).
+/// Max rows visible in a nested leaf viewport (virtualized via [ListView.builder]).
 const int kConnectionTreeMaxVisibleRows = 14;
 
-/// Builds a short [Column] or a height-capped [ListView.builder] for large lists.
+/// Builds connection-tree children without nested [shrinkWrap] layout passes.
+///
+/// - **No [itemExtent]** (databases, schemas, folder tiles): always a [Column]
+///   so expand/collapse participates in the outer sidebar [CustomScrollView]
+///   instead of nesting a second scroller (#724).
+/// - **With [itemExtent]** and `itemCount > [eagerThreshold]`: a fixed-height
+///   [ListView.builder] (SDUI-style — **not** shrink-wrapped) so only the
+///   viewport (+ cacheExtent) leaf rows are built for large table lists.
 material.Widget lazyConnectionTreeList({
   required material.BuildContext context,
   required int itemCount,
@@ -130,26 +137,32 @@ material.Widget lazyConnectionTreeList({
   if (itemCount == 0) {
     return const material.SizedBox.shrink();
   }
-  if (itemCount <= eagerThreshold) {
-    return material.Column(
+
+  final useVirtualizedLeaves =
+      itemExtent != null && itemCount > eagerThreshold;
+
+  if (!useVirtualizedLeaves) {
+    final pad = padding;
+    final column = material.Column(
       mainAxisSize: material.MainAxisSize.min,
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
         for (var i = 0; i < itemCount; i++) itemBuilder(context, i),
       ],
     );
+    if (pad == null) return column;
+    return material.Padding(padding: pad, child: column);
   }
-  final rowExtent = itemExtent ?? kConnectionTreeRowExtent;
-  return material.ConstrainedBox(
-    constraints: material.BoxConstraints(
-      maxHeight: maxVisibleRows * rowExtent,
-    ),
+
+  final rowExtent = itemExtent!;
+  return material.SizedBox(
+    height: maxVisibleRows * rowExtent,
     child: material.ListView.builder(
       padding: padding ?? material.EdgeInsets.zero,
-      shrinkWrap: true,
       physics: const material.ClampingScrollPhysics(),
       itemCount: itemCount,
-      itemExtent: itemExtent,
+      itemExtent: rowExtent,
+      cacheExtent: rowExtent * 4,
       itemBuilder: itemBuilder,
     ),
   );
