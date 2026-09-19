@@ -176,6 +176,15 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
     return ContextMenu(
       items: [
         MenuButton(
+          leading: material.Icon(material.Icons.refresh_rounded,
+              size: 18, color: theme.colorScheme.mutedForeground),
+          onPressed: (_) {
+            setState(() => _schema = null);
+            _loadTree();
+          },
+          child: const Text('Refresh tree'),
+        ),
+        MenuButton(
           leading: material.Icon(material.Icons.edit_outlined,
               size: 18, color: theme.colorScheme.mutedForeground),
           onPressed: (_) => widget.onEdit(),
@@ -248,9 +257,6 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
                                   maxLines: 1,
                                   style: material.TextStyle(
                                     fontSize: 13,
-                                    fontWeight: widget.isSelected
-                                        ? material.FontWeight.w600
-                                        : material.FontWeight.w500,
                                     color: theme.colorScheme.foreground,
                                   ),
                                 ),

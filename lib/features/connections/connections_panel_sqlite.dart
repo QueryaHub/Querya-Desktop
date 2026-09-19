@@ -224,9 +224,12 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
                                     color: theme.colorScheme.foreground,
                                   ),
                                 ),
-                                if (widget.connection.host != null)
+                                if ((widget.connection.host ??
+                                        widget.connection.databaseName) !=
+                                    null)
                                   material.Text(
-                                    widget.connection.host!,
+                                    widget.connection.host ??
+                                        widget.connection.databaseName!,
                                     overflow: material.TextOverflow.ellipsis,
                                     maxLines: 1,
                                     style: material.TextStyle(

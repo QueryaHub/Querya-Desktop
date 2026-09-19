@@ -315,6 +315,7 @@ class _RedisDatabasesNode extends material.StatelessWidget {
             index: db.index,
             keys: db.keys,
             onTap: () => onDatabaseTap?.call(db.index),
+            onRefreshDatabases: onRefreshDatabases,
           );
         },
       ),
@@ -328,12 +329,14 @@ class _RedisDatabaseNode extends StatelessWidget {
     required this.index,
     required this.keys,
     required this.onTap,
+    required this.onRefreshDatabases,
   });
 
   final ConnectionRow connection;
   final int index;
   final int keys;
   final VoidCallback onTap;
+  final VoidCallback onRefreshDatabases;
 
   @override
   Widget build(BuildContext context) {
@@ -369,6 +372,8 @@ class _RedisDatabaseNode extends StatelessWidget {
         ),
         verticalPadding: 3,
         onTap: onTap,
+        connection: connection,
+        onContextRefresh: onRefreshDatabases,
       ),
     );
   }
