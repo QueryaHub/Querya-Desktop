@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart' show Icons;
-import 'package:flutter/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' show ThemeMode;
 import 'package:querya_desktop/core/actions/querya_command.dart';
 import 'package:querya_desktop/core/actions/querya_command_host.dart';
@@ -69,13 +68,13 @@ List<QueryaCommand> queryaCoreCommands() {
       execute: (context) =>
           QueryaCommandHost.maybeOf(context)?.onShowQuickSwitcher?.call(''),
     ),
-    QueryaCommand(
+    const QueryaCommand(
       id: 'querya.app.preferences',
       title: 'Open Preferences',
       category: 'Application',
       icon: Icons.settings_outlined,
       shortcutLabel: 'Ctrl+,',
-      aliases: const ['settings', 'options'],
+      aliases: ['settings', 'options'],
       execute: showPreferencesDialog,
     ),
     QueryaCommand(

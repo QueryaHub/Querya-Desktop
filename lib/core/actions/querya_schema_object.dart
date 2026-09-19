@@ -122,7 +122,7 @@ class QueryaSchemaObject {
 
   /// Fields the switcher matches against (`users` → `public.users`).
   String get searchHaystack =>
-      '$name ${qualifiedName} ${kind.name} ${kindLabel} ${database ?? ''} ${schema ?? ''}';
+      '$name $qualifiedName ${kind.name} $kindLabel ${database ?? ''} ${schema ?? ''}';
 
   @override
   bool operator ==(Object other) =>
