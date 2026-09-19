@@ -58,6 +58,8 @@ class WorkspacePanel extends StatefulWidget {
     this.lastSelectedMysqlObject,
     this.lastSelectedSqliteObject,
     this.lastSelectedExtensionObject,
+    this.lastSelectedMongoDb,
+    this.lastSelectedRedisDb,
     this.onNavigateHome,
     this.onRestoreLastSelectedObject,
     this.isReadOnly = false,
@@ -153,6 +155,12 @@ class WorkspacePanel extends StatefulWidget {
     String database,
     String name,
   })? lastSelectedExtensionObject;
+
+  /// Last MongoDB database for 1-click return from stats.
+  final String? lastSelectedMongoDb;
+
+  /// Last Redis database index for 1-click return from stats.
+  final int? lastSelectedRedisDb;
 
   /// Callback to return to the active connection's stats / overview home.
   final VoidCallback? onNavigateHome;
@@ -302,6 +310,8 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
           home: MongoStatsView(
             key: ValueKey('mongo_stats_${activeConn.id}'),
             connectionRow: activeConn,
+            lastSelectedMongoDb: widget.lastSelectedMongoDb,
+            onRestoreLastSelectedObject: widget.onRestoreLastSelectedObject,
           ),
           object: mongoDb == null
               ? null
@@ -319,6 +329,8 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
           home: RedisView(
             key: ValueKey('redis_stats_${activeConn.id}'),
             connectionRow: activeConn,
+            lastSelectedRedisDb: widget.lastSelectedRedisDb,
+            onRestoreLastSelectedObject: widget.onRestoreLastSelectedObject,
           ),
           object: redisDb == null
               ? null
