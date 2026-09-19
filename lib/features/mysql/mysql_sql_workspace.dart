@@ -86,6 +86,14 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       },
       onNextTab: _nextTab,
       onPrevTab: _prevTab,
+      onFormat: () {
+        _activeSession.formatSql();
+        setState(() {});
+      },
+      onClear: () {
+        _activeSession.clearSql();
+        setState(() {});
+      },
       onOpenWithContent: (sql, filePath, title) {
         if (!mounted) return;
         final session = _activeSession;

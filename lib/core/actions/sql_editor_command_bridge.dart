@@ -17,6 +17,8 @@ class SqlEditorCommandBridge {
   VoidCallback? _onCloseTab;
   VoidCallback? _onNextTab;
   VoidCallback? _onPrevTab;
+  VoidCallback? _onFormat;
+  VoidCallback? _onClear;
   void Function(String sql, String? filePath, String title)? _onOpenWithContent;
 
   SqlEditorPendingAction pendingAction = SqlEditorPendingAction.none;
@@ -25,6 +27,8 @@ class SqlEditorCommandBridge {
   bool get isActive => _onNew != null;
   bool get canExecute => _onExecute != null;
   bool get canCloseTab => _onCloseTab != null;
+  bool get canFormat => _onFormat != null;
+  bool get canClear => _onClear != null;
 
   void register({
     required int? connectionId,
@@ -35,6 +39,8 @@ class SqlEditorCommandBridge {
     VoidCallback? onCloseTab,
     VoidCallback? onNextTab,
     VoidCallback? onPrevTab,
+    VoidCallback? onFormat,
+    VoidCallback? onClear,
     void Function(String sql, String? filePath, String title)? onOpenWithContent,
   }) {
     _ownerConnectionId = connectionId;
@@ -45,6 +51,8 @@ class SqlEditorCommandBridge {
     _onCloseTab = onCloseTab;
     _onNextTab = onNextTab;
     _onPrevTab = onPrevTab;
+    _onFormat = onFormat;
+    _onClear = onClear;
     _onOpenWithContent = onOpenWithContent;
     _flushPending();
   }
@@ -59,6 +67,8 @@ class SqlEditorCommandBridge {
     _onCloseTab = null;
     _onNextTab = null;
     _onPrevTab = null;
+    _onFormat = null;
+    _onClear = null;
     _onOpenWithContent = null;
   }
 
@@ -108,6 +118,14 @@ class SqlEditorCommandBridge {
 
   void invokePrevTab() {
     _onPrevTab?.call();
+  }
+
+  void invokeFormat() {
+    _onFormat?.call();
+  }
+
+  void invokeClear() {
+    _onClear?.call();
   }
 
   void openFileWithContent({
@@ -161,6 +179,8 @@ class SqlEditorCommandBridge {
     _onCloseTab = null;
     _onNextTab = null;
     _onPrevTab = null;
+    _onFormat = null;
+    _onClear = null;
     _onOpenWithContent = null;
     _pendingFileContent = null;
     pendingAction = SqlEditorPendingAction.none;

@@ -504,6 +504,15 @@ class _MainScreenState extends State<MainScreen> {
     QueryaShellStatus.instance.clear();
   }
 
+  bool _hasCloseableWorkspace(MainScreenWorkspaceState ws) {
+    return ws.selectedPostgresObject != null ||
+        ws.selectedMysqlObject != null ||
+        ws.selectedSqliteObject != null ||
+        ws.selectedExtensionObject != null ||
+        ws.activeMongoDB != null ||
+        ws.activeRedisDb != null;
+  }
+
   void _onOpenWelcomeTour() {
     showWelcomeTourDialog(
       context,
@@ -590,6 +599,37 @@ class _MainScreenState extends State<MainScreen> {
           onNewConnection: () => unawaited(_onNewDatabaseConnectionFromMenu()),
           onShowQuickSwitcher: _openQuickSwitcher,
           onOpenSchemaObject: _onOpenSchemaObject,
+          onGoHome:
+              workspace.activeConnection != null ? _onGoHome : null,
+          onCloseWorkspace: _hasCloseableWorkspace(workspace)
+              ? () {
+                  _workspace.value = _workspace.value.unselectActiveObject();
+                }
+              : null,
+          onConnect: workspace.activeConnection?.id != null
+              ? () => _connectionsPanelKey.currentState
+                  ?.connect(workspace.activeConnection!.id!)
+              : null,
+          onDisconnect: workspace.activeConnection != null
+              ? () => unawaited(
+                    _connectionsPanelKey.currentState
+                            ?.disconnect(workspace.activeConnection!) ??
+                        Future<void>.value(),
+                  )
+              : null,
+          onReconnect: workspace.activeConnection != null
+              ? () => unawaited(
+                    _connectionsPanelKey.currentState
+                            ?.reconnect(workspace.activeConnection!) ??
+                        Future<void>.value(),
+                  )
+              : null,
+          onToggleReadOnly: workspace.activeConnection != null
+              ? () {
+                  _workspace.value = _workspace.value.toggleReadOnly();
+                }
+              : null,
+          onOpenWelcomeTour: _onOpenWelcomeTour,
           child: FocusScope(
           autofocus: true,
           child: material.CallbackShortcuts(

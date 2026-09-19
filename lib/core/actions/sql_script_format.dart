@@ -1,0 +1,70 @@
+const _kSqlKeywords = {
+  'ADD',
+  'ALL',
+  'ALTER',
+  'AND',
+  'AS',
+  'ASC',
+  'BEGIN',
+  'BETWEEN',
+  'BY',
+  'CASE',
+  'CAST',
+  'COMMIT',
+  'CREATE',
+  'CROSS',
+  'DELETE',
+  'DESC',
+  'DISTINCT',
+  'DROP',
+  'ELSE',
+  'END',
+  'EXCEPT',
+  'EXISTS',
+  'FROM',
+  'FULL',
+  'GROUP',
+  'HAVING',
+  'IN',
+  'INNER',
+  'INSERT',
+  'INTERSECT',
+  'INTO',
+  'IS',
+  'JOIN',
+  'LEFT',
+  'LIKE',
+  'LIMIT',
+  'NOT',
+  'NULL',
+  'OFFSET',
+  'ON',
+  'OR',
+  'ORDER',
+  'OUTER',
+  'RETURNING',
+  'RIGHT',
+  'ROLLBACK',
+  'SELECT',
+  'SET',
+  'TABLE',
+  'THEN',
+  'UNION',
+  'UPDATE',
+  'USING',
+  'VALUES',
+  'WHEN',
+  'WHERE',
+  'WITH',
+};
+
+final _kSqlWord = RegExp(r"[A-Za-z_][A-Za-z0-9_]*");
+
+/// Uppercases SQL keywords. Enough for palette "Format SQL" without a parser.
+String formatSqlScript(String sql) {
+  return sql.replaceAllMapped(_kSqlWord, (match) {
+    final word = match[0]!;
+    final upper = word.toUpperCase();
+    return _kSqlKeywords.contains(upper) ? upper : word;
+  });
+}

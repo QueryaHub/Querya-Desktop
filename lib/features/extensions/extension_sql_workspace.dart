@@ -144,6 +144,14 @@ class _ExtensionSqlWorkspaceState
       },
       onNextTab: _nextTab,
       onPrevTab: _prevTab,
+      onFormat: () {
+        _activeSession.formatSql();
+        setState(() {});
+      },
+      onClear: () {
+        _activeSession.clearSql();
+        setState(() {});
+      },
       onExecute: () {
         if (!_activeSession.running) unawaited(_execute(_activeSession));
       },
