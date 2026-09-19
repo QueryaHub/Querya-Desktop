@@ -244,31 +244,12 @@ class _MysqlConnectionTileState extends State<_MysqlConnectionTile> {
                 crossAxisAlignment: material.CrossAxisAlignment.stretch,
                 children: [
                   if (_loading)
-                    material.Padding(
-                      padding: const material.EdgeInsets.only(
-                          left: 28, top: 4, bottom: 4),
-                      child: material.Row(
-                        children: [
-                          const material.SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: material.CircularProgressIndicator(
-                                strokeWidth: 1.5),
-                          ),
-                          const Gap(8),
-                          const Text('Loading...').muted().xSmall(),
-                        ],
-                      ),
-                    ),
+                    const ConnectionTreeLoadingRow.connection(),
                   if (_error != null)
                     TreeLoadError(
                       title: 'Could not load databases',
                       message: _error!,
-                      padding: const material.EdgeInsets.only(
-                        left: 28,
-                        top: 4,
-                        bottom: 4,
-                      ),
+                      padding: QueryaTreeTokens.errorPaddingConnection,
                       onRetry: _loadDatabases,
                     ),
                   if (_databases.isNotEmpty)
@@ -316,7 +297,7 @@ class _MysqlDatabasesNode extends material.StatelessWidget {
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context);
     return material.Padding(
-      padding: const material.EdgeInsets.only(left: 20),
+      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.underConnection),
       child: material.Column(
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
@@ -449,7 +430,7 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return material.Padding(
-      padding: const material.EdgeInsets.only(left: 16),
+      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent),
       child: material.Column(
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
@@ -490,22 +471,7 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
               crossAxisAlignment: material.CrossAxisAlignment.stretch,
               children: [
                 if (_loading)
-                  material.Padding(
-                    padding: const material.EdgeInsets.only(
-                        left: 24, top: 2, bottom: 2),
-                    child: material.Row(
-                      children: [
-                        const material.SizedBox(
-                          width: 10,
-                          height: 10,
-                          child: material.CircularProgressIndicator(
-                              strokeWidth: 1.5),
-                        ),
-                        const Gap(6),
-                        const Text('Loading...').muted().xSmall(),
-                      ],
-                    ),
-                  )
+                  const ConnectionTreeLoadingRow.nested()
                 else if (_error != null)
                   TreeLoadError(
                     title: 'Could not load tables',
@@ -517,7 +483,7 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
                     _procedures.isNotEmpty ||
                     _functions.isNotEmpty)
                   material.Padding(
-                    padding: const material.EdgeInsets.only(left: 16),
+                    padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent),
                     child: material.Column(
                       crossAxisAlignment: material.CrossAxisAlignment.start,
                       children: [
@@ -720,8 +686,7 @@ class _MysqlObjectGroupState extends State<_MysqlObjectGroup> {
                   ),
                 if (sorted.isEmpty && widget.items.isNotEmpty)
                   material.Padding(
-                    padding: const material.EdgeInsets.only(
-                        left: 26, top: 4, bottom: 6),
+                    padding: QueryaTreeTokens.emptyFilterPadding,
                     child: Text('No matching ${widget.label.toLowerCase()}')
                         .muted()
                         .xSmall(),
@@ -731,7 +696,7 @@ class _MysqlObjectGroupState extends State<_MysqlObjectGroup> {
                     context: context,
                     itemCount: sorted.length,
                     itemExtent: kConnectionTreeRowExtent,
-                    padding: const material.EdgeInsets.only(left: 26),
+                    padding: const material.EdgeInsets.only(left: QueryaTreeTokens.leafList),
                     itemBuilder: (context, index) {
                       final item = sorted[index];
                       final isPinned = _pinnedItems.contains(item);

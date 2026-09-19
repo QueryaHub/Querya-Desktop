@@ -281,33 +281,12 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
                 crossAxisAlignment: material.CrossAxisAlignment.stretch,
                 children: [
                   if (_loading)
-                    material.Padding(
-                      padding: const material.EdgeInsets.only(
-                          left: 28, top: 4, bottom: 4),
-                      child: material.Row(
-                        children: [
-                          const material.SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: material.CircularProgressIndicator(
-                                strokeWidth: 1.5),
-                          ),
-                          const Gap(8),
-                          const Text('Loading...').muted().xSmall(),
-                        ],
-                      ),
-                    ),
+                    const ConnectionTreeLoadingRow.connection(),
                   if (_error != null)
                     TreeLoadError(
                       title: 'Could not load databases',
                       message: _error!,
-                      detailFontSize: 10,
-                      padding: const material.EdgeInsets.only(
-                        left: 28,
-                        top: 4,
-                        bottom: 4,
-                        right: 8,
-                      ),
+                      padding: QueryaTreeTokens.errorPaddingConnection,
                       onRetry: _loadDatabases,
                     ),
                   if (_databases.isNotEmpty)
@@ -350,7 +329,7 @@ class _MongoDatabasesNode extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return material.Padding(
-      padding: const material.EdgeInsets.only(left: 20),
+      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.underConnection),
       child: material.Column(
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
@@ -412,7 +391,7 @@ class _MongoDatabaseNode extends StatelessWidget {
         sel.selectedConnectionId == connection.id &&
         sel.selectedMongoDb == name;
     return material.Padding(
-      padding: const material.EdgeInsets.only(left: 16, top: 2, bottom: 2),
+      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent, top: 2, bottom: 2),
       child: _PgTreeRow(
         label: name,
         isSelected: isSelected,

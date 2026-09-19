@@ -239,31 +239,12 @@ class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
                 crossAxisAlignment: material.CrossAxisAlignment.stretch,
                 children: [
                   if (_loading)
-                    material.Padding(
-                      padding: const material.EdgeInsets.only(
-                          left: 28, top: 4, bottom: 4),
-                      child: material.Row(
-                        children: [
-                          const material.SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: material.CircularProgressIndicator(
-                                strokeWidth: 1.5),
-                          ),
-                          const Gap(8),
-                          const Text('Loading...').muted().xSmall(),
-                        ],
-                      ),
-                    ),
+                    const ConnectionTreeLoadingRow.connection(),
                   if (_error != null)
                     TreeLoadError(
                       title: 'Could not load databases',
                       message: _error!,
-                      padding: const material.EdgeInsets.only(
-                        left: 28,
-                        top: 4,
-                        bottom: 4,
-                      ),
+                      padding: QueryaTreeTokens.errorPaddingConnection,
                       onRetry: _loadDatabases,
                     ),
                   if (_databases.isNotEmpty)

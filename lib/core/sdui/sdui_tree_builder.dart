@@ -179,12 +179,7 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
           return TreeLoadError(
             title: 'Could not expand',
             message: row.error!,
-            detailFontSize: 10,
-            padding: material.EdgeInsets.only(
-              left: 36.0 + row.depth * QueryaTreeTokens.indent,
-              top: 2,
-              bottom: 2,
-            ),
+            padding: QueryaTreeTokens.errorPaddingForDepth(row.depth),
           );
         }
         return _buildNodeRow(row.node!, depth: row.depth);
@@ -283,9 +278,11 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
                   const material.SizedBox(width: QueryaIconSizes.treeExpand + 4),
                 if (isLoading)
                   const material.SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: material.CircularProgressIndicator(strokeWidth: 2),
+                    width: QueryaTreeTokens.spinnerInline,
+                    height: QueryaTreeTokens.spinnerInline,
+                    child: material.CircularProgressIndicator(
+                      strokeWidth: QueryaTreeTokens.spinnerStrokeInline,
+                    ),
                   )
                 else
                   material.Icon(

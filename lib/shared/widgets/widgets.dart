@@ -19,6 +19,7 @@ export 'querya_dropdown.dart'
         QueryaDropdownItem,
         QueryaDropdownTokens,
         kPreferencesLabelWidth;
+export 'connection_tree_loading_row.dart';
 export 'tree_load_error.dart';
 export 'package:querya_desktop/core/motion/querya_motion.dart';
 export 'package:querya_desktop/core/motion/querya_motion_context.dart';

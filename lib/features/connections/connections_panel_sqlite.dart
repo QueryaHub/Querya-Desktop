@@ -251,36 +251,17 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
                 crossAxisAlignment: material.CrossAxisAlignment.stretch,
                 children: [
                   if (_loading)
-                    material.Padding(
-                      padding: const material.EdgeInsets.only(
-                          left: 28, top: 4, bottom: 4),
-                      child: material.Row(
-                        children: [
-                          const material.SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: material.CircularProgressIndicator(
-                                strokeWidth: 1.5),
-                          ),
-                          const Gap(8),
-                          const Text('Loading...').muted().xSmall(),
-                        ],
-                      ),
-                    ),
+                    const ConnectionTreeLoadingRow.connection(),
                   if (_error != null)
                     TreeLoadError(
                       title: 'Could not load objects',
                       message: _error!,
-                      padding: const material.EdgeInsets.only(
-                        left: 28,
-                        top: 4,
-                        bottom: 4,
-                      ),
+                      padding: QueryaTreeTokens.errorPaddingConnection,
                       onRetry: _loadTables,
                     ),
                   if (!_loading && _error == null)
                     material.Padding(
-                      padding: const material.EdgeInsets.only(left: 16),
+                      padding: const material.EdgeInsets.only(left: QueryaTreeTokens.indent),
                       child: material.Column(
                         crossAxisAlignment: material.CrossAxisAlignment.start,
                         children: [
@@ -448,8 +429,7 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
                   ),
                 if (sorted.isEmpty && widget.items.isNotEmpty)
                   material.Padding(
-                    padding: const material.EdgeInsets.only(
-                        left: 26, top: 4, bottom: 6),
+                    padding: QueryaTreeTokens.emptyFilterPadding,
                     child: Text('No matching ${widget.label.toLowerCase()}')
                         .muted()
                         .xSmall(),
@@ -459,7 +439,7 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
                     context: context,
                     itemCount: sorted.length,
                     itemExtent: kConnectionTreeRowExtent,
-                    padding: const material.EdgeInsets.only(left: 26),
+                    padding: const material.EdgeInsets.only(left: QueryaTreeTokens.leafList),
                     itemBuilder: (context, index) {
                       final item = sorted[index];
                       final isPinned = _pinnedItems.contains(item);
