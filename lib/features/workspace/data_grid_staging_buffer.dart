@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
+import 'package:querya_desktop/core/unsaved_work_registry.dart';
 
 /// Status of a row within the staging buffer.
 enum StagedRowStatus {
@@ -27,7 +28,9 @@ class DataGridStagingBuffer extends ChangeNotifier {
   })  : _originalColumns = List.unmodifiable(columns),
         _originalRows = List.unmodifiable(
           rows.map((r) => List<String>.unmodifiable(r)).toList(),
-        );
+        ) {
+    UnsavedWorkRegistry.instance.register(this, () => isDirty);
+  }
 
   final List<String> _originalColumns;
   final List<List<String>> _originalRows;
@@ -344,6 +347,7 @@ class DataGridStagingBuffer extends ChangeNotifier {
 
   @override
   void dispose() {
+    UnsavedWorkRegistry.instance.unregister(this);
     _modifiedCells.clear();
     _insertedRows.clear();
     _deletedRowIndices.clear();

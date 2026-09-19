@@ -66,7 +66,30 @@ class UpdateVersion implements Comparable<UpdateVersion> {
     if (!isPreRelease && !other.isPreRelease) return 0;
     if (!isPreRelease && other.isPreRelease) return 1;
     if (isPreRelease && !other.isPreRelease) return -1;
-    return preRelease!.compareTo(other.preRelease!);
+    return _comparePreRelease(preRelease!, other.preRelease!);
+  }
+
+  /// SemVer 2.0.0 pre-release identifiers (numeric vs alphanumeric).
+  static int _comparePreRelease(String left, String right) {
+    final a = left.split('.');
+    final b = right.split('.');
+    final n = a.length < b.length ? a.length : b.length;
+    for (var i = 0; i < n; i++) {
+      final cmp = _comparePreIdentifier(a[i], b[i]);
+      if (cmp != 0) return cmp;
+    }
+    return a.length.compareTo(b.length);
+  }
+
+  static int _comparePreIdentifier(String left, String right) {
+    final leftNum = int.tryParse(left);
+    final rightNum = int.tryParse(right);
+    if (leftNum != null && rightNum != null) {
+      return leftNum.compareTo(rightNum);
+    }
+    if (leftNum != null) return -1;
+    if (rightNum != null) return 1;
+    return left.compareTo(right);
   }
 
   int _compareCore(UpdateVersion other) {

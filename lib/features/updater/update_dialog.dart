@@ -2,8 +2,11 @@ import 'dart:async' show unawaited;
 import 'dart:io';
 
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
+import 'package:querya_desktop/core/unsaved_work_registry.dart';
 import 'package:querya_desktop/core/updater/app_updater_service.dart';
+import 'package:querya_desktop/core/updater/sha256_checksums.dart';
 import 'package:querya_desktop/core/updater/update_manifest.dart';
 import 'package:querya_desktop/features/updater/update_changelog_view.dart';
 import 'package:querya_desktop/features/updater/update_controller.dart';
@@ -29,24 +32,97 @@ Future<void> showUpdateDialog(
     builder: (ctx) => material.Dialog(
       backgroundColor: material.Colors.transparent,
       insetPadding: WindowLayout.dialogSymmetricInsets(ctx),
-      child: _UpdateDialogContent(initialManifest: initialManifest),
+      child: UpdateDialogContent(initialManifest: initialManifest),
     ),
   );
 }
 
-class _UpdateDialogContent extends material.StatefulWidget {
-  const _UpdateDialogContent({this.initialManifest});
-
-  final UpdateManifest? initialManifest;
-
-  @override
-  material.State<_UpdateDialogContent> createState() =>
-      _UpdateDialogContentState();
+/// Warns before `exit(0)` when SQL tabs or staged grid edits are dirty.
+Future<bool?> showUnsavedUpdateRestartDialog(material.BuildContext context) {
+  return showAppDialog<bool>(
+    context: context,
+    builder: (ctx) {
+      return QueryaDialogCard(
+        constraints: const material.BoxConstraints(maxWidth: 420),
+        child: material.Padding(
+          padding: const material.EdgeInsets.all(20),
+          child: material.Column(
+            mainAxisSize: material.MainAxisSize.min,
+            crossAxisAlignment: material.CrossAxisAlignment.start,
+            children: [
+              const Text('Unsaved changes').semiBold().large(),
+              const Gap(8),
+              const Text(
+                'You have unsaved SQL or staged table changes. '
+                'Restarting to install the update will discard them.',
+              ).muted().small(),
+              const Gap(20),
+              material.Align(
+                alignment: material.Alignment.centerRight,
+                child: material.Wrap(
+                  alignment: material.WrapAlignment.end,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlineButton(
+                      onPressed: () => material.Navigator.of(ctx).pop(false),
+                      child: const Text('Cancel'),
+                    ),
+                    DestructiveButton(
+                      onPressed: () => material.Navigator.of(ctx).pop(true),
+                      child: const Text('Restart anyway'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }
 
-class _UpdateDialogContentState extends material.State<_UpdateDialogContent> {
-  final _updater = AppUpdaterService.instance;
-  final _controller = UpdateController.instance;
+/// Update check / download / install pane. Test hooks are optional overrides.
+class UpdateDialogContent extends material.StatefulWidget {
+  const UpdateDialogContent({
+    super.key,
+    this.initialManifest,
+    this.updater,
+    this.controller,
+    this.hasUnsavedWork,
+    this.isInstallBlocked,
+    this.packageUpdateCommand,
+    this.selectAsset,
+    this.download,
+    this.install,
+    this.confirmRestartIfUnsaved,
+    this.showCopyToast = true,
+  });
+
+  final UpdateManifest? initialManifest;
+  final AppUpdaterService? updater;
+  final UpdateController? controller;
+  final bool Function()? hasUnsavedWork;
+  final bool? isInstallBlocked;
+  final String? packageUpdateCommand;
+  final UpdateAsset? Function(UpdateManifest manifest)? selectAsset;
+  final Future<File> Function(UpdateAsset asset, UpdateManifest manifest)?
+      download;
+  final Future<void> Function(File file)? install;
+  final Future<bool?> Function(material.BuildContext context)?
+      confirmRestartIfUnsaved;
+  final bool showCopyToast;
+
+  @override
+  material.State<UpdateDialogContent> createState() =>
+      UpdateDialogContentState();
+}
+
+@visibleForTesting
+class UpdateDialogContentState extends material.State<UpdateDialogContent> {
+  late final AppUpdaterService _updater;
+  late final UpdateController _controller;
 
   UpdateDialogPhase _phase = UpdateDialogPhase.checking;
   String _currentVersion = '';
@@ -62,9 +138,23 @@ class _UpdateDialogContentState extends material.State<_UpdateDialogContent> {
   DateTime? _lastProgressAt;
   int _lastProgressBytes = 0;
 
+  bool get _installBlocked =>
+      widget.isInstallBlocked ?? _updater.isInstallBlockedByPackageManager;
+
+  String? get _packageCommand =>
+      widget.packageUpdateCommand ?? _updater.packageManagerUpdateCommand;
+
+  @visibleForTesting
+  UpdateDialogPhase get phase => _phase;
+
+  @visibleForTesting
+  String? get errorMessage => _errorMessage;
+
   @override
   void initState() {
     super.initState();
+    _updater = widget.updater ?? AppUpdaterService.instance;
+    _controller = widget.controller ?? UpdateController.instance;
     if (widget.initialManifest != null) {
       _manifest = widget.initialManifest;
       _phase = UpdateDialogPhase.available;
@@ -90,32 +180,20 @@ class _UpdateDialogContentState extends material.State<_UpdateDialogContent> {
       } else {
         setState(() => _phase = UpdateDialogPhase.upToDate);
       }
-    } on AppUpdaterException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _phase = UpdateDialogPhase.error;
-        _errorMessage = e.message;
-      });
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _phase = UpdateDialogPhase.error;
-        _errorMessage = e.toString();
-      });
+      _setError(_messageFor(e));
     }
   }
 
   Future<void> _startDownload() async {
     final manifest = _manifest;
     if (manifest == null) return;
+    if (_installBlocked) return;
 
-    final asset = _updater.platformAssetFor(manifest);
+    final asset = widget.selectAsset?.call(manifest) ??
+        _updater.platformAssetFor(manifest);
     if (asset == null) {
-      setState(() {
-        _phase = UpdateDialogPhase.error;
-        _errorMessage =
-            'No update package found for ${Platform.operatingSystem}.';
-      });
+      _setError('No update package found for ${Platform.operatingSystem}.');
       return;
     }
 
@@ -132,27 +210,29 @@ class _UpdateDialogContentState extends material.State<_UpdateDialogContent> {
     });
 
     try {
-      final file = await _updater.downloadAsset(
-        asset,
-        manifest: manifest,
-        shouldCancel: () => _downloadCancelled,
-        onProgress: (received, total) {
-          if (!mounted) return;
-          final now = DateTime.now();
-          final elapsedMs =
-              now.difference(_lastProgressAt ?? now).inMilliseconds;
-          if (elapsedMs >= 250) {
-            final deltaBytes = received - _lastProgressBytes;
-            _bytesPerSecond = deltaBytes / (elapsedMs / 1000);
-            _lastProgressAt = now;
-            _lastProgressBytes = received;
-          }
-          setState(() {
-            _receivedBytes = received;
-            if (total > 0) _totalBytes = total;
-          });
-        },
-      );
+      final file = widget.download != null
+          ? await widget.download!(asset, manifest)
+          : await _updater.downloadAsset(
+              asset,
+              manifest: manifest,
+              shouldCancel: () => _downloadCancelled,
+              onProgress: (received, total) {
+                if (!mounted) return;
+                final now = DateTime.now();
+                final elapsedMs =
+                    now.difference(_lastProgressAt ?? now).inMilliseconds;
+                if (elapsedMs >= 250) {
+                  final deltaBytes = received - _lastProgressBytes;
+                  _bytesPerSecond = deltaBytes / (elapsedMs / 1000);
+                  _lastProgressAt = now;
+                  _lastProgressBytes = received;
+                }
+                setState(() {
+                  _receivedBytes = received;
+                  if (total > 0) _totalBytes = total;
+                });
+              },
+            );
       if (!mounted) return;
       setState(() {
         _downloadedFile = file;
@@ -164,30 +244,70 @@ class _UpdateDialogContentState extends material.State<_UpdateDialogContent> {
         setState(() => _phase = UpdateDialogPhase.available);
         return;
       }
-      setState(() {
-        _phase = UpdateDialogPhase.error;
-        _errorMessage = e.message;
-      });
+      _setError(e.message);
+    } catch (e) {
+      _setError(_messageFor(e));
     }
   }
 
   Future<void> _install() async {
     final file = _downloadedFile;
     if (file == null) return;
-    try {
-      await _updater.installDownloadedUpdate(file);
-    } on AppUpdaterException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _phase = UpdateDialogPhase.error;
-        _errorMessage = e.message;
-      });
+
+    final dirty = widget.hasUnsavedWork?.call() ??
+        UnsavedWorkRegistry.instance.hasUnsaved;
+    if (dirty) {
+      final confirmed = widget.confirmRestartIfUnsaved != null
+          ? await widget.confirmRestartIfUnsaved!(context)
+          : await showUnsavedUpdateRestartDialog(context);
+      if (confirmed != true) return;
     }
+
+    try {
+      if (widget.install != null) {
+        await widget.install!(file);
+      } else {
+        await _updater.installDownloadedUpdate(file);
+      }
+    } on AppUpdaterException catch (e) {
+      _setError(e.message);
+    } catch (e) {
+      _setError(_messageFor(e));
+    }
+  }
+
+  Future<void> _copyPackageCommand() async {
+    final cmd = _packageCommand;
+    if (cmd == null || cmd.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: cmd));
+    if (!mounted || !widget.showCopyToast) return;
+    showAppToast(
+      context: context,
+      message: 'Copied: $cmd',
+      variant: AppToastVariant.success,
+    );
   }
 
   Future<void> _remindLater() async {
     await _controller.remindLater();
     if (mounted) material.Navigator.of(context).pop();
+  }
+
+  void _setError(String message) {
+    if (!mounted) return;
+    setState(() {
+      _phase = UpdateDialogPhase.error;
+      _errorMessage = message;
+    });
+  }
+
+  String _messageFor(Object error) {
+    if (error is AppUpdaterException) return error.message;
+    if (error is UpdateChecksumMismatchException) {
+      return 'The downloaded update failed integrity verification (SHA256 mismatch). '
+          'The file was discarded.';
+    }
+    return error.toString();
   }
 
   String _formatBytes(int bytes) {
@@ -309,11 +429,12 @@ class _UpdateDialogContentState extends material.State<_UpdateDialogContent> {
       UpdateDialogPhase.checking => 'Checking for updates…',
       UpdateDialogPhase.upToDate =>
         'You are running the latest version of Querya Desktop (v$_currentVersion).',
-      UpdateDialogPhase.available =>
-        'Querya Desktop v${_manifest?.version ?? ''} is available!',
+      UpdateDialogPhase.available => _installBlocked
+          ? 'This build is managed by ${_packageCommand ?? 'the package manager'}.'
+          : 'Querya Desktop v${_manifest?.version ?? ''} is available!',
       UpdateDialogPhase.downloading => 'Downloading update…',
       UpdateDialogPhase.readyToInstall => 'Update ready to install.',
-      UpdateDialogPhase.error => 'Update check failed.',
+      UpdateDialogPhase.error => 'Update failed.',
     };
   }
 
@@ -350,6 +471,13 @@ class _UpdateDialogContentState extends material.State<_UpdateDialogContent> {
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.start,
       children: [
+        if (_installBlocked && _phase == UpdateDialogPhase.available) ...[
+          Text(
+            'Install updates with ${_packageCommand ?? 'the system package manager'} '
+            'instead of downloading a GitHub package.',
+          ).muted().small(),
+          const material.SizedBox(height: 12),
+        ],
         if (dateLabel != null) ...[
           Text('Released $dateLabel').muted().xSmall(),
           const material.SizedBox(height: 12),
@@ -411,10 +539,16 @@ class _UpdateDialogContentState extends material.State<_UpdateDialogContent> {
                 child: const Text('Remind me later'),
               ),
               const material.SizedBox(width: 8),
-              PrimaryButton(
-                onPressed: () => unawaited(_startDownload()),
-                child: const Text('Download & Install'),
-              ),
+              if (_installBlocked)
+                PrimaryButton(
+                  onPressed: () => unawaited(_copyPackageCommand()),
+                  child: const Text('Copy update command'),
+                )
+              else
+                PrimaryButton(
+                  onPressed: () => unawaited(_startDownload()),
+                  child: const Text('Download'),
+                ),
             ],
           UpdateDialogPhase.downloading => [
               GhostButton(
