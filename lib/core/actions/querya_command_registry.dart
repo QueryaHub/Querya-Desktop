@@ -19,8 +19,28 @@ class QueryaCommandRegistry extends ChangeNotifier {
   }
 
   void register(QueryaCommand command) {
+    final existing = _commands[command.id];
+    if (existing != null &&
+        existing.sourceExtensionId == null &&
+        command.sourceExtensionId != null) {
+      return;
+    }
     _commands[command.id] = command;
     notifyListeners();
+  }
+
+  /// Re-installs any built-in ids that are missing or still owned by an extension.
+  void restoreMissingCoreCommands() {
+    var changed = false;
+    for (final command in queryaCoreCommands()) {
+      final existing = _commands[command.id];
+      if (existing == null || existing.sourceExtensionId != null) {
+        _commands[command.id] = command;
+        changed = true;
+      }
+    }
+    _coreInstalled = true;
+    if (changed) notifyListeners();
   }
 
   void registerAll(Iterable<QueryaCommand> commands) {

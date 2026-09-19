@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
+import 'package:querya_desktop/core/extensions/extension_command_target.dart';
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
 import 'package:querya_desktop/core/extensions/extension_support.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
@@ -34,13 +35,39 @@ class ExtensionDriverSession {
       _bridges[connectionId]?.isStarted == true;
 
   /// Live plugin process for [extensionId], if a connection already started it.
-  PluginRpcBridge? activeBridgeForExtension(String extensionId) {
-    for (final entry in _bridges.entries) {
-      if (_manifests[entry.key]?.id == extensionId && entry.value.isStarted) {
-        return entry.value;
-      }
-    }
-    return null;
+  PluginRpcBridge? activeBridgeForExtension(
+    String extensionId, {
+    int? preferredConnectionId,
+  }) {
+    final target = targetForExtension(
+      extensionId,
+      preferredConnectionId: preferredConnectionId,
+    );
+    final id = target.connectionId;
+    if (id == null) return null;
+    return _startedBridge(id);
+  }
+
+  /// Which live session should receive a palette command for [extensionId].
+  ExtensionCommandTarget targetForExtension(
+    String extensionId, {
+    int? preferredConnectionId,
+  }) {
+    return resolveExtensionCommandTarget(
+      extensionId: extensionId,
+      liveConnectionIds: [
+        for (final entry in _bridges.entries)
+          if (entry.value.isStarted) entry.key,
+      ],
+      extensionIdFor: (id) => _manifests[id]?.id,
+      preferredConnectionId: preferredConnectionId,
+    );
+  }
+
+  PluginRpcBridge? _startedBridge(int connectionId) {
+    final bridge = _bridges[connectionId];
+    if (bridge == null || !bridge.isStarted) return null;
+    return bridge;
   }
 
   /// Starts the plugin (if needed), injects credentials, and calls `db.connect`.

@@ -16,6 +16,7 @@ class QueryaCommandHost extends InheritedWidget {
     this.onReconnect,
     this.onToggleReadOnly,
     this.onOpenWelcomeTour,
+    this.selectedConnectionId,
     required super.child,
   });
 
@@ -36,6 +37,9 @@ class QueryaCommandHost extends InheritedWidget {
   final VoidCallback? onToggleReadOnly;
   final VoidCallback? onOpenWelcomeTour;
 
+  /// Workspace-selected connection, used to target extension commands (CP-05).
+  final int? selectedConnectionId;
+
   static QueryaCommandHost? maybeOf(BuildContext context) {
     return context.dependOnInheritedWidgetOfExactType<QueryaCommandHost>();
   }
@@ -52,6 +56,7 @@ class QueryaCommandHost extends InheritedWidget {
         onDisconnect != oldWidget.onDisconnect ||
         onReconnect != oldWidget.onReconnect ||
         onToggleReadOnly != oldWidget.onToggleReadOnly ||
-        onOpenWelcomeTour != oldWidget.onOpenWelcomeTour;
+        onOpenWelcomeTour != oldWidget.onOpenWelcomeTour ||
+        selectedConnectionId != oldWidget.selectedConnectionId;
   }
 }

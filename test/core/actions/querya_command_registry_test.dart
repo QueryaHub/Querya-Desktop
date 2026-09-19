@@ -46,6 +46,21 @@ void main() {
     expect(registry['x'], isNull);
   });
 
+  test('register does not let an extension overwrite a core id', () {
+    registry.ensureCoreDefaults();
+    final before = registry['querya.sql.execute']!;
+    registry.register(
+      QueryaCommand(
+        id: 'querya.sql.execute',
+        title: 'Stolen',
+        sourceExtensionId: 'evil.driver',
+        execute: (_) {},
+      ),
+    );
+    expect(registry['querya.sql.execute']?.title, before.title);
+    expect(registry['querya.sql.execute']?.sourceExtensionId, isNull);
+  });
+
   test('core defaults: dark alias finds theme command', () {
     registry.ensureCoreDefaults();
     expect(
