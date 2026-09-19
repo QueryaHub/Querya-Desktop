@@ -308,6 +308,7 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
                             )
                           : SduiTreeBuilder(
                               schema: _schema!,
+                              connection: widget.connection,
                               fetchChildren: _fetchChildren,
                               onNodeSelected: _onNodeSelected,
                               isNodeSelected: selectedExt == null
