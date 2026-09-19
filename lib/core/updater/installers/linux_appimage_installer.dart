@@ -57,13 +57,17 @@ class LinuxAppImageInstaller {
       }
 
       final executable = context.resolvedExecutable;
+      final sourceDir = resolveLinuxFlutterBundleRoot(
+        extractDir: extractDir,
+        executableName: p.basename(executable),
+      );
       final scriptFile = File(
         p.join(tempRoot.path, 'querya-linux-update-$pid.sh'),
       );
       await scriptFile.writeAsString(
         buildLinuxBundleReplaceScript(
           pid: pid,
-          sourceDir: extractDir.path,
+          sourceDir: sourceDir.path,
           targetDir: targetDir,
           executable: executable,
         ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/actions/sql_script_format.dart';
+import 'package:querya_desktop/core/unsaved_work_registry.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 
 /// A stateful query session inside an SQL workspace.
@@ -14,7 +15,12 @@ class SqlQueryTabSession {
     this.filePath,
     double initialFraction = 0.65,
   })  : controller = material.TextEditingController(text: initialSql ?? ''),
-        topFraction = material.ValueNotifier<double>(initialFraction);
+        topFraction = material.ValueNotifier<double>(initialFraction) {
+    UnsavedWorkRegistry.instance.register(
+      this,
+      () => isModified || (stagingBuffer?.isDirty ?? false),
+    );
+  }
 
   final String id;
   String title;
@@ -48,6 +54,7 @@ class SqlQueryTabSession {
   }
 
   void dispose() {
+    UnsavedWorkRegistry.instance.unregister(this);
     controller.dispose();
     topFraction.dispose();
     stagingBuffer?.dispose();

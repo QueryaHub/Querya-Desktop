@@ -96,6 +96,48 @@ Future<void> launchDetachedScript(String scriptPath, List<String> args) async {
   );
 }
 
+/// True when [dir] looks like a Flutter Linux desktop bundle for [executableName].
+bool looksLikeLinuxFlutterBundle(Directory dir, String executableName) {
+  final exe = File(p.join(dir.path, executableName));
+  if (!exe.existsSync()) return false;
+  final lib = Directory(p.join(dir.path, 'lib'));
+  final data = Directory(p.join(dir.path, 'data'));
+  return lib.existsSync() || data.existsSync();
+}
+
+/// Resolves the Flutter bundle root inside an extracted Linux zip.
+///
+/// GitHub zips often wrap the bundle in a single top-level folder. A mismatched
+/// layout is refused so the replace script never `rsync --delete`s into the
+/// running executable directory.
+Directory resolveLinuxFlutterBundleRoot({
+  required Directory extractDir,
+  required String executableName,
+}) {
+  if (looksLikeLinuxFlutterBundle(extractDir, executableName)) {
+    return extractDir;
+  }
+
+  final children = extractDir.existsSync()
+      ? extractDir
+          .listSync()
+          .whereType<Directory>()
+          .where((d) => !p.basename(d.path).startsWith('.'))
+          .toList()
+      : const <Directory>[];
+
+  for (final child in children) {
+    if (looksLikeLinuxFlutterBundle(child, executableName)) {
+      return child;
+    }
+  }
+
+  throw AppUpdaterException(
+    'Linux update zip is not a Flutter desktop bundle '
+    '(expected $executableName plus lib/ or data/). Refusing install.',
+  );
+}
+
 /// Shell script that waits for [pid], syncs [sourceDir] into [targetDir], then execs [executable].
 String buildLinuxBundleReplaceScript({
   required int pid,
@@ -110,7 +152,16 @@ PID="$pid"
 SRC='${_shellQuote(sourceDir)}'
 DST='${_shellQuote(targetDir)}'
 EXE='${_shellQuote(executable)}'
+EXE_NAME=\$(basename "\$EXE")
 while kill -0 "\$PID" 2>/dev/null; do sleep 0.2; done
+if [ ! -f "\$SRC/\$EXE_NAME" ]; then
+  echo "querya-update: refusing replace, \$SRC is not a Flutter bundle" >&2
+  exit 1
+fi
+if [ ! -d "\$SRC/lib" ] && [ ! -d "\$SRC/data" ]; then
+  echo "querya-update: refusing replace, missing lib/ or data/" >&2
+  exit 1
+fi
 if command -v rsync >/dev/null 2>&1; then
   rsync -a --delete "\$SRC"/ "\$DST"/
 else

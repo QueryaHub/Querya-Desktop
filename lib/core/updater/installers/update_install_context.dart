@@ -33,11 +33,16 @@ class UpdateInstallContext {
       Platform.isLinux && environment.containsKey('SNAP');
 
   bool get isFlatpak =>
-      Platform.isLinux &&
-      (environment.containsKey('FLATPAK_ID') ||
-          environment.containsKey('container'));
+      Platform.isLinux && environment.containsKey('FLATPAK_ID');
 
   bool get isManagedPackage => isSnap || isFlatpak;
+
+  /// Command the user should run when [isManagedPackage] is true.
+  String? get packageManagerUpdateCommand {
+    if (isSnap) return 'snap refresh';
+    if (isFlatpak) return 'flatpak update';
+    return null;
+  }
 
   String? get linuxBundleRoot {
     if (!Platform.isLinux) return null;

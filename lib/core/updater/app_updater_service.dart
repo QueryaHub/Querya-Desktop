@@ -131,41 +131,59 @@ class AppUpdaterService {
       await destination.delete();
     }
 
-    final request = http.Request('GET', Uri.parse(asset.downloadUrl));
-    final response = await _downloadClient.send(request);
-    if (response.statusCode != 200) {
-      throw AppUpdaterException(
-        'Download failed for ${asset.name} (HTTP ${response.statusCode})',
-      );
-    }
-
-    final total = response.contentLength ?? asset.sizeBytes ?? 0;
-    var received = 0;
-    final sink = destination.openWrite();
     try {
-      await for (final chunk in response.stream) {
-        if (shouldCancel?.call() == true) {
-          throw const AppUpdaterException('Download cancelled');
-        }
-        received += chunk.length;
-        sink.add(chunk);
-        if (onProgress != null) {
-          onProgress(received, total > 0 ? total : received);
-        }
+      final request = http.Request('GET', Uri.parse(asset.downloadUrl));
+      final response = await _downloadClient.send(request);
+      if (response.statusCode != 200) {
+        throw AppUpdaterException(
+          'Download failed for ${asset.name} (HTTP ${response.statusCode})',
+        );
       }
-    } finally {
-      await sink.close();
-    }
 
-    if (shouldCancel?.call() == true) {
-      if (await destination.exists()) {
-        await destination.delete();
+      final total = response.contentLength ?? asset.sizeBytes ?? 0;
+      var received = 0;
+      final sink = destination.openWrite();
+      try {
+        await for (final chunk in response.stream) {
+          if (shouldCancel?.call() == true) {
+            throw const AppUpdaterException('Download cancelled');
+          }
+          received += chunk.length;
+          sink.add(chunk);
+          if (onProgress != null) {
+            onProgress(received, total > 0 ? total : received);
+          }
+        }
+      } finally {
+        await sink.close();
       }
-      throw const AppUpdaterException('Download cancelled');
-    }
 
-    await verifyFileSha256(file: destination, expectedHex: expected);
-    return destination;
+      if (shouldCancel?.call() == true) {
+        throw const AppUpdaterException('Download cancelled');
+      }
+
+      try {
+        await verifyFileSha256(file: destination, expectedHex: expected);
+      } on UpdateChecksumMismatchException catch (e) {
+        throw AppUpdaterException(
+          'The downloaded update failed integrity verification (SHA256 mismatch). '
+          'The file was discarded.',
+          cause: e,
+        );
+      }
+      return destination;
+    } catch (e) {
+      await _deleteIfExists(destination);
+      rethrow;
+    }
+  }
+
+  static Future<void> _deleteIfExists(File file) async {
+    try {
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {}
   }
 
   /// Installs a verified update package using the platform-specific installer.
@@ -177,6 +195,11 @@ class AppUpdaterService {
   bool get isInstallBlockedByPackageManager {
     final context = UpdateInstallContext.current();
     return context.isManagedPackage;
+  }
+
+  /// `snap refresh` / `flatpak update`, or null when in-app install is allowed.
+  String? get packageManagerUpdateCommand {
+    return UpdateInstallContext.current().packageManagerUpdateCommand;
   }
 
   /// Picks the best Release asset for the current packaging context.
