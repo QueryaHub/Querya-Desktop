@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **MySQL SELECT cap (#808)** — SQL Workspace injects/clamps `LIMIT` like Postgres and drains leftover `rowsStream` rows instead of cancelling, so the session is ready for the next statement. Table Browser custom SQL gets the same LIMIT clamp so `execute` does not buffer an unbounded result.
 - **Postgres Save (#784)** — Table Browser and SQL-grid Save run `BEGIN`, each DML statement, and `COMMIT` as separate extended-protocol executes (Parse cannot contain multiple commands). Autocommit-off SQL starts a transaction with its own `BEGIN` instead of concatenating `BEGIN;` onto the user query.
 - **Mongo session auth (#780)** — After `scrubCredentials()`, find/update/list still authenticate from an in-memory session URI (getters stay null; nothing is written back). One `Db` is reused per database instead of open/close on every call.
 - **Table Browser INSERT (#792, #810)** — Skip `GENERATED ALWAYS` / identity-always / `AUTO_INCREMENT` columns and omit empty cells that have a server default, so new rows do not send `id` or `''`.

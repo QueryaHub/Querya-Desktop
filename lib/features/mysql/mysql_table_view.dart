@@ -6,6 +6,8 @@ import 'package:mysql_client/mysql_client.dart';
 import 'package:querya_desktop/core/database/mysql_connection.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
 import 'package:querya_desktop/core/database/result_row_string_convert.dart';
+import 'package:querya_desktop/core/database/sql_limit.dart';
+import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -318,7 +320,9 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       _error = null;
     });
     try {
-      final result = await conn.execute(sql);
+      final result = await conn.execute(
+        injectSqlLimit(sql, kDefaultSqlResultMaxRows),
+      );
       if (!mounted) return;
       final stringRows = await _resultRowsAsync(result);
       if (!mounted) return;
