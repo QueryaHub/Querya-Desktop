@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Table Browser INSERT (#792, #810)** — Skip `GENERATED ALWAYS` / identity-always / `AUTO_INCREMENT` columns and omit empty cells that have a server default, so new rows do not send `id` or `''`.
+- **SQLite WAL (#801)** — Open writable user databases with `PRAGMA journal_mode=WAL` (falls back if the FS cannot create the WAL file) and surface `SQLITE_BUSY` as a retryable error instead of a generic execute failure.
+
 ## [0.4.16] - 2026-09-20
 
 In-place editing in Table Browser (same DML staging as SQL Workspace), Command Palette and Quick Switcher, workspace chrome parity across drivers, connections-tree visual + FPS work, MongoDB per-field Save to DB, and a hardened in-app updater.

@@ -398,7 +398,8 @@ class PostgresConnection {
     }
     final colsRs = await _conn!.execute(
       Sql.named(
-        'SELECT column_name, data_type, is_nullable, column_default '
+        'SELECT column_name, data_type, is_nullable, column_default, '
+        'is_generated, is_identity, identity_generation '
         'FROM information_schema.columns '
         'WHERE table_schema = @schema AND table_name = @table '
         'ORDER BY ordinal_position',
@@ -431,6 +432,14 @@ class PostgresConnection {
       final isPk = primaryKeys.contains(name);
       final pkPos = isPk ? primaryKeys.indexOf(name) + 1 : null;
       final dflt = r[3]?.toString();
+      final isGenerated =
+          (r[4] as String? ?? 'NEVER').toUpperCase() == 'ALWAYS';
+      final isIdentity = (r[5] as String? ?? 'NO').toUpperCase() == 'YES';
+      final identityGeneration = (r[6] as String? ?? '').toUpperCase();
+      final omitOnInsert =
+          isGenerated || (isIdentity && identityGeneration == 'ALWAYS');
+      final hasServerDefault = (dflt != null && dflt.isNotEmpty) ||
+          (isIdentity && identityGeneration == 'BY DEFAULT');
 
       columns.add(
         TableColumnMeta(
@@ -440,6 +449,8 @@ class PostgresConnection {
           isPrimaryKey: isPk,
           primaryKeyPosition: pkPos,
           defaultValue: dflt,
+          omitOnInsert: omitOnInsert,
+          hasServerDefault: hasServerDefault,
         ),
       );
     }

@@ -40,6 +40,11 @@ Map<String, String> columnDataTypesFromSchema(TableSchemaMeta schema) {
   };
 }
 
+/// Column name → schema flags used by INSERT (generated / defaults).
+Map<String, TableColumnMeta> columnMetaFromSchema(TableSchemaMeta schema) {
+  return {for (final c in schema.columns) c.name: c};
+}
+
 /// Disposes [previous] and returns a new buffer when [enabled].
 DataGridStagingBuffer? replaceTableViewStagingBuffer({
   DataGridStagingBuffer? previous,
@@ -186,6 +191,7 @@ Future<TableViewApplyOutcome> applyTableViewStagedChanges({
   String? schema,
   required List<String> primaryKeys,
   Map<String, String>? columnDataTypes,
+  Map<String, TableColumnMeta>? columnMeta,
   required Future<void> Function(TableMutationPlan plan) execute,
 }) async {
   if (!buffer.isDirty) return const TableViewApplyOutcome.noop();
@@ -201,6 +207,7 @@ Future<TableViewApplyOutcome> applyTableViewStagedChanges({
     schema: schema,
     primaryKeys: primaryKeys,
     columnDataTypes: columnDataTypes,
+    columnMeta: columnMeta,
   );
   if (plan.isEmpty) return const TableViewApplyOutcome.noop();
 

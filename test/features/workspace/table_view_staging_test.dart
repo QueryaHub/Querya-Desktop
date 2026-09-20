@@ -132,6 +132,20 @@ void main() {
         {'id': 'integer', 'name': 'text'},
       );
     });
+
+    test('columnMetaFromSchema indexes columns by name', () {
+      const schema = TableSchemaMeta(
+        tableName: 'users',
+        columns: [
+          TableColumnMeta(
+            name: 'id',
+            dataType: 'integer',
+            omitOnInsert: true,
+          ),
+        ],
+      );
+      expect(columnMetaFromSchema(schema)['id']?.omitOnInsert, isTrue);
+    });
   });
 
   group('replaceTableViewStagingBuffer', () {

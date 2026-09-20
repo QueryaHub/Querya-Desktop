@@ -7,6 +7,8 @@ class TableColumnMeta {
     this.isPrimaryKey = false,
     this.primaryKeyPosition,
     this.defaultValue,
+    this.omitOnInsert = false,
+    this.hasServerDefault = false,
   });
 
   final String name;
@@ -16,6 +18,12 @@ class TableColumnMeta {
   final int? primaryKeyPosition;
   final String? defaultValue;
 
+  /// Never send on INSERT (GENERATED ALWAYS, identity always, AUTO_INCREMENT).
+  final bool omitOnInsert;
+
+  /// Empty INSERT cells should omit the column so DEFAULT / serial applies.
+  final bool hasServerDefault;
+
   Map<String, Object?> toJson() => {
         'name': name,
         'dataType': dataType,
@@ -23,6 +31,8 @@ class TableColumnMeta {
         'isPrimaryKey': isPrimaryKey,
         'primaryKeyPosition': primaryKeyPosition,
         'defaultValue': defaultValue,
+        'omitOnInsert': omitOnInsert,
+        'hasServerDefault': hasServerDefault,
       };
 
   factory TableColumnMeta.fromJson(Map<String, Object?> json) =>
@@ -33,6 +43,8 @@ class TableColumnMeta {
         isPrimaryKey: json['isPrimaryKey'] as bool? ?? false,
         primaryKeyPosition: json['primaryKeyPosition'] as int?,
         defaultValue: json['defaultValue'] as String?,
+        omitOnInsert: json['omitOnInsert'] as bool? ?? false,
+        hasServerDefault: json['hasServerDefault'] as bool? ?? false,
       );
 }
 

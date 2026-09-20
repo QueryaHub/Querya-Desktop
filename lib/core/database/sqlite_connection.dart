@@ -48,6 +48,11 @@ class SqliteConnection {
             await db.execute('PRAGMA busy_timeout = 5000');
             if (!readOnly) {
               await db.execute('PRAGMA foreign_keys = ON');
+              try {
+                await db.execute('PRAGMA journal_mode = WAL');
+              } catch (e) {
+                debugPrint('SqliteConnection WAL not available: $e');
+              }
             }
           },
         ),
@@ -125,6 +130,13 @@ class SqliteConnection {
       }
     } on TimeoutException {
       unawaited(forceClose());
+      rethrow;
+    } on DatabaseException catch (e) {
+      if (_isSqliteBusy(e)) {
+        throw StateError(
+          'SQLite is busy (another connection is writing). Retry in a moment.',
+        );
+      }
       rethrow;
     }
   }
@@ -258,6 +270,15 @@ class SqliteConnection {
       'journal_mode': jm,
       'table_count': tblCount,
     };
+  }
+
+  static bool _isSqliteBusy(DatabaseException e) {
+    final code = e.getResultCode();
+    if (code == 5 || code == 6) return true;
+    final msg = e.toString().toLowerCase();
+    return msg.contains('database is locked') ||
+        msg.contains('database busy') ||
+        msg.contains('sqlite_busy');
   }
 
   /// Helper to quote SQLite identifiers safely.

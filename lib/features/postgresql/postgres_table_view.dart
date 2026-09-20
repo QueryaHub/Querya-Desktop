@@ -6,6 +6,7 @@ import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/result_row_string_convert.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
+import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/postgresql/postgres_sql_editor_dialog.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_privileges_dialog.dart';
@@ -68,6 +69,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
   DataGridStagingBuffer? _stagingBuffer;
   List<String> _primaryKeys = [];
   Map<String, String> _columnDataTypes = {};
+  Map<String, TableColumnMeta> _columnMeta = {};
   bool _schemaLoaded = false;
   bool _isSaving = false;
 
@@ -116,6 +118,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     _stagingBuffer = null;
     _primaryKeys = [];
     _columnDataTypes = {};
+    _columnMeta = {};
     _schemaLoaded = false;
     _isSaving = false;
   }
@@ -198,6 +201,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       _schemaLoaded = true;
       _primaryKeys = [];
       _columnDataTypes = {};
+      _columnMeta = {};
       return;
     }
     try {
@@ -207,9 +211,11 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       );
       _primaryKeys = List<String>.from(schema.primaryKeys);
       _columnDataTypes = columnDataTypesFromSchema(schema);
+      _columnMeta = columnMetaFromSchema(schema);
     } catch (_) {
       _primaryKeys = [];
       _columnDataTypes = {};
+      _columnMeta = {};
     }
     _schemaLoaded = true;
   }
@@ -519,6 +525,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       schema: widget.schema,
       primaryKeys: _primaryKeys,
       columnDataTypes: _columnDataTypes.isEmpty ? null : _columnDataTypes,
+      columnMeta: _columnMeta.isEmpty ? null : _columnMeta,
       execute: (plan) async {
         final conn = _connection;
         if (conn == null || !conn.isConnected) {

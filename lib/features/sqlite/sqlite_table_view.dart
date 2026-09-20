@@ -5,6 +5,7 @@ import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
 import 'package:querya_desktop/core/database/sqlite_service.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
+import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/editor/querya_code_editor.dart';
 import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -49,6 +50,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
   DataGridStagingBuffer? _stagingBuffer;
   List<String> _primaryKeys = [];
   Map<String, String> _columnDataTypes = {};
+  Map<String, TableColumnMeta> _columnMeta = {};
   bool _schemaLoaded = false;
   bool _isSaving = false;
 
@@ -98,6 +100,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     _stagingBuffer = null;
     _primaryKeys = [];
     _columnDataTypes = {};
+    _columnMeta = {};
     _schemaLoaded = false;
     _isSaving = false;
   }
@@ -154,15 +157,18 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
       _schemaLoaded = true;
       _primaryKeys = [];
       _columnDataTypes = {};
+      _columnMeta = {};
       return;
     }
     try {
       final schema = await conn.getTableSchema(table: widget.tableName);
       _primaryKeys = List<String>.from(schema.primaryKeys);
       _columnDataTypes = columnDataTypesFromSchema(schema);
+      _columnMeta = columnMetaFromSchema(schema);
     } catch (_) {
       _primaryKeys = [];
       _columnDataTypes = {};
+      _columnMeta = {};
     }
     _schemaLoaded = true;
   }
@@ -296,6 +302,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
       tableName: widget.tableName,
       primaryKeys: _primaryKeys,
       columnDataTypes: _columnDataTypes.isEmpty ? null : _columnDataTypes,
+      columnMeta: _columnMeta.isEmpty ? null : _columnMeta,
       execute: (plan) async {
         final conn = _connection;
         if (conn == null || !conn.isConnected) {

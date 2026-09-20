@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -74,6 +76,26 @@ void main() {
       final res = await conn.execute('PRAGMA busy_timeout');
       expect(res, isNotEmpty);
       expect(res.first['timeout'], 5000);
+    });
+
+    test('enables WAL on a file database', () async {
+      final dir = await Directory.systemTemp.createTemp('querya_sqlite_wal_');
+      final path = '${dir.path}/t.db';
+      final fileConn = SqliteConnection(
+        id: 9,
+        name: 'wal_file',
+        path: path,
+      );
+      addTearDown(() async {
+        await fileConn.disconnect();
+        await dir.delete(recursive: true);
+      });
+      await fileConn.connect();
+      final res = await fileConn.execute('PRAGMA journal_mode');
+      expect(
+        res.first['journal_mode']?.toString().toLowerCase(),
+        'wal',
+      );
     });
 
     test('testConnection connects, queries and cleans up', () async {
