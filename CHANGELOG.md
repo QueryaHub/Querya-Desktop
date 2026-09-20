@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Postgres Table Browser session (#785)** — Browse uses a read-only pool slot; Save and `REFRESH MATERIALIZED VIEW` use a dedicated `tableWrite` socket so they do not share the SQL editor’s TCP session. Statement-timeout `forceClose` on SQL no longer kills the grid. Opening a table while SQL has an open transaction on the same database warns, matching Overview↔SQL.
 - **Mongo inspector Apply (#775)** — With **Save to DB** wired, **Apply** and **Ctrl/Cmd+Enter** persist through the same `$set` callback instead of only closing the dialog. SQL-grid Apply (no callback) still stages locally.
 - **Mongo field codec (#777)** — Inspector Save keeps BSON type: strings that look like numbers stay strings; ObjectId, DateTime, Int64, and Decimal128 round-trip. `$set` of `_id` stays blocked.
 - **Mongo document editor (#779)** — Documents encode as relaxed Extended JSON (`$oid`, `$date`, …) instead of `JsonEncoder` / `toString()`. Save decodes EJSON so the `_id` filter stays an `ObjectId`, not a string.

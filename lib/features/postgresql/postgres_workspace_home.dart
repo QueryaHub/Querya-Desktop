@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/motion/querya_cross_fade_stack.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
+import 'package:querya_desktop/features/postgresql/postgres_sql_tx_guard.dart';
 import 'package:querya_desktop/features/postgresql/postgres_sql_workspace.dart';
 import 'package:querya_desktop/features/postgresql/postgres_stats_view.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -91,27 +92,8 @@ class _PostgresWorkspaceHomeState
   Future<void> _selectTab(int i) async {
     if (i == _tab) return;
     if (_tab == 1 && i == 0 && _sqlTxNotifier.value == true) {
-      final ok = await showAppDialog<bool>(
-        context: context,
-        builder: (ctx) => material.AlertDialog(
-          title: const material.Text('Open transaction'),
-          content: const material.Text(
-            'The SQL tab has an open transaction. Leave anyway? '
-            'Uncommitted work may be lost if the session ends.',
-          ),
-          actions: [
-            material.TextButton(
-              onPressed: () => material.Navigator.of(ctx).pop(false),
-              child: const material.Text('Stay'),
-            ),
-            material.TextButton(
-              onPressed: () => material.Navigator.of(ctx).pop(true),
-              child: const material.Text('Leave'),
-            ),
-          ],
-        ),
-      );
-      if (ok != true) return;
+      final ok = await confirmLeaveOpenPostgresTransaction(context);
+      if (!ok) return;
     }
     setState(() => _tab = i);
   }

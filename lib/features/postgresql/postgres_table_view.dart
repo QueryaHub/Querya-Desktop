@@ -129,7 +129,14 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       PostgresService.instance.interrupt(
         widget.connectionRow,
         database: widget.database,
-        mode: PgSessionMode.readWrite,
+        mode: PgSessionMode.readOnly,
+      );
+    }
+    if (interruptIfBusy && _isSaving) {
+      PostgresService.instance.interrupt(
+        widget.connectionRow,
+        database: widget.database,
+        mode: PgSessionMode.tableWrite,
       );
     }
     _lease?.release();
@@ -155,8 +162,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       final lease = await PostgresService.instance.acquire(
         widget.connectionRow,
         database: widget.database,
-        // Custom SQL + REFRESH MATERIALIZED VIEW need a read-write session.
-        mode: PgSessionMode.readWrite,
+        mode: PgSessionMode.readOnly,
       );
       if (!mounted) {
         lease.release();
@@ -186,6 +192,21 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     final schemaQ = quotePostgresIdentifier(widget.schema);
     final tableQ = quotePostgresIdentifier(widget.tableName);
     return 'SELECT * FROM $schemaQ.$tableQ LIMIT ${widget.limit} OFFSET $_offset';
+  }
+
+  Future<T> _withTableWrite<T>(
+    Future<T> Function(PostgresConnection conn) fn,
+  ) async {
+    final lease = await PostgresService.instance.acquire(
+      widget.connectionRow,
+      database: widget.database,
+      mode: PgSessionMode.tableWrite,
+    );
+    try {
+      return await fn(lease.connection);
+    } finally {
+      lease.release();
+    }
   }
 
   Future<bool> _confirmDiscardIfNeeded() {
@@ -378,12 +399,13 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
   }
 
   Future<void> _refreshMaterializedView() async {
-    final conn = _connection;
-    if (conn == null || !conn.isConnected || _loading) return;
+    if (_loading) return;
     if (!await _confirmDiscardIfNeeded()) return;
     if (!mounted) return;
     try {
-      await conn.refreshMaterializedView(widget.schema, widget.tableName);
+      await _withTableWrite((conn) {
+        return conn.refreshMaterializedView(widget.schema, widget.tableName);
+      });
       if (!mounted) return;
       await _fetch(refreshCount: true);
     } catch (e) {
@@ -528,19 +550,20 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       columnDataTypes: _columnDataTypes.isEmpty ? null : _columnDataTypes,
       columnMeta: _columnMeta.isEmpty ? null : _columnMeta,
       execute: (plan) async {
-        final conn = _connection;
-        if (conn == null || !conn.isConnected) {
-          throw StateError('Could not connect to PostgreSQL.');
-        }
-        await runPostgresStatementsInTransaction(
-          (sql) async {
-            final result = await conn.execute(sql);
-            if (sql != 'BEGIN' && sql != 'COMMIT' && sql != 'ROLLBACK') {
-              expectDmlMatchedRows(result.affectedRows);
-            }
-          },
-          plan.statements.map((s) => s.sql),
-        );
+        await _withTableWrite((conn) async {
+          if (!conn.isConnected) {
+            throw StateError('Could not connect to PostgreSQL.');
+          }
+          await runPostgresStatementsInTransaction(
+            (sql) async {
+              final result = await conn.execute(sql);
+              if (sql != 'BEGIN' && sql != 'COMMIT' && sql != 'ROLLBACK') {
+                expectDmlMatchedRows(result.affectedRows);
+              }
+            },
+            plan.statements.map((s) => s.sql),
+          );
+        });
       },
     );
     if (!mounted) return;
