@@ -8,6 +8,12 @@ bool mysqlObjectOpensTableBrowser(MysqlObjectKind kind) {
   return kind == MysqlObjectKind.table || kind == MysqlObjectKind.view;
 }
 
+/// SQL-editor toolbar label for the current transaction state.
+String mysqlSqlToolbarTxLabel(bool? txOpen) {
+  if (txOpen == null) return 'Transaction: —';
+  return txOpen ? 'Transaction: open' : 'Transaction: none';
+}
+
 /// Confirms leaving the SQL tab (or opening a table) while a transaction is open.
 Future<bool> confirmLeaveOpenMysqlTransaction(
   material.BuildContext context,

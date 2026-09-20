@@ -13,6 +13,12 @@ void main() {
     expect(mysqlObjectOpensTableBrowser(MysqlObjectKind.function), isFalse);
   });
 
+  test('mysqlSqlToolbarTxLabel matches Postgres wording', () {
+    expect(mysqlSqlToolbarTxLabel(null), 'Transaction: —');
+    expect(mysqlSqlToolbarTxLabel(true), 'Transaction: open');
+    expect(mysqlSqlToolbarTxLabel(false), 'Transaction: none');
+  });
+
   testWidgets('Stay keeps the caller on the SQL session', (tester) async {
     var left = false;
     await tester.pumpWidget(

@@ -17,6 +17,7 @@ import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/ui/querya_shell_status.dart';
+import 'package:querya_desktop/features/mysql/mysql_sql_tx_guard.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
 import 'package:querya_desktop/features/workspace/workspace.dart';
@@ -630,12 +631,52 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
     }
   }
 
-  Future<void> _runTxCommand(String sql) async {
-    _activeSession.controller.value = material.TextEditingValue(
-      text: sql,
-      selection: material.TextSelection.collapsed(offset: sql.length),
-    );
-    await _execute(_activeSession);
+  Future<void> _runTxCommand(String cmd) async {
+    final session = _activeSession;
+    setState(() {
+      session.running = true;
+      session.error = null;
+    });
+    try {
+      await _ensureLease();
+      final conn = _lease?.connection;
+      if (conn == null || !conn.isConnected) {
+        if (mounted) {
+          setState(() {
+            session.error = 'Could not connect to MySQL.';
+            session.running = false;
+          });
+        }
+        return;
+      }
+      final to = _statementTimeout();
+      await conn.executeWithTimeout(cmd, timeout: to);
+      if (!mounted) return;
+      setState(() {
+        session.columns = [];
+        session.rows = [];
+        session.affectedRows = null;
+        session.statusLine = 'OK: $cmd';
+        session.running = false;
+      });
+    } on TimeoutException catch (e) {
+      unawaited(_lease?.connection.forceClose());
+      if (mounted) {
+        setState(() {
+          session.error = e.toString();
+          session.running = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          session.error = e.toString();
+          session.running = false;
+        });
+      }
+    } finally {
+      await _refreshTxStatus();
+    }
   }
 
   @override
@@ -797,12 +838,13 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
                     );
                   }
                 : null,
+            txOpen: _txOpen,
             onBegin: session.running
                 ? null
-                : () => _runTxCommand('START TRANSACTION;'),
-            onCommit: session.running ? null : () => _runTxCommand('COMMIT;'),
+                : () => _runTxCommand('START TRANSACTION'),
+            onCommit: session.running ? null : () => _runTxCommand('COMMIT'),
             onRollback:
-                session.running ? null : () => _runTxCommand('ROLLBACK;'),
+                session.running ? null : () => _runTxCommand('ROLLBACK'),
           ),
           const Divider(height: 1),
           Expanded(
@@ -863,6 +905,7 @@ class _MysqlSqlToolbar extends material.StatelessWidget {
     required this.onQueryTimeoutChanged,
     required this.onOpenPreferences,
     this.onOpenHistory,
+    required this.txOpen,
     required this.onBegin,
     required this.onCommit,
     required this.onRollback,
@@ -874,6 +917,7 @@ class _MysqlSqlToolbar extends material.StatelessWidget {
   final void Function(int?) onQueryTimeoutChanged;
   final VoidCallback onOpenPreferences;
   final VoidCallback? onOpenHistory;
+  final bool? txOpen;
   final VoidCallback? onBegin;
   final VoidCallback? onCommit;
   final VoidCallback? onRollback;
@@ -891,6 +935,8 @@ class _MysqlSqlToolbar extends material.StatelessWidget {
           material.Row(
             children: [
               const Text('Query').semiBold().small(),
+              const Gap(12),
+              Text(mysqlSqlToolbarTxLabel(txOpen)).muted().small(),
               const Spacer(),
               OutlineButton(
                 size: ButtonSize.small,
