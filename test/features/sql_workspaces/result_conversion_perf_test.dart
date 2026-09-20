@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/features/mysql/mysql_result_utils.dart';
 import 'package:querya_desktop/features/postgresql/postgres_result_utils.dart';
@@ -18,7 +20,9 @@ void main() {
       expect(out[1], ['2', 'world', 'abc', 'NULL', 'false']);
     });
 
-    test('convertPostgresResultRowsToStrings maps nulls and primitives correctly', () {
+    test(
+        'convertPostgresResultRowsToStrings maps nulls and primitives correctly',
+        () {
       final rawRows = [
         [100, null, 'pg_test'],
         [null, 999, 'foo'],
@@ -31,17 +35,24 @@ void main() {
       expect(out[1], ['NULL', '999', 'foo']);
     });
 
-    test('convertSqliteResultRowsToStrings maps nulls and primitives correctly', () {
+    test('convertSqliteResultRowsToStrings maps nulls, primitives, and blobs',
+        () {
       final rawRows = [
         ['sqlite', null, 42],
         [null, null, null],
+        [
+          Uint8List.fromList(const [0xff]),
+          'x',
+          1
+        ],
       ];
       final job = SqliteResultConvertJob(rowValues: rawRows);
       final out = convertSqliteResultRowsToStrings(job);
 
-      expect(out.length, 2);
+      expect(out.length, 3);
       expect(out[0], ['sqlite', 'NULL', '42']);
       expect(out[1], ['NULL', 'NULL', 'NULL']);
+      expect(out[2], ["X'ff'", 'x', '1']);
     });
 
     test('All convert jobs handle large batches efficiently', () {
