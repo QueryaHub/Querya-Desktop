@@ -6,8 +6,18 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 
 /// Session policy for pooled connections: browse vs SQL editor (writes).
 enum MysqlSessionMode {
+  /// Tree catalog, stats, and Table Browser SELECT/COUNT.
   readOnly,
+
+  /// SQL editor. Must not be shared with Table Browser.
   readWrite,
+
+  /// Table Browser Save (own TCP session so START TRANSACTION / SET / USE do not leak).
+  tableWrite,
+}
+
+extension MysqlSessionModeReadOnly on MysqlSessionMode {
+  bool get isReadOnlySession => this == MysqlSessionMode.readOnly;
 }
 
 typedef MysqlPoolConnectionFactory = Future<MysqlConnection> Function(
@@ -68,9 +78,7 @@ class MysqlConnectionPool {
       entry.refs++;
       if (!entry.connection.isConnected) {
         await entry.connection.connect();
-        await entry.connection.setSessionReadOnly(
-          mode == MysqlSessionMode.readOnly,
-        );
+        await entry.connection.setSessionReadOnly(mode.isReadOnlySession);
       }
       return MysqlLease._(this, k, entry.connection);
     }
@@ -105,9 +113,7 @@ class MysqlConnectionPool {
     entry.refs++;
     if (!entry.connection.isConnected) {
       await entry.connection.connect();
-      await entry.connection.setSessionReadOnly(
-        mode == MysqlSessionMode.readOnly,
-      );
+      await entry.connection.setSessionReadOnly(mode.isReadOnlySession);
     }
     return MysqlLease._(this, k, entry.connection);
   }
@@ -154,6 +160,26 @@ class MysqlConnectionPool {
   }) {
     final k = keyFor(row.id, database, mode);
     _removeEntryClosing(k);
+  }
+
+  /// Force-closes every session mode for this connection+database.
+  void interruptAllModes(
+    ConnectionRow row, {
+    required String database,
+  }) {
+    for (final mode in MysqlSessionMode.values) {
+      interrupt(row, database: database, mode: mode);
+    }
+  }
+
+  /// Whether the SQL-editor slot currently has an open transaction.
+  Future<bool> hasOpenSqlTransaction(
+    ConnectionRow row, {
+    required String database,
+  }) async {
+    final entry = _pool[keyFor(row.id, database, MysqlSessionMode.readWrite)];
+    if (entry == null || !entry.connection.isConnected) return false;
+    return await entry.connection.inOpenTransaction() ?? false;
   }
 
   Future<void> disconnectAll() async {

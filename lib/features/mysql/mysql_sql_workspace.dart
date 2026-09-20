@@ -27,11 +27,15 @@ class MysqlSqlWorkspace extends material.StatefulWidget {
   const MysqlSqlWorkspace({
     super.key,
     required this.connectionRow,
+    this.transactionOpenNotifier,
     this.isReadOnly = false,
   });
 
   final ConnectionRow connectionRow;
   final bool isReadOnly;
+
+  /// Updated when transaction state changes (for tab-switch warnings).
+  final material.ValueNotifier<bool?>? transactionOpenNotifier;
 
   @override
   material.State<MysqlSqlWorkspace> createState() => _MysqlSqlWorkspaceState();
@@ -45,6 +49,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
   SqlQueryTabSession get _activeSession => _sessions[_activeSessionIndex];
 
   MysqlLease? _lease;
+  bool? _txOpen;
 
   int? _queryTimeoutSeconds;
 
@@ -203,13 +208,31 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
     final lease = await MysqlService.instance.acquire(
       widget.connectionRow,
       database: _poolDatabaseKey(),
-      mode: widget.isReadOnly ? MysqlSessionMode.readOnly : MysqlSessionMode.readWrite,
+      mode: widget.isReadOnly
+          ? MysqlSessionMode.readOnly
+          : MysqlSessionMode.readWrite,
     );
     if (!mounted) {
       lease.release();
       return;
     }
     _lease = lease;
+  }
+
+  void _notifyTransactionOpen() {
+    widget.transactionOpenNotifier?.value = _txOpen;
+  }
+
+  Future<void> _refreshTxStatus() async {
+    final conn = _lease?.connection;
+    if (conn == null || !conn.isConnected) {
+      if (mounted) setState(() => _txOpen = null);
+      _notifyTransactionOpen();
+      return;
+    }
+    final v = await conn.inOpenTransaction();
+    if (mounted) setState(() => _txOpen = v);
+    _notifyTransactionOpen();
   }
 
   Duration? _statementTimeout() => _queryTimeoutSeconds == null
@@ -227,7 +250,9 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       MysqlService.instance.interrupt(
         widget.connectionRow,
         database: _poolDatabaseKey(),
-        mode: widget.isReadOnly ? MysqlSessionMode.readOnly : MysqlSessionMode.readWrite,
+        mode: widget.isReadOnly
+            ? MysqlSessionMode.readOnly
+            : MysqlSessionMode.readWrite,
       );
     }
     _lease?.release();
@@ -384,6 +409,8 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
         });
         QueryaShellStatus.instance.endBusy();
       }
+    } finally {
+      await _refreshTxStatus();
     }
   }
 
@@ -427,19 +454,13 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
         throw StateError('Could not connect to MySQL.');
       }
 
-      await conn.execute('START TRANSACTION');
-      try {
+      await conn.runInTransaction(() async {
         for (final stmt in plan.statements) {
           final rs = await conn.execute(stmt.sql);
           expectDmlMatchedRows(rs.affectedRows.toInt());
         }
-        await conn.execute('COMMIT');
-      } catch (e) {
-        try {
-          await conn.execute('ROLLBACK');
-        } catch (_) {}
-        rethrow;
-      }
+      });
+      await _refreshTxStatus();
 
       if (!mounted) return;
       final newRows = session.stagingBuffer!.effectiveRows;
@@ -623,16 +644,22 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       },
       child: material.CallbackShortcuts(
         bindings: {
-          const material.SingleActivator(LogicalKeyboardKey.keyT, control: true): _addNewTab,
-          const material.SingleActivator(LogicalKeyboardKey.keyT, meta: true): _addNewTab,
-          const material.SingleActivator(LogicalKeyboardKey.keyW, control: true): () {
+          const material.SingleActivator(LogicalKeyboardKey.keyT,
+              control: true): _addNewTab,
+          const material.SingleActivator(LogicalKeyboardKey.keyT, meta: true):
+              _addNewTab,
+          const material.SingleActivator(LogicalKeyboardKey.keyW,
+              control: true): () {
             if (_sessions.length > 1) unawaited(_closeTab(_activeSessionIndex));
           },
-          const material.SingleActivator(LogicalKeyboardKey.keyW, meta: true): () {
+          const material.SingleActivator(LogicalKeyboardKey.keyW, meta: true):
+              () {
             if (_sessions.length > 1) unawaited(_closeTab(_activeSessionIndex));
           },
-          const material.SingleActivator(LogicalKeyboardKey.tab, control: true): _nextTab,
-          const material.SingleActivator(LogicalKeyboardKey.tab, control: true, shift: true): _prevTab,
+          const material.SingleActivator(LogicalKeyboardKey.tab, control: true):
+              _nextTab,
+          const material.SingleActivator(LogicalKeyboardKey.tab,
+              control: true, shift: true): _prevTab,
           const material.SingleActivator(LogicalKeyboardKey.f5): () {
             if (!_activeSession.running) unawaited(_execute(_activeSession));
           },
@@ -681,7 +708,8 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
               SqlQueryTabBar(
                 sessions: _sessions,
                 selectedIndex: _activeSessionIndex,
-                onSelect: (index) => setState(() => _activeSessionIndex = index),
+                onSelect: (index) =>
+                    setState(() => _activeSessionIndex = index),
                 onAdd: _addNewTab,
                 onClose: _sessions.length > 1
                     ? (index) => unawaited(_closeTab(index))
@@ -730,9 +758,12 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
                     );
                   }
                 : null,
-            onBegin: session.running ? null : () => _runTxCommand('START TRANSACTION;'),
+            onBegin: session.running
+                ? null
+                : () => _runTxCommand('START TRANSACTION;'),
             onCommit: session.running ? null : () => _runTxCommand('COMMIT;'),
-            onRollback: session.running ? null : () => _runTxCommand('ROLLBACK;'),
+            onRollback:
+                session.running ? null : () => _runTxCommand('ROLLBACK;'),
           ),
           const Divider(height: 1),
           Expanded(

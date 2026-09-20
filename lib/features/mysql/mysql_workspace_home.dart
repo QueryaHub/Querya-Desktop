@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/motion/querya_cross_fade_stack.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
+import 'package:querya_desktop/features/mysql/mysql_sql_tx_guard.dart';
 import 'package:querya_desktop/features/mysql/mysql_sql_workspace.dart';
 import 'package:querya_desktop/features/mysql/mysql_stats_view.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -40,11 +41,13 @@ class MysqlWorkspaceHome extends material.StatefulWidget {
 
 class _MysqlWorkspaceHomeState extends material.State<MysqlWorkspaceHome> {
   int _tab = 0;
+  late final material.ValueNotifier<bool?> _sqlTxNotifier;
   int _lastAppliedSqlTabToken = 0;
 
   @override
   void initState() {
     super.initState();
+    _sqlTxNotifier = material.ValueNotifier<bool?>(null);
     _lastAppliedSqlTabToken = widget.sqlTabRequestToken;
   }
 
@@ -65,8 +68,18 @@ class _MysqlWorkspaceHomeState extends material.State<MysqlWorkspaceHome> {
     }
   }
 
+  @override
+  void dispose() {
+    _sqlTxNotifier.dispose();
+    super.dispose();
+  }
+
   Future<void> _selectTab(int i) async {
     if (i == _tab) return;
+    if (_tab == 1 && i == 0 && _sqlTxNotifier.value == true) {
+      final ok = await confirmLeaveOpenMysqlTransaction(context);
+      if (!ok) return;
+    }
     setState(() => _tab = i);
   }
 
@@ -103,7 +116,8 @@ class _MysqlWorkspaceHomeState extends material.State<MysqlWorkspaceHome> {
                     material.Icons.table_chart_outlined,
                     size: 14,
                   ),
-                  child: Text('Return to ${widget.lastSelectedMysqlObject!.name}'),
+                  child:
+                      Text('Return to ${widget.lastSelectedMysqlObject!.name}'),
                 ),
               ],
               const Spacer(),
@@ -127,6 +141,7 @@ class _MysqlWorkspaceHomeState extends material.State<MysqlWorkspaceHome> {
               MysqlSqlWorkspace(
                 key: ValueKey('mysql_sql_${widget.connectionRow.id}'),
                 connectionRow: widget.connectionRow,
+                transactionOpenNotifier: _sqlTxNotifier,
                 isReadOnly: widget.isReadOnly,
               ),
             ],

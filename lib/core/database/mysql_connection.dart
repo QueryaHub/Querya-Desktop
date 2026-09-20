@@ -78,6 +78,7 @@ class MysqlConnection {
 
   MySQLConnection? _conn;
   bool _isConnected = false;
+  bool _inTransaction = false;
 
   bool get isConnected => _isConnected && _conn != null;
 
@@ -102,7 +103,8 @@ class MysqlConnection {
     var effectiveConnectionString = _connectionString;
 
     if ((effectivePassword == null || effectivePassword.isEmpty) &&
-        (effectiveConnectionString == null || effectiveConnectionString.isEmpty) &&
+        (effectiveConnectionString == null ||
+            effectiveConnectionString.isEmpty) &&
         id > 0) {
       try {
         final secrets = await ConnectionSecretsStore.readForConnection(id);
@@ -136,7 +138,8 @@ class MysqlConnection {
         );
         await _conn!.connect(timeoutMs: connectTimeoutMs);
       } else {
-        final sslPaths = extractSslCertificatePathsFromString(effectiveConnectionString);
+        final sslPaths =
+            extractSslCertificatePathsFromString(effectiveConnectionString);
         final securityContext = buildSecurityContext(sslPaths);
         _conn = await MySQLConnection.createConnection(
           host: host,
@@ -233,6 +236,7 @@ class MysqlConnection {
 
   Future<void> disconnect() async {
     _isConnected = false;
+    _inTransaction = false;
     final c = _conn;
     _conn = null;
     try {
@@ -248,6 +252,7 @@ class MysqlConnection {
   /// while a query is in progress.
   Future<void> forceClose() async {
     _isConnected = false;
+    _inTransaction = false;
     final c = _conn;
     _conn = null;
     if (c == null) return;
@@ -295,10 +300,55 @@ class MysqlConnection {
       throw StateError('Not connected to MySQL');
     }
     try {
-      return await _conn!.execute(sql, params, iterable);
+      final rs = await _conn!.execute(sql, params, iterable);
+      _noteTransactionSql(sql);
+      return rs;
     } on TimeoutException {
       unawaited(forceClose());
       rethrow;
+    }
+  }
+
+  /// Whether this session has an open `START TRANSACTION` / `BEGIN`.
+  Future<bool?> inOpenTransaction() async {
+    if (!isConnected) return null;
+    return _inTransaction;
+  }
+
+  /// Runs [body] inside a transaction. If the session already has one, DML
+  /// joins it instead of nesting `START TRANSACTION`.
+  Future<void> runInTransaction(Future<void> Function() body) async {
+    final join = _inTransaction;
+    if (!join) {
+      await execute('START TRANSACTION');
+    }
+    try {
+      await body();
+      if (!join) await execute('COMMIT');
+    } catch (e) {
+      if (!join) {
+        try {
+          await execute('ROLLBACK');
+        } catch (_) {}
+      }
+      rethrow;
+    }
+  }
+
+  void _noteTransactionSql(String sql) {
+    final sqlLower = sql.trim().toLowerCase();
+    if (sqlLower.startsWith('start transaction') ||
+        sqlLower.startsWith('begin')) {
+      _inTransaction = true;
+      return;
+    }
+    if (sqlLower.startsWith('commit')) {
+      _inTransaction = false;
+      return;
+    }
+    if (sqlLower.startsWith('rollback') &&
+        !RegExp(r'^rollback\s+to\b').hasMatch(sqlLower)) {
+      _inTransaction = false;
     }
   }
 
@@ -409,7 +459,8 @@ class MysqlConnection {
     for (final r in colsRs.rows) {
       final name = r.colByName('COLUMN_NAME') ?? '';
       final dataType = r.colByName('DATA_TYPE') ?? '';
-      final isNullable = (r.colByName('IS_NULLABLE') ?? 'YES').toUpperCase() == 'YES';
+      final isNullable =
+          (r.colByName('IS_NULLABLE') ?? 'YES').toUpperCase() == 'YES';
       final isPk = primaryKeys.contains(name);
       final pkPos = isPk ? primaryKeys.indexOf(name) + 1 : null;
       final dflt = r.colByName('COLUMN_DEFAULT');

@@ -24,6 +24,8 @@ class FakeMysqlConnection extends MysqlConnection {
   int disconnectCount = 0;
   int forceCloseCount = 0;
   int setReadOnlyCount = 0;
+  bool? lastReadOnly;
+  bool? openTransaction;
 
   @override
   bool get isConnected => _connected;
@@ -49,7 +51,11 @@ class FakeMysqlConnection extends MysqlConnection {
   @override
   Future<void> setSessionReadOnly(bool readOnly) async {
     setReadOnlyCount++;
+    lastReadOnly = readOnly;
   }
+
+  @override
+  Future<bool?> inOpenTransaction() async => openTransaction;
 }
 
 void main() {
@@ -57,7 +63,8 @@ void main() {
     test('acquire increments refs and connects if needed', () async {
       final fake = FakeMysqlConnection();
       final pool = MysqlConnectionPool(
-        createAndConnect: (row, {required database, required mode}) async => fake,
+        createAndConnect: (row, {required database, required mode}) async =>
+            fake,
       );
 
       final lease = await pool.acquire(_row(id: 1), database: 'testdb');
@@ -94,6 +101,103 @@ void main() {
         () => pool.acquire(_row(id: 2), database: 'db2'),
         throwsA(isA<StateError>()),
       );
+    });
+
+    test('tableWrite is a separate key from SQL readWrite', () async {
+      final created = <FakeMysqlConnection>[];
+      final pool = MysqlConnectionPool(
+        createAndConnect: (row, {required database, required mode}) async {
+          final c = FakeMysqlConnection();
+          await c.connect();
+          await c.setSessionReadOnly(mode.isReadOnlySession);
+          created.add(c);
+          return c;
+        },
+      );
+      final r = _row();
+      final sql = await pool.acquire(r,
+          database: 'app', mode: MysqlSessionMode.readWrite);
+      final grid = await pool.acquire(r,
+          database: 'app', mode: MysqlSessionMode.tableWrite);
+      final browse = await pool.acquire(r,
+          database: 'app', mode: MysqlSessionMode.readOnly);
+      expect(identical(sql.connection, grid.connection), isFalse);
+      expect(identical(sql.connection, browse.connection), isFalse);
+      expect(created.length, 3);
+      expect(
+        pool.keyFor(1, 'app', MysqlSessionMode.tableWrite),
+        '1::app::tableWrite',
+      );
+      expect((browse.connection as FakeMysqlConnection).lastReadOnly, isTrue);
+      expect((grid.connection as FakeMysqlConnection).lastReadOnly, isFalse);
+      sql.release();
+      grid.release();
+      browse.release();
+    });
+
+    test('interrupt of SQL readWrite does not kill tableWrite or readOnly',
+        () async {
+      final pool = MysqlConnectionPool(
+        createAndConnect: (row, {required database, required mode}) async {
+          final c = FakeMysqlConnection();
+          await c.connect();
+          return c;
+        },
+      );
+      final r = _row();
+      final sql = await pool.acquire(r,
+          database: 'app', mode: MysqlSessionMode.readWrite);
+      final grid = await pool.acquire(r,
+          database: 'app', mode: MysqlSessionMode.tableWrite);
+      final browse = await pool.acquire(r,
+          database: 'app', mode: MysqlSessionMode.readOnly);
+      final sqlFake = sql.connection as FakeMysqlConnection;
+      final gridFake = grid.connection as FakeMysqlConnection;
+      final browseFake = browse.connection as FakeMysqlConnection;
+
+      pool.interrupt(r, database: 'app', mode: MysqlSessionMode.readWrite);
+      expect(sqlFake.forceCloseCount, 1);
+      expect(gridFake.forceCloseCount, 0);
+      expect(browseFake.forceCloseCount, 0);
+
+      pool.interruptAllModes(r, database: 'app');
+      expect(gridFake.forceCloseCount, 1);
+      expect(browseFake.forceCloseCount, 1);
+      sql.release();
+      grid.release();
+      browse.release();
+    });
+
+    test('hasOpenSqlTransaction reads the SQL slot only', () async {
+      final pool = MysqlConnectionPool(
+        createAndConnect: (row, {required database, required mode}) async {
+          final c = FakeMysqlConnection();
+          await c.connect();
+          return c;
+        },
+      );
+      final r = _row();
+      expect(
+        await pool.hasOpenSqlTransaction(r, database: 'app'),
+        isFalse,
+      );
+
+      final sql = await pool.acquire(r,
+          database: 'app', mode: MysqlSessionMode.readWrite);
+      (sql.connection as FakeMysqlConnection).openTransaction = true;
+      expect(await pool.hasOpenSqlTransaction(r, database: 'app'), isTrue);
+      expect(
+        await pool.hasOpenSqlTransaction(r, database: 'other'),
+        isFalse,
+      );
+
+      final grid = await pool.acquire(r,
+          database: 'app', mode: MysqlSessionMode.tableWrite);
+      (grid.connection as FakeMysqlConnection).openTransaction = true;
+      (sql.connection as FakeMysqlConnection).openTransaction = false;
+      expect(await pool.hasOpenSqlTransaction(r, database: 'app'), isFalse);
+      sql.release();
+      grid.release();
     });
   });
 }

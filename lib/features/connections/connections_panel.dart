@@ -704,10 +704,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
       PostgresService.instance.interruptAllModes(conn,
           database: conn.databaseName ?? 'postgres');
     } else if (conn.type == 'mysql') {
-      MysqlService.instance.interrupt(conn,
-          database: conn.databaseName ?? '', mode: MysqlSessionMode.readOnly);
-      MysqlService.instance.interrupt(conn,
-          database: conn.databaseName ?? '', mode: MysqlSessionMode.readWrite);
+      MysqlService.instance.interruptAllModes(conn,
+          database: conn.databaseName ?? '');
     } else if (conn.type == 'sqlite') {
       SqliteService.instance.interruptAllModes(conn);
     } else if (conn.type == 'redis') {
