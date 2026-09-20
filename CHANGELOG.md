@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Redis URL paste (#819)** — Paste `redis://` / `rediss://` stores the raw URI on `connectionString` (like Postgres/MySQL/Mongo), so `sslrootcert` / `sslcert` / `sslkey` reach `RedisConnection.connect`.
 - **Redis binary bulk (#818)** — GET / SCAN / hash / list / set / zset decode bulk replies as bytes (`RedisParserBulkBinary`). Invalid UTF-8 is shown as hex / base64; Save as text is off so SET cannot write replacement characters.
 - **Redis stream/unknown GET-SET (#817)** — Stream, module, and `unknown` keys are not opened with `GET` or saved with `SET`. Save stays on `string` only; `unknown` retries `TYPE` before treating the value as a string.
 - **SQL toolbar overflow** — MySQL / Postgres Query + History + Execute wrap instead of overflowing at ~700px (widget tests treat RenderFlex overflow as failure).
