@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/onboarding/welcome_tour_dialog.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -173,5 +174,30 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(homeTriggered, isTrue);
+  });
+
+  testWidgets('Motion Off makes welcome tour chrome instant', (tester) async {
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: const QueryaMotionScope(
+          level: QueryaMotionLevel.off,
+          child: material.Scaffold(
+            body: WelcomeTourDialog(),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      tester.widget<material.AnimatedSize>(find.byType(material.AnimatedSize)).duration,
+      Duration.zero,
+    );
+    expect(
+      tester
+          .widget<material.AnimatedSwitcher>(find.byType(material.AnimatedSwitcher))
+          .duration,
+      Duration.zero,
+    );
   });
 }

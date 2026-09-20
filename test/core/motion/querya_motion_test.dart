@@ -12,6 +12,7 @@ void main() {
       expect(QueryaMotion.standard, const Duration(milliseconds: 200));
       expect(QueryaMotion.slow, const Duration(milliseconds: 320));
       expect(QueryaMotion.treeExpand, QueryaMotion.standard);
+      expect(QueryaMotion.sidebarCubic, const Duration(milliseconds: 160));
     });
 
     test('curve constants are set', () {

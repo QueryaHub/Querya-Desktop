@@ -257,10 +257,14 @@ class UpdateDialogContentState extends material.State<UpdateDialogContent> {
     final dirty = widget.hasUnsavedWork?.call() ??
         UnsavedWorkRegistry.instance.hasUnsaved;
     if (dirty) {
-      final confirmed = widget.confirmRestartIfUnsaved != null
-          ? await widget.confirmRestartIfUnsaved!(context)
-          : await showUnsavedUpdateRestartDialog(context);
-      if (confirmed != true) return;
+      final confirmFn = widget.confirmRestartIfUnsaved;
+      final bool? confirmed;
+      if (confirmFn != null) {
+        confirmed = await confirmFn(context);
+      } else {
+        confirmed = await showUnsavedUpdateRestartDialog(context);
+      }
+      if (!mounted || confirmed != true) return;
     }
 
     try {
