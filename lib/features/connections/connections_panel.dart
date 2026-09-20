@@ -679,13 +679,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
   Future<void> _removeConnection(int id) async {
     await MongoService.instance.disconnectByConnectionId(id);
     await ExtensionDriverSession.instance.disconnect(id);
-    SqliteService.instance.interrupt(
+    SqliteService.instance.interruptAllModes(
       ConnectionRow(id: id, type: 'sqlite', name: '', createdAt: ''),
-      mode: SqliteSessionMode.readOnly,
-    );
-    SqliteService.instance.interrupt(
-      ConnectionRow(id: id, type: 'sqlite', name: '', createdAt: ''),
-      mode: SqliteSessionMode.readWrite,
     );
     await LocalDb.instance.removeConnection(id);
     await _loadData();
@@ -714,8 +709,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
       MysqlService.instance.interrupt(conn,
           database: conn.databaseName ?? '', mode: MysqlSessionMode.readWrite);
     } else if (conn.type == 'sqlite') {
-      SqliteService.instance.interrupt(conn, mode: SqliteSessionMode.readOnly);
-      SqliteService.instance.interrupt(conn, mode: SqliteSessionMode.readWrite);
+      SqliteService.instance.interruptAllModes(conn);
     } else if (conn.type == 'redis') {
       final redisConn = RedisService.instance.getConnection(id);
       if (redisConn != null) {

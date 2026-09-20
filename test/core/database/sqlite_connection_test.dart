@@ -107,7 +107,8 @@ void main() {
     test('lists tables, views, and columns correctly', () async {
       await conn.connect();
 
-      await conn.execute('CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)');
+      await conn
+          .execute('CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)');
       await conn.execute('CREATE VIEW user_names AS SELECT name FROM users');
 
       final tables = await conn.listTables();
@@ -120,25 +121,30 @@ void main() {
       expect(columns, containsAll(['id', 'name']));
     });
 
-    test('executes INSERT, UPDATE, DELETE with RETURNING clause correctly', () async {
+    test('executes INSERT, UPDATE, DELETE with RETURNING clause correctly',
+        () async {
       await conn.connect();
 
-      await conn.execute('CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)');
+      await conn.execute(
+          'CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)');
 
       // INSERT with RETURNING
-      final insertRes = await conn.execute("INSERT INTO users (name) VALUES ('Alice') RETURNING id, name");
+      final insertRes = await conn.execute(
+          "INSERT INTO users (name) VALUES ('Alice') RETURNING id, name");
       expect(insertRes, isNotEmpty);
       expect(insertRes.first['id'], 1);
       expect(insertRes.first['name'], 'Alice');
 
       // UPDATE with RETURNING
-      final updateRes = await conn.execute("UPDATE users SET name = 'Bob' WHERE id = 1 RETURNING id, name");
+      final updateRes = await conn.execute(
+          "UPDATE users SET name = 'Bob' WHERE id = 1 RETURNING id, name");
       expect(updateRes, isNotEmpty);
       expect(updateRes.first['id'], 1);
       expect(updateRes.first['name'], 'Bob');
 
       // DELETE with RETURNING
-      final deleteRes = await conn.execute("DELETE FROM users WHERE id = 1 RETURNING id, name");
+      final deleteRes = await conn
+          .execute("DELETE FROM users WHERE id = 1 RETURNING id, name");
       expect(deleteRes, isNotEmpty);
       expect(deleteRes.first['id'], 1);
       expect(deleteRes.first['name'], 'Bob');
@@ -167,9 +173,38 @@ void main() {
       await roConn.disconnect();
     });
 
+    test('tracks BEGIN/COMMIT and refuses nested BEGIN via runInTransaction',
+        () async {
+      await conn.connect();
+      await conn.execute(
+        'CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)',
+      );
+      await conn.execute('BEGIN');
+      expect(await conn.inOpenTransaction(), isTrue);
+
+      await conn.runInTransaction(() async {
+        await conn.execute("INSERT INTO t (name) VALUES ('a')");
+      });
+      expect(await conn.inOpenTransaction(), isTrue);
+      await conn.execute('COMMIT');
+      expect(await conn.inOpenTransaction(), isFalse);
+
+      final rows = await conn.execute('SELECT COUNT(*) AS c FROM t');
+      expect(rows.first['c'], 1);
+
+      await conn.runInTransaction(() async {
+        await conn.execute("INSERT INTO t (name) VALUES ('b')");
+      });
+      expect(await conn.inOpenTransaction(), isFalse);
+      final rows2 = await conn.execute('SELECT COUNT(*) AS c FROM t');
+      expect(rows2.first['c'], 2);
+    });
+
     test('handles quotes in quoteIdentifier helper', () {
-      expect(SqliteConnection.quoteIdentifier('normal_table'), '"normal_table"');
-      expect(SqliteConnection.quoteIdentifier('table"with"quotes'), '"table""with""quotes"');
+      expect(
+          SqliteConnection.quoteIdentifier('normal_table'), '"normal_table"');
+      expect(SqliteConnection.quoteIdentifier('table"with"quotes'),
+          '"table""with""quotes"');
     });
   });
 }

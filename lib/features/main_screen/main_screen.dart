@@ -37,6 +37,7 @@ import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
 import 'package:querya_desktop/features/onboarding/welcome_tour_dialog.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
 import 'package:querya_desktop/features/postgresql/postgres_sql_tx_guard.dart';
+import 'package:querya_desktop/features/sqlite/sqlite_sql_tx_guard.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'main_screen_workspace_state.dart';
@@ -473,6 +474,14 @@ class _MainScreenState extends State<MainScreen> {
         cur.kind == kind;
     if (same) return;
     if (!await _allowUnsavedNavigation()) return;
+    if (!mounted) return;
+    if (!await confirmOpenSqliteTableIfSqlTx(
+      context,
+      connection: connection,
+      kind: kind,
+    )) {
+      return;
+    }
     if (!mounted) return;
     _workspace.value = _workspace.value.selectSqliteObject(
       connection,
@@ -1198,6 +1207,17 @@ class _MainContentSplitState extends State<_MainContentSplit>
         connection: conn,
         database: pg.database,
         kind: pg.kind,
+      )) {
+        return;
+      }
+    }
+    if (!mounted) return;
+    final sq = ws.lastSelectedSqliteObject;
+    if (conn != null && conn.type == 'sqlite' && sq != null) {
+      if (!await confirmOpenSqliteTableIfSqlTx(
+        context,
+        connection: conn,
+        kind: sq.kind,
       )) {
         return;
       }

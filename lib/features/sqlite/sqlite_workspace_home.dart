@@ -4,6 +4,7 @@ import 'package:querya_desktop/core/storage/local_db.dart' show ConnectionRow;
 import 'package:querya_desktop/features/connections/connections_panel.dart'
     show SqliteObjectKind;
 import 'package:querya_desktop/features/sqlite/sqlite_overview_tab.dart';
+import 'package:querya_desktop/features/sqlite/sqlite_sql_tx_guard.dart';
 import 'package:querya_desktop/features/sqlite/sqlite_sql_workspace.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -22,10 +23,7 @@ class SqliteWorkspaceHome extends material.StatefulWidget {
   final bool isReadOnly;
 
   /// Remembers the last visited table/view for 1-click return.
-  final ({
-    String name,
-    SqliteObjectKind kind
-  })? lastSelectedSqliteObject;
+  final ({String name, SqliteObjectKind kind})? lastSelectedSqliteObject;
   final VoidCallback? onRestoreLastSelectedObject;
 
   @override
@@ -35,11 +33,13 @@ class SqliteWorkspaceHome extends material.StatefulWidget {
 
 class _SqliteWorkspaceHomeState extends material.State<SqliteWorkspaceHome> {
   int _tab = 0;
+  late final material.ValueNotifier<bool?> _sqlTxNotifier;
   int _lastAppliedSqlTabToken = 0;
 
   @override
   void initState() {
     super.initState();
+    _sqlTxNotifier = material.ValueNotifier<bool?>(null);
     _lastAppliedSqlTabToken = widget.sqlTabRequestToken;
   }
 
@@ -60,8 +60,18 @@ class _SqliteWorkspaceHomeState extends material.State<SqliteWorkspaceHome> {
     }
   }
 
-  void _selectTab(int i) {
+  @override
+  void dispose() {
+    _sqlTxNotifier.dispose();
+    super.dispose();
+  }
+
+  Future<void> _selectTab(int i) async {
     if (i == _tab) return;
+    if (_tab == 1 && i == 0 && _sqlTxNotifier.value == true) {
+      final ok = await confirmLeaveOpenSqliteTransaction(context);
+      if (!ok) return;
+    }
     setState(() => _tab = i);
   }
 
@@ -98,7 +108,8 @@ class _SqliteWorkspaceHomeState extends material.State<SqliteWorkspaceHome> {
                     material.Icons.table_chart_outlined,
                     size: 14,
                   ),
-                  child: Text('Return to ${widget.lastSelectedSqliteObject!.name}'),
+                  child: Text(
+                      'Return to ${widget.lastSelectedSqliteObject!.name}'),
                 ),
               ],
               const Spacer(),
@@ -122,6 +133,7 @@ class _SqliteWorkspaceHomeState extends material.State<SqliteWorkspaceHome> {
               SqliteSqlWorkspace(
                 key: ValueKey('sqlite_sql_${widget.connectionRow.id}'),
                 connectionRow: widget.connectionRow,
+                transactionOpenNotifier: _sqlTxNotifier,
                 isReadOnly: widget.isReadOnly,
               ),
             ],

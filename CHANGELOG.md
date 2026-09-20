@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **SQLite Table Browser session (#794)** — Browse uses a read-only `Database`; Save uses a dedicated `tableWrite` handle so SQL `BEGIN` / `ATTACH` do not leak into the grid (no nested `BEGIN`). SQL-grid Save joins an already-open transaction instead of starting another. Opening a table (and Overview↔SQL) warns while SQL has an open `BEGIN`.
 - **Postgres Table Browser session (#785)** — Browse uses a read-only pool slot; Save and `REFRESH MATERIALIZED VIEW` use a dedicated `tableWrite` socket so they do not share the SQL editor’s TCP session. Statement-timeout `forceClose` on SQL no longer kills the grid. Opening a table while SQL has an open transaction on the same database warns, matching Overview↔SQL.
 - **Mongo inspector Apply (#775)** — With **Save to DB** wired, **Apply** and **Ctrl/Cmd+Enter** persist through the same `$set` callback instead of only closing the dialog. SQL-grid Apply (no callback) still stages locally.
 - **Mongo field codec (#777)** — Inspector Save keeps BSON type: strings that look like numbers stay strings; ObjectId, DateTime, Int64, and Decimal128 round-trip. `$set` of `_id` stays blocked.

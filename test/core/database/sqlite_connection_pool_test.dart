@@ -22,6 +22,7 @@ class FakeSqliteConnection extends SqliteConnection {
   int connectCount = 0;
   int disconnectCount = 0;
   int forceCloseCount = 0;
+  bool? openTransaction;
 
   @override
   bool get isConnected => _connected;
@@ -43,6 +44,9 @@ class FakeSqliteConnection extends SqliteConnection {
     forceCloseCount++;
     _connected = false;
   }
+
+  @override
+  Future<bool?> inOpenTransaction() async => openTransaction;
 }
 
 void main() {
@@ -99,7 +103,8 @@ void main() {
       );
     });
 
-    test('rethrows SqliteConnectionException wrapped on acquire error', () async {
+    test('rethrows SqliteConnectionException wrapped on acquire error',
+        () async {
       final pool = SqliteConnectionPool(
         createAndConnect: (row, {required mode}) async {
           throw Exception('network boom');
@@ -117,7 +122,8 @@ void main() {
       final fake2 = FakeSqliteConnection(id: 2);
       var i = 0;
       final pool = SqliteConnectionPool(
-        createAndConnect: (row, {required mode}) async => i++ == 0 ? fake1 : fake2,
+        createAndConnect: (row, {required mode}) async =>
+            i++ == 0 ? fake1 : fake2,
       );
 
       await pool.acquire(_row(id: 1));
@@ -126,6 +132,82 @@ void main() {
 
       expect(fake1.forceCloseCount, 1);
       expect(fake2.forceCloseCount, 1);
+    });
+
+    test('tableWrite is a separate key from SQL readWrite', () async {
+      final created = <FakeSqliteConnection>[];
+      final pool = SqliteConnectionPool(
+        createAndConnect: (row, {required mode}) async {
+          final c = FakeSqliteConnection();
+          await c.connect();
+          created.add(c);
+          return c;
+        },
+      );
+      final r = _row();
+      final sql = await pool.acquire(r, mode: SqliteSessionMode.readWrite);
+      final grid = await pool.acquire(r, mode: SqliteSessionMode.tableWrite);
+      final browse = await pool.acquire(r, mode: SqliteSessionMode.readOnly);
+      expect(identical(sql.connection, grid.connection), isFalse);
+      expect(identical(sql.connection, browse.connection), isFalse);
+      expect(created.length, 3);
+      expect(pool.keyFor(1, SqliteSessionMode.tableWrite), '1::tableWrite');
+      sql.release();
+      grid.release();
+      browse.release();
+    });
+
+    test('interrupt of SQL readWrite does not kill tableWrite or readOnly',
+        () async {
+      final pool = SqliteConnectionPool(
+        createAndConnect: (row, {required mode}) async {
+          final c = FakeSqliteConnection();
+          await c.connect();
+          return c;
+        },
+      );
+      final r = _row();
+      final sql = await pool.acquire(r, mode: SqliteSessionMode.readWrite);
+      final grid = await pool.acquire(r, mode: SqliteSessionMode.tableWrite);
+      final browse = await pool.acquire(r, mode: SqliteSessionMode.readOnly);
+      final sqlFake = sql.connection as FakeSqliteConnection;
+      final gridFake = grid.connection as FakeSqliteConnection;
+      final browseFake = browse.connection as FakeSqliteConnection;
+
+      pool.interrupt(r, mode: SqliteSessionMode.readWrite);
+      expect(sqlFake.forceCloseCount, 1);
+      expect(gridFake.forceCloseCount, 0);
+      expect(browseFake.forceCloseCount, 0);
+
+      pool.interruptAllModes(r);
+      expect(gridFake.forceCloseCount, 1);
+      expect(browseFake.forceCloseCount, 1);
+      sql.release();
+      grid.release();
+      browse.release();
+    });
+
+    test('hasOpenSqlTransaction reads the SQL slot only', () async {
+      final pool = SqliteConnectionPool(
+        createAndConnect: (row, {required mode}) async {
+          final c = FakeSqliteConnection();
+          await c.connect();
+          return c;
+        },
+      );
+      final r = _row();
+      expect(await pool.hasOpenSqlTransaction(r), isFalse);
+
+      final sql = await pool.acquire(r, mode: SqliteSessionMode.readWrite);
+      (sql.connection as FakeSqliteConnection).openTransaction = true;
+      expect(await pool.hasOpenSqlTransaction(r), isTrue);
+
+      final grid = await pool.acquire(r, mode: SqliteSessionMode.tableWrite);
+      (grid.connection as FakeSqliteConnection).openTransaction = true;
+      (sql.connection as FakeSqliteConnection).openTransaction = false;
+      expect(await pool.hasOpenSqlTransaction(r), isFalse);
+      sql.release();
+      grid.release();
     });
   });
 }
