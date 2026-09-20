@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-/// Process-wide probes for unsaved SQL / staged grid edits.
+/// Process-wide probes for unsaved SQL, staged grid edits, and document editors.
 ///
 /// Used by the in-app updater (and similar quit paths) to warn before
 /// discarding work. Owners register a probe and must unregister on dispose.
