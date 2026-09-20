@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **SQLite Table Browser paging (#799)** — Browse `SELECT` uses `ORDER BY` primary-key columns, or `rowid` when the table has implicit rowid. First paint skips blocking `COUNT(*)` (Next stays available when the page is full). SQL workspace has an optional statement timeout matching Postgres/MySQL.
 - **SQLite BLOB / TEXT grid (#800)** — Table Browser and SQL results show BLOB as `X'hex'` (not `Uint8List.toString()`) and persist the same. Declared TEXT stays a quoted string even when it looks numeric (`00123`).
 - **MySQL Table Browser session lock (#803)** — Browse stays on `MysqlSessionMode.readOnly`. Title-bar lock is passed into `MysqlTableView`: staging / Save stay off and Save does not acquire `tableWrite`. `SET SESSION TRANSACTION READ ONLY` is documented as a next-transaction hint (weaker than a read-only user; MariaDB vs MySQL 8).
 - **MySQL ssl-mode (#805)** — `ssl-mode=prefer` enables TLS (same as `require`) instead of turning it off. `verify_ca` / `verify_identity` fail closed without `sslrootcert` and ask the driver to check the CA (and hostname for identity). Form Use SSL stays encrypt-only.

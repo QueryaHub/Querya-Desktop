@@ -107,6 +107,7 @@ abstract final class AppSettingsKeys {
   static const postgresSqlStmtTimeoutSeconds =
       'postgres_sql_stmt_timeout_seconds';
   static const mysqlSqlStmtTimeoutSeconds = 'mysql_sql_stmt_timeout_seconds';
+  static const sqliteSqlStmtTimeoutSeconds = 'sqlite_sql_stmt_timeout_seconds';
   static const sqlResultMaxRows = 'sql_result_max_rows';
   static const sqlEditorFontSizePoints = 'sql_editor_font_size_points';
   static const sqlHistoryMaxEntries = 'sql_history_max_entries';
@@ -191,6 +192,29 @@ class AppSettings {
     } else {
       await LocalDb.instance.setAppSetting(
         AppSettingsKeys.mysqlSqlStmtTimeoutSeconds,
+        seconds.toString(),
+      );
+    }
+    SqlWorkspaceSettingsRevision.bump();
+  }
+
+  /// `null` = no application-level timeout (`executeWithTimeout` is unbounded).
+  Future<int?> getSqliteSqlStmtTimeoutSeconds() async {
+    final v = await LocalDb.instance.getAppSetting(
+      AppSettingsKeys.sqliteSqlStmtTimeoutSeconds,
+    );
+    if (v == null || v.isEmpty) return null;
+    return int.tryParse(v);
+  }
+
+  Future<void> setSqliteSqlStmtTimeoutSeconds(int? seconds) async {
+    if (seconds == null) {
+      await LocalDb.instance.deleteAppSetting(
+        AppSettingsKeys.sqliteSqlStmtTimeoutSeconds,
+      );
+    } else {
+      await LocalDb.instance.setAppSetting(
+        AppSettingsKeys.sqliteSqlStmtTimeoutSeconds,
         seconds.toString(),
       );
     }

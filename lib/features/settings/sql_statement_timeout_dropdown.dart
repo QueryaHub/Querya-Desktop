@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/shared/widgets/querya_dropdown.dart';
 
-/// Shared dropdown values for SQL statement timeouts (PostgreSQL / MySQL).
+/// Shared dropdown values for SQL statement timeouts (PostgreSQL / MySQL / SQLite).
 const List<QueryaDropdownItem<int?>> kSqlStatementTimeoutMenuItems = [
   QueryaDropdownItem<int?>(value: null, label: 'No limit'),
   QueryaDropdownItem(value: 10, label: '10 s'),

@@ -17,6 +17,7 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/ui/querya_shell_status.dart';
 import 'package:querya_desktop/features/sqlite/sqlite_result_utils.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
+import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
 import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -49,6 +50,8 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
 
   SqliteLease? _lease;
   bool? _txOpen;
+
+  int? _queryTimeoutSeconds;
 
   int _resultMaxRows = kDefaultSqlResultMaxRows;
   int _historyMaxEntries = kDefaultSqlHistoryMaxEntries;
@@ -180,15 +183,22 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
   }
 
   Future<void> _loadWorkspaceSettings() async {
+    final t = await AppSettings.instance.getSqliteSqlStmtTimeoutSeconds();
     final rows = await AppSettings.instance.getSqlResultMaxRows();
     final hist = await AppSettings.instance.getSqlHistoryMaxEntries();
     final font = await AppSettings.instance.getSqlEditorFontSize();
     if (!mounted) return;
     setState(() {
+      _queryTimeoutSeconds = t;
       _resultMaxRows = rows;
       _historyMaxEntries = hist;
       _editorFontSize = font;
     });
+  }
+
+  void _onStmtTimeoutChanged(int? v) {
+    setState(() => _queryTimeoutSeconds = v);
+    unawaited(AppSettings.instance.setSqliteSqlStmtTimeoutSeconds(v));
   }
 
   Future<void> _ensureLease() async {
@@ -223,6 +233,10 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
     if (mounted) setState(() => _txOpen = v);
     _notifyTransactionOpen();
   }
+
+  Duration? _statementTimeout() => _queryTimeoutSeconds == null
+      ? null
+      : Duration(seconds: _queryTimeoutSeconds!);
 
   @override
   void dispose() {
@@ -296,7 +310,8 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       // Client-side take() remains as defense for PRAGMA/EXPLAIN and author LIMIT.
       final cap = _resultMaxRows;
       final sql = injectSqlLimit(userSql, cap);
-      final results = await conn.execute(sql);
+      final results =
+          await conn.executeWithTimeout(sql, timeout: _statementTimeout());
 
       if (!mounted) return;
 
@@ -723,6 +738,8 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
           _SqliteSqlToolbar(
             onExecute: session.running ? null : () => _execute(session),
             running: session.running,
+            queryTimeoutSeconds: _queryTimeoutSeconds,
+            onQueryTimeoutChanged: _onStmtTimeoutChanged,
             onOpenPreferences: () => showPreferencesDialog(context),
             onOpenHistory: widget.connectionRow.id != null && !session.running
                 ? () {
@@ -790,12 +807,16 @@ class _SqliteSqlToolbar extends material.StatelessWidget {
   const _SqliteSqlToolbar({
     required this.onExecute,
     required this.running,
+    required this.queryTimeoutSeconds,
+    required this.onQueryTimeoutChanged,
     required this.onOpenPreferences,
     this.onOpenHistory,
   });
 
   final Future<void> Function()? onExecute;
   final bool running;
+  final int? queryTimeoutSeconds;
+  final void Function(int?) onQueryTimeoutChanged;
   final VoidCallback onOpenPreferences;
   final VoidCallback? onOpenHistory;
 
@@ -805,47 +826,67 @@ class _SqliteSqlToolbar extends material.StatelessWidget {
     return material.Container(
       padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: SqlEditorChrome.sqlToolbarDecoration(context),
-      child: material.Row(
+      child: material.Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: material.MainAxisSize.min,
         children: [
-          const Text('Query').semiBold().small(),
-          const Spacer(),
-          OutlineButton(
-            size: ButtonSize.small,
-            onPressed: onOpenHistory,
-            leading: material.Icon(
-              material.Icons.history_rounded,
-              size: 16,
-              color: accent,
-            ),
-            child: const Text('History'),
+          material.Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: material.WrapCrossAlignment.center,
+            children: [
+              const Text('Query').semiBold().small(),
+              OutlineButton(
+                size: ButtonSize.small,
+                onPressed: onOpenHistory,
+                leading: material.Icon(
+                  material.Icons.history_rounded,
+                  size: 16,
+                  color: accent,
+                ),
+                child: const Text('History'),
+              ),
+              OutlineButton(
+                onPressed: onExecute,
+                leading: running
+                    ? material.SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: material.CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: accent,
+                        ),
+                      )
+                    : material.Icon(
+                        material.Icons.play_arrow_rounded,
+                        size: 18,
+                        color: accent,
+                      ),
+                child: const Text('Execute (F5)'),
+              ),
+            ],
           ),
           const Gap(8),
-          IconButton.ghost(
-            onPressed: running ? null : onOpenPreferences,
-            icon: material.Icon(
-              material.Icons.settings_rounded,
-              size: 20,
-              color: accent,
-            ),
-          ),
-          const Gap(8),
-          OutlineButton(
-            onPressed: onExecute,
-            leading: running
-                ? material.SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: material.CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: accent,
-                    ),
-                  )
-                : material.Icon(
-                    material.Icons.play_arrow_rounded,
-                    size: 18,
-                    color: accent,
-                  ),
-            child: const Text('Execute (F5)'),
+          material.Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: material.WrapCrossAlignment.center,
+            children: [
+              const Text('Stmt timeout').small(),
+              SqlStatementTimeoutDropdown(
+                value: queryTimeoutSeconds,
+                onChanged: onQueryTimeoutChanged,
+                enabled: !running,
+              ),
+              IconButton.ghost(
+                onPressed: running ? null : onOpenPreferences,
+                icon: material.Icon(
+                  material.Icons.settings_rounded,
+                  size: 20,
+                  color: accent,
+                ),
+              ),
+            ],
           ),
         ],
       ),
