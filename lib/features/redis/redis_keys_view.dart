@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
+import 'package:querya_desktop/core/database/redis_bulk.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/theme/querya_semantic_palette.dart';
 import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
@@ -18,7 +19,7 @@ class RedisKeysView extends material.StatefulWidget {
 
   final RedisConnection connection;
   final int database;
-  final void Function(String key, String type)? onKeyTap;
+  final void Function(RedisBulkValue key, String type)? onKeyTap;
   final bool isReadOnly;
 
   @override
@@ -143,8 +144,8 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
     final confirmed = await confirmDestructiveAction(
       context: context,
       type: DestructiveSqlType.redisDel,
-      targetName: '${keyInfo.name} (${keyInfo.type})',
-      commandPreview: 'DEL ${keyInfo.name}',
+      targetName: '${keyInfo.name.label} (${keyInfo.type})',
+      commandPreview: 'DEL ${keyInfo.name.label}',
       connectionName: widget.connection.name,
     );
     if (!mounted || !confirmed) return;
@@ -343,7 +344,7 @@ class _KeyInfo {
     required this.type,
     required this.ttl,
   });
-  final String name;
+  final RedisBulkValue name;
   final String type;
   final int ttl; // -1 = no expiry, -2 = key doesn't exist
 }
@@ -451,7 +452,7 @@ class _KeyTile extends material.StatelessWidget {
               const Gap(10),
               material.Expanded(
                 child: material.Text(
-                  ki.name,
+                  ki.name.label,
                   overflow: material.TextOverflow.ellipsis,
                   maxLines: 1,
                   style: material.TextStyle(

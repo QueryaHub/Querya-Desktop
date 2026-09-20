@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
+import 'package:querya_desktop/core/database/redis_bulk.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -14,6 +15,7 @@ class RedisKeyEditor extends material.StatefulWidget {
     required this.database,
     required this.keyName,
     required this.keyType,
+    this.keyArg,
     this.onBack,
     this.onKeyDeleted,
     this.isReadOnly = false,
@@ -23,6 +25,9 @@ class RedisKeyEditor extends material.StatefulWidget {
   final int database;
   final String keyName;
   final String keyType;
+
+  /// Wire key for GET/SET/DEL when [keyName] is only a UTF-8/hex label.
+  final Object? keyArg;
   final VoidCallback? onBack;
   final VoidCallback? onKeyDeleted;
   final bool isReadOnly;
@@ -38,20 +43,20 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   int _ttl = -1;
 
   // String value
-  String? _stringValue;
+  RedisBulkValue? _stringValue;
   final _stringController = material.TextEditingController();
 
   // Hash value
-  Map<String, String> _hashValue = {};
+  Map<RedisBulkValue, RedisBulkValue> _hashValue = {};
 
   // List value
-  List<String> _listValue = [];
+  List<RedisBulkValue> _listValue = [];
 
   // Set value
-  List<String> _setValue = [];
+  List<RedisBulkValue> _setValue = [];
 
   // Sorted set value
-  List<(String, double)> _zsetValue = [];
+  List<(RedisBulkValue, double)> _zsetValue = [];
 
   int _collectionTotal = 0;
   int _scanCursor = 0;
@@ -78,6 +83,13 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     super.dispose();
   }
 
+  Object get _cmdKey => widget.keyArg ?? widget.keyName;
+
+  bool get _stringIsBinary =>
+      _effectiveType == 'string' &&
+      _stringValue != null &&
+      !_stringValue!.isUtf8;
+
   String _normalizedType(String type) {
     final t = type.trim().toLowerCase();
     if (t.isEmpty) return 'unknown';
@@ -89,7 +101,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     if (incoming != 'unknown') return incoming;
     try {
       final resolved = _normalizedType(
-        await widget.connection.keyType(widget.keyName),
+        await widget.connection.keyType(_cmdKey),
       );
       if (resolved == 'none' || resolved == 'unknown') return 'unknown';
       return resolved;
@@ -107,19 +119,19 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     });
     try {
       await widget.connection.selectDatabase(widget.database);
-      _ttl = await widget.connection.ttl(widget.keyName);
+      _ttl = await widget.connection.ttl(_cmdKey);
       _effectiveType = await _resolveType();
 
       switch (_effectiveType) {
         case 'string':
-          _stringValue = await widget.connection.get(widget.keyName);
-          _stringController.text = _stringValue ?? '';
+          _stringValue = await widget.connection.get(_cmdKey);
+          _stringController.text = _stringValue?.text ?? '';
         case 'hash':
         case 'list':
         case 'set':
         case 'zset':
           _collectionTotal = await widget.connection.keySize(
-            widget.keyName,
+            _cmdKey,
             _effectiveType,
           );
           _scanCursor = 0;
@@ -188,7 +200,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
             _hashValue = {};
           }
           final (next, page) = await widget.connection.hscan(
-            widget.keyName,
+            _cmdKey,
             cursor: _scanCursor,
             count: redisCollectionPageSize,
           );
@@ -199,7 +211,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
           if (reset) _listValue = [];
           final start = _listValue.length;
           final chunk = await widget.connection.lrange(
-            widget.keyName,
+            _cmdKey,
             start,
             start + redisCollectionPageSize - 1,
           );
@@ -211,7 +223,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
             _setValue = [];
           }
           final (next, members) = await widget.connection.sscan(
-            widget.keyName,
+            _cmdKey,
             cursor: _scanCursor,
             count: redisCollectionPageSize,
           );
@@ -222,7 +234,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
           if (reset) _zsetValue = [];
           final start = _zsetValue.length;
           final chunk = await widget.connection.zrangeWithScores(
-            widget.keyName,
+            _cmdKey,
             start,
             start + redisCollectionPageSize - 1,
           );
@@ -242,11 +254,11 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
 
   Future<void> _saveString() async {
     if (widget.isReadOnly) return;
-    if (_effectiveType != 'string') return;
+    if (_effectiveType != 'string' || _stringIsBinary) return;
     try {
       await widget.connection.selectDatabase(widget.database);
       await widget.connection.set(
-        widget.keyName,
+        _cmdKey,
         _stringController.text,
         keepTtl: true,
       );
@@ -271,7 +283,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     if (!mounted || !confirmed) return;
     try {
       await widget.connection.selectDatabase(widget.database);
-      await widget.connection.del(widget.keyName);
+      await widget.connection.del(_cmdKey);
       widget.onKeyDeleted?.call();
     } catch (e) {
       if (!mounted) return;
@@ -284,11 +296,11 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     try {
       await widget.connection.selectDatabase(widget.database);
       if (seconds > 0) {
-        await widget.connection.expire(widget.keyName, seconds);
+        await widget.connection.expire(_cmdKey, seconds);
       } else {
-        await widget.connection.persist(widget.keyName);
+        await widget.connection.persist(_cmdKey);
       }
-      _ttl = await widget.connection.ttl(widget.keyName);
+      _ttl = await widget.connection.ttl(_cmdKey);
       if (!mounted) return;
       setState(() {
         _success = seconds > 0 ? 'TTL set to $seconds seconds' : 'TTL removed';
@@ -305,7 +317,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     if (widget.isReadOnly) return;
     try {
       await widget.connection.selectDatabase(widget.database);
-      await widget.connection.hset(widget.keyName, field, value);
+      await widget.connection.hset(_cmdKey, field, value);
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -313,19 +325,19 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     }
   }
 
-  Future<void> _hashDel(String field) async {
+  Future<void> _hashDel(RedisBulkValue field) async {
     if (widget.isReadOnly) return;
     final confirmed = await confirmDestructiveAction(
       context: context,
       type: DestructiveSqlType.redisHdel,
-      targetName: field,
-      commandPreview: 'HDEL ${widget.keyName} $field',
+      targetName: field.label,
+      commandPreview: 'HDEL ${widget.keyName} ${field.label}',
       connectionName: widget.connection.name,
     );
     if (!mounted || !confirmed) return;
     try {
       await widget.connection.selectDatabase(widget.database);
-      await widget.connection.hdel(widget.keyName, field);
+      await widget.connection.hdel(_cmdKey, field);
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -338,7 +350,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     if (widget.isReadOnly) return;
     try {
       await widget.connection.selectDatabase(widget.database);
-      await widget.connection.rpush(widget.keyName, value);
+      await widget.connection.rpush(_cmdKey, value);
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -351,7 +363,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     if (widget.isReadOnly) return;
     try {
       await widget.connection.selectDatabase(widget.database);
-      await widget.connection.sadd(widget.keyName, member);
+      await widget.connection.sadd(_cmdKey, member);
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -359,19 +371,19 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     }
   }
 
-  Future<void> _setRemove(String member) async {
+  Future<void> _setRemove(RedisBulkValue member) async {
     if (widget.isReadOnly) return;
     final confirmed = await confirmDestructiveAction(
       context: context,
       type: DestructiveSqlType.redisSrem,
-      targetName: member,
-      commandPreview: 'SREM ${widget.keyName} $member',
+      targetName: member.label,
+      commandPreview: 'SREM ${widget.keyName} ${member.label}',
       connectionName: widget.connection.name,
     );
     if (!mounted || !confirmed) return;
     try {
       await widget.connection.selectDatabase(widget.database);
-      await widget.connection.srem(widget.keyName, member);
+      await widget.connection.srem(_cmdKey, member);
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -384,7 +396,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     if (widget.isReadOnly) return;
     try {
       await widget.connection.selectDatabase(widget.database);
-      await widget.connection.zadd(widget.keyName, score, member);
+      await widget.connection.zadd(_cmdKey, score, member);
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -392,19 +404,19 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     }
   }
 
-  Future<void> _zsetRemove(String member) async {
+  Future<void> _zsetRemove(RedisBulkValue member) async {
     if (widget.isReadOnly) return;
     final confirmed = await confirmDestructiveAction(
       context: context,
       type: DestructiveSqlType.redisZrem,
-      targetName: member,
-      commandPreview: 'ZREM ${widget.keyName} $member',
+      targetName: member.label,
+      commandPreview: 'ZREM ${widget.keyName} ${member.label}',
       connectionName: widget.connection.name,
     );
     if (!mounted || !confirmed) return;
     try {
       await widget.connection.selectDatabase(widget.database);
-      await widget.connection.zrem(widget.keyName, member);
+      await widget.connection.zrem(_cmdKey, member);
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -673,6 +685,39 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   // ─── String ─────────────────────────────────────────────────────────────
 
   Widget _buildStringEditor(ColorScheme cs, shadcn.ColorScheme scs) {
+    if (_stringIsBinary) {
+      final bulk = _stringValue!;
+      return material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
+          Text('Binary value (${bulk.bytes.length} bytes)').semiBold(),
+          const Gap(8),
+          const Text(
+            'Not valid UTF-8. Save as text is disabled so the original bytes are not overwritten.',
+          ).muted().small(),
+          const Gap(12),
+          const Text('Hex').semiBold().small(),
+          const Gap(4),
+          material.SelectableText(
+            bulk.toHex(),
+            style: const material.TextStyle(
+              fontSize: 13,
+              fontFamily: 'monospace',
+            ),
+          ),
+          const Gap(12),
+          const Text('Base64').semiBold().small(),
+          const Gap(4),
+          material.SelectableText(
+            bulk.toBase64(),
+            style: const material.TextStyle(
+              fontSize: 13,
+              fontFamily: 'monospace',
+            ),
+          ),
+        ],
+      );
+    }
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
@@ -768,8 +813,8 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
                   itemBuilder: (context, index) {
                     final entry = entries[index];
                     return _FieldRow(
-                      field: entry.key,
-                      value: entry.value,
+                      field: entry.key.label,
+                      value: entry.value.label,
                       onDelete:
                           widget.isReadOnly ? null : () => _hashDel(entry.key),
                       colorScheme: cs,
@@ -823,7 +868,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
                   separatorBuilder: (_, __) => const Gap(4),
                   itemBuilder: (context, i) => _IndexedValueRow(
                     index: i,
-                    value: _listValue[i],
+                    value: _listValue[i].label,
                     colorScheme: cs,
                     shadcnCs: scs,
                   ),
@@ -873,7 +918,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
                   itemCount: _setValue.length,
                   separatorBuilder: (_, __) => const Gap(4),
                   itemBuilder: (context, index) => _MemberRow(
-                    member: _setValue[index],
+                    member: _setValue[index].label,
                     onDelete: widget.isReadOnly
                         ? null
                         : () => _setRemove(_setValue[index]),
@@ -938,7 +983,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
                   itemBuilder: (context, index) {
                     final (member, score) = _zsetValue[index];
                     return _ScoredMemberRow(
-                      member: member,
+                      member: member.label,
                       score: score,
                       onDelete:
                           widget.isReadOnly ? null : () => _zsetRemove(member),

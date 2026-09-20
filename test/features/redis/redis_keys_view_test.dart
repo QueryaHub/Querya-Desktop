@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/database/redis_bulk.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/features/redis/redis_keys_view.dart';
 
@@ -165,6 +166,39 @@ void main() {
     expect(find.text('key_a'), findsOneWidget);
     await fake.disconnect();
   });
+
+  testWidgets('RedisKeysView shows binary SCAN keys as hex, not List.toString',
+      (tester) async {
+    final fake = RedisConnectionTestFake(
+      firstScanKeys: const ['ascii'],
+      binaryScanKeys: const [
+        [0xff, 0xfe],
+      ],
+      dbSizeResult: 2,
+    );
+    await fake.connect();
+
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.Scaffold(
+          body: material.SizedBox(
+            width: 800,
+            height: 600,
+            child: RedisKeysView(
+              connection: fake,
+              database: 0,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('ascii'), findsOneWidget);
+    expect(find.text('0xfffe'), findsOneWidget);
+    expect(find.text('[255, 254]'), findsNothing);
+    await fake.disconnect();
+  });
 }
 
 class _DelTrackingFake extends RedisConnectionTestFake {
@@ -173,8 +207,8 @@ class _DelTrackingFake extends RedisConnectionTestFake {
   final deleted = <String>[];
 
   @override
-  Future<int> del(String key) async {
-    deleted.add(key);
+  Future<int> del(Object key) async {
+    deleted.add(key is RedisBulkValue ? key.label : key.toString());
     return super.del(key);
   }
 }

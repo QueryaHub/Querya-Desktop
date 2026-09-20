@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Redis binary bulk (#818)** — GET / SCAN / hash / list / set / zset decode bulk replies as bytes (`RedisParserBulkBinary`). Invalid UTF-8 is shown as hex / base64; Save as text is off so SET cannot write replacement characters.
 - **Redis stream/unknown GET-SET (#817)** — Stream, module, and `unknown` keys are not opened with `GET` or saved with `SET`. Save stays on `string` only; `unknown` retries `TYPE` before treating the value as a string.
 - **SQL toolbar overflow** — MySQL / Postgres Query + History + Execute wrap instead of overflowing at ~700px (widget tests treat RenderFlex overflow as failure).
 - **Redis collection paging (#816)** — Hash / list / set / zset editors load the first 200 members (`HSCAN` / `LRANGE` / `SSCAN` / `ZRANGE`) with Load more, instead of `HGETALL` / `LRANGE 0 -1` / `SMEMBERS` / `ZRANGE 0 -1`. Keys with 10k+ members show a large-key warning.

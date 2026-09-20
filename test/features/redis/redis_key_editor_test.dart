@@ -245,4 +245,20 @@ void main() {
     expect(fake.sentCommands.contains('GET'), isTrue);
     await fake.disconnect();
   });
+
+  testWidgets('RedisKeyEditor binary GET shows hex and hides Save',
+      (tester) async {
+    final fake = RedisConnectionTestFake(
+      getBytesResult: const [0xff, 0xfe, 0x01],
+    );
+    await fake.connect();
+
+    await pumpEditor(tester, fake: fake, isReadOnly: false);
+
+    expect(find.textContaining('Binary value'), findsOneWidget);
+    expect(find.text('fffe01'), findsOneWidget);
+    expect(find.text('Save'), findsNothing);
+    expect(find.text('[255, 254, 1]'), findsNothing);
+    await fake.disconnect();
+  });
 }

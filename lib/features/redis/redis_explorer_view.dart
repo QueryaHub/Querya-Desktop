@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/database/redis_bulk.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/database/redis_service.dart';
 import 'package:querya_desktop/core/motion/querya_switching_body.dart';
@@ -53,7 +54,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
   int _refreshEpoch = 0;
 
   // Navigation state
-  String? _selectedKey;
+  RedisBulkValue? _selectedKey;
   String? _selectedKeyType;
 
   @override
@@ -131,7 +132,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
 
   // ─── Navigation helpers ─────────────────────────────────────────────────
 
-  void _navigateToKey(String key, String type) {
+  void _navigateToKey(RedisBulkValue key, String type) {
     setState(() {
       _selectedKey = key;
       _selectedKeyType = type;
@@ -153,7 +154,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
           '${widget.connectionRow.name} › db${widget.database}', _Level.keys),
     ];
     if (_selectedKey != null) {
-      list.add(_Crumb(_selectedKey!, _Level.key));
+      list.add(_Crumb(_selectedKey!.label, _Level.key));
     }
     if (_showStats) {
       list.add(const _Crumb('Statistics', _Level.stats));
@@ -270,10 +271,12 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
     // Key editor
     if (_selectedKey != null) {
       return RedisKeyEditor(
-        key: ValueKey('key_${widget.database}_${_selectedKey}_$_refreshEpoch'),
+        key: ValueKey(
+            'key_${widget.database}_${_selectedKey!.label}_$_refreshEpoch'),
         connection: conn,
         database: widget.database,
-        keyName: _selectedKey!,
+        keyName: _selectedKey!.label,
+        keyArg: _selectedKey!.commandArg,
         keyType: _selectedKeyType ?? 'unknown',
         onBack: _navigateToKeys,
         onKeyDeleted: _navigateToKeys,
