@@ -125,7 +125,14 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       MysqlService.instance.interrupt(
         widget.connectionRow,
         database: widget.database,
-        mode: MysqlSessionMode.readWrite,
+        mode: MysqlSessionMode.readOnly,
+      );
+    }
+    if (interruptIfBusy && _isSaving) {
+      MysqlService.instance.interrupt(
+        widget.connectionRow,
+        database: widget.database,
+        mode: MysqlSessionMode.tableWrite,
       );
     }
     _lease?.release();
@@ -151,7 +158,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       final lease = await MysqlService.instance.acquire(
         widget.connectionRow,
         database: widget.database,
-        mode: MysqlSessionMode.readWrite,
+        mode: MysqlSessionMode.readOnly,
       );
       if (!mounted) {
         lease.release();
@@ -194,6 +201,21 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       }
     }
     return out;
+  }
+
+  Future<T> _withTableWrite<T>(
+    Future<T> Function(MysqlConnection conn) fn,
+  ) async {
+    final lease = await MysqlService.instance.acquire(
+      widget.connectionRow,
+      database: widget.database,
+      mode: MysqlSessionMode.tableWrite,
+    );
+    try {
+      return await fn(lease.connection);
+    } finally {
+      lease.release();
+    }
   }
 
   Future<bool> _confirmDiscardIfNeeded() {
@@ -485,23 +507,17 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       columnDataTypes: _columnDataTypes.isEmpty ? null : _columnDataTypes,
       columnMeta: _columnMeta.isEmpty ? null : _columnMeta,
       execute: (plan) async {
-        final conn = _connection;
-        if (conn == null || !conn.isConnected) {
-          throw StateError('Could not connect to MySQL.');
-        }
-        await conn.execute('START TRANSACTION');
-        try {
-          for (final stmt in plan.statements) {
-            final rs = await conn.execute(stmt.sql);
-            expectDmlMatchedRows(rs.affectedRows.toInt());
+        await _withTableWrite((conn) async {
+          if (!conn.isConnected) {
+            throw StateError('Could not connect to MySQL.');
           }
-          await conn.execute('COMMIT');
-        } catch (e) {
-          try {
-            await conn.execute('ROLLBACK');
-          } catch (_) {}
-          rethrow;
-        }
+          await conn.runInTransaction(() async {
+            for (final stmt in plan.statements) {
+              final rs = await conn.execute(stmt.sql);
+              expectDmlMatchedRows(rs.affectedRows.toInt());
+            }
+          });
+        });
       },
     );
     if (!mounted) return;

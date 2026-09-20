@@ -3,7 +3,11 @@ import 'package:querya_desktop/core/database/mysql_connection_pool.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 
 export 'mysql_connection_pool.dart'
-    show MysqlLease, MysqlSessionMode, MysqlConnectionPool;
+    show
+        MysqlLease,
+        MysqlSessionMode,
+        MysqlSessionModeReadOnly,
+        MysqlConnectionPool;
 
 Future<MysqlConnection> _defaultCreateAndConnect(
   ConnectionRow row, {
@@ -15,7 +19,7 @@ Future<MysqlConnection> _defaultCreateAndConnect(
     database: database.isEmpty ? null : database,
   );
   await conn.connect();
-  await conn.setSessionReadOnly(mode == MysqlSessionMode.readOnly);
+  await conn.setSessionReadOnly(mode.isReadOnlySession);
   return conn;
 }
 
@@ -47,6 +51,20 @@ class MysqlService {
     MysqlSessionMode mode = MysqlSessionMode.readOnly,
   }) =>
       _pool.interrupt(row, database: database, mode: mode);
+
+  /// Force-closes every session mode for this connection+database.
+  void interruptAllModes(
+    ConnectionRow row, {
+    required String database,
+  }) =>
+      _pool.interruptAllModes(row, database: database);
+
+  /// Whether the SQL-editor read-write slot has an open transaction.
+  Future<bool> hasOpenSqlTransaction(
+    ConnectionRow row, {
+    required String database,
+  }) =>
+      _pool.hasOpenSqlTransaction(row, database: database);
 
   Future<void> disconnectAll() => _pool.disconnectAll();
 }
