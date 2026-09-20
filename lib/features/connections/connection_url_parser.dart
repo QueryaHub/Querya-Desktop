@@ -165,7 +165,10 @@ ConnectionRow? _buildConnectionRow(
     authSource =
         uri.queryParameters['authSource'] ?? uri.queryParameters['authsource'];
 
-    if (type == 'postgresql' || type == 'mysql' || type == 'mongodb') {
+    if (type == 'postgresql' ||
+        type == 'mysql' ||
+        type == 'mongodb' ||
+        type == 'redis') {
       connectionString = url;
     }
   }
