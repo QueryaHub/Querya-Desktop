@@ -55,4 +55,47 @@ void main() {
       );
     });
   });
+
+  group('mongoFilterFromJson', () {
+    test('24-char hex _id becomes ObjectId, not a String', () {
+      const hex = '507f1f77bcf86cd799439011';
+      final filter = mongoFilterFromJson('{"_id": "$hex"}');
+      expect(filter['_id'], isA<ObjectId>());
+      expect(filter['_id'], isNot(isA<String>()));
+      expect((filter['_id'] as ObjectId).oid, hex);
+      expect(mongoFilterNeedsObjectIdHint(filter), isFalse);
+    });
+
+    test('Extended JSON \$oid _id is ObjectId', () {
+      const hex = '507f191e810c19729de860ea';
+      final filter = mongoFilterFromJson(
+        '{"_id": {"\$oid": "$hex"}}',
+      );
+      expect(filter['_id'], isA<ObjectId>());
+      expect((filter['_id'] as ObjectId).oid, hex);
+    });
+
+    test('Extended JSON \$date is DateTime', () {
+      final filter = mongoFilterFromJson(
+        '{"created": {"\$date": "2024-01-15T12:30:00.000Z"}}',
+      );
+      expect(filter['created'], isA<DateTime>());
+      expect(
+        (filter['created'] as DateTime).toUtc(),
+        DateTime.utc(2024, 1, 15, 12, 30),
+      );
+    });
+
+    test('non-hex _id string stays a string and needs the ObjectId hint', () {
+      final filter = mongoFilterFromJson('{"_id": "not-an-objectid"}');
+      expect(filter['_id'], 'not-an-objectid');
+      expect(mongoFilterNeedsObjectIdHint(filter), isTrue);
+    });
+
+    test('query operators like \$gt are kept', () {
+      final filter = mongoFilterFromJson('{"age": {"\$gt": 5}}');
+      expect(filter['age'], isA<Map>());
+      expect((filter['age'] as Map)[r'$gt'], 5);
+    });
+  });
 }
