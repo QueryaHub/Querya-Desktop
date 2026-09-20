@@ -24,6 +24,20 @@ abstract final class GridDataTypeValidator {
 
     final type = dataTypeName.toLowerCase().trim();
 
+    // Boolean types (MySQL BOOLEAN is TINYINT(1) — check before generic int)
+    if (type == 'bool' || type == 'boolean' || type.startsWith('tinyint(1)')) {
+      final lower = value.toLowerCase().trim();
+      if (lower != 'true' &&
+          lower != 'false' &&
+          lower != '1' &&
+          lower != '0' &&
+          lower != 't' &&
+          lower != 'f') {
+        return 'Expected boolean (true/false/1/0)';
+      }
+      return null;
+    }
+
     // Integer types
     if (type.contains('int') || type == 'serial' || type == 'bigserial') {
       if (!_intRegex.hasMatch(value.trim())) {
@@ -40,20 +54,6 @@ abstract final class GridDataTypeValidator {
         type == 'real') {
       if (!_numRegex.hasMatch(value.trim())) {
         return 'Expected valid number';
-      }
-      return null;
-    }
-
-    // Boolean types
-    if (type == 'bool' || type == 'boolean') {
-      final lower = value.toLowerCase().trim();
-      if (lower != 'true' &&
-          lower != 'false' &&
-          lower != '1' &&
-          lower != '0' &&
-          lower != 't' &&
-          lower != 'f') {
-        return 'Expected boolean (true/false/1/0)';
       }
       return null;
     }
@@ -99,11 +99,12 @@ abstract final class GridDataTypeValidator {
       return null;
     }
 
-    // Binary / BLOB / Bytea
+    // Binary / BLOB / Bytea / BIT
     if (type.contains('blob') ||
         type.contains('bytea') ||
         type.contains('binary') ||
         type.contains('varbinary') ||
+        type.startsWith('bit') ||
         type == 'raw' ||
         type == 'image') {
       var hex = value.trim();

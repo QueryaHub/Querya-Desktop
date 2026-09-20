@@ -18,6 +18,14 @@ extension MySQLUint8ListExtension on Uint8List {
   }
 
   Tuple2<String, int> getUtf8LengthEncodedString(int startOffset) {
+    return getLengthEncodedString(startOffset);
+  }
+
+  /// Length-encoded string. [latin1Bytes] maps each byte 1:1 (BIT/BLOB/BINARY).
+  Tuple2<String, int> getLengthEncodedString(
+    int startOffset, {
+    bool latin1Bytes = false,
+  }) {
     final tmp = Uint8List.sublistView(this, startOffset);
     final bd = ByteData.sublistView(tmp);
 
@@ -29,7 +37,8 @@ extension MySQLUint8ListExtension on Uint8List {
       strLength.item2 + strLength.item1.toInt(),
     );
 
-    return Tuple2(utf8.decode(tmp2), strLength.item2 + strLength.item1.toInt());
+    final decoded = latin1Bytes ? latin1.decode(tmp2) : utf8.decode(tmp2);
+    return Tuple2(decoded, strLength.item2 + strLength.item1.toInt());
   }
 }
 

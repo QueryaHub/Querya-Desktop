@@ -7,6 +7,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
+import 'package:querya_desktop/core/database/mysql_result_cells.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
 import 'package:querya_desktop/core/database/result_row_string_convert.dart';
 import 'package:querya_desktop/core/database/sql_limit.dart';
@@ -341,11 +342,18 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
           }
         },
       );
+      final colList = rs.cols.toList();
       final outRows = [
         for (final row in taken.items)
           List.generate(
             row.numOfColumns,
-            (i) => resultCellToDisplayString(row.colAt(i)),
+            (i) {
+              final col = i < colList.length ? colList[i] : null;
+              return mysqlResultCellToDisplayString(
+                row.colAt(i),
+                column: col,
+              );
+            },
           ),
       ];
       final truncated =

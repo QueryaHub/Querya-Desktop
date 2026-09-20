@@ -34,6 +34,29 @@ const mysqlColumnTypeVarString = 0xfd;
 const mysqlColumnTypeString = 0xfe;
 const mysqlColumnTypeGeometry = 0xff;
 
+/// `character_set` id 63 (`binary`) — BIT / BLOB / BINARY / VARBINARY.
+const mysqlCharsetBinary = 63;
+
+/// Whether the wire value is raw bytes (latin1 1:1), not UTF-8 text.
+bool mysqlColumnHoldsRawBytes({
+  required int columnType,
+  required int charset,
+}) {
+  if (charset == mysqlCharsetBinary) {
+    return true;
+  }
+  switch (columnType) {
+    case mysqlColumnTypeBit:
+    case mysqlColumnTypeTinyBlob:
+    case mysqlColumnTypeMediumBlob:
+    case mysqlColumnTypeLongBlob:
+    case mysqlColumnTypeBlob:
+      return true;
+    default:
+      return false;
+  }
+}
+
 class MySQLColumnType {
   final int _value;
 
@@ -188,8 +211,9 @@ Tuple2<String, int> parseBinaryColumnData(
   int columnType,
   ByteData data,
   Uint8List buffer,
-  int startOffset,
-) {
+  int startOffset, [
+  int charset = 0,
+]) {
   switch (columnType) {
     case mysqlColumnTypeTiny:
       final value = data.getInt8(startOffset);
@@ -333,7 +357,13 @@ Tuple2<String, int> parseBinaryColumnData(
     case mysqlColumnTypeBit:
     case mysqlColumnTypeDecimal:
     case mysqlColumnTypeNewDecimal:
-      return buffer.getUtf8LengthEncodedString(startOffset);
+      return buffer.getLengthEncodedString(
+        startOffset,
+        latin1Bytes: mysqlColumnHoldsRawBytes(
+          columnType: columnType,
+          charset: charset,
+        ),
+      );
   }
 
   throw MySQLProtocolException(

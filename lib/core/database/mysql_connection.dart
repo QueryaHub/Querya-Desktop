@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:mysql_client/mysql_client.dart';
+import 'package:querya_desktop/core/database/mysql_result_cells.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
@@ -432,7 +433,7 @@ class MysqlConnection {
       throw StateError('Not connected to MySQL');
     }
     final colsRs = await execute(
-      'SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT, EXTRA '
+      'SELECT COLUMN_NAME, DATA_TYPE, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, EXTRA '
       'FROM information_schema.COLUMNS '
       'WHERE TABLE_SCHEMA = :database AND TABLE_NAME = :table '
       'ORDER BY ORDINAL_POSITION',
@@ -458,7 +459,10 @@ class MysqlConnection {
 
     for (final r in colsRs.rows) {
       final name = r.colByName('COLUMN_NAME') ?? '';
-      final dataType = r.colByName('DATA_TYPE') ?? '';
+      final dataType = mysqlColumnSchemaType(
+        dataType: r.colByName('DATA_TYPE') ?? '',
+        columnType: r.colByName('COLUMN_TYPE') ?? '',
+      );
       final isNullable =
           (r.colByName('IS_NULLABLE') ?? 'YES').toUpperCase() == 'YES';
       final isPk = primaryKeys.contains(name);

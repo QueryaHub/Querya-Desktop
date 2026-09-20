@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:mysql_client/mysql_client.dart';
 import 'package:querya_desktop/core/database/mysql_connection.dart';
+import 'package:querya_desktop/core/database/mysql_result_cells.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
 import 'package:querya_desktop/core/database/result_row_string_convert.dart';
 import 'package:querya_desktop/core/database/sql_limit.dart';
@@ -186,13 +187,21 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
   }
 
   Future<List<List<String>>> _resultRowsAsync(IResultSet rs) async {
+    final colList = rs.cols.toList();
     final out = <List<String>>[];
     var n = 0;
     for (final row in rs.rows) {
       out.add(
         List.generate(
           row.numOfColumns,
-          (i) => resultCellToDisplayString(row.colAt(i)),
+          (i) {
+            final col = i < colList.length ? colList[i] : null;
+            return mysqlResultCellToDisplayString(
+              row.colAt(i),
+              column: col,
+              schemaDataType: col == null ? null : _columnDataTypes[col.name],
+            );
+          },
         ),
       );
       n++;

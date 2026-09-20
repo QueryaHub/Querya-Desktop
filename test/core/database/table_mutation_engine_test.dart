@@ -63,7 +63,9 @@ void main() {
       ['2', 'bob', '25', 'false'],
     ];
 
-    test('generates UPDATE statement for modified cells with single PK in Postgres dialect', () {
+    test(
+        'generates UPDATE statement for modified cells with single PK in Postgres dialect',
+        () {
       final plan = TableMutationEngine.generatePlan(
         dialect: SqlDialect.postgres,
         tableName: 'users',
@@ -216,7 +218,9 @@ void main() {
       );
     });
 
-    test('preserves leading zeros and boolean strings in string columns with columnDataTypes', () {
+    test(
+        'preserves leading zeros and boolean strings in string columns with columnDataTypes',
+        () {
       const stringCols = ['id', 'zip_code', 'is_flag_str'];
       const stringRows = [
         ['1', '01234', 'true'],
@@ -253,7 +257,9 @@ void main() {
       );
     });
 
-    test('preserves leading zeros in fallback heuristic without columnDataTypes', () {
+    test(
+        'preserves leading zeros in fallback heuristic without columnDataTypes',
+        () {
       expect(
         TableMutationEngine.formatLiteral('01234', SqlDialect.postgres),
         '\'01234\'',
@@ -329,6 +335,16 @@ void main() {
           dataTypeName: 'blob',
         ),
         "X'CAFE'",
+      );
+
+      // MySQL BOOLEAN stored as tinyint(1)
+      expect(
+        TableMutationEngine.formatLiteral(
+          '1',
+          SqlDialect.mysql,
+          dataTypeName: 'tinyint(1)',
+        ),
+        'TRUE',
       );
 
       // NULL for binary
