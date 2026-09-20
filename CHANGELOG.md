@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Target cut: **0.4.17** ([milestone](https://github.com/QueryaHub/Querya-Desktop/milestone/8), tracking [#880](https://github.com/QueryaHub/Querya-Desktop/issues/880)).
+
+### Planned (not yet on `dev`)
+
+- Hidden bugs pass 2 — data-loss / fail-open: [#867](https://github.com/QueryaHub/Querya-Desktop/issues/867)–[#873](https://github.com/QueryaHub/Querya-Desktop/issues/873)
+- Algorithm / first paint / 120 Hz: [#874](https://github.com/QueryaHub/Querya-Desktop/issues/874)–[#879](https://github.com/QueryaHub/Querya-Desktop/issues/879)
+
 ### Fixed
 
 - **Table Browser schema load vs missing PK (#772)** — A failed `getTableSchema` (permissions, disconnect) is no longer shown as “Cannot edit: no primary key detected”. Status is “schema unavailable” plus the real error and Refresh retries schema. Editing stays off until schema loads. Genuine missing PKs still use the old copy. SQLite implicit `rowid` is applied only after a successful schema load.
