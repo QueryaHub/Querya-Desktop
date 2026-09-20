@@ -2,6 +2,7 @@ import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
+import 'package:postgres/postgres.dart';
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/postgres_sql.dart';
@@ -9,6 +10,7 @@ import 'package:querya_desktop/core/database/result_row_string_convert.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/postgresql/postgres_result_utils.dart';
 import 'package:querya_desktop/features/postgresql/postgres_sql_editor_dialog.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_privileges_dialog.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_toolbar.dart';
@@ -251,6 +253,28 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     );
   }
 
+  Future<List<List<String>>> _postgresRowsToDisplayStrings(
+    Result result,
+    List<String> colNames,
+  ) async {
+    final rawRows = <List<Object?>>[
+      for (final row in result)
+        List<Object?>.generate(row.length, (i) => row[i]),
+    ];
+    final converted = convertPostgresResultRowsToStrings(
+      PostgresResultConvertJob(
+        rowValues: rawRows,
+        columnTypeOids: [
+          for (final c in result.schema.columns) c.typeOid,
+        ],
+        columnDataTypes: [
+          for (final n in colNames) _columnDataTypes[n],
+        ],
+      ),
+    );
+    return convertResultRowsToStringsAdaptive(converted);
+  }
+
   /// [refreshCount] runs `COUNT(*)` (e.g. first load or Refresh). Pagination only runs SELECT.
   Future<void> _fetch({bool refreshCount = false}) async {
     final conn = _connection;
@@ -296,12 +320,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         (i) => result.schema.columns[i].columnName ?? 'col_$i',
       );
 
-      final rawRows = <List<Object?>>[
-        for (final row in result)
-          List<Object?>.generate(row.length, (i) => row[i]),
-      ];
-
-      final stringRows = await convertResultRowsToStringsAdaptive(rawRows);
+      final stringRows = await _postgresRowsToDisplayStrings(result, colNames);
 
       if (!mounted) return;
       setState(() {
@@ -351,12 +370,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         (i) => result.schema.columns[i].columnName ?? 'col_$i',
       );
 
-      final rawRows = <List<Object?>>[
-        for (final row in result)
-          List<Object?>.generate(row.length, (i) => row[i]),
-      ];
-
-      final stringRows = await convertResultRowsToStringsAdaptive(rawRows);
+      final stringRows = await _postgresRowsToDisplayStrings(result, colNames);
 
       if (!mounted) return;
       setState(() {

@@ -1,6 +1,7 @@
 /// Utilities for PostgreSQL table data view (quoting, row conversion).
 library;
 
+import 'package:querya_desktop/core/database/postgres_result_cells.dart';
 import 'package:querya_desktop/core/database/sql_limit.dart';
 
 /// Default page size for table browse and the SQL template filled from the tree.
@@ -24,13 +25,10 @@ String quotePostgresIdentifier(String name) {
 
 /// Converts raw result rows (list of dynamic values per row) to list of string rows.
 List<List<String>> convertResultRowsToStrings(List<List<dynamic>> rawRows) {
-  return rawRows.map((row) {
-    return row.map((value) {
-      if (value == null) return 'NULL';
-      if (value is DateTime) return value.toIso8601String();
-      return value.toString();
-    }).toList();
-  }).toList();
+  return [
+    for (final row in rawRows)
+      [for (final value in row) postgresResultCellToDisplayString(value)],
+  ];
 }
 
 /// Whether [sql] is allowed for the Table Browser custom-SQL dialog.

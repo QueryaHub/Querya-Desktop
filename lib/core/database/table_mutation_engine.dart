@@ -142,6 +142,13 @@ abstract final class TableMutationEngine {
         lower.startsWith('bit');
   }
 
+  static bool _isArrayType(String dataTypeName) {
+    final lower = dataTypeName.toLowerCase().trim();
+    if (lower.contains('[]')) return true;
+    if (lower == 'array') return true;
+    return lower.startsWith('_') && !lower.contains(' ');
+  }
+
   /// Public alias of [_isBoolType] for grid display / validators.
   static bool isBoolType(String dataTypeName) => _isBoolType(dataTypeName);
 
@@ -165,6 +172,13 @@ abstract final class TableMutationEngine {
     final trimmed = value.trim();
 
     if (dataTypeName != null && dataTypeName.isNotEmpty) {
+      if (_isArrayType(dataTypeName)) {
+        if (trimmed == 'NULL' || trimmed == 'null') {
+          return 'NULL';
+        }
+        return _formatStringLiteral(value, dialect);
+      }
+
       if (_isBinaryType(dataTypeName)) {
         if (trimmed == 'NULL' || trimmed == 'null') {
           return 'NULL';

@@ -18,6 +18,7 @@ import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/ui/querya_shell_status.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
+import 'package:querya_desktop/features/postgresql/postgres_result_utils.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_utils.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
@@ -475,7 +476,15 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         n++;
       }
 
-      final outRows = await convertResultRowsToStringsAdaptive(rawRows);
+      final converted = convertPostgresResultRowsToStrings(
+        PostgresResultConvertJob(
+          rowValues: rawRows,
+          columnTypeOids: [
+            for (final c in schema.columns) c.typeOid,
+          ],
+        ),
+      );
+      final outRows = await convertResultRowsToStringsAdaptive(converted);
 
       final target = SqlTableTargetExtractor.extract(userSql);
       var pks = const <String>[];

@@ -10,6 +10,7 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:postgres/src/connection_string.dart' show parseConnectionString;
 
 import 'postgres_metadata.dart';
+import 'postgres_result_cells.dart';
 import 'table_schema_meta.dart';
 
 /// Replaces the database in a `postgresql://` / `postgres://` URI (path or
@@ -421,7 +422,7 @@ class PostgresConnection {
     }
     final colsRs = await _conn!.execute(
       Sql.named(
-        'SELECT column_name, data_type, is_nullable, column_default, '
+        'SELECT column_name, data_type, udt_name, is_nullable, column_default, '
         'is_generated, is_identity, identity_generation '
         'FROM information_schema.columns '
         'WHERE table_schema = @schema AND table_name = @table '
@@ -450,15 +451,18 @@ class PostgresConnection {
 
     for (final r in colsRs) {
       final name = r[0] as String? ?? '';
-      final dataType = r[1] as String? ?? '';
-      final isNullable = (r[2] as String? ?? 'YES').toUpperCase() == 'YES';
+      final dataType = postgresColumnSchemaType(
+        dataType: r[1] as String? ?? '',
+        udtName: r[2] as String? ?? '',
+      );
+      final isNullable = (r[3] as String? ?? 'YES').toUpperCase() == 'YES';
       final isPk = primaryKeys.contains(name);
       final pkPos = isPk ? primaryKeys.indexOf(name) + 1 : null;
-      final dflt = r[3]?.toString();
+      final dflt = r[4]?.toString();
       final isGenerated =
-          (r[4] as String? ?? 'NEVER').toUpperCase() == 'ALWAYS';
-      final isIdentity = (r[5] as String? ?? 'NO').toUpperCase() == 'YES';
-      final identityGeneration = (r[6] as String? ?? '').toUpperCase();
+          (r[5] as String? ?? 'NEVER').toUpperCase() == 'ALWAYS';
+      final isIdentity = (r[6] as String? ?? 'NO').toUpperCase() == 'YES';
+      final identityGeneration = (r[7] as String? ?? '').toUpperCase();
       final omitOnInsert =
           isGenerated || (isIdentity && identityGeneration == 'ALWAYS');
       final hasServerDefault = (dflt != null && dflt.isNotEmpty) ||

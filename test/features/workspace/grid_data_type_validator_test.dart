@@ -93,6 +93,17 @@ void main() {
       expect(GridDataTypeValidator.validate('123', dataTypeName: 'bytea'), isNotNull); // odd length hex
     });
 
+    test('skips scalar checks for PostgreSQL array types', () {
+      expect(
+        GridDataTypeValidator.validate('{1,2,3}', dataTypeName: 'integer[]'),
+        isNull,
+      );
+      expect(
+        GridDataTypeValidator.validate('{1,2,3}', dataTypeName: '_int4'),
+        isNull,
+      );
+    });
+
     test('allows empty and NULL values regardless of type', () {
       expect(GridDataTypeValidator.validate('', dataTypeName: 'int'), isNull);
       expect(GridDataTypeValidator.validate('NULL', dataTypeName: 'uuid'), isNull);
