@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Table Browser schema load vs missing PK (#772)** — A failed `getTableSchema` (permissions, disconnect) is no longer shown as “Cannot edit: no primary key detected”. Status is “schema unavailable” plus the real error and Refresh retries schema. Editing stays off until schema loads. Genuine missing PKs still use the old copy. SQLite implicit `rowid` is applied only after a successful schema load.
 - **SQLite implicit rowid Table Browser (#774)** — Tables with no declared PRIMARY KEY (`CREATE TABLE t (name TEXT)`) use implicit `rowid` as the DML key. Browse `SELECT` projects `"rowid", *` so Save can `UPDATE … WHERE rowid`. Status is no longer “no primary key”. `WITHOUT ROWID` tables keep their declared PK.
 - **Mongo 0-match write (#776)** — `updateOne` / `replaceOne` / `deleteOne` throw when `nMatched` / `nRemoved` is 0 (wrong `_id` type, deleted doc). Inspector and JSON editor surface Save Failed instead of a success toast. An identical `$set` (`nModified == 0`) still counts as a match.
 - **Mongo full-document Save (#778)** — JSON editor Save uses `replaceOne` (whole document, `_id` locked) instead of `$set`, so fields deleted in JSON — including nested keys — are removed on the server.

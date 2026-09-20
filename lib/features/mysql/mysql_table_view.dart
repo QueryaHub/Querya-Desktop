@@ -65,6 +65,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
   Map<String, String> _columnDataTypes = {};
   Map<String, TableColumnMeta> _columnMeta = {};
   bool _schemaLoaded = false;
+  Object? _schemaError;
   bool _isSaving = false;
 
   String get _tableTitle => '${widget.database}.${widget.tableName}';
@@ -76,6 +77,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
         customSqlActive: _customSqlActive,
         hasPrimaryKey: _primaryKeys.isNotEmpty,
         readOnly: widget.isReadOnly,
+        schemaError: _schemaError,
       );
 
   String _qualifiedFrom() {
@@ -130,6 +132,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
     _columnDataTypes = {};
     _columnMeta = {};
     _schemaLoaded = false;
+    _schemaError = null;
     _isSaving = false;
   }
 
@@ -264,23 +267,29 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
     if (_schemaLoaded) return;
     if (widget.isView) {
       _schemaLoaded = true;
+      _schemaError = null;
       _primaryKeys = [];
       _columnDataTypes = {};
       _columnMeta = {};
       return;
     }
-    try {
-      final schema = await conn.getTableSchema(
+    final loaded = await loadTableViewSchema(
+      () => conn.getTableSchema(
         database: widget.database,
         table: widget.tableName,
-      );
+      ),
+    );
+    final schema = loaded.schema;
+    if (schema != null) {
       _primaryKeys = List<String>.from(schema.primaryKeys);
       _columnDataTypes = columnDataTypesFromSchema(schema);
       _columnMeta = columnMetaFromSchema(schema);
-    } catch (_) {
+      _schemaError = null;
+    } else {
       _primaryKeys = [];
       _columnDataTypes = {};
       _columnMeta = {};
+      _schemaError = loaded.error;
     }
     _schemaLoaded = true;
   }
@@ -509,6 +518,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       hasPrimaryKey: _primaryKeys.isNotEmpty,
       schemaLoaded: _schemaLoaded,
       readOnly: widget.isReadOnly,
+      schemaError: _schemaError,
     );
     final pag = _paginationLabel();
     if (reason != null) return '$pag · $reason';
@@ -518,6 +528,8 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
   Future<void> _onRefresh() async {
     if (!await _confirmDiscardIfNeeded()) return;
     if (!mounted) return;
+    _schemaLoaded = false;
+    _schemaError = null;
     if (_customSqlActive) {
       await _fetchCustom();
     } else {
