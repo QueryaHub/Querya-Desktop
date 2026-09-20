@@ -33,6 +33,8 @@ class MySQLConnection {
   bool _inTransaction = false;
   final bool _secure;
   final SecurityContext? _securityContext;
+  final bool _sslVerifyCertificates;
+  final String? _sslServerName;
   final List<int> _incompleteBufferData = [];
   Object? _lastError;
   int _serverCapabilities = 0;
@@ -47,12 +49,16 @@ class MySQLConnection {
     bool secure = true,
     String? databaseName,
     SecurityContext? securityContext,
+    bool sslVerifyCertificates = false,
+    String? sslServerName,
   })  : _socket = socket,
         _username = username,
         _password = password,
         _databaseName = databaseName,
         _secure = secure,
         _securityContext = securityContext,
+        _sslVerifyCertificates = sslVerifyCertificates,
+        _sslServerName = sslServerName,
         _collation = collation;
 
   /// Creates connection with provided options.
@@ -82,6 +88,8 @@ class MySQLConnection {
     String? databaseName,
     String collation = 'utf8mb4_general_ci',
     SecurityContext? securityContext,
+    bool sslVerifyCertificates = false,
+    String? sslServerName,
   }) async {
     final Socket socket = await Socket.connect(host, port);
 
@@ -97,6 +105,8 @@ class MySQLConnection {
       databaseName: databaseName,
       secure: secure,
       securityContext: securityContext,
+      sslVerifyCertificates: sslVerifyCertificates,
+      sslServerName: sslServerName,
       collation: collation,
     );
 
@@ -364,8 +374,10 @@ class MySQLConnection {
 
         final secureSocket = await SecureSocket.secure(
           _socket,
+          host: _sslServerName,
           context: _securityContext,
-          onBadCertificate: (certificate) => true,
+          onBadCertificate:
+              _sslVerifyCertificates ? null : (certificate) => true,
         );
 
         // switch socket

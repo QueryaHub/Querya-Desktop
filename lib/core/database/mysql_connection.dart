@@ -8,6 +8,61 @@ import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 
+/// TLS policy from `ssl-mode` / `sslmode` / `ssl` on a MySQL URI.
+enum MysqlSslMode {
+  disable,
+  encrypt,
+  verifyCa,
+  verifyIdentity,
+}
+
+extension MysqlSslModeX on MysqlSslMode {
+  bool get secure => this != MysqlSslMode.disable;
+  bool get verifyCertificates =>
+      this == MysqlSslMode.verifyCa || this == MysqlSslMode.verifyIdentity;
+  bool get verifyIdentity => this == MysqlSslMode.verifyIdentity;
+}
+
+/// Parses Connector/J-style `ssl-mode` (`prefer` is TLS on, not disable).
+MysqlSslMode parseMysqlSslMode(String? raw, {required bool fallbackSsl}) {
+  if (raw == null || raw.trim().isEmpty) {
+    return fallbackSsl ? MysqlSslMode.encrypt : MysqlSslMode.disable;
+  }
+  switch (raw.toLowerCase().replaceAll('-', '_')) {
+    case 'false':
+    case '0':
+    case 'disable':
+    case 'disabled':
+      return MysqlSslMode.disable;
+    case 'prefer':
+    case 'preferred':
+    case 'require':
+    case 'required':
+    case 'true':
+    case '1':
+    case 'enabled':
+      return MysqlSslMode.encrypt;
+    case 'verify_ca':
+      return MysqlSslMode.verifyCa;
+    case 'verify_identity':
+    case 'verify_full':
+      return MysqlSslMode.verifyIdentity;
+    default:
+      return fallbackSsl ? MysqlSslMode.encrypt : MysqlSslMode.disable;
+  }
+}
+
+/// `verify_ca` / `verify_identity` fail closed without `sslrootcert`.
+void validateMysqlSslMode(MysqlSslMode mode, SslCertificatePaths paths) {
+  if (!mode.verifyCertificates) return;
+  final ca = paths.rootCert?.trim() ?? '';
+  if (ca.isEmpty) {
+    final label =
+        mode == MysqlSslMode.verifyIdentity ? 'verify_identity' : 'verify_ca';
+    throw ArgumentError('ssl-mode=$label requires sslrootcert');
+  }
+}
+
 /// Replaces the database in a `mysql://` / `mariadb://` URI (path or `database=`).
 String replaceDatabaseInMysqlConnectionString(
   String connectionString,
@@ -127,15 +182,23 @@ class MysqlConnection {
             : effectiveConnectionString!.trim();
         final parsed = _parseMysqlUri(uriStr, fallbackSsl: useSSL);
         final sslPaths = extractSslCertificatePathsFromString(uriStr);
+        var sslMode = parsed.sslMode;
+        if (sslPaths.hasAny && sslMode == MysqlSslMode.disable) {
+          sslMode = MysqlSslMode.encrypt;
+        }
+        validateMysqlSslMode(sslMode, sslPaths);
         final securityContext = buildSecurityContext(sslPaths);
+        final host = parsed.host;
         _conn = await MySQLConnection.createConnection(
-          host: parsed.host,
+          host: host,
           port: parsed.port,
           userName: parsed.userName,
           password: parsed.password,
-          secure: parsed.secure || sslPaths.hasAny,
+          secure: sslMode.secure,
           databaseName: parsed.databaseName,
           securityContext: securityContext,
+          sslVerifyCertificates: sslMode.verifyCertificates,
+          sslServerName: sslMode.verifyIdentity && host is String ? host : null,
         );
         await _conn!.connect(timeoutMs: connectTimeoutMs);
       } else {
@@ -169,7 +232,7 @@ class MysqlConnection {
     String userName,
     String password,
     String? databaseName,
-    bool secure,
+    MysqlSslMode sslMode,
   }) _parseMysqlUri(String raw, {required bool fallbackSsl}) {
     final uri = Uri.parse(raw);
     if (uri.scheme != 'mysql' && uri.scheme != 'mariadb') {
@@ -198,22 +261,16 @@ class MysqlConnection {
     db ??= uri.queryParameters['database'];
 
     final q = uri.queryParameters;
-    bool secure = fallbackSsl;
-    final ssl = (q['ssl-mode'] ?? q['sslmode'] ?? q['ssl'])?.toLowerCase();
-    if (ssl == 'false' ||
-        ssl == '0' ||
-        ssl == 'disable' ||
-        ssl == 'disabled' ||
-        ssl == 'prefer') {
-      secure = false;
-    }
-    if (ssl == 'require' || ssl == 'verify_ca' || ssl == 'verify_identity') {
-      secure = true;
-    }
+    var sslMode = parseMysqlSslMode(
+      q['ssl-mode'] ?? q['sslmode'] ?? q['ssl'],
+      fallbackSsl: fallbackSsl,
+    );
     if (q.containsKey(kSslRootCertParam) ||
         q.containsKey(kSslCertParam) ||
         q.containsKey(kSslKeyParam)) {
-      secure = true;
+      if (sslMode == MysqlSslMode.disable) {
+        sslMode = MysqlSslMode.encrypt;
+      }
     }
 
     return (
@@ -222,8 +279,17 @@ class MysqlConnection {
       userName: userName,
       password: password,
       databaseName: db,
-      secure: secure,
+      sslMode: sslMode,
     );
+  }
+
+  /// Parsed `ssl-mode` for [connectionString] (tests).
+  @visibleForTesting
+  static MysqlSslMode sslModeFromConnectionString(
+    String connectionString, {
+    bool fallbackSsl = true,
+  }) {
+    return _parseMysqlUri(connectionString, fallbackSsl: fallbackSsl).sslMode;
   }
 
   /// Whether [connectionString] implies a TLS session (including cert query params).
@@ -232,7 +298,9 @@ class MysqlConnection {
     String connectionString, {
     bool fallbackSsl = true,
   }) {
-    return _parseMysqlUri(connectionString, fallbackSsl: fallbackSsl).secure;
+    return _parseMysqlUri(connectionString, fallbackSsl: fallbackSsl)
+        .sslMode
+        .secure;
   }
 
   Future<void> disconnect() async {
