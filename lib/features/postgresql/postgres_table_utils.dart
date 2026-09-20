@@ -7,6 +7,20 @@ import 'package:querya_desktop/core/database/sql_limit.dart';
 /// Default page size for table browse and the SQL template filled from the tree.
 const kPostgresBrowseDefaultRowLimit = 200;
 
+/// Browse SELECT for Table Browser. PK columns get `ORDER BY` so LIMIT/OFFSET
+/// is stable. Empty [primaryKeys] keeps unordered scan (views / no PK).
+String postgresBrowseDataSql({
+  required String qualifiedFrom,
+  required List<String> primaryKeys,
+  required int limit,
+  required int offset,
+}) {
+  final order = primaryKeys.isEmpty
+      ? ''
+      : ' ORDER BY ${primaryKeys.map(quotePostgresIdentifier).join(', ')}';
+  return 'SELECT * FROM $qualifiedFrom$order LIMIT $limit OFFSET $offset';
+}
+
 /// `SELECT *` template matching [PostgresTableView] browse (same limit/offset).
 String postgresBrowseSelectSql({
   required String schema,

@@ -7,7 +7,7 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 /// Session policy for pooled connections: browse-only vs ad-hoc SQL (writes).
 enum PgSessionMode {
   /// `SET default_transaction_read_only = ON` after connect.
-  /// Tree catalog, stats, and Table Browser SELECT/COUNT.
+  /// Tree catalog, stats, and Table Browser SELECT.
   readOnly,
 
   /// SQL editor read-write session. Must not be shared with Table Browser.

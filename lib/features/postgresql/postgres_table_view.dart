@@ -59,7 +59,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
   /// Rows on the current page (same as _rows.length when not loading).
   int _rowsOnPage = 0;
 
-  /// Total rows in table/view (from COUNT(*)).
+  /// Planner estimate (`reltuples`); `null` when unknown or stale.
   int? _totalRowCount;
 
   /// Zero-based offset for LIMIT/OFFSET pagination.
@@ -182,18 +182,15 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     }
   }
 
-  static int _asInt(dynamic v) {
-    if (v == null) return 0;
-    if (v is int) return v;
-    if (v is BigInt) return v.toInt();
-    if (v is num) return v.toInt();
-    return int.tryParse(v.toString()) ?? 0;
-  }
-
   String _browseDataSql() {
     final schemaQ = quotePostgresIdentifier(widget.schema);
     final tableQ = quotePostgresIdentifier(widget.tableName);
-    return 'SELECT * FROM $schemaQ.$tableQ LIMIT ${widget.limit} OFFSET $_offset';
+    return postgresBrowseDataSql(
+      qualifiedFrom: '$schemaQ.$tableQ',
+      primaryKeys: _primaryKeys,
+      limit: widget.limit,
+      offset: _offset,
+    );
   }
 
   Future<T> _withTableWrite<T>(
@@ -275,7 +272,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     return convertResultRowsToStringsAdaptive(converted);
   }
 
-  /// [refreshCount] runs `COUNT(*)` (e.g. first load or Refresh). Pagination only runs SELECT.
+  /// [refreshCount] re-reads `reltuples` (e.g. first load or Refresh). Pagination only runs SELECT.
   Future<void> _fetch({bool refreshCount = false}) async {
     final conn = _connection;
     if (conn == null || !conn.isConnected) {
@@ -296,23 +293,24 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       _loading = true;
       _error = null;
     });
-    final schemaQ = quotePostgresIdentifier(widget.schema);
-    final tableQ = quotePostgresIdentifier(widget.tableName);
-    final countSql = 'SELECT COUNT(*) AS c FROM $schemaQ.$tableQ';
-    final dataSql = _browseDataSql();
     try {
-      int totalRows;
-      if (refreshCount || _totalRowCount == null) {
-        final countResult = await conn.execute(countSql);
-        totalRows = countResult.isEmpty ? 0 : _asInt(countResult.first[0]);
-      } else {
-        totalRows = _totalRowCount!;
-      }
-
-      final result = await conn.execute(dataSql);
+      await _ensureSchema(conn);
       if (!mounted) return;
 
-      await _ensureSchema(conn);
+      int? totalRows = _totalRowCount;
+      if (refreshCount || totalRows == null) {
+        try {
+          totalRows = await conn.estimateTableRows(
+            schema: widget.schema,
+            table: widget.tableName,
+          );
+        } catch (_) {
+          totalRows = null;
+        }
+      }
+
+      final dataSql = _browseDataSql();
+      final result = await conn.execute(dataSql);
       if (!mounted) return;
 
       final colNames = List<String>.generate(
@@ -323,10 +321,14 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       final stringRows = await _postgresRowsToDisplayStrings(result, colNames);
 
       if (!mounted) return;
+      final shown = stringRows.length;
+      if (totalRows != null && shown > 0 && totalRows < _offset + shown) {
+        totalRows = null;
+      }
       setState(() {
         _columnNames = colNames;
         _rows = stringRows;
-        _rowsOnPage = stringRows.length;
+        _rowsOnPage = shown;
         if (refreshCount || _totalRowCount == null) {
           _totalRowCount = totalRows;
         }
