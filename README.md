@@ -102,7 +102,7 @@ Whether you are navigating multi-million row datasets, authoring complex analyti
 |:---|:---:|:---:|:---:|
 | **Runtime Overhead** | **Zero JVM (Native Flutter / Dart)** | Heavy (~1–2 GB JVM/Electron) | Browser Tab Memory Limits |
 | **Data Grid Architecture** | **2D Virtualized ($O(1)$ Memory)** | Paginated or Unbounded Heap | DOM Virtualization Limits |
-| **In-Place Cell Editing** | **Yes (DML Staging & Preview)** | Often Direct or Unchecked | Read-Only or Manual Forms |
+| **In-Place Cell Editing** | **Live In-Grid Editing + Staged Commit** | Often Direct or Unchecked | Read-Only or Manual Forms |
 | **Multi-Tab SQL Sessions** | **Yes (Isolated Sessions)** | Varies | Limited by Tab Lifecycles |
 | **Local SQLite File Association** | **Native (.db, .sqlite, .sqlite3)** | Partial | Requires Server Upload |
 | **Complex Cell Inspector** | **JSON / XML / HTML / Hex-Binary** | Basic String View | Basic Textarea |

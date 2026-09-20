@@ -36,6 +36,7 @@ class ResultsTab extends material.StatefulWidget {
     this.onApplyChanges,
     this.isSaving = false,
     this.errorAction,
+    this.columnDataTypes,
   });
 
   final List<String> columns;
@@ -49,6 +50,9 @@ class ResultsTab extends material.StatefulWidget {
   final material.VoidCallback? onApplyChanges;
   final bool isSaving;
   final material.Widget? errorAction;
+
+  /// Column name → SQL type for cell hover tooltips and the inline editor.
+  final Map<String, String>? columnDataTypes;
 
   @override
   material.State<ResultsTab> createState() => _ResultsTabState();
@@ -491,6 +495,7 @@ class _ResultsTabState extends material.State<ResultsTab> {
                           columns: widget.columns,
                           rows: filteredRows,
                           stagingBuffer: widget.stagingBuffer,
+                          columnDataTypes: widget.columnDataTypes,
                           rowIndicesMapping: _cachedFilteredIndices,
                           onRowSelected: (row) => setState(() => _selectedRowIndex = row),
                           onSelectionValuesChanged: (values) {
