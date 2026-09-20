@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:convert';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
@@ -7,6 +8,11 @@ import 'package:querya_desktop/features/workspace/xml_html_formatter.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Opens a rich modal inspector for viewing and editing large text, JSON, XML, or BLOB values.
+///
+/// **Apply** and **Ctrl/Cmd+Enter** return the edited string for local staging
+/// (SQL grid). When [onSaveToDatabase] is set (Mongo field inspector), those
+/// same actions persist through the callback — they are not a local-only
+/// dismiss. **Cancel** still closes without writing.
 Future<String?> showGridCellInspectorDialog({
   required material.BuildContext context,
   required String columnName,
@@ -201,6 +207,10 @@ class _GridCellInspectorDialogState
   }
 
   void _apply() {
+    if (widget.onSaveToDatabase != null) {
+      unawaited(_saveToDatabase());
+      return;
+    }
     final result = _isNull ? 'NULL' : _controller.text;
     material.Navigator.of(context).pop(result);
   }

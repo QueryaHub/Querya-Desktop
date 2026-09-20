@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Mongo inspector Apply (#775)** — With **Save to DB** wired, **Apply** and **Ctrl/Cmd+Enter** persist through the same `$set` callback instead of only closing the dialog. SQL-grid Apply (no callback) still stages locally.
 - **Mongo field codec (#777)** — Inspector Save keeps BSON type: strings that look like numbers stay strings; ObjectId, DateTime, Int64, and Decimal128 round-trip. `$set` of `_id` stays blocked.
 - **Mongo document editor (#779)** — Documents encode as relaxed Extended JSON (`$oid`, `$date`, …) instead of `JsonEncoder` / `toString()`. Save decodes EJSON so the `_id` filter stays an `ObjectId`, not a string.
 - **0-row DML Save (#773)** — Table Browser and SQL-grid Save fail (and roll back) if any statement matches 0 rows instead of toasting success from statement count. The staging buffer is kept.
