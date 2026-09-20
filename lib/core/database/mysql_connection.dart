@@ -334,15 +334,26 @@ class MysqlConnection {
     }
   }
 
-  /// Session hint for read-only browsing (MySQL 8+ / MariaDB — semantics differ from PostgreSQL).
+  /// Session hint for Table Browser / tree (`MysqlSessionMode.readOnly`).
+  ///
+  /// Issues `SET SESSION TRANSACTION READ ONLY` (or `READ WRITE`). This is the
+  /// **next-transaction** default, not PostgreSQL `default_transaction_read_only`.
+  ///
+  /// On MySQL 8 with autocommit, each statement is its own transaction, so the
+  /// hint applies — but it is weaker than a dedicated read-only user and does
+  /// not block `SET SESSION TRANSACTION READ WRITE` later on the same socket.
+  /// MariaDB accepts the same syntax; enforcement still depends on account
+  /// privileges. Browse stays on a read-only pool slot; Save uses `tableWrite`.
   Future<void> setSessionReadOnly(bool readOnly) async {
     if (!isConnected || _conn == null) return;
-    if (readOnly) {
-      await execute('SET SESSION TRANSACTION READ ONLY');
-    } else {
-      await execute('SET SESSION TRANSACTION READ WRITE');
-    }
+    await execute(sessionTransactionAccessModeSql(readOnly));
   }
+
+  /// `SET SESSION TRANSACTION READ ONLY` / `READ WRITE`.
+  @visibleForTesting
+  static String sessionTransactionAccessModeSql(bool readOnly) => readOnly
+      ? 'SET SESSION TRANSACTION READ ONLY'
+      : 'SET SESSION TRANSACTION READ WRITE';
 
   Future<bool> testConnection() async {
     try {
