@@ -1,3 +1,5 @@
+import 'package:querya_desktop/core/database/table_schema_meta.dart';
+
 /// Supported SQL dialects for DML mutation generation.
 enum SqlDialect {
   postgres,
@@ -256,6 +258,7 @@ abstract final class TableMutationEngine {
     required List<List<String>> insertedRows,
     required Set<int> deletedRowIndices,
     Map<String, String>? columnDataTypes,
+    Map<String, TableColumnMeta>? columnMeta,
   }) {
     final statements = <TableMutationStatement>[];
     final tableRef = quoteQualifiedTable(
@@ -316,14 +319,31 @@ abstract final class TableMutationEngine {
 
       for (var c = 0; c < columns.length; c++) {
         final colName = columns[c];
+        final meta = columnMeta?[colName];
+        if (meta?.omitOnInsert == true) continue;
+
+        final cellVal = c < row.length ? row[c] : (meta == null ? 'NULL' : '');
+        if (meta != null &&
+            _isBlankInsertCell(cellVal) &&
+            (meta.hasServerDefault || meta.isNullable)) {
+          continue;
+        }
+
         final quotedCol = quoteIdentifier(colName, dialect);
-        final cellVal = c < row.length ? row[c] : 'NULL';
-        final colType = columnDataTypes?[colName];
+        final colType = columnDataTypes?[colName] ?? meta?.dataType;
         colNames.add(quotedCol);
         values.add(formatLiteral(cellVal, dialect, dataTypeName: colType));
       }
 
-      final sql = 'INSERT INTO $tableRef (${colNames.join(', ')}) VALUES (${values.join(', ')})';
+      final String sql;
+      if (colNames.isEmpty) {
+        sql = dialect == SqlDialect.mysql
+            ? 'INSERT INTO $tableRef () VALUES ()'
+            : 'INSERT INTO $tableRef DEFAULT VALUES';
+      } else {
+        sql =
+            'INSERT INTO $tableRef (${colNames.join(', ')}) VALUES (${values.join(', ')})';
+      }
       statements.add(
         TableMutationStatement(
           type: MutationType.insert,
@@ -406,5 +426,10 @@ abstract final class TableMutationEngine {
     }
 
     return clauses.join(' AND ');
+  }
+
+  static bool _isBlankInsertCell(String value) {
+    if (value == kNullSentinel) return true;
+    return value.trim().isEmpty;
   }
 }

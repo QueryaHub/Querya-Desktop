@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
+import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/unsaved_work_registry.dart';
 
 /// Status of a row within the staging buffer.
@@ -297,6 +298,7 @@ class DataGridStagingBuffer extends ChangeNotifier {
     String? schema,
     List<String> primaryKeys = const [],
     Map<String, String>? columnDataTypes,
+    Map<String, TableColumnMeta>? columnMeta,
   }) {
     return TableMutationEngine.generatePlan(
       dialect: dialect,
@@ -309,6 +311,7 @@ class DataGridStagingBuffer extends ChangeNotifier {
       insertedRows: _insertedRows,
       deletedRowIndices: _deletedRowIndices,
       columnDataTypes: columnDataTypes,
+      columnMeta: columnMeta,
     );
   }
 

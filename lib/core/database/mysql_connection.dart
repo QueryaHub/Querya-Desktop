@@ -382,7 +382,7 @@ class MysqlConnection {
       throw StateError('Not connected to MySQL');
     }
     final colsRs = await execute(
-      'SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT '
+      'SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT, EXTRA '
       'FROM information_schema.COLUMNS '
       'WHERE TABLE_SCHEMA = :database AND TABLE_NAME = :table '
       'ORDER BY ORDINAL_POSITION',
@@ -413,6 +413,12 @@ class MysqlConnection {
       final isPk = primaryKeys.contains(name);
       final pkPos = isPk ? primaryKeys.indexOf(name) + 1 : null;
       final dflt = r.colByName('COLUMN_DEFAULT');
+      final extra = (r.colByName('EXTRA') ?? '').toLowerCase();
+      final omitOnInsert = extra.contains('auto_increment') ||
+          extra.contains('virtual generated') ||
+          extra.contains('stored generated');
+      final hasServerDefault =
+          (dflt != null && dflt.isNotEmpty) || extra.contains('auto_increment');
 
       columns.add(
         TableColumnMeta(
@@ -422,6 +428,8 @@ class MysqlConnection {
           isPrimaryKey: isPk,
           primaryKeyPosition: pkPos,
           defaultValue: dflt,
+          omitOnInsert: omitOnInsert,
+          hasServerDefault: hasServerDefault,
         ),
       );
     }
