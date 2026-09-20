@@ -161,4 +161,108 @@ void main() {
       expect(RedisService.instance.getConnection(202), isNull);
     });
   });
+
+  group('RedisService role pool', () {
+    ConnectionRow row(int id, {String name = 'r'}) => ConnectionRow(
+          id: id,
+          type: 'redis',
+          name: name,
+          createdAt: '2026-01-01T00:00:00Z',
+        );
+
+    test('stats and explorer are independent sockets', () {
+      const id = 8120;
+      final stats = RedisService.instance.acquire(
+        row(id, name: 'stats'),
+        role: RedisSessionRole.stats,
+      );
+      final explorer = RedisService.instance.acquire(
+        row(id, name: 'explorer'),
+        role: RedisSessionRole.explorer,
+      );
+
+      expect(stats, isNot(same(explorer)));
+      expect(
+        RedisService.instance.getConnection(id),
+        same(stats),
+      );
+      expect(
+        RedisService.instance
+            .getConnection(id, role: RedisSessionRole.explorer),
+        same(explorer),
+      );
+    });
+
+    test('acquire reuses the socket for the same role', () {
+      const id = 8121;
+      final first = RedisService.instance.acquire(
+        row(id),
+        role: RedisSessionRole.stats,
+      );
+      final second = RedisService.instance.acquire(
+        row(id),
+        role: RedisSessionRole.stats,
+      );
+      expect(second, same(first));
+    });
+
+    test('createConnection replaces stats without dropping explorer', () {
+      const id = 8122;
+      final explorer = RedisService.instance.acquire(
+        row(id, name: 'explorer'),
+        role: RedisSessionRole.explorer,
+      );
+      RedisService.instance.createConnection(row(id, name: 'old-stats'));
+      final stats2 = RedisService.instance.createConnection(
+        row(id, name: 'new-stats'),
+      );
+
+      expect(
+        RedisService.instance.getConnection(id),
+        same(stats2),
+      );
+      expect(stats2.name, 'new-stats');
+      expect(
+        RedisService.instance
+            .getConnection(id, role: RedisSessionRole.explorer),
+        same(explorer),
+      );
+    });
+
+    test('disconnect removes only that instance', () async {
+      const id = 8123;
+      final stats = RedisService.instance.acquire(
+        row(id),
+        role: RedisSessionRole.stats,
+      );
+      final explorer = RedisService.instance.acquire(
+        row(id),
+        role: RedisSessionRole.explorer,
+      );
+
+      await RedisService.instance.disconnect(stats);
+
+      expect(RedisService.instance.getConnection(id), isNull);
+      expect(
+        RedisService.instance
+            .getConnection(id, role: RedisSessionRole.explorer),
+        same(explorer),
+      );
+    });
+
+    test('disconnectByConnectionId closes every role', () async {
+      const id = 8124;
+      RedisService.instance.acquire(row(id), role: RedisSessionRole.stats);
+      RedisService.instance.acquire(row(id), role: RedisSessionRole.explorer);
+
+      await RedisService.instance.disconnectByConnectionId(id);
+
+      expect(RedisService.instance.getConnection(id), isNull);
+      expect(
+        RedisService.instance
+            .getConnection(id, role: RedisSessionRole.explorer),
+        isNull,
+      );
+    });
+  });
 }

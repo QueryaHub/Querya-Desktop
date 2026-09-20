@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Redis Overview/Explorer sockets (#812)** — Overview INFO and Explorer SCAN/GET/`SELECT` use separate pooled sockets (`stats` vs `explorer`) so opening a DB no longer kills keep-alive Overview, and Home Refresh no longer steals Explorer. User Disconnect closes both roles.
 - **MySQL Table Browser session (#802)** — Browse uses a read-only pool slot; Save uses a dedicated `tableWrite` socket so SQL `START TRANSACTION` / `SET` / `USE` do not leak into the grid. SQL-grid Save joins an already-open transaction instead of nesting `START TRANSACTION`. Opening a table on the same database (and Overview↔SQL) warns while SQL has an open transaction.
 - **SQLite Table Browser session (#794)** — Browse uses a read-only `Database`; Save uses a dedicated `tableWrite` handle so SQL `BEGIN` / `ATTACH` do not leak into the grid (no nested `BEGIN`). SQL-grid Save joins an already-open transaction instead of starting another. Opening a table (and Overview↔SQL) warns while SQL has an open `BEGIN`.
 - **Postgres Table Browser session (#785)** — Browse uses a read-only pool slot; Save and `REFRESH MATERIALIZED VIEW` use a dedicated `tableWrite` socket so they do not share the SQL editor’s TCP session. Statement-timeout `forceClose` on SQL no longer kills the grid. Opening a table while SQL has an open transaction on the same database warns, matching Overview↔SQL.

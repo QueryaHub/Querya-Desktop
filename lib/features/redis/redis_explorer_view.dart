@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/database/redis_service.dart';
@@ -78,12 +80,16 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
     final conn = _connection;
     _connection = null;
     if (conn != null) {
-      conn.disconnect();
+      unawaited(RedisService.instance.disconnect(conn));
     }
   }
 
   Future<void> _connect() async {
-    _disconnectCurrent();
+    final old = _connection;
+    _connection = null;
+    if (old != null) {
+      await RedisService.instance.disconnect(old);
+    }
     if (!mounted) return;
     setState(() {
       _connecting = true;
@@ -93,10 +99,15 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
       _showStats = false;
     });
     try {
-      final conn = RedisService.instance.createConnection(widget.connectionRow);
-      await conn.connect();
+      final conn = RedisService.instance.acquire(
+        widget.connectionRow,
+        role: RedisSessionRole.explorer,
+      );
+      if (!conn.isConnected) {
+        await conn.connect();
+      }
       if (!mounted) {
-        conn.disconnect();
+        unawaited(RedisService.instance.disconnect(conn));
         return;
       }
       setState(() {
