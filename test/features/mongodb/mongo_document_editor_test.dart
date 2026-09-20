@@ -91,4 +91,36 @@ void main() {
     );
     expect(container.color, bg);
   });
+
+  testWidgets('Delete Cancel does not call onDocumentDeleted', (tester) async {
+    await tester.binding.setSurfaceSize(const material.Size(800, 700));
+    var deleted = false;
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.SizedBox(
+          width: 800,
+          height: 700,
+          child: MongoDocumentEditor(
+            connection: connection,
+            database: 'db',
+            collection: 'items',
+            document: const {'_id': 'abc', 'a': 1},
+            onDocumentDeleted: () => deleted = true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await pumpSyntaxHighlightDebounce(tester);
+
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('DELETE DOCUMENT'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(deleted, isFalse);
+    expect(find.text('Delete'), findsOneWidget);
+  });
 }

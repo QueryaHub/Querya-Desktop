@@ -8,11 +8,14 @@ import '../../support/querya_theme_test_shell.dart';
 
 void main() {
   group('DestructiveQueryDialog', () {
-    testWidgets('renders warning, detected operations, and disables confirm until acknowledged', (tester) async {
+    testWidgets(
+        'renders warning, detected operations, and disables confirm until acknowledged',
+        (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 700));
       bool? result;
 
-      final inspection = DestructiveSqlDetector.inspect('DROP TABLE legacy_users;');
+      final inspection =
+          DestructiveSqlDetector.inspect('DROP TABLE legacy_users;');
 
       await tester.pumpWidget(
         queryaThemeTestShell(
@@ -36,7 +39,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Destructive Operation Detected'), findsOneWidget);
-      expect(find.text('Target connection: Production PostgreSQL'), findsOneWidget);
+      expect(find.text('Target connection: Production PostgreSQL'),
+          findsOneWidget);
       expect(find.text('DROP TABLE'), findsOneWidget);
       expect(find.text('DROP TABLE legacy_users;'), findsOneWidget);
       expect(find.text('Execute Destructive Statement'), findsOneWidget);
@@ -60,7 +64,8 @@ void main() {
     testWidgets('shows Critical header for DROP DATABASE', (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 700));
 
-      final inspection = DestructiveSqlDetector.inspect('DROP DATABASE customer_records;');
+      final inspection =
+          DestructiveSqlDetector.inspect('DROP DATABASE customer_records;');
 
       await tester.pumpWidget(
         queryaThemeTestShell(
@@ -114,6 +119,86 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(result, isFalse);
+    });
+
+    testWidgets(
+        'Mongo drop database shows Critical and Cancel does not confirm',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 700));
+      var confirmed = true;
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Builder(
+            builder: (context) => material.ElevatedButton(
+              onPressed: () async {
+                confirmed = await confirmDestructiveMongoAction(
+                  context: context,
+                  type: DestructiveSqlType.dropDatabase,
+                  targetName: 'orders',
+                  commandPreview: '{ dropDatabase: 1 }',
+                  connectionName: 'prod-mongo',
+                );
+              },
+              child: const material.Text('Open'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Critical Destructive Operation'), findsOneWidget);
+      expect(find.text('DROP DATABASE'), findsOneWidget);
+      expect(find.text('{ dropDatabase: 1 }'), findsOneWidget);
+      expect(find.text('Target connection: prod-mongo'), findsOneWidget);
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(confirmed, isFalse);
+    });
+
+    testWidgets(
+        'Mongo drop collection confirm stays disabled until acknowledged',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 700));
+      var confirmed = false;
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Builder(
+            builder: (context) => material.ElevatedButton(
+              onPressed: () async {
+                confirmed = await confirmDestructiveMongoAction(
+                  context: context,
+                  type: DestructiveSqlType.dropCollection,
+                  targetName: 'users',
+                  commandPreview: 'db.users.drop()',
+                );
+              },
+              child: const material.Text('Open'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('DROP COLLECTION'), findsOneWidget);
+      expect(find.text('db.users.drop()'), findsOneWidget);
+
+      await tester.tap(find.text('Execute Destructive Statement'));
+      await tester.pumpAndSettle();
+      expect(confirmed, isFalse);
+      expect(find.text('DROP COLLECTION'), findsOneWidget);
+
+      await tester.tap(find.byType(material.Checkbox));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Execute Destructive Statement'));
+      await tester.pumpAndSettle();
+      expect(confirmed, isTrue);
     });
   });
 }

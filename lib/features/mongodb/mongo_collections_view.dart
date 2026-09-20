@@ -3,8 +3,10 @@ import 'dart:math' show min;
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/actions/querya_schema_object.dart';
 import 'package:querya_desktop/core/actions/querya_schema_object_cache.dart';
+import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
+import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
@@ -181,6 +183,15 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
   }
 
   Future<void> _dropCollection(String name) async {
+    final confirmed = await confirmDestructiveMongoAction(
+      context: context,
+      type: DestructiveSqlType.dropCollection,
+      targetName: name,
+      commandPreview: 'db.$name.drop()',
+      connectionName: widget.connection.name,
+    );
+    if (!mounted || !confirmed) return;
+
     try {
       await MongoService.instance.dropCollection(
         widget.connection,
