@@ -1,10 +1,9 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
+import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/editor/querya_code_editor.dart';
 import 'package:querya_desktop/core/editor/querya_code_language.dart';
-import 'package:querya_desktop/core/database/mongodb_service.dart';
+import 'package:querya_desktop/features/mongodb/mongo_ejson.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
@@ -51,7 +50,7 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
   void initState() {
     super.initState();
     _controller = material.TextEditingController(
-      text: _prettyJson(widget.document),
+      text: mongoDocumentToEjson(widget.document),
     );
     _controller.addListener(_onTextChanged);
   }
@@ -87,7 +86,7 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
       }
       final doc = rows.first;
       _controller.removeListener(_onTextChanged);
-      _controller.text = _prettyJson(doc);
+      _controller.text = mongoDocumentToEjson(doc);
       _controller.addListener(_onTextChanged);
       setState(() {
         _dirty = false;
@@ -114,8 +113,8 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
 
   void _format() {
     try {
-      final parsed = json.decode(_controller.text) as Map<String, dynamic>;
-      _controller.text = _prettyJson(parsed);
+      final parsed = mongoDocumentFromEjson(_controller.text);
+      _controller.text = mongoDocumentToEjson(parsed);
       setState(() => _error = null);
     } catch (e) {
       setState(() => _error = 'Invalid JSON: $e');
@@ -131,13 +130,14 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
 
     Map<String, dynamic> parsed;
     try {
-      parsed = json.decode(_controller.text) as Map<String, dynamic>;
+      parsed = mongoDocumentFromEjson(_controller.text);
     } catch (e) {
       setState(() => _error = 'Invalid JSON: $e');
       return;
     }
 
-    // Remove _id from the update payload (can't change _id)
+    // Remove _id from the update payload (can't change _id). Filter uses the
+    // original BSON _id, not a stringified copy from the editor.
     final updateDoc = Map<String, dynamic>.from(parsed);
     updateDoc.remove('_id');
 
@@ -200,14 +200,6 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
           _error = 'Failed to delete: $e';
         });
       }
-    }
-  }
-
-  String _prettyJson(Map<String, dynamic> doc) {
-    try {
-      return const JsonEncoder.withIndent('  ').convert(doc);
-    } catch (_) {
-      return doc.toString();
     }
   }
 
