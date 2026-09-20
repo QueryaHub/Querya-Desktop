@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Redis stream/unknown GET-SET (#817)** — Stream, module, and `unknown` keys are not opened with `GET` or saved with `SET`. Save stays on `string` only; `unknown` retries `TYPE` before treating the value as a string.
 - **SQL toolbar overflow** — MySQL / Postgres Query + History + Execute wrap instead of overflowing at ~700px (widget tests treat RenderFlex overflow as failure).
 - **Redis collection paging (#816)** — Hash / list / set / zset editors load the first 200 members (`HSCAN` / `LRANGE` / `SSCAN` / `ZRANGE`) with Load more, instead of `HGETALL` / `LRANGE 0 -1` / `SMEMBERS` / `ZRANGE 0 -1`. Keys with 10k+ members show a large-key warning.
 - **Redis URI Test/sidebar (#815)** — Test Connection and the sidebar keyspace probe parse `redis://` / `rediss://` via `fromConnectionRow` (host, port, TLS, cert query params) instead of hitting localhost:6379. The probe keeps `id: -1` so it does not replace workspace sockets.

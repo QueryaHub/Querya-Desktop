@@ -152,4 +152,97 @@ void main() {
     expect(find.text('name'), findsOneWidget);
     await fake.disconnect();
   });
+
+  testWidgets('RedisKeyEditor stream does not GET or show Save',
+      (tester) async {
+    final fake = RedisConnectionTestFake(
+      getResult: 'should-not-load',
+      typeResult: 'stream',
+    );
+    await fake.connect();
+
+    await pumpEditor(
+      tester,
+      fake: fake,
+      isReadOnly: false,
+      keyType: 'stream',
+      keyName: 'querya:stream:events',
+    );
+
+    expect(find.text('Unsupported type'), findsOneWidget);
+    expect(find.text('Save'), findsNothing);
+    expect(find.text('should-not-load'), findsNothing);
+    expect(fake.sentCommands.contains('GET'), isFalse);
+    expect(fake.sentCommands.contains('SET'), isFalse);
+    await fake.disconnect();
+  });
+
+  testWidgets('RedisKeyEditor unknown does not GET until TYPE succeeds',
+      (tester) async {
+    final fake = RedisConnectionTestFake(
+      getResult: 'should-not-load',
+      failType: true,
+    );
+    await fake.connect();
+
+    await pumpEditor(
+      tester,
+      fake: fake,
+      isReadOnly: false,
+      keyType: 'unknown',
+      keyName: 'maybe-module',
+    );
+
+    expect(find.text('Type unknown'), findsOneWidget);
+    expect(find.text('Save'), findsNothing);
+    expect(find.text('should-not-load'), findsNothing);
+    expect(fake.sentCommands.contains('GET'), isFalse);
+    expect(fake.sentCommands.contains('SET'), isFalse);
+    await fake.disconnect();
+  });
+
+  testWidgets('RedisKeyEditor unknown TYPE stream does not GET',
+      (tester) async {
+    final fake = RedisConnectionTestFake(
+      getResult: 'should-not-load',
+      typeResult: 'stream',
+    );
+    await fake.connect();
+
+    await pumpEditor(
+      tester,
+      fake: fake,
+      isReadOnly: false,
+      keyType: 'unknown',
+      keyName: 'querya:stream:events',
+    );
+
+    expect(find.text('Unsupported type'), findsOneWidget);
+    expect(find.text('Save'), findsNothing);
+    expect(find.textContaining('STREAM'), findsWidgets);
+    expect(fake.sentCommands.contains('TYPE'), isTrue);
+    expect(fake.sentCommands.contains('GET'), isFalse);
+    await fake.disconnect();
+  });
+
+  testWidgets('RedisKeyEditor unknown TYPE string then GET and Save',
+      (tester) async {
+    final fake =
+        RedisConnectionTestFake(getResult: 'hello', typeResult: 'string');
+    await fake.connect();
+
+    await pumpEditor(
+      tester,
+      fake: fake,
+      isReadOnly: false,
+      keyType: 'unknown',
+      keyName: 'session:1',
+    );
+
+    expect(find.text('hello'), findsOneWidget);
+    expect(find.text('Save'), findsOneWidget);
+    expect(fake.sentCommands.contains('TYPE'), isTrue);
+    expect(fake.sentCommands.contains('GET'), isTrue);
+    await fake.disconnect();
+  });
 }

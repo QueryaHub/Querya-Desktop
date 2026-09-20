@@ -274,7 +274,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
         connection: conn,
         database: widget.database,
         keyName: _selectedKey!,
-        keyType: _selectedKeyType ?? 'string',
+        keyType: _selectedKeyType ?? 'unknown',
         onBack: _navigateToKeys,
         onKeyDeleted: _navigateToKeys,
         isReadOnly: widget.isReadOnly,
