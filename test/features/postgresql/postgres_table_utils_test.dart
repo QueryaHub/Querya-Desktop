@@ -23,6 +23,64 @@ void main() {
     });
   });
 
+  group('isAllowedPostgresSelectQuery', () {
+    test('allows SELECT inserted_at (not substring-blocked)', () {
+      expect(
+        isAllowedPostgresSelectQuery('SELECT inserted_at FROM t'),
+        isTrue,
+      );
+      expect(
+        isAllowedPostgresSelectQuery('SELECT dropped_at, updated_at FROM t'),
+        isTrue,
+      );
+    });
+
+    test('rejects multi-statement even when the first is SELECT', () {
+      expect(isAllowedPostgresSelectQuery('SELECT 1; DELETE FROM t'), isFalse);
+      expect(isAllowedPostgresSelectQuery('SELECT 1; SELECT 2'), isFalse);
+    });
+
+    test('allows trailing semicolon and trailing comment', () {
+      expect(isAllowedPostgresSelectQuery('SELECT * FROM t;'), isTrue);
+      expect(isAllowedPostgresSelectQuery('SELECT * FROM t; -- done'), isTrue);
+    });
+
+    test('allows WITH SELECT, TABLE, VALUES, and parenthesized SELECT', () {
+      expect(
+        isAllowedPostgresSelectQuery('WITH x AS (SELECT 1) SELECT * FROM x'),
+        isTrue,
+      );
+      expect(isAllowedPostgresSelectQuery('TABLE t'), isTrue);
+      expect(isAllowedPostgresSelectQuery('VALUES (1)'), isTrue);
+      expect(
+          isAllowedPostgresSelectQuery('(SELECT inserted_at FROM t)'), isTrue);
+    });
+
+    test('rejects WITH INSERT and other writes', () {
+      expect(
+        isAllowedPostgresSelectQuery(
+          'WITH x AS (SELECT 1) INSERT INTO t SELECT * FROM x',
+        ),
+        isFalse,
+      );
+      expect(isAllowedPostgresSelectQuery('DELETE FROM t'), isFalse);
+      expect(isAllowedPostgresSelectQuery('INSERT INTO t VALUES (1)'), isFalse);
+    });
+
+    test('allows semicolon inside a string literal', () {
+      expect(
+        isAllowedPostgresSelectQuery(
+          "SELECT * FROM logs WHERE message = 'error; system halted'",
+        ),
+        isTrue,
+      );
+    });
+
+    test('rejects empty', () {
+      expect(isAllowedPostgresSelectQuery(''), isFalse);
+    });
+  });
+
   group('postgresBrowseSelectSql', () {
     test('quotes identifiers and uses default limit', () {
       expect(

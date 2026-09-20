@@ -1,4 +1,4 @@
-/// Comment-strip + first-keyword classification for SQLite (not a full parser).
+// Comment-strip + first-keyword classification for SQLite (not a full parser).
 
 /// Strips `--` line comments and `/* */` block comments.
 String sqliteStripSqlComments(String sql) {
