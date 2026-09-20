@@ -36,6 +36,7 @@ import 'package:querya_desktop/features/macos/querya_platform_menu_bar.dart';
 import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
 import 'package:querya_desktop/features/onboarding/welcome_tour_dialog.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
+import 'package:querya_desktop/features/postgresql/postgres_sql_tx_guard.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'main_screen_workspace_state.dart';
@@ -319,6 +320,15 @@ class _MainScreenState extends State<MainScreen> {
         cur.kind == kind;
     if (same) return;
     if (!await _allowUnsavedNavigation()) return;
+    if (!mounted) return;
+    if (!await confirmOpenPostgresTableIfSqlTx(
+      context,
+      connection: connection,
+      database: database,
+      kind: kind,
+    )) {
+      return;
+    }
     if (!mounted) return;
     _workspace.value = _workspace.value.selectPostgresObject(
       connection,
@@ -1178,6 +1188,24 @@ class _MainContentSplitState extends State<_MainContentSplit>
     unawaited(_restoreState());
   }
 
+  Future<void> _restoreLastSelectedObject() async {
+    final ws = widget.workspace.value;
+    final conn = ws.activeConnection;
+    final pg = ws.lastSelectedPostgresObject;
+    if (conn != null && conn.type == 'postgresql' && pg != null) {
+      if (!await confirmOpenPostgresTableIfSqlTx(
+        context,
+        connection: conn,
+        database: pg.database,
+        kind: pg.kind,
+      )) {
+        return;
+      }
+    }
+    if (!mounted) return;
+    widget.workspace.value = widget.workspace.value.restoreLastSelectedObject();
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -1416,8 +1444,7 @@ class _MainContentSplitState extends State<_MainContentSplit>
                             widget.workspace.value.unselectActiveObject();
                       },
                       onRestoreLastSelectedObject: () {
-                        widget.workspace.value =
-                            widget.workspace.value.restoreLastSelectedObject();
+                        unawaited(_restoreLastSelectedObject());
                       },
                       isReadOnly: ws.isReadOnly,
                       onRequestNewConnection: widget.onRequestNewConnection,

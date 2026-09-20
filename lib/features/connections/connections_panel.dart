@@ -706,12 +706,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
       _expandedConnections.remove(id);
     });
     if (conn.type == 'postgresql') {
-      PostgresService.instance.interrupt(conn,
-          database: conn.databaseName ?? 'postgres',
-          mode: PgSessionMode.readOnly);
-      PostgresService.instance.interrupt(conn,
-          database: conn.databaseName ?? 'postgres',
-          mode: PgSessionMode.readWrite);
+      PostgresService.instance.interruptAllModes(conn,
+          database: conn.databaseName ?? 'postgres');
     } else if (conn.type == 'mysql') {
       MysqlService.instance.interrupt(conn,
           database: conn.databaseName ?? '', mode: MysqlSessionMode.readOnly);

@@ -26,6 +26,7 @@ class FakePostgresConnection extends PostgresConnection {
   int forceCloseCount = 0;
   int setReadOnlyCount = 0;
   bool? lastReadOnly;
+  bool? openTransaction;
 
   @override
   bool get isConnected => _connected;
@@ -53,6 +54,9 @@ class FakePostgresConnection extends PostgresConnection {
     setReadOnlyCount++;
     lastReadOnly = readOnly;
   }
+
+  @override
+  Future<bool?> inOpenTransaction() async => openTransaction;
 }
 
 void main() {
@@ -107,6 +111,40 @@ void main() {
       rw.release();
     });
 
+    test('tableWrite is a separate key from SQL readWrite', () async {
+      final created = <FakePostgresConnection>[];
+      Future<PostgresConnection> factory(
+        ConnectionRow row, {
+        required String database,
+        required PgSessionMode mode,
+      }) async {
+        final c = FakePostgresConnection();
+        await c.connect();
+        await c.setSessionReadOnly(mode.isReadOnlySession);
+        created.add(c);
+        return c;
+      }
+
+      final pool = PostgresConnectionPool(createAndConnect: factory);
+      final r = _row();
+      final sql = await pool.acquire(r,
+          database: 'postgres', mode: PgSessionMode.readWrite);
+      final grid = await pool.acquire(r,
+          database: 'postgres', mode: PgSessionMode.tableWrite);
+      final browse = await pool.acquire(r,
+          database: 'postgres', mode: PgSessionMode.readOnly);
+      expect(identical(sql.connection, grid.connection), isFalse);
+      expect(identical(sql.connection, browse.connection), isFalse);
+      expect(identical(grid.connection, browse.connection), isFalse);
+      expect(created.length, 3);
+      expect((grid.connection as FakePostgresConnection).lastReadOnly, isFalse);
+      expect(
+          (browse.connection as FakePostgresConnection).lastReadOnly, isTrue);
+      sql.release();
+      grid.release();
+      browse.release();
+    });
+
     test('keyFor matches pool slot identity', () {
       final pool = PostgresConnectionPool(
         createAndConnect: (_, {required database, required mode}) async =>
@@ -119,6 +157,10 @@ void main() {
       expect(
         pool.keyFor(null, 'postgres', PgSessionMode.readWrite),
         '0::postgres::readWrite',
+      );
+      expect(
+        pool.keyFor(1, 'app', PgSessionMode.tableWrite),
+        '1::app::tableWrite',
       );
     });
   });
@@ -288,6 +330,82 @@ void main() {
       lease2.release();
     });
 
+    test('interrupt of SQL readWrite does not kill tableWrite or readOnly',
+        () async {
+      Future<PostgresConnection> factory(
+        ConnectionRow row, {
+        required String database,
+        required PgSessionMode mode,
+      }) async {
+        final c = FakePostgresConnection();
+        await c.connect();
+        await c.setSessionReadOnly(mode.isReadOnlySession);
+        return c;
+      }
+
+      final pool = PostgresConnectionPool(createAndConnect: factory);
+      final r = _row();
+      final sql =
+          await pool.acquire(r, database: 'app', mode: PgSessionMode.readWrite);
+      final grid = await pool.acquire(r,
+          database: 'app', mode: PgSessionMode.tableWrite);
+      final browse =
+          await pool.acquire(r, database: 'app', mode: PgSessionMode.readOnly);
+      final sqlFake = sql.connection as FakePostgresConnection;
+      final gridFake = grid.connection as FakePostgresConnection;
+      final browseFake = browse.connection as FakePostgresConnection;
+
+      pool.interrupt(r, database: 'app', mode: PgSessionMode.readWrite);
+      expect(sqlFake.forceCloseCount, 1);
+      expect(gridFake.forceCloseCount, 0);
+      expect(browseFake.forceCloseCount, 0);
+
+      pool.interruptAllModes(r, database: 'app');
+      expect(gridFake.forceCloseCount, 1);
+      expect(browseFake.forceCloseCount, 1);
+      sql.release();
+      grid.release();
+      browse.release();
+    });
+
+    test('hasOpenSqlTransaction reads the SQL slot only', () async {
+      Future<PostgresConnection> factory(
+        ConnectionRow row, {
+        required String database,
+        required PgSessionMode mode,
+      }) async {
+        final c = FakePostgresConnection();
+        await c.connect();
+        await c.setSessionReadOnly(mode.isReadOnlySession);
+        return c;
+      }
+
+      final pool = PostgresConnectionPool(createAndConnect: factory);
+      final r = _row();
+      expect(
+        await pool.hasOpenSqlTransaction(r, database: 'app'),
+        isFalse,
+      );
+
+      final sql =
+          await pool.acquire(r, database: 'app', mode: PgSessionMode.readWrite);
+      final sqlFake = sql.connection as FakePostgresConnection;
+      sqlFake.openTransaction = true;
+      expect(await pool.hasOpenSqlTransaction(r, database: 'app'), isTrue);
+      expect(
+        await pool.hasOpenSqlTransaction(r, database: 'other'),
+        isFalse,
+      );
+
+      final grid = await pool.acquire(r,
+          database: 'app', mode: PgSessionMode.tableWrite);
+      (grid.connection as FakePostgresConnection).openTransaction = true;
+      sqlFake.openTransaction = false;
+      expect(await pool.hasOpenSqlTransaction(r, database: 'app'), isFalse);
+      sql.release();
+      grid.release();
+    });
+
     test('disconnectAll forceCloses every pooled connection', () async {
       final fakes = <FakePostgresConnection>[];
       Future<PostgresConnection> factory(
@@ -396,7 +514,8 @@ void main() {
   });
 
   group('PostgresConnectionPool error wrapping', () {
-    test('wraps unexpected factory errors in PostgresConnectionException', () async {
+    test('wraps unexpected factory errors in PostgresConnectionException',
+        () async {
       Future<PostgresConnection> factory(
         ConnectionRow row, {
         required String database,
