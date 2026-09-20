@@ -2,9 +2,11 @@ import 'dart:async' show unawaited;
 import 'dart:convert';
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/features/mongodb/mongo_field_codec.dart';
+import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
 import 'package:querya_desktop/features/workspace/grid_cell_popover_inspector.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
@@ -191,6 +193,17 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
   Future<void> _deleteDocument(Map<String, dynamic> doc) async {
     final id = doc['_id'];
     if (id == null) return;
+
+    final confirmed = await confirmDestructiveMongoAction(
+      context: context,
+      type: DestructiveSqlType.deleteDocument,
+      targetName: id.toString(),
+      commandPreview:
+          'db.${widget.collection}.deleteOne({ _id: ${id.toString()} })',
+      connectionName: widget.connection.name,
+    );
+    if (!mounted || !confirmed) return;
+
     try {
       await MongoService.instance.deleteDocument(
         widget.connection,

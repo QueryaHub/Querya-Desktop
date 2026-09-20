@@ -1,4 +1,5 @@
-/// Categorization of destructive SQL operations that can alter or destroy schema/data.
+/// Categorization of destructive SQL / Mongo operations that can alter or
+/// destroy schema/data.
 enum DestructiveSqlType {
   dropDatabase,
   dropSchema,
@@ -6,7 +7,9 @@ enum DestructiveSqlType {
   dropView,
   dropMaterializedView,
   truncateTable,
-  unconditionalDelete;
+  unconditionalDelete,
+  dropCollection,
+  deleteDocument;
 
   String get label => switch (this) {
         DestructiveSqlType.dropDatabase => 'DROP DATABASE',
@@ -16,6 +19,8 @@ enum DestructiveSqlType {
         DestructiveSqlType.dropMaterializedView => 'DROP MATERIALIZED VIEW',
         DestructiveSqlType.truncateTable => 'TRUNCATE TABLE',
         DestructiveSqlType.unconditionalDelete => 'UNCONDITIONAL DELETE',
+        DestructiveSqlType.dropCollection => 'DROP COLLECTION',
+        DestructiveSqlType.deleteDocument => 'DELETE DOCUMENT',
       };
 
   String get riskLevel => switch (this) {
@@ -24,6 +29,8 @@ enum DestructiveSqlType {
         DestructiveSqlType.dropTable => 'HIGH',
         DestructiveSqlType.truncateTable => 'HIGH',
         DestructiveSqlType.unconditionalDelete => 'HIGH',
+        DestructiveSqlType.dropCollection => 'HIGH',
+        DestructiveSqlType.deleteDocument => 'HIGH',
         DestructiveSqlType.dropMaterializedView => 'MEDIUM',
         DestructiveSqlType.dropView => 'MEDIUM',
       };
@@ -48,14 +55,17 @@ class DestructiveSqlOperation {
           'Permanently drops schema "$targetName" and all contained tables.',
         DestructiveSqlType.dropTable =>
           'Permanently drops table structure and all data in "$targetName".',
-        DestructiveSqlType.dropView =>
-          'Drops view "$targetName".',
+        DestructiveSqlType.dropView => 'Drops view "$targetName".',
         DestructiveSqlType.dropMaterializedView =>
           'Drops materialized view "$targetName".',
         DestructiveSqlType.truncateTable =>
           'Quickly deletes all rows from table "$targetName" without transaction rollbacks in some engines.',
         DestructiveSqlType.unconditionalDelete =>
           'Deletes all rows from table "$targetName" (no WHERE clause detected).',
+        DestructiveSqlType.dropCollection =>
+          'Permanently drops collection "$targetName" and all documents in it.',
+        DestructiveSqlType.deleteDocument =>
+          'Permanently deletes document "$targetName". This cannot be undone.',
       };
 }
 
@@ -72,7 +82,9 @@ class DestructiveSqlInspectionResult {
   /// Returns highest risk level present ('CRITICAL', 'HIGH', 'MEDIUM', or 'NONE').
   String get maxRiskLevel {
     if (operations.isEmpty) return 'NONE';
-    if (operations.any((o) => o.type.riskLevel == 'CRITICAL')) return 'CRITICAL';
+    if (operations.any((o) => o.type.riskLevel == 'CRITICAL')) {
+      return 'CRITICAL';
+    }
     if (operations.any((o) => o.type.riskLevel == 'HIGH')) return 'HIGH';
     return 'MEDIUM';
   }
@@ -151,7 +163,8 @@ abstract final class DestructiveSqlDetector {
 
       // 3. Dollar quotes in PostgreSQL: $$ or $tag$
       if (sql[i] == '\$') {
-        final match = RegExp(r'^\$([a-zA-Z0-9_]*)\$').matchAsPrefix(sql.substring(i));
+        final match =
+            RegExp(r'^\$([a-zA-Z0-9_]*)\$').matchAsPrefix(sql.substring(i));
         if (match != null) {
           final tag = match.group(0)!;
           i += tag.length;
@@ -231,7 +244,8 @@ abstract final class DestructiveSqlDetector {
 
       // Dollar quotes
       if (sql[i] == '\$') {
-        final match = RegExp(r'^\$([a-zA-Z0-9_]*)\$').matchAsPrefix(sql.substring(i));
+        final match =
+            RegExp(r'^\$([a-zA-Z0-9_]*)\$').matchAsPrefix(sql.substring(i));
         if (match != null) {
           final tag = match.group(0)!;
           current.write(tag);
@@ -339,7 +353,8 @@ abstract final class DestructiveSqlDetector {
       if (dropMatViewMatch != null) {
         final schema = dropMatViewMatch.group(1);
         final view = dropMatViewMatch.group(2) ?? 'view';
-        final target = (schema != null && schema.isNotEmpty) ? '$schema.$view' : view;
+        final target =
+            (schema != null && schema.isNotEmpty) ? '$schema.$view' : view;
         operations.add(
           DestructiveSqlOperation(
             type: DestructiveSqlType.dropMaterializedView,
@@ -355,7 +370,8 @@ abstract final class DestructiveSqlDetector {
       if (dropViewMatch != null) {
         final schema = dropViewMatch.group(1);
         final view = dropViewMatch.group(2) ?? 'view';
-        final target = (schema != null && schema.isNotEmpty) ? '$schema.$view' : view;
+        final target =
+            (schema != null && schema.isNotEmpty) ? '$schema.$view' : view;
         operations.add(
           DestructiveSqlOperation(
             type: DestructiveSqlType.dropView,
@@ -371,7 +387,8 @@ abstract final class DestructiveSqlDetector {
       if (dropTableMatch != null) {
         final schema = dropTableMatch.group(1);
         final table = dropTableMatch.group(2) ?? 'table';
-        final target = (schema != null && schema.isNotEmpty) ? '$schema.$table' : table;
+        final target =
+            (schema != null && schema.isNotEmpty) ? '$schema.$table' : table;
         operations.add(
           DestructiveSqlOperation(
             type: DestructiveSqlType.dropTable,
@@ -387,7 +404,8 @@ abstract final class DestructiveSqlDetector {
       if (truncateMatch != null) {
         final schema = truncateMatch.group(1);
         final table = truncateMatch.group(2) ?? 'table';
-        final target = (schema != null && schema.isNotEmpty) ? '$schema.$table' : table;
+        final target =
+            (schema != null && schema.isNotEmpty) ? '$schema.$table' : table;
         operations.add(
           DestructiveSqlOperation(
             type: DestructiveSqlType.truncateTable,
@@ -401,11 +419,13 @@ abstract final class DestructiveSqlDetector {
       // 7. DELETE FROM table without WHERE
       final deleteMatch = _deleteRegex.firstMatch(sanitized);
       if (deleteMatch != null) {
-        final hasWhere = RegExp(r'\bWHERE\b', caseSensitive: false).hasMatch(sanitized);
+        final hasWhere =
+            RegExp(r'\bWHERE\b', caseSensitive: false).hasMatch(sanitized);
         if (!hasWhere) {
           final schema = deleteMatch.group(1);
           final table = deleteMatch.group(2) ?? 'table';
-          final target = (schema != null && schema.isNotEmpty) ? '$schema.$table' : table;
+          final target =
+              (schema != null && schema.isNotEmpty) ? '$schema.$table' : table;
           operations.add(
             DestructiveSqlOperation(
               type: DestructiveSqlType.unconditionalDelete,

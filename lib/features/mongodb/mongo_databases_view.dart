@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
@@ -175,6 +177,15 @@ class _MongoDatabasesViewState extends State<MongoDatabasesView> {
 
   Future<void> _dropDatabase(String name) async {
     if (_connection == null) return;
+
+    final confirmed = await confirmDestructiveMongoAction(
+      context: context,
+      type: DestructiveSqlType.dropDatabase,
+      targetName: name,
+      commandPreview: '{ dropDatabase: 1 }',
+      connectionName: widget.connectionRow.name,
+    );
+    if (!mounted || !confirmed) return;
 
     try {
       await MongoService.instance.executeCommand(

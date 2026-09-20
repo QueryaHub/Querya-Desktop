@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/editor/querya_code_editor.dart';
 import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/features/mongodb/mongo_ejson.dart';
+import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
@@ -178,6 +180,16 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
   Future<void> _delete() async {
     final id = widget.document['_id'];
     if (id == null) return;
+
+    final confirmed = await confirmDestructiveMongoAction(
+      context: context,
+      type: DestructiveSqlType.deleteDocument,
+      targetName: id.toString(),
+      commandPreview:
+          'db.${widget.collection}.deleteOne({ _id: ${id.toString()} })',
+      connectionName: widget.connection.name,
+    );
+    if (!mounted || !confirmed) return;
 
     setState(() {
       _deleting = true;
