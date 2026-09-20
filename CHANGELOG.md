@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **SQLite missing file (#798)** — Test Connection and opening a saved connection no longer create an empty `.db` when the path is a typo. Errors distinguish file not found, permission, and corrupt. New-connection Save still creates the file if it does not exist.
 - **SQLite Table Browser paging (#799)** — Browse `SELECT` uses `ORDER BY` primary-key columns, or `rowid` when the table has implicit rowid. First paint skips blocking `COUNT(*)` (Next stays available when the page is full). SQL workspace has an optional statement timeout matching Postgres/MySQL.
 - **SQLite BLOB / TEXT grid (#800)** — Table Browser and SQL results show BLOB as `X'hex'` (not `Uint8List.toString()`) and persist the same. Declared TEXT stays a quoted string even when it looks numeric (`00123`).
 - **MySQL Table Browser session lock (#803)** — Browse stays on `MysqlSessionMode.readOnly`. Title-bar lock is passed into `MysqlTableView`: staging / Save stay off and Save does not acquire `tableWrite`. `SET SESSION TRANSACTION READ ONLY` is documented as a next-transaction hint (weaker than a read-only user; MariaDB vs MySQL 8).

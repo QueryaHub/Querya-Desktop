@@ -149,12 +149,14 @@ class _SqliteConnectionFormContentState
         path: _pathController.text.trim(),
         readOnly: _readOnly,
       );
-      final ok = await conn.testConnection();
+      final result = await conn.testConnection();
       if (!mounted) return;
-      if (ok) {
+      if (result.ok) {
         _showTestResult('success');
       } else {
-        _showTestResult('error:Failed to open SQLite database.');
+        _showTestResult(
+          'error:${result.error ?? 'Failed to open SQLite database.'}',
+        );
       }
     } catch (e) {
       if (!mounted) return;
@@ -162,8 +164,19 @@ class _SqliteConnectionFormContentState
     }
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (!_formValidNotifier.value) return;
+    final path = _pathController.text.trim();
+    if (!_isEditing) {
+      try {
+        await SqliteConnection.createFileIfMissing(path);
+      } catch (e) {
+        if (!mounted) return;
+        _showTestResult('error:$e');
+        return;
+      }
+    }
+    if (!mounted) return;
     final initial = widget.initial;
     final row = ConnectionRow(
       id: initial?.id,

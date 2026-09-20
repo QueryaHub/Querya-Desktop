@@ -131,6 +131,7 @@ void main() {
         id: 9,
         name: 'wal_file',
         path: path,
+        createIfMissing: true,
       );
       addTearDown(() async {
         await fileConn.disconnect();
@@ -145,8 +146,8 @@ void main() {
     });
 
     test('testConnection connects, queries and cleans up', () async {
-      final ok = await conn.testConnection();
-      expect(ok, true);
+      final result = await conn.testConnection();
+      expect(result.ok, isTrue);
       expect(conn.isConnected, false); // should be disconnected afterwards
     });
 
@@ -280,6 +281,122 @@ void main() {
           SqliteConnection.quoteIdentifier('normal_table'), '"normal_table"');
       expect(SqliteConnection.quoteIdentifier('table"with"quotes'),
           '"table""with""quotes"');
+    });
+  });
+
+  group('SqliteConnection missing file (#798)', () {
+    test('connect on a missing path does not create the file', () async {
+      final dir = await Directory.systemTemp.createTemp('querya_sqlite_miss_');
+      final path = '${dir.path}/oops.db';
+      final conn = SqliteConnection(
+        id: 1,
+        name: 'missing',
+        path: path,
+      );
+      addTearDown(() async {
+        await conn.disconnect();
+        await dir.delete(recursive: true);
+      });
+
+      await expectLater(
+        conn.connect(),
+        throwsA(
+          isA<SqliteConnectionException>().having(
+            (e) => e.message,
+            'message',
+            contains('not found'),
+          ),
+        ),
+      );
+      expect(File(path).existsSync(), isFalse);
+      expect(conn.isConnected, isFalse);
+    });
+
+    test('testConnection on a missing path does not create the file', () async {
+      final dir = await Directory.systemTemp.createTemp('querya_sqlite_test_');
+      final path = '${dir.path}/oops.db';
+      final conn = SqliteConnection(
+        id: 1,
+        name: 'missing',
+        path: path,
+      );
+      addTearDown(() async {
+        await conn.disconnect();
+        await dir.delete(recursive: true);
+      });
+
+      final result = await conn.testConnection();
+      expect(result.ok, isFalse);
+      expect(result.error, contains('not found'));
+      expect(File(path).existsSync(), isFalse);
+    });
+
+    test('createIfMissing creates an empty database', () async {
+      final dir = await Directory.systemTemp.createTemp('querya_sqlite_new_');
+      final path = '${dir.path}/new.db';
+      addTearDown(() async {
+        await dir.delete(recursive: true);
+      });
+
+      await SqliteConnection.createFileIfMissing(path);
+      expect(File(path).existsSync(), isTrue);
+
+      final conn = SqliteConnection(
+        id: 1,
+        name: 'created',
+        path: path,
+      );
+      addTearDown(conn.disconnect);
+      await conn.connect();
+      expect(conn.isConnected, isTrue);
+    });
+
+    test('corrupt file is reported as not a database', () async {
+      final dir = await Directory.systemTemp.createTemp('querya_sqlite_bad_');
+      final path = '${dir.path}/junk.db';
+      await File(path).writeAsString('this is not sqlite');
+      final conn = SqliteConnection(
+        id: 1,
+        name: 'junk',
+        path: path,
+      );
+      addTearDown(() async {
+        await conn.disconnect();
+        await dir.delete(recursive: true);
+      });
+
+      await expectLater(
+        conn.connect(),
+        throwsA(
+          isA<SqliteConnectionException>().having(
+            (e) => e.message.toLowerCase(),
+            'message',
+            anyOf(contains('corrupt'), contains('not a database')),
+          ),
+        ),
+      );
+      expect(conn.isConnected, isFalse);
+    });
+
+    test('sqliteMapOpenError distinguishes missing, permission, corrupt', () {
+      expect(
+        sqliteMapOpenError(StateError('file /x not found'), '/x').message,
+        'SQLite file not found: /x',
+      );
+      expect(
+        sqliteMapOpenError(
+          Exception('OS Error: Permission denied, errno = 13'),
+          '/x',
+        ).message,
+        'Permission denied opening SQLite file: /x',
+      );
+      expect(
+        sqliteMapOpenError(
+          Exception('file is not a database'),
+          '/x',
+        ).message,
+        'SQLite database is corrupt or not a database: /x',
+      );
     });
   });
 }

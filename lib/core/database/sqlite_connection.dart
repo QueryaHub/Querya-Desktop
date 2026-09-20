@@ -1,9 +1,50 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+
+/// In-memory paths (`:memory:`) skip the missing-file check.
+bool sqlitePathIsInMemory(String path) =>
+    path == inMemoryDatabasePath || path == ':memory:';
+
+/// Maps driver / OS errors to a user-facing [SqliteConnectionException].
+SqliteConnectionException sqliteMapOpenError(Object error, String path) {
+  final msg = error.toString().toLowerCase();
+  if (msg.contains('not found') ||
+      msg.contains('no such file') ||
+      msg.contains('errno = 2') ||
+      msg.contains('errno =2')) {
+    return SqliteConnectionException(
+      'SQLite file not found: $path',
+      cause: error,
+    );
+  }
+  if (msg.contains('permission') ||
+      msg.contains('access denied') ||
+      msg.contains('errno = 13') ||
+      msg.contains('errno =13')) {
+    return SqliteConnectionException(
+      'Permission denied opening SQLite file: $path',
+      cause: error,
+    );
+  }
+  if (msg.contains('not a database') ||
+      msg.contains('malformed') ||
+      msg.contains('corrupt') ||
+      msg.contains('disk image')) {
+    return SqliteConnectionException(
+      'SQLite database is corrupt or not a database: $path',
+      cause: error,
+    );
+  }
+  return SqliteConnectionException(
+    'Failed to open SQLite database: $error',
+    cause: error,
+  );
+}
 
 /// SQLite database connection using sqflite_common_ffi.
 class SqliteConnection {
@@ -12,6 +53,7 @@ class SqliteConnection {
     required this.name,
     required this.path,
     this.readOnly = false,
+    this.createIfMissing = false,
   });
 
   factory SqliteConnection.fromConnectionRow(
@@ -32,6 +74,9 @@ class SqliteConnection {
   final String path;
   final bool readOnly;
 
+  /// When true, `openDatabase` may create the file (new-connection Save only).
+  final bool createIfMissing;
+
   Database? _db;
   bool _isConnected = false;
   bool _inTransaction = false;
@@ -42,12 +87,14 @@ class SqliteConnection {
     if (_isConnected && _db != null) return;
     try {
       await LocalDb.initFfi();
+      _ensureFileReady();
       _db = await databaseFactoryFfi.openDatabase(
         path,
         options: OpenDatabaseOptions(
           readOnly: readOnly,
           onOpen: (db) async {
             await db.execute('PRAGMA busy_timeout = 5000');
+            await db.rawQuery('SELECT 1');
             if (!readOnly) {
               await db.execute('PRAGMA foreign_keys = ON');
               try {
@@ -60,10 +107,46 @@ class SqliteConnection {
         ),
       );
       _isConnected = true;
-    } catch (e) {
+    } on SqliteConnectionException {
       _isConnected = false;
       _db = null;
       rethrow;
+    } catch (e) {
+      _isConnected = false;
+      _db = null;
+      throw sqliteMapOpenError(e, path);
+    }
+  }
+
+  void _ensureFileReady() {
+    if (sqlitePathIsInMemory(path)) return;
+    final file = File(path);
+    if (file.existsSync()) {
+      if (file.statSync().type == FileSystemEntityType.directory) {
+        throw SqliteConnectionException('SQLite path is a directory: $path');
+      }
+      return;
+    }
+    // sqflite FFI uses OpenMode.readWriteCreate and even mkdir's parents.
+    if (!createIfMissing || readOnly) {
+      throw SqliteConnectionException('SQLite file not found: $path');
+    }
+  }
+
+  /// Creates an empty SQLite file if [path] is missing (new-connection Save).
+  static Future<void> createFileIfMissing(String path) async {
+    if (sqlitePathIsInMemory(path)) return;
+    if (File(path).existsSync()) return;
+    final conn = SqliteConnection(
+      id: 0,
+      name: 'create',
+      path: path,
+      createIfMissing: true,
+    );
+    try {
+      await conn.connect();
+    } finally {
+      await conn.disconnect();
     }
   }
 
@@ -81,17 +164,19 @@ class SqliteConnection {
 
   Future<void> forceClose() => disconnect();
 
-  Future<bool> testConnection() async {
+  /// Tests connectivity without leaving a session open.
+  Future<({bool ok, String? error})> testConnection() async {
     try {
       await connect();
       if (_db != null) {
         await _db!.rawQuery('SELECT 1');
-        return true;
+        return (ok: true, error: null);
       }
-      return false;
+      return (ok: false, error: 'Connection could not be established.');
+    } on SqliteConnectionException catch (e) {
+      return (ok: false, error: e.message);
     } catch (e) {
-      debugPrint('SqliteConnection.testConnection: $e');
-      return false;
+      return (ok: false, error: sqliteMapOpenError(e, path).message);
     } finally {
       await disconnect();
     }
