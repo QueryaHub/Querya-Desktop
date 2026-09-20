@@ -53,8 +53,8 @@ Future<bool?> showUnsavedUpdateRestartDialog(material.BuildContext context) {
               const Text('Unsaved changes').semiBold().large(),
               const Gap(8),
               const Text(
-                'You have unsaved SQL or staged table changes. '
-                'Restarting to install the update will discard them.',
+                'You have unsaved SQL, staged table edits, or document '
+                'changes. Restarting to install the update will discard them.',
               ).muted().small(),
               const Gap(20),
               material.Align(

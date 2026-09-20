@@ -2,8 +2,9 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/unsaved_work_registry.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
-/// Confirms before Home / Close / tree navigation discards SQL or staged grid
-/// edits. Returns true when it is safe to tear down the current view.
+/// Confirms before Home / Close / tree navigation discards SQL, staged grid
+/// edits, or a dirty document editor. Returns true when it is safe to tear
+/// down the current view.
 Future<bool> confirmDiscardUnsavedWorkIfNeeded(
   material.BuildContext context,
 ) async {
@@ -12,7 +13,7 @@ Future<bool> confirmDiscardUnsavedWorkIfNeeded(
   return confirmed == true;
 }
 
-/// Prompt when leaving a workspace that has unsaved SQL or table edits.
+/// Prompt when leaving a workspace that has unsaved SQL, table, or document edits.
 Future<bool?> showDiscardUnsavedWorkDialog(material.BuildContext context) {
   return showAppDialog<bool>(
     context: context,
@@ -28,8 +29,8 @@ Future<bool?> showDiscardUnsavedWorkDialog(material.BuildContext context) {
               const Text('Unsaved changes').semiBold().large(),
               const Gap(8),
               const Text(
-                'You have unsaved SQL or staged table edits. '
-                'Continuing will discard them.',
+                'You have unsaved SQL, staged table edits, or document '
+                'changes. Continuing will discard them.',
               ).muted().small(),
               const Gap(20),
               material.Align(

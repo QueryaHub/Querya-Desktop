@@ -1,9 +1,13 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/editor/querya_code_editor.dart';
 import 'package:querya_desktop/core/editor/querya_code_language.dart';
+import 'package:querya_desktop/core/unsaved_work_guard.dart';
+import 'package:querya_desktop/core/unsaved_work_registry.dart';
 import 'package:querya_desktop/features/mongodb/mongo_ejson.dart';
 import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -55,6 +59,7 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
       text: mongoDocumentToEjson(widget.document),
     );
     _controller.addListener(_onTextChanged);
+    UnsavedWorkRegistry.instance.register(this, () => _dirty || _saving);
   }
 
   @override
@@ -102,9 +107,16 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
 
   @override
   void dispose() {
+    UnsavedWorkRegistry.instance.unregister(this);
     _controller.removeListener(_onTextChanged);
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _onBack() async {
+    if (!await confirmDiscardUnsavedWorkIfNeeded(context)) return;
+    if (!mounted) return;
+    widget.onBack?.call();
   }
 
   void _onTextChanged() {
@@ -237,7 +249,7 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
           child: Row(
             children: [
               material.InkWell(
-                onTap: widget.onBack,
+                onTap: () => unawaited(_onBack()),
                 borderRadius: material.BorderRadius.circular(6),
                 child: material.Padding(
                   padding: const material.EdgeInsets.all(4),

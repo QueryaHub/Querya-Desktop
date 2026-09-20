@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Mongo document editor Back (#782)** — Dirty JSON in `MongoDocumentEditor` is registered with `UnsavedWorkRegistry`. Breadcrumb Back, Home, Close, and tree navigation confirm before discarding; Cancel keeps the editor.
 - **Mongo JSON filter ObjectId / DateTime (#783)** — Document list filter parses Extended JSON (`$oid`, `$date`) and wraps a 24-character hex `_id` as `ObjectId`. A leftover string `_id` with zero matches shows how to write `{ "_id": { "$oid": "…" } }`.
 - **Postgres open-transaction probe (#787)** — `BEGIN` + `SELECT` does not assign an XID, so `pg_current_xact_id_if_assigned` stayed NULL (SQL-tab badge off; autocommit-off prepended a second `BEGIN`). The session tracks BEGIN/COMMIT/ROLLBACK and otherwise probes `pg_stat_activity.xact_start` (PG 9+). Implicit BEGIN when autocommit is off stays a separate `execute`.
 - **Postgres Table Browser paging (#788)** — Browse stays on `PgSessionMode.readOnly`. `SELECT` uses `ORDER BY` primary-key columns when a PK exists. Row totals come from `pg_class.reltuples` instead of a blocking `COUNT(*)` before first paint (stale estimates below the current page are ignored so Next still works). Save / REFRESH stay on `tableWrite`.
