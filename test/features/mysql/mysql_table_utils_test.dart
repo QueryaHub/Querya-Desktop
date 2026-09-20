@@ -84,4 +84,42 @@ void main() {
       expect(isAllowedMysqlSelectQuery('DELETE FROM t'), isFalse);
     });
   });
+
+  group('mysqlBrowseDataSql', () {
+    test('orders by quoted PK columns', () {
+      expect(
+        mysqlBrowseDataSql(
+          qualifiedFrom: '`shop`.`orders`',
+          primaryKeys: const ['id'],
+          limit: 200,
+          offset: 400,
+        ),
+        'SELECT * FROM `shop`.`orders` ORDER BY `id` LIMIT 200 OFFSET 400',
+      );
+    });
+
+    test('composite PK lists all columns', () {
+      expect(
+        mysqlBrowseDataSql(
+          qualifiedFrom: '`db`.`t`',
+          primaryKeys: const ['a', 'b'],
+          limit: 200,
+          offset: 0,
+        ),
+        'SELECT * FROM `db`.`t` ORDER BY `a`, `b` LIMIT 200 OFFSET 0',
+      );
+    });
+
+    test('omits ORDER BY when there is no PK', () {
+      expect(
+        mysqlBrowseDataSql(
+          qualifiedFrom: '`db`.`v`',
+          primaryKeys: const [],
+          limit: 200,
+          offset: 0,
+        ),
+        'SELECT * FROM `db`.`v` LIMIT 200 OFFSET 0',
+      );
+    });
+  });
 }

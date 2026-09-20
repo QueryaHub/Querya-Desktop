@@ -79,7 +79,12 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
   }
 
   String _browseDataSql() {
-    return 'SELECT * FROM ${_qualifiedFrom()} LIMIT ${widget.limit} OFFSET $_offset';
+    return mysqlBrowseDataSql(
+      qualifiedFrom: _qualifiedFrom(),
+      primaryKeys: _primaryKeys,
+      limit: widget.limit,
+      offset: _offset,
+    );
   }
 
   @override
@@ -174,11 +179,6 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
         });
       }
     }
-  }
-
-  static int _asInt(String? v) {
-    if (v == null) return 0;
-    return int.tryParse(v) ?? 0;
   }
 
   List<String> _resultColumns(IResultSet rs) {
@@ -280,33 +280,38 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       _loading = true;
       _error = null;
     });
-    final from = _qualifiedFrom();
-    final countSql = 'SELECT COUNT(*) AS c FROM $from';
-    final dataSql = _browseDataSql();
     try {
-      int totalRows;
-      if (refreshCount || _totalRowCount == null) {
-        final countRs = await conn.execute(countSql);
-        totalRows =
-            countRs.rows.isEmpty ? 0 : _asInt(countRs.rows.first.colAt(0));
-      } else {
-        totalRows = _totalRowCount!;
-      }
-
-      final result = await conn.execute(dataSql);
+      await _ensureSchema(conn);
       if (!mounted) return;
 
-      await _ensureSchema(conn);
+      int? totalRows = _totalRowCount;
+      if (refreshCount || totalRows == null) {
+        try {
+          totalRows = await conn.estimateTableRows(
+            database: widget.database,
+            table: widget.tableName,
+          );
+        } catch (_) {
+          totalRows = null;
+        }
+      }
+
+      final dataSql = _browseDataSql();
+      final result = await conn.execute(dataSql);
       if (!mounted) return;
 
       final colNames = _resultColumns(result);
       final stringRows = await _resultRowsAsync(result);
 
       if (!mounted) return;
+      final shown = stringRows.length;
+      if (totalRows != null && shown > 0 && totalRows < _offset + shown) {
+        totalRows = null;
+      }
       setState(() {
         _columnNames = colNames;
         _rows = stringRows;
-        _rowsOnPage = stringRows.length;
+        _rowsOnPage = shown;
         if (refreshCount || _totalRowCount == null) {
           _totalRowCount = totalRows;
         }
