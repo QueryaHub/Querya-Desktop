@@ -6,6 +6,12 @@ import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:redis/redis.dart' as redis;
 
+/// First page / load-more size for hash, list, set, and zset editors.
+const redisCollectionPageSize = 200;
+
+/// Warn in the key editor when HLEN / LLEN / SCARD / ZCARD is at least this.
+const redisLargeCollectionWarnAt = 10000;
+
 /// Redis connection using the Dart redis package (no Java/JRE).
 class RedisConnection {
   RedisConnection({
@@ -383,6 +389,33 @@ class RedisConnection {
     return map;
   }
 
+  /// HSCAN key cursor [COUNT count]. Returns (nextCursor, fields).
+  Future<(int, Map<String, String>)> hscan(
+    String key, {
+    int cursor = 0,
+    int count = redisCollectionPageSize,
+  }) async {
+    final result = await sendCommand(['HSCAN', key, cursor, 'COUNT', count]);
+    if (result is List && result.length == 2) {
+      final nextCursor = int.tryParse(result[0].toString()) ?? 0;
+      final map = <String, String>{};
+      final pairs = result[1];
+      if (pairs is List) {
+        for (var i = 0; i + 1 < pairs.length; i += 2) {
+          map[pairs[i].toString()] = pairs[i + 1].toString();
+        }
+      }
+      return (nextCursor, map);
+    }
+    return (0, <String, String>{});
+  }
+
+  /// HLEN key.
+  Future<int> hlen(String key) async {
+    final result = await sendCommand(['HLEN', key]);
+    return result is int ? result : int.tryParse(result.toString()) ?? 0;
+  }
+
   /// HSET key field value.
   Future<void> hset(String key, String field, String value) async {
     _assertWritable();
@@ -423,6 +456,22 @@ class RedisConnection {
       return result.map((e) => e.toString()).toList();
     }
     return [];
+  }
+
+  /// SSCAN key cursor [COUNT count]. Returns (nextCursor, members).
+  Future<(int, List<String>)> sscan(
+    String key, {
+    int cursor = 0,
+    int count = redisCollectionPageSize,
+  }) async {
+    final result = await sendCommand(['SSCAN', key, cursor, 'COUNT', count]);
+    if (result is List && result.length == 2) {
+      final nextCursor = int.tryParse(result[0].toString()) ?? 0;
+      final members =
+          (result[1] as List?)?.map((e) => e.toString()).toList() ?? [];
+      return (nextCursor, members);
+    }
+    return (0, <String>[]);
   }
 
   /// SCARD key.
@@ -515,8 +564,7 @@ class RedisConnection {
       case 'zset':
         return zcard(key);
       case 'hash':
-        final r = await sendCommand(['HLEN', key]);
-        return r is int ? r : int.tryParse(r.toString()) ?? 0;
+        return hlen(key);
       default:
         return 0;
     }
@@ -531,6 +579,16 @@ class RedisConnectionTestFake extends RedisConnection {
     this.secondScanKeys = const <String>[],
     this.dbSizeResult = 2,
     this.getResult,
+    this.listItems = const <String>[],
+    this.llenResult,
+    this.hashFirstPage = const <String, String>{},
+    this.hashSecondPage = const <String, String>{},
+    this.hlenResult,
+    this.setFirstPage = const <String>[],
+    this.setSecondPage = const <String>[],
+    this.scardResult,
+    this.zsetItems = const <(String, double)>[],
+    this.zcardResult,
   }) : super(
           id: -1,
           name: 'test-fake',
@@ -542,8 +600,20 @@ class RedisConnectionTestFake extends RedisConnection {
   final List<String> secondScanKeys;
   final int dbSizeResult;
   final String? getResult;
+  final List<String> listItems;
+  final int? llenResult;
+  final Map<String, String> hashFirstPage;
+  final Map<String, String> hashSecondPage;
+  final int? hlenResult;
+  final List<String> setFirstPage;
+  final List<String> setSecondPage;
+  final int? scardResult;
+  final List<(String, double)> zsetItems;
+  final int? zcardResult;
 
   bool _firstScanDone = false;
+  bool _firstHscanDone = false;
+  bool _firstSscanDone = false;
 
   @override
   bool get isConnected => _isConnected;
@@ -596,12 +666,97 @@ class RedisConnectionTestFake extends RedisConnection {
         return -1;
       case 'GET':
         return getResult;
+      case 'HGETALL':
+      case 'SMEMBERS':
+        throw StateError('$op is unbounded; use a paged command');
+      case 'HLEN':
+        return hlenResult ?? hashFirstPage.length + hashSecondPage.length;
+      case 'LLEN':
+        return llenResult ?? listItems.length;
+      case 'SCARD':
+        return scardResult ?? setFirstPage.length + setSecondPage.length;
+      case 'ZCARD':
+        return zcardResult ?? zsetItems.length;
+      case 'LRANGE':
+        return _sliceList(listItems, args);
+      case 'ZRANGE':
+        final stop = int.tryParse(args[3].toString()) ?? -1;
+        if (stop < 0) {
+          throw StateError('unbounded ZRANGE');
+        }
+        final start = int.tryParse(args[2].toString()) ?? 0;
+        if (start >= zsetItems.length || start > stop) return <dynamic>[];
+        final end = (stop + 1).clamp(0, zsetItems.length);
+        final out = <dynamic>[];
+        for (final (member, score) in zsetItems.sublist(start, end)) {
+          out.add(member);
+          out.add(score);
+        }
+        return out;
+      case 'HSCAN':
+        return _pagedPairs(
+          cursor: int.tryParse(args[2].toString()) ?? 0,
+          first: hashFirstPage,
+          second: hashSecondPage,
+          firstDone: _firstHscanDone,
+          markFirst: () => _firstHscanDone = true,
+        );
+      case 'SSCAN':
+        final cursor = int.tryParse(args[2].toString()) ?? 0;
+        if (cursor == 0 && !_firstSscanDone) {
+          _firstSscanDone = true;
+          final next = setSecondPage.isNotEmpty ? 1 : 0;
+          return [next, setFirstPage];
+        }
+        if (cursor == 1 && setSecondPage.isNotEmpty) {
+          return [0, setSecondPage];
+        }
+        return [0, <String>[]];
       case 'READONLY':
       case 'READWRITE':
         return 'OK';
       default:
         return null;
     }
+  }
+
+  List<String> _sliceList(List<String> items, List<dynamic> args) {
+    if (items.isEmpty) return const [];
+    final start = int.tryParse(args[2].toString()) ?? 0;
+    var stop = int.tryParse(args[3].toString()) ?? -1;
+    if (stop < 0) {
+      throw StateError('unbounded LRANGE');
+    }
+    if (start >= items.length || start > stop) return const [];
+    final end = (stop + 1).clamp(0, items.length);
+    return items.sublist(start, end);
+  }
+
+  List<dynamic> _pagedPairs({
+    required int cursor,
+    required Map<String, String> first,
+    required Map<String, String> second,
+    required bool firstDone,
+    required void Function() markFirst,
+  }) {
+    List<String> flatten(Map<String, String> map) {
+      final out = <String>[];
+      map.forEach((k, v) {
+        out.add(k);
+        out.add(v);
+      });
+      return out;
+    }
+
+    if (cursor == 0 && !firstDone) {
+      markFirst();
+      final next = second.isNotEmpty ? 1 : 0;
+      return [next, flatten(first)];
+    }
+    if (cursor == 1 && second.isNotEmpty) {
+      return [0, flatten(second)];
+    }
+    return [0, <String>[]];
   }
 }
 

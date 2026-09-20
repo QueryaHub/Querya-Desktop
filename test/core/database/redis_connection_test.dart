@@ -216,4 +216,39 @@ void main() {
       await fake.disconnect();
     });
   });
+
+  group('RedisConnection collection paging', () {
+    test('LRANGE first page is capped and HGETALL is refused by the fake',
+        () async {
+      final fake = RedisConnectionTestFake(
+        listItems: List.generate(250, (i) => 'item_$i'),
+      );
+      await fake.connect();
+
+      final page = await fake.lrange('k', 0, redisCollectionPageSize - 1);
+      expect(page, hasLength(redisCollectionPageSize));
+      expect(page.first, 'item_0');
+      expect(page.last, 'item_199');
+      expect(await fake.llen('k'), 250);
+      await expectLater(fake.hgetall('k'), throwsStateError);
+      await fake.disconnect();
+    });
+
+    test('HSCAN returns pages instead of HGETALL', () async {
+      final fake = RedisConnectionTestFake(
+        hashFirstPage: const {'a': '1', 'b': '2'},
+        hashSecondPage: const {'c': '3'},
+      );
+      await fake.connect();
+
+      final (c1, p1) = await fake.hscan('h');
+      expect(c1, 1);
+      expect(p1, {'a': '1', 'b': '2'});
+      final (c2, p2) = await fake.hscan('h', cursor: c1);
+      expect(c2, 0);
+      expect(p2, {'c': '3'});
+      expect(await fake.hlen('h'), 3);
+      await fake.disconnect();
+    });
+  });
 }
