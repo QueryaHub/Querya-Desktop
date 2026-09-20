@@ -7,20 +7,15 @@ Manual 120 Hz DevTools QA: issue [#739](https://github.com/QueryaHub/Querya-Desk
 
 ## Product smoke (manual) — 0.4.17
 
-- [ ] **SQL Execute discard (#867)** — edit a result-grid cell, Execute again: discard dialog; Cancel keeps pending edits.
-- [ ] **SQL-grid Save parity (#868)** — schema load failure is not a silent healthy row-count; SQLite `CREATE TABLE t (name TEXT)` SQL-grid can Save via rowid if in scope.
-- [ ] **Extension Table Browser (#869)** — no PK / failed schema: cells not editable; dirty page/Refresh confirms discard.
-- [ ] **Mongo Refresh (#870)** — dirty JSON + breadcrumb Refresh: discard dialog.
-- [ ] **Mongo list after Save (#871)** — full-document Save updates collection card previews without a manual Refresh.
-- [ ] **Mongo dotted `$set` (#872)** — top-level key `a.b` Save does not create nested `a: { b }`.
-- [ ] **Redis string dirty (#873)** — edit a string key, Refresh or keys crumb: discard dialog.
-- [ ] **Postgres convert (#874)** — large SELECT first paint (no double hitch vs 0.4.16).
-- [ ] **Grid sort+edit (#875)** — sorted result, edit a cell: no full re-sort hitch.
-- [ ] **Mongo list first paint (#876)** — large collection opens the first 25 docs without waiting on exact count.
-- [ ] **LIKE filter (#877)** — `LIKE '%x%'` on a 5k grid stays snappy.
-- [ ] **Tree filter debounce (#878)** — typing in object filter / sidebar search does not rebuild every keystroke.
-- [ ] **Horizontal grid scroll (#879)** — wide grid pan stays smooth at 120 Hz.
-- [ ] **Table Browser edit (regression)** — Postgres/MySQL/SQLite table with a PK: double-click cell, Save via DML preview; schema error ≠ “no PK”.
+- [ ] **Table Browser schema vs PK (#772)** — failed `getTableSchema` shows “schema unavailable”, not “no primary key”; Refresh retries schema.
+- [ ] **SQLite implicit rowid (#774)** — `CREATE TABLE t (name TEXT)` Table Browser can Save via `rowid`; `WITHOUT ROWID` stays on declared PK.
+- [ ] **Mongo 0-match (#776)** — inspector/JSON Save with a wrong `_id` is Save Failed, not a success toast.
+- [ ] **Mongo full-document Save (#778)** — JSON editor Save is `replaceOne`; deleting a nested key in JSON removes it on the server.
+- [ ] **Mongo dirty editor Back (#782)** — dirty JSON + breadcrumb Back: discard dialog; Cancel keeps the editor.
+- [ ] **Mongo JSON filter (#783)** — `{ "_id": { "$oid": "…" } }` and 24-char hex `_id` match ObjectId documents.
+- [ ] **SQL-grid Save** — simple single-table `SELECT` with a PK can Save; JOIN / no-PK stays read-only (Postgres #786, SQLite #795, MySQL #804).
+- [ ] **0-row DML (#773)** — Save that matches 0 rows fails and keeps the staging buffer.
+- [ ] **Table Browser edit (regression)** — Postgres/MySQL/SQLite table with a PK: double-click cell, Save via DML preview.
 - [ ] **Command Palette** — Ctrl/Cmd+P runs a command; Ctrl/Cmd+K jumps to a table.
 - [ ] **Mongo field Save** — inspector `$set` still 0-match fails (#776); JSON editor is `replaceOne`.
 
@@ -87,6 +82,6 @@ Verify the 0.4.4 motion tokens, smooth animations, and high refresh rate support
 
 ## Docs
 
-- [ ] [CHANGELOG.md](../CHANGELOG.md) has a dated **`## [0.4.17]`** section for the release (CI copies it into the GitHub Release body).
+- [x] [CHANGELOG.md](../CHANGELOG.md) has a dated **`## [0.4.17]`** section for the release (CI copies it into the GitHub Release body).
 - [x] [security.md](security.md) still matches behavior if storage changed.
 - [x] [roadmap.md](roadmap.md) marks 0.4.17 as this cut and 0.5.0 as next.
