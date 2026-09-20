@@ -443,14 +443,14 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         return;
       }
 
+      final to = _statementTimeout();
       if (!_autocommit) {
         final inTx = await conn.inOpenTransaction() ?? false;
         if (!inTx && !shouldSkipImplicitBegin(sql)) {
-          sql = 'BEGIN;\n$sql';
+          await conn.execute('BEGIN', timeout: to);
         }
       }
 
-      final to = _statementTimeout();
       final result = await conn.execute(sql, timeout: to);
 
       if (!mounted) return;
@@ -584,9 +584,13 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         throw StateError('Could not connect to PostgreSQL.');
       }
 
-      final txSql = plan.toTransactionSql();
       final to = _statementTimeout();
-      await conn.execute(txSql, timeout: to);
+      await runPostgresStatementsInTransaction(
+        (sql) async {
+          await conn.execute(sql, timeout: to);
+        },
+        plan.statements.map((s) => s.sql),
+      );
 
       if (!mounted) return;
       final newRows = session.stagingBuffer!.effectiveRows;

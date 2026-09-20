@@ -80,6 +80,64 @@ void main() {
     });
   });
 
+  group('runPostgresStatementsInTransaction', () {
+    test('executes BEGIN, each statement, COMMIT as separate calls', () async {
+      final calls = <String>[];
+      await runPostgresStatementsInTransaction(
+        (sql) async => calls.add(sql),
+        [
+          'UPDATE public.t SET a = 1 WHERE id = 1',
+          'DELETE FROM public.t WHERE id = 2',
+        ],
+      );
+      expect(calls, [
+        'BEGIN',
+        'UPDATE public.t SET a = 1 WHERE id = 1',
+        'DELETE FROM public.t WHERE id = 2',
+        'COMMIT',
+      ]);
+    });
+
+    test('ROLLBACK then rethrows when a statement fails', () async {
+      final calls = <String>[];
+      await expectLater(
+        runPostgresStatementsInTransaction(
+          (sql) async {
+            calls.add(sql);
+            if (sql.startsWith('UPDATE')) {
+              throw StateError(
+                'cannot insert multiple commands into a prepared statement',
+              );
+            }
+          },
+          ['UPDATE t SET a = 1 WHERE id = 1'],
+        ),
+        throwsA(isA<StateError>()),
+      );
+      expect(calls, [
+        'BEGIN',
+        'UPDATE t SET a = 1 WHERE id = 1',
+        'ROLLBACK',
+      ]);
+    });
+
+    test('ROLLBACK failure does not hide the original error', () async {
+      await expectLater(
+        runPostgresStatementsInTransaction(
+          (sql) async {
+            if (sql == 'BEGIN') return;
+            if (sql == 'ROLLBACK') throw StateError('already aborted');
+            throw StateError('multi-command');
+          },
+          ['UPDATE t SET a = 1'],
+        ),
+        throwsA(
+          predicate<StateError>((e) => e.message == 'multi-command'),
+        ),
+      );
+    });
+  });
+
   group('injectSqlLimit', () {
     test('appends LIMIT to select query without limit', () {
       expect(injectSqlLimit('SELECT * FROM users', 5000),
