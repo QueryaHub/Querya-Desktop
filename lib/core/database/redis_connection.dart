@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
+import 'package:querya_desktop/core/database/redis_bulk.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:redis/redis.dart' as redis;
 
@@ -128,6 +129,7 @@ class RedisConnection {
     } else {
       _command = await _conn!.connect(host, port);
     }
+    _command!.setParser(redis.RedisParserBulkBinary());
     if (effectivePassword != null && effectivePassword.isNotEmpty) {
       if (username != null && username!.trim().isNotEmpty) {
         await _command!
@@ -180,7 +182,7 @@ class RedisConnection {
       throw StateError('Not connected to Redis');
     }
     final result = await _command!.send_object(['INFO']);
-    return result?.toString() ?? '';
+    return RedisBulkValue.fromReply(result).text ?? '';
   }
 
   Future<bool> testConnection() async {
@@ -235,7 +237,7 @@ class RedisConnection {
   /// DBSIZE — number of keys in the currently selected database.
   Future<int> dbSize() async {
     final result = await sendCommand(['DBSIZE']);
-    return result is int ? result : int.tryParse(result.toString()) ?? 0;
+    return redisReplyInt(result);
   }
 
   /// CONFIG GET databases — max number of databases.
@@ -243,7 +245,7 @@ class RedisConnection {
     try {
       final result = await sendCommand(['CONFIG', 'GET', 'databases']);
       if (result is List && result.length >= 2) {
-        return int.tryParse(result[1].toString()) ?? 16;
+        return redisReplyInt(result[1], 16);
       }
     } catch (e) {
       debugPrint('RedisConnection.getMaxDatabases: $e');
@@ -254,7 +256,7 @@ class RedisConnection {
 
   /// SCAN cursor [MATCH pattern] [COUNT count].
   /// Returns (nextCursor, keys).
-  Future<(int, List<String>)> scan({
+  Future<(int, List<RedisBulkValue>)> scan({
     int cursor = 0,
     String? match,
     int count = 100,
@@ -266,24 +268,24 @@ class RedisConnection {
     args.addAll(['COUNT', count]);
     final result = await sendCommand(args);
     if (result is List && result.length == 2) {
-      final nextCursor = int.tryParse(result[0].toString()) ?? 0;
+      final nextCursor = redisReplyInt(result[0]);
       final keys =
-          (result[1] as List?)?.map((e) => e.toString()).toList() ?? [];
+          (result[1] as List?)?.map(RedisBulkValue.fromReply).toList() ?? [];
       return (nextCursor, keys);
     }
-    return (0, <String>[]);
+    return (0, <RedisBulkValue>[]);
   }
 
   /// TYPE key.
-  Future<String> keyType(String key) async {
-    final result = await sendCommand(['TYPE', key]);
-    return result?.toString() ?? 'none';
+  Future<String> keyType(Object key) async {
+    final result = await sendCommand(['TYPE', redisCommandArg(key)]);
+    return RedisBulkValue.fromReply(result).text ?? 'none';
   }
 
   /// TTL key (returns -1 if no expiry, -2 if missing).
-  Future<int> ttl(String key) async {
-    final result = await sendCommand(['TTL', key]);
-    return result is int ? result : int.tryParse(result.toString()) ?? -1;
+  Future<int> ttl(Object key) async {
+    final result = await sendCommand(['TTL', redisCommandArg(key)]);
+    return redisReplyInt(result, -1);
   }
 
   /// Pipelined TYPE + TTL for a SCAN batch.
@@ -291,7 +293,8 @@ class RedisConnection {
   /// Writes all commands before awaiting replies (redis-dart FIFO parse
   /// queue + optional Nagle via [Command.pipe_start]), so a batch of N keys
   /// costs ~1 RTT instead of ~2N sequential round-trips.
-  Future<List<({String type, int ttl})>> typesAndTtls(List<String> keys) async {
+  Future<List<({String type, int ttl})>> typesAndTtls(
+      List<RedisBulkValue> keys) async {
     if (keys.isEmpty) return const [];
     if (!isConnected) {
       throw StateError('Not connected to Redis');
@@ -302,15 +305,15 @@ class RedisConnection {
     try {
       final typeFutures = <Future<String>>[
         for (final key in keys)
-          sendCommand(['TYPE', key]).then(
-            (v) => v?.toString() ?? 'none',
+          sendCommand(['TYPE', key.commandArg]).then(
+            (v) => RedisBulkValue.fromReply(v).text ?? 'none',
             onError: (_) => 'unknown',
           ),
       ];
       final ttlFutures = <Future<int>>[
         for (final key in keys)
-          sendCommand(['TTL', key]).then(
-            (v) => v is int ? v : int.tryParse(v.toString()) ?? -1,
+          sendCommand(['TTL', key.commandArg]).then(
+            (v) => redisReplyInt(v, -1),
             onError: (_) => -1,
           ),
       ];
@@ -324,10 +327,11 @@ class RedisConnection {
     }
   }
 
-  /// GET (string).
-  Future<String?> get(String key) async {
-    final result = await sendCommand(['GET', key]);
-    return result?.toString();
+  /// GET. Returns null for a missing key. Non-UTF-8 values keep raw bytes.
+  Future<RedisBulkValue?> get(Object key) async {
+    final result = await sendCommand(['GET', redisCommandArg(key)]);
+    if (result == null) return null;
+    return RedisBulkValue.fromReply(result);
   }
 
   /// SET key value [EX seconds].
@@ -337,24 +341,25 @@ class RedisConnection {
   /// `SET … EX` on older servers. Does not recreate a key that is already gone
   /// (TTL `-2` / `XX` miss).
   Future<void> set(
-    String key,
+    Object key,
     String value, {
     int? ttlSeconds,
     bool keepTtl = true,
   }) async {
     _assertWritable();
+    final k = redisCommandArg(key);
     if (ttlSeconds != null && ttlSeconds > 0) {
-      await sendCommand(['SET', key, value, 'EX', ttlSeconds]);
+      await sendCommand(['SET', k, value, 'EX', ttlSeconds]);
       return;
     }
     if (!keepTtl) {
-      await sendCommand(['SET', key, value]);
+      await sendCommand(['SET', k, value]);
       return;
     }
-    await _setPreservingTtl(key, value);
+    await _setPreservingTtl(k, value);
   }
 
-  Future<void> _setPreservingTtl(String key, String value) async {
+  Future<void> _setPreservingTtl(Object key, String value) async {
     try {
       final result = await sendCommand(['SET', key, value, 'KEEPTTL', 'XX']);
       if (_isRedisNil(result)) {
@@ -377,160 +382,166 @@ class RedisConnection {
     }
   }
 
-  /// HGETALL key. Returns a `Map<String, String>`.
-  Future<Map<String, String>> hgetall(String key) async {
-    final result = await sendCommand(['HGETALL', key]);
-    final map = <String, String>{};
+  /// HGETALL key.
+  Future<Map<RedisBulkValue, RedisBulkValue>> hgetall(Object key) async {
+    final result = await sendCommand(['HGETALL', redisCommandArg(key)]);
+    final map = <RedisBulkValue, RedisBulkValue>{};
     if (result is List) {
       for (var i = 0; i + 1 < result.length; i += 2) {
-        map[result[i].toString()] = result[i + 1].toString();
+        map[RedisBulkValue.fromReply(result[i])] =
+            RedisBulkValue.fromReply(result[i + 1]);
       }
     }
     return map;
   }
 
   /// HSCAN key cursor [COUNT count]. Returns (nextCursor, fields).
-  Future<(int, Map<String, String>)> hscan(
-    String key, {
+  Future<(int, Map<RedisBulkValue, RedisBulkValue>)> hscan(
+    Object key, {
     int cursor = 0,
     int count = redisCollectionPageSize,
   }) async {
-    final result = await sendCommand(['HSCAN', key, cursor, 'COUNT', count]);
+    final result = await sendCommand(
+        ['HSCAN', redisCommandArg(key), cursor, 'COUNT', count]);
     if (result is List && result.length == 2) {
-      final nextCursor = int.tryParse(result[0].toString()) ?? 0;
-      final map = <String, String>{};
+      final nextCursor = redisReplyInt(result[0]);
+      final map = <RedisBulkValue, RedisBulkValue>{};
       final pairs = result[1];
       if (pairs is List) {
         for (var i = 0; i + 1 < pairs.length; i += 2) {
-          map[pairs[i].toString()] = pairs[i + 1].toString();
+          map[RedisBulkValue.fromReply(pairs[i])] =
+              RedisBulkValue.fromReply(pairs[i + 1]);
         }
       }
       return (nextCursor, map);
     }
-    return (0, <String, String>{});
+    return (0, <RedisBulkValue, RedisBulkValue>{});
   }
 
   /// HLEN key.
-  Future<int> hlen(String key) async {
-    final result = await sendCommand(['HLEN', key]);
-    return result is int ? result : int.tryParse(result.toString()) ?? 0;
+  Future<int> hlen(Object key) async {
+    final result = await sendCommand(['HLEN', redisCommandArg(key)]);
+    return redisReplyInt(result);
   }
 
   /// HSET key field value.
-  Future<void> hset(String key, String field, String value) async {
+  Future<void> hset(Object key, String field, String value) async {
     _assertWritable();
-    await sendCommand(['HSET', key, field, value]);
+    await sendCommand(['HSET', redisCommandArg(key), field, value]);
   }
 
   /// HDEL key field.
-  Future<void> hdel(String key, String field) async {
+  Future<void> hdel(Object key, Object field) async {
     _assertWritable();
-    await sendCommand(['HDEL', key, field]);
+    await sendCommand(['HDEL', redisCommandArg(key), redisCommandArg(field)]);
   }
 
   /// LRANGE key start stop.
-  Future<List<String>> lrange(String key, int start, int stop) async {
-    final result = await sendCommand(['LRANGE', key, start, stop]);
+  Future<List<RedisBulkValue>> lrange(Object key, int start, int stop) async {
+    final result =
+        await sendCommand(['LRANGE', redisCommandArg(key), start, stop]);
     if (result is List) {
-      return result.map((e) => e.toString()).toList();
+      return result.map(RedisBulkValue.fromReply).toList();
     }
     return [];
   }
 
   /// LLEN key.
-  Future<int> llen(String key) async {
-    final result = await sendCommand(['LLEN', key]);
-    return result is int ? result : int.tryParse(result.toString()) ?? 0;
+  Future<int> llen(Object key) async {
+    final result = await sendCommand(['LLEN', redisCommandArg(key)]);
+    return redisReplyInt(result);
   }
 
   /// RPUSH key value.
-  Future<void> rpush(String key, String value) async {
+  Future<void> rpush(Object key, String value) async {
     _assertWritable();
-    await sendCommand(['RPUSH', key, value]);
+    await sendCommand(['RPUSH', redisCommandArg(key), value]);
   }
 
   /// SMEMBERS key.
-  Future<List<String>> smembers(String key) async {
-    final result = await sendCommand(['SMEMBERS', key]);
+  Future<List<RedisBulkValue>> smembers(Object key) async {
+    final result = await sendCommand(['SMEMBERS', redisCommandArg(key)]);
     if (result is List) {
-      return result.map((e) => e.toString()).toList();
+      return result.map(RedisBulkValue.fromReply).toList();
     }
     return [];
   }
 
   /// SSCAN key cursor [COUNT count]. Returns (nextCursor, members).
-  Future<(int, List<String>)> sscan(
-    String key, {
+  Future<(int, List<RedisBulkValue>)> sscan(
+    Object key, {
     int cursor = 0,
     int count = redisCollectionPageSize,
   }) async {
-    final result = await sendCommand(['SSCAN', key, cursor, 'COUNT', count]);
+    final result = await sendCommand(
+        ['SSCAN', redisCommandArg(key), cursor, 'COUNT', count]);
     if (result is List && result.length == 2) {
-      final nextCursor = int.tryParse(result[0].toString()) ?? 0;
+      final nextCursor = redisReplyInt(result[0]);
       final members =
-          (result[1] as List?)?.map((e) => e.toString()).toList() ?? [];
+          (result[1] as List?)?.map(RedisBulkValue.fromReply).toList() ?? [];
       return (nextCursor, members);
     }
-    return (0, <String>[]);
+    return (0, <RedisBulkValue>[]);
   }
 
   /// SCARD key.
-  Future<int> scard(String key) async {
-    final result = await sendCommand(['SCARD', key]);
-    return result is int ? result : int.tryParse(result.toString()) ?? 0;
+  Future<int> scard(Object key) async {
+    final result = await sendCommand(['SCARD', redisCommandArg(key)]);
+    return redisReplyInt(result);
   }
 
   /// SADD key member.
-  Future<void> sadd(String key, String member) async {
+  Future<void> sadd(Object key, String member) async {
     _assertWritable();
-    await sendCommand(['SADD', key, member]);
+    await sendCommand(['SADD', redisCommandArg(key), member]);
   }
 
   /// SREM key member.
-  Future<void> srem(String key, String member) async {
+  Future<void> srem(Object key, Object member) async {
     _assertWritable();
-    await sendCommand(['SREM', key, member]);
+    await sendCommand(['SREM', redisCommandArg(key), redisCommandArg(member)]);
   }
 
   /// ZRANGE key start stop WITHSCORES → list of (member, score).
-  Future<List<(String, double)>> zrangeWithScores(
-      String key, int start, int stop) async {
-    final result =
-        await sendCommand(['ZRANGE', key, start, stop, 'WITHSCORES']);
-    final list = <(String, double)>[];
+  Future<List<(RedisBulkValue, double)>> zrangeWithScores(
+      Object key, int start, int stop) async {
+    final result = await sendCommand(
+        ['ZRANGE', redisCommandArg(key), start, stop, 'WITHSCORES']);
+    final list = <(RedisBulkValue, double)>[];
     if (result is List) {
       for (var i = 0; i + 1 < result.length; i += 2) {
-        final member = result[i].toString();
-        final score = double.tryParse(result[i + 1].toString()) ?? 0;
-        list.add((member, score));
+        list.add((
+          RedisBulkValue.fromReply(result[i]),
+          redisReplyDouble(result[i + 1]),
+        ));
       }
     }
     return list;
   }
 
   /// ZCARD key.
-  Future<int> zcard(String key) async {
-    final result = await sendCommand(['ZCARD', key]);
-    return result is int ? result : int.tryParse(result.toString()) ?? 0;
+  Future<int> zcard(Object key) async {
+    final result = await sendCommand(['ZCARD', redisCommandArg(key)]);
+    return redisReplyInt(result);
   }
 
   /// ZADD key score member.
-  Future<void> zadd(String key, double score, String member) async {
+  Future<void> zadd(Object key, double score, String member) async {
     _assertWritable();
-    await sendCommand(['ZADD', key, score, member]);
+    await sendCommand(['ZADD', redisCommandArg(key), score, member]);
   }
 
   /// ZREM key member.
-  Future<void> zrem(String key, String member) async {
+  Future<void> zrem(Object key, Object member) async {
     _assertWritable();
-    await sendCommand(['ZREM', key, member]);
+    await sendCommand(['ZREM', redisCommandArg(key), redisCommandArg(member)]);
   }
 
   /// DEL key.
-  Future<int> del(String key) async {
+  Future<int> del(Object key) async {
     _assertWritable();
-    final result = await sendCommand(['DEL', key]);
-    return result is int ? result : int.tryParse(result.toString()) ?? 0;
+    final result = await sendCommand(['DEL', redisCommandArg(key)]);
+    return redisReplyInt(result);
   }
 
   /// RENAME old new.
@@ -540,23 +551,23 @@ class RedisConnection {
   }
 
   /// EXPIRE key seconds.
-  Future<void> expire(String key, int seconds) async {
+  Future<void> expire(Object key, int seconds) async {
     _assertWritable();
-    await sendCommand(['EXPIRE', key, seconds]);
+    await sendCommand(['EXPIRE', redisCommandArg(key), seconds]);
   }
 
   /// PERSIST key (remove TTL).
-  Future<void> persist(String key) async {
+  Future<void> persist(Object key) async {
     _assertWritable();
-    await sendCommand(['PERSIST', key]);
+    await sendCommand(['PERSIST', redisCommandArg(key)]);
   }
 
   /// STRLEN / LLEN / SCARD / ZCARD / HLEN — get size for any type.
-  Future<int> keySize(String key, String type) async {
+  Future<int> keySize(Object key, String type) async {
     switch (type) {
       case 'string':
-        final r = await sendCommand(['STRLEN', key]);
-        return r is int ? r : int.tryParse(r.toString()) ?? 0;
+        final r = await sendCommand(['STRLEN', redisCommandArg(key)]);
+        return redisReplyInt(r);
       case 'list':
         return llen(key);
       case 'set':
@@ -591,6 +602,8 @@ class RedisConnectionTestFake extends RedisConnection {
     this.zcardResult,
     this.typeResult = 'string',
     this.failType = false,
+    this.getBytesResult,
+    this.binaryScanKeys = const <List<int>>[],
   }) : super(
           id: -1,
           name: 'test-fake',
@@ -614,6 +627,8 @@ class RedisConnectionTestFake extends RedisConnection {
   final int? zcardResult;
   final String typeResult;
   final bool failType;
+  final List<int>? getBytesResult;
+  final List<List<int>> binaryScanKeys;
   final List<String> sentCommands = [];
 
   bool _firstScanDone = false;
@@ -657,15 +672,17 @@ class RedisConnectionTestFake extends RedisConnection {
         return dbSizeResult;
       case 'SCAN':
         final cursor = int.tryParse(args[1].toString()) ?? 0;
+        List<Object> keysFor(List<String> named) =>
+            [...named, ...binaryScanKeys];
         if (cursor == 0 && !_firstScanDone) {
           _firstScanDone = true;
           final next = secondScanKeys.isNotEmpty ? 1 : 0;
-          return [next, firstScanKeys];
+          return [next, keysFor(firstScanKeys)];
         }
         if (cursor == 1 && secondScanKeys.isNotEmpty) {
-          return [0, secondScanKeys];
+          return [0, keysFor(secondScanKeys)];
         }
-        return [0, <String>[]];
+        return [0, <Object>[]];
       case 'TYPE':
         if (failType) {
           throw StateError('TYPE failed');
@@ -674,6 +691,7 @@ class RedisConnectionTestFake extends RedisConnection {
       case 'TTL':
         return -1;
       case 'GET':
+        if (getBytesResult != null) return getBytesResult;
         if (typeResult != 'string') {
           throw StateError(
             'WRONGTYPE Operation against a key holding the wrong kind of value',

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/database/redis_bulk.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 
 /// Counts outbound commands to prove [typesAndTtls] fires TYPE+TTL without
@@ -22,7 +23,11 @@ void main() {
     final fake = _CountingRedisFake();
     await fake.connect();
 
-    final metas = await fake.typesAndTtls(['a', 'b', 'c']);
+    final metas = await fake.typesAndTtls([
+      RedisBulkValue.utf8('a'),
+      RedisBulkValue.utf8('b'),
+      RedisBulkValue.utf8('c'),
+    ]);
 
     expect(metas, hasLength(3));
     expect(metas.map((m) => m.type), everyElement('string'));
