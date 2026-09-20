@@ -291,6 +291,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
               tableName: my.name,
               isView: my.kind == MysqlObjectKind.view,
               onNavigateHome: widget.onNavigateHome,
+              isReadOnly: widget.isReadOnly,
             );
           }
         }

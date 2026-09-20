@@ -157,6 +157,21 @@ void main() {
     });
   });
 
+  group('MysqlConnection.sessionTransactionAccessModeSql', () {
+    test(
+        'documents SET SESSION TRANSACTION (not default_transaction_read_only)',
+        () {
+      expect(
+        MysqlConnection.sessionTransactionAccessModeSql(true),
+        'SET SESSION TRANSACTION READ ONLY',
+      );
+      expect(
+        MysqlConnection.sessionTransactionAccessModeSql(false),
+        'SET SESSION TRANSACTION READ WRITE',
+      );
+    });
+  });
+
   group('MysqlConnection.quoteIdentifier', () {
     test('escapes backticks', () {
       expect(

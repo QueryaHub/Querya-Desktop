@@ -28,6 +28,7 @@ class MysqlTableView extends material.StatefulWidget {
     this.isView = false,
     this.limit = _defaultLimit,
     this.onNavigateHome,
+    this.isReadOnly = false,
   });
 
   final ConnectionRow connectionRow;
@@ -36,6 +37,9 @@ class MysqlTableView extends material.StatefulWidget {
   final bool isView;
   final int limit;
   final VoidCallback? onNavigateHome;
+
+  /// Title-bar session lock: no staging / Save / `tableWrite` acquire.
+  final bool isReadOnly;
 
   @override
   material.State<MysqlTableView> createState() => _MysqlTableViewState();
@@ -71,6 +75,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
         isView: widget.isView,
         customSqlActive: _customSqlActive,
         hasPrimaryKey: _primaryKeys.isNotEmpty,
+        readOnly: widget.isReadOnly,
       );
 
   String _qualifiedFrom() {
@@ -106,6 +111,8 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       _resetStaging();
       _disconnectCurrent(interruptIfBusy: true);
       _connectAndLoad();
+    } else if (oldWidget.isReadOnly != widget.isReadOnly) {
+      _syncStagingToReadOnly();
     }
   }
 
@@ -124,6 +131,21 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
     _columnMeta = {};
     _schemaLoaded = false;
     _isSaving = false;
+  }
+
+  void _syncStagingToReadOnly() {
+    if (widget.isReadOnly) {
+      _stagingBuffer?.dispose();
+      _stagingBuffer = null;
+    } else if (_columnNames.isNotEmpty) {
+      _stagingBuffer = replaceTableViewStagingBuffer(
+        previous: _stagingBuffer,
+        columns: _columnNames,
+        rows: _rows,
+        enabled: _editingEnabled,
+      );
+    }
+    if (mounted) setState(() {});
   }
 
   void _disconnectCurrent({bool interruptIfBusy = false}) {
@@ -215,6 +237,9 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
   Future<T> _withTableWrite<T>(
     Future<T> Function(MysqlConnection conn) fn,
   ) async {
+    if (widget.isReadOnly) {
+      throw StateError('MySQL session is read-only');
+    }
     final lease = await MysqlService.instance.acquire(
       widget.connectionRow,
       database: widget.database,
@@ -483,6 +508,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       customSqlActive: _customSqlActive,
       hasPrimaryKey: _primaryKeys.isNotEmpty,
       schemaLoaded: _schemaLoaded,
+      readOnly: widget.isReadOnly,
     );
     final pag = _paginationLabel();
     if (reason != null) return '$pag · $reason';
@@ -508,6 +534,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
   }
 
   Future<void> _applyStagedChanges() async {
+    if (widget.isReadOnly) return;
     final buffer = _stagingBuffer;
     if (buffer == null || !buffer.isDirty || _isSaving) return;
     setState(() => _isSaving = true);
