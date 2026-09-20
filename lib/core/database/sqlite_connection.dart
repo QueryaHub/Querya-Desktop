@@ -358,7 +358,7 @@ class SqliteConnection {
   /// Returns the DDL (`sql`) of a table or view from sqlite_master.
   Future<String> getObjectDdl(String objectName) async {
     final rows = await execute(
-      "SELECT sql FROM sqlite_master WHERE name = :name",
+      'SELECT sql FROM sqlite_master WHERE name = ?',
       [objectName],
     );
     if (rows.isEmpty) return '-- No definition found for $objectName';
