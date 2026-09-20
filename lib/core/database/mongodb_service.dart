@@ -173,7 +173,8 @@ class MongoService {
     });
   }
 
-  /// Opens a temporary [Db] for the given [database], runs [action], then closes.
+  /// Reuses a pooled [Db] for [database] on the live session (auth via the
+  /// in-memory session URI, not the scrubbed password getter).
   Future<T> _withDb<T>(
     MongoConnection connection,
     String database,
@@ -182,14 +183,8 @@ class MongoService {
     if (!connection.isConnected) {
       throw StateError('Not connected to MongoDB');
     }
-    final dbUri = connection.buildUriForDatabase(database);
-    final db = await Db.create(dbUri);
-    await db.open();
-    try {
-      return await action(db);
-    } finally {
-      await db.close();
-    }
+    final db = await connection.openDatabase(database);
+    return await action(db);
   }
 
   /// Returns the document count for a collection (with optional filter).
