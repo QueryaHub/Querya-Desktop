@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:postgres/postgres.dart' show SslMode;
 // ignore: implementation_imports
 import 'package:postgres/src/connection_string.dart' show parseConnectionString;
+import 'package:querya_desktop/core/database/postgres_connection.dart';
 
 /// Ensures libpq-style URI params match what we document for [PostgresConnection.connect].
 void main() {
@@ -60,6 +61,62 @@ void main() {
         ),
         throwsArgumentError,
       );
+    });
+  });
+
+  group('postgresResolveSslMode', () {
+    test('URI sslmode is source of truth', () {
+      expect(
+        postgresResolveSslMode(
+          uriSslMode: SslMode.require,
+          encrypt: true,
+          hasRootCert: true,
+        ),
+        SslMode.require,
+      );
+      expect(
+        postgresResolveSslMode(
+          uriSslMode: SslMode.verifyFull,
+          encrypt: false,
+          hasRootCert: false,
+        ),
+        SslMode.verifyFull,
+      );
+    });
+
+    test('host/port SSL without CA is require (encrypt only)', () {
+      expect(
+        postgresResolveSslMode(encrypt: true, hasRootCert: false),
+        SslMode.require,
+      );
+    });
+
+    test('host/port with Root CA is verifyFull', () {
+      expect(
+        postgresResolveSslMode(encrypt: true, hasRootCert: true),
+        SslMode.verifyFull,
+      );
+      expect(
+        postgresResolveSslMode(encrypt: false, hasRootCert: true),
+        SslMode.verifyFull,
+      );
+    });
+
+    test('no SSL and no CA is disable', () {
+      expect(
+        postgresResolveSslMode(encrypt: false, hasRootCert: false),
+        SslMode.disable,
+      );
+    });
+  });
+
+  group('postgresReltuplesEstimate', () {
+    test('rounds planner floats and treats unanalyzed as unknown', () {
+      expect(postgresReltuplesEstimate(200.4), 200);
+      expect(postgresReltuplesEstimate(199.6), 200);
+      expect(postgresReltuplesEstimate(0), 0);
+      expect(postgresReltuplesEstimate(-1), isNull);
+      expect(postgresReltuplesEstimate(null), isNull);
     });
   });
 }

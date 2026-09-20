@@ -23,6 +23,50 @@ Future<bool?> showDestructiveQueryDialog({
   );
 }
 
+/// Same dialog as SQL DROP/DELETE, with a command preview (Mongo / Redis).
+///
+/// Returns `true` only when the user checks the acknowledgment box and
+/// confirms. Cancel / Escape returns `false`.
+Future<bool> confirmDestructiveAction({
+  required material.BuildContext context,
+  required DestructiveSqlType type,
+  required String targetName,
+  required String commandPreview,
+  String? connectionName,
+}) async {
+  final confirmed = await showDestructiveQueryDialog(
+    context: context,
+    result: DestructiveSqlInspectionResult(
+      operations: [
+        DestructiveSqlOperation(
+          type: type,
+          targetName: targetName,
+          rawStatement: commandPreview,
+        ),
+      ],
+    ),
+    sql: commandPreview,
+    connectionName: connectionName,
+  );
+  return confirmed == true;
+}
+
+/// Mongo explorer drop/delete. Same dialog as SQL.
+Future<bool> confirmDestructiveMongoAction({
+  required material.BuildContext context,
+  required DestructiveSqlType type,
+  required String targetName,
+  required String commandPreview,
+  String? connectionName,
+}) =>
+    confirmDestructiveAction(
+      context: context,
+      type: type,
+      targetName: targetName,
+      commandPreview: commandPreview,
+      connectionName: connectionName,
+    );
+
 class _DestructiveQueryDialog extends material.StatefulWidget {
   const _DestructiveQueryDialog({
     required this.result,
@@ -39,7 +83,8 @@ class _DestructiveQueryDialog extends material.StatefulWidget {
       _DestructiveQueryDialogState();
 }
 
-class _DestructiveQueryDialogState extends material.State<_DestructiveQueryDialog> {
+class _DestructiveQueryDialogState
+    extends material.State<_DestructiveQueryDialog> {
   bool _acknowledged = false;
   bool _copied = false;
 
@@ -67,14 +112,14 @@ class _DestructiveQueryDialogState extends material.State<_DestructiveQueryDialo
         maxHeight: 580,
       ),
       child: material.FocusTraversalGroup(
-          child: material.SizedBox(
-            height: 540,
-            child: material.Padding(
-              padding: const material.EdgeInsets.all(20),
-              child: material.Column(
-                mainAxisSize: material.MainAxisSize.min,
-                crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                children: [
+        child: material.SizedBox(
+          height: 540,
+          child: material.Padding(
+            padding: const material.EdgeInsets.all(20),
+            child: material.Column(
+              mainAxisSize: material.MainAxisSize.min,
+              crossAxisAlignment: material.CrossAxisAlignment.stretch,
+              children: [
                 // Header
                 material.Row(
                   children: [
@@ -245,12 +290,14 @@ class _DestructiveQueryDialogState extends material.State<_DestructiveQueryDialo
                   children: [
                     material.Checkbox(
                       value: _acknowledged,
-                      onChanged: (v) => setState(() => _acknowledged = v ?? false),
+                      onChanged: (v) =>
+                          setState(() => _acknowledged = v ?? false),
                     ),
                     const Gap(8),
                     material.Expanded(
                       child: material.GestureDetector(
-                        onTap: () => setState(() => _acknowledged = !_acknowledged),
+                        onTap: () =>
+                            setState(() => _acknowledged = !_acknowledged),
                         child: const Text(
                           'I understand that this query cannot be undone and may result in permanent data loss.',
                         ).small(),
@@ -270,7 +317,8 @@ class _DestructiveQueryDialogState extends material.State<_DestructiveQueryDialo
                     crossAxisAlignment: material.WrapCrossAlignment.center,
                     children: [
                       GhostButton(
-                        onPressed: () => material.Navigator.of(context).pop(false),
+                        onPressed: () =>
+                            material.Navigator.of(context).pop(false),
                         child: const Text('Cancel'),
                       ),
                       DestructiveButton(

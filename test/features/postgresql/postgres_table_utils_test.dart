@@ -23,11 +23,107 @@ void main() {
     });
   });
 
+  group('isAllowedPostgresSelectQuery', () {
+    test('allows SELECT inserted_at (not substring-blocked)', () {
+      expect(
+        isAllowedPostgresSelectQuery('SELECT inserted_at FROM t'),
+        isTrue,
+      );
+      expect(
+        isAllowedPostgresSelectQuery('SELECT dropped_at, updated_at FROM t'),
+        isTrue,
+      );
+    });
+
+    test('rejects multi-statement even when the first is SELECT', () {
+      expect(isAllowedPostgresSelectQuery('SELECT 1; DELETE FROM t'), isFalse);
+      expect(isAllowedPostgresSelectQuery('SELECT 1; SELECT 2'), isFalse);
+    });
+
+    test('allows trailing semicolon and trailing comment', () {
+      expect(isAllowedPostgresSelectQuery('SELECT * FROM t;'), isTrue);
+      expect(isAllowedPostgresSelectQuery('SELECT * FROM t; -- done'), isTrue);
+    });
+
+    test('allows WITH SELECT, TABLE, VALUES, and parenthesized SELECT', () {
+      expect(
+        isAllowedPostgresSelectQuery('WITH x AS (SELECT 1) SELECT * FROM x'),
+        isTrue,
+      );
+      expect(isAllowedPostgresSelectQuery('TABLE t'), isTrue);
+      expect(isAllowedPostgresSelectQuery('VALUES (1)'), isTrue);
+      expect(
+          isAllowedPostgresSelectQuery('(SELECT inserted_at FROM t)'), isTrue);
+    });
+
+    test('rejects WITH INSERT and other writes', () {
+      expect(
+        isAllowedPostgresSelectQuery(
+          'WITH x AS (SELECT 1) INSERT INTO t SELECT * FROM x',
+        ),
+        isFalse,
+      );
+      expect(isAllowedPostgresSelectQuery('DELETE FROM t'), isFalse);
+      expect(isAllowedPostgresSelectQuery('INSERT INTO t VALUES (1)'), isFalse);
+    });
+
+    test('allows semicolon inside a string literal', () {
+      expect(
+        isAllowedPostgresSelectQuery(
+          "SELECT * FROM logs WHERE message = 'error; system halted'",
+        ),
+        isTrue,
+      );
+    });
+
+    test('rejects empty', () {
+      expect(isAllowedPostgresSelectQuery(''), isFalse);
+    });
+  });
+
   group('postgresBrowseSelectSql', () {
     test('quotes identifiers and uses default limit', () {
       expect(
         postgresBrowseSelectSql(schema: 'public', table: 'stock'),
         'SELECT * FROM "public"."stock" LIMIT 200 OFFSET 0;\n',
+      );
+    });
+  });
+
+  group('postgresBrowseDataSql', () {
+    test('orders by quoted PK columns', () {
+      expect(
+        postgresBrowseDataSql(
+          qualifiedFrom: '"public"."orders"',
+          primaryKeys: const ['id'],
+          limit: 200,
+          offset: 400,
+        ),
+        'SELECT * FROM "public"."orders" ORDER BY "id" LIMIT 200 OFFSET 400',
+      );
+    });
+
+    test('composite PK lists all columns', () {
+      expect(
+        postgresBrowseDataSql(
+          qualifiedFrom: '"public"."t"',
+          primaryKeys: const ['a', 'b'],
+          limit: 200,
+          offset: 0,
+        ),
+        'SELECT * FROM "public"."t" ORDER BY "a", "b" LIMIT 200 OFFSET 0',
+      );
+    });
+
+    test('omits ORDER BY when there is no PK', () {
+      expect(
+        postgresBrowseDataSql(
+          qualifiedFrom: '"public"."v"',
+          primaryKeys: const [],
+          limit: 200,
+          offset: 0,
+        ),
+        'SELECT * FROM "public"."v" LIMIT 200 OFFSET 0',
       );
     });
   });

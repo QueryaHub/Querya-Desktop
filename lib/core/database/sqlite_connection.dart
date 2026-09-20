@@ -1,9 +1,51 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:querya_desktop/core/database/sqlite_sql.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+
+/// In-memory paths (`:memory:`) skip the missing-file check.
+bool sqlitePathIsInMemory(String path) =>
+    path == inMemoryDatabasePath || path == ':memory:';
+
+/// Maps driver / OS errors to a user-facing [SqliteConnectionException].
+SqliteConnectionException sqliteMapOpenError(Object error, String path) {
+  final msg = error.toString().toLowerCase();
+  if (msg.contains('not found') ||
+      msg.contains('no such file') ||
+      msg.contains('errno = 2') ||
+      msg.contains('errno =2')) {
+    return SqliteConnectionException(
+      'SQLite file not found: $path',
+      cause: error,
+    );
+  }
+  if (msg.contains('permission') ||
+      msg.contains('access denied') ||
+      msg.contains('errno = 13') ||
+      msg.contains('errno =13')) {
+    return SqliteConnectionException(
+      'Permission denied opening SQLite file: $path',
+      cause: error,
+    );
+  }
+  if (msg.contains('not a database') ||
+      msg.contains('malformed') ||
+      msg.contains('corrupt') ||
+      msg.contains('disk image')) {
+    return SqliteConnectionException(
+      'SQLite database is corrupt or not a database: $path',
+      cause: error,
+    );
+  }
+  return SqliteConnectionException(
+    'Failed to open SQLite database: $error',
+    cause: error,
+  );
+}
 
 /// SQLite database connection using sqflite_common_ffi.
 class SqliteConnection {
@@ -12,6 +54,7 @@ class SqliteConnection {
     required this.name,
     required this.path,
     this.readOnly = false,
+    this.createIfMissing = false,
   });
 
   factory SqliteConnection.fromConnectionRow(
@@ -22,7 +65,8 @@ class SqliteConnection {
       id: row.id ?? 0,
       name: row.name,
       path: row.host ?? '', // Store absolute file path in the 'host' field
-      readOnly: readOnly ?? row.useSSL, // Store read-only flag in the 'useSSL' field
+      readOnly:
+          readOnly ?? row.useSSL, // Store read-only flag in the 'useSSL' field
     );
   }
 
@@ -31,8 +75,12 @@ class SqliteConnection {
   final String path;
   final bool readOnly;
 
+  /// When true, `openDatabase` may create the file (new-connection Save only).
+  final bool createIfMissing;
+
   Database? _db;
   bool _isConnected = false;
+  bool _inTransaction = false;
 
   bool get isConnected => _isConnected && _db != null;
 
@@ -40,28 +88,72 @@ class SqliteConnection {
     if (_isConnected && _db != null) return;
     try {
       await LocalDb.initFfi();
+      _ensureFileReady();
       _db = await databaseFactoryFfi.openDatabase(
         path,
         options: OpenDatabaseOptions(
           readOnly: readOnly,
           onOpen: (db) async {
             await db.execute('PRAGMA busy_timeout = 5000');
+            await db.rawQuery('SELECT 1');
             if (!readOnly) {
               await db.execute('PRAGMA foreign_keys = ON');
+              try {
+                await db.execute('PRAGMA journal_mode = WAL');
+              } catch (e) {
+                debugPrint('SqliteConnection WAL not available: $e');
+              }
             }
           },
         ),
       );
       _isConnected = true;
-    } catch (e) {
+    } on SqliteConnectionException {
       _isConnected = false;
       _db = null;
       rethrow;
+    } catch (e) {
+      _isConnected = false;
+      _db = null;
+      throw sqliteMapOpenError(e, path);
+    }
+  }
+
+  void _ensureFileReady() {
+    if (sqlitePathIsInMemory(path)) return;
+    final file = File(path);
+    if (file.existsSync()) {
+      if (file.statSync().type == FileSystemEntityType.directory) {
+        throw SqliteConnectionException('SQLite path is a directory: $path');
+      }
+      return;
+    }
+    // sqflite FFI uses OpenMode.readWriteCreate and even mkdir's parents.
+    if (!createIfMissing || readOnly) {
+      throw SqliteConnectionException('SQLite file not found: $path');
+    }
+  }
+
+  /// Creates an empty SQLite file if [path] is missing (new-connection Save).
+  static Future<void> createFileIfMissing(String path) async {
+    if (sqlitePathIsInMemory(path)) return;
+    if (File(path).existsSync()) return;
+    final conn = SqliteConnection(
+      id: 0,
+      name: 'create',
+      path: path,
+      createIfMissing: true,
+    );
+    try {
+      await conn.connect();
+    } finally {
+      await conn.disconnect();
     }
   }
 
   Future<void> disconnect() async {
     _isConnected = false;
+    _inTransaction = false;
     final d = _db;
     _db = null;
     try {
@@ -73,17 +165,19 @@ class SqliteConnection {
 
   Future<void> forceClose() => disconnect();
 
-  Future<bool> testConnection() async {
+  /// Tests connectivity without leaving a session open.
+  Future<({bool ok, String? error})> testConnection() async {
     try {
       await connect();
       if (_db != null) {
         await _db!.rawQuery('SELECT 1');
-        return true;
+        return (ok: true, error: null);
       }
-      return false;
+      return (ok: false, error: 'Connection could not be established.');
+    } on SqliteConnectionException catch (e) {
+      return (ok: false, error: e.message);
     } catch (e) {
-      debugPrint('SqliteConnection.testConnection: $e');
-      return false;
+      return (ok: false, error: sqliteMapOpenError(e, path).message);
     } finally {
       await disconnect();
     }
@@ -97,18 +191,8 @@ class SqliteConnection {
     if (!isConnected || _db == null) {
       throw StateError('Not connected to SQLite');
     }
-    final sqlLower = sql
-        .replaceAll(RegExp(r'--.*$', multiLine: true), '')
-        .replaceAll(RegExp(r'/\*.*?\*/', dotAll: true), '')
-        .trim()
-        .toLowerCase();
-    
-    // SQLite can execute PRAGMA, SELECT, EXPLAIN statements, which return data
-    final isReadOnlyQuery = sqlLower.startsWith('select') ||
-        sqlLower.startsWith('pragma') ||
-        sqlLower.startsWith('explain') ||
-        sqlLower.startsWith('with') ||
-        sqlLower.startsWith('values');
+    final sqlLower = sqliteStripSqlComments(sql).trim().toLowerCase();
+    final isReadOnlyQuery = sqliteSqlIsReadOnlyQuery(sql);
 
     final hasReturning = RegExp(r'\breturning\b').hasMatch(sqlLower);
 
@@ -121,12 +205,31 @@ class SqliteConnection {
         return await _db!.rawQuery(sql, arguments);
       } else {
         await _db!.execute(sql, arguments);
+        _noteTransactionSql(sqlLower);
         return [];
       }
     } on TimeoutException {
       unawaited(forceClose());
       rethrow;
+    } on DatabaseException catch (e) {
+      if (_isSqliteBusy(e)) {
+        throw StateError(
+          'SQLite is busy (another connection is writing). Retry in a moment.',
+        );
+      }
+      rethrow;
     }
+  }
+
+  /// Runs DML and returns sqlite `changes()` for the last INSERT/UPDATE/DELETE.
+  Future<int> executeAffected(String sql) async {
+    await execute(sql);
+    if (!isConnected || _db == null) return 0;
+    final rows = await _db!.rawQuery('SELECT changes() AS c');
+    if (rows.isEmpty) return 0;
+    final v = rows.first['c'];
+    if (v is int) return v;
+    return int.tryParse('$v') ?? 0;
   }
 
   /// Runs [execute] with an application-level [timeout].
@@ -141,6 +244,32 @@ class SqliteConnection {
       return await f.timeout(timeout);
     } on TimeoutException {
       unawaited(forceClose());
+      rethrow;
+    }
+  }
+
+  /// Whether this session has an open `BEGIN` (tracked from executed SQL).
+  Future<bool?> inOpenTransaction() async {
+    if (!isConnected) return null;
+    return _inTransaction;
+  }
+
+  /// Runs [body] inside a transaction. If the session already has a `BEGIN`,
+  /// DML joins it instead of nesting `BEGIN TRANSACTION`.
+  Future<void> runInTransaction(Future<void> Function() body) async {
+    final join = _inTransaction;
+    if (!join) {
+      await execute('BEGIN TRANSACTION');
+    }
+    try {
+      await body();
+      if (!join) await execute('COMMIT');
+    } catch (e) {
+      if (!join) {
+        try {
+          await execute('ROLLBACK');
+        } catch (_) {}
+      }
       rethrow;
     }
   }
@@ -166,10 +295,12 @@ class SqliteConnection {
     final rows = await execute(
       "SELECT name, tbl_name FROM sqlite_master WHERE type = 'index' AND name NOT LIKE 'sqlite_%' ORDER BY name",
     );
-    return rows.map((r) => {
-      'name': r['name'] as String,
-      'table': r['tbl_name'] as String,
-    }).toList();
+    return rows
+        .map((r) => {
+              'name': r['name'] as String,
+              'table': r['tbl_name'] as String,
+            })
+        .toList();
   }
 
   /// Lists column names for a table.
@@ -227,7 +358,7 @@ class SqliteConnection {
   /// Returns the DDL (`sql`) of a table or view from sqlite_master.
   Future<String> getObjectDdl(String objectName) async {
     final rows = await execute(
-      "SELECT sql FROM sqlite_master WHERE name = :name",
+      'SELECT sql FROM sqlite_master WHERE name = ?',
       [objectName],
     );
     if (rows.isEmpty) return '-- No definition found for $objectName';
@@ -248,8 +379,10 @@ class SqliteConnection {
     final jmRows = await execute('PRAGMA journal_mode');
     final jm = (jmRows.isNotEmpty ? jmRows.first.values.first : '') ?? '';
 
-    final tblCountRows = await execute("SELECT count(*) AS c FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
-    final tblCount = (tblCountRows.isNotEmpty ? tblCountRows.first['c'] : 0) ?? 0;
+    final tblCountRows = await execute(
+        "SELECT count(*) AS c FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
+    final tblCount =
+        (tblCountRows.isNotEmpty ? tblCountRows.first['c'] : 0) ?? 0;
 
     return {
       'version': ver,
@@ -258,6 +391,30 @@ class SqliteConnection {
       'journal_mode': jm,
       'table_count': tblCount,
     };
+  }
+
+  void _noteTransactionSql(String sqlLower) {
+    if (sqlLower.startsWith('begin')) {
+      _inTransaction = true;
+      return;
+    }
+    if (sqlLower.startsWith('commit') || sqlLower.startsWith('end')) {
+      _inTransaction = false;
+      return;
+    }
+    if (sqlLower.startsWith('rollback') &&
+        !RegExp(r'^rollback\s+to\b').hasMatch(sqlLower)) {
+      _inTransaction = false;
+    }
+  }
+
+  static bool _isSqliteBusy(DatabaseException e) {
+    final code = e.getResultCode();
+    if (code == 5 || code == 6) return true;
+    final msg = e.toString().toLowerCase();
+    return msg.contains('database is locked') ||
+        msg.contains('database busy') ||
+        msg.contains('sqlite_busy');
   }
 
   /// Helper to quote SQLite identifiers safely.

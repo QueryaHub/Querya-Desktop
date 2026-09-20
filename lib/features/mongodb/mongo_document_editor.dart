@@ -1,10 +1,15 @@
-import 'dart:convert';
+import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
+import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/editor/querya_code_editor.dart';
 import 'package:querya_desktop/core/editor/querya_code_language.dart';
-import 'package:querya_desktop/core/database/mongodb_service.dart';
+import 'package:querya_desktop/core/unsaved_work_guard.dart';
+import 'package:querya_desktop/core/unsaved_work_registry.dart';
+import 'package:querya_desktop/features/mongodb/mongo_ejson.dart';
+import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
@@ -51,9 +56,10 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
   void initState() {
     super.initState();
     _controller = material.TextEditingController(
-      text: _prettyJson(widget.document),
+      text: mongoDocumentToEjson(widget.document),
     );
     _controller.addListener(_onTextChanged);
+    UnsavedWorkRegistry.instance.register(this, () => _dirty || _saving);
   }
 
   @override
@@ -87,7 +93,7 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
       }
       final doc = rows.first;
       _controller.removeListener(_onTextChanged);
-      _controller.text = _prettyJson(doc);
+      _controller.text = mongoDocumentToEjson(doc);
       _controller.addListener(_onTextChanged);
       setState(() {
         _dirty = false;
@@ -101,9 +107,16 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
 
   @override
   void dispose() {
+    UnsavedWorkRegistry.instance.unregister(this);
     _controller.removeListener(_onTextChanged);
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _onBack() async {
+    if (!await confirmDiscardUnsavedWorkIfNeeded(context)) return;
+    if (!mounted) return;
+    widget.onBack?.call();
   }
 
   void _onTextChanged() {
@@ -114,8 +127,8 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
 
   void _format() {
     try {
-      final parsed = json.decode(_controller.text) as Map<String, dynamic>;
-      _controller.text = _prettyJson(parsed);
+      final parsed = mongoDocumentFromEjson(_controller.text);
+      _controller.text = mongoDocumentToEjson(parsed);
       setState(() => _error = null);
     } catch (e) {
       setState(() => _error = 'Invalid JSON: $e');
@@ -131,15 +144,18 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
 
     Map<String, dynamic> parsed;
     try {
-      parsed = json.decode(_controller.text) as Map<String, dynamic>;
+      parsed = mongoDocumentFromEjson(_controller.text);
     } catch (e) {
       setState(() => _error = 'Invalid JSON: $e');
       return;
     }
 
-    // Remove _id from the update payload (can't change _id)
-    final updateDoc = Map<String, dynamic>.from(parsed);
-    updateDoc.remove('_id');
+    // replaceOne drops keys the user deleted. `_id` stays the original BSON
+    // value even if the editor JSON changed it.
+    final replacement = mongoFullDocumentReplacement(
+      parsed: parsed,
+      originalId: id,
+    );
 
     setState(() {
       _saving = true;
@@ -148,12 +164,12 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
     });
 
     try {
-      await MongoService.instance.updateDocument(
+      await MongoService.instance.replaceDocument(
         widget.connection,
         widget.database,
         widget.collection,
         {'_id': id},
-        {r'$set': updateDoc},
+        replacement,
       );
       if (!mounted) return;
       setState(() {
@@ -179,6 +195,16 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
     final id = widget.document['_id'];
     if (id == null) return;
 
+    final confirmed = await confirmDestructiveMongoAction(
+      context: context,
+      type: DestructiveSqlType.deleteDocument,
+      targetName: id.toString(),
+      commandPreview:
+          'db.${widget.collection}.deleteOne({ _id: ${id.toString()} })',
+      connectionName: widget.connection.name,
+    );
+    if (!mounted || !confirmed) return;
+
     setState(() {
       _deleting = true;
       _error = null;
@@ -200,14 +226,6 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
           _error = 'Failed to delete: $e';
         });
       }
-    }
-  }
-
-  String _prettyJson(Map<String, dynamic> doc) {
-    try {
-      return const JsonEncoder.withIndent('  ').convert(doc);
-    } catch (_) {
-      return doc.toString();
     }
   }
 
@@ -233,7 +251,7 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
           child: Row(
             children: [
               material.InkWell(
-                onTap: widget.onBack,
+                onTap: () => unawaited(_onBack()),
                 borderRadius: material.BorderRadius.circular(6),
                 child: material.Padding(
                   padding: const material.EdgeInsets.all(4),

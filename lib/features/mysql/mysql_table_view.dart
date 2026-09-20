@@ -4,9 +4,13 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:mysql_client/mysql_client.dart';
 import 'package:querya_desktop/core/database/mysql_connection.dart';
+import 'package:querya_desktop/core/database/mysql_result_cells.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
 import 'package:querya_desktop/core/database/result_row_string_convert.dart';
+import 'package:querya_desktop/core/database/sql_limit.dart';
+import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
+import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/mysql/mysql_sql_editor_dialog.dart';
 import 'package:querya_desktop/features/mysql/mysql_table_utils.dart';
@@ -24,6 +28,7 @@ class MysqlTableView extends material.StatefulWidget {
     this.isView = false,
     this.limit = _defaultLimit,
     this.onNavigateHome,
+    this.isReadOnly = false,
   });
 
   final ConnectionRow connectionRow;
@@ -32,6 +37,9 @@ class MysqlTableView extends material.StatefulWidget {
   final bool isView;
   final int limit;
   final VoidCallback? onNavigateHome;
+
+  /// Title-bar session lock: no staging / Save / `tableWrite` acquire.
+  final bool isReadOnly;
 
   @override
   material.State<MysqlTableView> createState() => _MysqlTableViewState();
@@ -55,7 +63,9 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
   DataGridStagingBuffer? _stagingBuffer;
   List<String> _primaryKeys = [];
   Map<String, String> _columnDataTypes = {};
+  Map<String, TableColumnMeta> _columnMeta = {};
   bool _schemaLoaded = false;
+  Object? _schemaError;
   bool _isSaving = false;
 
   String get _tableTitle => '${widget.database}.${widget.tableName}';
@@ -66,6 +76,8 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
         isView: widget.isView,
         customSqlActive: _customSqlActive,
         hasPrimaryKey: _primaryKeys.isNotEmpty,
+        readOnly: widget.isReadOnly,
+        schemaError: _schemaError,
       );
 
   String _qualifiedFrom() {
@@ -75,7 +87,12 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
   }
 
   String _browseDataSql() {
-    return 'SELECT * FROM ${_qualifiedFrom()} LIMIT ${widget.limit} OFFSET $_offset';
+    return mysqlBrowseDataSql(
+      qualifiedFrom: _qualifiedFrom(),
+      primaryKeys: _primaryKeys,
+      limit: widget.limit,
+      offset: _offset,
+    );
   }
 
   @override
@@ -96,6 +113,8 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       _resetStaging();
       _disconnectCurrent(interruptIfBusy: true);
       _connectAndLoad();
+    } else if (oldWidget.isReadOnly != widget.isReadOnly) {
+      _syncStagingToReadOnly();
     }
   }
 
@@ -111,8 +130,25 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
     _stagingBuffer = null;
     _primaryKeys = [];
     _columnDataTypes = {};
+    _columnMeta = {};
     _schemaLoaded = false;
+    _schemaError = null;
     _isSaving = false;
+  }
+
+  void _syncStagingToReadOnly() {
+    if (widget.isReadOnly) {
+      _stagingBuffer?.dispose();
+      _stagingBuffer = null;
+    } else if (_columnNames.isNotEmpty) {
+      _stagingBuffer = replaceTableViewStagingBuffer(
+        previous: _stagingBuffer,
+        columns: _columnNames,
+        rows: _rows,
+        enabled: _editingEnabled,
+      );
+    }
+    if (mounted) setState(() {});
   }
 
   void _disconnectCurrent({bool interruptIfBusy = false}) {
@@ -120,7 +156,14 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       MysqlService.instance.interrupt(
         widget.connectionRow,
         database: widget.database,
-        mode: MysqlSessionMode.readWrite,
+        mode: MysqlSessionMode.readOnly,
+      );
+    }
+    if (interruptIfBusy && _isSaving) {
+      MysqlService.instance.interrupt(
+        widget.connectionRow,
+        database: widget.database,
+        mode: MysqlSessionMode.tableWrite,
       );
     }
     _lease?.release();
@@ -146,7 +189,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       final lease = await MysqlService.instance.acquire(
         widget.connectionRow,
         database: widget.database,
-        mode: MysqlSessionMode.readWrite,
+        mode: MysqlSessionMode.readOnly,
       );
       if (!mounted) {
         lease.release();
@@ -164,23 +207,26 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
     }
   }
 
-  static int _asInt(String? v) {
-    if (v == null) return 0;
-    return int.tryParse(v) ?? 0;
-  }
-
   List<String> _resultColumns(IResultSet rs) {
     return rs.cols.map((c) => c.name.isNotEmpty ? c.name : 'col').toList();
   }
 
   Future<List<List<String>>> _resultRowsAsync(IResultSet rs) async {
+    final colList = rs.cols.toList();
     final out = <List<String>>[];
     var n = 0;
     for (final row in rs.rows) {
       out.add(
         List.generate(
           row.numOfColumns,
-          (i) => resultCellToDisplayString(row.colAt(i)),
+          (i) {
+            final col = i < colList.length ? colList[i] : null;
+            return mysqlResultCellToDisplayString(
+              row.colAt(i),
+              column: col,
+              schemaDataType: col == null ? null : _columnDataTypes[col.name],
+            );
+          },
         ),
       );
       n++;
@@ -189,6 +235,24 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       }
     }
     return out;
+  }
+
+  Future<T> _withTableWrite<T>(
+    Future<T> Function(MysqlConnection conn) fn,
+  ) async {
+    if (widget.isReadOnly) {
+      throw StateError('MySQL session is read-only');
+    }
+    final lease = await MysqlService.instance.acquire(
+      widget.connectionRow,
+      database: widget.database,
+      mode: MysqlSessionMode.tableWrite,
+    );
+    try {
+      return await fn(lease.connection);
+    } finally {
+      lease.release();
+    }
   }
 
   Future<bool> _confirmDiscardIfNeeded() {
@@ -203,20 +267,29 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
     if (_schemaLoaded) return;
     if (widget.isView) {
       _schemaLoaded = true;
+      _schemaError = null;
       _primaryKeys = [];
       _columnDataTypes = {};
+      _columnMeta = {};
       return;
     }
-    try {
-      final schema = await conn.getTableSchema(
+    final loaded = await loadTableViewSchema(
+      () => conn.getTableSchema(
         database: widget.database,
         table: widget.tableName,
-      );
+      ),
+    );
+    final schema = loaded.schema;
+    if (schema != null) {
       _primaryKeys = List<String>.from(schema.primaryKeys);
       _columnDataTypes = columnDataTypesFromSchema(schema);
-    } catch (_) {
+      _columnMeta = columnMetaFromSchema(schema);
+      _schemaError = null;
+    } else {
       _primaryKeys = [];
       _columnDataTypes = {};
+      _columnMeta = {};
+      _schemaError = loaded.error;
     }
     _schemaLoaded = true;
   }
@@ -250,33 +323,38 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       _loading = true;
       _error = null;
     });
-    final from = _qualifiedFrom();
-    final countSql = 'SELECT COUNT(*) AS c FROM $from';
-    final dataSql = _browseDataSql();
     try {
-      int totalRows;
-      if (refreshCount || _totalRowCount == null) {
-        final countRs = await conn.execute(countSql);
-        totalRows =
-            countRs.rows.isEmpty ? 0 : _asInt(countRs.rows.first.colAt(0));
-      } else {
-        totalRows = _totalRowCount!;
-      }
-
-      final result = await conn.execute(dataSql);
+      await _ensureSchema(conn);
       if (!mounted) return;
 
-      await _ensureSchema(conn);
+      int? totalRows = _totalRowCount;
+      if (refreshCount || totalRows == null) {
+        try {
+          totalRows = await conn.estimateTableRows(
+            database: widget.database,
+            table: widget.tableName,
+          );
+        } catch (_) {
+          totalRows = null;
+        }
+      }
+
+      final dataSql = _browseDataSql();
+      final result = await conn.execute(dataSql);
       if (!mounted) return;
 
       final colNames = _resultColumns(result);
       final stringRows = await _resultRowsAsync(result);
 
       if (!mounted) return;
+      final shown = stringRows.length;
+      if (totalRows != null && shown > 0 && totalRows < _offset + shown) {
+        totalRows = null;
+      }
       setState(() {
         _columnNames = colNames;
         _rows = stringRows;
-        _rowsOnPage = stringRows.length;
+        _rowsOnPage = shown;
         if (refreshCount || _totalRowCount == null) {
           _totalRowCount = totalRows;
         }
@@ -312,7 +390,9 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       _error = null;
     });
     try {
-      final result = await conn.execute(sql);
+      final result = await conn.execute(
+        injectSqlLimit(sql, kDefaultSqlResultMaxRows),
+      );
       if (!mounted) return;
       final stringRows = await _resultRowsAsync(result);
       if (!mounted) return;
@@ -437,6 +517,8 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       customSqlActive: _customSqlActive,
       hasPrimaryKey: _primaryKeys.isNotEmpty,
       schemaLoaded: _schemaLoaded,
+      readOnly: widget.isReadOnly,
+      schemaError: _schemaError,
     );
     final pag = _paginationLabel();
     if (reason != null) return '$pag · $reason';
@@ -446,6 +528,8 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
   Future<void> _onRefresh() async {
     if (!await _confirmDiscardIfNeeded()) return;
     if (!mounted) return;
+    _schemaLoaded = false;
+    _schemaError = null;
     if (_customSqlActive) {
       await _fetchCustom();
     } else {
@@ -462,6 +546,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
   }
 
   Future<void> _applyStagedChanges() async {
+    if (widget.isReadOnly) return;
     final buffer = _stagingBuffer;
     if (buffer == null || !buffer.isDirty || _isSaving) return;
     setState(() => _isSaving = true);
@@ -473,23 +558,19 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       schema: widget.database,
       primaryKeys: _primaryKeys,
       columnDataTypes: _columnDataTypes.isEmpty ? null : _columnDataTypes,
+      columnMeta: _columnMeta.isEmpty ? null : _columnMeta,
       execute: (plan) async {
-        final conn = _connection;
-        if (conn == null || !conn.isConnected) {
-          throw StateError('Could not connect to MySQL.');
-        }
-        await conn.execute('START TRANSACTION');
-        try {
-          for (final stmt in plan.statements) {
-            await conn.execute(stmt.sql);
+        await _withTableWrite((conn) async {
+          if (!conn.isConnected) {
+            throw StateError('Could not connect to MySQL.');
           }
-          await conn.execute('COMMIT');
-        } catch (e) {
-          try {
-            await conn.execute('ROLLBACK');
-          } catch (_) {}
-          rethrow;
-        }
+          await conn.runInTransaction(() async {
+            for (final stmt in plan.statements) {
+              final rs = await conn.execute(stmt.sql);
+              expectDmlMatchedRows(rs.affectedRows.toInt());
+            }
+          });
+        });
       },
     );
     if (!mounted) return;

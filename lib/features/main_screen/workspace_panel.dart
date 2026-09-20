@@ -291,6 +291,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
               tableName: my.name,
               isView: my.kind == MysqlObjectKind.view,
               onNavigateHome: widget.onNavigateHome,
+              isReadOnly: widget.isReadOnly,
             );
           }
         }
@@ -343,6 +344,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
                   key: ValueKey('redis_${activeConn.id}_db_$redisDb'),
                   connectionRow: activeConn,
                   database: redisDb,
+                  isReadOnly: widget.isReadOnly,
                 ),
         );
         break;
@@ -368,6 +370,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
                   tableName: sq.name,
                   isView: sq.kind == SqliteObjectKind.view,
                   onNavigateHome: widget.onNavigateHome,
+                  isReadOnly: widget.isReadOnly,
                 ),
         );
         break;

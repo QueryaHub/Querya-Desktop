@@ -33,6 +33,8 @@ class MySQLConnection {
   bool _inTransaction = false;
   final bool _secure;
   final SecurityContext? _securityContext;
+  final bool _sslVerifyCertificates;
+  final String? _sslServerName;
   final List<int> _incompleteBufferData = [];
   Object? _lastError;
   int _serverCapabilities = 0;
@@ -47,12 +49,16 @@ class MySQLConnection {
     bool secure = true,
     String? databaseName,
     SecurityContext? securityContext,
+    bool sslVerifyCertificates = false,
+    String? sslServerName,
   })  : _socket = socket,
         _username = username,
         _password = password,
         _databaseName = databaseName,
         _secure = secure,
         _securityContext = securityContext,
+        _sslVerifyCertificates = sslVerifyCertificates,
+        _sslServerName = sslServerName,
         _collation = collation;
 
   /// Creates connection with provided options.
@@ -82,6 +88,8 @@ class MySQLConnection {
     String? databaseName,
     String collation = 'utf8mb4_general_ci',
     SecurityContext? securityContext,
+    bool sslVerifyCertificates = false,
+    String? sslServerName,
   }) async {
     final Socket socket = await Socket.connect(host, port);
 
@@ -97,6 +105,8 @@ class MySQLConnection {
       databaseName: databaseName,
       secure: secure,
       securityContext: securityContext,
+      sslVerifyCertificates: sslVerifyCertificates,
+      sslServerName: sslServerName,
       collation: collation,
     );
 
@@ -364,8 +374,10 @@ class MySQLConnection {
 
         final secureSocket = await SecureSocket.secure(
           _socket,
+          host: _sslServerName,
           context: _securityContext,
-          onBadCertificate: (certificate) => true,
+          onBadCertificate:
+              _sslVerifyCertificates ? null : (certificate) => true,
         );
 
         // switch socket
@@ -550,7 +562,11 @@ class MySQLConnection {
                 return;
               }
 
-              packet = MySQLPacket.decodeResultSetRowPacket(data, colsCount);
+              packet = MySQLPacket.decodeResultSetRowPacket(
+                data,
+                colsCount,
+                colDefs,
+              );
               final values = (packet.payload as MySQLResultSetRowPacket).values;
               sink!.add(ResultSetRow._(colDefs: colDefs, values: values));
               packet = null;
@@ -593,7 +609,11 @@ class MySQLConnection {
                 }
               }
 
-              packet = MySQLPacket.decodeResultSetRowPacket(data, colsCount);
+              packet = MySQLPacket.decodeResultSetRowPacket(
+                data,
+                colsCount,
+                colDefs,
+              );
               break;
             }
         }
@@ -1258,6 +1278,7 @@ class ResultSet extends IResultSet {
         name: e.name,
         type: e.type,
         length: e.columnLength,
+        charset: e.charset,
       ),
     );
   }
@@ -1318,6 +1339,7 @@ class IterableResultSet with IterableMixin<IResultSet> implements IResultSet {
         name: e.name,
         type: e.type,
         length: e.columnLength,
+        charset: e.charset,
       ),
     );
   }
@@ -1365,6 +1387,7 @@ class PreparedStmtResultSet extends IResultSet {
         name: e.name,
         type: e.type,
         length: e.columnLength,
+        charset: e.charset,
       ),
     );
   }
@@ -1412,6 +1435,7 @@ class IterablePreparedStmtResultSet extends IResultSet {
         name: e.name,
         type: e.type,
         length: e.columnLength,
+        charset: e.charset,
       ),
     );
   }
@@ -1587,12 +1611,23 @@ class ResultSetColumn {
   String name;
   MySQLColumnType type;
   int length;
+  int charset;
 
   ResultSetColumn({
     required this.name,
     required this.type,
     required this.length,
+    this.charset = 0,
   });
+
+  /// BIT / BLOB / BINARY payload (charset 63 or blob/bit type).
+  bool get isBinaryPayload => mysqlColumnHoldsRawBytes(
+        columnType: type.intVal,
+        charset: charset,
+      );
+
+  /// `TINYINT(1)` / BOOLEAN.
+  bool get isBooleanTiny => type.intVal == mysqlColumnTypeTiny && length == 1;
 }
 
 /// Prepared statement class

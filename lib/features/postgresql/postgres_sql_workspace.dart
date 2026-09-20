@@ -18,6 +18,7 @@ import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/ui/querya_shell_status.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
+import 'package:querya_desktop/features/postgresql/postgres_result_utils.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_utils.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
@@ -425,6 +426,8 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       session.rows = [];
       session.affectedRows = null;
       session.statusLine = null;
+      session.resultGridPrimaryKeys = const [];
+      session.resultGridColumnDataTypes = null;
     });
     QueryaShellStatus.instance.beginBusy(message: 'Running query…');
     final sw = Stopwatch()..start();
@@ -443,14 +446,15 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         return;
       }
 
+      final to = _statementTimeout();
       if (!_autocommit) {
         final inTx = await conn.inOpenTransaction() ?? false;
         if (!inTx && !shouldSkipImplicitBegin(sql)) {
-          sql = 'BEGIN;\n$sql';
+          // Separate execute: Parse cannot take `BEGIN;` + the next statement.
+          await conn.execute('BEGIN', timeout: to);
         }
       }
 
-      final to = _statementTimeout();
       final result = await conn.execute(sql, timeout: to);
 
       if (!mounted) return;
@@ -473,16 +477,47 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         n++;
       }
 
-      // Adaptive convert offloads to background compute for large row sets (#522).
-      final outRows = await convertResultRowsToStringsAdaptive(rawRows);
+      final converted = convertPostgresResultRowsToStrings(
+        PostgresResultConvertJob(
+          rowValues: rawRows,
+          columnTypeOids: [
+            for (final c in schema.columns) c.typeOid,
+          ],
+        ),
+      );
+      final outRows = await convertResultRowsToStringsAdaptive(converted);
+
+      final target = SqlTableTargetExtractor.extract(userSql);
+      var pks = const <String>[];
+      Map<String, String>? types;
+      if (target != null && cols.isNotEmpty) {
+        try {
+          final meta = await conn.getTableSchema(
+            schema: target.schema ?? 'public',
+            table: target.tableName,
+          );
+          pks = List<String>.from(meta.primaryKeys);
+          types = columnDataTypesFromSchema(meta);
+        } catch (_) {
+          pks = const [];
+          types = null;
+        }
+      }
+      final canSave = sqlResultGridSaveEnabled(
+        sql: userSql,
+        resultColumns: cols,
+        primaryKeys: pks,
+      );
 
       setState(() {
         session.columns = cols;
         session.rows = outRows;
         session.affectedRows = result.affectedRows;
         session.lastExecutedSql = userSql;
+        session.resultGridPrimaryKeys = canSave ? pks : const [];
+        session.resultGridColumnDataTypes = types;
         session.stagingBuffer?.dispose();
-        session.stagingBuffer = cols.isNotEmpty
+        session.stagingBuffer = canSave
             ? DataGridStagingBuffer(columns: cols, rows: outRows)
             : null;
         if (cols.isEmpty && outRows.isEmpty) {
@@ -554,15 +589,23 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     final target = session.lastExecutedSql != null
         ? SqlTableTargetExtractor.extract(session.lastExecutedSql!)
         : null;
-    final tableName = target?.tableName ?? 'table';
-    final schemaName = target?.schema;
+    if (target == null ||
+        !sqlResultGridSaveEnabled(
+          sql: session.lastExecutedSql,
+          resultColumns: session.columns,
+          primaryKeys: session.resultGridPrimaryKeys,
+        )) {
+      return;
+    }
 
     setState(() => session.savingChanges = true);
     try {
       final plan = session.stagingBuffer!.generateMutationPlan(
         dialect: SqlDialect.postgres,
-        tableName: tableName,
-        schema: schemaName,
+        tableName: target.tableName,
+        schema: target.schema ?? 'public',
+        primaryKeys: session.resultGridPrimaryKeys,
+        columnDataTypes: session.resultGridColumnDataTypes,
       );
       if (plan.isEmpty) {
         setState(() => session.savingChanges = false);
@@ -584,9 +627,16 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         throw StateError('Could not connect to PostgreSQL.');
       }
 
-      final txSql = plan.toTransactionSql();
       final to = _statementTimeout();
-      await conn.execute(txSql, timeout: to);
+      await runPostgresStatementsInTransaction(
+        (sql) async {
+          final result = await conn.execute(sql, timeout: to);
+          if (sql != 'BEGIN' && sql != 'COMMIT' && sql != 'ROLLBACK') {
+            expectDmlMatchedRows(result.affectedRows);
+          }
+        },
+        plan.statements.map((s) => s.sql),
+      );
 
       if (!mounted) return;
       final newRows = session.stagingBuffer!.effectiveRows;
@@ -907,8 +957,15 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
               affectedRows: session.affectedRows,
               statusLine: session.statusLine,
               stagingBuffer: session.stagingBuffer,
-              onApplyChanges:
-                  widget.isReadOnly ? null : () => _applyStagedChanges(session),
+              columnDataTypes: session.resultGridColumnDataTypes,
+              onApplyChanges: widget.isReadOnly ||
+                      !sqlResultGridSaveEnabled(
+                        sql: session.lastExecutedSql,
+                        resultColumns: session.columns,
+                        primaryKeys: session.resultGridPrimaryKeys,
+                      )
+                  ? null
+                  : () => _applyStagedChanges(session),
               isSaving: session.savingChanges,
             ),
           ),
@@ -965,14 +1022,14 @@ class _SqlToolbar extends material.StatelessWidget {
         crossAxisAlignment: material.CrossAxisAlignment.stretch,
         mainAxisSize: material.MainAxisSize.min,
         children: [
-          material.Row(
+          material.Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: material.WrapCrossAlignment.center,
             children: [
               const Text('Query').semiBold().small(),
-              const Gap(12),
               Text('DB: $sessionDatabase').muted().small(),
-              const Gap(12),
               Text(_txLabel()).muted().small(),
-              const Spacer(),
               OutlineButton(
                 size: ButtonSize.small,
                 onPressed: onOpenHistory,
@@ -983,7 +1040,6 @@ class _SqlToolbar extends material.StatelessWidget {
                 ),
                 child: const Text('History'),
               ),
-              const Gap(8),
               OutlineButton(
                 onPressed: onExecute,
                 leading: running

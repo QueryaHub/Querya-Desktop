@@ -3,6 +3,31 @@ import 'package:mongo_dart/mongo_dart.dart';
 import '../storage/local_db.dart';
 import 'mongodb_connection.dart';
 
+/// Throws if a single-document write matched nothing (wrong `_id` type,
+/// concurrent delete). Same class of lie as 0-row SQL DML.
+///
+/// [nModified] is ignored: an identical `$set` still matched the document.
+void expectMongoDocumentMatched(int matched, {required String operation}) {
+  if (matched >= 1) return;
+  throw StateError(
+    '$operation failed: matched 0 documents. '
+    'The document may have been deleted or the _id type does not match.',
+  );
+}
+
+void _throwIfMongoWriteFailed(
+  WriteResult result, {
+  required String operation,
+  required int matched,
+}) {
+  if (result.hasWriteErrors) {
+    throw StateError(
+      '$operation failed: ${result.writeError?.errmsg ?? 'write error'}',
+    );
+  }
+  expectMongoDocumentMatched(matched, operation: operation);
+}
+
 /// Service for managing MongoDB connections.
 class MongoService {
   MongoService._();
@@ -173,7 +198,8 @@ class MongoService {
     });
   }
 
-  /// Opens a temporary [Db] for the given [database], runs [action], then closes.
+  /// Reuses a pooled [Db] for [database] on the live session (auth via the
+  /// in-memory session URI, not the scrubbed password getter).
   Future<T> _withDb<T>(
     MongoConnection connection,
     String database,
@@ -182,14 +208,8 @@ class MongoService {
     if (!connection.isConnected) {
       throw StateError('Not connected to MongoDB');
     }
-    final dbUri = connection.buildUriForDatabase(database);
-    final db = await Db.create(dbUri);
-    await db.open();
-    try {
-      return await action(db);
-    } finally {
-      await db.close();
-    }
+    final db = await connection.openDatabase(database);
+    return await action(db);
   }
 
   /// Returns the document count for a collection (with optional filter).
@@ -236,7 +256,7 @@ class MongoService {
     });
   }
 
-  /// Updates a single document matched by [filter].
+  /// Updates a single document matched by [filter] (`$set` / `$unset` / …).
   Future<void> updateDocument(
     MongoConnection connection,
     String database,
@@ -246,7 +266,31 @@ class MongoService {
   ) async {
     return _withDb(connection, database, (db) async {
       final coll = db.collection(collection);
-      await coll.updateOne(filter, update);
+      final result = await coll.updateOne(filter, update);
+      _throwIfMongoWriteFailed(
+        result,
+        operation: 'updateOne',
+        matched: result.nMatched,
+      );
+    });
+  }
+
+  /// Replaces a single document matched by [filter] (full-document Save).
+  Future<void> replaceDocument(
+    MongoConnection connection,
+    String database,
+    String collection,
+    Map<String, dynamic> filter,
+    Map<String, dynamic> replacement,
+  ) async {
+    return _withDb(connection, database, (db) async {
+      final coll = db.collection(collection);
+      final result = await coll.replaceOne(filter, replacement);
+      _throwIfMongoWriteFailed(
+        result,
+        operation: 'replaceOne',
+        matched: result.nMatched,
+      );
     });
   }
 
@@ -259,7 +303,12 @@ class MongoService {
   ) async {
     return _withDb(connection, database, (db) async {
       final coll = db.collection(collection);
-      await coll.deleteOne(filter);
+      final result = await coll.deleteOne(filter);
+      _throwIfMongoWriteFailed(
+        result,
+        operation: 'deleteOne',
+        matched: result.nRemoved,
+      );
     });
   }
 

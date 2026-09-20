@@ -24,6 +24,14 @@ void main() {
       expect(GridDataTypeValidator.validate('1', dataTypeName: 'bool'), isNull);
       expect(GridDataTypeValidator.validate('0', dataTypeName: 'bool'), isNull);
       expect(GridDataTypeValidator.validate('yes', dataTypeName: 'bool'), isNotNull);
+      expect(
+        GridDataTypeValidator.validate('true', dataTypeName: 'tinyint(1)'),
+        isNull,
+      );
+      expect(
+        GridDataTypeValidator.validate('yes', dataTypeName: 'tinyint(1)'),
+        isNotNull,
+      );
     });
 
     test('validates UUID types', () {
@@ -80,8 +88,20 @@ void main() {
       expect(GridDataTypeValidator.validate('0x12AB', dataTypeName: 'blob'), isNull);
       expect(GridDataTypeValidator.validate("X'CAFE'", dataTypeName: 'binary'), isNull);
       expect(GridDataTypeValidator.validate('DEADBEEF', dataTypeName: 'varbinary'), isNull);
+      expect(GridDataTypeValidator.validate('0xaa', dataTypeName: 'bit(8)'), isNull);
       expect(GridDataTypeValidator.validate('not_hex', dataTypeName: 'blob'), isNotNull);
       expect(GridDataTypeValidator.validate('123', dataTypeName: 'bytea'), isNotNull); // odd length hex
+    });
+
+    test('skips scalar checks for PostgreSQL array types', () {
+      expect(
+        GridDataTypeValidator.validate('{1,2,3}', dataTypeName: 'integer[]'),
+        isNull,
+      );
+      expect(
+        GridDataTypeValidator.validate('{1,2,3}', dataTypeName: '_int4'),
+        isNull,
+      );
     });
 
     test('allows empty and NULL values regardless of type', () {

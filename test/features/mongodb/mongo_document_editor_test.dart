@@ -4,6 +4,7 @@ import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/editor/querya_code_editor.dart';
 import 'package:querya_desktop/core/editor/syntax_highlight_service.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
+import 'package:querya_desktop/core/unsaved_work_registry.dart';
 import 'package:querya_desktop/features/mongodb/mongo_document_editor.dart';
 
 import '../../support/pump_syntax_highlight.dart';
@@ -15,12 +16,15 @@ void main() {
     await SyntaxHighlightService.ensureInitialized();
   });
 
+  tearDown(UnsavedWorkRegistry.instance.resetForTest);
+
   final connection = MongoConnection(id: 1, name: 'test', host: 'localhost');
 
   Future<void> pumpEditor(
     WidgetTester tester, {
     QueryaTheme? theme,
     Map<String, dynamic> document = const {'_id': 'abc', 'a': 1},
+    material.VoidCallback? onBack,
   }) async {
     await tester.pumpWidget(
       queryaThemeTestShell(
@@ -33,6 +37,7 @@ void main() {
             database: 'db',
             collection: 'items',
             document: document,
+            onBack: onBack,
           ),
         ),
       ),
@@ -90,5 +95,82 @@ void main() {
           .first,
     );
     expect(container.color, bg);
+  });
+
+  testWidgets('Delete Cancel does not call onDocumentDeleted', (tester) async {
+    await tester.binding.setSurfaceSize(const material.Size(800, 700));
+    var deleted = false;
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.SizedBox(
+          width: 800,
+          height: 700,
+          child: MongoDocumentEditor(
+            connection: connection,
+            database: 'db',
+            collection: 'items',
+            document: const {'_id': 'abc', 'a': 1},
+            onDocumentDeleted: () => deleted = true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await pumpSyntaxHighlightDebounce(tester);
+
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('DELETE DOCUMENT'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(deleted, isFalse);
+    expect(find.text('Delete'), findsOneWidget);
+  });
+
+  testWidgets('clean Back leaves the editor without a confirm dialog',
+      (tester) async {
+    var wentBack = false;
+    await pumpEditor(tester, onBack: () => wentBack = true);
+    expect(UnsavedWorkRegistry.instance.hasUnsaved, isFalse);
+
+    await tester.tap(find.byIcon(material.Icons.arrow_back_rounded));
+    await tester.pumpAndSettle();
+
+    expect(wentBack, isTrue);
+    expect(find.text('Unsaved changes'), findsNothing);
+  });
+
+  testWidgets('dirty Back Cancel keeps edits; Discard calls onBack',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const material.Size(800, 700));
+    var wentBack = false;
+    await pumpEditor(tester, onBack: () => wentBack = true);
+
+    await tester.enterText(find.byType(material.EditableText), '{"a":2}');
+    await tester.pump();
+    expect(UnsavedWorkRegistry.instance.hasUnsaved, isTrue);
+
+    await tester.tap(find.byIcon(material.Icons.arrow_back_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('Unsaved changes'), findsOneWidget);
+    expect(wentBack, isFalse);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(wentBack, isFalse);
+    expect(UnsavedWorkRegistry.instance.hasUnsaved, isTrue);
+
+    await tester.tap(find.byIcon(material.Icons.arrow_back_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Discard'));
+    await tester.pumpAndSettle();
+    expect(wentBack, isTrue);
+
+    await tester.pumpWidget(
+      queryaThemeTestShell(child: const material.SizedBox()),
+    );
+    expect(UnsavedWorkRegistry.instance.hasUnsaved, isFalse);
   });
 }

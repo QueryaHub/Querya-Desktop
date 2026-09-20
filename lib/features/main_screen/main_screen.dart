@@ -28,13 +28,17 @@ import 'package:querya_desktop/features/connections/new_connection_url_dialog.da
 import 'package:querya_desktop/features/connections/connections_panel.dart';
 import 'package:querya_desktop/features/connections/sqlite_connection_form.dart';
 import 'package:querya_desktop/core/ui/querya_shell_status.dart';
+import 'package:querya_desktop/core/unsaved_work_guard.dart';
 import 'package:querya_desktop/features/main_screen/connections_panel_width_persist.dart';
 import 'package:querya_desktop/features/main_screen/querya_status_bar.dart';
 import 'package:querya_desktop/features/main_screen/querya_window_title_bar.dart';
 import 'package:querya_desktop/features/macos/querya_platform_menu_bar.dart';
 import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
+import 'package:querya_desktop/features/mysql/mysql_sql_tx_guard.dart';
 import 'package:querya_desktop/features/onboarding/welcome_tour_dialog.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
+import 'package:querya_desktop/features/postgresql/postgres_sql_tx_guard.dart';
+import 'package:querya_desktop/features/sqlite/sqlite_sql_tx_guard.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'main_screen_workspace_state.dart';
@@ -262,7 +266,17 @@ class _MainScreenState extends State<MainScreen> {
     return false;
   }
 
+  Future<bool> _allowUnsavedNavigation() {
+    return confirmDiscardUnsavedWorkIfNeeded(context);
+  }
+
   void _onConnectionSelected(ConnectionRow connection) {
+    unawaited(_selectConnection(connection));
+  }
+
+  Future<void> _selectConnection(ConnectionRow connection) async {
+    if (!await _allowUnsavedNavigation()) return;
+    if (!mounted) return;
     final prevId = _workspace.value.activeConnection?.id;
     _workspace.value = _workspace.value.selectConnection(connection);
     if (prevId != connection.id) {
@@ -282,6 +296,42 @@ class _MainScreenState extends State<MainScreen> {
     String name,
     PostgresObjectKind kind,
   ) {
+    unawaited(_selectPostgresObject(
+      connection,
+      database,
+      schema,
+      name,
+      kind,
+    ));
+  }
+
+  Future<void> _selectPostgresObject(
+    ConnectionRow connection,
+    String database,
+    String schema,
+    String name,
+    PostgresObjectKind kind,
+  ) async {
+    final ws = _workspace.value;
+    final cur = ws.selectedPostgresObject;
+    final same = ws.activeConnection?.id == connection.id &&
+        cur != null &&
+        cur.database == database &&
+        cur.schema == schema &&
+        cur.name == name &&
+        cur.kind == kind;
+    if (same) return;
+    if (!await _allowUnsavedNavigation()) return;
+    if (!mounted) return;
+    if (!await confirmOpenPostgresTableIfSqlTx(
+      context,
+      connection: connection,
+      database: database,
+      kind: kind,
+    )) {
+      return;
+    }
+    if (!mounted) return;
     _workspace.value = _workspace.value.selectPostgresObject(
       connection,
       database,
@@ -297,6 +347,34 @@ class _MainScreenState extends State<MainScreen> {
     String name,
     MysqlObjectKind kind,
   ) {
+    unawaited(_selectMysqlObject(connection, database, name, kind));
+  }
+
+  Future<void> _selectMysqlObject(
+    ConnectionRow connection,
+    String database,
+    String name,
+    MysqlObjectKind kind,
+  ) async {
+    final ws = _workspace.value;
+    final cur = ws.selectedMysqlObject;
+    final same = ws.activeConnection?.id == connection.id &&
+        cur != null &&
+        cur.database == database &&
+        cur.name == name &&
+        cur.kind == kind;
+    if (same) return;
+    if (!await _allowUnsavedNavigation()) return;
+    if (!mounted) return;
+    if (!await confirmOpenMysqlTableIfSqlTx(
+      context,
+      connection: connection,
+      database: database,
+      kind: kind,
+    )) {
+      return;
+    }
+    if (!mounted) return;
     _workspace.value = _workspace.value.selectMysqlObject(
       connection,
       database,
@@ -306,10 +384,38 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _onRedisDatabaseSelected(ConnectionRow connection, int database) {
+    unawaited(_selectRedisDatabase(connection, database));
+  }
+
+  Future<void> _selectRedisDatabase(
+    ConnectionRow connection,
+    int database,
+  ) async {
+    final ws = _workspace.value;
+    if (ws.activeConnection?.id == connection.id &&
+        ws.activeRedisDb == database) {
+      return;
+    }
+    if (!await _allowUnsavedNavigation()) return;
+    if (!mounted) return;
     _workspace.value = _workspace.value.selectRedisDb(connection, database);
   }
 
   void _onMongoDBDatabaseSelected(ConnectionRow connection, String database) {
+    unawaited(_selectMongoDatabase(connection, database));
+  }
+
+  Future<void> _selectMongoDatabase(
+    ConnectionRow connection,
+    String database,
+  ) async {
+    final ws = _workspace.value;
+    if (ws.activeConnection?.id == connection.id &&
+        ws.activeMongoDB == database) {
+      return;
+    }
+    if (!await _allowUnsavedNavigation()) return;
+    if (!mounted) return;
     _workspace.value = _workspace.value.selectMongoDb(connection, database);
   }
 
@@ -320,6 +426,24 @@ class _MainScreenState extends State<MainScreen> {
     String? name,
     PostgresObjectKind? kind,
   }) {
+    unawaited(_openPostgresSqlWorkspace(
+      connection,
+      database: database,
+      schema: schema,
+      name: name,
+      kind: kind,
+    ));
+  }
+
+  Future<void> _openPostgresSqlWorkspace(
+    ConnectionRow connection, {
+    String? database,
+    String? schema,
+    String? name,
+    PostgresObjectKind? kind,
+  }) async {
+    if (!await _allowUnsavedNavigation()) return;
+    if (!mounted) return;
     _workspace.value = _workspace.value.openPostgresSqlWorkspace(
       connection,
       seedDatabase: database,
@@ -330,6 +454,12 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _onMysqlOpenSqlWorkspace(ConnectionRow connection) {
+    unawaited(_openMysqlSqlWorkspace(connection));
+  }
+
+  Future<void> _openMysqlSqlWorkspace(ConnectionRow connection) async {
+    if (!await _allowUnsavedNavigation()) return;
+    if (!mounted) return;
     _workspace.value = _workspace.value.openMysqlSqlWorkspace(connection);
   }
 
@@ -338,6 +468,31 @@ class _MainScreenState extends State<MainScreen> {
     String name,
     SqliteObjectKind kind,
   ) {
+    unawaited(_selectSqliteObject(connection, name, kind));
+  }
+
+  Future<void> _selectSqliteObject(
+    ConnectionRow connection,
+    String name,
+    SqliteObjectKind kind,
+  ) async {
+    final ws = _workspace.value;
+    final cur = ws.selectedSqliteObject;
+    final same = ws.activeConnection?.id == connection.id &&
+        cur != null &&
+        cur.name == name &&
+        cur.kind == kind;
+    if (same) return;
+    if (!await _allowUnsavedNavigation()) return;
+    if (!mounted) return;
+    if (!await confirmOpenSqliteTableIfSqlTx(
+      context,
+      connection: connection,
+      kind: kind,
+    )) {
+      return;
+    }
+    if (!mounted) return;
     _workspace.value = _workspace.value.selectSqliteObject(
       connection,
       name,
@@ -346,6 +501,12 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _onSqliteOpenSqlWorkspace(ConnectionRow connection) {
+    unawaited(_openSqliteSqlWorkspace(connection));
+  }
+
+  Future<void> _openSqliteSqlWorkspace(ConnectionRow connection) async {
+    if (!await _allowUnsavedNavigation()) return;
+    if (!mounted) return;
     _workspace.value = _workspace.value.openSqliteSqlWorkspace(connection);
   }
 
@@ -354,6 +515,23 @@ class _MainScreenState extends State<MainScreen> {
     String database,
     String name,
   ) {
+    unawaited(_selectExtensionObject(connection, database, name));
+  }
+
+  Future<void> _selectExtensionObject(
+    ConnectionRow connection,
+    String database,
+    String name,
+  ) async {
+    final ws = _workspace.value;
+    final cur = ws.selectedExtensionObject;
+    final same = ws.activeConnection?.id == connection.id &&
+        cur != null &&
+        cur.database == database &&
+        cur.name == name;
+    if (same) return;
+    if (!await _allowUnsavedNavigation()) return;
+    if (!mounted) return;
     _workspace.value = _workspace.value.selectExtensionObject(
       connection,
       database,
@@ -449,7 +627,7 @@ class _MainScreenState extends State<MainScreen> {
         _onSqliteOpenSqlWorkspace(connection);
       default:
         if (ExtensionDriverCatalog.isExtensionDriverConnection(connection)) {
-          _workspace.value = _workspace.value.selectConnection(connection);
+          unawaited(_selectConnection(connection));
         }
     }
   }
@@ -500,8 +678,20 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _onGoHome() {
+    unawaited(_goHome());
+  }
+
+  Future<void> _goHome() async {
+    if (!await _allowUnsavedNavigation()) return;
+    if (!mounted) return;
     _workspace.value = MainScreenWorkspaceState.empty;
     QueryaShellStatus.instance.clear();
+  }
+
+  Future<void> _closeWorkspace() async {
+    if (!await _allowUnsavedNavigation()) return;
+    if (!mounted) return;
+    _workspace.value = _workspace.value.unselectActiveObject();
   }
 
   bool _hasCloseableWorkspace(MainScreenWorkspaceState ws) {
@@ -602,9 +792,7 @@ class _MainScreenState extends State<MainScreen> {
           onGoHome:
               workspace.activeConnection != null ? _onGoHome : null,
           onCloseWorkspace: _hasCloseableWorkspace(workspace)
-              ? () {
-                  _workspace.value = _workspace.value.unselectActiveObject();
-                }
+              ? () => unawaited(_closeWorkspace())
               : null,
           onConnect: workspace.activeConnection?.id != null
               ? () => _connectionsPanelKey.currentState
@@ -1019,6 +1207,47 @@ class _MainContentSplitState extends State<_MainContentSplit>
     unawaited(_restoreState());
   }
 
+  Future<void> _restoreLastSelectedObject() async {
+    final ws = widget.workspace.value;
+    final conn = ws.activeConnection;
+    final pg = ws.lastSelectedPostgresObject;
+    if (conn != null && conn.type == 'postgresql' && pg != null) {
+      if (!await confirmOpenPostgresTableIfSqlTx(
+        context,
+        connection: conn,
+        database: pg.database,
+        kind: pg.kind,
+      )) {
+        return;
+      }
+    }
+    if (!mounted) return;
+    final sq = ws.lastSelectedSqliteObject;
+    if (conn != null && conn.type == 'sqlite' && sq != null) {
+      if (!await confirmOpenSqliteTableIfSqlTx(
+        context,
+        connection: conn,
+        kind: sq.kind,
+      )) {
+        return;
+      }
+    }
+    if (!mounted) return;
+    final my = ws.lastSelectedMysqlObject;
+    if (conn != null && conn.type == 'mysql' && my != null) {
+      if (!await confirmOpenMysqlTableIfSqlTx(
+        context,
+        connection: conn,
+        database: my.database,
+        kind: my.kind,
+      )) {
+        return;
+      }
+    }
+    if (!mounted) return;
+    widget.workspace.value = widget.workspace.value.restoreLastSelectedObject();
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -1257,8 +1486,7 @@ class _MainContentSplitState extends State<_MainContentSplit>
                             widget.workspace.value.unselectActiveObject();
                       },
                       onRestoreLastSelectedObject: () {
-                        widget.workspace.value =
-                            widget.workspace.value.restoreLastSelectedObject();
+                        unawaited(_restoreLastSelectedObject());
                       },
                       isReadOnly: ws.isReadOnly,
                       onRequestNewConnection: widget.onRequestNewConnection,

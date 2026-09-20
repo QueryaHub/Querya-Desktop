@@ -10,6 +10,8 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:postgres/src/connection_string.dart' show parseConnectionString;
 
 import 'postgres_metadata.dart';
+import 'postgres_result_cells.dart';
+import 'postgres_sql.dart';
 import 'table_schema_meta.dart';
 
 /// Replaces the database in a `postgresql://` / `postgres://` URI (path or
@@ -35,6 +37,30 @@ String replaceDatabaseInConnectionString(
   }
   params['database'] = newDatabase;
   return uri.replace(queryParameters: params).toString();
+}
+
+/// Host/port TLS mode when the URI has no `sslmode`.
+///
+/// [uriSslMode] wins (URI is source of truth). Otherwise encrypt-only
+/// (`require`) unless a Root CA is set, then `verifyFull`. `require` does not
+/// check the CA — MITM is possible.
+SslMode postgresResolveSslMode({
+  SslMode? uriSslMode,
+  required bool encrypt,
+  required bool hasRootCert,
+}) {
+  if (uriSslMode != null) return uriSslMode;
+  if (!encrypt && !hasRootCert) return SslMode.disable;
+  if (hasRootCert) return SslMode.verifyFull;
+  return SslMode.require;
+}
+
+/// `pg_class.reltuples` → row estimate. Negative / unanalyzed → `null`.
+int? postgresReltuplesEstimate(Object? value) {
+  if (value == null) return null;
+  final n = value is num ? value.toDouble() : double.tryParse(value.toString());
+  if (n == null || n < 0) return null;
+  return n.round();
 }
 
 /// PostgreSQL connection using the pure-Dart `postgres` package.
@@ -106,6 +132,7 @@ class PostgresConnection {
 
   Connection? _conn;
   bool _isConnected = false;
+  bool _inTransaction = false;
 
   bool get isConnected => _isConnected && _conn != null;
 
@@ -145,9 +172,10 @@ class PostgresConnection {
       }
     }
     return ConnectionSettings(
-      sslMode: (useSSL || securityContext != null)
-          ? SslMode.require
-          : SslMode.disable,
+      sslMode: postgresResolveSslMode(
+        encrypt: useSSL || securityContext != null,
+        hasRootCert: sslRootCert != null && sslRootCert!.trim().isNotEmpty,
+      ),
       connectTimeout: const Duration(seconds: 10),
       queryTimeout: const Duration(seconds: 30),
       securityContext: securityContext,
@@ -184,8 +212,14 @@ class PostgresConnection {
           dbName,
         );
         final parsed = parseConnectionString(uriForOpen);
-        final sslMode =
-            parsed.sslMode ?? (useSSL ? SslMode.require : SslMode.disable);
+        final sslMode = postgresResolveSslMode(
+          uriSslMode: parsed.sslMode,
+          encrypt: useSSL ||
+              (sslRootCert != null && sslRootCert!.trim().isNotEmpty) ||
+              (sslCert != null && sslCert!.trim().isNotEmpty) ||
+              (sslKey != null && sslKey!.trim().isNotEmpty),
+          hasRootCert: sslRootCert != null && sslRootCert!.trim().isNotEmpty,
+        );
         _conn = await Connection.open(
           parsed.endpoints.first,
           settings: ConnectionSettings(
@@ -206,6 +240,7 @@ class PostgresConnection {
         );
       }
       _isConnected = true;
+      _inTransaction = false;
       scrubCredentials();
     } catch (e, st) {
       _isConnected = false;
@@ -223,6 +258,7 @@ class PostgresConnection {
 
   Future<void> disconnect() async {
     _isConnected = false;
+    _inTransaction = false;
     final c = _conn;
     _conn = null;
     try {
@@ -236,6 +272,7 @@ class PostgresConnection {
   /// cancelling a long query or [PostgresService.interrupt].
   Future<void> forceClose() async {
     _isConnected = false;
+    _inTransaction = false;
     final c = _conn;
     _conn = null;
     try {
@@ -281,7 +318,9 @@ class PostgresConnection {
       throw StateError('Not connected to PostgreSQL');
     }
     try {
-      return await _conn!.execute(sql, timeout: timeout);
+      final result = await _conn!.execute(sql, timeout: timeout);
+      _inTransaction = applyPostgresTransactionSql(_inTransaction, sql);
+      return result;
     } on TimeoutException {
       unawaited(forceClose());
       rethrow;
@@ -303,19 +342,24 @@ class PostgresConnection {
     }
   }
 
-  /// Whether the session has an open transaction (PostgreSQL 13+).
-  /// Returns `null` if the server does not support the probe or an error occurs.
+  /// Whether the session has an open transaction.
+  ///
+  /// `BEGIN` + `SELECT` does not assign an XID, so `pg_current_xact_id_if_assigned`
+  /// stays NULL. We track BEGIN/COMMIT/ROLLBACK on [execute], and otherwise
+  /// probe `pg_stat_activity.xact_start` for this backend (PG 9+; no PG 13
+  /// requirement). Returns `null` only when disconnected.
   Future<bool?> inOpenTransaction() async {
     if (!isConnected || _conn == null) return null;
+    if (_inTransaction) return true;
     try {
-      final r = await _conn!.execute(
-        'SELECT pg_current_xact_id_if_assigned() IS NOT NULL',
-      );
-      if (r.isEmpty) return null;
-      return r.first[0] as bool;
+      final r = await _conn!.execute(kPostgresOpenTransactionProbeSql);
+      if (r.isEmpty) return false;
+      final open = r.first[0] == true;
+      _inTransaction = open;
+      return open;
     } catch (e) {
       debugPrint('PostgresConnection.inOpenTransaction: $e');
-      return null;
+      return _inTransaction;
     }
   }
 
@@ -398,7 +442,8 @@ class PostgresConnection {
     }
     final colsRs = await _conn!.execute(
       Sql.named(
-        'SELECT column_name, data_type, is_nullable, column_default '
+        'SELECT column_name, data_type, udt_name, is_nullable, column_default, '
+        'is_generated, is_identity, identity_generation '
         'FROM information_schema.columns '
         'WHERE table_schema = @schema AND table_name = @table '
         'ORDER BY ordinal_position',
@@ -426,11 +471,22 @@ class PostgresConnection {
 
     for (final r in colsRs) {
       final name = r[0] as String? ?? '';
-      final dataType = r[1] as String? ?? '';
-      final isNullable = (r[2] as String? ?? 'YES').toUpperCase() == 'YES';
+      final dataType = postgresColumnSchemaType(
+        dataType: r[1] as String? ?? '',
+        udtName: r[2] as String? ?? '',
+      );
+      final isNullable = (r[3] as String? ?? 'YES').toUpperCase() == 'YES';
       final isPk = primaryKeys.contains(name);
       final pkPos = isPk ? primaryKeys.indexOf(name) + 1 : null;
-      final dflt = r[3]?.toString();
+      final dflt = r[4]?.toString();
+      final isGenerated =
+          (r[5] as String? ?? 'NEVER').toUpperCase() == 'ALWAYS';
+      final isIdentity = (r[6] as String? ?? 'NO').toUpperCase() == 'YES';
+      final identityGeneration = (r[7] as String? ?? '').toUpperCase();
+      final omitOnInsert =
+          isGenerated || (isIdentity && identityGeneration == 'ALWAYS');
+      final hasServerDefault = (dflt != null && dflt.isNotEmpty) ||
+          (isIdentity && identityGeneration == 'BY DEFAULT');
 
       columns.add(
         TableColumnMeta(
@@ -440,6 +496,8 @@ class PostgresConnection {
           isPrimaryKey: isPk,
           primaryKeyPosition: pkPos,
           defaultValue: dflt,
+          omitOnInsert: omitOnInsert,
+          hasServerDefault: hasServerDefault,
         ),
       );
     }
@@ -450,6 +508,29 @@ class PostgresConnection {
       columns: columns,
       primaryKeys: primaryKeys,
     );
+  }
+
+  /// Planner row estimate (`pg_class.reltuples`), not a blocking `COUNT(*)`.
+  /// Unanalyzed relations (`-1`) and missing catalog rows return `null`.
+  Future<int?> estimateTableRows({
+    String schema = 'public',
+    required String table,
+  }) async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final result = await _conn!.execute(
+      Sql.named(
+        'SELECT c.reltuples FROM pg_catalog.pg_class c '
+        'JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace '
+        'WHERE n.nspname = @schema AND c.relname = @table '
+        "AND c.relkind IN ('r', 'p', 'm', 'f') "
+        'LIMIT 1',
+      ),
+      parameters: {'schema': schema, 'table': table},
+    );
+    if (result.isEmpty) return null;
+    return postgresReltuplesEstimate(result.first[0]);
   }
 
   /// Returns primary key column names for [table] in [schema].

@@ -7,14 +7,18 @@ import 'package:file_selector/file_selector.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
+import 'package:querya_desktop/core/database/mysql_result_cells.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
 import 'package:querya_desktop/core/database/result_row_string_convert.dart';
+import 'package:querya_desktop/core/database/sql_limit.dart';
 import 'package:querya_desktop/core/database/sql_table_target_extractor.dart';
+import 'package:querya_desktop/core/database/stream_take_drain.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/ui/querya_shell_status.dart';
+import 'package:querya_desktop/features/mysql/mysql_sql_tx_guard.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
 import 'package:querya_desktop/features/workspace/workspace.dart';
@@ -25,11 +29,15 @@ class MysqlSqlWorkspace extends material.StatefulWidget {
   const MysqlSqlWorkspace({
     super.key,
     required this.connectionRow,
+    this.transactionOpenNotifier,
     this.isReadOnly = false,
   });
 
   final ConnectionRow connectionRow;
   final bool isReadOnly;
+
+  /// Updated when transaction state changes (for tab-switch warnings).
+  final material.ValueNotifier<bool?>? transactionOpenNotifier;
 
   @override
   material.State<MysqlSqlWorkspace> createState() => _MysqlSqlWorkspaceState();
@@ -43,6 +51,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
   SqlQueryTabSession get _activeSession => _sessions[_activeSessionIndex];
 
   MysqlLease? _lease;
+  bool? _txOpen;
 
   int? _queryTimeoutSeconds;
 
@@ -201,13 +210,31 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
     final lease = await MysqlService.instance.acquire(
       widget.connectionRow,
       database: _poolDatabaseKey(),
-      mode: widget.isReadOnly ? MysqlSessionMode.readOnly : MysqlSessionMode.readWrite,
+      mode: widget.isReadOnly
+          ? MysqlSessionMode.readOnly
+          : MysqlSessionMode.readWrite,
     );
     if (!mounted) {
       lease.release();
       return;
     }
     _lease = lease;
+  }
+
+  void _notifyTransactionOpen() {
+    widget.transactionOpenNotifier?.value = _txOpen;
+  }
+
+  Future<void> _refreshTxStatus() async {
+    final conn = _lease?.connection;
+    if (conn == null || !conn.isConnected) {
+      if (mounted) setState(() => _txOpen = null);
+      _notifyTransactionOpen();
+      return;
+    }
+    final v = await conn.inOpenTransaction();
+    if (mounted) setState(() => _txOpen = v);
+    _notifyTransactionOpen();
   }
 
   Duration? _statementTimeout() => _queryTimeoutSeconds == null
@@ -225,7 +252,9 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       MysqlService.instance.interrupt(
         widget.connectionRow,
         database: _poolDatabaseKey(),
-        mode: widget.isReadOnly ? MysqlSessionMode.readOnly : MysqlSessionMode.readWrite,
+        mode: widget.isReadOnly
+            ? MysqlSessionMode.readOnly
+            : MysqlSessionMode.readWrite,
       );
     }
     _lease?.release();
@@ -269,6 +298,8 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       session.rows = [];
       session.affectedRows = null;
       session.statusLine = null;
+      session.resultGridPrimaryKeys = const [];
+      session.resultGridColumnDataTypes = null;
     });
     QueryaShellStatus.instance.beginBusy(message: 'Running query…');
     final sw = Stopwatch()..start();
@@ -288,8 +319,10 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       }
 
       final to = _statementTimeout();
+      final cap = _resultMaxRows;
+      final sql = injectSqlLimit(userSql, cap);
       final rs =
-          await conn.executeWithTimeout(userSql, timeout: to, iterable: true);
+          await conn.executeWithTimeout(sql, timeout: to, iterable: true);
 
       if (!mounted) return;
 
@@ -299,39 +332,71 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       }
 
       // Convert while streaming — no Object? matrix + isolate double-copy (#421).
-      final outRows = <List<String>>[];
-      var n = 0;
-      final cap = _resultMaxRows;
-      var truncated = false;
-      await for (final row in rs.rowsStream) {
-        if (n >= cap) {
-          truncated = true;
-          break;
-        }
-        outRows.add(
+      // Drain leftover rows so COM_QUERY reaches EOF (#808); do not cancel.
+      final taken = await takeThenDrain(
+        rs.rowsStream,
+        cap,
+        onProgress: (n) async {
+          if (n % kResultStringConvertYieldEvery == 0) {
+            await Future<void>.delayed(Duration.zero);
+          }
+        },
+      );
+      final colList = rs.cols.toList();
+      final outRows = [
+        for (final row in taken.items)
           List.generate(
             row.numOfColumns,
-            (i) => resultCellToDisplayString(row.colAt(i)),
+            (i) {
+              final col = i < colList.length ? colList[i] : null;
+              return mysqlResultCellToDisplayString(
+                row.colAt(i),
+                column: col,
+              );
+            },
           ),
-        );
-        n++;
-        if (n % kResultStringConvertYieldEvery == 0) {
-          await Future<void>.delayed(Duration.zero);
-        }
-      }
+      ];
+      final truncated =
+          taken.truncated || (sql != userSql && outRows.length >= cap);
+      final n = outRows.length;
 
       int? affected;
       if (cols.isEmpty && outRows.isEmpty) {
         affected = _affectedInt(rs.affectedRows);
       }
 
+      final target = SqlTableTargetExtractor.extract(userSql);
+      var pks = const <String>[];
+      Map<String, String>? types;
+      final schemaName = target?.schema ?? _poolDatabaseKey();
+      if (target != null && cols.isNotEmpty && schemaName.isNotEmpty) {
+        try {
+          final meta = await conn.getTableSchema(
+            database: schemaName,
+            table: target.tableName,
+          );
+          pks = List<String>.from(meta.primaryKeys);
+          types = columnDataTypesFromSchema(meta);
+        } catch (_) {
+          pks = const [];
+          types = null;
+        }
+      }
+      final canSave = sqlResultGridSaveEnabled(
+        sql: userSql,
+        resultColumns: cols,
+        primaryKeys: pks,
+      );
+
       setState(() {
         session.columns = cols;
         session.rows = outRows;
         session.affectedRows = affected;
         session.lastExecutedSql = userSql;
+        session.resultGridPrimaryKeys = canSave ? pks : const [];
+        session.resultGridColumnDataTypes = types;
         session.stagingBuffer?.dispose();
-        session.stagingBuffer = cols.isNotEmpty
+        session.stagingBuffer = canSave
             ? DataGridStagingBuffer(columns: cols, rows: outRows)
             : null;
         if (cols.isEmpty && outRows.isEmpty) {
@@ -380,6 +445,8 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
         });
         QueryaShellStatus.instance.endBusy();
       }
+    } finally {
+      await _refreshTxStatus();
     }
   }
 
@@ -393,15 +460,27 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
     final target = session.lastExecutedSql != null
         ? SqlTableTargetExtractor.extract(session.lastExecutedSql!)
         : null;
-    final tableName = target?.tableName ?? 'table';
-    final schemaName = target?.schema;
+    if (target == null ||
+        !sqlResultGridSaveEnabled(
+          sql: session.lastExecutedSql,
+          resultColumns: session.columns,
+          primaryKeys: session.resultGridPrimaryKeys,
+        )) {
+      return;
+    }
+    final schemaName = target.schema ??
+        (widget.connectionRow.databaseName?.trim().isNotEmpty == true
+            ? widget.connectionRow.databaseName!.trim()
+            : null);
 
     setState(() => session.savingChanges = true);
     try {
       final plan = session.stagingBuffer!.generateMutationPlan(
         dialect: SqlDialect.mysql,
-        tableName: tableName,
+        tableName: target.tableName,
         schema: schemaName,
+        primaryKeys: session.resultGridPrimaryKeys,
+        columnDataTypes: session.resultGridColumnDataTypes,
       );
       if (plan.isEmpty) {
         setState(() => session.savingChanges = false);
@@ -423,9 +502,13 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
         throw StateError('Could not connect to MySQL.');
       }
 
-      for (final stmt in plan.statements) {
-        await conn.execute(stmt.sql);
-      }
+      await conn.runInTransaction(() async {
+        for (final stmt in plan.statements) {
+          final rs = await conn.execute(stmt.sql);
+          expectDmlMatchedRows(rs.affectedRows.toInt());
+        }
+      });
+      await _refreshTxStatus();
 
       if (!mounted) return;
       final newRows = session.stagingBuffer!.effectiveRows;
@@ -556,12 +639,52 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
     }
   }
 
-  Future<void> _runTxCommand(String sql) async {
-    _activeSession.controller.value = material.TextEditingValue(
-      text: sql,
-      selection: material.TextSelection.collapsed(offset: sql.length),
-    );
-    await _execute(_activeSession);
+  Future<void> _runTxCommand(String cmd) async {
+    final session = _activeSession;
+    setState(() {
+      session.running = true;
+      session.error = null;
+    });
+    try {
+      await _ensureLease();
+      final conn = _lease?.connection;
+      if (conn == null || !conn.isConnected) {
+        if (mounted) {
+          setState(() {
+            session.error = 'Could not connect to MySQL.';
+            session.running = false;
+          });
+        }
+        return;
+      }
+      final to = _statementTimeout();
+      await conn.executeWithTimeout(cmd, timeout: to);
+      if (!mounted) return;
+      setState(() {
+        session.columns = [];
+        session.rows = [];
+        session.affectedRows = null;
+        session.statusLine = 'OK: $cmd';
+        session.running = false;
+      });
+    } on TimeoutException catch (e) {
+      unawaited(_lease?.connection.forceClose());
+      if (mounted) {
+        setState(() {
+          session.error = e.toString();
+          session.running = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          session.error = e.toString();
+          session.running = false;
+        });
+      }
+    } finally {
+      await _refreshTxStatus();
+    }
   }
 
   @override
@@ -609,16 +732,22 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       },
       child: material.CallbackShortcuts(
         bindings: {
-          const material.SingleActivator(LogicalKeyboardKey.keyT, control: true): _addNewTab,
-          const material.SingleActivator(LogicalKeyboardKey.keyT, meta: true): _addNewTab,
-          const material.SingleActivator(LogicalKeyboardKey.keyW, control: true): () {
+          const material.SingleActivator(LogicalKeyboardKey.keyT,
+              control: true): _addNewTab,
+          const material.SingleActivator(LogicalKeyboardKey.keyT, meta: true):
+              _addNewTab,
+          const material.SingleActivator(LogicalKeyboardKey.keyW,
+              control: true): () {
             if (_sessions.length > 1) unawaited(_closeTab(_activeSessionIndex));
           },
-          const material.SingleActivator(LogicalKeyboardKey.keyW, meta: true): () {
+          const material.SingleActivator(LogicalKeyboardKey.keyW, meta: true):
+              () {
             if (_sessions.length > 1) unawaited(_closeTab(_activeSessionIndex));
           },
-          const material.SingleActivator(LogicalKeyboardKey.tab, control: true): _nextTab,
-          const material.SingleActivator(LogicalKeyboardKey.tab, control: true, shift: true): _prevTab,
+          const material.SingleActivator(LogicalKeyboardKey.tab, control: true):
+              _nextTab,
+          const material.SingleActivator(LogicalKeyboardKey.tab,
+              control: true, shift: true): _prevTab,
           const material.SingleActivator(LogicalKeyboardKey.f5): () {
             if (!_activeSession.running) unawaited(_execute(_activeSession));
           },
@@ -667,7 +796,8 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
               SqlQueryTabBar(
                 sessions: _sessions,
                 selectedIndex: _activeSessionIndex,
-                onSelect: (index) => setState(() => _activeSessionIndex = index),
+                onSelect: (index) =>
+                    setState(() => _activeSessionIndex = index),
                 onAdd: _addNewTab,
                 onClose: _sessions.length > 1
                     ? (index) => unawaited(_closeTab(index))
@@ -716,9 +846,13 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
                     );
                   }
                 : null,
-            onBegin: session.running ? null : () => _runTxCommand('START TRANSACTION;'),
-            onCommit: session.running ? null : () => _runTxCommand('COMMIT;'),
-            onRollback: session.running ? null : () => _runTxCommand('ROLLBACK;'),
+            txOpen: _txOpen,
+            onBegin: session.running
+                ? null
+                : () => _runTxCommand('START TRANSACTION'),
+            onCommit: session.running ? null : () => _runTxCommand('COMMIT'),
+            onRollback:
+                session.running ? null : () => _runTxCommand('ROLLBACK'),
           ),
           const Divider(height: 1),
           Expanded(
@@ -753,8 +887,15 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
               affectedRows: session.affectedRows,
               statusLine: session.statusLine,
               stagingBuffer: session.stagingBuffer,
-              onApplyChanges:
-                  widget.isReadOnly ? null : () => _applyStagedChanges(session),
+              columnDataTypes: session.resultGridColumnDataTypes,
+              onApplyChanges: widget.isReadOnly ||
+                      !sqlResultGridSaveEnabled(
+                        sql: session.lastExecutedSql,
+                        resultColumns: session.columns,
+                        primaryKeys: session.resultGridPrimaryKeys,
+                      )
+                  ? null
+                  : () => _applyStagedChanges(session),
               isSaving: session.savingChanges,
             ),
           ),
@@ -772,6 +913,7 @@ class _MysqlSqlToolbar extends material.StatelessWidget {
     required this.onQueryTimeoutChanged,
     required this.onOpenPreferences,
     this.onOpenHistory,
+    required this.txOpen,
     required this.onBegin,
     required this.onCommit,
     required this.onRollback,
@@ -783,6 +925,7 @@ class _MysqlSqlToolbar extends material.StatelessWidget {
   final void Function(int?) onQueryTimeoutChanged;
   final VoidCallback onOpenPreferences;
   final VoidCallback? onOpenHistory;
+  final bool? txOpen;
   final VoidCallback? onBegin;
   final VoidCallback? onCommit;
   final VoidCallback? onRollback;
@@ -797,10 +940,13 @@ class _MysqlSqlToolbar extends material.StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: material.MainAxisSize.min,
         children: [
-          material.Row(
+          material.Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: material.WrapCrossAlignment.center,
             children: [
               const Text('Query').semiBold().small(),
-              const Spacer(),
+              Text(mysqlSqlToolbarTxLabel(txOpen)).muted().small(),
               OutlineButton(
                 size: ButtonSize.small,
                 onPressed: onOpenHistory,
@@ -811,7 +957,6 @@ class _MysqlSqlToolbar extends material.StatelessWidget {
                 ),
                 child: const Text('History'),
               ),
-              const Gap(8),
               OutlineButton(
                 onPressed: onExecute,
                 leading: running

@@ -5,14 +5,47 @@ import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart'
 import 'package:querya_desktop/features/workspace/dml_preview_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
+/// Outcome of [loadTableViewSchema] (success vs swallowed getTableSchema error).
+class TableViewSchemaLoad {
+  const TableViewSchemaLoad._({this.schema, this.error});
+
+  const TableViewSchemaLoad.ok(TableSchemaMeta schema) : this._(schema: schema);
+
+  const TableViewSchemaLoad.failed(Object error) : this._(error: error);
+
+  final TableSchemaMeta? schema;
+  final Object? error;
+
+  bool get isOk => schema != null;
+}
+
+/// Runs [fetch] and captures a failure instead of treating it as “no PK”.
+Future<TableViewSchemaLoad> loadTableViewSchema(
+  Future<TableSchemaMeta> Function() fetch,
+) async {
+  try {
+    return TableViewSchemaLoad.ok(await fetch());
+  } catch (e) {
+    return TableViewSchemaLoad.failed(e);
+  }
+}
+
+/// Status copy when [loadTableViewSchema] failed. Editing stays off.
+String tableViewSchemaUnavailableReason(Object error) {
+  return 'Cannot edit: schema unavailable. $error. Refresh to retry.';
+}
+
 /// Whether Table Browser should attach a [DataGridStagingBuffer] for this page.
 bool tableViewEditingEnabled({
   required bool isView,
   bool isMaterializedView = false,
   required bool customSqlActive,
   required bool hasPrimaryKey,
+  bool readOnly = false,
+  Object? schemaError,
 }) {
-  if (isView || isMaterializedView || customSqlActive) return false;
+  if (readOnly || isView || isMaterializedView || customSqlActive) return false;
+  if (schemaError != null) return false;
   return hasPrimaryKey;
 }
 
@@ -23,9 +56,15 @@ String? tableViewEditDisabledReason({
   required bool customSqlActive,
   required bool hasPrimaryKey,
   required bool schemaLoaded,
+  bool readOnly = false,
+  Object? schemaError,
 }) {
+  if (readOnly) return 'Read-only session';
   if (isView || isMaterializedView) return 'Views are read-only';
   if (customSqlActive) return 'Custom SQL results are read-only';
+  if (schemaError != null) {
+    return tableViewSchemaUnavailableReason(schemaError);
+  }
   if (schemaLoaded && !hasPrimaryKey) {
     return 'Cannot edit: no primary key detected';
   }
@@ -38,6 +77,11 @@ Map<String, String> columnDataTypesFromSchema(TableSchemaMeta schema) {
     for (final c in schema.columns)
       if (c.dataType.isNotEmpty) c.name: c.dataType,
   };
+}
+
+/// Column name → schema flags used by INSERT (generated / defaults).
+Map<String, TableColumnMeta> columnMetaFromSchema(TableSchemaMeta schema) {
+  return {for (final c in schema.columns) c.name: c};
 }
 
 /// Disposes [previous] and returns a new buffer when [enabled].
@@ -119,6 +163,15 @@ Future<bool?> showDiscardTableEditsDialog({
   );
 }
 
+/// Throws if a DML statement matched no rows (stale PK / concurrent delete).
+void expectDmlMatchedRows(int affectedRows) {
+  if (affectedRows >= 1) return;
+  throw StateError(
+    'Save failed: a statement matched 0 rows. '
+    'The row may have been changed or deleted. Refresh and try again.',
+  );
+}
+
 Future<void> showTableViewSaveFailedDialog({
   required material.BuildContext context,
   required Object error,
@@ -178,6 +231,10 @@ class TableViewApplyOutcome {
 }
 
 /// Preview + execute a staging-buffer mutation plan for Table Browser.
+///
+/// [execute] must throw if any statement matched 0 rows (see
+/// [expectDmlMatchedRows]) so this returns [TableViewApplyOutcome.failed]
+/// and the caller keeps the staging buffer.
 Future<TableViewApplyOutcome> applyTableViewStagedChanges({
   required material.BuildContext context,
   required DataGridStagingBuffer buffer,
@@ -186,6 +243,7 @@ Future<TableViewApplyOutcome> applyTableViewStagedChanges({
   String? schema,
   required List<String> primaryKeys,
   Map<String, String>? columnDataTypes,
+  Map<String, TableColumnMeta>? columnMeta,
   required Future<void> Function(TableMutationPlan plan) execute,
 }) async {
   if (!buffer.isDirty) return const TableViewApplyOutcome.noop();
@@ -201,6 +259,7 @@ Future<TableViewApplyOutcome> applyTableViewStagedChanges({
     schema: schema,
     primaryKeys: primaryKeys,
     columnDataTypes: columnDataTypes,
+    columnMeta: columnMeta,
   );
   if (plan.isEmpty) return const TableViewApplyOutcome.noop();
 

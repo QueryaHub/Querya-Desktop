@@ -3,7 +3,11 @@ import 'package:querya_desktop/core/database/sqlite_connection_pool.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 
 export 'sqlite_connection_pool.dart'
-    show SqliteLease, SqliteSessionMode, SqliteConnectionPool;
+    show
+        SqliteLease,
+        SqliteSessionMode,
+        SqliteSessionModeReadOnly,
+        SqliteConnectionPool;
 
 Future<SqliteConnection> _defaultCreateAndConnect(
   ConnectionRow row, {
@@ -11,11 +15,21 @@ Future<SqliteConnection> _defaultCreateAndConnect(
 }) async {
   final conn = SqliteConnection.fromConnectionRow(
     row,
-    readOnly: mode == SqliteSessionMode.readOnly,
+    readOnly: sqliteOpenReadOnly(row: row, mode: mode),
   );
   await conn.connect();
   return conn;
 }
+
+/// Whether this pool slot must open the file with `SQLITE_OPEN_READONLY`.
+///
+/// Form **Read only** (`useSSL`) always opens `SQLITE_OPEN_READONLY`, even
+/// for [SqliteSessionMode.tableWrite]. Browse already uses `readOnly`.
+bool sqliteOpenReadOnly({
+  required ConnectionRow row,
+  required SqliteSessionMode mode,
+}) =>
+    mode.isReadOnlySession || row.useSSL;
 
 /// Global SQLite connection pool service (singleton).
 class SqliteService {
@@ -43,6 +57,13 @@ class SqliteService {
     SqliteSessionMode mode = SqliteSessionMode.readOnly,
   }) =>
       _pool.interrupt(row, mode: mode);
+
+  /// Force-closes every session mode for this connection id.
+  void interruptAllModes(ConnectionRow row) => _pool.interruptAllModes(row);
+
+  /// Whether the SQL-editor read-write slot has an open transaction.
+  Future<bool> hasOpenSqlTransaction(ConnectionRow row) =>
+      _pool.hasOpenSqlTransaction(row);
 
   Future<void> disconnectAll() => _pool.disconnectAll();
 }

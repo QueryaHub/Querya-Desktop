@@ -1,4 +1,4 @@
-// Shared helpers for bounding ad-hoc SQL result sets (Postgres, SQLite, …).
+// Shared helpers for bounding ad-hoc SQL result sets (Postgres, SQLite, MySQL, …).
 
 /// Removes leading whitespace and `--` line comments (not `/* */`).
 String stripLeadingWhitespaceAndLineComments(String sql) {

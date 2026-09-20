@@ -2,11 +2,15 @@ import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
+import 'package:postgres/postgres.dart';
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
+import 'package:querya_desktop/core/database/postgres_sql.dart';
 import 'package:querya_desktop/core/database/result_row_string_convert.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
+import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/postgresql/postgres_result_utils.dart';
 import 'package:querya_desktop/features/postgresql/postgres_sql_editor_dialog.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_privileges_dialog.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_toolbar.dart';
@@ -55,7 +59,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
   /// Rows on the current page (same as _rows.length when not loading).
   int _rowsOnPage = 0;
 
-  /// Total rows in table/view (from COUNT(*)).
+  /// Planner estimate (`reltuples`); `null` when unknown or stale.
   int? _totalRowCount;
 
   /// Zero-based offset for LIMIT/OFFSET pagination.
@@ -68,7 +72,9 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
   DataGridStagingBuffer? _stagingBuffer;
   List<String> _primaryKeys = [];
   Map<String, String> _columnDataTypes = {};
+  Map<String, TableColumnMeta> _columnMeta = {};
   bool _schemaLoaded = false;
+  Object? _schemaError;
   bool _isSaving = false;
 
   String get _tableTitle => '${widget.schema}.${widget.tableName}';
@@ -80,6 +86,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         isMaterializedView: widget.isMaterializedView,
         customSqlActive: _customSqlActive,
         hasPrimaryKey: _primaryKeys.isNotEmpty,
+        schemaError: _schemaError,
       );
 
   @override
@@ -116,7 +123,9 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     _stagingBuffer = null;
     _primaryKeys = [];
     _columnDataTypes = {};
+    _columnMeta = {};
     _schemaLoaded = false;
+    _schemaError = null;
     _isSaving = false;
   }
 
@@ -125,7 +134,14 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       PostgresService.instance.interrupt(
         widget.connectionRow,
         database: widget.database,
-        mode: PgSessionMode.readWrite,
+        mode: PgSessionMode.readOnly,
+      );
+    }
+    if (interruptIfBusy && _isSaving) {
+      PostgresService.instance.interrupt(
+        widget.connectionRow,
+        database: widget.database,
+        mode: PgSessionMode.tableWrite,
       );
     }
     _lease?.release();
@@ -151,8 +167,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       final lease = await PostgresService.instance.acquire(
         widget.connectionRow,
         database: widget.database,
-        // Custom SQL + REFRESH MATERIALIZED VIEW need a read-write session.
-        mode: PgSessionMode.readWrite,
+        mode: PgSessionMode.readOnly,
       );
       if (!mounted) {
         lease.release();
@@ -170,18 +185,30 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     }
   }
 
-  static int _asInt(dynamic v) {
-    if (v == null) return 0;
-    if (v is int) return v;
-    if (v is BigInt) return v.toInt();
-    if (v is num) return v.toInt();
-    return int.tryParse(v.toString()) ?? 0;
-  }
-
   String _browseDataSql() {
     final schemaQ = quotePostgresIdentifier(widget.schema);
     final tableQ = quotePostgresIdentifier(widget.tableName);
-    return 'SELECT * FROM $schemaQ.$tableQ LIMIT ${widget.limit} OFFSET $_offset';
+    return postgresBrowseDataSql(
+      qualifiedFrom: '$schemaQ.$tableQ',
+      primaryKeys: _primaryKeys,
+      limit: widget.limit,
+      offset: _offset,
+    );
+  }
+
+  Future<T> _withTableWrite<T>(
+    Future<T> Function(PostgresConnection conn) fn,
+  ) async {
+    final lease = await PostgresService.instance.acquire(
+      widget.connectionRow,
+      database: widget.database,
+      mode: PgSessionMode.tableWrite,
+    );
+    try {
+      return await fn(lease.connection);
+    } finally {
+      lease.release();
+    }
   }
 
   Future<bool> _confirmDiscardIfNeeded() {
@@ -196,20 +223,29 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     if (_schemaLoaded) return;
     if (widget.isView || widget.isMaterializedView) {
       _schemaLoaded = true;
+      _schemaError = null;
       _primaryKeys = [];
       _columnDataTypes = {};
+      _columnMeta = {};
       return;
     }
-    try {
-      final schema = await conn.getTableSchema(
+    final loaded = await loadTableViewSchema(
+      () => conn.getTableSchema(
         schema: widget.schema,
         table: widget.tableName,
-      );
+      ),
+    );
+    final schema = loaded.schema;
+    if (schema != null) {
       _primaryKeys = List<String>.from(schema.primaryKeys);
       _columnDataTypes = columnDataTypesFromSchema(schema);
-    } catch (_) {
+      _columnMeta = columnMetaFromSchema(schema);
+      _schemaError = null;
+    } else {
       _primaryKeys = [];
       _columnDataTypes = {};
+      _columnMeta = {};
+      _schemaError = loaded.error;
     }
     _schemaLoaded = true;
   }
@@ -223,7 +259,29 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     );
   }
 
-  /// [refreshCount] runs `COUNT(*)` (e.g. first load or Refresh). Pagination only runs SELECT.
+  Future<List<List<String>>> _postgresRowsToDisplayStrings(
+    Result result,
+    List<String> colNames,
+  ) async {
+    final rawRows = <List<Object?>>[
+      for (final row in result)
+        List<Object?>.generate(row.length, (i) => row[i]),
+    ];
+    final converted = convertPostgresResultRowsToStrings(
+      PostgresResultConvertJob(
+        rowValues: rawRows,
+        columnTypeOids: [
+          for (final c in result.schema.columns) c.typeOid,
+        ],
+        columnDataTypes: [
+          for (final n in colNames) _columnDataTypes[n],
+        ],
+      ),
+    );
+    return convertResultRowsToStringsAdaptive(converted);
+  }
+
+  /// [refreshCount] re-reads `reltuples` (e.g. first load or Refresh). Pagination only runs SELECT.
   Future<void> _fetch({bool refreshCount = false}) async {
     final conn = _connection;
     if (conn == null || !conn.isConnected) {
@@ -244,23 +302,24 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       _loading = true;
       _error = null;
     });
-    final schemaQ = quotePostgresIdentifier(widget.schema);
-    final tableQ = quotePostgresIdentifier(widget.tableName);
-    final countSql = 'SELECT COUNT(*) AS c FROM $schemaQ.$tableQ';
-    final dataSql = _browseDataSql();
     try {
-      int totalRows;
-      if (refreshCount || _totalRowCount == null) {
-        final countResult = await conn.execute(countSql);
-        totalRows = countResult.isEmpty ? 0 : _asInt(countResult.first[0]);
-      } else {
-        totalRows = _totalRowCount!;
-      }
-
-      final result = await conn.execute(dataSql);
+      await _ensureSchema(conn);
       if (!mounted) return;
 
-      await _ensureSchema(conn);
+      int? totalRows = _totalRowCount;
+      if (refreshCount || totalRows == null) {
+        try {
+          totalRows = await conn.estimateTableRows(
+            schema: widget.schema,
+            table: widget.tableName,
+          );
+        } catch (_) {
+          totalRows = null;
+        }
+      }
+
+      final dataSql = _browseDataSql();
+      final result = await conn.execute(dataSql);
       if (!mounted) return;
 
       final colNames = List<String>.generate(
@@ -268,18 +327,17 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         (i) => result.schema.columns[i].columnName ?? 'col_$i',
       );
 
-      final rawRows = <List<Object?>>[
-        for (final row in result)
-          List<Object?>.generate(row.length, (i) => row[i]),
-      ];
-
-      final stringRows = await convertResultRowsToStringsAdaptive(rawRows);
+      final stringRows = await _postgresRowsToDisplayStrings(result, colNames);
 
       if (!mounted) return;
+      final shown = stringRows.length;
+      if (totalRows != null && shown > 0 && totalRows < _offset + shown) {
+        totalRows = null;
+      }
       setState(() {
         _columnNames = colNames;
         _rows = stringRows;
-        _rowsOnPage = stringRows.length;
+        _rowsOnPage = shown;
         if (refreshCount || _totalRowCount == null) {
           _totalRowCount = totalRows;
         }
@@ -323,12 +381,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         (i) => result.schema.columns[i].columnName ?? 'col_$i',
       );
 
-      final rawRows = <List<Object?>>[
-        for (final row in result)
-          List<Object?>.generate(row.length, (i) => row[i]),
-      ];
-
-      final stringRows = await convertResultRowsToStringsAdaptive(rawRows);
+      final stringRows = await _postgresRowsToDisplayStrings(result, colNames);
 
       if (!mounted) return;
       setState(() {
@@ -371,12 +424,13 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
   }
 
   Future<void> _refreshMaterializedView() async {
-    final conn = _connection;
-    if (conn == null || !conn.isConnected || _loading) return;
+    if (_loading) return;
     if (!await _confirmDiscardIfNeeded()) return;
     if (!mounted) return;
     try {
-      await conn.refreshMaterializedView(widget.schema, widget.tableName);
+      await _withTableWrite((conn) {
+        return conn.refreshMaterializedView(widget.schema, widget.tableName);
+      });
       if (!mounted) return;
       await _fetch(refreshCount: true);
     } catch (e) {
@@ -483,6 +537,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       customSqlActive: _customSqlActive,
       hasPrimaryKey: _primaryKeys.isNotEmpty,
       schemaLoaded: _schemaLoaded,
+      schemaError: _schemaError,
     );
     final pag = _paginationLabel();
     if (reason != null) return '$pag · $reason';
@@ -492,6 +547,8 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
   Future<void> _onRefresh() async {
     if (!await _confirmDiscardIfNeeded()) return;
     if (!mounted) return;
+    _schemaLoaded = false;
+    _schemaError = null;
     if (_customSqlActive) {
       await _fetchCustom();
     } else {
@@ -519,12 +576,22 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       schema: widget.schema,
       primaryKeys: _primaryKeys,
       columnDataTypes: _columnDataTypes.isEmpty ? null : _columnDataTypes,
+      columnMeta: _columnMeta.isEmpty ? null : _columnMeta,
       execute: (plan) async {
-        final conn = _connection;
-        if (conn == null || !conn.isConnected) {
-          throw StateError('Could not connect to PostgreSQL.');
-        }
-        await conn.execute(plan.toTransactionSql());
+        await _withTableWrite((conn) async {
+          if (!conn.isConnected) {
+            throw StateError('Could not connect to PostgreSQL.');
+          }
+          await runPostgresStatementsInTransaction(
+            (sql) async {
+              final result = await conn.execute(sql);
+              if (sql != 'BEGIN' && sql != 'COMMIT' && sql != 'ROLLBACK') {
+                expectDmlMatchedRows(result.affectedRows);
+              }
+            },
+            plan.statements.map((s) => s.sql),
+          );
+        });
       },
     );
     if (!mounted) return;

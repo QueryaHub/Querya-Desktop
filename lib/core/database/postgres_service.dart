@@ -3,7 +3,7 @@ import 'package:querya_desktop/core/database/postgres_connection_pool.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 
 export 'postgres_connection_pool.dart'
-    show PgLease, PgSessionMode, PostgresConnectionPool;
+    show PgLease, PgSessionMode, PgSessionModeReadOnly, PostgresConnectionPool;
 
 Future<PostgresConnection> _defaultCreateAndConnect(
   ConnectionRow row, {
@@ -12,7 +12,7 @@ Future<PostgresConnection> _defaultCreateAndConnect(
 }) async {
   final conn = PostgresConnection.fromConnectionRow(row, database: database);
   await conn.connect();
-  await conn.setSessionReadOnly(mode == PgSessionMode.readOnly);
+  await conn.setSessionReadOnly(mode.isReadOnlySession);
   return conn;
 }
 
@@ -50,6 +50,20 @@ class PostgresService {
     PgSessionMode mode = PgSessionMode.readOnly,
   }) =>
       _pool.interrupt(row, database: database, mode: mode);
+
+  /// Force-closes every session mode for this connection+database.
+  void interruptAllModes(
+    ConnectionRow row, {
+    required String database,
+  }) =>
+      _pool.interruptAllModes(row, database: database);
+
+  /// Whether the SQL-editor read-write slot has an open transaction.
+  Future<bool> hasOpenSqlTransaction(
+    ConnectionRow row, {
+    required String database,
+  }) =>
+      _pool.hasOpenSqlTransaction(row, database: database);
 
   /// Closes all pooled connections (e.g. app shutdown).
   Future<void> disconnectAll() => _pool.disconnectAll();

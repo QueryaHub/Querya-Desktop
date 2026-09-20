@@ -1,3 +1,5 @@
+import 'package:querya_desktop/core/database/table_schema_meta.dart';
+
 /// Supported SQL dialects for DML mutation generation.
 enum SqlDialect {
   postgres,
@@ -140,6 +142,19 @@ abstract final class TableMutationEngine {
         lower.startsWith('bit');
   }
 
+  static bool _isArrayType(String dataTypeName) {
+    final lower = dataTypeName.toLowerCase().trim();
+    if (lower.contains('[]')) return true;
+    if (lower == 'array') return true;
+    return lower.startsWith('_') && !lower.contains(' ');
+  }
+
+  /// Public alias of [_isBoolType] for grid display / validators.
+  static bool isBoolType(String dataTypeName) => _isBoolType(dataTypeName);
+
+  /// Public alias of [_isBinaryType] for grid display / validators.
+  static bool isBinaryType(String dataTypeName) => _isBinaryType(dataTypeName);
+
   static const String kNullSentinel = '\u0000__QUERYA_NULL__\u0000';
 
   /// Formats a cell string value safely as an SQL literal or `NULL`.
@@ -157,6 +172,13 @@ abstract final class TableMutationEngine {
     final trimmed = value.trim();
 
     if (dataTypeName != null && dataTypeName.isNotEmpty) {
+      if (_isArrayType(dataTypeName)) {
+        if (trimmed == 'NULL' || trimmed == 'null') {
+          return 'NULL';
+        }
+        return _formatStringLiteral(value, dialect);
+      }
+
       if (_isBinaryType(dataTypeName)) {
         if (trimmed == 'NULL' || trimmed == 'null') {
           return 'NULL';
@@ -256,6 +278,7 @@ abstract final class TableMutationEngine {
     required List<List<String>> insertedRows,
     required Set<int> deletedRowIndices,
     Map<String, String>? columnDataTypes,
+    Map<String, TableColumnMeta>? columnMeta,
   }) {
     final statements = <TableMutationStatement>[];
     final tableRef = quoteQualifiedTable(
@@ -316,14 +339,31 @@ abstract final class TableMutationEngine {
 
       for (var c = 0; c < columns.length; c++) {
         final colName = columns[c];
+        final meta = columnMeta?[colName];
+        if (meta?.omitOnInsert == true) continue;
+
+        final cellVal = c < row.length ? row[c] : (meta == null ? 'NULL' : '');
+        if (meta != null &&
+            _isBlankInsertCell(cellVal) &&
+            (meta.hasServerDefault || meta.isNullable)) {
+          continue;
+        }
+
         final quotedCol = quoteIdentifier(colName, dialect);
-        final cellVal = c < row.length ? row[c] : 'NULL';
-        final colType = columnDataTypes?[colName];
+        final colType = columnDataTypes?[colName] ?? meta?.dataType;
         colNames.add(quotedCol);
         values.add(formatLiteral(cellVal, dialect, dataTypeName: colType));
       }
 
-      final sql = 'INSERT INTO $tableRef (${colNames.join(', ')}) VALUES (${values.join(', ')})';
+      final String sql;
+      if (colNames.isEmpty) {
+        sql = dialect == SqlDialect.mysql
+            ? 'INSERT INTO $tableRef () VALUES ()'
+            : 'INSERT INTO $tableRef DEFAULT VALUES';
+      } else {
+        sql =
+            'INSERT INTO $tableRef (${colNames.join(', ')}) VALUES (${values.join(', ')})';
+      }
       statements.add(
         TableMutationStatement(
           type: MutationType.insert,
@@ -406,5 +446,10 @@ abstract final class TableMutationEngine {
     }
 
     return clauses.join(' AND ');
+  }
+
+  static bool _isBlankInsertCell(String value) {
+    if (value == kNullSentinel) return true;
+    return value.trim().isEmpty;
   }
 }

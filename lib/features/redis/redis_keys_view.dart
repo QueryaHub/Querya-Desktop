@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
+import 'package:querya_desktop/core/database/redis_bulk.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/theme/querya_semantic_palette.dart';
+import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
@@ -11,11 +14,13 @@ class RedisKeysView extends material.StatefulWidget {
     required this.connection,
     required this.database,
     this.onKeyTap,
+    this.isReadOnly = false,
   });
 
   final RedisConnection connection;
   final int database;
-  final void Function(String key, String type)? onKeyTap;
+  final void Function(RedisBulkValue key, String type)? onKeyTap;
+  final bool isReadOnly;
 
   @override
   material.State<RedisKeysView> createState() => _RedisKeysViewState();
@@ -135,6 +140,15 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
   }
 
   Future<void> _deleteKey(_KeyInfo keyInfo) async {
+    if (widget.isReadOnly) return;
+    final confirmed = await confirmDestructiveAction(
+      context: context,
+      type: DestructiveSqlType.redisDel,
+      targetName: '${keyInfo.name.label} (${keyInfo.type})',
+      commandPreview: 'DEL ${keyInfo.name.label}',
+      connectionName: widget.connection.name,
+    );
+    if (!mounted || !confirmed) return;
     try {
       await widget.connection.selectDatabase(widget.database);
       await widget.connection.del(keyInfo.name);
@@ -214,7 +228,9 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
                         palette: context.semanticPalette,
                         onTap: () =>
                             widget.onKeyTap?.call(_keys[i].name, _keys[i].type),
-                        onDelete: () => _deleteKey(_keys[i]),
+                        onDelete: widget.isReadOnly
+                            ? null
+                            : () => _deleteKey(_keys[i]),
                       ),
                     );
                   },
@@ -304,6 +320,10 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
           Text('db${widget.database}').muted().small(),
           const Gap(16),
           Text('$_dbSize total keys').muted().small(),
+          if (widget.isReadOnly) ...[
+            const Gap(16),
+            const Text('Read-only session').muted().small(),
+          ],
           const Spacer(),
           Text('${_keys.length} loaded').muted().small(),
           if (_hasMore) ...[
@@ -324,7 +344,7 @@ class _KeyInfo {
     required this.type,
     required this.ttl,
   });
-  final String name;
+  final RedisBulkValue name;
   final String type;
   final int ttl; // -1 = no expiry, -2 = key doesn't exist
 }
@@ -338,7 +358,7 @@ class _KeyTile extends material.StatelessWidget {
     required this.shadcnCs,
     required this.palette,
     required this.onTap,
-    required this.onDelete,
+    this.onDelete,
   });
 
   final _KeyInfo keyInfo;
@@ -346,7 +366,7 @@ class _KeyTile extends material.StatelessWidget {
   final shadcn.ColorScheme shadcnCs;
   final QueryaSemanticPalette palette;
   final material.VoidCallback onTap;
-  final material.VoidCallback onDelete;
+  final material.VoidCallback? onDelete;
 
   static Color _typeColor(String type, QueryaSemanticPalette palette) {
     switch (type) {
@@ -432,7 +452,7 @@ class _KeyTile extends material.StatelessWidget {
               const Gap(10),
               material.Expanded(
                 child: material.Text(
-                  ki.name,
+                  ki.name.label,
                   overflow: material.TextOverflow.ellipsis,
                   maxLines: 1,
                   style: material.TextStyle(
@@ -460,19 +480,20 @@ class _KeyTile extends material.StatelessWidget {
                   ),
                 ),
               const Gap(4),
-              material.IconButton(
-                onPressed: onDelete,
-                icon: material.Icon(
-                  material.Icons.delete_rounded,
-                  size: 15,
-                  color: palette.destructive,
+              if (onDelete != null)
+                material.IconButton(
+                  onPressed: onDelete,
+                  icon: material.Icon(
+                    material.Icons.delete_rounded,
+                    size: 15,
+                    color: palette.destructive,
+                  ),
+                  padding: const material.EdgeInsets.all(4),
+                  constraints: const material.BoxConstraints(
+                      minWidth: 28, minHeight: 28),
+                  splashRadius: 18,
+                  tooltip: 'Delete key',
                 ),
-                padding: const material.EdgeInsets.all(4),
-                constraints:
-                    const material.BoxConstraints(minWidth: 28, minHeight: 28),
-                splashRadius: 18,
-                tooltip: 'Delete key',
-              ),
               material.Icon(material.Icons.chevron_right_rounded,
                   size: 18, color: shadcnCs.mutedForeground),
             ],

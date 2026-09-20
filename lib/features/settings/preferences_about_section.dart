@@ -10,7 +10,7 @@ import 'package:url_launcher/url_launcher_string.dart';
 class PreferencesAboutSection extends StatelessWidget {
   const PreferencesAboutSection({super.key});
 
-  static const String appVersion = '0.4.16';
+  static const String appVersion = '0.4.17';
   static const String githubRepoUrl =
       'https://github.com/QueryaHub/Querya-Desktop';
 

@@ -2,10 +2,66 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:mysql_client/mysql_client.dart';
+import 'package:querya_desktop/core/database/mysql_result_cells.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+
+/// TLS policy from `ssl-mode` / `sslmode` / `ssl` on a MySQL URI.
+enum MysqlSslMode {
+  disable,
+  encrypt,
+  verifyCa,
+  verifyIdentity,
+}
+
+extension MysqlSslModeX on MysqlSslMode {
+  bool get secure => this != MysqlSslMode.disable;
+  bool get verifyCertificates =>
+      this == MysqlSslMode.verifyCa || this == MysqlSslMode.verifyIdentity;
+  bool get verifyIdentity => this == MysqlSslMode.verifyIdentity;
+}
+
+/// Parses Connector/J-style `ssl-mode` (`prefer` is TLS on, not disable).
+MysqlSslMode parseMysqlSslMode(String? raw, {required bool fallbackSsl}) {
+  if (raw == null || raw.trim().isEmpty) {
+    return fallbackSsl ? MysqlSslMode.encrypt : MysqlSslMode.disable;
+  }
+  switch (raw.toLowerCase().replaceAll('-', '_')) {
+    case 'false':
+    case '0':
+    case 'disable':
+    case 'disabled':
+      return MysqlSslMode.disable;
+    case 'prefer':
+    case 'preferred':
+    case 'require':
+    case 'required':
+    case 'true':
+    case '1':
+    case 'enabled':
+      return MysqlSslMode.encrypt;
+    case 'verify_ca':
+      return MysqlSslMode.verifyCa;
+    case 'verify_identity':
+    case 'verify_full':
+      return MysqlSslMode.verifyIdentity;
+    default:
+      return fallbackSsl ? MysqlSslMode.encrypt : MysqlSslMode.disable;
+  }
+}
+
+/// `verify_ca` / `verify_identity` fail closed without `sslrootcert`.
+void validateMysqlSslMode(MysqlSslMode mode, SslCertificatePaths paths) {
+  if (!mode.verifyCertificates) return;
+  final ca = paths.rootCert?.trim() ?? '';
+  if (ca.isEmpty) {
+    final label =
+        mode == MysqlSslMode.verifyIdentity ? 'verify_identity' : 'verify_ca';
+    throw ArgumentError('ssl-mode=$label requires sslrootcert');
+  }
+}
 
 /// Replaces the database in a `mysql://` / `mariadb://` URI (path or `database=`).
 String replaceDatabaseInMysqlConnectionString(
@@ -78,6 +134,7 @@ class MysqlConnection {
 
   MySQLConnection? _conn;
   bool _isConnected = false;
+  bool _inTransaction = false;
 
   bool get isConnected => _isConnected && _conn != null;
 
@@ -102,7 +159,8 @@ class MysqlConnection {
     var effectiveConnectionString = _connectionString;
 
     if ((effectivePassword == null || effectivePassword.isEmpty) &&
-        (effectiveConnectionString == null || effectiveConnectionString.isEmpty) &&
+        (effectiveConnectionString == null ||
+            effectiveConnectionString.isEmpty) &&
         id > 0) {
       try {
         final secrets = await ConnectionSecretsStore.readForConnection(id);
@@ -124,19 +182,28 @@ class MysqlConnection {
             : effectiveConnectionString!.trim();
         final parsed = _parseMysqlUri(uriStr, fallbackSsl: useSSL);
         final sslPaths = extractSslCertificatePathsFromString(uriStr);
+        var sslMode = parsed.sslMode;
+        if (sslPaths.hasAny && sslMode == MysqlSslMode.disable) {
+          sslMode = MysqlSslMode.encrypt;
+        }
+        validateMysqlSslMode(sslMode, sslPaths);
         final securityContext = buildSecurityContext(sslPaths);
+        final host = parsed.host;
         _conn = await MySQLConnection.createConnection(
-          host: parsed.host,
+          host: host,
           port: parsed.port,
           userName: parsed.userName,
           password: parsed.password,
-          secure: parsed.secure || sslPaths.hasAny,
+          secure: sslMode.secure,
           databaseName: parsed.databaseName,
           securityContext: securityContext,
+          sslVerifyCertificates: sslMode.verifyCertificates,
+          sslServerName: sslMode.verifyIdentity && host is String ? host : null,
         );
         await _conn!.connect(timeoutMs: connectTimeoutMs);
       } else {
-        final sslPaths = extractSslCertificatePathsFromString(effectiveConnectionString);
+        final sslPaths =
+            extractSslCertificatePathsFromString(effectiveConnectionString);
         final securityContext = buildSecurityContext(sslPaths);
         _conn = await MySQLConnection.createConnection(
           host: host,
@@ -165,7 +232,7 @@ class MysqlConnection {
     String userName,
     String password,
     String? databaseName,
-    bool secure,
+    MysqlSslMode sslMode,
   }) _parseMysqlUri(String raw, {required bool fallbackSsl}) {
     final uri = Uri.parse(raw);
     if (uri.scheme != 'mysql' && uri.scheme != 'mariadb') {
@@ -194,22 +261,16 @@ class MysqlConnection {
     db ??= uri.queryParameters['database'];
 
     final q = uri.queryParameters;
-    bool secure = fallbackSsl;
-    final ssl = (q['ssl-mode'] ?? q['sslmode'] ?? q['ssl'])?.toLowerCase();
-    if (ssl == 'false' ||
-        ssl == '0' ||
-        ssl == 'disable' ||
-        ssl == 'disabled' ||
-        ssl == 'prefer') {
-      secure = false;
-    }
-    if (ssl == 'require' || ssl == 'verify_ca' || ssl == 'verify_identity') {
-      secure = true;
-    }
+    var sslMode = parseMysqlSslMode(
+      q['ssl-mode'] ?? q['sslmode'] ?? q['ssl'],
+      fallbackSsl: fallbackSsl,
+    );
     if (q.containsKey(kSslRootCertParam) ||
         q.containsKey(kSslCertParam) ||
         q.containsKey(kSslKeyParam)) {
-      secure = true;
+      if (sslMode == MysqlSslMode.disable) {
+        sslMode = MysqlSslMode.encrypt;
+      }
     }
 
     return (
@@ -218,8 +279,17 @@ class MysqlConnection {
       userName: userName,
       password: password,
       databaseName: db,
-      secure: secure,
+      sslMode: sslMode,
     );
+  }
+
+  /// Parsed `ssl-mode` for [connectionString] (tests).
+  @visibleForTesting
+  static MysqlSslMode sslModeFromConnectionString(
+    String connectionString, {
+    bool fallbackSsl = true,
+  }) {
+    return _parseMysqlUri(connectionString, fallbackSsl: fallbackSsl).sslMode;
   }
 
   /// Whether [connectionString] implies a TLS session (including cert query params).
@@ -228,11 +298,14 @@ class MysqlConnection {
     String connectionString, {
     bool fallbackSsl = true,
   }) {
-    return _parseMysqlUri(connectionString, fallbackSsl: fallbackSsl).secure;
+    return _parseMysqlUri(connectionString, fallbackSsl: fallbackSsl)
+        .sslMode
+        .secure;
   }
 
   Future<void> disconnect() async {
     _isConnected = false;
+    _inTransaction = false;
     final c = _conn;
     _conn = null;
     try {
@@ -248,6 +321,7 @@ class MysqlConnection {
   /// while a query is in progress.
   Future<void> forceClose() async {
     _isConnected = false;
+    _inTransaction = false;
     final c = _conn;
     _conn = null;
     if (c == null) return;
@@ -260,15 +334,26 @@ class MysqlConnection {
     }
   }
 
-  /// Session hint for read-only browsing (MySQL 8+ / MariaDB — semantics differ from PostgreSQL).
+  /// Session hint for Table Browser / tree (`MysqlSessionMode.readOnly`).
+  ///
+  /// Issues `SET SESSION TRANSACTION READ ONLY` (or `READ WRITE`). This is the
+  /// **next-transaction** default, not PostgreSQL `default_transaction_read_only`.
+  ///
+  /// On MySQL 8 with autocommit, each statement is its own transaction, so the
+  /// hint applies — but it is weaker than a dedicated read-only user and does
+  /// not block `SET SESSION TRANSACTION READ WRITE` later on the same socket.
+  /// MariaDB accepts the same syntax; enforcement still depends on account
+  /// privileges. Browse stays on a read-only pool slot; Save uses `tableWrite`.
   Future<void> setSessionReadOnly(bool readOnly) async {
     if (!isConnected || _conn == null) return;
-    if (readOnly) {
-      await execute('SET SESSION TRANSACTION READ ONLY');
-    } else {
-      await execute('SET SESSION TRANSACTION READ WRITE');
-    }
+    await execute(sessionTransactionAccessModeSql(readOnly));
   }
+
+  /// `SET SESSION TRANSACTION READ ONLY` / `READ WRITE`.
+  @visibleForTesting
+  static String sessionTransactionAccessModeSql(bool readOnly) => readOnly
+      ? 'SET SESSION TRANSACTION READ ONLY'
+      : 'SET SESSION TRANSACTION READ WRITE';
 
   Future<bool> testConnection() async {
     try {
@@ -295,10 +380,55 @@ class MysqlConnection {
       throw StateError('Not connected to MySQL');
     }
     try {
-      return await _conn!.execute(sql, params, iterable);
+      final rs = await _conn!.execute(sql, params, iterable);
+      _noteTransactionSql(sql);
+      return rs;
     } on TimeoutException {
       unawaited(forceClose());
       rethrow;
+    }
+  }
+
+  /// Whether this session has an open `START TRANSACTION` / `BEGIN`.
+  Future<bool?> inOpenTransaction() async {
+    if (!isConnected) return null;
+    return _inTransaction;
+  }
+
+  /// Runs [body] inside a transaction. If the session already has one, DML
+  /// joins it instead of nesting `START TRANSACTION`.
+  Future<void> runInTransaction(Future<void> Function() body) async {
+    final join = _inTransaction;
+    if (!join) {
+      await execute('START TRANSACTION');
+    }
+    try {
+      await body();
+      if (!join) await execute('COMMIT');
+    } catch (e) {
+      if (!join) {
+        try {
+          await execute('ROLLBACK');
+        } catch (_) {}
+      }
+      rethrow;
+    }
+  }
+
+  void _noteTransactionSql(String sql) {
+    final sqlLower = sql.trim().toLowerCase();
+    if (sqlLower.startsWith('start transaction') ||
+        sqlLower.startsWith('begin')) {
+      _inTransaction = true;
+      return;
+    }
+    if (sqlLower.startsWith('commit')) {
+      _inTransaction = false;
+      return;
+    }
+    if (sqlLower.startsWith('rollback') &&
+        !RegExp(r'^rollback\s+to\b').hasMatch(sqlLower)) {
+      _inTransaction = false;
     }
   }
 
@@ -382,7 +512,7 @@ class MysqlConnection {
       throw StateError('Not connected to MySQL');
     }
     final colsRs = await execute(
-      'SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT '
+      'SELECT COLUMN_NAME, DATA_TYPE, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, EXTRA '
       'FROM information_schema.COLUMNS '
       'WHERE TABLE_SCHEMA = :database AND TABLE_NAME = :table '
       'ORDER BY ORDINAL_POSITION',
@@ -408,11 +538,21 @@ class MysqlConnection {
 
     for (final r in colsRs.rows) {
       final name = r.colByName('COLUMN_NAME') ?? '';
-      final dataType = r.colByName('DATA_TYPE') ?? '';
-      final isNullable = (r.colByName('IS_NULLABLE') ?? 'YES').toUpperCase() == 'YES';
+      final dataType = mysqlColumnSchemaType(
+        dataType: r.colByName('DATA_TYPE') ?? '',
+        columnType: r.colByName('COLUMN_TYPE') ?? '',
+      );
+      final isNullable =
+          (r.colByName('IS_NULLABLE') ?? 'YES').toUpperCase() == 'YES';
       final isPk = primaryKeys.contains(name);
       final pkPos = isPk ? primaryKeys.indexOf(name) + 1 : null;
       final dflt = r.colByName('COLUMN_DEFAULT');
+      final extra = (r.colByName('EXTRA') ?? '').toLowerCase();
+      final omitOnInsert = extra.contains('auto_increment') ||
+          extra.contains('virtual generated') ||
+          extra.contains('stored generated');
+      final hasServerDefault =
+          (dflt != null && dflt.isNotEmpty) || extra.contains('auto_increment');
 
       columns.add(
         TableColumnMeta(
@@ -422,6 +562,8 @@ class MysqlConnection {
           isPrimaryKey: isPk,
           primaryKeyPosition: pkPos,
           defaultValue: dflt,
+          omitOnInsert: omitOnInsert,
+          hasServerDefault: hasServerDefault,
         ),
       );
     }
@@ -432,6 +574,28 @@ class MysqlConnection {
       columns: columns,
       primaryKeys: primaryKeys,
     );
+  }
+
+  /// InnoDB `TABLE_ROWS` estimate (not a blocking `COUNT(*)`).
+  Future<int?> estimateTableRows({
+    required String database,
+    required String table,
+  }) async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to MySQL');
+    }
+    final rs = await execute(
+      'SELECT TABLE_ROWS FROM information_schema.TABLES '
+      'WHERE TABLE_SCHEMA = :database AND TABLE_NAME = :table',
+      {
+        'database': database,
+        'table': table,
+      },
+    );
+    if (rs.rows.isEmpty) return null;
+    final v = rs.rows.first.colAt(0);
+    if (v == null || v.isEmpty) return null;
+    return int.tryParse(v);
   }
 
   /// Returns primary key column names for [table] in [database].

@@ -7,10 +7,19 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 /// Session policy for pooled connections: browse-only vs ad-hoc SQL (writes).
 enum PgSessionMode {
   /// `SET default_transaction_read_only = ON` after connect.
+  /// Tree catalog, stats, and Table Browser SELECT.
   readOnly,
 
-  /// Read-write session (SQL editor, probes that need catalog writes — rare).
+  /// SQL editor read-write session. Must not be shared with Table Browser.
   readWrite,
+
+  /// Table Browser Save / `REFRESH MATERIALIZED VIEW` (own TCP session).
+  tableWrite,
+}
+
+extension PgSessionModeReadOnly on PgSessionMode {
+  /// Whether this slot should `SET default_transaction_read_only = ON`.
+  bool get isReadOnlySession => this == PgSessionMode.readOnly;
 }
 
 /// Creates a connected [PostgresConnection] for the pool (real or fake in tests).
@@ -81,8 +90,7 @@ class PostgresConnectionPool {
       entry.refs++;
       if (!entry.connection.isConnected) {
         await entry.connection.connect();
-        await entry.connection
-            .setSessionReadOnly(mode == PgSessionMode.readOnly);
+        await entry.connection.setSessionReadOnly(mode.isReadOnlySession);
       }
       return PgLease._(this, k, entry.connection);
     }
@@ -90,7 +98,8 @@ class PostgresConnectionPool {
     try {
       await _creationLock.createIfAbsent(k, () async {
         _evictIfNeededBeforeNewSlot();
-        final conn = await createAndConnect(row, database: database, mode: mode);
+        final conn =
+            await createAndConnect(row, database: database, mode: mode);
         _pool[k] = _PoolEntry(conn);
         return conn;
       });
@@ -116,8 +125,7 @@ class PostgresConnectionPool {
     entry.refs++;
     if (!entry.connection.isConnected) {
       await entry.connection.connect();
-      await entry.connection
-          .setSessionReadOnly(mode == PgSessionMode.readOnly);
+      await entry.connection.setSessionReadOnly(mode.isReadOnlySession);
     }
     return PgLease._(this, k, entry.connection);
   }
@@ -167,6 +175,29 @@ class PostgresConnectionPool {
   }) {
     final k = keyFor(row.id, database, mode);
     _removeEntryClosing(k);
+  }
+
+  /// Force-closes every session mode for this connection+database.
+  void interruptAllModes(
+    ConnectionRow row, {
+    required String database,
+  }) {
+    for (final mode in PgSessionMode.values) {
+      interrupt(row, database: database, mode: mode);
+    }
+  }
+
+  /// Whether the SQL-editor slot currently has an open transaction.
+  ///
+  /// Does not acquire a new connection; returns false if the slot is idle or
+  /// disconnected.
+  Future<bool> hasOpenSqlTransaction(
+    ConnectionRow row, {
+    required String database,
+  }) async {
+    final entry = _pool[keyFor(row.id, database, PgSessionMode.readWrite)];
+    if (entry == null || !entry.connection.isConnected) return false;
+    return await entry.connection.inOpenTransaction() ?? false;
   }
 
   /// Closes all pooled connections (e.g. app shutdown).

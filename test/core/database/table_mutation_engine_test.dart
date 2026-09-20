@@ -35,6 +35,24 @@ void main() {
       expect(restored.columns.length, 2);
       expect(restored.getColumn('id')?.isPrimaryKey, isTrue);
       expect(restored.getColumn('email')?.isNullable, isTrue);
+      expect(restored.getColumn('id')?.omitOnInsert, isFalse);
+    });
+
+    test('round-trips omitOnInsert and hasServerDefault', () {
+      const meta = TableSchemaMeta(
+        tableName: 'users',
+        columns: [
+          TableColumnMeta(
+            name: 'id',
+            dataType: 'integer',
+            omitOnInsert: true,
+            hasServerDefault: true,
+          ),
+        ],
+      );
+      final restored = TableSchemaMeta.fromJson(meta.toJson());
+      expect(restored.getColumn('id')?.omitOnInsert, isTrue);
+      expect(restored.getColumn('id')?.hasServerDefault, isTrue);
     });
   });
 
@@ -45,7 +63,9 @@ void main() {
       ['2', 'bob', '25', 'false'],
     ];
 
-    test('generates UPDATE statement for modified cells with single PK in Postgres dialect', () {
+    test(
+        'generates UPDATE statement for modified cells with single PK in Postgres dialect',
+        () {
       final plan = TableMutationEngine.generatePlan(
         dialect: SqlDialect.postgres,
         tableName: 'users',
@@ -198,7 +218,9 @@ void main() {
       );
     });
 
-    test('preserves leading zeros and boolean strings in string columns with columnDataTypes', () {
+    test(
+        'preserves leading zeros and boolean strings in string columns with columnDataTypes',
+        () {
       const stringCols = ['id', 'zip_code', 'is_flag_str'];
       const stringRows = [
         ['1', '01234', 'true'],
@@ -235,7 +257,9 @@ void main() {
       );
     });
 
-    test('preserves leading zeros in fallback heuristic without columnDataTypes', () {
+    test(
+        'preserves leading zeros in fallback heuristic without columnDataTypes',
+        () {
       expect(
         TableMutationEngine.formatLiteral('01234', SqlDialect.postgres),
         '\'01234\'',
@@ -313,6 +337,16 @@ void main() {
         "X'CAFE'",
       );
 
+      // MySQL BOOLEAN stored as tinyint(1)
+      expect(
+        TableMutationEngine.formatLiteral(
+          '1',
+          SqlDialect.mysql,
+          dataTypeName: 'tinyint(1)',
+        ),
+        'TRUE',
+      );
+
       // NULL for binary
       expect(
         TableMutationEngine.formatLiteral(
@@ -351,6 +385,157 @@ void main() {
         ),
         r"'C:\Program Files\'",
       );
+    });
+
+    test('omits GENERATED ALWAYS identity column on Postgres INSERT', () {
+      final plan = TableMutationEngine.generatePlan(
+        dialect: SqlDialect.postgres,
+        tableName: 'users',
+        schema: 'public',
+        columns: ['id', 'email'],
+        primaryKeys: ['id'],
+        originalRows: const [],
+        modifiedCells: const {},
+        insertedRows: [
+          ['', 'ada@example.com'],
+        ],
+        deletedRowIndices: const {},
+        columnMeta: {
+          'id': const TableColumnMeta(
+            name: 'id',
+            dataType: 'integer',
+            isNullable: false,
+            isPrimaryKey: true,
+            omitOnInsert: true,
+            hasServerDefault: true,
+          ),
+          'email': const TableColumnMeta(
+            name: 'email',
+            dataType: 'varchar',
+            isNullable: false,
+          ),
+        },
+      );
+
+      expect(plan.statementCount, 1);
+      expect(
+        plan.statements.first.sql,
+        'INSERT INTO "public"."users" ("email") VALUES (\'ada@example.com\')',
+      );
+    });
+
+    test('omits AUTO_INCREMENT id on MySQL INSERT', () {
+      final plan = TableMutationEngine.generatePlan(
+        dialect: SqlDialect.mysql,
+        tableName: 'users',
+        schema: 'app',
+        columns: ['id', 'name'],
+        primaryKeys: ['id'],
+        originalRows: const [],
+        modifiedCells: const {},
+        insertedRows: [
+          ['', 'bob'],
+        ],
+        deletedRowIndices: const {},
+        columnMeta: {
+          'id': const TableColumnMeta(
+            name: 'id',
+            dataType: 'int',
+            isNullable: false,
+            isPrimaryKey: true,
+            omitOnInsert: true,
+            hasServerDefault: true,
+          ),
+          'name': const TableColumnMeta(
+            name: 'name',
+            dataType: 'varchar',
+            isNullable: false,
+          ),
+        },
+      );
+
+      expect(
+        plan.statements.first.sql,
+        'INSERT INTO `app`.`users` (`name`) VALUES (\'bob\')',
+      );
+    });
+
+    test('omits empty serial cell when hasServerDefault', () {
+      final plan = TableMutationEngine.generatePlan(
+        dialect: SqlDialect.postgres,
+        tableName: 'items',
+        columns: ['id', 'label'],
+        primaryKeys: ['id'],
+        originalRows: const [],
+        modifiedCells: const {},
+        insertedRows: [
+          ['', 'x'],
+        ],
+        deletedRowIndices: const {},
+        columnMeta: {
+          'id': const TableColumnMeta(
+            name: 'id',
+            dataType: 'integer',
+            isNullable: false,
+            isPrimaryKey: true,
+            hasServerDefault: true,
+          ),
+          'label': const TableColumnMeta(
+            name: 'label',
+            dataType: 'text',
+            isNullable: false,
+          ),
+        },
+      );
+
+      expect(
+        plan.statements.first.sql,
+        'INSERT INTO "items" ("label") VALUES (\'x\')',
+      );
+    });
+
+    test('DEFAULT VALUES when every INSERT column is omitted', () {
+      final pg = TableMutationEngine.generatePlan(
+        dialect: SqlDialect.postgres,
+        tableName: 't',
+        columns: ['id'],
+        primaryKeys: ['id'],
+        originalRows: const [],
+        modifiedCells: const {},
+        insertedRows: [
+          [''],
+        ],
+        deletedRowIndices: const {},
+        columnMeta: {
+          'id': const TableColumnMeta(
+            name: 'id',
+            dataType: 'integer',
+            omitOnInsert: true,
+          ),
+        },
+      );
+      expect(pg.statements.first.sql, 'INSERT INTO "t" DEFAULT VALUES');
+
+      final mysql = TableMutationEngine.generatePlan(
+        dialect: SqlDialect.mysql,
+        tableName: 't',
+        columns: ['id'],
+        primaryKeys: ['id'],
+        originalRows: const [],
+        modifiedCells: const {},
+        insertedRows: [
+          [''],
+        ],
+        deletedRowIndices: const {},
+        columnMeta: {
+          'id': const TableColumnMeta(
+            name: 'id',
+            dataType: 'int',
+            omitOnInsert: true,
+          ),
+        },
+      );
+      expect(mysql.statements.first.sql, 'INSERT INTO `t` () VALUES ()');
     });
   });
 }

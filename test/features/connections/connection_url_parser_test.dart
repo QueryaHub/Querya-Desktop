@@ -34,7 +34,8 @@ void main() {
       expect(row.username, 'alice');
       expect(row.password, 'secret');
       expect(row.databaseName, 'myapp');
-      expect(row.connectionString, 'postgresql://alice:secret@db.example.com:5432/myapp');
+      expect(row.connectionString,
+          'postgresql://alice:secret@db.example.com:5432/myapp');
       expect(row.useSSL, false);
     });
 
@@ -149,13 +150,17 @@ void main() {
     });
 
     test('parses redis URL', () {
-      final result = parseConnectionUrlInput('redis://:password@localhost:6379');
+      final result =
+          parseConnectionUrlInput('redis://:password@localhost:6379');
       expect(result.error, isNull);
       final row = result.row!;
       expect(row.type, 'redis');
       expect(row.name, 'Redis: localhost:6379');
       expect(row.password, 'password');
-      expect(row.connectionString, isNull);
+      expect(
+        row.connectionString,
+        'redis://:password@localhost:6379',
+      );
     });
 
     test('uses default driver port when URI omits port', () {
@@ -171,6 +176,19 @@ void main() {
       expect(result.row!.type, 'redis');
       expect(result.row!.useSSL, true);
       expect(result.row!.port, 6379);
+      expect(result.row!.connectionString, 'rediss://localhost');
+    });
+
+    test('keeps Redis TLS cert query params on the stored URI', () {
+      const url = 'rediss://cache.example.com:6380?sslrootcert=/ca.pem';
+      final result = parseConnectionUrlInput(url);
+      expect(result.error, isNull);
+      final row = result.row!;
+      expect(row.type, 'redis');
+      expect(row.useSSL, true);
+      expect(row.host, 'cache.example.com');
+      expect(row.port, 6380);
+      expect(row.connectionString, url);
     });
 
     test('password with colon is preserved', () {

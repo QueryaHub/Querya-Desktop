@@ -5,9 +5,12 @@ import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
 import 'package:querya_desktop/core/database/sqlite_service.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
+import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/editor/querya_code_editor.dart';
 import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/sqlite/sqlite_result_utils.dart';
+import 'package:querya_desktop/features/sqlite/sqlite_table_utils.dart';
 import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -21,6 +24,7 @@ class SqliteTableView extends material.StatefulWidget {
     this.isView = false,
     this.limit = _defaultLimit,
     this.onNavigateHome,
+    this.isReadOnly = false,
   });
 
   final ConnectionRow connectionRow;
@@ -28,6 +32,9 @@ class SqliteTableView extends material.StatefulWidget {
   final bool isView;
   final int limit;
   final VoidCallback? onNavigateHome;
+
+  /// Title-bar session lock. Combined with connection-form Read only (`useSSL`).
+  final bool isReadOnly;
 
   @override
   material.State<SqliteTableView> createState() => _SqliteTableViewState();
@@ -49,15 +56,21 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
   DataGridStagingBuffer? _stagingBuffer;
   List<String> _primaryKeys = [];
   Map<String, String> _columnDataTypes = {};
+  Map<String, TableColumnMeta> _columnMeta = {};
   bool _schemaLoaded = false;
+  Object? _schemaError;
   bool _isSaving = false;
 
   bool get _isDirty => _stagingBuffer?.isDirty ?? false;
+
+  bool get _readOnly => widget.isReadOnly || widget.connectionRow.useSSL;
 
   bool get _editingEnabled => tableViewEditingEnabled(
         isView: widget.isView,
         customSqlActive: false,
         hasPrimaryKey: _primaryKeys.isNotEmpty,
+        readOnly: _readOnly,
+        schemaError: _schemaError,
       );
 
   String _qualifiedFrom() {
@@ -65,7 +78,13 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
   }
 
   String _browseDataSql() {
-    return 'SELECT * FROM ${_qualifiedFrom()} LIMIT ${widget.limit} OFFSET $_offset';
+    return sqliteBrowseDataSql(
+      qualifiedFrom: _qualifiedFrom(),
+      primaryKeys: _primaryKeys,
+      isView: widget.isView,
+      limit: widget.limit,
+      offset: _offset,
+    );
   }
 
   @override
@@ -83,13 +102,16 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
       _resetStaging();
       _disconnectCurrent();
       _connectAndLoad();
+    } else if (oldWidget.isReadOnly != widget.isReadOnly ||
+        oldWidget.connectionRow.useSSL != widget.connectionRow.useSSL) {
+      _syncStagingToReadOnly();
     }
   }
 
   @override
   void dispose() {
     _resetStaging();
-    _disconnectCurrent();
+    _disconnectCurrent(interruptIfBusy: true);
     super.dispose();
   }
 
@@ -98,11 +120,40 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     _stagingBuffer = null;
     _primaryKeys = [];
     _columnDataTypes = {};
+    _columnMeta = {};
     _schemaLoaded = false;
+    _schemaError = null;
     _isSaving = false;
   }
 
-  void _disconnectCurrent() {
+  void _syncStagingToReadOnly() {
+    if (_readOnly) {
+      _stagingBuffer?.dispose();
+      _stagingBuffer = null;
+    } else if (_columnNames.isNotEmpty) {
+      _stagingBuffer = replaceTableViewStagingBuffer(
+        previous: _stagingBuffer,
+        columns: _columnNames,
+        rows: _rows,
+        enabled: _editingEnabled,
+      );
+    }
+    if (mounted) setState(() {});
+  }
+
+  void _disconnectCurrent({bool interruptIfBusy = false}) {
+    if (interruptIfBusy && _loading) {
+      SqliteService.instance.interrupt(
+        widget.connectionRow,
+        mode: SqliteSessionMode.readOnly,
+      );
+    }
+    if (interruptIfBusy && _isSaving) {
+      SqliteService.instance.interrupt(
+        widget.connectionRow,
+        mode: SqliteSessionMode.tableWrite,
+      );
+    }
     _lease?.release();
     _lease = null;
   }
@@ -123,20 +174,37 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     try {
       final lease = await SqliteService.instance.acquire(
         widget.connectionRow,
-        mode: SqliteSessionMode.readWrite,
+        mode: SqliteSessionMode.readOnly,
       );
       if (!mounted) {
         lease.release();
         return;
       }
       _lease = lease;
-      await _fetch(refreshCount: true);
+      await _fetch();
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _error = e.toString();
         _loading = false;
       });
+    }
+  }
+
+  Future<T> _withTableWrite<T>(
+    Future<T> Function(SqliteConnection conn) fn,
+  ) async {
+    if (_readOnly) {
+      throw StateError('SQLite connection is read-only');
+    }
+    final lease = await SqliteService.instance.acquire(
+      widget.connectionRow,
+      mode: SqliteSessionMode.tableWrite,
+    );
+    try {
+      return await fn(lease.connection);
+    } finally {
+      lease.release();
     }
   }
 
@@ -152,17 +220,38 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     if (_schemaLoaded) return;
     if (widget.isView) {
       _schemaLoaded = true;
+      _schemaError = null;
       _primaryKeys = [];
       _columnDataTypes = {};
+      _columnMeta = {};
       return;
     }
-    try {
-      final schema = await conn.getTableSchema(table: widget.tableName);
-      _primaryKeys = List<String>.from(schema.primaryKeys);
+    final loaded = await loadTableViewSchema(
+      () => conn.getTableSchema(table: widget.tableName),
+    );
+    final schema = loaded.schema;
+    if (schema != null) {
+      _primaryKeys = sqliteTableBrowserPrimaryKeys(
+        declaredPrimaryKeys: schema.primaryKeys,
+        isView: widget.isView,
+      );
       _columnDataTypes = columnDataTypesFromSchema(schema);
-    } catch (_) {
+      _columnMeta = columnMetaFromSchema(schema);
+      if (sqliteBrowseNeedsRowidColumn(
+            primaryKeys: _primaryKeys,
+            isView: widget.isView,
+          ) &&
+          !_columnMeta.containsKey(kSqliteImplicitRowid)) {
+        _columnDataTypes[kSqliteImplicitRowid] =
+            sqliteImplicitRowidColumn.dataType;
+        _columnMeta[kSqliteImplicitRowid] = sqliteImplicitRowidColumn;
+      }
+      _schemaError = null;
+    } else {
       _primaryKeys = [];
       _columnDataTypes = {};
+      _columnMeta = {};
+      _schemaError = loaded.error;
     }
     _schemaLoaded = true;
   }
@@ -176,7 +265,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     );
   }
 
-  Future<void> _fetch({bool refreshCount = false}) async {
+  Future<void> _fetch() async {
     final conn = _connection;
     if (conn == null || !conn.isConnected) {
       if (mounted && _loading) {
@@ -192,24 +281,16 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
       _error = null;
     });
     try {
-      if (refreshCount) {
-        try {
-          final countRs =
-              await conn.execute('SELECT COUNT(*) FROM ${_qualifiedFrom()}');
-          if (countRs.isNotEmpty) {
-            _totalRowCount = countRs.first.values.first as int?;
-          }
-        } catch (_) {
-          _totalRowCount = null;
-        }
-      }
+      await _ensureSchema(conn);
+      if (!mounted) return;
+
+      // Skip COUNT(*) — it blocks the FFI isolate on large files. Next is
+      // enabled when the current page is full (_canGoNext).
+      _totalRowCount = null;
 
       final browseSql = _browseDataSql();
       final rs = await conn.execute(browseSql);
 
-      if (!mounted) return;
-
-      await _ensureSchema(conn);
       if (!mounted) return;
 
       final cols = <String>[];
@@ -221,8 +302,10 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
 
       final outRows = rs.map((row) {
         return cols.map((col) {
-          final val = row[col];
-          return val == null ? 'NULL' : val.toString();
+          return sqliteResultCellToDisplayString(
+            row[col],
+            dataTypeName: _columnDataTypes[col],
+          );
         }).toList();
       }).toList();
 
@@ -274,7 +357,9 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
   Future<void> _onRefresh() async {
     if (!await _confirmDiscardIfNeeded()) return;
     if (!mounted) return;
-    await _fetch(refreshCount: true);
+    _schemaLoaded = false;
+    _schemaError = null;
+    await _fetch();
   }
 
   Future<void> _onNavigateHome() async {
@@ -286,6 +371,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
   }
 
   Future<void> _applyStagedChanges() async {
+    if (_readOnly) return;
     final buffer = _stagingBuffer;
     if (buffer == null || !buffer.isDirty || _isSaving) return;
     setState(() => _isSaving = true);
@@ -296,23 +382,18 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
       tableName: widget.tableName,
       primaryKeys: _primaryKeys,
       columnDataTypes: _columnDataTypes.isEmpty ? null : _columnDataTypes,
+      columnMeta: _columnMeta.isEmpty ? null : _columnMeta,
       execute: (plan) async {
-        final conn = _connection;
-        if (conn == null || !conn.isConnected) {
-          throw StateError('Could not connect to SQLite.');
-        }
-        await conn.execute('BEGIN TRANSACTION');
-        try {
-          for (final stmt in plan.statements) {
-            await conn.execute(stmt.sql);
+        await _withTableWrite((conn) async {
+          if (!conn.isConnected) {
+            throw StateError('Could not connect to SQLite.');
           }
-          await conn.execute('COMMIT');
-        } catch (e) {
-          try {
-            await conn.execute('ROLLBACK');
-          } catch (_) {}
-          rethrow;
-        }
+          await conn.runInTransaction(() async {
+            for (final stmt in plan.statements) {
+              expectDmlMatchedRows(await conn.executeAffected(stmt.sql));
+            }
+          });
+        });
       },
     );
     if (!mounted) return;
@@ -431,6 +512,8 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
       customSqlActive: false,
       hasPrimaryKey: _primaryKeys.isNotEmpty,
       schemaLoaded: _schemaLoaded,
+      readOnly: _readOnly,
+      schemaError: _schemaError,
     );
     final pag = _paginationLabel();
     if (pag.isEmpty) return reason;

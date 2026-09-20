@@ -1,8 +1,11 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/motion/querya_switching_body.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/unsaved_work_guard.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
@@ -192,7 +195,14 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
     return list;
   }
 
-  void _onCrumbTap(_Crumb crumb) {
+  Future<void> _onCrumbTap(_Crumb crumb) async {
+    final leavesDocument = _selectedDocument != null &&
+        crumb.level != _Level.document &&
+        crumb.level != _Level.stats;
+    if (leavesDocument) {
+      if (!await confirmDiscardUnsavedWorkIfNeeded(context)) return;
+      if (!mounted) return;
+    }
     if (_showStats && crumb.level != _Level.stats) {
       setState(() => _showStats = false);
     }
@@ -275,7 +285,7 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
           // Breadcrumb bar
           _BreadcrumbBar(
             crumbs: _crumbs,
-            onCrumbTap: _onCrumbTap,
+            onCrumbTap: (crumb) => unawaited(_onCrumbTap(crumb)),
             onRefresh: () => setState(() => _refreshToken++),
             onStats: () => setState(() => _showStats = !_showStats),
           ),

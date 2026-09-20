@@ -54,6 +54,24 @@ void main() {
         ),
         isFalse,
       );
+      expect(
+        tableViewEditingEnabled(
+          isView: false,
+          customSqlActive: false,
+          hasPrimaryKey: true,
+          readOnly: true,
+        ),
+        isFalse,
+      );
+      expect(
+        tableViewEditingEnabled(
+          isView: false,
+          customSqlActive: false,
+          hasPrimaryKey: true,
+          schemaError: StateError('permission denied'),
+        ),
+        isFalse,
+      );
     });
   });
 
@@ -111,8 +129,88 @@ void main() {
           customSqlActive: false,
           hasPrimaryKey: true,
           schemaLoaded: true,
+          readOnly: true,
+        ),
+        'Read-only session',
+      );
+      expect(
+        tableViewEditDisabledReason(
+          isView: false,
+          customSqlActive: false,
+          hasPrimaryKey: true,
+          schemaLoaded: true,
         ),
         isNull,
+      );
+      expect(
+        tableViewEditDisabledReason(
+          isView: false,
+          customSqlActive: false,
+          hasPrimaryKey: false,
+          schemaLoaded: true,
+          schemaError: StateError('permission denied'),
+        ),
+        'Cannot edit: schema unavailable. '
+        'Bad state: permission denied. Refresh to retry.',
+      );
+    });
+
+    test('schema load failure is not reported as a missing PK', () {
+      final reason = tableViewEditDisabledReason(
+        isView: false,
+        customSqlActive: false,
+        hasPrimaryKey: false,
+        schemaLoaded: true,
+        schemaError: Exception('information_schema denied'),
+      );
+      expect(reason, contains('schema unavailable'));
+      expect(reason, contains('information_schema denied'));
+      expect(reason, contains('Refresh to retry'));
+      expect(reason, isNot(contains('no primary key')));
+    });
+  });
+
+  group('loadTableViewSchema', () {
+    test('returns schema on success', () async {
+      const meta = TableSchemaMeta(
+        tableName: 'users',
+        primaryKeys: ['id'],
+      );
+      final loaded = await loadTableViewSchema(() async => meta);
+      expect(loaded.isOk, isTrue);
+      expect(loaded.schema, same(meta));
+      expect(loaded.error, isNull);
+    });
+
+    test('captures a throwing getTableSchema stub instead of empty PKs',
+        () async {
+      Future<TableSchemaMeta> throwingStub() async {
+        throw StateError('permission denied');
+      }
+
+      final loaded = await loadTableViewSchema(throwingStub);
+      expect(loaded.isOk, isFalse);
+      expect(loaded.schema, isNull);
+      expect(loaded.error, isA<StateError>());
+      expect(
+        tableViewEditDisabledReason(
+          isView: false,
+          customSqlActive: false,
+          hasPrimaryKey: loaded.schema?.hasPrimaryKey ?? false,
+          schemaLoaded: true,
+          schemaError: loaded.error,
+        ),
+        contains('schema unavailable'),
+      );
+      expect(
+        tableViewEditDisabledReason(
+          isView: false,
+          customSqlActive: false,
+          hasPrimaryKey: false,
+          schemaLoaded: true,
+          schemaError: loaded.error,
+        ),
+        isNot(contains('no primary key')),
       );
     });
   });
@@ -131,6 +229,20 @@ void main() {
         columnDataTypesFromSchema(schema),
         {'id': 'integer', 'name': 'text'},
       );
+    });
+
+    test('columnMetaFromSchema indexes columns by name', () {
+      const schema = TableSchemaMeta(
+        tableName: 'users',
+        columns: [
+          TableColumnMeta(
+            name: 'id',
+            dataType: 'integer',
+            omitOnInsert: true,
+          ),
+        ],
+      );
+      expect(columnMetaFromSchema(schema)['id']?.omitOnInsert, isTrue);
     });
   });
 
@@ -233,6 +345,62 @@ void main() {
       expect(outcome.isFailed, isTrue);
       expect(outcome.error.toString(), contains('no primary key'));
       expect(executed, isFalse);
+    });
+
+    testWidgets('0-row DML is failed and the staging buffer stays dirty',
+        (tester) async {
+      await tester.pumpWidget(
+        ShadcnApp(
+          theme: AppTheme.dark,
+          home: const material.Scaffold(body: material.SizedBox()),
+        ),
+      );
+      final ctx = tester.element(find.byType(material.Scaffold));
+      final buffer = DataGridStagingBuffer(
+        columns: ['id', 'name'],
+        rows: [
+          ['1', 'Ada'],
+        ],
+      );
+      buffer.setCell(0, 1, 'Grace');
+      addTearDown(buffer.dispose);
+
+      final future = applyTableViewStagedChanges(
+        context: ctx,
+        buffer: buffer,
+        dialect: SqlDialect.postgres,
+        tableName: 'users',
+        schema: 'public',
+        primaryKeys: ['id'],
+        execute: (_) async => expectDmlMatchedRows(0),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Apply Changes'));
+      final outcome = await future;
+
+      expect(outcome.isFailed, isTrue);
+      expect(outcome.error.toString(), contains('matched 0 rows'));
+      expect(buffer.isDirty, isTrue);
+    });
+  });
+
+  group('expectDmlMatchedRows', () {
+    test('allows 1+ affected rows', () {
+      expect(() => expectDmlMatchedRows(1), returnsNormally);
+      expect(() => expectDmlMatchedRows(3), returnsNormally);
+    });
+
+    test('throws on 0-row DML so Save is a failure', () {
+      expect(
+        () => expectDmlMatchedRows(0),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('matched 0 rows'),
+          ),
+        ),
+      );
     });
   });
 

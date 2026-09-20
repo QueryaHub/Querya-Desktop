@@ -80,6 +80,118 @@ void main() {
     });
   });
 
+  group('applyPostgresTransactionSql', () {
+    test('BEGIN + SELECT stays open; COMMIT closes', () {
+      var open = false;
+      open = applyPostgresTransactionSql(open, 'BEGIN');
+      expect(open, isTrue);
+      open = applyPostgresTransactionSql(open, 'SELECT 1');
+      expect(open, isTrue);
+      open = applyPostgresTransactionSql(open, 'COMMIT');
+      expect(open, isFalse);
+    });
+
+    test('BEGIN WORK opens; BEGINNING does not', () {
+      expect(applyPostgresTransactionSql(false, 'BEGIN WORK'), isTrue);
+      expect(applyPostgresTransactionSql(false, 'BEGINNING'), isFalse);
+    });
+
+    test('START TRANSACTION and END', () {
+      var open = applyPostgresTransactionSql(false, 'START TRANSACTION');
+      expect(open, isTrue);
+      open = applyPostgresTransactionSql(open, 'END');
+      expect(open, isFalse);
+    });
+
+    test('ROLLBACK closes; ROLLBACK TO savepoint does not', () {
+      expect(applyPostgresTransactionSql(true, 'ROLLBACK'), isFalse);
+      expect(
+        applyPostgresTransactionSql(true, 'ROLLBACK TO sp1'),
+        isTrue,
+      );
+      expect(
+        applyPostgresTransactionSql(true, 'ROLLBACK TO SAVEPOINT sp1'),
+        isTrue,
+      );
+    });
+
+    test('strips leading comments before BEGIN', () {
+      expect(
+        applyPostgresTransactionSql(false, '-- note\nBEGIN'),
+        isTrue,
+      );
+    });
+  });
+
+  group('kPostgresOpenTransactionProbeSql', () {
+    test('uses xact_start, not xid-if-assigned', () {
+      expect(kPostgresOpenTransactionProbeSql, contains('xact_start'));
+      expect(kPostgresOpenTransactionProbeSql, contains('pg_backend_pid()'));
+      expect(
+        kPostgresOpenTransactionProbeSql,
+        isNot(contains('pg_current_xact_id')),
+      );
+    });
+  });
+
+  group('runPostgresStatementsInTransaction', () {
+    test('executes BEGIN, each statement, COMMIT as separate calls', () async {
+      final calls = <String>[];
+      await runPostgresStatementsInTransaction(
+        (sql) async => calls.add(sql),
+        [
+          'UPDATE public.t SET a = 1 WHERE id = 1',
+          'DELETE FROM public.t WHERE id = 2',
+        ],
+      );
+      expect(calls, [
+        'BEGIN',
+        'UPDATE public.t SET a = 1 WHERE id = 1',
+        'DELETE FROM public.t WHERE id = 2',
+        'COMMIT',
+      ]);
+    });
+
+    test('ROLLBACK then rethrows when a statement fails', () async {
+      final calls = <String>[];
+      await expectLater(
+        runPostgresStatementsInTransaction(
+          (sql) async {
+            calls.add(sql);
+            if (sql.startsWith('UPDATE')) {
+              throw StateError(
+                'cannot insert multiple commands into a prepared statement',
+              );
+            }
+          },
+          ['UPDATE t SET a = 1 WHERE id = 1'],
+        ),
+        throwsA(isA<StateError>()),
+      );
+      expect(calls, [
+        'BEGIN',
+        'UPDATE t SET a = 1 WHERE id = 1',
+        'ROLLBACK',
+      ]);
+    });
+
+    test('ROLLBACK failure does not hide the original error', () async {
+      await expectLater(
+        runPostgresStatementsInTransaction(
+          (sql) async {
+            if (sql == 'BEGIN') return;
+            if (sql == 'ROLLBACK') throw StateError('already aborted');
+            throw StateError('multi-command');
+          },
+          ['UPDATE t SET a = 1'],
+        ),
+        throwsA(
+          predicate<StateError>((e) => e.message == 'multi-command'),
+        ),
+      );
+    });
+  });
+
   group('injectSqlLimit', () {
     test('appends LIMIT to select query without limit', () {
       expect(injectSqlLimit('SELECT * FROM users', 5000),

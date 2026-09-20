@@ -342,6 +342,87 @@ void main() {
       expect(result, 'Ada');
       expect(find.text('Save to DB'), findsNothing);
     });
+
+    testWidgets('Apply persists through onSaveToDatabase after edit',
+        (tester) async {
+      String? saved;
+      String? result;
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Builder(
+            builder: (context) => material.ElevatedButton(
+              onPressed: () async {
+                result = await showGridCellInspectorDialog(
+                  context: context,
+                  columnName: 'name',
+                  initialValue: 'Ada',
+                  onSaveToDatabase: (value) async {
+                    saved = value;
+                  },
+                );
+              },
+              child: const Text('Open Dialog'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Open Dialog'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(material.TextField), 'Bob');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Apply'), findsOneWidget);
+      await tester.tap(find.text('Apply'));
+      await tester.pumpAndSettle();
+
+      expect(saved, 'Bob');
+      expect(result, 'Bob');
+      expect(find.text('Save to DB'), findsNothing);
+    });
+
+    testWidgets('Ctrl+Enter persists through onSaveToDatabase', (tester) async {
+      String? saved;
+      String? result;
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Builder(
+            builder: (context) => material.ElevatedButton(
+              onPressed: () async {
+                result = await showGridCellInspectorDialog(
+                  context: context,
+                  columnName: 'name',
+                  initialValue: 'Ada',
+                  onSaveToDatabase: (value) async {
+                    saved = value;
+                  },
+                );
+              },
+              child: const Text('Open Dialog'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Open Dialog'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(material.TextField), 'Bob');
+      await tester.pumpAndSettle();
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+
+      expect(saved, 'Bob');
+      expect(result, 'Bob');
+    });
   });
 
   group('VirtualResultGrid Inline Editing Integration', () {

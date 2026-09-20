@@ -199,5 +199,22 @@ void main() {
       expect(uri, contains('mongodb://'));
       expect(Uri.parse(uri).path, '/');
     });
+
+    test('password remains in URI after scrubCredentials', () {
+      final conn = MongoConnection(
+        id: 1,
+        name: 'test',
+        host: '127.0.0.1',
+        username: 'root',
+        password: 'root',
+        database: 'mydb',
+      );
+      conn.scrubCredentials();
+      expect(conn.password, isNull);
+      final uri = conn.buildUriForDatabase('otherdb');
+      expect(uri, contains('root:root'));
+      expect(uri, contains('/otherdb'));
+      expect(uri, contains('authSource=mydb'));
+    });
   });
 }

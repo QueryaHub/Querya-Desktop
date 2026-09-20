@@ -184,22 +184,7 @@ class _RedisConnectionFormContentState
       _testResult = null;
     });
     try {
-      final uri = _effectiveConnectionUri();
-      final conn = RedisConnection(
-        id: 0,
-        name: _nameController.text.trim().isEmpty
-            ? 'test'
-            : _nameController.text.trim(),
-        host: uri.isNotEmpty ? 'localhost' : _hostController.text.trim(),
-        port: int.tryParse(_portController.text.trim()) ?? 6379,
-        username: _usernameController.text.trim().isEmpty
-            ? null
-            : _usernameController.text.trim(),
-        password:
-            _passwordController.text.isEmpty ? null : _passwordController.text,
-        useSSL: _useSSL || _hasSslCertificateFields(),
-        connectionString: uri.isEmpty ? null : uri,
-      );
+      final conn = RedisConnection.fromConnectionRow(_draftRow());
       final ok = await conn.testConnection();
       if (mounted) _showTestResult(ok ? 'success' : 'failed');
     } catch (e) {
@@ -207,8 +192,7 @@ class _RedisConnectionFormContentState
     }
   }
 
-  void _save() {
-    if (!_formValidNotifier.value) return;
+  ConnectionRow _draftRow({int? id}) {
     _syncUriSslParams();
     final name = _nameController.text.trim();
     final host = _hostController.text.trim();
@@ -216,10 +200,10 @@ class _RedisConnectionFormContentState
     final uri = _effectiveConnectionUri();
     final displayName = name.isNotEmpty ? name : 'Redis $host:$port';
     final initial = widget.initial;
-    final row = ConnectionRow(
-      id: initial?.id,
+    return ConnectionRow(
+      id: id,
       type: initial?.type ?? 'redis',
-      name: displayName,
+      name: displayName.isEmpty ? 'test' : displayName,
       host: uri.isNotEmpty ? null : host,
       port: uri.isNotEmpty ? null : port,
       username: _usernameController.text.trim().isEmpty
@@ -235,7 +219,11 @@ class _RedisConnectionFormContentState
       sortOrder: initial?.sortOrder ?? 0,
       createdAt: initial?.createdAt ?? DateTime.now().toUtc().toIso8601String(),
     );
-    material.Navigator.of(context).pop(row);
+  }
+
+  void _save() {
+    if (!_formValidNotifier.value) return;
+    material.Navigator.of(context).pop(_draftRow(id: widget.initial?.id));
   }
 
   @override

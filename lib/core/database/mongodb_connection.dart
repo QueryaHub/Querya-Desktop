@@ -32,6 +32,13 @@ class MongoConnection {
   final String? replicaSet;
   String? _connectionString;
 
+  /// Handshake URI for this live session (includes auth). Not persisted; not
+  /// exposed via [password] / [connectionString] after [scrubCredentials].
+  String? _sessionUri;
+
+  final Map<String, Db> _openedDbs = {};
+  final Map<String, Future<Db>> _openingDbs = {};
+
   String? get password => _password;
   String? get connectionString => _connectionString;
 
@@ -39,7 +46,11 @@ class MongoConnection {
   bool _isConnected = false;
 
   /// Scrubs sensitive in-memory credentials once the network handshake completes.
+  ///
+  /// Getters [password] and [connectionString] become null. The live session
+  /// still authenticates via [_sessionUri] (in-memory only, never written back).
   void scrubCredentials() {
+    _sessionUri ??= buildConnectionUri();
     _password = null;
     _connectionString = null;
   }
@@ -49,6 +60,12 @@ class MongoConnection {
     final effectiveConnStr = connStr ?? _connectionString;
     if (effectiveConnStr != null && effectiveConnStr.isNotEmpty) {
       return effectiveConnStr;
+    }
+    if (pass == null &&
+        _sessionUri != null &&
+        _sessionUri!.isNotEmpty &&
+        (_password == null || _password!.isEmpty)) {
+      return _sessionUri!;
     }
 
     final buffer = StringBuffer('mongodb://');
@@ -153,7 +170,12 @@ class MongoConnection {
       );
       _db = await Db.create(uri);
       await _db!.open();
+      _sessionUri = uri;
       _isConnected = true;
+      final defaultName = _databaseNameFromUri(uri);
+      if (defaultName != null && defaultName.isNotEmpty) {
+        _openedDbs[defaultName] = _db!;
+      }
       scrubCredentials();
     } catch (e) {
       _isConnected = false;
@@ -193,13 +215,64 @@ class MongoConnection {
   /// Disconnects from MongoDB server.
   Future<void> disconnect() async {
     _isConnected = false;
-    final db = _db;
+    _sessionUri = null;
+    _openingDbs.clear();
+    final toClose = <Db>{
+      ..._openedDbs.values,
+      if (_db != null) _db!,
+    };
+    _openedDbs.clear();
     _db = null;
-    try {
-      await db?.close();
-    } catch (e) {
-      debugPrint('MongoConnection.disconnect: $e');
+    for (final db in toClose) {
+      try {
+        await db.close();
+      } catch (e) {
+        debugPrint('MongoConnection.disconnect: $e');
+      }
     }
+  }
+
+  /// Opens (or reuses) a [Db] for [databaseName] on this live session.
+  ///
+  /// Auth comes from [_sessionUri], not from the scrubbed [password] getter.
+  Future<Db> openDatabase(String databaseName) async {
+    if (!isConnected) {
+      throw StateError('Not connected to MongoDB');
+    }
+    final existing = _openedDbs[databaseName];
+    if (existing != null && existing.isConnected) {
+      return existing;
+    }
+    if (existing != null) {
+      _openedDbs.remove(databaseName);
+      try {
+        await existing.close();
+      } catch (_) {}
+    }
+    return _openingDbs.putIfAbsent(databaseName, () async {
+      try {
+        final dbUri = buildUriForDatabase(databaseName);
+        final db = await Db.create(dbUri);
+        try {
+          await db.open();
+        } catch (_) {
+          try {
+            await db.close();
+          } catch (_) {}
+          rethrow;
+        }
+        _openedDbs[databaseName] = db;
+        return db;
+      } finally {
+        _openingDbs.remove(databaseName);
+      }
+    });
+  }
+
+  static String? _databaseNameFromUri(String uri) {
+    final path = Uri.tryParse(uri)?.path.replaceFirst(RegExp(r'^/'), '') ?? '';
+    if (path.isEmpty) return null;
+    return path.split('/').first;
   }
 
   /// Checks if connection is active.
@@ -215,22 +288,15 @@ class MongoConnection {
     }
 
     try {
-      // Switch to admin database to list all databases
-      final adminUri = buildUriForDatabase('admin');
-      final adminDb = await Db.create(adminUri);
-      await adminDb.open();
-      try {
-        final result = await adminDb.runCommand({'listDatabases': 1});
-        final databases = result['databases'] as List?;
-        if (databases == null) return [];
+      final adminDb = await openDatabase('admin');
+      final result = await adminDb.runCommand({'listDatabases': 1});
+      final databases = result['databases'] as List?;
+      if (databases == null) return [];
 
-        return databases
-            .map((db) => (db as Map)['name'] as String)
-            .where((name) => name.isNotEmpty)
-            .toList();
-      } finally {
-        await adminDb.close();
-      }
+      return databases
+          .map((db) => (db as Map)['name'] as String)
+          .where((name) => name.isNotEmpty)
+          .toList();
     } catch (e) {
       rethrow;
     }
@@ -243,16 +309,9 @@ class MongoConnection {
     }
 
     try {
-      // Create a new Db connection to the specified database
-      final dbUri = buildUriForDatabase(databaseName);
-      final db = await Db.create(dbUri);
-      await db.open();
-      try {
-        final collections = await db.getCollectionNames();
-        return collections.whereType<String>().toList();
-      } finally {
-        await db.close();
-      }
+      final db = await openDatabase(databaseName);
+      final collections = await db.getCollectionNames();
+      return collections.whereType<String>().toList();
     } catch (e) {
       rethrow;
     }
@@ -279,13 +338,21 @@ class MongoConnection {
     }
 
     try {
-      final dbUri = buildUriForDatabase(databaseName);
-      final db = await Db.create(dbUri);
-      await db.open();
+      final db = await openDatabase(databaseName);
+      await db.drop();
+      _openedDbs.remove(databaseName);
       try {
-        await db.drop();
-      } finally {
         await db.close();
+      } catch (_) {}
+      if (identical(_db, db)) {
+        _db = null;
+        for (final other in _openedDbs.values) {
+          if (other.isConnected) {
+            _db = other;
+            break;
+          }
+        }
+        _isConnected = _db != null;
       }
     } catch (e) {
       rethrow;

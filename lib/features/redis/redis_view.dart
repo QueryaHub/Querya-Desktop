@@ -102,33 +102,50 @@ class _RedisViewState extends material.State<RedisView> {
     final conn = _connection;
     _connection = null;
     if (conn != null && _ownsConnection) {
-      conn.disconnect();
+      unawaited(RedisService.instance.disconnect(conn));
     }
     _ownsConnection = false;
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool reconnect = false}) async {
     _timer?.cancel();
-    _disconnectCurrent();
     if (!mounted) return;
     setState(() {
       _loading = true;
       _error = null;
-      _info = null;
+      if (reconnect) _info = null;
     });
     try {
       final supplied = widget.connection;
       RedisConnection conn;
-      if (supplied != null && supplied.isConnected) {
+      if (supplied != null) {
         conn = supplied;
         _ownsConnection = false;
+        if (!conn.isConnected) {
+          await conn.connect();
+        }
       } else {
-        conn = RedisService.instance.createConnection(widget.connectionRow);
-        await conn.connect();
+        if (reconnect && _ownsConnection) {
+          final old = _connection;
+          _connection = null;
+          _ownsConnection = false;
+          if (old != null) {
+            await RedisService.instance.disconnect(old);
+          }
+        }
+        conn = RedisService.instance.acquire(
+          widget.connectionRow,
+          role: RedisSessionRole.stats,
+        );
+        if (!conn.isConnected) {
+          await conn.connect();
+        }
         _ownsConnection = true;
       }
       if (!mounted) {
-        if (_ownsConnection) conn.disconnect();
+        if (_ownsConnection) {
+          unawaited(RedisService.instance.disconnect(conn));
+        }
         return;
       }
       _connection = conn;
@@ -142,6 +159,17 @@ class _RedisViewState extends material.State<RedisView> {
         });
       }
     }
+  }
+
+  /// Header Refresh: reuse a live stats socket; do not recreate (or steal
+  /// Explorer's) TCP session. Retry after an error reconnects stats only.
+  Future<void> _refresh() async {
+    final c = _connection;
+    if (c != null && c.isConnected) {
+      await _fetch();
+      return;
+    }
+    await _load(reconnect: true);
   }
 
   Future<void> _fetch() async {
@@ -220,7 +248,7 @@ class _RedisViewState extends material.State<RedisView> {
                       color: cs.mutedForeground, fontSize: 13)),
               const Gap(24),
               OutlineButton(
-                onPressed: _load,
+                onPressed: () => unawaited(_load(reconnect: true)),
                 leading: const material.Icon(material.Icons.refresh_rounded,
                     size: 18),
                 child: const Text('Retry'),
@@ -247,7 +275,7 @@ class _RedisViewState extends material.State<RedisView> {
               const Text('Redis INFO returned no data.').muted().small(),
               const Gap(24),
               OutlineButton(
-                onPressed: _load,
+                onPressed: () => unawaited(_load(reconnect: true)),
                 leading: const material.Icon(material.Icons.refresh_rounded,
                     size: 18),
                 child: const Text('Retry'),
@@ -407,7 +435,7 @@ class _RedisViewState extends material.State<RedisView> {
           const Gap(8),
         ],
         OutlineButton(
-          onPressed: _load,
+          onPressed: () => unawaited(_refresh()),
           leading:
               const material.Icon(material.Icons.refresh_rounded, size: 18),
           child: const Text('Refresh'),

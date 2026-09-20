@@ -57,6 +57,7 @@ class PreferencesDialogContentState
   bool _confirmDestructive = true;
   int? _pgTimeout;
   int? _mysqlTimeout;
+  int? _sqliteTimeout;
   int _maxRows = kDefaultSqlResultMaxRows;
   int _historyMax = kDefaultSqlHistoryMaxEntries;
   double _fontSize = kDefaultSqlEditorFontSize;
@@ -95,6 +96,8 @@ class PreferencesDialogContentState
           await AppSettings.instance.getConfirmDestructiveOperations();
       final pg = await AppSettings.instance.getPostgresSqlStmtTimeoutSeconds();
       final my = await AppSettings.instance.getMysqlSqlStmtTimeoutSeconds();
+      final sqlite =
+          await AppSettings.instance.getSqliteSqlStmtTimeoutSeconds();
       final rows = await AppSettings.instance.getSqlResultMaxRows();
       final hist = await AppSettings.instance.getSqlHistoryMaxEntries();
       final font = await AppSettings.instance.getSqlEditorFontSize();
@@ -105,6 +108,7 @@ class PreferencesDialogContentState
         _confirmDestructive = destructive;
         _pgTimeout = pg;
         _mysqlTimeout = my;
+        _sqliteTimeout = sqlite;
         _maxRows = rows;
         _historyMax = hist;
         _fontSize = font;
@@ -135,6 +139,11 @@ class PreferencesDialogContentState
   Future<void> _setMysql(int? v) async {
     setState(() => _mysqlTimeout = v);
     await AppSettings.instance.setMysqlSqlStmtTimeoutSeconds(v);
+  }
+
+  Future<void> _setSqlite(int? v) async {
+    setState(() => _sqliteTimeout = v);
+    await AppSettings.instance.setSqliteSqlStmtTimeoutSeconds(v);
   }
 
   Future<void> _setMaxRows(int v) async {
@@ -171,7 +180,7 @@ class PreferencesDialogContentState
           count++;
         }
       case PreferencesCategory.sql:
-        if ('font size postgresql mysql statement timeout history destructive drop truncate delete'
+        if ('font size postgresql mysql sqlite statement timeout history destructive drop truncate delete'
             .contains(q)) {
           count++;
         }
@@ -617,6 +626,18 @@ class PreferencesDialogContentState
             value: _mysqlTimeout,
             expandToParent: true,
             onChanged: (v) => unawaited(_setMysql(v)),
+          ),
+        ),
+
+        const material.SizedBox(height: 16),
+        PreferencesFieldRow(
+          label: 'SQLite timeout',
+          hint:
+              'Application-level statement timeout for queries on SQLite connections.',
+          control: SqlStatementTimeoutDropdown(
+            value: _sqliteTimeout,
+            expandToParent: true,
+            onChanged: (v) => unawaited(_setSqlite(v)),
           ),
         ),
 

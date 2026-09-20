@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/database/redis_bulk.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/database/redis_service.dart';
 import 'package:querya_desktop/core/motion/querya_switching_body.dart';
@@ -30,10 +33,12 @@ class RedisExplorerView extends material.StatefulWidget {
     super.key,
     required this.connectionRow,
     required this.database,
+    this.isReadOnly = false,
   });
 
   final ConnectionRow connectionRow;
   final int database;
+  final bool isReadOnly;
 
   @override
   material.State<RedisExplorerView> createState() => _RedisExplorerViewState();
@@ -49,7 +54,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
   int _refreshEpoch = 0;
 
   // Navigation state
-  String? _selectedKey;
+  RedisBulkValue? _selectedKey;
   String? _selectedKeyType;
 
   @override
@@ -65,6 +70,8 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
         oldWidget.database != widget.database) {
       _disconnectCurrent();
       _connect();
+    } else if (oldWidget.isReadOnly != widget.isReadOnly) {
+      unawaited(_connection?.applyClientReadOnly(widget.isReadOnly));
     }
   }
 
@@ -78,12 +85,16 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
     final conn = _connection;
     _connection = null;
     if (conn != null) {
-      conn.disconnect();
+      unawaited(RedisService.instance.disconnect(conn));
     }
   }
 
   Future<void> _connect() async {
-    _disconnectCurrent();
+    final old = _connection;
+    _connection = null;
+    if (old != null) {
+      await RedisService.instance.disconnect(old);
+    }
     if (!mounted) return;
     setState(() {
       _connecting = true;
@@ -93,10 +104,16 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
       _showStats = false;
     });
     try {
-      final conn = RedisService.instance.createConnection(widget.connectionRow);
-      await conn.connect();
+      final conn = RedisService.instance.acquire(
+        widget.connectionRow,
+        role: RedisSessionRole.explorer,
+      );
+      await conn.applyClientReadOnly(widget.isReadOnly);
+      if (!conn.isConnected) {
+        await conn.connect();
+      }
       if (!mounted) {
-        conn.disconnect();
+        unawaited(RedisService.instance.disconnect(conn));
         return;
       }
       setState(() {
@@ -115,7 +132,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
 
   // ─── Navigation helpers ─────────────────────────────────────────────────
 
-  void _navigateToKey(String key, String type) {
+  void _navigateToKey(RedisBulkValue key, String type) {
     setState(() {
       _selectedKey = key;
       _selectedKeyType = type;
@@ -137,7 +154,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
           '${widget.connectionRow.name} › db${widget.database}', _Level.keys),
     ];
     if (_selectedKey != null) {
-      list.add(_Crumb(_selectedKey!, _Level.key));
+      list.add(_Crumb(_selectedKey!.label, _Level.key));
     }
     if (_showStats) {
       list.add(const _Crumb('Statistics', _Level.stats));
@@ -226,6 +243,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
             onCrumbTap: _onCrumbTap,
             onRefresh: () => setState(() => _refreshEpoch++),
             onStats: () => setState(() => _showStats = !_showStats),
+            isReadOnly: widget.isReadOnly,
           ),
           const Divider(height: 1),
           // Content with fluid cross-fade morph between keys and stats
@@ -253,13 +271,16 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
     // Key editor
     if (_selectedKey != null) {
       return RedisKeyEditor(
-        key: ValueKey('key_${widget.database}_${_selectedKey}_$_refreshEpoch'),
+        key: ValueKey(
+            'key_${widget.database}_${_selectedKey!.label}_$_refreshEpoch'),
         connection: conn,
         database: widget.database,
-        keyName: _selectedKey!,
-        keyType: _selectedKeyType ?? 'string',
+        keyName: _selectedKey!.label,
+        keyArg: _selectedKey!.commandArg,
+        keyType: _selectedKeyType ?? 'unknown',
         onBack: _navigateToKeys,
         onKeyDeleted: _navigateToKeys,
+        isReadOnly: widget.isReadOnly,
       );
     }
 
@@ -269,6 +290,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
       connection: conn,
       database: widget.database,
       onKeyTap: _navigateToKey,
+      isReadOnly: widget.isReadOnly,
     );
   }
 }
@@ -281,12 +303,14 @@ class _BreadcrumbBar extends StatelessWidget {
     required this.onCrumbTap,
     required this.onRefresh,
     required this.onStats,
+    this.isReadOnly = false,
   });
 
   final List<_Crumb> crumbs;
   final void Function(_Crumb) onCrumbTap;
   final VoidCallback onRefresh;
   final VoidCallback onStats;
+  final bool isReadOnly;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -301,6 +325,14 @@ class _BreadcrumbBar extends StatelessWidget {
         children: [
           material.Icon(material.Icons.memory_rounded,
               size: 18, color: cs.primary),
+          if (isReadOnly) ...[
+            const Gap(6),
+            material.Icon(
+              material.Icons.lock_outline_rounded,
+              size: 14,
+              color: cs.mutedForeground,
+            ),
+          ],
           const Gap(10),
           material.Expanded(
             child: material.SingleChildScrollView(
