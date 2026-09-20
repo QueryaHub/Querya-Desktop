@@ -98,4 +98,39 @@ void main() {
       expect((filter['age'] as Map)[r'$gt'], 5);
     });
   });
+
+  group('mongoFullDocumentReplacement', () {
+    test('start {a:1,b:2}, save {a:1} drops b and keeps original _id', () {
+      final id = ObjectId.fromHexString('507f1f77bcf86cd799439011');
+      final replacement = mongoFullDocumentReplacement(
+        parsed: <String, dynamic>{'a': 1},
+        originalId: id,
+      );
+      expect(replacement.containsKey('b'), isFalse);
+      expect(replacement['a'], 1);
+      expect(replacement['_id'], same(id));
+    });
+
+    test('nested keys deleted in JSON are absent from the replacement', () {
+      final id = ObjectId.fromHexString('507f191e810c19729de860ea');
+      final replacement = mongoFullDocumentReplacement(
+        parsed: <String, dynamic>{
+          'nested': <String, dynamic>{'x': 1},
+        },
+        originalId: id,
+      );
+      expect(replacement['nested'], <String, dynamic>{'x': 1});
+      expect((replacement['nested'] as Map).containsKey('y'), isFalse);
+    });
+
+    test('edited _id in JSON is overwritten with the original BSON id', () {
+      final id = ObjectId.fromHexString('507f1f77bcf86cd799439011');
+      final replacement = mongoFullDocumentReplacement(
+        parsed: <String, dynamic>{'_id': 'tampered', 'a': 1},
+        originalId: id,
+      );
+      expect(replacement['_id'], same(id));
+      expect(replacement['a'], 1);
+    });
+  });
 }

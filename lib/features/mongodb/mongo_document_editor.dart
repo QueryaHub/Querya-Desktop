@@ -150,10 +150,12 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
       return;
     }
 
-    // Remove _id from the update payload (can't change _id). Filter uses the
-    // original BSON _id, not a stringified copy from the editor.
-    final updateDoc = Map<String, dynamic>.from(parsed);
-    updateDoc.remove('_id');
+    // replaceOne drops keys the user deleted. `_id` stays the original BSON
+    // value even if the editor JSON changed it.
+    final replacement = mongoFullDocumentReplacement(
+      parsed: parsed,
+      originalId: id,
+    );
 
     setState(() {
       _saving = true;
@@ -162,12 +164,12 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
     });
 
     try {
-      await MongoService.instance.updateDocument(
+      await MongoService.instance.replaceDocument(
         widget.connection,
         widget.database,
         widget.collection,
         {'_id': id},
-        {r'$set': updateDoc},
+        replacement,
       );
       if (!mounted) return;
       setState(() {
