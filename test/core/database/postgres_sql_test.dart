@@ -80,6 +80,60 @@ void main() {
     });
   });
 
+  group('applyPostgresTransactionSql', () {
+    test('BEGIN + SELECT stays open; COMMIT closes', () {
+      var open = false;
+      open = applyPostgresTransactionSql(open, 'BEGIN');
+      expect(open, isTrue);
+      open = applyPostgresTransactionSql(open, 'SELECT 1');
+      expect(open, isTrue);
+      open = applyPostgresTransactionSql(open, 'COMMIT');
+      expect(open, isFalse);
+    });
+
+    test('BEGIN WORK opens; BEGINNING does not', () {
+      expect(applyPostgresTransactionSql(false, 'BEGIN WORK'), isTrue);
+      expect(applyPostgresTransactionSql(false, 'BEGINNING'), isFalse);
+    });
+
+    test('START TRANSACTION and END', () {
+      var open = applyPostgresTransactionSql(false, 'START TRANSACTION');
+      expect(open, isTrue);
+      open = applyPostgresTransactionSql(open, 'END');
+      expect(open, isFalse);
+    });
+
+    test('ROLLBACK closes; ROLLBACK TO savepoint does not', () {
+      expect(applyPostgresTransactionSql(true, 'ROLLBACK'), isFalse);
+      expect(
+        applyPostgresTransactionSql(true, 'ROLLBACK TO sp1'),
+        isTrue,
+      );
+      expect(
+        applyPostgresTransactionSql(true, 'ROLLBACK TO SAVEPOINT sp1'),
+        isTrue,
+      );
+    });
+
+    test('strips leading comments before BEGIN', () {
+      expect(
+        applyPostgresTransactionSql(false, '-- note\nBEGIN'),
+        isTrue,
+      );
+    });
+  });
+
+  group('kPostgresOpenTransactionProbeSql', () {
+    test('uses xact_start, not xid-if-assigned', () {
+      expect(kPostgresOpenTransactionProbeSql, contains('xact_start'));
+      expect(kPostgresOpenTransactionProbeSql, contains('pg_backend_pid()'));
+      expect(
+        kPostgresOpenTransactionProbeSql,
+        isNot(contains('pg_current_xact_id')),
+      );
+    });
+  });
+
   group('runPostgresStatementsInTransaction', () {
     test('executes BEGIN, each statement, COMMIT as separate calls', () async {
       final calls = <String>[];

@@ -11,6 +11,7 @@ import 'package:postgres/src/connection_string.dart' show parseConnectionString;
 
 import 'postgres_metadata.dart';
 import 'postgres_result_cells.dart';
+import 'postgres_sql.dart';
 import 'table_schema_meta.dart';
 
 /// Replaces the database in a `postgresql://` / `postgres://` URI (path or
@@ -131,6 +132,7 @@ class PostgresConnection {
 
   Connection? _conn;
   bool _isConnected = false;
+  bool _inTransaction = false;
 
   bool get isConnected => _isConnected && _conn != null;
 
@@ -238,6 +240,7 @@ class PostgresConnection {
         );
       }
       _isConnected = true;
+      _inTransaction = false;
       scrubCredentials();
     } catch (e, st) {
       _isConnected = false;
@@ -255,6 +258,7 @@ class PostgresConnection {
 
   Future<void> disconnect() async {
     _isConnected = false;
+    _inTransaction = false;
     final c = _conn;
     _conn = null;
     try {
@@ -268,6 +272,7 @@ class PostgresConnection {
   /// cancelling a long query or [PostgresService.interrupt].
   Future<void> forceClose() async {
     _isConnected = false;
+    _inTransaction = false;
     final c = _conn;
     _conn = null;
     try {
@@ -313,7 +318,9 @@ class PostgresConnection {
       throw StateError('Not connected to PostgreSQL');
     }
     try {
-      return await _conn!.execute(sql, timeout: timeout);
+      final result = await _conn!.execute(sql, timeout: timeout);
+      _inTransaction = applyPostgresTransactionSql(_inTransaction, sql);
+      return result;
     } on TimeoutException {
       unawaited(forceClose());
       rethrow;
@@ -335,19 +342,24 @@ class PostgresConnection {
     }
   }
 
-  /// Whether the session has an open transaction (PostgreSQL 13+).
-  /// Returns `null` if the server does not support the probe or an error occurs.
+  /// Whether the session has an open transaction.
+  ///
+  /// `BEGIN` + `SELECT` does not assign an XID, so `pg_current_xact_id_if_assigned`
+  /// stays NULL. We track BEGIN/COMMIT/ROLLBACK on [execute], and otherwise
+  /// probe `pg_stat_activity.xact_start` for this backend (PG 9+; no PG 13
+  /// requirement). Returns `null` only when disconnected.
   Future<bool?> inOpenTransaction() async {
     if (!isConnected || _conn == null) return null;
+    if (_inTransaction) return true;
     try {
-      final r = await _conn!.execute(
-        'SELECT pg_current_xact_id_if_assigned() IS NOT NULL',
-      );
-      if (r.isEmpty) return null;
-      return r.first[0] as bool;
+      final r = await _conn!.execute(kPostgresOpenTransactionProbeSql);
+      if (r.isEmpty) return false;
+      final open = r.first[0] == true;
+      _inTransaction = open;
+      return open;
     } catch (e) {
       debugPrint('PostgresConnection.inOpenTransaction: $e');
-      return null;
+      return _inTransaction;
     }
   }
 
