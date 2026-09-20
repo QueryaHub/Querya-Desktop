@@ -32,10 +32,12 @@ class RedisExplorerView extends material.StatefulWidget {
     super.key,
     required this.connectionRow,
     required this.database,
+    this.isReadOnly = false,
   });
 
   final ConnectionRow connectionRow;
   final int database;
+  final bool isReadOnly;
 
   @override
   material.State<RedisExplorerView> createState() => _RedisExplorerViewState();
@@ -67,6 +69,8 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
         oldWidget.database != widget.database) {
       _disconnectCurrent();
       _connect();
+    } else if (oldWidget.isReadOnly != widget.isReadOnly) {
+      unawaited(_connection?.applyClientReadOnly(widget.isReadOnly));
     }
   }
 
@@ -103,6 +107,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
         widget.connectionRow,
         role: RedisSessionRole.explorer,
       );
+      await conn.applyClientReadOnly(widget.isReadOnly);
       if (!conn.isConnected) {
         await conn.connect();
       }
@@ -237,6 +242,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
             onCrumbTap: _onCrumbTap,
             onRefresh: () => setState(() => _refreshEpoch++),
             onStats: () => setState(() => _showStats = !_showStats),
+            isReadOnly: widget.isReadOnly,
           ),
           const Divider(height: 1),
           // Content with fluid cross-fade morph between keys and stats
@@ -271,6 +277,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
         keyType: _selectedKeyType ?? 'string',
         onBack: _navigateToKeys,
         onKeyDeleted: _navigateToKeys,
+        isReadOnly: widget.isReadOnly,
       );
     }
 
@@ -280,6 +287,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
       connection: conn,
       database: widget.database,
       onKeyTap: _navigateToKey,
+      isReadOnly: widget.isReadOnly,
     );
   }
 }
@@ -292,12 +300,14 @@ class _BreadcrumbBar extends StatelessWidget {
     required this.onCrumbTap,
     required this.onRefresh,
     required this.onStats,
+    this.isReadOnly = false,
   });
 
   final List<_Crumb> crumbs;
   final void Function(_Crumb) onCrumbTap;
   final VoidCallback onRefresh;
   final VoidCallback onStats;
+  final bool isReadOnly;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -312,6 +322,14 @@ class _BreadcrumbBar extends StatelessWidget {
         children: [
           material.Icon(material.Icons.memory_rounded,
               size: 18, color: cs.primary),
+          if (isReadOnly) ...[
+            const Gap(6),
+            material.Icon(
+              material.Icons.lock_outline_rounded,
+              size: 14,
+              color: cs.mutedForeground,
+            ),
+          ],
           const Gap(10),
           material.Expanded(
             child: material.SingleChildScrollView(

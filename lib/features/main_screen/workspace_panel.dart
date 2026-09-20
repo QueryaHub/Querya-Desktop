@@ -343,6 +343,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
                   key: ValueKey('redis_${activeConn.id}_db_$redisDb'),
                   connectionRow: activeConn,
                   database: redisDb,
+                  isReadOnly: widget.isReadOnly,
                 ),
         );
         break;
