@@ -15,11 +15,21 @@ Future<SqliteConnection> _defaultCreateAndConnect(
 }) async {
   final conn = SqliteConnection.fromConnectionRow(
     row,
-    readOnly: mode.isReadOnlySession,
+    readOnly: sqliteOpenReadOnly(row: row, mode: mode),
   );
   await conn.connect();
   return conn;
 }
+
+/// Whether this pool slot must open the file with `SQLITE_OPEN_READONLY`.
+///
+/// Form **Read only** (`useSSL`) always opens `SQLITE_OPEN_READONLY`, even
+/// for [SqliteSessionMode.tableWrite]. Browse already uses `readOnly`.
+bool sqliteOpenReadOnly({
+  required ConnectionRow row,
+  required SqliteSessionMode mode,
+}) =>
+    mode.isReadOnlySession || row.useSSL;
 
 /// Global SQLite connection pool service (singleton).
 class SqliteService {

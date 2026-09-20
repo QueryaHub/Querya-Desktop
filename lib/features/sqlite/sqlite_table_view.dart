@@ -22,6 +22,7 @@ class SqliteTableView extends material.StatefulWidget {
     this.isView = false,
     this.limit = _defaultLimit,
     this.onNavigateHome,
+    this.isReadOnly = false,
   });
 
   final ConnectionRow connectionRow;
@@ -29,6 +30,9 @@ class SqliteTableView extends material.StatefulWidget {
   final bool isView;
   final int limit;
   final VoidCallback? onNavigateHome;
+
+  /// Title-bar session lock. Combined with connection-form Read only (`useSSL`).
+  final bool isReadOnly;
 
   @override
   material.State<SqliteTableView> createState() => _SqliteTableViewState();
@@ -56,10 +60,14 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
 
   bool get _isDirty => _stagingBuffer?.isDirty ?? false;
 
+  bool get _readOnly =>
+      widget.isReadOnly || widget.connectionRow.useSSL;
+
   bool get _editingEnabled => tableViewEditingEnabled(
         isView: widget.isView,
         customSqlActive: false,
         hasPrimaryKey: _primaryKeys.isNotEmpty,
+        readOnly: _readOnly,
       );
 
   String _qualifiedFrom() {
@@ -85,6 +93,9 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
       _resetStaging();
       _disconnectCurrent();
       _connectAndLoad();
+    } else if (oldWidget.isReadOnly != widget.isReadOnly ||
+        oldWidget.connectionRow.useSSL != widget.connectionRow.useSSL) {
+      _syncStagingToReadOnly();
     }
   }
 
@@ -103,6 +114,21 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     _columnMeta = {};
     _schemaLoaded = false;
     _isSaving = false;
+  }
+
+  void _syncStagingToReadOnly() {
+    if (_readOnly) {
+      _stagingBuffer?.dispose();
+      _stagingBuffer = null;
+    } else if (_columnNames.isNotEmpty) {
+      _stagingBuffer = replaceTableViewStagingBuffer(
+        previous: _stagingBuffer,
+        columns: _columnNames,
+        rows: _rows,
+        enabled: _editingEnabled,
+      );
+    }
+    if (mounted) setState(() {});
   }
 
   void _disconnectCurrent({bool interruptIfBusy = false}) {
@@ -158,6 +184,9 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
   Future<T> _withTableWrite<T>(
     Future<T> Function(SqliteConnection conn) fn,
   ) async {
+    if (_readOnly) {
+      throw StateError('SQLite connection is read-only');
+    }
     final lease = await SqliteService.instance.acquire(
       widget.connectionRow,
       mode: SqliteSessionMode.tableWrite,
@@ -318,6 +347,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
   }
 
   Future<void> _applyStagedChanges() async {
+    if (_readOnly) return;
     final buffer = _stagingBuffer;
     if (buffer == null || !buffer.isDirty || _isSaving) return;
     setState(() => _isSaving = true);
@@ -458,6 +488,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
       customSqlActive: false,
       hasPrimaryKey: _primaryKeys.isNotEmpty,
       schemaLoaded: _schemaLoaded,
+      readOnly: _readOnly,
     );
     final pag = _paginationLabel();
     if (pag.isEmpty) return reason;

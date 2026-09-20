@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
+import 'package:querya_desktop/core/database/sqlite_service.dart';
 import 'package:querya_desktop/features/workspace/table_view_staging.dart';
 
 void main() {
@@ -40,6 +41,50 @@ void main() {
       expect(conn.name, 'Row SQLite');
       expect(conn.path, '/another/path.sqlite');
       expect(conn.readOnly, true);
+    });
+  });
+
+  group('sqliteOpenReadOnly', () {
+    const rw = ConnectionRow(
+      id: 1,
+      type: 'sqlite',
+      name: 'rw',
+      host: '/tmp/rw.db',
+      createdAt: '',
+    );
+    const formRo = ConnectionRow(
+      id: 2,
+      type: 'sqlite',
+      name: 'ro',
+      host: '/tmp/ro.db',
+      useSSL: true,
+      createdAt: '',
+    );
+
+    test('form read-only opens SQLITE_OPEN_READONLY even for tableWrite', () {
+      expect(
+        sqliteOpenReadOnly(row: formRo, mode: SqliteSessionMode.tableWrite),
+        isTrue,
+      );
+      expect(
+        sqliteOpenReadOnly(row: formRo, mode: SqliteSessionMode.readWrite),
+        isTrue,
+      );
+    });
+
+    test('writable form uses read-write only for tableWrite/readWrite', () {
+      expect(
+        sqliteOpenReadOnly(row: rw, mode: SqliteSessionMode.readOnly),
+        isTrue,
+      );
+      expect(
+        sqliteOpenReadOnly(row: rw, mode: SqliteSessionMode.tableWrite),
+        isFalse,
+      );
+      expect(
+        sqliteOpenReadOnly(row: rw, mode: SqliteSessionMode.readWrite),
+        isFalse,
+      );
     });
   });
 

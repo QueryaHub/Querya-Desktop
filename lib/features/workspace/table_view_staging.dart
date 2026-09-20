@@ -11,8 +11,9 @@ bool tableViewEditingEnabled({
   bool isMaterializedView = false,
   required bool customSqlActive,
   required bool hasPrimaryKey,
+  bool readOnly = false,
 }) {
-  if (isView || isMaterializedView || customSqlActive) return false;
+  if (readOnly || isView || isMaterializedView || customSqlActive) return false;
   return hasPrimaryKey;
 }
 
@@ -23,7 +24,9 @@ String? tableViewEditDisabledReason({
   required bool customSqlActive,
   required bool hasPrimaryKey,
   required bool schemaLoaded,
+  bool readOnly = false,
 }) {
+  if (readOnly) return 'Read-only session';
   if (isView || isMaterializedView) return 'Views are read-only';
   if (customSqlActive) return 'Custom SQL results are read-only';
   if (schemaLoaded && !hasPrimaryKey) {

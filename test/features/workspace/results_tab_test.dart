@@ -947,6 +947,30 @@ void main() {
       expect(appliedChanges, 1);
     });
 
+    testWidgets('hides Save Changes when staging is disabled (session lock)',
+        (tester) async {
+      await tester.pumpWidget(
+        resultsShell(
+          child: const material.Scaffold(
+            body: material.SizedBox(
+              width: 800,
+              height: 500,
+              child: ResultsTab(
+                columns: ['id', 'name'],
+                rows: [
+                  ['1', 'Alice'],
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(DataGridStagingToolbar), findsNothing);
+      expect(find.text('Save Changes'), findsNothing);
+    });
+
     testWidgets('memoizes filtered rows across rebuilds when filterText and rows do not change', (tester) async {
       final rows = [
         ['1', 'Alice', 'Engineering'],
