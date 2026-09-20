@@ -450,6 +450,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       if (!_autocommit) {
         final inTx = await conn.inOpenTransaction() ?? false;
         if (!inTx && !shouldSkipImplicitBegin(sql)) {
+          // Separate execute: Parse cannot take `BEGIN;` + the next statement.
           await conn.execute('BEGIN', timeout: to);
         }
       }
