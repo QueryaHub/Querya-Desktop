@@ -53,6 +53,11 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   // Sorted set value
   List<(String, double)> _zsetValue = [];
 
+  int _collectionTotal = 0;
+  int _scanCursor = 0;
+  bool _hasMore = false;
+  bool _loadingMore = false;
+
   // For adding new items
   final _newFieldController = material.TextEditingController();
   final _newValueController = material.TextEditingController();
@@ -87,15 +92,20 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
           _stringValue = await widget.connection.get(widget.keyName);
           _stringController.text = _stringValue ?? '';
         case 'hash':
-          _hashValue = await widget.connection.hgetall(widget.keyName);
         case 'list':
-          _listValue = await widget.connection.lrange(widget.keyName, 0, -1);
         case 'set':
-          _setValue = await widget.connection.smembers(widget.keyName);
-          _setValue.sort();
         case 'zset':
-          _zsetValue =
-              await widget.connection.zrangeWithScores(widget.keyName, 0, -1);
+          _collectionTotal = await widget.connection.keySize(
+            widget.keyName,
+            widget.keyType,
+          );
+          _scanCursor = 0;
+          _hashValue = {};
+          _listValue = [];
+          _setValue = [];
+          _zsetValue = [];
+          _hasMore = false;
+          await _loadMore(reset: true);
         default:
           _stringValue = await widget.connection.get(widget.keyName);
           _stringController.text = _stringValue ?? '';
@@ -110,6 +120,100 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
           _loading = false;
         });
       }
+    }
+  }
+
+  int get _loadedCount => switch (widget.keyType) {
+        'hash' => _hashValue.length,
+        'list' => _listValue.length,
+        'set' => _setValue.length,
+        'zset' => _zsetValue.length,
+        _ => 0,
+      };
+
+  String _collectionHeading(String noun) {
+    if (_collectionTotal > 0) {
+      return '$noun ($_loadedCount / $_collectionTotal)';
+    }
+    return '$noun ($_loadedCount)';
+  }
+
+  Widget _loadMoreTile() {
+    return material.Padding(
+      padding: const material.EdgeInsets.only(top: 12),
+      child: material.Center(
+        child: OutlineButton(
+          onPressed: _loadingMore ? null : () => _loadMore(),
+          size: ButtonSize.small,
+          child: _loadingMore
+              ? const Text('Loading...')
+              : Text('Load more ($_loadedCount / $_collectionTotal)'),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _loadMore({bool reset = false}) async {
+    if (_loadingMore) return;
+    if (!reset && mounted) setState(() => _loadingMore = true);
+    try {
+      await widget.connection.selectDatabase(widget.database);
+      switch (widget.keyType) {
+        case 'hash':
+          if (reset) {
+            _scanCursor = 0;
+            _hashValue = {};
+          }
+          final (next, page) = await widget.connection.hscan(
+            widget.keyName,
+            cursor: _scanCursor,
+            count: redisCollectionPageSize,
+          );
+          _hashValue.addAll(page);
+          _scanCursor = next;
+          _hasMore = next != 0;
+        case 'list':
+          if (reset) _listValue = [];
+          final start = _listValue.length;
+          final chunk = await widget.connection.lrange(
+            widget.keyName,
+            start,
+            start + redisCollectionPageSize - 1,
+          );
+          _listValue.addAll(chunk);
+          _hasMore = _listValue.length < _collectionTotal;
+        case 'set':
+          if (reset) {
+            _scanCursor = 0;
+            _setValue = [];
+          }
+          final (next, members) = await widget.connection.sscan(
+            widget.keyName,
+            cursor: _scanCursor,
+            count: redisCollectionPageSize,
+          );
+          _setValue.addAll(members);
+          _scanCursor = next;
+          _hasMore = next != 0;
+        case 'zset':
+          if (reset) _zsetValue = [];
+          final start = _zsetValue.length;
+          final chunk = await widget.connection.zrangeWithScores(
+            widget.keyName,
+            start,
+            start + redisCollectionPageSize - 1,
+          );
+          _zsetValue.addAll(chunk);
+          _hasMore = _zsetValue.length < _collectionTotal;
+      }
+      if (!mounted) return;
+      setState(() => _loadingMore = false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadingMore = false;
+        _error = 'Load failed: $e';
+      });
     }
   }
 
@@ -374,6 +478,14 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
               ],
             ),
           ),
+        if (_collectionTotal >= redisLargeCollectionWarnAt)
+          material.Container(
+            padding: const material.EdgeInsets.symmetric(
+                horizontal: 16, vertical: 8),
+            child: Text(
+              'Large key ($_collectionTotal members). Loading in pages of $redisCollectionPageSize.',
+            ).muted().small(),
+          ),
         // Header
         _buildHeader(cs, shadcnCs),
         const Divider(height: 1),
@@ -570,7 +682,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
-        Text('Hash fields (${entries.length})').semiBold(),
+        Text(_collectionHeading('Hash fields')).semiBold(),
         if (!widget.isReadOnly) ...[
           const Gap(8),
           material.Row(
@@ -624,6 +736,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
                   },
                 ),
         ),
+        if (_hasMore) _loadMoreTile(),
       ],
     );
   }
@@ -634,7 +747,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
-        Text('List items (${_listValue.length})').semiBold(),
+        Text(_collectionHeading('List items')).semiBold(),
         if (!widget.isReadOnly) ...[
           const Gap(8),
           material.Row(
@@ -674,6 +787,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
                   ),
                 ),
         ),
+        if (_hasMore) _loadMoreTile(),
       ],
     );
   }
@@ -684,7 +798,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
-        Text('Set members (${_setValue.length})').semiBold(),
+        Text(_collectionHeading('Set members')).semiBold(),
         if (!widget.isReadOnly) ...[
           const Gap(8),
           material.Row(
@@ -726,6 +840,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
                   ),
                 ),
         ),
+        if (_hasMore) _loadMoreTile(),
       ],
     );
   }
@@ -736,7 +851,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
-        Text('Sorted set (${_zsetValue.length})').semiBold(),
+        Text(_collectionHeading('Sorted set')).semiBold(),
         if (!widget.isReadOnly) ...[
           const Gap(8),
           material.Row(
@@ -791,6 +906,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
                   },
                 ),
         ),
+        if (_hasMore) _loadMoreTile(),
       ],
     );
   }

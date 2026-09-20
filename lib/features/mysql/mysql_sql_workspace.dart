@@ -932,12 +932,13 @@ class _MysqlSqlToolbar extends material.StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: material.MainAxisSize.min,
         children: [
-          material.Row(
+          material.Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: material.WrapCrossAlignment.center,
             children: [
               const Text('Query').semiBold().small(),
-              const Gap(12),
               Text(mysqlSqlToolbarTxLabel(txOpen)).muted().small(),
-              const Spacer(),
               OutlineButton(
                 size: ButtonSize.small,
                 onPressed: onOpenHistory,
@@ -948,7 +949,6 @@ class _MysqlSqlToolbar extends material.StatelessWidget {
                 ),
                 child: const Text('History'),
               ),
-              const Gap(8),
               OutlineButton(
                 onPressed: onExecute,
                 leading: running

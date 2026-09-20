@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **SQL toolbar overflow** — MySQL / Postgres Query + History + Execute wrap instead of overflowing at ~700px (widget tests treat RenderFlex overflow as failure).
+- **Redis collection paging (#816)** — Hash / list / set / zset editors load the first 200 members (`HSCAN` / `LRANGE` / `SSCAN` / `ZRANGE`) with Load more, instead of `HGETALL` / `LRANGE 0 -1` / `SMEMBERS` / `ZRANGE 0 -1`. Keys with 10k+ members show a large-key warning.
 - **Redis URI Test/sidebar (#815)** — Test Connection and the sidebar keyspace probe parse `redis://` / `rediss://` via `fromConnectionRow` (host, port, TLS, cert query params) instead of hitting localhost:6379. The probe keeps `id: -1` so it does not replace workspace sockets.
 - **Redis DEL confirm (#814)** — Deleting a key (browser or editor) and removing a hash field / set member / zset member opens the same destructive-operation dialog as SQL. Cancel / Escape does not send `DEL` / `HDEL` / `SREM` / `ZREM`.
 - **Mongo drop/delete confirm (#781)** — Drop database, drop collection, document Del, and editor Delete open the same destructive-operation dialog as SQL. Cancel / Escape does not call `dropDatabase` / `dropCollection` / `deleteOne`.
