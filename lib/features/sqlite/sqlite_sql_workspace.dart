@@ -10,6 +10,7 @@ import 'package:querya_desktop/core/database/result_row_string_convert.dart';
 import 'package:querya_desktop/core/database/sql_table_target_extractor.dart';
 import 'package:querya_desktop/core/database/sqlite_service.dart';
 import 'package:querya_desktop/core/database/sql_limit.dart';
+import 'package:querya_desktop/core/database/sqlite_sql.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
@@ -306,10 +307,12 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         return;
       }
 
-      // Bound SELECT/WITH/VALUES at the engine before materializing rows.
-      // Client-side take() remains as defense for PRAGMA/EXPLAIN and author LIMIT.
+      // Bound SELECT/WITH-SELECT/VALUES at the engine before materializing rows.
+      // WITH … INSERT and assignment PRAGMA skip LIMIT (they are writes).
       final cap = _resultMaxRows;
-      final sql = injectSqlLimit(userSql, cap);
+      final sql = sqliteSqlIsReadOnlyQuery(userSql)
+          ? injectSqlLimit(userSql, cap)
+          : userSql;
       final results =
           await conn.executeWithTimeout(sql, timeout: _statementTimeout());
 

@@ -220,6 +220,50 @@ void main() {
       await roConn.disconnect();
     });
 
+    test('read-only rejects WITH INSERT; PRAGMA busy_timeout still allowed',
+        () async {
+      final roConn = SqliteConnection(
+        id: 3,
+        name: 'in_memory_ro_with',
+        path: inMemoryDatabasePath,
+        readOnly: true,
+      );
+      await roConn.connect();
+      addTearDown(roConn.disconnect);
+
+      expect(
+        await roConn.execute('PRAGMA busy_timeout'),
+        isNotEmpty,
+      );
+      expect(
+        await roConn.execute('WITH x AS (SELECT 1) SELECT * FROM x'),
+        isNotEmpty,
+      );
+      expect(
+        () => roConn.execute(
+          'WITH x AS (SELECT 1) INSERT INTO t SELECT * FROM x',
+        ),
+        throwsA(isA<StateError>()),
+      );
+      expect(
+        () => roConn.execute('PRAGMA journal_mode=WAL'),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('WITH INSERT on a writable connection applies DML', () async {
+      await conn.connect();
+      await conn.execute(
+        'CREATE TABLE w (id INTEGER PRIMARY KEY, n INTEGER)',
+      );
+      await conn.execute(
+        'WITH x AS (SELECT 7 AS n) INSERT INTO w (n) SELECT n FROM x',
+      );
+      final rows = await conn.execute('SELECT n FROM w');
+      expect(rows, hasLength(1));
+      expect(rows.first['n'], 7);
+    });
+
     test('tracks BEGIN/COMMIT and refuses nested BEGIN via runInTransaction',
         () async {
       await conn.connect();

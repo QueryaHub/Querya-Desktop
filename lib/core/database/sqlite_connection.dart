@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:querya_desktop/core/database/sqlite_sql.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 
@@ -190,18 +191,8 @@ class SqliteConnection {
     if (!isConnected || _db == null) {
       throw StateError('Not connected to SQLite');
     }
-    final sqlLower = sql
-        .replaceAll(RegExp(r'--.*$', multiLine: true), '')
-        .replaceAll(RegExp(r'/\*.*?\*/', dotAll: true), '')
-        .trim()
-        .toLowerCase();
-
-    // SQLite can execute PRAGMA, SELECT, EXPLAIN statements, which return data
-    final isReadOnlyQuery = sqlLower.startsWith('select') ||
-        sqlLower.startsWith('pragma') ||
-        sqlLower.startsWith('explain') ||
-        sqlLower.startsWith('with') ||
-        sqlLower.startsWith('values');
+    final sqlLower = sqliteStripSqlComments(sql).trim().toLowerCase();
+    final isReadOnlyQuery = sqliteSqlIsReadOnlyQuery(sql);
 
     final hasReturning = RegExp(r'\breturning\b').hasMatch(sqlLower);
 
