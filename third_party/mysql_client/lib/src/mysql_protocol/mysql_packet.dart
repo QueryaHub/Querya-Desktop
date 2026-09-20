@@ -238,8 +238,9 @@ class MySQLPacket {
 
   factory MySQLPacket.decodeResultSetRowPacket(
     Uint8List buffer,
-    int numOfCols,
-  ) {
+    int numOfCols, [
+    List<MySQLColumnDefinitionPacket>? colDefs,
+  ]) {
     int offset = 0;
 
     final header = MySQLPacket.decodePacketHeader(buffer);
@@ -250,6 +251,7 @@ class MySQLPacket {
     final payload = MySQLResultSetRowPacket.decode(
       Uint8List.sublistView(buffer, offset),
       numOfCols,
+      colDefs,
     );
 
     return MySQLPacket(

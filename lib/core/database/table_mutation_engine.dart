@@ -142,6 +142,12 @@ abstract final class TableMutationEngine {
         lower.startsWith('bit');
   }
 
+  /// Public alias of [_isBoolType] for grid display / validators.
+  static bool isBoolType(String dataTypeName) => _isBoolType(dataTypeName);
+
+  /// Public alias of [_isBinaryType] for grid display / validators.
+  static bool isBinaryType(String dataTypeName) => _isBinaryType(dataTypeName);
+
   static const String kNullSentinel = '\u0000__QUERYA_NULL__\u0000';
 
   /// Formats a cell string value safely as an SQL literal or `NULL`.

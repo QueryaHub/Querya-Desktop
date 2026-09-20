@@ -241,6 +241,12 @@ void main() {
       expect(actual.item1, "def");
       expect(actual.item2, 4);
     });
+    test("testing getLengthEncodedString latin1 binary bytes", () {
+      final buffer = Uint8List.fromList([0x02, 0xaa, 0xde]);
+      final actual = buffer.getLengthEncodedString(0, latin1Bytes: true);
+      expect(actual.item1.codeUnits, [0xaa, 0xde]);
+      expect(actual.item2, 3);
+    });
     test("testing getLengthEncodedString for long string", () {
       final buffer = Uint8List.fromList([
         0xfc,

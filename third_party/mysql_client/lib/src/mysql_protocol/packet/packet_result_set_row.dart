@@ -10,7 +10,11 @@ class MySQLResultSetRowPacket extends MySQLPacketPayload {
     required this.values,
   });
 
-  factory MySQLResultSetRowPacket.decode(Uint8List buffer, int numOfCols) {
+  factory MySQLResultSetRowPacket.decode(
+    Uint8List buffer,
+    int numOfCols, [
+    List<MySQLColumnDefinitionPacket>? colDefs,
+  ]) {
     final byteData = ByteData.sublistView(buffer);
     int offset = 0;
 
@@ -24,7 +28,13 @@ class MySQLResultSetRowPacket extends MySQLPacketPayload {
         values.add(null);
         offset += 1;
       } else {
-        value = buffer.getUtf8LengthEncodedString(offset);
+        final binary = colDefs != null &&
+            x < colDefs.length &&
+            mysqlColumnHoldsRawBytes(
+              columnType: colDefs[x].type.intVal,
+              charset: colDefs[x].charset,
+            );
+        value = buffer.getLengthEncodedString(offset, latin1Bytes: binary);
         values.add(value.item1);
         offset += value.item2;
       }
