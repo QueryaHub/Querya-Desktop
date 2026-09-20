@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/mysql_connection.dart';
+import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
 
 void main() {
   group('MysqlConnection SSL URI parsing', () {
@@ -20,6 +21,110 @@ void main() {
         ),
         isTrue,
       );
+    });
+
+    test('ssl-mode=prefer enables TLS even when fallback is off', () {
+      expect(
+        MysqlConnection.connectionStringRequiresSsl(
+          'mysql://localhost/db?ssl-mode=prefer',
+          fallbackSsl: false,
+        ),
+        isTrue,
+      );
+      expect(
+        MysqlConnection.sslModeFromConnectionString(
+          'mysql://localhost/db?ssl-mode=prefer',
+          fallbackSsl: false,
+        ),
+        MysqlSslMode.encrypt,
+      );
+    });
+
+    test('ssl-mode=require enables TLS', () {
+      expect(
+        MysqlConnection.connectionStringRequiresSsl(
+          'mysql://localhost/db?ssl-mode=require',
+          fallbackSsl: false,
+        ),
+        isTrue,
+      );
+      expect(
+        MysqlConnection.sslModeFromConnectionString(
+          'mysql://localhost/db?ssl-mode=require',
+        ),
+        MysqlSslMode.encrypt,
+      );
+    });
+
+    test('ssl-mode=disable stays off without cert params', () {
+      expect(
+        MysqlConnection.connectionStringRequiresSsl(
+          'mysql://localhost/db?ssl-mode=disable',
+          fallbackSsl: true,
+        ),
+        isFalse,
+      );
+    });
+
+    test('ssl-mode=verify_identity verifies CA and hostname', () {
+      expect(
+        MysqlConnection.sslModeFromConnectionString(
+          'mysql://db.example.com/db?ssl-mode=verify_identity&sslrootcert=%2Fca.pem',
+        ),
+        MysqlSslMode.verifyIdentity,
+      );
+      expect(
+        MysqlConnection.sslModeFromConnectionString(
+          'mysql://db.example.com/db?ssl-mode=verify-full&sslrootcert=%2Fca.pem',
+        ),
+        MysqlSslMode.verifyIdentity,
+      );
+    });
+
+    test('ssl-mode=verify_ca requires sslrootcert', () {
+      expect(
+        MysqlConnection.sslModeFromConnectionString(
+          'mysql://localhost/db?ssl-mode=verify_ca&sslrootcert=%2Fca.pem',
+        ),
+        MysqlSslMode.verifyCa,
+      );
+      expect(
+        () => validateMysqlSslMode(
+          MysqlSslMode.verifyCa,
+          const SslCertificatePaths(),
+        ),
+        throwsA(
+          isA<ArgumentError>().having(
+            (e) => e.message,
+            'message',
+            contains('sslrootcert'),
+          ),
+        ),
+      );
+      expect(
+        () => validateMysqlSslMode(
+          MysqlSslMode.verifyIdentity,
+          const SslCertificatePaths(),
+        ),
+        throwsA(isA<ArgumentError>()),
+      );
+      expect(
+        () => validateMysqlSslMode(
+          MysqlSslMode.verifyCa,
+          const SslCertificatePaths(rootCert: '/ca.pem'),
+        ),
+        returnsNormally,
+      );
+    });
+
+    test('connect fails closed on verify_ca without sslrootcert', () async {
+      final conn = MysqlConnection(
+        id: 0,
+        name: 't',
+        host: 'localhost',
+        connectionString: 'mysql://u:p@example.com/db?ssl-mode=verify_ca',
+      );
+      await expectLater(conn.connect(), throwsA(isA<ArgumentError>()));
     });
   });
 

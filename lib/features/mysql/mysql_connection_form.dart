@@ -368,8 +368,10 @@ class _MysqlConnectionFormContentState
                     ).muted().small(),
                     const Gap(4),
                     const Text(
-                      'Query params: ssl-mode (disable, require), database, '
-                      'sslrootcert, sslcert, sslkey.',
+                      'Query params: ssl-mode (disable, prefer, require, '
+                      'verify_ca, verify_identity), database, '
+                      'sslrootcert, sslcert, sslkey. '
+                      'prefer/require encrypt; verify_* needs sslrootcert.',
                     ).muted().small(),
                     const Gap(8),
                     TextField(
