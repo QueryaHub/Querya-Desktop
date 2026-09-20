@@ -73,15 +73,10 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
       _error = null;
     });
     try {
-      // Use a temporary connection so we don't kill the main view's connection.
-      final c = widget.connection;
-      final conn = RedisConnection(
+      // Temporary probe (id: -1) so we don't touch RedisService / workspace sockets.
+      final conn = RedisConnection.fromConnectionRow(
+        widget.connection,
         id: -1,
-        name: 'sidebar_probe',
-        host: c.host ?? 'localhost',
-        port: c.port ?? 6379,
-        username: c.username,
-        password: c.password,
       );
       await conn.connect();
       final raw = await conn.info();

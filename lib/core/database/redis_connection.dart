@@ -20,7 +20,14 @@ class RedisConnection {
   })  : _password = password,
         _connectionString = connectionString;
 
-  factory RedisConnection.fromConnectionRow(ConnectionRow row) {
+  /// Parses [ConnectionRow.connectionString] (`redis://` / `rediss://`) for
+  /// host, port, userinfo, and TLS. Pass [id] `-1` for a sidebar probe that
+  /// must not share the workspace pool id (and skips secrets lookup).
+  factory RedisConnection.fromConnectionRow(
+    ConnectionRow row, {
+    int? id,
+  }) {
+    final resolvedId = id ?? row.id ?? 0;
     final uriText = row.connectionString?.trim();
     if (uriText != null && uriText.isNotEmpty) {
       final parsed = Uri.parse(uriText);
@@ -37,7 +44,7 @@ class RedisConnection {
         }
       }
       return RedisConnection(
-        id: row.id ?? 0,
+        id: resolvedId,
         name: row.name,
         host: parsed.host.isEmpty ? (row.host ?? 'localhost') : parsed.host,
         port: parsed.hasPort ? parsed.port : (row.port ?? 6379),
@@ -48,7 +55,7 @@ class RedisConnection {
       );
     }
     return RedisConnection(
-      id: row.id ?? 0,
+      id: resolvedId,
       name: row.name,
       host: row.host ?? 'localhost',
       port: row.port ?? 6379,
