@@ -125,6 +125,28 @@ void main() {
           await AppSettings.instance.getMysqlSqlStmtTimeoutSeconds(), isNull);
     });
 
+    test('getSqliteSqlStmtTimeoutSeconds roundtrip', () async {
+      expect(
+          await AppSettings.instance.getSqliteSqlStmtTimeoutSeconds(), isNull);
+
+      await AppSettings.instance.setSqliteSqlStmtTimeoutSeconds(60);
+      expect(await AppSettings.instance.getSqliteSqlStmtTimeoutSeconds(), 60);
+
+      await AppSettings.instance.setSqliteSqlStmtTimeoutSeconds(null);
+      expect(
+          await AppSettings.instance.getSqliteSqlStmtTimeoutSeconds(), isNull);
+    });
+
+    test('getSqliteSqlStmtTimeoutSeconds returns null for invalid stored value',
+        () async {
+      await LocalDb.instance.setAppSetting(
+        AppSettingsKeys.sqliteSqlStmtTimeoutSeconds,
+        'not-a-number',
+      );
+      expect(
+          await AppSettings.instance.getSqliteSqlStmtTimeoutSeconds(), isNull);
+    });
+
     test('getSqlResultMaxRows defaults and normalizes to preset', () async {
       expect(await AppSettings.instance.getSqlResultMaxRows(),
           kDefaultSqlResultMaxRows);

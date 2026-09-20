@@ -10,6 +10,7 @@ import 'package:querya_desktop/core/editor/querya_code_editor.dart';
 import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/sqlite/sqlite_result_utils.dart';
+import 'package:querya_desktop/features/sqlite/sqlite_table_utils.dart';
 import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -76,7 +77,13 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
   }
 
   String _browseDataSql() {
-    return 'SELECT * FROM ${_qualifiedFrom()} LIMIT ${widget.limit} OFFSET $_offset';
+    return sqliteBrowseDataSql(
+      qualifiedFrom: _qualifiedFrom(),
+      primaryKeys: _primaryKeys,
+      isView: widget.isView,
+      limit: widget.limit,
+      offset: _offset,
+    );
   }
 
   @override
@@ -172,7 +179,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
         return;
       }
       _lease = lease;
-      await _fetch(refreshCount: true);
+      await _fetch();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -238,7 +245,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     );
   }
 
-  Future<void> _fetch({bool refreshCount = false}) async {
+  Future<void> _fetch() async {
     final conn = _connection;
     if (conn == null || !conn.isConnected) {
       if (mounted && _loading) {
@@ -254,24 +261,16 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
       _error = null;
     });
     try {
-      if (refreshCount) {
-        try {
-          final countRs =
-              await conn.execute('SELECT COUNT(*) FROM ${_qualifiedFrom()}');
-          if (countRs.isNotEmpty) {
-            _totalRowCount = countRs.first.values.first as int?;
-          }
-        } catch (_) {
-          _totalRowCount = null;
-        }
-      }
+      await _ensureSchema(conn);
+      if (!mounted) return;
+
+      // Skip COUNT(*) — it blocks the FFI isolate on large files. Next is
+      // enabled when the current page is full (_canGoNext).
+      _totalRowCount = null;
 
       final browseSql = _browseDataSql();
       final rs = await conn.execute(browseSql);
 
-      if (!mounted) return;
-
-      await _ensureSchema(conn);
       if (!mounted) return;
 
       final cols = <String>[];
@@ -338,7 +337,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
   Future<void> _onRefresh() async {
     if (!await _confirmDiscardIfNeeded()) return;
     if (!mounted) return;
-    await _fetch(refreshCount: true);
+    await _fetch();
   }
 
   Future<void> _onNavigateHome() async {
