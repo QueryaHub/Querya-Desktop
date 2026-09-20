@@ -231,7 +231,7 @@ class MongoService {
     });
   }
 
-  /// Updates a single document matched by [filter].
+  /// Updates a single document matched by [filter] (`$set` / `$unset` / …).
   Future<void> updateDocument(
     MongoConnection connection,
     String database,
@@ -242,6 +242,20 @@ class MongoService {
     return _withDb(connection, database, (db) async {
       final coll = db.collection(collection);
       await coll.updateOne(filter, update);
+    });
+  }
+
+  /// Replaces a single document matched by [filter] (full-document Save).
+  Future<void> replaceDocument(
+    MongoConnection connection,
+    String database,
+    String collection,
+    Map<String, dynamic> filter,
+    Map<String, dynamic> replacement,
+  ) async {
+    return _withDb(connection, database, (db) async {
+      final coll = db.collection(collection);
+      await coll.replaceOne(filter, replacement);
     });
   }
 

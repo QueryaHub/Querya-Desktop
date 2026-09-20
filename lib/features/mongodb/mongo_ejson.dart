@@ -53,3 +53,17 @@ Map<String, dynamic> mongoFilterFromJson(String text) {
 bool mongoFilterNeedsObjectIdHint(Map<String, dynamic> filter) {
   return filter['_id'] is String;
 }
+
+/// Full-document Save payload for [DbCollection.replaceOne].
+///
+/// Parsed JSON minus any `_id` the user typed, then `_id` locked to
+/// [originalId]. Keys absent from [parsed] (including nested ones) are not in
+/// the replacement, so they are dropped — unlike `$set`, which only merges.
+Map<String, dynamic> mongoFullDocumentReplacement({
+  required Map<String, dynamic> parsed,
+  required Object originalId,
+}) {
+  final out = Map<String, dynamic>.from(parsed);
+  out['_id'] = originalId;
+  return out;
+}
