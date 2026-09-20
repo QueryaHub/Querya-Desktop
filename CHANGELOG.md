@@ -7,12 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Target cut: **0.4.17** ([milestone](https://github.com/QueryaHub/Querya-Desktop/milestone/8), tracking [#880](https://github.com/QueryaHub/Querya-Desktop/issues/880)).
-
-### Planned (not yet on `dev`)
+### Planned
 
 - Hidden bugs pass 2 — data-loss / fail-open: [#867](https://github.com/QueryaHub/Querya-Desktop/issues/867)–[#873](https://github.com/QueryaHub/Querya-Desktop/issues/873)
 - Algorithm / first paint / 120 Hz: [#874](https://github.com/QueryaHub/Querya-Desktop/issues/874)–[#879](https://github.com/QueryaHub/Querya-Desktop/issues/879)
+
+## [0.4.17] - 2026-09-20
+
+Driver and grid correctness after 0.4.16: Table Browser schema vs missing PK, SQLite implicit `rowid`, Mongo write/filter/discard, and Postgres / MySQL / SQLite / Redis session, type, and Save fixes.
 
 ### Fixed
 
