@@ -3,6 +3,31 @@ import 'package:mongo_dart/mongo_dart.dart';
 import '../storage/local_db.dart';
 import 'mongodb_connection.dart';
 
+/// Throws if a single-document write matched nothing (wrong `_id` type,
+/// concurrent delete). Same class of lie as 0-row SQL DML.
+///
+/// [nModified] is ignored: an identical `$set` still matched the document.
+void expectMongoDocumentMatched(int matched, {required String operation}) {
+  if (matched >= 1) return;
+  throw StateError(
+    '$operation failed: matched 0 documents. '
+    'The document may have been deleted or the _id type does not match.',
+  );
+}
+
+void _throwIfMongoWriteFailed(
+  WriteResult result, {
+  required String operation,
+  required int matched,
+}) {
+  if (result.hasWriteErrors) {
+    throw StateError(
+      '$operation failed: ${result.writeError?.errmsg ?? 'write error'}',
+    );
+  }
+  expectMongoDocumentMatched(matched, operation: operation);
+}
+
 /// Service for managing MongoDB connections.
 class MongoService {
   MongoService._();
@@ -241,7 +266,12 @@ class MongoService {
   ) async {
     return _withDb(connection, database, (db) async {
       final coll = db.collection(collection);
-      await coll.updateOne(filter, update);
+      final result = await coll.updateOne(filter, update);
+      _throwIfMongoWriteFailed(
+        result,
+        operation: 'updateOne',
+        matched: result.nMatched,
+      );
     });
   }
 
@@ -255,7 +285,12 @@ class MongoService {
   ) async {
     return _withDb(connection, database, (db) async {
       final coll = db.collection(collection);
-      await coll.replaceOne(filter, replacement);
+      final result = await coll.replaceOne(filter, replacement);
+      _throwIfMongoWriteFailed(
+        result,
+        operation: 'replaceOne',
+        matched: result.nMatched,
+      );
     });
   }
 
@@ -268,7 +303,12 @@ class MongoService {
   ) async {
     return _withDb(connection, database, (db) async {
       final coll = db.collection(collection);
-      await coll.deleteOne(filter);
+      final result = await coll.deleteOne(filter);
+      _throwIfMongoWriteFailed(
+        result,
+        operation: 'deleteOne',
+        matched: result.nRemoved,
+      );
     });
   }
 

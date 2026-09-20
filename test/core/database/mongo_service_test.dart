@@ -3,6 +3,31 @@ import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 
 void main() {
+  group('expectMongoDocumentMatched', () {
+    test('allows 1+ matched documents', () {
+      expectMongoDocumentMatched(1, operation: 'updateOne');
+      expectMongoDocumentMatched(2, operation: 'replaceOne');
+    });
+
+    test('throws on 0 matches so Save is a failure', () {
+      expect(
+        () => expectMongoDocumentMatched(0, operation: 'updateOne'),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('matched 0 documents'),
+          ),
+        ),
+      );
+    });
+
+    test('nModified 0 is not a failure when the filter matched', () {
+      // Identical $set: nMatched=1, nModified=0 — still a successful save.
+      expectMongoDocumentMatched(1, operation: 'updateOne');
+    });
+  });
+
   group('MongoService.createConnection', () {
     test('creates MongoConnection from ConnectionRow', () {
       const row = ConnectionRow(
