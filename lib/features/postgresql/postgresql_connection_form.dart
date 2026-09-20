@@ -144,6 +144,10 @@ class _PostgresConnectionFormContentState
     _setOrRemoveSslParam(params, 'sslrootcert', _sslRootCertController);
     _setOrRemoveSslParam(params, 'sslcert', _sslCertController);
     _setOrRemoveSslParam(params, 'sslkey', _sslKeyController);
+    if (!params.containsKey('sslmode') &&
+        _sslRootCertController.text.trim().isNotEmpty) {
+      params['sslmode'] = 'verify-full';
+    }
     final newUri = Uri(
       scheme: parsed.scheme,
       userInfo: parsed.userInfo.isEmpty ? null : parsed.userInfo,
@@ -187,8 +191,10 @@ class _PostgresConnectionFormContentState
         Uri.encodeComponent(password),
     ];
     final queryParams = <String, String>{
-      if (sslRootCert != null && sslRootCert.isNotEmpty)
+      if (sslRootCert != null && sslRootCert.isNotEmpty) ...{
         'sslrootcert': sslRootCert,
+        'sslmode': 'verify-full',
+      },
       if (sslCert != null && sslCert.isNotEmpty) 'sslcert': sslCert,
       if (sslKey != null && sslKey.isNotEmpty) 'sslkey': sslKey,
     };
@@ -623,6 +629,13 @@ class _PostgresConnectionFormContentState
                         ],
                       ),
                       if (_useSSL) ...[
+                        const Gap(8),
+                        const Text(
+                          'Without a Root CA this is sslmode=require: traffic is '
+                          'encrypted but the server certificate is not checked '
+                          '(MITM is possible). A Root CA enables verify-full. '
+                          'A URI sslmode= value always wins.',
+                        ).muted().small(),
                         const Gap(16),
                         material.FocusTraversalGroup(
                           policy: material.WidgetOrderTraversalPolicy(),
