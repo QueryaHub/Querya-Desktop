@@ -300,6 +300,7 @@ void main() {
       expect(result!.connectionString, contains('pg.example.com'));
       expect(result!.connectionString, contains('sslrootcert'));
       expect(result!.connectionString, contains('root.pem'));
+      expect(result!.connectionString, contains('sslmode=verify-full'));
       expect(result!.connectionString, contains('admin'));
       expect(result!.connectionString, contains('secret'));
       expect(result!.useSSL, true);

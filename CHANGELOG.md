@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Postgres host/port SSL (#790)** — Host/port Use SSL/TLS stays `sslmode=require` (encrypt, no CA check) unless a Root CA is set, then `verify-full`. A URI `sslmode=` value still wins. The form documents the MITM tradeoff and writes `sslmode=verify-full` when saving a Root CA.
 - **Postgres custom-SQL allowlist (#791)** — Table Browser SQL dialog classifies the first statement after comments instead of substring `contains('insert ')`. `SELECT inserted_at` is allowed; `SELECT 1; DELETE FROM t` is rejected. `WITH … INSERT` is a write; `TABLE` / `VALUES` / `(SELECT …)` stay allowed.
 - **SQLite getObjectDdl bind (#796)** — DDL lookup uses `WHERE name = ?` with a positional list. `:name` plus `[objectName]` did not bind, so the dialog showed **No definition found** for tables that exist.
 - **SQLite WITH / PRAGMA (#797)** — `execute` classifies the first statement after comments: `WITH … INSERT` is a write (Dart read-only guard + `execute` instead of `rawQuery`). Assignment `PRAGMA name=value` is a write; `PRAGMA busy_timeout` stays a query. SQL workspace injects `LIMIT` only for read-only statements.

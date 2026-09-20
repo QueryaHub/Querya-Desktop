@@ -37,6 +37,22 @@ String replaceDatabaseInConnectionString(
   return uri.replace(queryParameters: params).toString();
 }
 
+/// Host/port TLS mode when the URI has no `sslmode`.
+///
+/// [uriSslMode] wins (URI is source of truth). Otherwise encrypt-only
+/// (`require`) unless a Root CA is set, then `verifyFull`. `require` does not
+/// check the CA — MITM is possible.
+SslMode postgresResolveSslMode({
+  SslMode? uriSslMode,
+  required bool encrypt,
+  required bool hasRootCert,
+}) {
+  if (uriSslMode != null) return uriSslMode;
+  if (!encrypt && !hasRootCert) return SslMode.disable;
+  if (hasRootCert) return SslMode.verifyFull;
+  return SslMode.require;
+}
+
 /// PostgreSQL connection using the pure-Dart `postgres` package.
 class PostgresConnection {
   PostgresConnection({
@@ -145,9 +161,10 @@ class PostgresConnection {
       }
     }
     return ConnectionSettings(
-      sslMode: (useSSL || securityContext != null)
-          ? SslMode.require
-          : SslMode.disable,
+      sslMode: postgresResolveSslMode(
+        encrypt: useSSL || securityContext != null,
+        hasRootCert: sslRootCert != null && sslRootCert!.trim().isNotEmpty,
+      ),
       connectTimeout: const Duration(seconds: 10),
       queryTimeout: const Duration(seconds: 30),
       securityContext: securityContext,
@@ -184,8 +201,14 @@ class PostgresConnection {
           dbName,
         );
         final parsed = parseConnectionString(uriForOpen);
-        final sslMode =
-            parsed.sslMode ?? (useSSL ? SslMode.require : SslMode.disable);
+        final sslMode = postgresResolveSslMode(
+          uriSslMode: parsed.sslMode,
+          encrypt: useSSL ||
+              (sslRootCert != null && sslRootCert!.trim().isNotEmpty) ||
+              (sslCert != null && sslCert!.trim().isNotEmpty) ||
+              (sslKey != null && sslKey!.trim().isNotEmpty),
+          hasRootCert: sslRootCert != null && sslRootCert!.trim().isNotEmpty,
+        );
         _conn = await Connection.open(
           parsed.endpoints.first,
           settings: ConnectionSettings(
