@@ -182,6 +182,42 @@ void main() {
       );
     });
 
+    test('buildUriForDatabase still contains auth after scrubCredentials', () {
+      final conn = MongoConnection(
+        id: 1,
+        name: 'test',
+        host: 'atlas.example.com',
+        username: 'app',
+        password: 's3cret',
+        database: 'prod',
+        authSource: 'admin',
+      );
+
+      conn.scrubCredentials();
+
+      expect(conn.password, isNull);
+      expect(conn.connectionString, isNull);
+
+      final uri = conn.buildUriForDatabase('analytics');
+      expect(uri, contains('app:${Uri.encodeComponent('s3cret')}@'));
+      expect(uri, contains('/analytics'));
+      expect(uri, contains('authSource=admin'));
+    });
+
+    test('scrubCredentials does not persist session URI onto connectionString getter', () {
+      final conn = MongoConnection(
+        id: 1,
+        name: 'test',
+        host: 'localhost',
+        username: 'u',
+        password: 'p',
+        connectionString: 'mongodb://u:p@localhost/db',
+      );
+      conn.scrubCredentials();
+      expect(conn.connectionString, isNull);
+      expect(conn.buildConnectionUri(), 'mongodb://u:p@localhost/db');
+    });
+
     test('empty connectionString falls back to building URI', () {
       final conn = MongoConnection(
         id: 1,
