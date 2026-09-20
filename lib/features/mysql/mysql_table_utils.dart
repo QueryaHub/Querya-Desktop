@@ -1,3 +1,19 @@
+import 'package:querya_desktop/core/database/mysql_connection.dart';
+
+/// Browse SELECT for Table Browser. PK columns get `ORDER BY` so LIMIT/OFFSET
+/// is stable on InnoDB. Empty [primaryKeys] keeps unordered scan (views / no PK).
+String mysqlBrowseDataSql({
+  required String qualifiedFrom,
+  required List<String> primaryKeys,
+  required int limit,
+  required int offset,
+}) {
+  final order = primaryKeys.isEmpty
+      ? ''
+      : ' ORDER BY ${primaryKeys.map(MysqlConnection.quoteIdentifier).join(', ')}';
+  return 'SELECT * FROM $qualifiedFrom$order LIMIT $limit OFFSET $offset';
+}
+
 /// Whether [sql] is allowed for the table browser "custom SQL" path (read-only SELECT).
 bool isAllowedMysqlSelectQuery(String sql) {
   final t = sql.trim();

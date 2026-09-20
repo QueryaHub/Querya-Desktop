@@ -493,6 +493,28 @@ class MysqlConnection {
     );
   }
 
+  /// InnoDB `TABLE_ROWS` estimate (not a blocking `COUNT(*)`).
+  Future<int?> estimateTableRows({
+    required String database,
+    required String table,
+  }) async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to MySQL');
+    }
+    final rs = await execute(
+      'SELECT TABLE_ROWS FROM information_schema.TABLES '
+      'WHERE TABLE_SCHEMA = :database AND TABLE_NAME = :table',
+      {
+        'database': database,
+        'table': table,
+      },
+    );
+    if (rs.rows.isEmpty) return null;
+    final v = rs.rows.first.colAt(0);
+    if (v == null || v.isEmpty) return null;
+    return int.tryParse(v);
+  }
+
   /// Returns primary key column names for [table] in [database].
   Future<List<String>> getPrimaryKeys({
     required String database,

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **MySQL Table Browser paging (#807)** — Browse `SELECT` uses `ORDER BY` primary-key columns when a PK exists. Row totals come from `information_schema.TABLES.TABLE_ROWS` instead of a blocking `COUNT(*)` before first paint (stale estimates that are below the current page are ignored so Next still works).
 - **Redis URL paste (#819)** — Paste `redis://` / `rediss://` stores the raw URI on `connectionString` (like Postgres/MySQL/Mongo), so `sslrootcert` / `sslcert` / `sslkey` reach `RedisConnection.connect`.
 - **Redis binary bulk (#818)** — GET / SCAN / hash / list / set / zset decode bulk replies as bytes (`RedisParserBulkBinary`). Invalid UTF-8 is shown as hex / base64; Save as text is off so SET cannot write replacement characters.
 - **Redis stream/unknown GET-SET (#817)** — Stream, module, and `unknown` keys are not opened with `GET` or saved with `SET`. Save stays on `string` only; `unknown` retries `TYPE` before treating the value as a string.
