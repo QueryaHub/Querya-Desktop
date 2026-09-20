@@ -168,6 +168,18 @@ void main() {
       expect(columns, containsAll(['id', 'name']));
     });
 
+    test('getObjectDdl returns CREATE SQL for a table that exists', () async {
+      await conn.connect();
+      await conn.execute(
+        'CREATE TABLE foo (id INTEGER PRIMARY KEY, name TEXT)',
+      );
+
+      final ddl = await conn.getObjectDdl('foo');
+      expect(ddl, isNot(contains('No definition found')));
+      expect(ddl.toUpperCase(), contains('CREATE TABLE'));
+      expect(ddl.toLowerCase(), contains('foo'));
+    });
+
     test('executes INSERT, UPDATE, DELETE with RETURNING clause correctly',
         () async {
       await conn.connect();
