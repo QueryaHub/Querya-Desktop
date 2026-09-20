@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
+import 'package:querya_desktop/core/database/postgres_sql.dart';
 import 'package:querya_desktop/core/database/result_row_string_convert.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
@@ -531,7 +532,12 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         if (conn == null || !conn.isConnected) {
           throw StateError('Could not connect to PostgreSQL.');
         }
-        await conn.execute(plan.toTransactionSql());
+        await runPostgresStatementsInTransaction(
+          (sql) async {
+            await conn.execute(sql);
+          },
+          plan.statements.map((s) => s.sql),
+        );
       },
     );
     if (!mounted) return;

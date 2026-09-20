@@ -26,3 +26,25 @@ bool shouldSkipImplicitBegin(String sql) {
 
   return false;
 }
+
+/// Runs [statements] as separate extended-protocol executes inside BEGIN/COMMIT.
+///
+/// PostgreSQL Parse cannot contain multiple commands, so
+/// `BEGIN; UPDATE …; COMMIT;` in one [execute] fails.
+Future<void> runPostgresStatementsInTransaction(
+  Future<void> Function(String sql) execute,
+  Iterable<String> statements,
+) async {
+  await execute('BEGIN');
+  try {
+    for (final sql in statements) {
+      await execute(sql);
+    }
+    await execute('COMMIT');
+  } catch (_) {
+    try {
+      await execute('ROLLBACK');
+    } catch (_) {}
+    rethrow;
+  }
+}
