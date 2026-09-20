@@ -311,7 +311,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
         await conn.execute('BEGIN TRANSACTION');
         try {
           for (final stmt in plan.statements) {
-            await conn.execute(stmt.sql);
+            expectDmlMatchedRows(await conn.executeAffected(stmt.sql));
           }
           await conn.execute('COMMIT');
         } catch (e) {

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **0-row DML Save (#773)** — Table Browser and SQL-grid Save fail (and roll back) if any statement matches 0 rows instead of toasting success from statement count. The staging buffer is kept.
 - **Table Browser navigation (#771)** — Home, Close workspace, tree/object changes, and the matching Command Palette actions confirm before discarding staged grid or SQL edits. Cancel leaves the staging buffer registered.
 - **Redis SET TTL (#811)** — Saving a string key uses `SET … KEEPTTL XX` (Redis 6+) so an existing expiry is not cleared. Older servers fall back to `TTL` then `SET … EX`. A key that already expired is not recreated.
 - **MySQL SELECT cap (#808)** — SQL Workspace injects/clamps `LIMIT` like Postgres and drains leftover `rowsStream` rows instead of cancelling, so the session is ready for the next statement. Table Browser custom SQL gets the same LIMIT clamp so `execute` does not buffer an unbounded result.

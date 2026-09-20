@@ -141,6 +141,17 @@ class SqliteConnection {
     }
   }
 
+  /// Runs DML and returns sqlite `changes()` for the last INSERT/UPDATE/DELETE.
+  Future<int> executeAffected(String sql) async {
+    await execute(sql);
+    if (!isConnected || _db == null) return 0;
+    final rows = await _db!.rawQuery('SELECT changes() AS c');
+    if (rows.isEmpty) return 0;
+    final v = rows.first['c'];
+    if (v is int) return v;
+    return int.tryParse('$v') ?? 0;
+  }
+
   /// Runs [execute] with an application-level [timeout].
   Future<List<Map<String, Object?>>> executeWithTimeout(
     String sql, {

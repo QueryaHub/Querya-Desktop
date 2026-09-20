@@ -248,6 +248,62 @@ void main() {
       expect(outcome.error.toString(), contains('no primary key'));
       expect(executed, isFalse);
     });
+
+    testWidgets('0-row DML is failed and the staging buffer stays dirty',
+        (tester) async {
+      await tester.pumpWidget(
+        ShadcnApp(
+          theme: AppTheme.dark,
+          home: const material.Scaffold(body: material.SizedBox()),
+        ),
+      );
+      final ctx = tester.element(find.byType(material.Scaffold));
+      final buffer = DataGridStagingBuffer(
+        columns: ['id', 'name'],
+        rows: [
+          ['1', 'Ada'],
+        ],
+      );
+      buffer.setCell(0, 1, 'Grace');
+      addTearDown(buffer.dispose);
+
+      final future = applyTableViewStagedChanges(
+        context: ctx,
+        buffer: buffer,
+        dialect: SqlDialect.postgres,
+        tableName: 'users',
+        schema: 'public',
+        primaryKeys: ['id'],
+        execute: (_) async => expectDmlMatchedRows(0),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Apply Changes'));
+      final outcome = await future;
+
+      expect(outcome.isFailed, isTrue);
+      expect(outcome.error.toString(), contains('matched 0 rows'));
+      expect(buffer.isDirty, isTrue);
+    });
+  });
+
+  group('expectDmlMatchedRows', () {
+    test('allows 1+ affected rows', () {
+      expect(() => expectDmlMatchedRows(1), returnsNormally);
+      expect(() => expectDmlMatchedRows(3), returnsNormally);
+    });
+
+    test('throws on 0-row DML so Save is a failure', () {
+      expect(
+        () => expectDmlMatchedRows(0),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('matched 0 rows'),
+          ),
+        ),
+      );
+    });
   });
 
   group('TableBrowserPendingActions', () {

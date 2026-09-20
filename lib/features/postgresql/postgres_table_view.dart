@@ -534,7 +534,10 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         }
         await runPostgresStatementsInTransaction(
           (sql) async {
-            await conn.execute(sql);
+            final result = await conn.execute(sql);
+            if (sql != 'BEGIN' && sql != 'COMMIT' && sql != 'ROLLBACK') {
+              expectDmlMatchedRows(result.affectedRows);
+            }
           },
           plan.statements.map((s) => s.sql),
         );
