@@ -9,6 +9,7 @@ import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/editor/querya_code_editor.dart';
 import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/sqlite/sqlite_result_utils.dart';
 import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -282,8 +283,10 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
 
       final outRows = rs.map((row) {
         return cols.map((col) {
-          final val = row[col];
-          return val == null ? 'NULL' : val.toString();
+          return sqliteResultCellToDisplayString(
+            row[col],
+            dataTypeName: _columnDataTypes[col],
+          );
         }).toList();
       }).toList();
 

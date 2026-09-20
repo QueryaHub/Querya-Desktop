@@ -15,6 +15,7 @@ import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/ui/querya_shell_status.dart';
+import 'package:querya_desktop/features/sqlite/sqlite_result_utils.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -309,7 +310,9 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       final injectedLimit = sql != userSql;
 
       final rawRows = results.take(limitCount).map((row) {
-        return cols.map((col) => row[col]).toList();
+        return cols
+            .map((col) => sqliteResultCellToDisplayString(row[col]))
+            .toList();
       }).toList();
 
       final outRows = await convertResultRowsToStringsAdaptive(rawRows);
