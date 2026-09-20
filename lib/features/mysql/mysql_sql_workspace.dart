@@ -9,7 +9,9 @@ import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
 import 'package:querya_desktop/core/database/result_row_string_convert.dart';
+import 'package:querya_desktop/core/database/sql_limit.dart';
 import 'package:querya_desktop/core/database/sql_table_target_extractor.dart';
+import 'package:querya_desktop/core/database/stream_take_drain.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
@@ -288,8 +290,10 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       }
 
       final to = _statementTimeout();
+      final cap = _resultMaxRows;
+      final sql = injectSqlLimit(userSql, cap);
       final rs =
-          await conn.executeWithTimeout(userSql, timeout: to, iterable: true);
+          await conn.executeWithTimeout(sql, timeout: to, iterable: true);
 
       if (!mounted) return;
 
@@ -299,26 +303,26 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       }
 
       // Convert while streaming — no Object? matrix + isolate double-copy (#421).
-      final outRows = <List<String>>[];
-      var n = 0;
-      final cap = _resultMaxRows;
-      var truncated = false;
-      await for (final row in rs.rowsStream) {
-        if (n >= cap) {
-          truncated = true;
-          break;
-        }
-        outRows.add(
+      // Drain leftover rows so COM_QUERY reaches EOF (#808); do not cancel.
+      final taken = await takeThenDrain(
+        rs.rowsStream,
+        cap,
+        onProgress: (n) async {
+          if (n % kResultStringConvertYieldEvery == 0) {
+            await Future<void>.delayed(Duration.zero);
+          }
+        },
+      );
+      final outRows = [
+        for (final row in taken.items)
           List.generate(
             row.numOfColumns,
             (i) => resultCellToDisplayString(row.colAt(i)),
           ),
-        );
-        n++;
-        if (n % kResultStringConvertYieldEvery == 0) {
-          await Future<void>.delayed(Duration.zero);
-        }
-      }
+      ];
+      final truncated =
+          taken.truncated || (sql != userSql && outRows.length >= cap);
+      final n = outRows.length;
 
       int? affected;
       if (cols.isEmpty && outRows.isEmpty) {
