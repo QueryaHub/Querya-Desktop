@@ -368,6 +368,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
                   tableName: sq.name,
                   isView: sq.kind == SqliteObjectKind.view,
                   onNavigateHome: widget.onNavigateHome,
+                  isReadOnly: widget.isReadOnly,
                 ),
         );
         break;

@@ -54,6 +54,15 @@ void main() {
         ),
         isFalse,
       );
+      expect(
+        tableViewEditingEnabled(
+          isView: false,
+          customSqlActive: false,
+          hasPrimaryKey: true,
+          readOnly: true,
+        ),
+        isFalse,
+      );
     });
   });
 
@@ -104,6 +113,16 @@ void main() {
           schemaLoaded: false,
         ),
         isNull,
+      );
+      expect(
+        tableViewEditDisabledReason(
+          isView: false,
+          customSqlActive: false,
+          hasPrimaryKey: true,
+          schemaLoaded: true,
+          readOnly: true,
+        ),
+        'Read-only session',
       );
       expect(
         tableViewEditDisabledReason(
