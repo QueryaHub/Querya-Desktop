@@ -709,10 +709,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     } else if (conn.type == 'sqlite') {
       SqliteService.instance.interruptAllModes(conn);
     } else if (conn.type == 'redis') {
-      final redisConn = RedisService.instance.getConnection(id);
-      if (redisConn != null) {
-        await RedisService.instance.disconnect(redisConn);
-      }
+      await RedisService.instance.disconnectByConnectionId(id);
     } else if (conn.type == 'mongodb') {
       await MongoService.instance.disconnectByConnectionId(id);
     }
