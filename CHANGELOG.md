@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Mongo 0-match write (#776)** — `updateOne` / `replaceOne` / `deleteOne` throw when `nMatched` / `nRemoved` is 0 (wrong `_id` type, deleted doc). Inspector and JSON editor surface Save Failed instead of a success toast. An identical `$set` (`nModified == 0`) still counts as a match.
 - **Mongo full-document Save (#778)** — JSON editor Save uses `replaceOne` (whole document, `_id` locked) instead of `$set`, so fields deleted in JSON — including nested keys — are removed on the server.
 - **Mongo document editor Back (#782)** — Dirty JSON in `MongoDocumentEditor` is registered with `UnsavedWorkRegistry`. Breadcrumb Back, Home, Close, and tree navigation confirm before discarding; Cancel keeps the editor.
 - **Mongo JSON filter ObjectId / DateTime (#783)** — Document list filter parses Extended JSON (`$oid`, `$date`) and wraps a 24-character hex `_id` as `ObjectId`. A leftover string `_id` with zero matches shows how to write `{ "_id": { "$oid": "…" } }`.
