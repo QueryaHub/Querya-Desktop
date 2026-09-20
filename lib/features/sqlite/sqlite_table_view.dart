@@ -613,6 +613,8 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
                   statusLine: _statusLine(),
                   showExportToolbar: true,
                   stagingBuffer: _stagingBuffer,
+                  columnDataTypes:
+                      _columnDataTypes.isEmpty ? null : _columnDataTypes,
                   onApplyChanges:
                       _stagingBuffer != null ? _applyStagedChanges : null,
                   isSaving: _isSaving,
