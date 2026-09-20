@@ -5,6 +5,9 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
 import 'package:querya_desktop/core/database/sqlite_service.dart';
+import 'package:querya_desktop/core/database/table_mutation_engine.dart';
+import 'package:querya_desktop/features/sqlite/sqlite_table_utils.dart';
+import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/features/workspace/table_view_staging.dart';
 
 void main() {
@@ -166,6 +169,103 @@ void main() {
 
       final columns = await conn.listColumnNames(table: 'users');
       expect(columns, containsAll(['id', 'name']));
+    });
+
+    test('Table Browser UPDATE on implicit rowid table round-trips', () async {
+      await conn.connect();
+      await conn.execute('CREATE TABLE t (name TEXT)');
+      await conn.execute("INSERT INTO t (name) VALUES ('Ada')");
+
+      final schema = await conn.getTableSchema(table: 't');
+      expect(schema.primaryKeys, isEmpty);
+
+      final pks = sqliteTableBrowserPrimaryKeys(
+        declaredPrimaryKeys: schema.primaryKeys,
+        isView: false,
+      );
+      expect(pks, ['rowid']);
+      expect(
+        tableViewEditingEnabled(
+          isView: false,
+          customSqlActive: false,
+          hasPrimaryKey: pks.isNotEmpty,
+        ),
+        isTrue,
+      );
+      expect(
+        tableViewEditDisabledReason(
+          isView: false,
+          customSqlActive: false,
+          hasPrimaryKey: pks.isNotEmpty,
+          schemaLoaded: true,
+        ),
+        isNull,
+      );
+
+      final sql = sqliteBrowseDataSql(
+        qualifiedFrom: SqliteConnection.quoteIdentifier('t'),
+        primaryKeys: pks,
+        isView: false,
+        limit: 200,
+        offset: 0,
+      );
+      final rs = await conn.execute(sql);
+      expect(rs, isNotEmpty);
+      final cols = rs.first.keys.toList();
+      expect(cols, contains('rowid'));
+      expect(cols, contains('name'));
+
+      final rows = [
+        for (final row in rs)
+          [for (final c in cols) '${row[c]}'],
+      ];
+      final buffer = DataGridStagingBuffer(columns: cols, rows: rows);
+      addTearDown(buffer.dispose);
+      buffer.setCell(0, cols.indexOf('name'), 'Grace');
+
+      final plan = buffer.generateMutationPlan(
+        dialect: SqlDialect.sqlite,
+        tableName: 't',
+        primaryKeys: pks,
+        columnDataTypes: {
+          kSqliteImplicitRowid: 'INTEGER',
+          'name': 'TEXT',
+        },
+        columnMeta: {kSqliteImplicitRowid: sqliteImplicitRowidColumn},
+      );
+      expect(plan.statements, hasLength(1));
+      expect(plan.statements.first.sql, contains('WHERE "rowid" ='));
+
+      expect(await conn.executeAffected(plan.statements.first.sql), 1);
+      final after = await conn.execute('SELECT name FROM t');
+      expect(after.first['name'], 'Grace');
+    });
+
+    test('WITHOUT ROWID tables keep the declared PK, not implicit rowid',
+        () async {
+      await conn.connect();
+      await conn.execute(
+        'CREATE TABLE wr (id INTEGER PRIMARY KEY, name TEXT) WITHOUT ROWID',
+      );
+      final schema = await conn.getTableSchema(table: 'wr');
+      expect(schema.primaryKeys, ['id']);
+      expect(
+        sqliteTableBrowserPrimaryKeys(
+          declaredPrimaryKeys: schema.primaryKeys,
+          isView: false,
+        ),
+        ['id'],
+      );
+      expect(
+        sqliteBrowseDataSql(
+          qualifiedFrom: '"wr"',
+          primaryKeys: schema.primaryKeys,
+          isView: false,
+          limit: 200,
+          offset: 0,
+        ),
+        'SELECT * FROM "wr" ORDER BY "id" LIMIT 200 OFFSET 0',
+      );
     });
 
     test('getObjectDdl returns CREATE SQL for a table that exists', () async {

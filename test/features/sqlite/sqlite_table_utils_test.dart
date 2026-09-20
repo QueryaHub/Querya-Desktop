@@ -2,6 +2,38 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/features/sqlite/sqlite_table_utils.dart';
 
 void main() {
+  group('sqliteTableBrowserPrimaryKeys', () {
+    test('keeps a declared PRIMARY KEY', () {
+      expect(
+        sqliteTableBrowserPrimaryKeys(
+          declaredPrimaryKeys: const ['id'],
+          isView: false,
+        ),
+        ['id'],
+      );
+    });
+
+    test('uses rowid when a table has no declared PK', () {
+      expect(
+        sqliteTableBrowserPrimaryKeys(
+          declaredPrimaryKeys: const [],
+          isView: false,
+        ),
+        ['rowid'],
+      );
+    });
+
+    test('stays empty for views', () {
+      expect(
+        sqliteTableBrowserPrimaryKeys(
+          declaredPrimaryKeys: const [],
+          isView: true,
+        ),
+        isEmpty,
+      );
+    });
+  });
+
   group('sqliteBrowseOrderColumns', () {
     test('uses declared PK columns', () {
       expect(
@@ -61,7 +93,7 @@ void main() {
       );
     });
 
-    test('orders by rowid when a table has no PK', () {
+    test('projects rowid and orders by it when a table has no PK', () {
       expect(
         sqliteBrowseDataSql(
           qualifiedFrom: '"t"',
@@ -70,7 +102,20 @@ void main() {
           limit: 200,
           offset: 0,
         ),
-        'SELECT * FROM "t" ORDER BY "rowid" LIMIT 200 OFFSET 0',
+        'SELECT "rowid", * FROM "t" ORDER BY "rowid" LIMIT 200 OFFSET 0',
+      );
+    });
+
+    test('projects rowid when PK was resolved to implicit rowid', () {
+      expect(
+        sqliteBrowseDataSql(
+          qualifiedFrom: '"t"',
+          primaryKeys: const ['rowid'],
+          isView: false,
+          limit: 200,
+          offset: 0,
+        ),
+        'SELECT "rowid", * FROM "t" ORDER BY "rowid" LIMIT 200 OFFSET 0',
       );
     });
 
