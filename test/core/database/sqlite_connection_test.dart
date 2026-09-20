@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
+import 'package:querya_desktop/features/workspace/table_view_staging.dart';
 
 void main() {
   setUpAll(() {
@@ -198,6 +199,35 @@ void main() {
       expect(await conn.inOpenTransaction(), isFalse);
       final rows2 = await conn.execute('SELECT COUNT(*) AS c FROM t');
       expect(rows2.first['c'], 2);
+    });
+
+    test('runInTransaction rolls back when a later statement fails', () async {
+      await conn.connect();
+      await conn.execute(
+        'CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT NOT NULL)',
+      );
+      await conn.execute("INSERT INTO t (id, name) VALUES (1, 'keep')");
+
+      await expectLater(
+        conn.runInTransaction(() async {
+          expectDmlMatchedRows(
+            await conn.executeAffected(
+              "UPDATE t SET name = 'changed' WHERE id = 1",
+            ),
+          );
+          expectDmlMatchedRows(
+            await conn.executeAffected(
+              "UPDATE t SET name = 'ghost' WHERE id = 999",
+            ),
+          );
+        }),
+        throwsA(isA<StateError>()),
+      );
+
+      expect(await conn.inOpenTransaction(), isFalse);
+      final rows = await conn.execute('SELECT id, name FROM t');
+      expect(rows, hasLength(1));
+      expect(rows.first['name'], 'keep');
     });
 
     test('handles quotes in quoteIdentifier helper', () {

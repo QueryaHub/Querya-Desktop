@@ -169,5 +169,33 @@ void main() {
       );
       expect(plan.statements.single.sql, isNot(contains('"zip" = \'01234\'')));
     });
+
+    test('simple SELECT * FROM t uses the SQLite PK and column types', () {
+      final target = SqlTableTargetExtractor.extract('SELECT * FROM t');
+      expect(target, const SqlTableTarget(tableName: 't'));
+
+      final buffer = DataGridStagingBuffer(
+        columns: const ['id', 'zip'],
+        rows: const [
+          ['1', '01234'],
+        ],
+      );
+      buffer.setCell(0, 1, '00789');
+
+      final plan = buffer.generateMutationPlan(
+        dialect: SqlDialect.sqlite,
+        tableName: target!.tableName,
+        primaryKeys: const ['id'],
+        columnDataTypes: const {'id': 'INTEGER', 'zip': 'TEXT'},
+      );
+
+      expect(plan.statementCount, 1);
+      expect(
+        plan.statements.single.sql,
+        'UPDATE "t" SET "zip" = \'00789\' WHERE "id" = 1',
+      );
+      expect(plan.toTransactionSql(), startsWith('BEGIN TRANSACTION;'));
+      expect(plan.statements.single.sql, isNot(contains('"zip" = \'01234\'')));
+    });
   });
 }
