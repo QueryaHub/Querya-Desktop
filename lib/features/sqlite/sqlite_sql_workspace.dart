@@ -271,6 +271,8 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       session.rows = [];
       session.affectedRows = null;
       session.statusLine = null;
+      session.resultGridPrimaryKeys = const [];
+      session.resultGridColumnDataTypes = null;
     });
     QueryaShellStatus.instance.beginBusy(message: 'Running query…');
     final sw = Stopwatch()..start();
@@ -310,16 +312,36 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         return cols.map((col) => row[col]).toList();
       }).toList();
 
-      // Adaptive convert offloads to background compute for large row sets (#522).
       final outRows = await convertResultRowsToStringsAdaptive(rawRows);
+
+      final target = SqlTableTargetExtractor.extract(userSql);
+      var pks = const <String>[];
+      Map<String, String>? types;
+      if (target != null && cols.isNotEmpty) {
+        try {
+          final meta = await conn.getTableSchema(table: target.tableName);
+          pks = List<String>.from(meta.primaryKeys);
+          types = columnDataTypesFromSchema(meta);
+        } catch (_) {
+          pks = const [];
+          types = null;
+        }
+      }
+      final canSave = sqlResultGridSaveEnabled(
+        sql: userSql,
+        resultColumns: cols,
+        primaryKeys: pks,
+      );
 
       setState(() {
         session.columns = cols;
         session.rows = outRows;
         session.affectedRows = null;
         session.lastExecutedSql = userSql;
+        session.resultGridPrimaryKeys = canSave ? pks : const [];
+        session.resultGridColumnDataTypes = types;
         session.stagingBuffer?.dispose();
-        session.stagingBuffer = cols.isNotEmpty
+        session.stagingBuffer = canSave
             ? DataGridStagingBuffer(columns: cols, rows: outRows)
             : null;
         if (cols.isEmpty && outRows.isEmpty) {
@@ -383,14 +405,23 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
     final target = session.lastExecutedSql != null
         ? SqlTableTargetExtractor.extract(session.lastExecutedSql!)
         : null;
-    final tableName = target?.tableName ?? 'table';
+    if (target == null ||
+        !sqlResultGridSaveEnabled(
+          sql: session.lastExecutedSql,
+          resultColumns: session.columns,
+          primaryKeys: session.resultGridPrimaryKeys,
+        )) {
+      return;
+    }
 
     setState(() => session.savingChanges = true);
     try {
       final plan = session.stagingBuffer!.generateMutationPlan(
         dialect: SqlDialect.sqlite,
-        tableName: tableName,
-        schema: target?.schema,
+        tableName: target.tableName,
+        schema: target.schema,
+        primaryKeys: session.resultGridPrimaryKeys,
+        columnDataTypes: session.resultGridColumnDataTypes,
       );
       if (plan.isEmpty) {
         setState(() => session.savingChanges = false);
@@ -734,8 +765,15 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
               affectedRows: session.affectedRows,
               statusLine: session.statusLine,
               stagingBuffer: session.stagingBuffer,
-              onApplyChanges:
-                  widget.isReadOnly ? null : () => _applyStagedChanges(session),
+              columnDataTypes: session.resultGridColumnDataTypes,
+              onApplyChanges: widget.isReadOnly ||
+                      !sqlResultGridSaveEnabled(
+                        sql: session.lastExecutedSql,
+                        resultColumns: session.columns,
+                        primaryKeys: session.resultGridPrimaryKeys,
+                      )
+                  ? null
+                  : () => _applyStagedChanges(session),
               isSaving: session.savingChanges,
             ),
           ),
