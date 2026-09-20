@@ -161,22 +161,25 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
   }
 
   Future<void> _inspectField(Map<String, dynamic> doc, String field) async {
-    if (field == '_id') return;
+    if (mongoFieldIsReadOnly(field)) return;
     final id = doc['_id'];
     if (id == null) return;
     await showGridCellInspectorDialog(
       context: context,
       columnName: field,
       initialValue: mongoFieldToDisplay(doc[field]),
-      dataTypeName: 'MongoDB field',
+      dataTypeName: doc[field]?.runtimeType.toString() ?? 'MongoDB field',
       onSaveToDatabase: (value) async {
+        mongoAssertFieldEditable(field);
         await MongoService.instance.updateDocument(
           widget.connection,
           widget.database,
           widget.collection,
           {'_id': id},
           {
-            r'$set': {field: mongoDisplayToValue(value)}
+            r'$set': {
+              field: mongoDisplayToValue(value, original: doc[field]),
+            }
           },
         );
         if (!mounted) return;
