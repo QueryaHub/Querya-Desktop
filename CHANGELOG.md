@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **MySQL SQL tx toolbar (#809)** — Begin / Commit / Rollback run `START TRANSACTION` / `COMMIT` / `ROLLBACK` on the SQL socket without replacing the editor buffer. The toolbar shows Transaction open/none. Table Browser Save stays on the `tableWrite` socket from #802 (no nested `START TRANSACTION`); opening a table still warns while SQL has an open transaction.
 - **MySQL SQL-grid Save (#804)** — Result-grid Save runs only for a simple single-table `SELECT` with a PK in the result (`getTableSchema`). JOIN, comma-`FROM`, and no-PK results stay read-only. DML uses the PK and `columnDataTypes`; applies still wrap `START TRANSACTION` / `COMMIT` / `ROLLBACK` (join an already-open SQL transaction).
 - **SQLite SQL-grid Save (#795)** — Result-grid Save runs only for a simple single-table `SELECT` with a PK in the result (`getTableSchema`). JOIN, comma-`FROM`, and no-PK results stay read-only. DML uses the PK and `columnDataTypes`; applies still wrap `BEGIN TRANSACTION` / `COMMIT` / `ROLLBACK` (join an already-open `BEGIN`).
 - **Postgres SQL-grid Save (#786)** — Result-grid Save runs only for a simple single-table `SELECT` with a PK present in the result (`getTableSchema`). JOIN, comma-`FROM`, subqueries, and VALUES stay read-only. DML `WHERE` uses the PK and `columnDataTypes` instead of every displayed column.
