@@ -39,6 +39,22 @@ void main() {
     createdAt: createdAt,
     id: 13,
   );
+  final mongoConn = ConnectionRow(
+    type: 'mongodb',
+    name: 'mongo',
+    host: '127.0.0.1',
+    port: 27017,
+    createdAt: createdAt,
+    id: 14,
+  );
+  final redisConn = ConnectionRow(
+    type: 'redis',
+    name: 'redis',
+    host: '127.0.0.1',
+    port: 6379,
+    createdAt: createdAt,
+    id: 15,
+  );
 
   group('MainScreenWorkspaceState', () {
     test('empty has no selection', () {
@@ -153,12 +169,16 @@ void main() {
     });
 
     test('selectRedisDb and selectMongoDb are mutually exclusive fields', () {
-      final redis = MainScreenWorkspaceState.empty.selectRedisDb(pgConn, 3);
+      final redis = MainScreenWorkspaceState.empty.selectRedisDb(redisConn, 3);
       expect(redis.activeRedisDb, 3);
       expect(redis.activeMongoDB, isNull);
-      final mongo = redis.selectMongoDb(pgConn, 'inventory');
+      expect(redis.lastSelectedRedisDb, 3);
+      expect(redis.lastSelectedMongoDb, isNull);
+      final mongo = redis.selectMongoDb(mongoConn, 'inventory');
       expect(mongo.activeMongoDB, 'inventory');
       expect(mongo.activeRedisDb, isNull);
+      expect(mongo.lastSelectedMongoDb, 'inventory');
+      expect(mongo.lastSelectedRedisDb, isNull);
     });
 
     test('equality uses connection id and selections', () {
@@ -260,6 +280,24 @@ void main() {
       expect(extState.lastSelectedExtensionObject?.name, 'hits');
       final restoredExt = extState.restoreLastSelectedObject();
       expect(restoredExt.selectedExtensionObject?.name, 'hits');
+
+      // 4. MongoDB
+      final mongoState = MainScreenWorkspaceState.empty
+          .selectMongoDb(mongoConn, 'analytics')
+          .unselectActiveObject();
+      expect(mongoState.activeMongoDB, isNull);
+      expect(mongoState.lastSelectedMongoDb, 'analytics');
+      final restoredMongo = mongoState.restoreLastSelectedObject();
+      expect(restoredMongo.activeMongoDB, 'analytics');
+
+      // 5. Redis
+      final redisState = MainScreenWorkspaceState.empty
+          .selectRedisDb(redisConn, 7)
+          .selectConnection(redisConn);
+      expect(redisState.activeRedisDb, isNull);
+      expect(redisState.lastSelectedRedisDb, 7);
+      final restoredRedis = redisState.restoreLastSelectedObject();
+      expect(restoredRedis.activeRedisDb, 7);
     });
 
     test('restoreLastSelectedObject ignores cached references from other drivers', () {
@@ -297,6 +335,8 @@ void main() {
       expect(statePg.lastSelectedMysqlObject, isNull);
       expect(statePg.lastSelectedSqliteObject, isNull);
       expect(statePg.lastSelectedExtensionObject, isNull);
+      expect(statePg.lastSelectedMongoDb, isNull);
+      expect(statePg.lastSelectedRedisDb, isNull);
 
       final stateMy = statePg.selectMysqlObject(
         mysqlConn,
@@ -308,6 +348,8 @@ void main() {
       expect(stateMy.lastSelectedMysqlObject?.name, 't2');
       expect(stateMy.lastSelectedSqliteObject, isNull);
       expect(stateMy.lastSelectedExtensionObject, isNull);
+      expect(stateMy.lastSelectedMongoDb, isNull);
+      expect(stateMy.lastSelectedRedisDb, isNull);
 
       final stateSq = stateMy.selectSqliteObject(
         sqliteConn,
@@ -318,6 +360,8 @@ void main() {
       expect(stateSq.lastSelectedMysqlObject, isNull);
       expect(stateSq.lastSelectedSqliteObject?.name, 't3');
       expect(stateSq.lastSelectedExtensionObject, isNull);
+      expect(stateSq.lastSelectedMongoDb, isNull);
+      expect(stateSq.lastSelectedRedisDb, isNull);
 
       final stateExt = stateSq.selectExtensionObject(
         clickhouseConn,
@@ -328,6 +372,17 @@ void main() {
       expect(stateExt.lastSelectedMysqlObject, isNull);
       expect(stateExt.lastSelectedSqliteObject, isNull);
       expect(stateExt.lastSelectedExtensionObject?.name, 't4');
+      expect(stateExt.lastSelectedMongoDb, isNull);
+      expect(stateExt.lastSelectedRedisDb, isNull);
+
+      final stateMongo = stateExt.selectMongoDb(mongoConn, 'app');
+      expect(stateMongo.lastSelectedExtensionObject, isNull);
+      expect(stateMongo.lastSelectedMongoDb, 'app');
+      expect(stateMongo.lastSelectedRedisDb, isNull);
+
+      final stateRedis = stateMongo.selectRedisDb(redisConn, 2);
+      expect(stateRedis.lastSelectedMongoDb, isNull);
+      expect(stateRedis.lastSelectedRedisDb, 2);
     });
   });
 }

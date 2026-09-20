@@ -14,6 +14,7 @@ import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/ui/querya_shell_status.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
 import 'package:querya_desktop/features/workspace/workspace.dart';
@@ -85,6 +86,14 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       },
       onNextTab: _nextTab,
       onPrevTab: _prevTab,
+      onFormat: () {
+        _activeSession.formatSql();
+        setState(() {});
+      },
+      onClear: () {
+        _activeSession.clearSql();
+        setState(() {});
+      },
       onOpenWithContent: (sql, filePath, title) {
         if (!mounted) return;
         final session = _activeSession;
@@ -261,6 +270,8 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       session.affectedRows = null;
       session.statusLine = null;
     });
+    QueryaShellStatus.instance.beginBusy(message: 'Running query…');
+    final sw = Stopwatch()..start();
 
     try {
       await _ensureLease();
@@ -271,6 +282,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
             session.error = 'Could not connect to MySQL.';
             session.running = false;
           });
+          QueryaShellStatus.instance.endBusy();
         }
         return;
       }
@@ -333,6 +345,13 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
         }
         session.running = false;
       });
+      sw.stop();
+      QueryaShellStatus.instance.reportQueryResult(
+        duration: sw.elapsed,
+        rowCount: outRows.length,
+        columnCount: cols.length,
+        message: session.statusLine,
+      );
       final cid = widget.connectionRow.id;
       if (cid != null) {
         unawaited(
@@ -351,6 +370,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
           session.error = e.toString();
           session.running = false;
         });
+        QueryaShellStatus.instance.endBusy();
       }
     } catch (e) {
       if (mounted) {
@@ -358,6 +378,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
           session.error = e.toString();
           session.running = false;
         });
+        QueryaShellStatus.instance.endBusy();
       }
     }
   }

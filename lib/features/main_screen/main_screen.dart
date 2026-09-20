@@ -5,6 +5,11 @@ import 'dart:math' as math;
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
+import 'package:querya_desktop/core/actions/querya_command_host.dart';
+import 'package:querya_desktop/core/actions/querya_schema_object.dart';
+import 'package:querya_desktop/core/actions/querya_schema_object_loader.dart';
+import 'package:querya_desktop/features/command_palette/command_palette_dialog.dart';
+import 'package:querya_desktop/features/command_palette/quick_switcher_dialog.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/actions/sql_editor_global_actions.dart';
@@ -22,7 +27,9 @@ import 'package:querya_desktop/features/connections/connection_creation_flow.dar
 import 'package:querya_desktop/features/connections/new_connection_url_dialog.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
 import 'package:querya_desktop/features/connections/sqlite_connection_form.dart';
+import 'package:querya_desktop/core/ui/querya_shell_status.dart';
 import 'package:querya_desktop/features/main_screen/connections_panel_width_persist.dart';
+import 'package:querya_desktop/features/main_screen/querya_status_bar.dart';
 import 'package:querya_desktop/features/main_screen/querya_window_title_bar.dart';
 import 'package:querya_desktop/features/macos/querya_platform_menu_bar.dart';
 import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
@@ -50,6 +57,7 @@ class _MainScreenState extends State<MainScreen> {
       ValueNotifier(MainScreenWorkspaceState.empty);
   final ValueNotifier<bool> _isSidebarVisible = ValueNotifier(true);
   bool _openingConnectionDialog = false;
+  String? _pendingMongoCollection;
 
   @override
   void initState() {
@@ -125,6 +133,27 @@ class _MainScreenState extends State<MainScreen> {
         logical == const LogicalKeyboardKey(0x00000438); // Russian 'и'
     if (isCmdOrCtrl && !isShift && !isAlt && isKeyB) {
       _splitKey.currentState?.toggleSidebar();
+      return true;
+    }
+
+    // Command Palette: Ctrl+P / Cmd+P (Physical P, Logical P, Russian 'з')
+    final isKeyP = physical == PhysicalKeyboardKey.keyP ||
+        logical == LogicalKeyboardKey.keyP ||
+        logical == const LogicalKeyboardKey(0x00000437) || // з
+        logical == const LogicalKeyboardKey(0x00000417); // З
+    if (isCmdOrCtrl && !isShift && !isAlt && isKeyP) {
+      final ctx = FocusManager.instance.primaryFocus?.context ?? context;
+      unawaited(showCommandPalette(ctx));
+      return true;
+    }
+
+    // Quick Switcher: Ctrl+K / Cmd+K (Physical K, Logical K, Russian 'л')
+    final isKeyK = physical == PhysicalKeyboardKey.keyK ||
+        logical == LogicalKeyboardKey.keyK ||
+        logical == const LogicalKeyboardKey(0x0000043b) || // л
+        logical == const LogicalKeyboardKey(0x0000041b); // Л
+    if (isCmdOrCtrl && !isShift && !isAlt && isKeyK) {
+      _openQuickSwitcher();
       return true;
     }
 
@@ -234,7 +263,12 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _onConnectionSelected(ConnectionRow connection) {
+    final prevId = _workspace.value.activeConnection?.id;
     _workspace.value = _workspace.value.selectConnection(connection);
+    if (prevId != connection.id) {
+      QueryaShellStatus.instance.clear();
+      _pendingMongoCollection = null;
+    }
     final id = connection.id;
     if (id != null) {
       unawaited(AppSettings.instance.recordRecentConnection(id));
@@ -327,6 +361,84 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  void _openQuickSwitcher([String query = '']) {
+    final ctx = FocusManager.instance.primaryFocus?.context ?? context;
+    final ws = _workspace.value;
+    final conn = ws.activeConnection;
+    unawaited(showQuickSwitcher(
+      ctx,
+      initialQuery: query,
+      load: () => QueryaSchemaObjectLoader.load(
+        connection: conn,
+        database: ws.selectedPostgresObject?.database ??
+            ws.selectedMysqlObject?.database ??
+            ws.selectedExtensionObject?.database ??
+            conn?.databaseName,
+        mongoDatabase: ws.activeMongoDB ?? conn?.databaseName,
+      ),
+    ));
+  }
+
+  void _onOpenSchemaObject(QueryaSchemaObject object) {
+    final conn = _workspace.value.activeConnection;
+    if (conn == null) return;
+    final type = conn.type.toLowerCase();
+    switch (object.kind) {
+      case QueryaSchemaObjectKind.table:
+      case QueryaSchemaObjectKind.view:
+      case QueryaSchemaObjectKind.materializedView:
+        if (type == 'postgres' || type == 'postgresql') {
+          _onPostgresObjectSelected(
+            conn,
+            object.database ?? conn.databaseName ?? '',
+            object.schema ?? 'public',
+            object.name,
+            switch (object.kind) {
+              QueryaSchemaObjectKind.view => PostgresObjectKind.view,
+              QueryaSchemaObjectKind.materializedView =>
+                PostgresObjectKind.materializedView,
+              _ => PostgresObjectKind.table,
+            },
+          );
+          return;
+        }
+        if (type == 'mysql') {
+          _onMysqlObjectSelected(
+            conn,
+            object.database ?? conn.databaseName ?? '',
+            object.name,
+            object.kind == QueryaSchemaObjectKind.view
+                ? MysqlObjectKind.view
+                : MysqlObjectKind.table,
+          );
+          return;
+        }
+        if (type == 'sqlite') {
+          _onSqliteObjectSelected(
+            conn,
+            object.name,
+            object.kind == QueryaSchemaObjectKind.view
+                ? SqliteObjectKind.view
+                : SqliteObjectKind.table,
+          );
+          return;
+        }
+        if (conn.isExtensionDriver) {
+          _onExtensionObjectSelected(
+            conn,
+            object.database ?? conn.databaseName ?? '',
+            object.name,
+          );
+        }
+      case QueryaSchemaObjectKind.collection:
+        setState(() => _pendingMongoCollection = object.name);
+        _onMongoDBDatabaseSelected(
+          conn,
+          object.database ?? conn.databaseName ?? '',
+        );
+    }
+  }
+
   void _openSqlWorkspaceForConnection(ConnectionRow connection) {
     switch (connection.type) {
       case 'postgresql':
@@ -389,6 +501,16 @@ class _MainScreenState extends State<MainScreen> {
 
   void _onGoHome() {
     _workspace.value = MainScreenWorkspaceState.empty;
+    QueryaShellStatus.instance.clear();
+  }
+
+  bool _hasCloseableWorkspace(MainScreenWorkspaceState ws) {
+    return ws.selectedPostgresObject != null ||
+        ws.selectedMysqlObject != null ||
+        ws.selectedSqliteObject != null ||
+        ws.selectedExtensionObject != null ||
+        ws.activeMongoDB != null ||
+        ws.activeRedisDb != null;
   }
 
   void _onOpenWelcomeTour() {
@@ -472,7 +594,44 @@ class _MainScreenState extends State<MainScreen> {
     return ValueListenableBuilder<MainScreenWorkspaceState>(
       valueListenable: _workspace,
       builder: (context, workspace, _) {
-        return FocusScope(
+        return QueryaCommandHost(
+          onToggleSidebar: () => _splitKey.currentState?.toggleSidebar(),
+          onNewConnection: () => unawaited(_onNewDatabaseConnectionFromMenu()),
+          onShowQuickSwitcher: _openQuickSwitcher,
+          onOpenSchemaObject: _onOpenSchemaObject,
+          onGoHome:
+              workspace.activeConnection != null ? _onGoHome : null,
+          onCloseWorkspace: _hasCloseableWorkspace(workspace)
+              ? () {
+                  _workspace.value = _workspace.value.unselectActiveObject();
+                }
+              : null,
+          onConnect: workspace.activeConnection?.id != null
+              ? () => _connectionsPanelKey.currentState
+                  ?.connect(workspace.activeConnection!.id!)
+              : null,
+          onDisconnect: workspace.activeConnection != null
+              ? () => unawaited(
+                    _connectionsPanelKey.currentState
+                            ?.disconnect(workspace.activeConnection!) ??
+                        Future<void>.value(),
+                  )
+              : null,
+          onReconnect: workspace.activeConnection != null
+              ? () => unawaited(
+                    _connectionsPanelKey.currentState
+                            ?.reconnect(workspace.activeConnection!) ??
+                        Future<void>.value(),
+                  )
+              : null,
+          onToggleReadOnly: workspace.activeConnection != null
+              ? () {
+                  _workspace.value = _workspace.value.toggleReadOnly();
+                }
+              : null,
+          onOpenWelcomeTour: _onOpenWelcomeTour,
+          selectedConnectionId: workspace.activeConnection?.id,
+          child: FocusScope(
           autofocus: true,
           child: material.CallbackShortcuts(
             bindings: {
@@ -551,6 +710,23 @@ class _MainScreenState extends State<MainScreen> {
                 LogicalKeyboardKey.keyB,
                 meta: true,
               ): () => _splitKey.currentState?.toggleSidebar(),
+
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyP,
+                control: true,
+              ): () => unawaited(showCommandPalette(context)),
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyP,
+                meta: true,
+              ): () => unawaited(showCommandPalette(context)),
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyK,
+                control: true,
+              ): () => _openQuickSwitcher(),
+              const material.SingleActivator(
+                LogicalKeyboardKey.keyK,
+                meta: true,
+              ): () => _openQuickSwitcher(),
 
               // Welcome Tour & Tutorial: F1 / Cmd+Shift+H / Ctrl+Shift+H
               const material.SingleActivator(
@@ -693,7 +869,33 @@ class _MainScreenState extends State<MainScreen> {
                         onRequestLaunchDemo: _onLaunchDemoPlayground,
                         onRequestOpenTour: _onOpenWelcomeTour,
                         onOpenConnection: _onConnectionSelected,
+                        initialMongoCollection: _pendingMongoCollection,
                       ),
+                    ),
+                    ValueListenableBuilder<bool>(
+                      valueListenable: _isSidebarVisible,
+                      builder: (context, isSidebarVisible, _) {
+                        return ListenableBuilder(
+                          listenable: QueryaShellStatus.instance,
+                          builder: (context, _) {
+                            final status = QueryaShellStatus.instance;
+                            return QueryaStatusBar(
+                              activeConnection: workspace.activeConnection,
+                              isReadOnly: workspace.isReadOnly,
+                              isSidebarVisible: isSidebarVisible,
+                              onToggleSidebar: () =>
+                                  _splitKey.currentState?.toggleSidebar(),
+                              onOpenPreferences: () =>
+                                  showPreferencesDialog(context),
+                              isBusy: status.isBusy,
+                              statusMessage: status.statusMessage,
+                              rowCount: status.rowCount,
+                              columnCount: status.columnCount,
+                              lastQueryDuration: status.lastQueryDuration,
+                            );
+                          },
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -701,6 +903,7 @@ class _MainScreenState extends State<MainScreen> {
             ),
             ),
           ),
+        ),
         ),
       );
     },
@@ -731,6 +934,7 @@ class _MainContentSplit extends StatefulWidget {
     this.onRequestOpenTour,
     required this.onOpenConnection,
     this.onSidebarVisibilityChanged,
+    this.initialMongoCollection,
   });
 
   final GlobalKey<ConnectionsPanelState> connectionsPanelKey;
@@ -768,6 +972,7 @@ class _MainContentSplit extends StatefulWidget {
   final VoidCallback onRequestNewConnection;
   final VoidCallback onRequestNewConnectionFromUrl;
   final VoidCallback onRequestOpenSqlite;
+  final String? initialMongoCollection;
   final VoidCallback? onRequestLaunchDemo;
   final VoidCallback? onRequestOpenTour;
   final void Function(ConnectionRow) onOpenConnection;
@@ -807,11 +1012,20 @@ class _MainContentSplitState extends State<_MainContentSplit>
       vsync: this,
       value: kDefaultConnectionsPanelWidth,
       spring: _sidebarSpring,
-      cubicDuration: const Duration(milliseconds: 160),
-      cubicCurve: Curves.easeOutCubic,
+      cubicDuration: QueryaMotion.sidebarCubic,
+      cubicCurve: QueryaMotion.enter,
     );
     _widthSpring.addListener(_onWidthSpringChanged);
     unawaited(_restoreState());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _widthSpring.cubicDuration =
+        context.motionDuration(QueryaMotion.sidebarCubic);
+    _widthSpring.cubicCurve = context.motionCurve(QueryaMotion.enter);
+    _widthSpring.useSprings = QueryaSpring.springsEnabled(context);
   }
 
   Future<void> _restoreState() async {
@@ -1036,6 +1250,8 @@ class _MainContentSplitState extends State<_MainContentSplit>
                       lastSelectedSqliteObject: ws.lastSelectedSqliteObject,
                       lastSelectedExtensionObject:
                           ws.lastSelectedExtensionObject,
+                      lastSelectedMongoDb: ws.lastSelectedMongoDb,
+                      lastSelectedRedisDb: ws.lastSelectedRedisDb,
                       onNavigateHome: () {
                         widget.workspace.value =
                             widget.workspace.value.unselectActiveObject();
@@ -1052,6 +1268,7 @@ class _MainContentSplitState extends State<_MainContentSplit>
                       onRequestLaunchDemo: widget.onRequestLaunchDemo,
                       onRequestOpenTour: widget.onRequestOpenTour,
                       onOpenConnection: widget.onOpenConnection,
+                      initialMongoCollection: widget.initialMongoCollection,
                     );
                   },
                 ),

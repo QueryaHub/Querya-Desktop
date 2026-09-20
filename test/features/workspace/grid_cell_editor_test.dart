@@ -11,7 +11,8 @@ import '../../support/querya_theme_test_shell.dart';
 
 void main() {
   group('GridCellEditor', () {
-    testWidgets('renders with initial value and commits text on Enter', (tester) async {
+    testWidgets('renders with initial value and commits text on Enter',
+        (tester) async {
       String? committed;
       bool movedRow = false;
 
@@ -22,7 +23,11 @@ void main() {
               initialValue: 'Original',
               width: 200,
               height: 36,
-              onCommit: (val, {moveNextCol = false, movePrevCol = false, moveNextRow = false, movePrevRow = false}) {
+              onCommit: (val,
+                  {moveNextCol = false,
+                  movePrevCol = false,
+                  moveNextRow = false,
+                  movePrevRow = false}) {
                 committed = val;
                 movedRow = moveNextRow;
               },
@@ -54,7 +59,11 @@ void main() {
               initialValue: 'Original',
               width: 200,
               height: 36,
-              onCommit: (val, {moveNextCol = false, movePrevCol = false, moveNextRow = false, movePrevRow = false}) {},
+              onCommit: (val,
+                  {moveNextCol = false,
+                  movePrevCol = false,
+                  moveNextRow = false,
+                  movePrevRow = false}) {},
               onCancel: () => cancelled = true,
             ),
           ),
@@ -68,7 +77,8 @@ void main() {
       expect(cancelled, isTrue);
     });
 
-    testWidgets('displays validation error icon on invalid integer input', (tester) async {
+    testWidgets('displays validation error icon on invalid integer input',
+        (tester) async {
       await tester.pumpWidget(
         queryaThemeTestShell(
           child: material.Material(
@@ -77,7 +87,11 @@ void main() {
               dataTypeName: 'integer',
               width: 200,
               height: 36,
-              onCommit: (val, {moveNextCol = false, movePrevCol = false, moveNextRow = false, movePrevRow = false}) {},
+              onCommit: (val,
+                  {moveNextCol = false,
+                  movePrevCol = false,
+                  moveNextRow = false,
+                  movePrevRow = false}) {},
               onCancel: () {},
             ),
           ),
@@ -247,7 +261,8 @@ void main() {
       expect(result, r'\x DE AD BE EF 12 34');
     });
 
-    testWidgets('toggles wrap and applies with Ctrl+Enter shortcut', (tester) async {
+    testWidgets('toggles wrap and applies with Ctrl+Enter shortcut',
+        (tester) async {
       String? result;
 
       await tester.pumpWidget(
@@ -289,10 +304,49 @@ void main() {
 
       expect(result, 'Hello world');
     });
+
+    testWidgets('Save to DB writes through the callback and closes',
+        (tester) async {
+      String? saved;
+      String? result;
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Builder(
+            builder: (context) => material.ElevatedButton(
+              onPressed: () async {
+                result = await showGridCellInspectorDialog(
+                  context: context,
+                  columnName: 'name',
+                  initialValue: 'Ada',
+                  onSaveToDatabase: (value) async {
+                    saved = value;
+                  },
+                );
+              },
+              child: const Text('Open Dialog'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Open Dialog'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Save to DB'), findsOneWidget);
+      await tester.tap(find.text('Save to DB'));
+      await tester.pumpAndSettle();
+
+      expect(saved, 'Ada');
+      expect(result, 'Ada');
+      expect(find.text('Save to DB'), findsNothing);
+    });
   });
 
   group('VirtualResultGrid Inline Editing Integration', () {
-    testWidgets('double click on cell activates editor and commits staged edit', (tester) async {
+    testWidgets('double click on cell activates editor and commits staged edit',
+        (tester) async {
       final staging = DataGridStagingBuffer(
         columns: ['id', 'name'],
         rows: [

@@ -448,5 +448,75 @@ void main() {
       expect(eventsDec?.border, isNull);
       expect(mvDec?.border, isNotNull);
     });
+
+    testWidgets('expand error shows Retry and reloads children', (tester) async {
+      final schema = SduiTreeSchema.fromJson(const {
+        'roots': [
+          {
+            'id': 'databases',
+            'label': 'Databases',
+            'expandable': true,
+          },
+        ],
+      });
+
+      var fetches = 0;
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: SduiTreeBuilder(
+              schema: schema,
+              fetchChildren: (id) async {
+                fetches++;
+                if (fetches == 1) {
+                  throw Exception('boom');
+                }
+                return const [
+                  SduiTreeNode(id: 'db1', label: 'analytics'),
+                ];
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byIcon(QueryaIcons.expandClosed));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Could not expand'), findsOneWidget);
+      expect(find.text('Retry'), findsOneWidget);
+      expect(find.text('analytics'), findsNothing);
+
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
+
+      expect(fetches, 2);
+      expect(find.text('analytics'), findsOneWidget);
+      expect(find.text('Could not expand'), findsNothing);
+    });
+
+    testWidgets('browsable labels are not bold unless selected', (tester) async {
+      final schema = SduiTreeSchema.fromJson(const {
+        'roots': [
+          {
+            'id': 'table.db.users',
+            'label': 'users',
+            'node_type': 'table',
+          },
+        ],
+      });
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: SduiTreeBuilder(schema: schema),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final text = tester.widget<material.Text>(find.text('users'));
+      expect(text.style?.fontWeight, isNot(material.FontWeight.w600));
+    });
   });
 }

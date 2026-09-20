@@ -108,7 +108,7 @@ class _MysqlWorkspaceHomeState extends material.State<MysqlWorkspaceHome> {
               ],
               const Spacer(),
               QueryaTabStrip(
-                labels: const ['Server', 'SQL'],
+                labels: const ['Overview', 'SQL'],
                 selectedIndex: _tab,
                 onSelected: (index) => unawaited(_selectTab(index)),
               ),

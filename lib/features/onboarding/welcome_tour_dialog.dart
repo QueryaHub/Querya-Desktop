@@ -221,8 +221,8 @@ class _WelcomeTourDialogState extends State<WelcomeTourDialog> {
           minWidth: 460,
         ),
         child: material.AnimatedSize(
-          duration: const Duration(milliseconds: 240),
-          curve: Curves.easeOutCubic,
+          duration: context.motionDuration(QueryaMotion.standard),
+          curve: context.motionCurve(QueryaMotion.enter),
           alignment: material.Alignment.topCenter,
           child: material.Padding(
             padding: const material.EdgeInsets.all(24),
@@ -288,9 +288,9 @@ class _WelcomeTourDialogState extends State<WelcomeTourDialog> {
 
                 // Animated Slide body
                 material.AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
+                  duration: context.motionDuration(QueryaMotion.standard),
+                  switchInCurve: context.motionCurve(QueryaMotion.enter),
+                  switchOutCurve: context.motionCurve(QueryaMotion.exit),
                   transitionBuilder: (child, animation) {
                     return material.FadeTransition(
                       opacity: animation,
@@ -329,8 +329,8 @@ class _WelcomeTourDialogState extends State<WelcomeTourDialog> {
                               vertical: 6,
                             ),
                             child: material.AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              curve: Curves.easeOutCubic,
+                              duration: context.motionDuration(QueryaMotion.fast),
+                              curve: context.motionCurve(QueryaMotion.enter),
                               width: active ? 22 : 6,
                               height: 6,
                               decoration: material.BoxDecoration(

@@ -19,4 +19,5 @@ export 'sql_editor_chrome.dart';
 export 'sql_query_history_dialog.dart';
 export 'sql_query_tab_bar.dart';
 export 'sql_query_tab_session.dart';
+export 'table_view_staging.dart';
 export 'xml_html_formatter.dart';

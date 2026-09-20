@@ -100,6 +100,14 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
         _schema = schema;
         _loading = false;
       });
+      final cacheId = widget.connection.id;
+      if (cacheId != null) {
+        QueryaSchemaObjectCache.instance.merge(
+          cacheId,
+          QueryaSchemaObjectCache.scopeExtension(),
+          flattenExtensionTree(schema),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -139,11 +147,6 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final sel = _ConnectionsTreeSelectionScope.of(context);
-    final selectedExt = (sel != null &&
-            sel.selectedConnectionId == widget.connection.id)
-        ? sel.selectedExtensionObject
-        : null;
     final material.Widget iconWidget;
     if (_iconFilePath != null) {
       iconWidget = DriverIconImage(
@@ -175,6 +178,15 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
 
     return ContextMenu(
       items: [
+        MenuButton(
+          leading: material.Icon(material.Icons.refresh_rounded,
+              size: 18, color: theme.colorScheme.mutedForeground),
+          onPressed: (_) {
+            setState(() => _schema = null);
+            _loadTree();
+          },
+          child: const Text('Refresh tree'),
+        ),
         MenuButton(
           leading: material.Icon(material.Icons.edit_outlined,
               size: 18, color: theme.colorScheme.mutedForeground),
@@ -248,9 +260,6 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
                                   maxLines: 1,
                                   style: material.TextStyle(
                                     fontSize: 13,
-                                    fontWeight: widget.isSelected
-                                        ? material.FontWeight.w600
-                                        : material.FontWeight.w500,
                                     color: theme.colorScheme.foreground,
                                   ),
                                 ),
@@ -281,40 +290,18 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
                 mainAxisSize: material.MainAxisSize.min,
                 children: [
                   if (_loading)
-                    material.Padding(
-                      padding: const material.EdgeInsets.only(
-                        left: 28,
-                        top: 4,
-                        bottom: 4,
-                      ),
-                      child: material.Row(
-                        children: [
-                          const material.SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: material.CircularProgressIndicator(
-                              strokeWidth: 1.5,
-                            ),
-                          ),
-                          const Gap(8),
-                          const Text('Loading...').muted().xSmall(),
-                        ],
-                      ),
-                    )
+                    const ConnectionTreeLoadingRow.connection()
                   else if (_error != null)
                     TreeLoadError(
                       title: 'Could not load extension tree',
                       message: _error!,
-                      padding: const material.EdgeInsets.only(
-                        left: 28,
-                        top: 4,
-                        bottom: 8,
-                      ),
+                      padding: QueryaTreeTokens.errorPaddingConnection,
                       onRetry: _loadTree,
                     )
                   else if (_schema != null)
                     material.Padding(
-                      padding: const material.EdgeInsets.only(left: 20),
+                      padding: const material.EdgeInsets.only(
+                          left: QueryaTreeTokens.underConnection),
                       child: _schema!.roots.isEmpty
                           ? material.Padding(
                               padding: const material.EdgeInsets.fromLTRB(
@@ -323,35 +310,53 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
                                 'No databases found on this server.',
                               ).muted().small(),
                             )
-                          : SduiTreeBuilder(
-                              schema: _schema!,
-                              fetchChildren: _fetchChildren,
-                              onNodeSelected: _onNodeSelected,
-                              isNodeSelected: selectedExt == null
-                                  ? null
-                                  : (node) {
-                                      final metaDb = node.meta['database'] ??
-                                          node.meta['db'];
-                                      final metaName = node.meta['table'] ??
-                                          node.meta['tableName'] ??
-                                          node.meta['name'];
-                                      if (metaDb != null && metaName != null) {
-                                        if (metaDb == selectedExt.database &&
-                                            metaName == selectedExt.name) {
-                                          return true;
-                                        }
-                                      }
-                                      final parts = node.id.split('.');
-                                      if (parts.length >= 3) {
-                                        final db = parts[1];
-                                        final name = parts.sublist(2).join('.');
-                                        return db == selectedExt.database &&
-                                            name == selectedExt.name;
-                                      }
-                                      return false;
-                                    },
-                              maxHeight: kConnectionTreeMaxVisibleRows *
-                                  kConnectionTreeRowExtent,
+                          : _ConnectionsTreeSelectionBuilder<
+                              ({String database, String name})?>(
+                              select: (sel) =>
+                                  sel.selectedConnectionId ==
+                                          widget.connection.id
+                                      ? sel.selectedExtensionObject
+                                      : null,
+                              builder: (context, selectedExt) {
+                                return SduiTreeBuilder(
+                                  schema: _schema!,
+                                  connection: widget.connection,
+                                  fetchChildren: _fetchChildren,
+                                  onNodeSelected: _onNodeSelected,
+                                  isNodeSelected: selectedExt == null
+                                      ? null
+                                      : (node) {
+                                          final metaDb =
+                                              node.meta['database'] ??
+                                                  node.meta['db'];
+                                          final metaName =
+                                              node.meta['table'] ??
+                                                  node.meta['tableName'] ??
+                                                  node.meta['name'];
+                                          if (metaDb != null &&
+                                              metaName != null) {
+                                            if (metaDb ==
+                                                    selectedExt.database &&
+                                                metaName == selectedExt.name) {
+                                              return true;
+                                            }
+                                          }
+                                          final parts = node.id.split('.');
+                                          if (parts.length >= 3) {
+                                            final db = parts[1];
+                                            final name =
+                                                parts.sublist(2).join('.');
+                                            return db ==
+                                                    selectedExt.database &&
+                                                name == selectedExt.name;
+                                          }
+                                          return false;
+                                        },
+                                  maxHeight:
+                                      kConnectionTreeMaxVisibleRows *
+                                          kConnectionTreeRowExtent,
+                                );
+                              },
                             ),
                     ),
                 ],

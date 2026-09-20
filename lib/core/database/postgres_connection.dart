@@ -341,6 +341,38 @@ class PostgresConnection {
     return result.map((row) => row[0] as String).toList();
   }
 
+  /// Tables, views, and materialized views across user schemas (Quick Switcher).
+  Future<List<({String schema, String name, String kind})>>
+      listBrowsableRelations() async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final result = await _conn!.execute(
+      "SELECT n.nspname::text, c.relname::text, "
+      "CASE c.relkind "
+      "WHEN 'r' THEN 'table' "
+      "WHEN 'p' THEN 'table' "
+      "WHEN 'v' THEN 'view' "
+      "WHEN 'm' THEN 'matview' "
+      "END "
+      "FROM pg_class c "
+      "JOIN pg_namespace n ON n.oid = c.relnamespace "
+      "WHERE c.relkind IN ('r', 'p', 'v', 'm') "
+      "AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast') "
+      "AND n.nspname NOT LIKE 'pg_temp%' "
+      "AND n.nspname NOT LIKE 'pg_toast_temp%' "
+      "ORDER BY 1, 2",
+    );
+    return [
+      for (final row in result)
+        (
+          schema: row[0] as String,
+          name: row[1] as String,
+          kind: row[2] as String? ?? 'table',
+        ),
+    ];
+  }
+
   Future<List<String>> listTables({String schema = 'public'}) async {
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to PostgreSQL');

@@ -26,6 +26,22 @@ abstract final class ResultGridMetrics {
 
   /// Extra columns built beyond the viewport to reduce scroll flicker.
   static const int columnOverscan = 2;
+
+  /// Hover tooltip: column SQL type when known, plus the cell value when long.
+  static String? cellTooltipMessage({
+    required String text,
+    String? dataTypeName,
+    String columnName = '',
+  }) {
+    final type = dataTypeName?.trim() ?? '';
+    final typePart = type.isEmpty
+        ? null
+        : (columnName.isNotEmpty ? '$columnName · $type' : type);
+    final showValue = text.length >= tooltipMinLength;
+    if (typePart == null && !showValue) return null;
+    if (typePart != null && showValue) return '$typePart\n$text';
+    return typePart ?? text;
+  }
 }
 
 /// Inclusive visible column window with spacer widths for off-screen columns.
@@ -424,14 +440,20 @@ class ResultGridSelection {
   }
 
   static String _escapeTsv(String val) {
-    if (val.contains('\t') || val.contains('\n') || val.contains('\r') || val.contains('"')) {
+    if (val.contains('\t') ||
+        val.contains('\n') ||
+        val.contains('\r') ||
+        val.contains('"')) {
       return '"${val.replaceAll('"', '""')}"';
     }
     return val;
   }
 
   static String _escapeCsv(String val) {
-    if (val.contains(',') || val.contains('"') || val.contains('\n') || val.contains('\r')) {
+    if (val.contains(',') ||
+        val.contains('"') ||
+        val.contains('\n') ||
+        val.contains('\r')) {
       return '"${val.replaceAll('"', '""')}"';
     }
     return val;
@@ -494,7 +516,8 @@ class _SortKey implements Comparable<_SortKey> {
 
   @override
   int compareTo(_SortKey other) {
-    if (type == _SortKeyType.nullOrEmpty && other.type == _SortKeyType.nullOrEmpty) {
+    if (type == _SortKeyType.nullOrEmpty &&
+        other.type == _SortKeyType.nullOrEmpty) {
       return 0;
     }
     if (type == _SortKeyType.nullOrEmpty) return 1;
@@ -507,8 +530,11 @@ class _SortKey implements Comparable<_SortKey> {
       return dtVal!.compareTo(other.dtVal!);
     }
 
-    final aLower = type == _SortKeyType.string ? strLower : strRaw.toLowerCase();
-    final bLower = other.type == _SortKeyType.string ? other.strLower : other.strRaw.toLowerCase();
+    final aLower =
+        type == _SortKeyType.string ? strLower : strRaw.toLowerCase();
+    final bLower = other.type == _SortKeyType.string
+        ? other.strLower
+        : other.strRaw.toLowerCase();
     final cmp = aLower.compareTo(bLower);
     if (cmp != 0) return cmp;
 
@@ -538,7 +564,8 @@ SortedResultGridData sortResultGridRowsWithIndices({
   if (rows.isEmpty || columnIndex < 0) {
     return SortedResultGridData(
       rows: rows,
-      sortedToModelIndices: List<int>.generate(rows.length, (i) => i, growable: false),
+      sortedToModelIndices:
+          List<int>.generate(rows.length, (i) => i, growable: false),
     );
   }
   final n = rows.length;
@@ -556,7 +583,8 @@ SortedResultGridData sortResultGridRowsWithIndices({
     return order == ResultGridSortOrder.ascending ? cmp : -cmp;
   });
 
-  final sortedRows = List<List<String>>.generate(n, (i) => rows[indices[i]], growable: false);
+  final sortedRows =
+      List<List<String>>.generate(n, (i) => rows[indices[i]], growable: false);
   return SortedResultGridData(
     rows: sortedRows,
     sortedToModelIndices: indices,
@@ -591,7 +619,8 @@ class _SortIsolateParams {
   });
 }
 
-SortedResultGridData _sortResultGridRowsWithIndicesIsolate(_SortIsolateParams params) {
+SortedResultGridData _sortResultGridRowsWithIndicesIsolate(
+    _SortIsolateParams params) {
   return sortResultGridRowsWithIndices(
     rows: params.rows,
     columnIndex: params.columnIndex,
@@ -632,15 +661,20 @@ class VirtualResultGrid extends material.StatefulWidget {
     this.onSelectionValuesChanged,
     this.onCellFocused,
     this.onFilterRequested,
+    this.columnDataTypes,
   });
 
   final List<String> columns;
   final List<List<String>> rows;
   final DataGridStagingBuffer? stagingBuffer;
+
+  /// Column name → SQL type, used for hover tooltips and the inline editor.
+  final Map<String, String>? columnDataTypes;
   final List<int>? rowIndicesMapping;
   final material.ValueChanged<int?>? onRowSelected;
   final material.ValueChanged<List<String>>? onSelectionValuesChanged;
-  final void Function(String columnName, String cellValue, int rowIndex)? onCellFocused;
+  final void Function(String columnName, String cellValue, int rowIndex)?
+      onCellFocused;
   final void Function(String filterExpression)? onFilterRequested;
 
   @override
@@ -877,12 +911,14 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
       return;
     }
     final colName = widget.columns[column];
-    final currentVal = column < _sortedRows[row].length ? _sortedRows[row][column] : '';
+    final currentVal =
+        column < _sortedRows[row].length ? _sortedRows[row][column] : '';
     final result = await showGridCellInspectorDialog(
       context: context,
       columnName: colName,
       initialValue: currentVal,
       rowIndex: row,
+      dataTypeName: widget.columnDataTypes?[colName],
     );
     if (result != null && widget.stagingBuffer != null) {
       widget.stagingBuffer!.setCell(_toModelRowIndex(row), column, result);
@@ -921,8 +957,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     var maxRowChars = 0;
     final sampleCount = math.min(rows.length, 200);
     for (var r = 0; r < sampleCount; r++) {
-      if (index < rows[r].length &&
-          rows[r][index].length > maxRowChars) {
+      if (index < rows[r].length && rows[r][index].length > maxRowChars) {
         maxRowChars = rows[r][index].length;
       }
     }
@@ -973,7 +1008,8 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
       if (widget.rowIndicesMapping != null) {
         _sortedToModelIndices = List<int>.from(widget.rowIndicesMapping!);
       } else {
-        _sortedToModelIndices = List<int>.generate(rows.length, (i) => i, growable: false);
+        _sortedToModelIndices =
+            List<int>.generate(rows.length, (i) => i, growable: false);
       }
       return;
     }
@@ -983,10 +1019,12 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     final version = ++_sortVersion;
 
     if (asyncIfLarge && rows.length >= kSortIsolateThreshold) {
-      foundation.compute(
+      foundation
+          .compute(
         _sortResultGridRowsWithIndicesIsolate,
         _SortIsolateParams(rows: rows, columnIndex: sortCol, order: sortOrd),
-      ).then((sortedData) {
+      )
+          .then((sortedData) {
         if (!mounted || version != _sortVersion) return;
         setState(() {
           _applySortedData(sortedData, rows);
@@ -1012,7 +1050,8 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     }
   }
 
-  void _applySortedData(SortedResultGridData sortedData, List<List<String>> rows) {
+  void _applySortedData(
+      SortedResultGridData sortedData, List<List<String>> rows) {
     _sortedRows = sortedData.rows;
     if (widget.rowIndicesMapping != null) {
       final mapping = widget.rowIndicesMapping!;
@@ -1033,7 +1072,9 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
         final values = <String>[];
         for (var r = _selection!.startRow; r <= _selection!.endRow; r++) {
           if (r >= 0 && r < rows.length) {
-            for (var c = _selection!.startColumn; c <= _selection!.endColumn; c++) {
+            for (var c = _selection!.startColumn;
+                c <= _selection!.endColumn;
+                c++) {
               if (c >= 0 && c < rows[r].length) {
                 values.add(rows[r][c]);
               }
@@ -1104,7 +1145,8 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     }
   }
 
-  void _copySelection({bool withHeaders = false, bool asCsv = false, bool asJson = false}) {
+  void _copySelection(
+      {bool withHeaders = false, bool asCsv = false, bool asJson = false}) {
     if (_selection == null) return;
     _copySelectionData(
       _selection!,
@@ -1197,7 +1239,8 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     if (widget.stagingBuffer == null) return;
     final sel = (_selection != null && _selection!.contains(row, col))
         ? _selection!
-        : ResultGridSelection(startRow: row, startColumn: col, endRow: row, endColumn: col);
+        : ResultGridSelection(
+            startRow: row, startColumn: col, endRow: row, endColumn: col);
     for (var r = sel.startRow; r <= sel.endRow; r++) {
       final modelRow = _toModelRowIndex(r);
       for (var c = sel.startColumn; c <= sel.endColumn; c++) {
@@ -1210,7 +1253,8 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     if (widget.stagingBuffer == null) return;
     final sel = (_selection != null && _selection!.contains(row, col))
         ? _selection!
-        : ResultGridSelection(startRow: row, startColumn: col, endRow: row, endColumn: col);
+        : ResultGridSelection(
+            startRow: row, startColumn: col, endRow: row, endColumn: col);
     for (var r = sel.startRow; r <= sel.endRow; r++) {
       final modelRow = _toModelRowIndex(r);
       for (var c = sel.startColumn; c <= sel.endColumn; c++) {
@@ -1223,7 +1267,8 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     if (widget.stagingBuffer == null) return;
     final sel = (_selection != null && _selection!.contains(row, col))
         ? _selection!
-        : ResultGridSelection(startRow: row, startColumn: col, endRow: row, endColumn: col);
+        : ResultGridSelection(
+            startRow: row, startColumn: col, endRow: row, endColumn: col);
     for (var r = sel.startRow; r <= sel.endRow; r++) {
       final modelRow = _toModelRowIndex(r);
       for (var c = sel.startColumn; c <= sel.endColumn; c++) {
@@ -1509,7 +1554,8 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
           control: true,
         ): () {
           if (widget.stagingBuffer != null && _selection != null) {
-            widget.stagingBuffer!.toggleDeleteRow(_toModelRowIndex(_selection!.startRow));
+            widget.stagingBuffer!
+                .toggleDeleteRow(_toModelRowIndex(_selection!.startRow));
           }
         },
         const material.SingleActivator(
@@ -1517,7 +1563,8 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
           meta: true,
         ): () {
           if (widget.stagingBuffer != null && _selection != null) {
-            widget.stagingBuffer!.toggleDeleteRow(_toModelRowIndex(_selection!.startRow));
+            widget.stagingBuffer!
+                .toggleDeleteRow(_toModelRowIndex(_selection!.startRow));
           }
         },
         const material.SingleActivator(
@@ -1525,7 +1572,8 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
           control: true,
         ): () {
           if (widget.stagingBuffer != null && _selection != null) {
-            widget.stagingBuffer!.revertRow(_toModelRowIndex(_selection!.startRow));
+            widget.stagingBuffer!
+                .revertRow(_toModelRowIndex(_selection!.startRow));
           }
         },
         const material.SingleActivator(
@@ -1533,7 +1581,8 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
           meta: true,
         ): () {
           if (widget.stagingBuffer != null && _selection != null) {
-            widget.stagingBuffer!.revertRow(_toModelRowIndex(_selection!.startRow));
+            widget.stagingBuffer!
+                .revertRow(_toModelRowIndex(_selection!.startRow));
           }
         },
         const material.SingleActivator(
@@ -1819,6 +1868,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
                                   onDuplicateRow: _handleDuplicateRow,
                                   onToggleDeleteRow: _handleToggleDeleteRow,
                                   onRevertRow: _handleRevertRow,
+                                  columnDataTypes: widget.columnDataTypes,
                                 );
                               },
                             ),
@@ -1888,9 +1938,8 @@ class _HeaderRow extends material.StatelessWidget {
               onResize: onResizeColumn != null
                   ? (delta) => onResizeColumn!(i, delta)
                   : null,
-              onAutoFit: onAutoFitColumn != null
-                  ? () => onAutoFitColumn!(i)
-                  : null,
+              onAutoFit:
+                  onAutoFitColumn != null ? () => onAutoFitColumn!(i) : null,
             ),
           if (window.trailingWidth > 0)
             material.SizedBox(width: window.trailingWidth),
@@ -1968,7 +2017,9 @@ class _HeaderCell extends material.StatelessWidget {
                       if (sortOrder != null) ...[
                         const Gap(4),
                         material.AnimatedRotation(
-                          turns: sortOrder == ResultGridSortOrder.ascending ? 0.0 : 0.5,
+                          turns: sortOrder == ResultGridSortOrder.ascending
+                              ? 0.0
+                              : 0.5,
                           duration: context.motionDuration(QueryaMotion.fast),
                           curve: context.motionCurve(QueryaMotion.enter),
                           child: material.Icon(
@@ -2038,6 +2089,7 @@ class _DataRow extends material.StatelessWidget {
     this.onDuplicateRow,
     this.onToggleDeleteRow,
     this.onRevertRow,
+    this.columnDataTypes,
   });
 
   final int rowIndex;
@@ -2074,7 +2126,8 @@ class _DataRow extends material.StatelessWidget {
     bool asJson,
     bool asCsv,
   })? onCopyCell;
-  final void Function(int row, int col, {required bool invert})? onFilterByValue;
+  final void Function(int row, int col, {required bool invert})?
+      onFilterByValue;
   final void Function(int row, int col, String operator)? onFilterComparison;
   final void Function(int row, int col)? onSetNull;
   final void Function(int row, int col)? onSetEmpty;
@@ -2082,10 +2135,12 @@ class _DataRow extends material.StatelessWidget {
   final void Function(int row)? onDuplicateRow;
   final void Function(int row)? onToggleDeleteRow;
   final void Function(int row)? onRevertRow;
+  final Map<String, String>? columnDataTypes;
 
   @override
   material.Widget build(material.BuildContext context) {
-    final rowStatus = stagingBuffer?.getRowStatus(modelRowIndex) ?? StagedRowStatus.unchanged;
+    final rowStatus =
+        stagingBuffer?.getRowStatus(modelRowIndex) ?? StagedRowStatus.unchanged;
 
     return material.RepaintBoundary(
       child: material.SizedBox(
@@ -2104,9 +2159,11 @@ class _DataRow extends material.StatelessWidget {
                 colorScheme: colorScheme,
                 striped: striped,
                 rowStatus: rowStatus,
-                cellStatus: stagingBuffer?.getCellStatus(modelRowIndex, c) ?? StagedCellStatus.clean,
+                cellStatus: stagingBuffer?.getCellStatus(modelRowIndex, c) ??
+                    StagedCellStatus.clean,
                 isSelected: selection?.contains(rowIndex, c) ?? false,
-                isEditing: editingCell?.row == rowIndex && editingCell?.column == c,
+                isEditing:
+                    editingCell?.row == rowIndex && editingCell?.column == c,
                 isSelectionTop: selection != null &&
                     selection!.contains(rowIndex, c) &&
                     rowIndex == selection!.startRow,
@@ -2121,6 +2178,8 @@ class _DataRow extends material.StatelessWidget {
                     c == selection!.endColumn,
                 canFilter: canFilter,
                 hasStagingBuffer: stagingBuffer != null,
+                dataTypeName:
+                    columnDataTypes?[c < columns.length ? columns[c] : ''],
                 onTap: onCellTap,
                 onDoubleTap: onCellDoubleTap,
                 onSecondaryTap: onCellSecondaryTap,
@@ -2165,6 +2224,7 @@ class _GridCell extends material.StatelessWidget {
     this.isSelectionRight = false,
     this.canFilter = false,
     this.hasStagingBuffer = false,
+    this.dataTypeName,
     this.onTap,
     this.onDoubleTap,
     this.onSecondaryTap,
@@ -2199,6 +2259,7 @@ class _GridCell extends material.StatelessWidget {
   final bool isSelectionRight;
   final bool canFilter;
   final bool hasStagingBuffer;
+  final String? dataTypeName;
   final void Function(int row, int col, {bool isShift})? onTap;
   final void Function(int row, int col)? onDoubleTap;
   final void Function(int row, int col)? onSecondaryTap;
@@ -2220,7 +2281,8 @@ class _GridCell extends material.StatelessWidget {
     bool asJson,
     bool asCsv,
   })? onCopyCell;
-  final void Function(int row, int col, {required bool invert})? onFilterByValue;
+  final void Function(int row, int col, {required bool invert})?
+      onFilterByValue;
   final void Function(int row, int col, String operator)? onFilterComparison;
   final void Function(int row, int col)? onSetNull;
   final void Function(int row, int col)? onSetEmpty;
@@ -2236,19 +2298,24 @@ class _GridCell extends material.StatelessWidget {
 
     return [
       MenuButton(
-        leading: const material.Icon(material.Icons.content_copy_rounded, size: 16),
-        trailing: const material.Text('Ctrl+C', style: material.TextStyle(fontSize: 11)),
+        leading:
+            const material.Icon(material.Icons.content_copy_rounded, size: 16),
+        trailing: const material.Text('Ctrl+C',
+            style: material.TextStyle(fontSize: 11)),
         onPressed: (_) => onCopyCell?.call(row, column),
         child: const material.Text('Copy Value'),
       ),
       MenuButton(
-        leading: const material.Icon(material.Icons.table_chart_outlined, size: 16),
-        trailing: const material.Text('Ctrl+Shift+C', style: material.TextStyle(fontSize: 11)),
+        leading:
+            const material.Icon(material.Icons.table_chart_outlined, size: 16),
+        trailing: const material.Text('Ctrl+Shift+C',
+            style: material.TextStyle(fontSize: 11)),
         onPressed: (_) => onCopyCell?.call(row, column, withHeaders: true),
         child: const material.Text('Copy with Headers'),
       ),
       MenuButton(
-        leading: const material.Icon(material.Icons.data_object_rounded, size: 16),
+        leading:
+            const material.Icon(material.Icons.data_object_rounded, size: 16),
         onPressed: (_) => onCopyCell?.call(row, column, asJson: true),
         child: const material.Text('Copy as JSON'),
       ),
@@ -2260,7 +2327,8 @@ class _GridCell extends material.StatelessWidget {
       if (canFilter && columnName.isNotEmpty) ...[
         const MenuDivider(),
         MenuButton(
-          leading: const material.Icon(material.Icons.filter_alt_outlined, size: 16),
+          leading:
+              const material.Icon(material.Icons.filter_alt_outlined, size: 16),
           onPressed: (_) => onFilterByValue?.call(row, column, invert: false),
           child: material.Text(
             isNull
@@ -2269,7 +2337,8 @@ class _GridCell extends material.StatelessWidget {
           ),
         ),
         MenuButton(
-          leading: const material.Icon(material.Icons.filter_alt_off_outlined, size: 16),
+          leading: const material.Icon(material.Icons.filter_alt_off_outlined,
+              size: 16),
           onPressed: (_) => onFilterByValue?.call(row, column, invert: true),
           child: material.Text(
             isNull
@@ -2279,12 +2348,14 @@ class _GridCell extends material.StatelessWidget {
         ),
         if (numVal != null) ...[
           MenuButton(
-            leading: const material.Icon(material.Icons.chevron_right_rounded, size: 16),
+            leading: const material.Icon(material.Icons.chevron_right_rounded,
+                size: 16),
             onPressed: (_) => onFilterComparison?.call(row, column, '>'),
             child: material.Text('Filter > $text ($columnName > $text)'),
           ),
           MenuButton(
-            leading: const material.Icon(material.Icons.chevron_left_rounded, size: 16),
+            leading: const material.Icon(material.Icons.chevron_left_rounded,
+                size: 16),
             onPressed: (_) => onFilterComparison?.call(row, column, '<'),
             child: material.Text('Filter < $text ($columnName < $text)'),
           ),
@@ -2292,20 +2363,26 @@ class _GridCell extends material.StatelessWidget {
       ],
       const MenuDivider(),
       MenuButton(
-        leading: const material.Icon(material.Icons.visibility_outlined, size: 16),
-        trailing: const material.Text('Ctrl+I', style: material.TextStyle(fontSize: 11)),
+        leading:
+            const material.Icon(material.Icons.visibility_outlined, size: 16),
+        trailing: const material.Text('Ctrl+I',
+            style: material.TextStyle(fontSize: 11)),
         onPressed: (_) => onOpenInspector?.call(row, column),
         child: const material.Text('Inspect Cell Value…'),
       ),
       if (hasStagingBuffer) ...[
         MenuButton(
-          leading: const material.Icon(material.Icons.remove_circle_outline_rounded, size: 16),
-          trailing: const material.Text('Alt+N', style: material.TextStyle(fontSize: 11)),
+          leading: const material.Icon(
+              material.Icons.remove_circle_outline_rounded,
+              size: 16),
+          trailing: const material.Text('Alt+N',
+              style: material.TextStyle(fontSize: 11)),
           onPressed: (_) => onSetNull?.call(row, column),
           child: const material.Text('Set NULL'),
         ),
         MenuButton(
-          leading: const material.Icon(material.Icons.format_clear_rounded, size: 16),
+          leading: const material.Icon(material.Icons.format_clear_rounded,
+              size: 16),
           onPressed: (_) => onSetEmpty?.call(row, column),
           child: const material.Text('Set to Empty String'),
         ),
@@ -2317,8 +2394,10 @@ class _GridCell extends material.StatelessWidget {
           ),
         const MenuDivider(),
         MenuButton(
-          leading: const material.Icon(material.Icons.content_paste_go_rounded, size: 16),
-          trailing: const material.Text('Ctrl+D', style: material.TextStyle(fontSize: 11)),
+          leading: const material.Icon(material.Icons.content_paste_go_rounded,
+              size: 16),
+          trailing: const material.Text('Ctrl+D',
+              style: material.TextStyle(fontSize: 11)),
           onPressed: (_) => onDuplicateRow?.call(row),
           child: const material.Text('Duplicate Row'),
         ),
@@ -2328,19 +2407,27 @@ class _GridCell extends material.StatelessWidget {
                 ? material.Icons.restore_from_trash_rounded
                 : material.Icons.delete_outline_rounded,
             size: 16,
-            color: rowStatus == StagedRowStatus.deleted ? null : colorScheme.destructive,
+            color: rowStatus == StagedRowStatus.deleted
+                ? null
+                : colorScheme.destructive,
           ),
           onPressed: (_) => onToggleDeleteRow?.call(row),
           child: material.Text(
-            rowStatus == StagedRowStatus.deleted ? 'Restore Deleted Row' : 'Delete Row',
+            rowStatus == StagedRowStatus.deleted
+                ? 'Restore Deleted Row'
+                : 'Delete Row',
             style: material.TextStyle(
-              color: rowStatus == StagedRowStatus.deleted ? null : colorScheme.destructive,
+              color: rowStatus == StagedRowStatus.deleted
+                  ? null
+                  : colorScheme.destructive,
             ),
           ),
         ),
-        if (rowStatus == StagedRowStatus.modified || rowStatus == StagedRowStatus.deleted)
+        if (rowStatus == StagedRowStatus.modified ||
+            rowStatus == StagedRowStatus.deleted)
           MenuButton(
-            leading: const material.Icon(material.Icons.restore_rounded, size: 16),
+            leading:
+                const material.Icon(material.Icons.restore_rounded, size: 16),
             onPressed: (_) => onRevertRow?.call(row),
             child: const material.Text('Revert Row Changes'),
           ),
@@ -2355,7 +2442,12 @@ class _GridCell extends material.StatelessWidget {
         initialValue: text,
         width: width,
         height: double.infinity,
-        onCommit: (val, {moveNextCol = false, movePrevCol = false, moveNextRow = false, movePrevRow = false}) {
+        dataTypeName: dataTypeName,
+        onCommit: (val,
+            {moveNextCol = false,
+            movePrevCol = false,
+            moveNextRow = false,
+            movePrevRow = false}) {
           onCommitEdit?.call(
             row,
             column,
@@ -2464,13 +2556,25 @@ class _GridCell extends material.StatelessWidget {
     );
 
     material.Widget content = interactiveCell;
-    if (text.length >= ResultGridMetrics.tooltipMinLength) {
+    final tooltip = ResultGridMetrics.cellTooltipMessage(
+      text: text,
+      dataTypeName: dataTypeName,
+      columnName: columnName,
+    );
+    if (tooltip != null) {
       content = material.Tooltip(
-        message: text,
+        message: tooltip,
         waitDuration: kQueryaTooltipWait,
         child: content,
       );
     }
+
+    content = material.MouseRegion(
+      cursor: hasStagingBuffer
+          ? material.SystemMouseCursors.text
+          : material.SystemMouseCursors.basic,
+      child: content,
+    );
 
     return material.Listener(
       onPointerDown: (event) {
@@ -2505,4 +2609,3 @@ class _TriangleCornerPainter extends material.CustomPainter {
   bool shouldRepaint(covariant _TriangleCornerPainter oldDelegate) =>
       oldDelegate.color != color;
 }
-

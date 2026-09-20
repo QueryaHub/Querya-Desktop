@@ -77,7 +77,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('MySQL'), findsOneWidget);
-      expect(find.text('Server'), findsOneWidget);
+      expect(find.text('Overview'), findsOneWidget);
       expect(find.text('SQL'), findsOneWidget);
 
       await tester.tap(find.text('SQL'));

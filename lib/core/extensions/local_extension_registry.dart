@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
+import 'extension_command_sync.dart';
 import 'extension_paths.dart';
 import 'models/extension_manifest.dart';
 import 'sandbox/sandbox_policy.dart';
@@ -79,6 +80,7 @@ class LocalExtensionRegistry {
     
     _manifests = loadedManifests;
     _loaded = true;
+    ExtensionCommandSync.instance.sync(_manifests);
     return manifests;
   }
 }

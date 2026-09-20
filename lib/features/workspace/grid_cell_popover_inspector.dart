@@ -13,6 +13,7 @@ Future<String?> showGridCellInspectorDialog({
   required String initialValue,
   int? rowIndex,
   String? dataTypeName,
+  Future<void> Function(String value)? onSaveToDatabase,
 }) {
   return showAppDialog<String>(
     context: context,
@@ -21,6 +22,7 @@ Future<String?> showGridCellInspectorDialog({
       initialValue: initialValue,
       rowIndex: rowIndex,
       dataTypeName: dataTypeName,
+      onSaveToDatabase: onSaveToDatabase,
     ),
   );
 }
@@ -31,12 +33,14 @@ class _GridCellInspectorDialog extends material.StatefulWidget {
     required this.initialValue,
     this.rowIndex,
     this.dataTypeName,
+    this.onSaveToDatabase,
   });
 
   final String columnName;
   final String initialValue;
   final int? rowIndex;
   final String? dataTypeName;
+  final Future<void> Function(String value)? onSaveToDatabase;
 
   @override
   material.State<_GridCellInspectorDialog> createState() =>
@@ -48,6 +52,8 @@ class _GridCellInspectorDialogState
   late final material.TextEditingController _controller;
   bool _isNull = false;
   bool _wordWrap = true;
+  bool _savingToDb = false;
+  String? _saveError;
 
   QueryaCodeLanguage get _detectedLanguage {
     final t = _controller.text.trimLeft();
@@ -199,6 +205,26 @@ class _GridCellInspectorDialogState
     material.Navigator.of(context).pop(result);
   }
 
+  Future<void> _saveToDatabase() async {
+    final save = widget.onSaveToDatabase;
+    if (save == null || _savingToDb) return;
+    setState(() {
+      _savingToDb = true;
+      _saveError = null;
+    });
+    try {
+      await save(_isNull ? 'NULL' : _controller.text);
+      if (!mounted) return;
+      material.Navigator.of(context).pop(_isNull ? 'NULL' : _controller.text);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _savingToDb = false;
+        _saveError = e.toString();
+      });
+    }
+  }
+
   @override
   material.Widget build(material.BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -301,142 +327,189 @@ class _GridCellInspectorDialogState
                     ),
                   ),
                   if (_isHex()) ...[
-                      GhostButton(
-                        density: ButtonDensity.compact,
-                        onPressed: _formatHex,
-                        leading: const material.Icon(
-                          material.Icons.grid_view_rounded,
-                          size: 14,
-                        ),
-                        child: const Text('Format Hex'),
-                      ),
-                      const Gap(6),
-                    ],
                     GhostButton(
                       density: ButtonDensity.compact,
-                      onPressed: () => setState(() => _wordWrap = !_wordWrap),
-                      leading: material.Icon(
-                        _wordWrap
-                            ? material.Icons.wrap_text_rounded
-                            : material.Icons.notes_rounded,
+                      onPressed: _formatHex,
+                      leading: const material.Icon(
+                        material.Icons.grid_view_rounded,
                         size: 14,
                       ),
-                      child: Text(_wordWrap ? 'Wrap' : 'No Wrap'),
+                      child: const Text('Format Hex'),
                     ),
                     const Gap(6),
-                    GhostButton(
-                      density: ButtonDensity.compact,
-                      onPressed: _isNull ? null : _setNull,
-                      child: const Text('Set NULL'),
-                    ),
                   ],
-                ),
-                const Gap(12),
-
-                // Editor Body
-                material.Expanded(
-                  child: material.Container(
-                    decoration: material.BoxDecoration(
-                      color: cs.background,
-                      borderRadius: material.BorderRadius.circular(6),
-                      border: material.Border.all(
-                        color: _isNull
-                            ? cs.primary.withValues(alpha: 0.5)
-                            : cs.border,
-                        width: 1,
-                      ),
+                  GhostButton(
+                    density: ButtonDensity.compact,
+                    onPressed: () => setState(() => _wordWrap = !_wordWrap),
+                    leading: material.Icon(
+                      _wordWrap
+                          ? material.Icons.wrap_text_rounded
+                          : material.Icons.notes_rounded,
+                      size: 14,
                     ),
-                    child: _isNull
-                        ? material.Center(
-                            child: material.Column(
-                              mainAxisSize: material.MainAxisSize.min,
-                              children: [
-                                const Text('Value is NULL').muted().semiBold(),
-                                const Gap(8),
-                                GhostButton(
-                                  density: ButtonDensity.compact,
-                                  onPressed: () =>
-                                      setState(() => _isNull = false),
-                                  child: const Text('Enter text value'),
-                                ),
-                              ],
-                            ),
-                          )
-                        : _wordWrap
-                            ? QueryaCodeEditor(
-                                controller: _controller,
-                                language: _detectedLanguage,
-                                autofocus: true,
-                                fontSize: 12,
-                                variant: QueryaCodeEditorVariant.material,
-                                hintText: 'Enter cell value…',
-                                contentPadding:
-                                    const material.EdgeInsets.all(12),
-                              )
-                            : material.SingleChildScrollView(
-                                scrollDirection: material.Axis.horizontal,
-                                child: material.SizedBox(
-                                  width: 3000,
-                                  child: QueryaCodeEditor(
-                                    controller: _controller,
-                                    language: _detectedLanguage,
-                                    autofocus: true,
-                                    fontSize: 12,
-                                    variant: QueryaCodeEditorVariant.material,
-                                    hintText: 'Enter cell value…',
-                                    contentPadding:
-                                        const material.EdgeInsets.all(12),
-                                  ),
+                    child: Text(_wordWrap ? 'Wrap' : 'No Wrap'),
+                  ),
+                  const Gap(6),
+                  GhostButton(
+                    density: ButtonDensity.compact,
+                    onPressed: _isNull ? null : _setNull,
+                    child: const Text('Set NULL'),
+                  ),
+                ],
+              ),
+              const Gap(12),
+
+              // Editor Body
+              material.Expanded(
+                child: material.Container(
+                  decoration: material.BoxDecoration(
+                    color: cs.background,
+                    borderRadius: material.BorderRadius.circular(6),
+                    border: material.Border.all(
+                      color: _isNull
+                          ? cs.primary.withValues(alpha: 0.5)
+                          : cs.border,
+                      width: 1,
+                    ),
+                  ),
+                  child: _isNull
+                      ? material.Center(
+                          child: material.Column(
+                            mainAxisSize: material.MainAxisSize.min,
+                            children: [
+                              const Text('Value is NULL').muted().semiBold(),
+                              const Gap(8),
+                              GhostButton(
+                                density: ButtonDensity.compact,
+                                onPressed: () =>
+                                    setState(() => _isNull = false),
+                                child: const Text('Enter text value'),
+                              ),
+                            ],
+                          ),
+                        )
+                      : _wordWrap
+                          ? QueryaCodeEditor(
+                              controller: _controller,
+                              language: _detectedLanguage,
+                              autofocus: true,
+                              fontSize: 12,
+                              variant: QueryaCodeEditorVariant.material,
+                              hintText: 'Enter cell value…',
+                              contentPadding: const material.EdgeInsets.all(12),
+                            )
+                          : material.SingleChildScrollView(
+                              scrollDirection: material.Axis.horizontal,
+                              child: material.SizedBox(
+                                width: 3000,
+                                child: QueryaCodeEditor(
+                                  controller: _controller,
+                                  language: _detectedLanguage,
+                                  autofocus: true,
+                                  fontSize: 12,
+                                  variant: QueryaCodeEditorVariant.material,
+                                  hintText: 'Enter cell value…',
+                                  contentPadding:
+                                      const material.EdgeInsets.all(12),
                                 ),
                               ),
-                  ),
+                            ),
                 ),
-                const Gap(12),
-
-                // Footer
-                material.Row(
-                  children: [
-                    GhostButton(
-                      density: ButtonDensity.compact,
-                      onPressed: () {
-                        Clipboard.setData(
-                          ClipboardData(
-                              text: _isNull ? 'NULL' : _controller.text),
-                        );
-                      },
-                      leading: const material.Icon(
-                        material.Icons.copy_rounded,
-                        size: 14,
-                      ),
-                      child: const Text('Copy'),
-                    ),
-                    const Gap(12),
-                    if (!_isNull)
-                      material.Text(
-                        '$linesCount ${linesCount == 1 ? "line" : "lines"} · $charsCount chars · $bytesCount B',
-                        style: material.TextStyle(
-                          fontSize: 11,
-                          color: cs.mutedForeground,
-                        ),
-                      ),
-                    const material.Spacer(),
-                    OutlineButton(
-                      density: ButtonDensity.compact,
-                      onPressed: () => material.Navigator.of(context).pop(null),
-                      child: const Text('Cancel'),
-                    ),
-                    const Gap(8),
-                    PrimaryButton(
-                      density: ButtonDensity.compact,
-                      onPressed: _apply,
-                      child: const Text('Apply'),
-                    ),
-                  ],
-                ),
+              ),
+              const Gap(12),
+              if (_saveError != null) ...[
+                Text(_saveError!).small().muted(),
+                const Gap(8),
               ],
-            ),
+              // Footer: two rows so Copy + metrics + extra Save to DB
+              // actions fit the 420px dialog without overflowing.
+              material.Column(
+                crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                children: [
+                  material.Row(
+                    children: [
+                      GhostButton(
+                        density: ButtonDensity.compact,
+                        onPressed: _savingToDb
+                            ? null
+                            : () {
+                                Clipboard.setData(
+                                  ClipboardData(
+                                      text:
+                                          _isNull ? 'NULL' : _controller.text),
+                                );
+                              },
+                        leading: const material.Icon(
+                          material.Icons.copy_rounded,
+                          size: 14,
+                        ),
+                        child: const Text('Copy'),
+                      ),
+                      const Gap(12),
+                      if (!_isNull)
+                        material.Expanded(
+                          child: material.Text(
+                            '$linesCount ${linesCount == 1 ? "line" : "lines"} · $charsCount chars · $bytesCount B',
+                            overflow: material.TextOverflow.ellipsis,
+                            style: material.TextStyle(
+                              fontSize: 11,
+                              color: cs.mutedForeground,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const Gap(8),
+                  material.Wrap(
+                    alignment: material.WrapAlignment.end,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlineButton(
+                        density: ButtonDensity.compact,
+                        onPressed: _savingToDb
+                            ? null
+                            : () => material.Navigator.of(context).pop(null),
+                        child: const Text('Cancel'),
+                      ),
+                      if (widget.onSaveToDatabase != null) ...[
+                        PrimaryButton(
+                          density: ButtonDensity.compact,
+                          onPressed: _savingToDb ? null : _saveToDatabase,
+                          leading: _savingToDb
+                              ? material.SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child: material.CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: cs.primaryForeground,
+                                  ),
+                                )
+                              : const material.Icon(
+                                  material.Icons.save_rounded,
+                                  size: 14,
+                                ),
+                          child: Text(_savingToDb ? 'Saving…' : 'Save to DB'),
+                        ),
+                        OutlineButton(
+                          density: ButtonDensity.compact,
+                          onPressed: _savingToDb ? null : _apply,
+                          child: const Text('Apply'),
+                        ),
+                      ] else
+                        PrimaryButton(
+                          density: ButtonDensity.compact,
+                          onPressed: _apply,
+                          child: const Text('Apply'),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
-      );
+      ),
+    );
   }
 }

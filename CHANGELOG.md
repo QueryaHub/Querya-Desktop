@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.16] - 2026-09-20
+
+In-place editing in Table Browser (same DML staging as SQL Workspace), Command Palette and Quick Switcher, workspace chrome parity across drivers, connections-tree visual + FPS work, MongoDB per-field Save to DB, and a hardened in-app updater.
+
+### Added
+
+- **Table Browser In-Place Editing (#759, PR #760)** — Postgres, MySQL, and SQLite table views attach `DataGridStagingBuffer` and `ResultsTab` so double-click edits a cell when a PRIMARY KEY is present. Views, materialized views, custom SQL, and tables without a PK stay read-only with an explicit status line. Toolbar **Save** / **Revert** + pending-change badge; pagination and Refresh confirm before discard; commit goes through DML preview and a transaction, then a success toast.
+- **Command Palette & Quick Switcher (#742–#747, #754, PRs #749–#753, #757)** — `QueryaCommandRegistry` and a modal palette on **Ctrl/Cmd+P** (CP-01…02); Quick Switcher for database objects on **Ctrl/Cmd+K** (CP-03); palette wired to menus, SQL, grid, and connections (CP-04); extension `contributes.commands` in the palette with RPC error toasts and reserved core ids (CP-05).
+- **Workspace UI Parity (#714–#717, #729, PRs #728, #730)** — Shared `QueryaTabStrip` on driver homes (Overview / SQL), `QueryaStatusBar` for busy / duration / rows / cols, read-only badge moved out of the title bar, and **Return to** last MongoDB database / Redis `dbN` from stats.
+- **Connections Tree Chrome (#718–#722, #740, PRs #731–#734, #748)** — Shared `QueryaTreeTokens`, collapsible Databases folder, SDUI/`QueryaConnectionTreeRow` parity, Extension Refresh / SQLite path subtitle / Redis DB menu polish, indent guides, and a compact SERVERS header.
+- **MongoDB Field Inspector + Save to DB (#763, PR #764)** — Expanded document cards list top-level fields; tapping a non-`_id` field opens the Cell Inspector with **Save to DB** (`$set` one field and reload). SQL inspector **Apply** is unchanged when the callback is not wired.
+- **Grid Cell UX (#761, PR #762)** — Text cursor on editable cells; hover tooltip `column · sql_type` (long values still included); README Feature Matrix: **Live In-Grid Editing + Staged Commit**.
+
+### Changed & Performance
+
+- **Connections Tree FPS (#724–#727, PRs #735–#738)** — Flatten nested shrinkWrap lists into a virtualized native tree, selection rebuilds only the selected slice, skip `AnimatedSize` on large expands and Motion Off, and a DevTools checklist for 120 Hz captures (QA tracked in #739 / epic #723).
+- **Motion Token Cleanup (#741, PR #758)** — Leftover welcome-tour, empty-hero, and sidebar durations use `QueryaMotion` tokens.
+
+### Fixed
+
+- **In-App Updater Hardening (#755, PR #756)** — Surface SHA-256 mismatches, refuse unsafe installs (dirty tree / managed / zip), and avoid using `BuildContext` across the restart-confirm await.
+- **Extension Palette Invoke (#754, PR #757)** — Toast RPC failures from extension commands and stop extensions from clobbering core command ids.
+
 ## [0.4.15] - 2026-09-07
 
 Multi-tab SQL workspace sessions, fluid motion transitions, cohesive dialog UI system, content-aware adaptive column sizing and auto-fit in data grid, rich cell context menus, desktop file associations (.sql, .sqlite) with CLI open-with handling, categorized Master-Detail preferences with Keymap reference and theme editor modal, server-side column sorting in table views, connection tree quick search and pinning, and comprehensive UI freeze and isolate performance optimizations.

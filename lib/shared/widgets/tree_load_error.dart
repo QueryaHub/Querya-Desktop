@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/ui/querya_icon_sizes.dart';
 import 'package:querya_desktop/core/ui/querya_icons.dart';
+import 'package:querya_desktop/core/ui/querya_tree_tokens.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Inline error block for connection tree lazy-load failures.
@@ -14,11 +15,7 @@ class TreeLoadError extends material.StatelessWidget {
     required this.message,
     this.onRetry,
     this.retryLabel = 'Retry',
-    this.padding = const material.EdgeInsets.only(
-      left: 24,
-      top: 4,
-      bottom: 8,
-    ),
+    this.padding = QueryaTreeTokens.errorPaddingNested,
     this.detailFontSize = 11,
     this.showTitleRow = true,
   });

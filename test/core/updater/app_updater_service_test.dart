@@ -249,10 +249,17 @@ void main() {
         checksumsUrl: 'https://example.com/SHA256SUMS.txt',
       );
 
-      expect(
+      await expectLater(
         () => service.downloadAsset(asset, manifest: manifest),
-        throwsA(isA<UpdateChecksumMismatchException>()),
+        throwsA(
+          isA<AppUpdaterException>().having(
+            (e) => e.cause,
+            'cause',
+            isA<UpdateChecksumMismatchException>(),
+          ),
+        ),
       );
+      expect(File('${tempDir.path}/$fileName').existsSync(), isFalse);
       service.dispose();
     });
   });

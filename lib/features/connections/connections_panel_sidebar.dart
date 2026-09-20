@@ -304,8 +304,9 @@ class _FolderTileState extends State<_FolderTile> {
             ),
             QueryaAnimatedExpand(
               expanded: _expanded,
-              child: material.Padding(
-                padding: const material.EdgeInsets.only(left: 24),
+              child: QueryaTreeIndentGuide(
+                depth: 1,
+                step: 24,
                 child: lazyConnectionTreeList(
                   context: context,
                   itemCount: widget.connections.length,

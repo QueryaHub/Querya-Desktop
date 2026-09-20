@@ -32,9 +32,11 @@ class MongoExplorerView extends material.StatefulWidget {
     super.key,
     required this.connectionRow,
     this.database,
+    this.initialCollection,
   });
   final ConnectionRow connectionRow;
   final String? database;
+  final String? initialCollection;
 
   @override
   material.State<MongoExplorerView> createState() => _MongoExplorerViewState();
@@ -62,6 +64,9 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
     _connect();
     if (widget.database != null) {
       _selectedDatabase = widget.database;
+    }
+    if (widget.initialCollection != null) {
+      _selectedCollection = widget.initialCollection;
     }
   }
 
@@ -104,6 +109,12 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
       setState(() {
         _connection = conn;
         _connecting = false;
+        if (widget.database != null) {
+          _selectedDatabase = widget.database;
+        }
+        if (widget.initialCollection != null) {
+          _selectedCollection = widget.initialCollection;
+        }
       });
     } catch (e) {
       if (mounted) {

@@ -2,6 +2,7 @@ import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
+import 'package:querya_desktop/core/actions/data_grid_command_bridge.dart';
 import 'package:querya_desktop/core/widgets/virtual_selectable_text_view.dart';
 import 'package:querya_desktop/features/workspace/data_grid_calc_bar.dart';
 import 'package:querya_desktop/features/workspace/data_grid_filter_bar.dart';
@@ -35,6 +36,7 @@ class ResultsTab extends material.StatefulWidget {
     this.onApplyChanges,
     this.isSaving = false,
     this.errorAction,
+    this.columnDataTypes,
   });
 
   final List<String> columns;
@@ -48,6 +50,9 @@ class ResultsTab extends material.StatefulWidget {
   final material.VoidCallback? onApplyChanges;
   final bool isSaving;
   final material.Widget? errorAction;
+
+  /// Column name → SQL type for cell hover tooltips and the inline editor.
+  final Map<String, String>? columnDataTypes;
 
   @override
   material.State<ResultsTab> createState() => _ResultsTabState();
@@ -104,7 +109,91 @@ class _ResultsTabState extends material.State<ResultsTab> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _syncGridBridge();
+  }
+
+  @override
+  void didUpdateWidget(covariant ResultsTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncGridBridge();
+  }
+
+  void _syncGridBridge() {
+    final hasGrid = widget.showExportToolbar &&
+        widget.columns.isNotEmpty &&
+        widget.errorMessage == null &&
+        !widget.isLoading;
+    if (!hasGrid) {
+      DataGridCommandBridge.instance.unregister();
+      return;
+    }
+    final effectiveRows = widget.stagingBuffer != null
+        ? widget.stagingBuffer!.effectiveRows
+        : widget.rows;
+    DataGridCommandBridge.instance.register(
+      onToggleFilter: () {
+        if (!mounted) return;
+        setState(() => _showFilterBar = !_showFilterBar);
+      },
+      onToggleInspector: () {
+        if (!mounted) return;
+        setState(() => _showValuePanel = !_showValuePanel);
+      },
+      onCopy: (format) => unawaited(_copyAs(format)),
+      onSaveExport: () => unawaited(_saveExport()),
+      onApplyStaged: widget.onApplyChanges,
+      canApplyStaged: () =>
+          widget.stagingBuffer?.isDirty == true && !widget.isSaving,
+      hasRows: effectiveRows.isNotEmpty,
+    );
+  }
+
+  List<List<String>> _exportRows() {
+    final effectiveRows = widget.stagingBuffer != null
+        ? widget.stagingBuffer!.effectiveRows
+        : widget.rows;
+    return _getFilteredRows(effectiveRows, widget.columns);
+  }
+
+  Future<void> _copyAs(DataExportFormat format) async {
+    final rows = _exportRows();
+    await DataExportService.copyToClipboard(
+      format,
+      columns: widget.columns,
+      rows: rows,
+    );
+    if (!mounted) return;
+    showAppToast(
+      context: context,
+      message: 'Copied ${rows.length} rows as ${format.name.toUpperCase()}',
+      variant: AppToastVariant.success,
+    );
+  }
+
+  Future<void> _saveExport() async {
+    final rows = _exportRows();
+    final outcome = await DataExportService.saveToFile(
+      DataExportFormat.csv,
+      columns: widget.columns,
+      rows: rows,
+    );
+    if (!mounted) return;
+    if (outcome == SaveExportOutcome.written) {
+      showAppToast(
+        context: context,
+        message: 'Exported ${rows.length} rows',
+        variant: AppToastVariant.success,
+      );
+    } else if (outcome == SaveExportOutcome.error) {
+      await _showSaveFileErrorDialog(context);
+    }
+  }
+
+  @override
   void dispose() {
+    DataGridCommandBridge.instance.unregister();
     _memoColumns = null;
     _memoEffectiveRows = null;
     _cachedFilteredRows = const [];
@@ -338,22 +427,7 @@ class _ResultsTabState extends material.State<ResultsTab> {
                       label: 'Export ▾',
                       icon: material.Icons.copy_rounded,
                       isSave: false,
-                      onSelected: (format) {
-                        unawaited(() async {
-                          await DataExportService.copyToClipboard(
-                            format,
-                            columns: widget.columns,
-                            rows: filteredRows,
-                          );
-                          if (context.mounted) {
-                            showAppToast(
-                              context: context,
-                              message: 'Copied ${filteredRows.length} rows as ${format.name.toUpperCase()}',
-                              variant: AppToastVariant.success,
-                            );
-                          }
-                        }());
-                      },
+                      onSelected: (format) => unawaited(_copyAs(format)),
                     ),
                     const Gap(6),
                     ExportMenuButton(
@@ -362,16 +436,17 @@ class _ResultsTabState extends material.State<ResultsTab> {
                       isSave: true,
                       onSelected: (format) {
                         unawaited(() async {
+                          final rows = _exportRows();
                           final outcome = await DataExportService.saveToFile(
                             format,
                             columns: widget.columns,
-                            rows: filteredRows,
+                            rows: rows,
                           );
                           if (context.mounted) {
                             if (outcome == SaveExportOutcome.written) {
                               showAppToast(
                                 context: context,
-                                message: 'Exported ${filteredRows.length} rows',
+                                message: 'Exported ${rows.length} rows',
                                 variant: AppToastVariant.success,
                               );
                             } else if (outcome == SaveExportOutcome.error) {
@@ -420,6 +495,7 @@ class _ResultsTabState extends material.State<ResultsTab> {
                           columns: widget.columns,
                           rows: filteredRows,
                           stagingBuffer: widget.stagingBuffer,
+                          columnDataTypes: widget.columnDataTypes,
                           rowIndicesMapping: _cachedFilteredIndices,
                           onRowSelected: (row) => setState(() => _selectedRowIndex = row),
                           onSelectionValuesChanged: (values) {

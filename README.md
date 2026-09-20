@@ -48,7 +48,7 @@ Whether you are navigating multi-million row datasets, authoring complex analyti
 - **Streaming Exporter:** Stream table data directly to **CSV**, **JSON**, or executable **SQL INSERT** statements.
 
 ### ✍️ Interactive In-Place DML Staging Buffer
-- **Safe Transactional Editing:** Edit cells directly within the grid with real-time data type validation (integers, floats, booleans, timestamps, UUIDs, and JSON).
+- **Safe Transactional Editing:** Edit cells directly in SQL Workspace **and Table Browser** (Postgres, MySQL, SQLite) with real-time data type validation (integers, floats, booleans, timestamps, UUIDs, and JSON). Views and tables without a primary key stay read-only.
 - **Atomic DML Generation:** Querya tracks modifications (`UPDATE`, `INSERT`, `DELETE`) in a dedicated staging buffer, generating dialect-accurate SQL statements.
 - **Review Before Execution:** Inspect generated SQL diffs with primary-key safety checks, row counts, and single-click commit or rollback.
 
@@ -66,6 +66,12 @@ Whether you are navigating multi-million row datasets, authoring complex analyti
 ### 🔬 Rich Cell & Payload Inspector
 - **Structured Pretty-Printers:** Inspect complex cell values in dedicated preview panes with automatic formatting and syntax validation for **JSON**, **XML**, and **HTML**.
 - **Raw Hex / Binary Viewer:** Inspect BLOBs, binary hashes, and raw payloads with side-by-side hex and ASCII representations.
+- **MongoDB Field Save:** Expand a document card, inspect a field, and **Save to DB** (`$set`) without replacing the whole document.
+
+### ⌘ Command Palette & Quick Switcher
+- **Command Palette (Ctrl/Cmd+P):** Fuzzy-search app commands — SQL run, grid staging, connections, preferences — from one modal.
+- **Quick Switcher (Ctrl/Cmd+K):** Jump to tables, views, collections, and other database objects in the current connection.
+- **Extension Commands:** Installed drivers can contribute commands via `contributes.commands` in their manifest.
 
 ### 🔒 Security & Privacy by Design
 - **Hardware-Backed Credential Vaults:** Connection passwords and keys are never stored in plaintext. Querya integrates directly with native OS credential stores (**Freedesktop Secret Service / Keyring** on Linux, **Apple Keychain** on macOS, and **Windows DPAPI Credential Manager**).
@@ -102,7 +108,8 @@ Whether you are navigating multi-million row datasets, authoring complex analyti
 |:---|:---:|:---:|:---:|
 | **Runtime Overhead** | **Zero JVM (Native Flutter / Dart)** | Heavy (~1–2 GB JVM/Electron) | Browser Tab Memory Limits |
 | **Data Grid Architecture** | **2D Virtualized ($O(1)$ Memory)** | Paginated or Unbounded Heap | DOM Virtualization Limits |
-| **In-Place Cell Editing** | **Yes (DML Staging & Preview)** | Often Direct or Unchecked | Read-Only or Manual Forms |
+| **In-Place Cell Editing** | **Live In-Grid Editing + Staged Commit** | Often Direct or Unchecked | Read-Only or Manual Forms |
+| **Command Palette** | **Ctrl/Cmd+P + Quick Switcher (Ctrl/Cmd+K)** | Varies / Buried Menus | Limited by Browser Shortcuts |
 | **Multi-Tab SQL Sessions** | **Yes (Isolated Sessions)** | Varies | Limited by Tab Lifecycles |
 | **Local SQLite File Association** | **Native (.db, .sqlite, .sqlite3)** | Partial | Requires Server Upload |
 | **Complex Cell Inspector** | **JSON / XML / HTML / Hex-Binary** | Basic String View | Basic Textarea |
@@ -173,7 +180,7 @@ flutter build linux --release
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                           Querya Desktop Shell                          │
-│          (bitsdojo_window, Multi-Tab Workspaces, Command Router)        │
+│     (bitsdojo_window, Multi-Tab Workspaces, Command Palette Ctrl+P)     │
 ├───────────────────────────────────┬─────────────────────────────────────┤
 │        UI & Presentation          │           State & Sessions          │
 │ • 2D Virtual Data Grid            │ • Connection Session Pool           │

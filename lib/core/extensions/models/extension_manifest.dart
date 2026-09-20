@@ -65,6 +65,10 @@ class ExtensionManifest {
   Iterable<DriverContribution> get contributedDrivers =>
       contributions?.drivers ?? const [];
 
+  /// Command Palette actions from `contributions.commands` / `contributes.commands`.
+  Iterable<CommandContribution> get contributedCommands =>
+      contributions?.commands ?? const [];
+
   /// Absolute path to the packaged icon, or null when missing on disk.
   String? get resolvedIconPath {
     final rel = icon?.trim();
@@ -135,8 +139,23 @@ class ExtensionManifest {
                   Map<String, dynamic>.from(json['sandbox'] as Map))
               : null),
       capabilities: _parseCapabilities(json['capabilities']),
-      contributions: _parseContributions(json['contributions']),
+      contributions: _mergeContributionBlocks(
+        json['contributions'],
+        json['contributes'],
+      ),
     );
+  }
+
+  static ExtensionContributions? _mergeContributionBlocks(
+    Object? contributions,
+    Object? contributes,
+  ) {
+    final merged = ExtensionContributions.merge(
+      _parseContributions(contributions),
+      _parseContributions(contributes),
+    );
+    if (merged.isEmpty) return null;
+    return merged;
   }
 
   static ExtensionCapabilities? _parseCapabilities(Object? raw) {

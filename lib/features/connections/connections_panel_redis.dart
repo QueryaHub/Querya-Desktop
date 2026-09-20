@@ -253,36 +253,18 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
             // Expanded database children — ALL 16 databases
             QueryaAnimatedExpand(
               expanded: _expanded,
+              estimatedChildCount: _databases.length,
               child: material.Column(
                 mainAxisSize: material.MainAxisSize.min,
                 crossAxisAlignment: material.CrossAxisAlignment.stretch,
                 children: [
                   if (_loading)
-                    material.Padding(
-                      padding: const material.EdgeInsets.only(
-                          left: 28, top: 4, bottom: 4),
-                      child: material.Row(
-                        children: [
-                          const material.SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: material.CircularProgressIndicator(
-                                strokeWidth: 1.5),
-                          ),
-                          const Gap(8),
-                          const Text('Loading...').muted().xSmall(),
-                        ],
-                      ),
-                    ),
+                    const ConnectionTreeLoadingRow.connection(),
                   if (_error != null)
                     TreeLoadError(
                       title: 'Could not load Redis info',
                       message: _error!,
-                      padding: const material.EdgeInsets.only(
-                        left: 28,
-                        top: 4,
-                        bottom: 4,
-                      ),
+                      padding: QueryaTreeTokens.errorPaddingConnection,
                       onRetry: _loadDatabases,
                     ),
                   if (_databases.isNotEmpty)
@@ -320,41 +302,23 @@ class _RedisDatabasesNode extends material.StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return material.Padding(
-      padding: const material.EdgeInsets.only(left: 20),
-      child: material.Column(
-        crossAxisAlignment: material.CrossAxisAlignment.start,
-        mainAxisSize: material.MainAxisSize.min,
-        children: [
-          _PgTreeRow(
-            label: 'Databases (${databases.length})',
-            icon: QueryaIcons.databasesFolder,
-            iconSize: QueryaIconSizes.treeConnection,
-            iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
-            textStyle: material.TextStyle(
-              fontSize: 12,
-              color: theme.colorScheme.foreground,
-            ),
-            verticalPadding: 4,
-            onTap: null,
+    return ConnectionDatabasesFolder(
+      connection: connection,
+      databaseCount: databases.length,
+      onRefresh: onRefreshDatabases,
+      child: lazyConnectionTreeList(
+        context: context,
+        itemCount: databases.length,
+        itemBuilder: (context, index) {
+          final db = databases[index];
+          return _RedisDatabaseNode(
             connection: connection,
-            onContextRefresh: onRefreshDatabases,
-          ),
-          lazyConnectionTreeList(
-            context: context,
-            itemCount: databases.length,
-            itemBuilder: (context, index) {
-              final db = databases[index];
-              return _RedisDatabaseNode(
-                connection: connection,
-                index: db.index,
-                keys: db.keys,
-                onTap: () => onDatabaseTap?.call(db.index),
-              );
-            },
-          ),
-        ],
+            index: db.index,
+            keys: db.keys,
+            onTap: () => onDatabaseTap?.call(db.index),
+            onRefreshDatabases: onRefreshDatabases,
+          );
+        },
       ),
     );
   }
@@ -366,48 +330,55 @@ class _RedisDatabaseNode extends StatelessWidget {
     required this.index,
     required this.keys,
     required this.onTap,
+    required this.onRefreshDatabases,
   });
 
   final ConnectionRow connection;
   final int index;
   final int keys;
   final VoidCallback onTap;
+  final VoidCallback onRefreshDatabases;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final sel = _ConnectionsTreeSelectionScope.of(context);
-    final isSelected = sel != null &&
-        sel.selectedConnectionId == connection.id &&
-        sel.selectedRedisDb == index;
-    return material.Padding(
-      padding: const material.EdgeInsets.only(left: 16),
-      child: _PgTreeRow(
-        label: 'db$index',
-        isSelected: isSelected,
-        icon: QueryaIcons.database,
-        iconSize: QueryaIconSizes.treeConnection,
-        iconColor: keys > 0
-            ? theme.colorScheme.primary.withValues(alpha: 0.7)
-            : theme.colorScheme.mutedForeground.withValues(alpha: 0.5),
-        trailing: keys > 0
-            ? material.Text(
-                '$keys',
-                style: material.TextStyle(
-                  fontSize: 10,
-                  color: theme.colorScheme.mutedForeground,
-                ),
-              )
-            : null,
-        textStyle: material.TextStyle(
-          fontSize: 12,
-          color: keys > 0
-              ? theme.colorScheme.foreground
-              : theme.colorScheme.mutedForeground,
-        ),
-        verticalPadding: 3,
-        onTap: onTap,
-      ),
+    return _ConnectionsTreeSelectionBuilder<bool>(
+      select: (sel) =>
+          sel.selectedConnectionId == connection.id &&
+          sel.selectedRedisDb == index,
+      builder: (context, isSelected) {
+        return QueryaTreeIndentGuide(
+          depth: 1,
+          child: QueryaConnectionTreeRow(
+            label: 'db$index',
+            isSelected: isSelected,
+            icon: QueryaIcons.database,
+            iconSize: QueryaIconSizes.treeConnection,
+            iconColor: keys > 0
+                ? theme.colorScheme.primary.withValues(alpha: 0.7)
+                : theme.colorScheme.mutedForeground.withValues(alpha: 0.5),
+            trailing: keys > 0
+                ? material.Text(
+                    '$keys',
+                    style: material.TextStyle(
+                      fontSize: 10,
+                      color: theme.colorScheme.mutedForeground,
+                    ),
+                  )
+                : null,
+            textStyle: material.TextStyle(
+              fontSize: 12,
+              color: keys > 0
+                  ? theme.colorScheme.foreground
+                  : theme.colorScheme.mutedForeground,
+            ),
+            verticalPadding: 3,
+            onTap: onTap,
+            connection: connection,
+            onContextRefresh: onRefreshDatabases,
+          ),
+        );
+      },
     );
   }
 }

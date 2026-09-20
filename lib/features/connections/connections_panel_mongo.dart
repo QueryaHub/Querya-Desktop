@@ -276,38 +276,18 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
             // Expanded database children
             QueryaAnimatedExpand(
               expanded: _expanded,
+              estimatedChildCount: _databases.length,
               child: material.Column(
                 mainAxisSize: material.MainAxisSize.min,
                 crossAxisAlignment: material.CrossAxisAlignment.stretch,
                 children: [
                   if (_loading)
-                    material.Padding(
-                      padding: const material.EdgeInsets.only(
-                          left: 28, top: 4, bottom: 4),
-                      child: material.Row(
-                        children: [
-                          const material.SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: material.CircularProgressIndicator(
-                                strokeWidth: 1.5),
-                          ),
-                          const Gap(8),
-                          const Text('Loading...').muted().xSmall(),
-                        ],
-                      ),
-                    ),
+                    const ConnectionTreeLoadingRow.connection(),
                   if (_error != null)
                     TreeLoadError(
                       title: 'Could not load databases',
                       message: _error!,
-                      detailFontSize: 10,
-                      padding: const material.EdgeInsets.only(
-                        left: 28,
-                        top: 4,
-                        bottom: 4,
-                        right: 8,
-                      ),
+                      padding: QueryaTreeTokens.errorPaddingConnection,
                       onRetry: _loadDatabases,
                     ),
                   if (_databases.isNotEmpty)
@@ -348,42 +328,23 @@ class _MongoDatabasesNode extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return material.Padding(
-      padding: const material.EdgeInsets.only(left: 20),
-      child: material.Column(
-        crossAxisAlignment: material.CrossAxisAlignment.start,
-        mainAxisSize: material.MainAxisSize.min,
-        children: [
-          _PgTreeRow(
-            label: 'Databases (${databases.length})',
-            icon: QueryaIcons.databasesFolder,
-            iconSize: QueryaIconSizes.treeConnection,
-            iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
-            textStyle: material.TextStyle(
-              fontSize: 12,
-              color: theme.colorScheme.foreground,
-            ),
-            verticalPadding: 4,
-            onTap: null,
+    return ConnectionDatabasesFolder(
+      connection: connection,
+      databaseCount: databases.length,
+      onRefresh: onRefreshDatabases,
+      child: lazyConnectionTreeList(
+        context: context,
+        itemCount: databases.length,
+        itemBuilder: (context, index) {
+          final db = databases[index];
+          return _MongoDatabaseNode(
             connection: connection,
-            onContextRefresh: onRefreshDatabases,
-          ),
-          lazyConnectionTreeList(
-            context: context,
-            itemCount: databases.length,
-            itemBuilder: (context, index) {
-              final db = databases[index];
-              return _MongoDatabaseNode(
-                connection: connection,
-                name: db,
-                onTap: () => onDatabaseTap?.call(db),
-                onDelete: () => onDeleteDatabase(db),
-                onRefreshDatabases: onRefreshDatabases,
-              );
-            },
-          ),
-        ],
+            name: db,
+            onTap: () => onDatabaseTap?.call(db),
+            onDelete: () => onDeleteDatabase(db),
+            onRefreshDatabases: onRefreshDatabases,
+          );
+        },
       ),
     );
   }
@@ -407,30 +368,34 @@ class _MongoDatabaseNode extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final sel = _ConnectionsTreeSelectionScope.of(context);
-    final isSelected = sel != null &&
-        sel.selectedConnectionId == connection.id &&
-        sel.selectedMongoDb == name;
-    return material.Padding(
-      padding: const material.EdgeInsets.only(left: 16, top: 2, bottom: 2),
-      child: _PgTreeRow(
-        label: name,
-        isSelected: isSelected,
-        icon: QueryaIcons.database,
-        iconSize: QueryaIconSizes.treeConnection,
-        iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
-        textStyle: material.TextStyle(
-          fontSize: 12,
-          color: theme.colorScheme.foreground,
-        ),
-        verticalPadding: 3,
-        onTap: onTap,
-        connection: connection,
-        onContextRefresh: onRefreshDatabases,
-        onOpenSqlWorkspace: null,
-        onContextDelete: onDelete,
-        contextDeleteLabel: 'Delete database',
-      ),
+    return _ConnectionsTreeSelectionBuilder<bool>(
+      select: (sel) =>
+          sel.selectedConnectionId == connection.id &&
+          sel.selectedMongoDb == name,
+      builder: (context, isSelected) {
+        return QueryaTreeIndentGuide(
+          depth: 1,
+          padding: const material.EdgeInsets.only(top: 2, bottom: 2),
+          child: QueryaConnectionTreeRow(
+            label: name,
+            isSelected: isSelected,
+            icon: QueryaIcons.database,
+            iconSize: QueryaIconSizes.treeConnection,
+            iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
+            textStyle: material.TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.foreground,
+            ),
+            verticalPadding: 3,
+            onTap: onTap,
+            connection: connection,
+            onContextRefresh: onRefreshDatabases,
+            onOpenSqlWorkspace: null,
+            onContextDelete: onDelete,
+            contextDeleteLabel: 'Delete database',
+          ),
+        );
+      },
     );
   }
 }

@@ -29,6 +29,13 @@ void main() {
       expect(b.compareTo(a), greaterThan(0));
     });
 
+    test('orders pre-release identifiers numerically (beta.10 > beta.2)', () {
+      final older = UpdateVersion.tryParse('1.0.0-beta.2')!;
+      final newer = UpdateVersion.tryParse('1.0.0-beta.10')!;
+      expect(older.compareTo(newer), lessThan(0));
+      expect(newer.compareTo(older), greaterThan(0));
+    });
+
     test('stable release is newer than same core pre-release', () {
       final stable = UpdateVersion.tryParse('1.0.0')!;
       final beta = UpdateVersion.tryParse('1.0.0-beta.1')!;

@@ -1,6 +1,8 @@
 import 'dart:math' show min;
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/actions/querya_schema_object.dart';
+import 'package:querya_desktop/core/actions/querya_schema_object_cache.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -89,6 +91,17 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
         _statsTotal = names.length;
         _statsProgress = 0;
       });
+      QueryaSchemaObjectCache.instance.merge(
+        widget.connection.id,
+        QueryaSchemaObjectCache.scopeMongo(widget.database),
+        [
+          for (final name in names)
+            QueryaSchemaObject.mongo(
+              database: widget.database,
+              name: name,
+            ),
+        ],
+      );
 
       if (names.isEmpty) return;
 

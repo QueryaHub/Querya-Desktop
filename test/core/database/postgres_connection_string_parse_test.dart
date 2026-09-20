@@ -56,7 +56,7 @@ void main() {
     test('invalid sslmode throws', () {
       expect(
         () => parseConnectionString(
-          'postgresql://localhost/postgres?sslmode=prefer',
+          'postgresql://localhost/postgres?sslmode=invalid',
         ),
         throwsArgumentError,
       );

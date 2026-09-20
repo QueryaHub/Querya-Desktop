@@ -154,7 +154,7 @@ class _PostgresWorkspaceHomeState
               ],
               const Spacer(),
               QueryaTabStrip(
-                labels: const ['Server', 'SQL'],
+                labels: const ['Overview', 'SQL'],
                 selectedIndex: _tab,
                 onSelected: (index) => unawaited(_selectTab(index)),
               ),

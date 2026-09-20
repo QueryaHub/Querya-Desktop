@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart' as material
     show
         AlertDialog,
-        BoxConstraints,
         BuildContext,
         Column,
-        ConstrainedBox,
         Container,
         BoxDecoration,
         Border,
@@ -36,13 +34,10 @@ import 'package:flutter/material.dart' as material
         Text,
         TextOverflow,
         Expanded,
-        CircularProgressIndicator,
         Material,
         Semantics,
         StatelessWidget,
         Colors,
-        Tooltip,
-        Color,
         Padding,
         Widget,
         Navigator,
@@ -54,14 +49,15 @@ import 'package:flutter/material.dart' as material
         ClampingScrollPhysics,
         CallbackShortcuts,
         SingleActivator,
-        AnimatedContainer,
         TextField,
         InputDecoration,
         InputBorder,
         TextEditingController,
         FocusNode;
-import 'package:flutter/services.dart'
-    show Clipboard, ClipboardData, LogicalKeyboardKey;
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
+import 'package:querya_desktop/core/actions/querya_schema_object.dart';
+import 'package:querya_desktop/core/actions/querya_schema_object_cache.dart';
+import 'package:querya_desktop/core/actions/querya_schema_object_loader.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
@@ -78,10 +74,12 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/core/ui/querya_icon_sizes.dart';
 import 'package:querya_desktop/core/ui/querya_icons.dart';
-import 'package:querya_desktop/core/ui/querya_tooltip.dart';
+import 'package:querya_desktop/core/ui/querya_tree_indent_guide.dart';
 import 'package:querya_desktop/core/ui/querya_tree_tokens.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
+import 'package:querya_desktop/features/connections/connection_databases_folder.dart';
 import 'package:querya_desktop/features/connections/driver_icon.dart';
+import 'package:querya_desktop/features/connections/querya_connection_tree_row.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/core/database/redis_service.dart';
 import 'package:querya_desktop/app/app_shutdown.dart';
@@ -116,10 +114,17 @@ const double kConnectionTreeRowExtent = 28;
 /// Build all rows inline when the list is short.
 const int kConnectionTreeEagerThreshold = 24;
 
-/// Max rows visible before nested list scrolls (virtualized via [ListView.builder]).
+/// Max rows visible in a nested leaf viewport (virtualized via [ListView.builder]).
 const int kConnectionTreeMaxVisibleRows = 14;
 
-/// Builds a short [Column] or a height-capped [ListView.builder] for large lists.
+/// Builds connection-tree children without nested [shrinkWrap] layout passes.
+///
+/// - **No [itemExtent]** (databases, schemas, folder tiles): always a [Column]
+///   so expand/collapse participates in the outer sidebar [CustomScrollView]
+///   instead of nesting a second scroller (#724).
+/// - **With [itemExtent]** and `itemCount > [eagerThreshold]`: a fixed-height
+///   [ListView.builder] (SDUI-style — **not** shrink-wrapped) so only the
+///   viewport (+ cacheExtent) leaf rows are built for large table lists.
 material.Widget lazyConnectionTreeList({
   required material.BuildContext context,
   required int itemCount,
@@ -133,26 +138,29 @@ material.Widget lazyConnectionTreeList({
   if (itemCount == 0) {
     return const material.SizedBox.shrink();
   }
-  if (itemCount <= eagerThreshold) {
-    return material.Column(
+
+  final rowExtent = itemExtent;
+  if (rowExtent == null || itemCount <= eagerThreshold) {
+    final pad = padding;
+    final column = material.Column(
       mainAxisSize: material.MainAxisSize.min,
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
         for (var i = 0; i < itemCount; i++) itemBuilder(context, i),
       ],
     );
+    if (pad == null) return column;
+    return material.Padding(padding: pad, child: column);
   }
-  final rowExtent = itemExtent ?? kConnectionTreeRowExtent;
-  return material.ConstrainedBox(
-    constraints: material.BoxConstraints(
-      maxHeight: maxVisibleRows * rowExtent,
-    ),
+
+  return material.SizedBox(
+    height: maxVisibleRows * rowExtent,
     child: material.ListView.builder(
       padding: padding ?? material.EdgeInsets.zero,
-      shrinkWrap: true,
       physics: const material.ClampingScrollPhysics(),
       itemCount: itemCount,
-      itemExtent: itemExtent,
+      itemExtent: rowExtent,
+      cacheExtent: rowExtent * 4,
       itemBuilder: itemBuilder,
     ),
   );
@@ -260,43 +268,161 @@ class TreeObjectFilterBar extends material.StatelessWidget {
 }
 
 /// Inherited scope providing the active connection and object selection down the connections tree.
+///
+/// The [listenable] is obtained via [listenableOf] **without** registering an
+/// InheritedWidget dependency. Leaves should use [_ConnectionsTreeSelectionBuilder]
+/// so only rows whose selected slice changes call [State.setState].
 class _ConnectionsTreeSelectionScope extends InheritedWidget {
   const _ConnectionsTreeSelectionScope({
-    required this.selectedConnectionId,
-    required this.selectedPostgresObject,
-    required this.selectedMysqlObject,
-    required this.selectedSqliteObject,
-    required this.selectedExtensionObject,
-    required this.selectedRedisDb,
-    required this.selectedMongoDb,
+    required this.listenable,
     required super.child,
   });
 
+  final ValueNotifier<_ConnectionsTreeSelection> listenable;
+
+  static ValueNotifier<_ConnectionsTreeSelection>? listenableOf(
+    material.BuildContext context,
+  ) {
+    return context
+        .getInheritedWidgetOfExactType<_ConnectionsTreeSelectionScope>()
+        ?.listenable;
+  }
+
+  @override
+  bool updateShouldNotify(_ConnectionsTreeSelectionScope oldWidget) {
+    return listenable != oldWidget.listenable;
+  }
+}
+
+@immutable
+class _ConnectionsTreeSelection {
+  const _ConnectionsTreeSelection({
+    this.selectedConnectionId,
+    this.selectedPostgresObject,
+    this.selectedMysqlObject,
+    this.selectedSqliteObject,
+    this.selectedExtensionObject,
+    this.selectedRedisDb,
+    this.selectedMongoDb,
+  });
+
+  static const empty = _ConnectionsTreeSelection();
+
   final int? selectedConnectionId;
-  final ({String database, String schema, String name, PostgresObjectKind kind})?
-      selectedPostgresObject;
-  final ({String database, String name, MysqlObjectKind kind})?
-      selectedMysqlObject;
+  final ({
+    String database,
+    String schema,
+    String name,
+    PostgresObjectKind kind
+  })? selectedPostgresObject;
+  final ({
+    String database,
+    String name,
+    MysqlObjectKind kind
+  })? selectedMysqlObject;
   final ({String name, SqliteObjectKind kind})? selectedSqliteObject;
   final ({String database, String name})? selectedExtensionObject;
   final int? selectedRedisDb;
   final String? selectedMongoDb;
 
-  static _ConnectionsTreeSelectionScope? of(material.BuildContext context) {
-    return context
-        .dependOnInheritedWidgetOfExactType<_ConnectionsTreeSelectionScope>();
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is _ConnectionsTreeSelection &&
+        selectedConnectionId == other.selectedConnectionId &&
+        selectedPostgresObject == other.selectedPostgresObject &&
+        selectedMysqlObject == other.selectedMysqlObject &&
+        selectedSqliteObject == other.selectedSqliteObject &&
+        selectedExtensionObject == other.selectedExtensionObject &&
+        selectedRedisDb == other.selectedRedisDb &&
+        selectedMongoDb == other.selectedMongoDb;
   }
 
   @override
-  bool updateShouldNotify(_ConnectionsTreeSelectionScope oldWidget) {
-    return selectedConnectionId != oldWidget.selectedConnectionId ||
-        selectedPostgresObject != oldWidget.selectedPostgresObject ||
-        selectedMysqlObject != oldWidget.selectedMysqlObject ||
-        selectedSqliteObject != oldWidget.selectedSqliteObject ||
-        selectedExtensionObject != oldWidget.selectedExtensionObject ||
-        selectedRedisDb != oldWidget.selectedRedisDb ||
-        selectedMongoDb != oldWidget.selectedMongoDb;
+  int get hashCode => Object.hash(
+        selectedConnectionId,
+        selectedPostgresObject,
+        selectedMysqlObject,
+        selectedSqliteObject,
+        selectedExtensionObject,
+        selectedRedisDb,
+        selectedMongoDb,
+      );
+}
+
+/// Rebuilds only when [select] yields a new value (`==`), avoiding full-tree
+/// InheritedWidget fan-out on every selection change.
+class _ConnectionsTreeSelectionBuilder<T> extends StatefulWidget {
+  const _ConnectionsTreeSelectionBuilder({
+    required this.select,
+    required this.builder,
+  });
+
+  final T Function(_ConnectionsTreeSelection selection) select;
+  final material.Widget Function(material.BuildContext context, T selected)
+      builder;
+
+  @override
+  State<_ConnectionsTreeSelectionBuilder<T>> createState() =>
+      _ConnectionsTreeSelectionBuilderState<T>();
+}
+
+class _ConnectionsTreeSelectionBuilderState<T>
+    extends State<_ConnectionsTreeSelectionBuilder<T>> {
+  ValueNotifier<_ConnectionsTreeSelection>? _listenable;
+  late T _slice;
+  var _hasSlice = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final next = _ConnectionsTreeSelectionScope.listenableOf(context);
+    if (!identical(_listenable, next)) {
+      _listenable?.removeListener(_onSelectionChanged);
+      _listenable = next;
+      _listenable?.addListener(_onSelectionChanged);
+    }
+    final computed = _compute();
+    if (!_hasSlice) {
+      _slice = computed;
+      _hasSlice = true;
+    } else if (computed != _slice) {
+      setState(() => _slice = computed);
+    }
   }
+
+  @override
+  void didUpdateWidget(covariant _ConnectionsTreeSelectionBuilder<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.select != widget.select) {
+      final next = _compute();
+      if (next != _slice) {
+        setState(() => _slice = next);
+      }
+    }
+  }
+
+  T _compute() {
+    final value = _listenable?.value ?? _ConnectionsTreeSelection.empty;
+    return widget.select(value);
+  }
+
+  void _onSelectionChanged() {
+    final next = _compute();
+    if (next != _slice) {
+      setState(() => _slice = next);
+    }
+  }
+
+  @override
+  void dispose() {
+    _listenable?.removeListener(_onSelectionChanged);
+    super.dispose();
+  }
+
+  @override
+  material.Widget build(material.BuildContext context) =>
+      widget.builder(context, _slice);
 }
 
 /// Left panel: Browser tree (pgAdmin-style). Uses shadcn layout widgets.
@@ -412,19 +538,44 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
   /// Ignores stale [setState] when multiple [_loadData] runs overlap (e.g. tests).
   int _loadDataGeneration = 0;
 
+  late final ValueNotifier<_ConnectionsTreeSelection> _treeSelection;
+
   @override
   void initState() {
     super.initState();
+    _treeSelection = ValueNotifier(_selectionFromWidget());
     if (!widget.skipInitialDbLoadForTest) {
       _loadData();
     }
   }
 
   @override
+  void didUpdateWidget(covariant ConnectionsPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final next = _selectionFromWidget();
+    if (next != _treeSelection.value) {
+      _treeSelection.value = next;
+    }
+  }
+
+  @override
   void dispose() {
+    _treeSelection.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  _ConnectionsTreeSelection _selectionFromWidget() {
+    return _ConnectionsTreeSelection(
+      selectedConnectionId: widget.selectedConnectionId,
+      selectedPostgresObject: widget.selectedPostgresObject,
+      selectedMysqlObject: widget.selectedMysqlObject,
+      selectedSqliteObject: widget.selectedSqliteObject,
+      selectedExtensionObject: widget.selectedExtensionObject,
+      selectedRedisDb: widget.selectedRedisDb,
+      selectedMongoDb: widget.selectedMongoDb,
+    );
   }
 
   /// For testing global search filtering.
@@ -756,13 +907,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         filteredFolders.length + rootConnections.length + (showEmptyState ? 1 : 0);
 
     return _ConnectionsTreeSelectionScope(
-      selectedConnectionId: widget.selectedConnectionId,
-      selectedPostgresObject: widget.selectedPostgresObject,
-      selectedMysqlObject: widget.selectedMysqlObject,
-      selectedSqliteObject: widget.selectedSqliteObject,
-      selectedExtensionObject: widget.selectedExtensionObject,
-      selectedRedisDb: widget.selectedRedisDb,
-      selectedMongoDb: widget.selectedMongoDb,
+      listenable: _treeSelection,
       child: material.CallbackShortcuts(
         bindings: {
           const material.SingleActivator(LogicalKeyboardKey.keyF, control: true):
@@ -784,7 +929,13 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
             crossAxisAlignment: material.CrossAxisAlignment.stretch,
             children: [
               material.Padding(
-                padding: const material.EdgeInsets.fromLTRB(20, 24, 16, 12),
+                key: const material.ValueKey('connections-servers-header'),
+                padding: const material.EdgeInsets.fromLTRB(
+                  20,
+                  QueryaTreeTokens.serversHeaderTop,
+                  16,
+                  12,
+                ),
                 child: material.Row(
                   children: [
                     material.Expanded(
@@ -800,14 +951,24 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                       ),
                     ),
                     if (_connections.isNotEmpty)
-                      material.Text(
-                        q.isEmpty
-                            ? '${_connections.length}'
-                            : '${filteredConnections.length}/${_connections.length}',
-                        style: material.TextStyle(
-                          fontSize: 10,
-                          fontWeight: material.FontWeight.w600,
-                          color: theme.colorScheme.mutedForeground,
+                      material.Container(
+                        padding: const material.EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 1,
+                        ),
+                        decoration: material.BoxDecoration(
+                          color: theme.colorScheme.muted.withValues(alpha: 0.28),
+                          borderRadius: material.BorderRadius.circular(8),
+                        ),
+                        child: material.Text(
+                          q.isEmpty
+                              ? '${_connections.length}'
+                              : '${filteredConnections.length}/${_connections.length}',
+                          style: material.TextStyle(
+                            fontSize: 10,
+                            fontWeight: material.FontWeight.w600,
+                            color: theme.colorScheme.mutedForeground,
+                          ),
                         ),
                       ),
                   ],

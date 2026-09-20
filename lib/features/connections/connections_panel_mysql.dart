@@ -239,36 +239,18 @@ class _MysqlConnectionTileState extends State<_MysqlConnectionTile> {
             ),
             QueryaAnimatedExpand(
               expanded: _expanded,
+              estimatedChildCount: _databases.length,
               child: material.Column(
                 mainAxisSize: material.MainAxisSize.min,
                 crossAxisAlignment: material.CrossAxisAlignment.stretch,
                 children: [
                   if (_loading)
-                    material.Padding(
-                      padding: const material.EdgeInsets.only(
-                          left: 28, top: 4, bottom: 4),
-                      child: material.Row(
-                        children: [
-                          const material.SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: material.CircularProgressIndicator(
-                                strokeWidth: 1.5),
-                          ),
-                          const Gap(8),
-                          const Text('Loading...').muted().xSmall(),
-                        ],
-                      ),
-                    ),
+                    const ConnectionTreeLoadingRow.connection(),
                   if (_error != null)
                     TreeLoadError(
                       title: 'Could not load databases',
                       message: _error!,
-                      padding: const material.EdgeInsets.only(
-                        left: 28,
-                        top: 4,
-                        bottom: 4,
-                      ),
+                      padding: QueryaTreeTokens.errorPaddingConnection,
                       onRetry: _loadDatabases,
                     ),
                   if (_databases.isNotEmpty)
@@ -314,46 +296,26 @@ class _MysqlDatabasesNode extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context);
-    return material.Padding(
-      padding: const material.EdgeInsets.only(left: 20),
-      child: material.Column(
-        crossAxisAlignment: material.CrossAxisAlignment.start,
-        mainAxisSize: material.MainAxisSize.min,
-        children: [
-          _PgTreeRow(
-            label: 'Databases (${databases.length})',
-            icon: QueryaIcons.databasesFolder,
-            iconSize: QueryaIconSizes.treeConnection,
-            iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
-            textStyle: material.TextStyle(
-              fontSize: 12,
-              color: theme.colorScheme.foreground,
-            ),
-            verticalPadding: 4,
-            onTap: null,
+    return ConnectionDatabasesFolder(
+      connection: connection,
+      databaseCount: databases.length,
+      onRefresh: onRefreshDatabases,
+      onOpenSql: onMysqlOpenSqlWorkspace == null
+          ? null
+          : () => onMysqlOpenSqlWorkspace!(connection),
+      child: lazyConnectionTreeList(
+        context: context,
+        itemCount: databases.length,
+        itemBuilder: (context, index) {
+          final db = databases[index];
+          return _MysqlDatabaseNode(
+            key: material.ValueKey('mysql-db-${connection.id ?? 0}-$db'),
             connection: connection,
-            onContextRefresh: onRefreshDatabases,
-            onOpenSqlWorkspace: onMysqlOpenSqlWorkspace == null
-                ? null
-                : (c, {database, schema, name, kind}) =>
-                    onMysqlOpenSqlWorkspace!(c),
-          ),
-          lazyConnectionTreeList(
-            context: context,
-            itemCount: databases.length,
-            itemBuilder: (context, index) {
-              final db = databases[index];
-              return _MysqlDatabaseNode(
-                key: material.ValueKey('mysql-db-${connection.id ?? 0}-$db'),
-                connection: connection,
-                databaseName: db,
-                onMysqlObjectSelected: onMysqlObjectSelected,
-                onMysqlOpenSqlWorkspace: onMysqlOpenSqlWorkspace,
-              );
-            },
-          ),
-        ],
+            databaseName: db,
+            onMysqlObjectSelected: onMysqlObjectSelected,
+            onMysqlOpenSqlWorkspace: onMysqlOpenSqlWorkspace,
+          );
+        },
       ),
     );
   }
@@ -434,6 +396,27 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
         _loading = false;
         _error = null;
       });
+      final cacheId = widget.connection.id;
+      if (cacheId != null) {
+        QueryaSchemaObjectCache.instance.merge(
+          cacheId,
+          QueryaSchemaObjectCache.scopeMysql(widget.databaseName),
+          [
+            for (final name in tables)
+              QueryaSchemaObject.mysql(
+                database: widget.databaseName,
+                name: name,
+                kind: QueryaSchemaObjectKind.table,
+              ),
+            for (final name in views)
+              QueryaSchemaObject.mysql(
+                database: widget.databaseName,
+                name: name,
+                kind: QueryaSchemaObjectKind.view,
+              ),
+          ],
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -448,13 +431,13 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return material.Padding(
-      padding: const material.EdgeInsets.only(left: 16),
+    return QueryaTreeIndentGuide(
+      depth: 1,
       child: material.Column(
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
         children: [
-          _PgTreeRow(
+          QueryaConnectionTreeRow(
             label: widget.databaseName,
             leading: material.AnimatedRotation(
               turns: _expanded ? 0.25 : 0,
@@ -490,22 +473,7 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
               crossAxisAlignment: material.CrossAxisAlignment.stretch,
               children: [
                 if (_loading)
-                  material.Padding(
-                    padding: const material.EdgeInsets.only(
-                        left: 24, top: 2, bottom: 2),
-                    child: material.Row(
-                      children: [
-                        const material.SizedBox(
-                          width: 10,
-                          height: 10,
-                          child: material.CircularProgressIndicator(
-                              strokeWidth: 1.5),
-                        ),
-                        const Gap(6),
-                        const Text('Loading...').muted().xSmall(),
-                      ],
-                    ),
-                  )
+                  const ConnectionTreeLoadingRow.nested()
                 else if (_error != null)
                   TreeLoadError(
                     title: 'Could not load tables',
@@ -516,8 +484,8 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
                     _views.isNotEmpty ||
                     _procedures.isNotEmpty ||
                     _functions.isNotEmpty)
-                  material.Padding(
-                    padding: const material.EdgeInsets.only(left: 16),
+                  QueryaTreeIndentGuide(
+                    depth: 1,
                     child: material.Column(
                       crossAxisAlignment: material.CrossAxisAlignment.start,
                       children: [
@@ -674,7 +642,7 @@ class _MysqlObjectGroupState extends State<_MysqlObjectGroup> {
         crossAxisAlignment: material.CrossAxisAlignment.start,
         mainAxisSize: material.MainAxisSize.min,
         children: [
-          _PgTreeRow(
+          QueryaConnectionTreeRow(
             label: _filter.isEmpty
                 ? '${widget.label} (${widget.items.length})'
                 : '${widget.label} (${sorted.length}/${widget.items.length})',
@@ -702,6 +670,7 @@ class _MysqlObjectGroupState extends State<_MysqlObjectGroup> {
           ),
           QueryaAnimatedExpand(
             expanded: _expanded,
+            estimatedChildCount: widget.items.length,
             child: material.Column(
               crossAxisAlignment: material.CrossAxisAlignment.stretch,
               mainAxisSize: material.MainAxisSize.min,
@@ -720,67 +689,73 @@ class _MysqlObjectGroupState extends State<_MysqlObjectGroup> {
                   ),
                 if (sorted.isEmpty && widget.items.isNotEmpty)
                   material.Padding(
-                    padding: const material.EdgeInsets.only(
-                        left: 26, top: 4, bottom: 6),
+                    padding: QueryaTreeTokens.emptyFilterPadding,
                     child: Text('No matching ${widget.label.toLowerCase()}')
                         .muted()
                         .xSmall(),
                   )
                 else
-                  lazyConnectionTreeList(
+                  QueryaTreeIndentGuide(
+                    depth: 1,
+                    leading: QueryaTreeTokens.leafList - QueryaTreeTokens.indent,
+                    child: lazyConnectionTreeList(
                     context: context,
                     itemCount: sorted.length,
                     itemExtent: kConnectionTreeRowExtent,
-                    padding: const material.EdgeInsets.only(left: 26),
                     itemBuilder: (context, index) {
                       final item = sorted[index];
                       final isPinned = _pinnedItems.contains(item);
-                      final sel = _ConnectionsTreeSelectionScope.of(context);
-                      final isSelected = sel != null &&
-                          sel.selectedConnectionId == widget.connection.id &&
-                          sel.selectedMysqlObject != null &&
-                          sel.selectedMysqlObject!.database == widget.databaseName &&
-                          sel.selectedMysqlObject!.name == item &&
-                          sel.selectedMysqlObject!.kind == widget.objectKind;
-                      return _PgTreeRow(
-                        key: material.ValueKey(
-                          'mysql-${widget.objectKind.name}-${widget.databaseName}-$item',
-                        ),
-                        label: item,
-                        isSelected: isSelected,
-                        isPinned: isPinned,
-                        onTogglePin: () {
-                          setState(() {
-                            if (isPinned) {
-                              _pinnedItems.remove(item);
-                            } else {
-                              _pinnedItems.add(item);
-                            }
-                          });
+                      return _ConnectionsTreeSelectionBuilder<bool>(
+                        select: (sel) =>
+                            sel.selectedConnectionId == widget.connection.id &&
+                            sel.selectedMysqlObject != null &&
+                            sel.selectedMysqlObject!.database ==
+                                widget.databaseName &&
+                            sel.selectedMysqlObject!.name == item &&
+                            sel.selectedMysqlObject!.kind == widget.objectKind,
+                        builder: (context, isSelected) {
+                          return QueryaConnectionTreeRow(
+                            key: material.ValueKey(
+                              'mysql-${widget.objectKind.name}-${widget.databaseName}-$item',
+                            ),
+                            label: item,
+                            isSelected: isSelected,
+                            isPinned: isPinned,
+                            onTogglePin: () {
+                              setState(() {
+                                if (isPinned) {
+                                  _pinnedItems.remove(item);
+                                } else {
+                                  _pinnedItems.add(item);
+                                }
+                              });
+                            },
+                            icon: widget.itemIcon,
+                            iconSize: QueryaIconSizes.treeLeaf,
+                            iconColor: QueryaTreeTokens.leafIconColor(
+                              theme.colorScheme.primary,
+                            ),
+                            textStyle: material.TextStyle(
+                              fontSize: 11,
+                              color: theme.colorScheme.foreground,
+                            ),
+                            verticalPadding: 2,
+                            onTap: widget.onItemTap != null
+                                ? () => widget.onItemTap!(item)
+                                : null,
+                            connection: widget.connection,
+                            openSqlDatabase: widget.databaseName,
+                            openSqlName: item,
+                            onContextRefresh: widget.onRefresh,
+                            onOpenSqlWorkspace: widget.onOpenSqlWorkspace != null
+                                ? (conn, {database, schema, name, kind}) =>
+                                    widget.onOpenSqlWorkspace!(conn)
+                                : null,
+                          );
                         },
-                        icon: widget.itemIcon,
-                        iconSize: QueryaIconSizes.treeLeaf,
-                        iconColor: QueryaTreeTokens.leafIconColor(
-                          theme.colorScheme.primary,
-                        ),
-                        textStyle: material.TextStyle(
-                          fontSize: 11,
-                          color: theme.colorScheme.foreground,
-                        ),
-                        verticalPadding: 2,
-                        onTap: widget.onItemTap != null
-                            ? () => widget.onItemTap!(item)
-                            : null,
-                        connection: widget.connection,
-                        openSqlDatabase: widget.databaseName,
-                        openSqlName: item,
-                        onContextRefresh: widget.onRefresh,
-                        onOpenSqlWorkspace: widget.onOpenSqlWorkspace != null
-                            ? (conn, {database, schema, name, kind}) =>
-                                widget.onOpenSqlWorkspace!(conn)
-                            : null,
                       );
                     },
+                  ),
                   ),
               ],
             ),
