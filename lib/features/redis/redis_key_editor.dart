@@ -6,7 +6,7 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
 /// Viewer / editor for a single Redis key. Type-aware: string, hash,
-/// list, set, zset.
+/// list, set, zset. Stream / module / unknown types are not GET/SET.
 class RedisKeyEditor extends material.StatefulWidget {
   const RedisKeyEditor({
     super.key,
@@ -57,6 +57,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   int _scanCursor = 0;
   bool _hasMore = false;
   bool _loadingMore = false;
+  late String _effectiveType;
 
   // For adding new items
   final _newFieldController = material.TextEditingController();
@@ -65,6 +66,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   @override
   void initState() {
     super.initState();
+    _effectiveType = _normalizedType(widget.keyType);
     _load();
   }
 
@@ -74,6 +76,26 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     _newFieldController.dispose();
     _newValueController.dispose();
     super.dispose();
+  }
+
+  String _normalizedType(String type) {
+    final t = type.trim().toLowerCase();
+    if (t.isEmpty) return 'unknown';
+    return t;
+  }
+
+  Future<String> _resolveType() async {
+    final incoming = _normalizedType(widget.keyType);
+    if (incoming != 'unknown') return incoming;
+    try {
+      final resolved = _normalizedType(
+        await widget.connection.keyType(widget.keyName),
+      );
+      if (resolved == 'none' || resolved == 'unknown') return 'unknown';
+      return resolved;
+    } catch (_) {
+      return 'unknown';
+    }
   }
 
   Future<void> _load() async {
@@ -86,8 +108,9 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     try {
       await widget.connection.selectDatabase(widget.database);
       _ttl = await widget.connection.ttl(widget.keyName);
+      _effectiveType = await _resolveType();
 
-      switch (widget.keyType) {
+      switch (_effectiveType) {
         case 'string':
           _stringValue = await widget.connection.get(widget.keyName);
           _stringController.text = _stringValue ?? '';
@@ -97,7 +120,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
         case 'zset':
           _collectionTotal = await widget.connection.keySize(
             widget.keyName,
-            widget.keyType,
+            _effectiveType,
           );
           _scanCursor = 0;
           _hashValue = {};
@@ -107,8 +130,8 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
           _hasMore = false;
           await _loadMore(reset: true);
         default:
-          _stringValue = await widget.connection.get(widget.keyName);
-          _stringController.text = _stringValue ?? '';
+          _stringValue = null;
+          _stringController.text = '';
       }
 
       if (!mounted) return;
@@ -123,7 +146,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     }
   }
 
-  int get _loadedCount => switch (widget.keyType) {
+  int get _loadedCount => switch (_effectiveType) {
         'hash' => _hashValue.length,
         'list' => _listValue.length,
         'set' => _setValue.length,
@@ -158,7 +181,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     if (!reset && mounted) setState(() => _loadingMore = true);
     try {
       await widget.connection.selectDatabase(widget.database);
-      switch (widget.keyType) {
+      switch (_effectiveType) {
         case 'hash':
           if (reset) {
             _scanCursor = 0;
@@ -219,6 +242,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
 
   Future<void> _saveString() async {
     if (widget.isReadOnly) return;
+    if (_effectiveType != 'string') return;
     try {
       await widget.connection.selectDatabase(widget.database);
       await widget.connection.set(
@@ -240,7 +264,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     final confirmed = await confirmDestructiveAction(
       context: context,
       type: DestructiveSqlType.redisDel,
-      targetName: '${widget.keyName} (${widget.keyType})',
+      targetName: '${widget.keyName} ($_effectiveType)',
       commandPreview: 'DEL ${widget.keyName}',
       connectionName: widget.connection.name,
     );
@@ -493,7 +517,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
         material.Expanded(
           child: material.Padding(
             padding: const material.EdgeInsets.all(16),
-            child: widget.keyType == 'string'
+            child: _effectiveType == 'string'
                 ? material.SingleChildScrollView(
                     child: _buildContent(cs, shadcnCs),
                   )
@@ -505,7 +529,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   }
 
   Widget _buildHeader(ColorScheme cs, shadcn.ColorScheme scs) {
-    final typeCol = _typeColor(widget.keyType);
+    final typeCol = _typeColor(_effectiveType);
     return material.Container(
       padding:
           const material.EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -514,7 +538,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       ),
       child: material.Row(
         children: [
-          material.Icon(_typeIcon(widget.keyType), size: 18, color: typeCol),
+          material.Icon(_typeIcon(_effectiveType), size: 18, color: typeCol),
           const Gap(8),
           material.Container(
             padding:
@@ -524,7 +548,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
               borderRadius: material.BorderRadius.circular(4),
             ),
             child: Text(
-              widget.keyType.toUpperCase(),
+              _effectiveType.toUpperCase(),
               style: material.TextStyle(
                 fontSize: 10,
                 fontWeight: material.FontWeight.w600,
@@ -612,7 +636,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   }
 
   Widget _buildContent(ColorScheme cs, shadcn.ColorScheme scs) {
-    switch (widget.keyType) {
+    switch (_effectiveType) {
       case 'string':
         return _buildStringEditor(cs, scs);
       case 'hash':
@@ -624,8 +648,26 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       case 'zset':
         return _buildZsetEditor(cs, scs);
       default:
-        return _buildStringEditor(cs, scs);
+        return _buildUnsupportedViewer();
     }
+  }
+
+  Widget _buildUnsupportedViewer() {
+    final unknown = _effectiveType == 'unknown';
+    return material.Column(
+      crossAxisAlignment: material.CrossAxisAlignment.stretch,
+      children: [
+        Text(unknown ? 'Type unknown' : 'Unsupported type').semiBold(),
+        const Gap(8),
+        Text(
+          unknown
+              ? 'This key is not opened as a string until TYPE succeeds. '
+                  'GET and SET are disabled so the original type is not overwritten.'
+              : '$_effectiveType keys cannot be opened with GET/SET. '
+                  'Save is disabled so the original type is not replaced with a string.',
+        ).muted().small(),
+      ],
+    );
   }
 
   // ─── String ─────────────────────────────────────────────────────────────
@@ -955,6 +997,8 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
         return material.Icons.scatter_plot_rounded;
       case 'zset':
         return material.Icons.sort_rounded;
+      case 'stream':
+        return material.Icons.view_stream_rounded;
       default:
         return material.Icons.help_outline_rounded;
     }

@@ -589,6 +589,8 @@ class RedisConnectionTestFake extends RedisConnection {
     this.scardResult,
     this.zsetItems = const <(String, double)>[],
     this.zcardResult,
+    this.typeResult = 'string',
+    this.failType = false,
   }) : super(
           id: -1,
           name: 'test-fake',
@@ -610,6 +612,9 @@ class RedisConnectionTestFake extends RedisConnection {
   final int? scardResult;
   final List<(String, double)> zsetItems;
   final int? zcardResult;
+  final String typeResult;
+  final bool failType;
+  final List<String> sentCommands = [];
 
   bool _firstScanDone = false;
   bool _firstHscanDone = false;
@@ -644,6 +649,7 @@ class RedisConnectionTestFake extends RedisConnection {
       throw StateError('Not connected to Redis');
     }
     final op = args.first.toString().toUpperCase();
+    sentCommands.add(op);
     switch (op) {
       case 'SELECT':
         return 'OK';
@@ -661,11 +667,24 @@ class RedisConnectionTestFake extends RedisConnection {
         }
         return [0, <String>[]];
       case 'TYPE':
-        return 'string';
+        if (failType) {
+          throw StateError('TYPE failed');
+        }
+        return typeResult;
       case 'TTL':
         return -1;
       case 'GET':
+        if (typeResult != 'string') {
+          throw StateError(
+            'WRONGTYPE Operation against a key holding the wrong kind of value',
+          );
+        }
         return getResult;
+      case 'SET':
+        if (typeResult != 'string') {
+          throw StateError('SET refused: key is $typeResult');
+        }
+        return 'OK';
       case 'HGETALL':
       case 'SMEMBERS':
         throw StateError('$op is unbounded; use a paged command');
