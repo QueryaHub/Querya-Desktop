@@ -90,6 +90,44 @@ void main() {
     });
   });
 
+  group('postgresBrowseDataSql', () {
+    test('orders by quoted PK columns', () {
+      expect(
+        postgresBrowseDataSql(
+          qualifiedFrom: '"public"."orders"',
+          primaryKeys: const ['id'],
+          limit: 200,
+          offset: 400,
+        ),
+        'SELECT * FROM "public"."orders" ORDER BY "id" LIMIT 200 OFFSET 400',
+      );
+    });
+
+    test('composite PK lists all columns', () {
+      expect(
+        postgresBrowseDataSql(
+          qualifiedFrom: '"public"."t"',
+          primaryKeys: const ['a', 'b'],
+          limit: 200,
+          offset: 0,
+        ),
+        'SELECT * FROM "public"."t" ORDER BY "a", "b" LIMIT 200 OFFSET 0',
+      );
+    });
+
+    test('omits ORDER BY when there is no PK', () {
+      expect(
+        postgresBrowseDataSql(
+          qualifiedFrom: '"public"."v"',
+          primaryKeys: const [],
+          limit: 200,
+          offset: 0,
+        ),
+        'SELECT * FROM "public"."v" LIMIT 200 OFFSET 0',
+      );
+    });
+  });
+
   group('convertResultRowsToStrings', () {
     test('converts null to "NULL"', () {
       final result = convertResultRowsToStrings([

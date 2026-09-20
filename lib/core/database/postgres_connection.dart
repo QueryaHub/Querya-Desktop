@@ -54,6 +54,14 @@ SslMode postgresResolveSslMode({
   return SslMode.require;
 }
 
+/// `pg_class.reltuples` → row estimate. Negative / unanalyzed → `null`.
+int? postgresReltuplesEstimate(Object? value) {
+  if (value == null) return null;
+  final n = value is num ? value.toDouble() : double.tryParse(value.toString());
+  if (n == null || n < 0) return null;
+  return n.round();
+}
+
 /// PostgreSQL connection using the pure-Dart `postgres` package.
 class PostgresConnection {
   PostgresConnection({
@@ -488,6 +496,29 @@ class PostgresConnection {
       columns: columns,
       primaryKeys: primaryKeys,
     );
+  }
+
+  /// Planner row estimate (`pg_class.reltuples`), not a blocking `COUNT(*)`.
+  /// Unanalyzed relations (`-1`) and missing catalog rows return `null`.
+  Future<int?> estimateTableRows({
+    String schema = 'public',
+    required String table,
+  }) async {
+    if (!isConnected || _conn == null) {
+      throw StateError('Not connected to PostgreSQL');
+    }
+    final result = await _conn!.execute(
+      Sql.named(
+        'SELECT c.reltuples FROM pg_catalog.pg_class c '
+        'JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace '
+        'WHERE n.nspname = @schema AND c.relname = @table '
+        "AND c.relkind IN ('r', 'p', 'm', 'f') "
+        'LIMIT 1',
+      ),
+      parameters: {'schema': schema, 'table': table},
+    );
+    if (result.isEmpty) return null;
+    return postgresReltuplesEstimate(result.first[0]);
   }
 
   /// Returns primary key column names for [table] in [schema].

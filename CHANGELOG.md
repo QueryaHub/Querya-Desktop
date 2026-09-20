@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Postgres Table Browser paging (#788)** — Browse stays on `PgSessionMode.readOnly`. `SELECT` uses `ORDER BY` primary-key columns when a PK exists. Row totals come from `pg_class.reltuples` instead of a blocking `COUNT(*)` before first paint (stale estimates below the current page are ignored so Next still works). Save / REFRESH stay on `tableWrite`.
 - **Postgres timestamptz / bytea / jsonb / arrays (#789)** — Table Browser and SQL results encode cells as PG literals (ISO timestamps, `\x` hex for bytea, JSON text for jsonb, `{1,2,3}` for arrays) instead of `Object.toString`. Schema uses `udt_name` so `ARRAY` / `USER-DEFINED` round-trip through `formatLiteral`.
 - **Postgres host/port SSL (#790)** — Host/port Use SSL/TLS stays `sslmode=require` (encrypt, no CA check) unless a Root CA is set, then `verify-full`. A URI `sslmode=` value still wins. The form documents the MITM tradeoff and writes `sslmode=verify-full` when saving a Root CA.
 - **Postgres custom-SQL allowlist (#791)** — Table Browser SQL dialog classifies the first statement after comments instead of substring `contains('insert ')`. `SELECT inserted_at` is allowed; `SELECT 1; DELETE FROM t` is rejected. `WITH … INSERT` is a write; `TABLE` / `VALUES` / `(SELECT …)` stay allowed.

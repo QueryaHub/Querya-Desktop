@@ -109,4 +109,14 @@ void main() {
       );
     });
   });
+
+  group('postgresReltuplesEstimate', () {
+    test('rounds planner floats and treats unanalyzed as unknown', () {
+      expect(postgresReltuplesEstimate(200.4), 200);
+      expect(postgresReltuplesEstimate(199.6), 200);
+      expect(postgresReltuplesEstimate(0), 0);
+      expect(postgresReltuplesEstimate(-1), isNull);
+      expect(postgresReltuplesEstimate(null), isNull);
+    });
+  });
 }
