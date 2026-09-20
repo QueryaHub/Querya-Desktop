@@ -225,9 +225,21 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     }
     try {
       final schema = await conn.getTableSchema(table: widget.tableName);
-      _primaryKeys = List<String>.from(schema.primaryKeys);
+      _primaryKeys = sqliteTableBrowserPrimaryKeys(
+        declaredPrimaryKeys: schema.primaryKeys,
+        isView: widget.isView,
+      );
       _columnDataTypes = columnDataTypesFromSchema(schema);
       _columnMeta = columnMetaFromSchema(schema);
+      if (sqliteBrowseNeedsRowidColumn(
+            primaryKeys: _primaryKeys,
+            isView: widget.isView,
+          ) &&
+          !_columnMeta.containsKey(kSqliteImplicitRowid)) {
+        _columnDataTypes[kSqliteImplicitRowid] =
+            sqliteImplicitRowidColumn.dataType;
+        _columnMeta[kSqliteImplicitRowid] = sqliteImplicitRowidColumn;
+      }
     } catch (_) {
       _primaryKeys = [];
       _columnDataTypes = {};
