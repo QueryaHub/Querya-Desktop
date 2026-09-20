@@ -23,11 +23,11 @@ Future<bool?> showDestructiveQueryDialog({
   );
 }
 
-/// Same dialog as SQL DROP/DELETE, with a Mongo command preview.
+/// Same dialog as SQL DROP/DELETE, with a command preview (Mongo / Redis).
 ///
 /// Returns `true` only when the user checks the acknowledgment box and
 /// confirms. Cancel / Escape returns `false`.
-Future<bool> confirmDestructiveMongoAction({
+Future<bool> confirmDestructiveAction({
   required material.BuildContext context,
   required DestructiveSqlType type,
   required String targetName,
@@ -50,6 +50,22 @@ Future<bool> confirmDestructiveMongoAction({
   );
   return confirmed == true;
 }
+
+/// Mongo explorer drop/delete. Same dialog as SQL.
+Future<bool> confirmDestructiveMongoAction({
+  required material.BuildContext context,
+  required DestructiveSqlType type,
+  required String targetName,
+  required String commandPreview,
+  String? connectionName,
+}) =>
+    confirmDestructiveAction(
+      context: context,
+      type: type,
+      targetName: targetName,
+      commandPreview: commandPreview,
+      connectionName: connectionName,
+    );
 
 class _DestructiveQueryDialog extends material.StatefulWidget {
   const _DestructiveQueryDialog({

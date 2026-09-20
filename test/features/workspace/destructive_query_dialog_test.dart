@@ -200,5 +200,80 @@ void main() {
       await tester.pumpAndSettle();
       expect(confirmed, isTrue);
     });
+
+    testWidgets('Redis DEL Cancel does not confirm', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 700));
+      var confirmed = true;
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Builder(
+            builder: (context) => material.ElevatedButton(
+              onPressed: () async {
+                confirmed = await confirmDestructiveAction(
+                  context: context,
+                  type: DestructiveSqlType.redisDel,
+                  targetName: 'session:1 (string)',
+                  commandPreview: 'DEL session:1',
+                  connectionName: 'cache',
+                );
+              },
+              child: const material.Text('Open'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('DEL'), findsWidgets);
+      expect(find.text('DEL session:1'), findsOneWidget);
+      expect(find.text('Target connection: cache'), findsOneWidget);
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(confirmed, isFalse);
+    });
+
+    testWidgets('Redis HDEL confirm stays disabled until acknowledged',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 700));
+      var confirmed = false;
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Builder(
+            builder: (context) => material.ElevatedButton(
+              onPressed: () async {
+                confirmed = await confirmDestructiveAction(
+                  context: context,
+                  type: DestructiveSqlType.redisHdel,
+                  targetName: 'email',
+                  commandPreview: 'HDEL user:1 email',
+                );
+              },
+              child: const material.Text('Open'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('HDEL'), findsWidgets);
+      expect(find.text('HDEL user:1 email'), findsOneWidget);
+
+      await tester.tap(find.text('Execute Destructive Statement'));
+      await tester.pumpAndSettle();
+      expect(confirmed, isFalse);
+
+      await tester.tap(find.byType(material.Checkbox));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Execute Destructive Statement'));
+      await tester.pumpAndSettle();
+      expect(confirmed, isTrue);
+    });
   });
 }

@@ -1,5 +1,5 @@
-/// Categorization of destructive SQL / Mongo operations that can alter or
-/// destroy schema/data.
+/// Categorization of destructive SQL / Mongo / Redis operations that can
+/// alter or destroy schema/data.
 enum DestructiveSqlType {
   dropDatabase,
   dropSchema,
@@ -9,7 +9,11 @@ enum DestructiveSqlType {
   truncateTable,
   unconditionalDelete,
   dropCollection,
-  deleteDocument;
+  deleteDocument,
+  redisDel,
+  redisHdel,
+  redisSrem,
+  redisZrem;
 
   String get label => switch (this) {
         DestructiveSqlType.dropDatabase => 'DROP DATABASE',
@@ -21,6 +25,10 @@ enum DestructiveSqlType {
         DestructiveSqlType.unconditionalDelete => 'UNCONDITIONAL DELETE',
         DestructiveSqlType.dropCollection => 'DROP COLLECTION',
         DestructiveSqlType.deleteDocument => 'DELETE DOCUMENT',
+        DestructiveSqlType.redisDel => 'DEL',
+        DestructiveSqlType.redisHdel => 'HDEL',
+        DestructiveSqlType.redisSrem => 'SREM',
+        DestructiveSqlType.redisZrem => 'ZREM',
       };
 
   String get riskLevel => switch (this) {
@@ -31,6 +39,10 @@ enum DestructiveSqlType {
         DestructiveSqlType.unconditionalDelete => 'HIGH',
         DestructiveSqlType.dropCollection => 'HIGH',
         DestructiveSqlType.deleteDocument => 'HIGH',
+        DestructiveSqlType.redisDel => 'HIGH',
+        DestructiveSqlType.redisHdel => 'HIGH',
+        DestructiveSqlType.redisSrem => 'HIGH',
+        DestructiveSqlType.redisZrem => 'HIGH',
         DestructiveSqlType.dropMaterializedView => 'MEDIUM',
         DestructiveSqlType.dropView => 'MEDIUM',
       };
@@ -66,6 +78,14 @@ class DestructiveSqlOperation {
           'Permanently drops collection "$targetName" and all documents in it.',
         DestructiveSqlType.deleteDocument =>
           'Permanently deletes document "$targetName". This cannot be undone.',
+        DestructiveSqlType.redisDel =>
+          'Permanently deletes Redis key "$targetName". This cannot be undone.',
+        DestructiveSqlType.redisHdel =>
+          'Permanently removes hash field "$targetName".',
+        DestructiveSqlType.redisSrem =>
+          'Permanently removes set member "$targetName".',
+        DestructiveSqlType.redisZrem =>
+          'Permanently removes sorted-set member "$targetName".',
       };
 }
 

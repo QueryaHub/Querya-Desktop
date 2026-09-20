@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/theme/querya_semantic_palette.dart';
+import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
@@ -138,6 +140,14 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
 
   Future<void> _deleteKey(_KeyInfo keyInfo) async {
     if (widget.isReadOnly) return;
+    final confirmed = await confirmDestructiveAction(
+      context: context,
+      type: DestructiveSqlType.redisDel,
+      targetName: '${keyInfo.name} (${keyInfo.type})',
+      commandPreview: 'DEL ${keyInfo.name}',
+      connectionName: widget.connection.name,
+    );
+    if (!mounted || !confirmed) return;
     try {
       await widget.connection.selectDatabase(widget.database);
       await widget.connection.del(keyInfo.name);
