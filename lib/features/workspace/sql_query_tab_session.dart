@@ -39,6 +39,12 @@ class SqlQueryTabSession {
   bool savingChanges = false;
   bool isModified = false;
 
+  /// PK columns for SQL-grid Save, empty when Save is disabled.
+  List<String> resultGridPrimaryKeys = const [];
+
+  /// Column types from [getTableSchema] for DML literals, if resolved.
+  Map<String, String>? resultGridColumnDataTypes;
+
   void formatSql() {
     final next = formatSqlScript(controller.text);
     controller.value = material.TextEditingValue(
