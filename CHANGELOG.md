@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.16] - 2026-09-20
+
 In-place editing in Table Browser (same DML staging as SQL Workspace), Command Palette and Quick Switcher, workspace chrome parity across drivers, connections-tree visual + FPS work, MongoDB per-field Save to DB, and a hardened in-app updater.
 
 ### Added

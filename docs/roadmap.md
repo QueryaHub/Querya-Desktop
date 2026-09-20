@@ -2,8 +2,8 @@
 
 Living document for planned work. Not a commitment order; adjust as priorities change.
 
-**GitHub Latest Release:** [0.4.11](https://github.com/QueryaHub/Querya-Desktop/releases/tag/0.4.11) (2026-07-27).  
-**Next patch:** **0.4.11-b** — security + packaging (from mistagged 0.4.11-a) + perf (#414) + UI (#445) + code-review (#463); tag after merge to `main`.  
+**GitHub Latest Release:** [0.4.15](https://github.com/QueryaHub/Querya-Desktop/releases/tag/0.4.15) (2026-09-06).  
+**This cut:** **0.4.16** — Table Browser in-place editing, Command Palette, workspace/tree parity, Mongo field Save to DB — [CHANGELOG.md](../CHANGELOG.md) `[0.4.16]`.  
 **Next product release:** **0.5.0** — live Marketplace download and install — see below.
 
 ## Theme system
@@ -27,7 +27,9 @@ Living document for planned work. Not a commitment order; adjust as priorities c
 - **Shipped in 0.4.10:** Sandboxed extension runtime (Block E), Plugin RPC bridge (Block C), SDUI form/tree builders, local `.zip`/`.qext` install, Registration/Activation for external database drivers (e.g. ClickHouse), in-app updater — see [CHANGELOG.md](../CHANGELOG.md).
 - **Shipped in 0.4.11:** Universal UI / SDUI RPC expand, ExtensionTableView, universal export, MySQL/SQLite parity, shell UX (#339), Fluid QueryaMotion (#342) + perf follow-ups (#356), grid/pool/timeout fixes, dual-channel packaging (portable zip + AppImage / `.deb` / Windows setup) — [CHANGELOG.md](../CHANGELOG.md) `[0.4.11]`, [packaging.md](packaging.md), epic [#379](https://github.com/QueryaHub/Querya-Desktop/issues/379).
 - **0.4.11-a:** changelog prepared; GitHub tag mistargeted onto `0.4.11` — do not treat as a shipped patch.
-- **Pending 0.4.11-b:** ships security (#395–#402), Linux `.rpm` / Flatpak / AUR (#386), perf (#414), UI reliability (#445), code-review fixes (#463) — [CHANGELOG.md](../CHANGELOG.md) `[0.4.11-b]`.
+- **Shipped in 0.4.11-b:** security (#395–#402), Linux `.rpm` / Flatpak / AUR (#386), perf (#414), UI reliability (#445), code-review fixes (#463) — [CHANGELOG.md](../CHANGELOG.md) `[0.4.11-b]`.
+- **Shipped in 0.4.13–0.4.15:** interactive Data Grid, fluid motion, multi-tab SQL, preferences/keymap — [CHANGELOG.md](../CHANGELOG.md).
+- **0.4.16 (this cut):** Table Browser in-place DML, Command Palette + Quick Switcher, workspace chrome / connections-tree parity, Mongo per-field Save to DB, updater hardening — [CHANGELOG.md](../CHANGELOG.md) `[0.4.16]`. Manual 120 Hz DevTools sign-off remains [#739](https://github.com/QueryaHub/Querya-Desktop/issues/739).
 - **Planned 0.5.0:** Marketplace Launch — live download, `sha256` validation, install themes (and later DB drivers) from the network.
 
 ## Query history and favorites
