@@ -129,4 +129,52 @@ void main() {
     expect(find.text('Read-only session'), findsNothing);
     await fake.disconnect();
   });
+
+  testWidgets('RedisKeysView Delete Cancel does not send DEL', (tester) async {
+    await tester.binding.setSurfaceSize(const material.Size(800, 700));
+    final fake = _DelTrackingFake(
+      firstScanKeys: const ['key_a'],
+      dbSizeResult: 1,
+    );
+    await fake.connect();
+
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.Scaffold(
+          body: material.SizedBox(
+            width: 800,
+            height: 700,
+            child: RedisKeysView(
+              connection: fake,
+              database: 0,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Delete key'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('DEL key_a'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(fake.deleted, isEmpty);
+    expect(find.text('key_a'), findsOneWidget);
+    await fake.disconnect();
+  });
+}
+
+class _DelTrackingFake extends RedisConnectionTestFake {
+  _DelTrackingFake({super.firstScanKeys, super.dbSizeResult});
+
+  final deleted = <String>[];
+
+  @override
+  Future<int> del(String key) async {
+    deleted.add(key);
+    return super.del(key);
+  }
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
+import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
@@ -131,6 +133,14 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
 
   Future<void> _deleteKey() async {
     if (widget.isReadOnly) return;
+    final confirmed = await confirmDestructiveAction(
+      context: context,
+      type: DestructiveSqlType.redisDel,
+      targetName: '${widget.keyName} (${widget.keyType})',
+      commandPreview: 'DEL ${widget.keyName}',
+      connectionName: widget.connection.name,
+    );
+    if (!mounted || !confirmed) return;
     try {
       await widget.connection.selectDatabase(widget.database);
       await widget.connection.del(widget.keyName);
@@ -177,6 +187,14 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
 
   Future<void> _hashDel(String field) async {
     if (widget.isReadOnly) return;
+    final confirmed = await confirmDestructiveAction(
+      context: context,
+      type: DestructiveSqlType.redisHdel,
+      targetName: field,
+      commandPreview: 'HDEL ${widget.keyName} $field',
+      connectionName: widget.connection.name,
+    );
+    if (!mounted || !confirmed) return;
     try {
       await widget.connection.selectDatabase(widget.database);
       await widget.connection.hdel(widget.keyName, field);
@@ -215,6 +233,14 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
 
   Future<void> _setRemove(String member) async {
     if (widget.isReadOnly) return;
+    final confirmed = await confirmDestructiveAction(
+      context: context,
+      type: DestructiveSqlType.redisSrem,
+      targetName: member,
+      commandPreview: 'SREM ${widget.keyName} $member',
+      connectionName: widget.connection.name,
+    );
+    if (!mounted || !confirmed) return;
     try {
       await widget.connection.selectDatabase(widget.database);
       await widget.connection.srem(widget.keyName, member);
@@ -240,6 +266,14 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
 
   Future<void> _zsetRemove(String member) async {
     if (widget.isReadOnly) return;
+    final confirmed = await confirmDestructiveAction(
+      context: context,
+      type: DestructiveSqlType.redisZrem,
+      targetName: member,
+      commandPreview: 'ZREM ${widget.keyName} $member',
+      connectionName: widget.connection.name,
+    );
+    if (!mounted || !confirmed) return;
     try {
       await widget.connection.selectDatabase(widget.database);
       await widget.connection.zrem(widget.keyName, member);

@@ -12,19 +12,22 @@ void main() {
     WidgetTester tester, {
     required RedisConnectionTestFake fake,
     required bool isReadOnly,
+    material.VoidCallback? onKeyDeleted,
+    material.Size size = const material.Size(800, 600),
   }) async {
     await tester.pumpWidget(
       queryaThemeTestShell(
         child: material.Scaffold(
           body: material.SizedBox(
-            width: 800,
-            height: 600,
+            width: size.width,
+            height: size.height,
             child: RedisKeyEditor(
               connection: fake,
               database: 0,
               keyName: 'session:1',
               keyType: 'string',
               isReadOnly: isReadOnly,
+              onKeyDeleted: onKeyDeleted,
             ),
           ),
         ),
@@ -56,6 +59,33 @@ void main() {
 
     expect(find.text('Save'), findsOneWidget);
     expect(find.byTooltip('Set TTL'), findsOneWidget);
+    expect(find.byTooltip('Delete key'), findsOneWidget);
+    await fake.disconnect();
+  });
+
+  testWidgets('RedisKeyEditor Delete Cancel does not call onKeyDeleted',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const material.Size(800, 700));
+    final fake = RedisConnectionTestFake(getResult: 'hello');
+    await fake.connect();
+    var deleted = false;
+
+    await pumpEditor(
+      tester,
+      fake: fake,
+      isReadOnly: false,
+      onKeyDeleted: () => deleted = true,
+      size: const material.Size(800, 700),
+    );
+
+    await tester.tap(find.byTooltip('Delete key'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('DEL session:1'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(deleted, isFalse);
     expect(find.byTooltip('Delete key'), findsOneWidget);
     await fake.disconnect();
   });
