@@ -127,6 +127,60 @@ void main() {
       expect(conn.password, 'pass');
       expect(conn.connectionString, contains('sslrootcert'));
     });
+
+    test('URI-only row (null host/port) still uses URI host, port, and TLS',
+        () {
+      final conn = RedisConnection.fromConnectionRow(
+        const ConnectionRow(
+          id: 8,
+          type: 'redis',
+          name: 'uri-only',
+          useSSL: false,
+          connectionString:
+              'rediss://user:s3cret@cache.example.com:6380?sslrootcert=%2Fca.pem',
+          createdAt: '0',
+        ),
+      );
+      expect(conn.host, 'cache.example.com');
+      expect(conn.port, 6380);
+      expect(conn.useSSL, isTrue);
+      expect(conn.username, 'user');
+      expect(conn.password, 's3cret');
+      expect(conn.connectionString, contains('sslrootcert'));
+    });
+
+    test('sidebar probe id override does not use the saved connection id', () {
+      final conn = RedisConnection.fromConnectionRow(
+        const ConnectionRow(
+          id: 42,
+          type: 'redis',
+          name: 'prod',
+          connectionString: 'rediss://cache.example.com:6380',
+          createdAt: '0',
+        ),
+        id: -1,
+      );
+      expect(conn.id, -1);
+      expect(conn.host, 'cache.example.com');
+      expect(conn.port, 6380);
+      expect(conn.useSSL, isTrue);
+    });
+
+    test('host/port form without URI stays on those fields', () {
+      final conn = RedisConnection.fromConnectionRow(
+        const ConnectionRow(
+          type: 'redis',
+          name: 'local',
+          host: '127.0.0.1',
+          port: 6379,
+          useSSL: false,
+          createdAt: '0',
+        ),
+      );
+      expect(conn.host, '127.0.0.1');
+      expect(conn.port, 6379);
+      expect(conn.useSSL, isFalse);
+    });
   });
 
   group('RedisConnectionException', () {
