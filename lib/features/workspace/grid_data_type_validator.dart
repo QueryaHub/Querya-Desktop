@@ -24,6 +24,11 @@ abstract final class GridDataTypeValidator {
 
     final type = dataTypeName.toLowerCase().trim();
 
+    // PostgreSQL arrays (`integer[]`, `_int4`) are not scalar ints/json.
+    if (type.contains('[]') || (type.startsWith('_') && !type.contains(' '))) {
+      return null;
+    }
+
     // Boolean types (MySQL BOOLEAN is TINYINT(1) — check before generic int)
     if (type == 'bool' || type == 'boolean' || type.startsWith('tinyint(1)')) {
       final lower = value.toLowerCase().trim();
