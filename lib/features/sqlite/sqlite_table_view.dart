@@ -1,11 +1,14 @@
 import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
 import 'package:querya_desktop/core/database/sqlite_service.dart';
+import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/editor/querya_code_editor.dart';
 import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/features/workspace/sql_editor_chrome.dart';
+import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 const _defaultLimit = 200;
@@ -42,40 +45,27 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
   int _rowsOnPage = 0;
   int? _totalRowCount;
   int _offset = 0;
-  String? _sortColumn;
-  bool _sortAscending = true;
 
-  final _verticalController = material.ScrollController();
-  final _horizontalController = material.ScrollController();
+  DataGridStagingBuffer? _stagingBuffer;
+  List<String> _primaryKeys = [];
+  Map<String, String> _columnDataTypes = {};
+  bool _schemaLoaded = false;
+  bool _isSaving = false;
+
+  bool get _isDirty => _stagingBuffer?.isDirty ?? false;
+
+  bool get _editingEnabled => tableViewEditingEnabled(
+        isView: widget.isView,
+        customSqlActive: false,
+        hasPrimaryKey: _primaryKeys.isNotEmpty,
+      );
 
   String _qualifiedFrom() {
     return SqliteConnection.quoteIdentifier(widget.tableName);
   }
 
   String _browseDataSql() {
-    final orderBy = _sortColumn != null
-        ? ' ORDER BY ${SqliteConnection.quoteIdentifier(_sortColumn!)} ${_sortAscending ? "ASC" : "DESC"}'
-        : '';
-    return 'SELECT * FROM ${_qualifiedFrom()}$orderBy LIMIT ${widget.limit} OFFSET $_offset';
-  }
-
-  void _toggleSort(String columnName) {
-    if (_loading) return;
-    setState(() {
-      if (_sortColumn == columnName) {
-        if (_sortAscending) {
-          _sortAscending = false;
-        } else {
-          _sortColumn = null;
-          _sortAscending = true;
-        }
-      } else {
-        _sortColumn = columnName;
-        _sortAscending = true;
-      }
-      _offset = 0;
-    });
-    unawaited(_fetch());
+    return 'SELECT * FROM ${_qualifiedFrom()} LIMIT ${widget.limit} OFFSET $_offset';
   }
 
   @override
@@ -90,8 +80,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     if (oldWidget.connectionRow.id != widget.connectionRow.id ||
         oldWidget.tableName != widget.tableName ||
         oldWidget.isView != widget.isView) {
-      _sortColumn = null;
-      _sortAscending = true;
+      _resetStaging();
       _disconnectCurrent();
       _connectAndLoad();
     }
@@ -99,10 +88,18 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
 
   @override
   void dispose() {
-    _verticalController.dispose();
-    _horizontalController.dispose();
+    _resetStaging();
     _disconnectCurrent();
     super.dispose();
+  }
+
+  void _resetStaging() {
+    _stagingBuffer?.dispose();
+    _stagingBuffer = null;
+    _primaryKeys = [];
+    _columnDataTypes = {};
+    _schemaLoaded = false;
+    _isSaving = false;
   }
 
   void _disconnectCurrent() {
@@ -121,11 +118,12 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
       _rowsOnPage = 0;
       _totalRowCount = null;
       _offset = 0;
+      _resetStaging();
     });
     try {
       final lease = await SqliteService.instance.acquire(
         widget.connectionRow,
-        mode: SqliteSessionMode.readOnly,
+        mode: SqliteSessionMode.readWrite,
       );
       if (!mounted) {
         lease.release();
@@ -140,6 +138,42 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
         _loading = false;
       });
     }
+  }
+
+  Future<bool> _confirmDiscardIfNeeded() {
+    return confirmDiscardTableEditsIfDirty(
+      context: context,
+      buffer: _stagingBuffer,
+      tableTitle: widget.tableName,
+    );
+  }
+
+  Future<void> _ensureSchema(SqliteConnection conn) async {
+    if (_schemaLoaded) return;
+    if (widget.isView) {
+      _schemaLoaded = true;
+      _primaryKeys = [];
+      _columnDataTypes = {};
+      return;
+    }
+    try {
+      final schema = await conn.getTableSchema(table: widget.tableName);
+      _primaryKeys = List<String>.from(schema.primaryKeys);
+      _columnDataTypes = columnDataTypesFromSchema(schema);
+    } catch (_) {
+      _primaryKeys = [];
+      _columnDataTypes = {};
+    }
+    _schemaLoaded = true;
+  }
+
+  void _installStagingBuffer(List<String> columns, List<List<String>> rows) {
+    _stagingBuffer = replaceTableViewStagingBuffer(
+      previous: _stagingBuffer,
+      columns: columns,
+      rows: rows,
+      enabled: _editingEnabled,
+    );
   }
 
   Future<void> _fetch({bool refreshCount = false}) async {
@@ -175,6 +209,9 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
 
       if (!mounted) return;
 
+      await _ensureSchema(conn);
+      if (!mounted) return;
+
       final cols = <String>[];
       if (rs.isNotEmpty) {
         cols.addAll(rs.first.keys);
@@ -189,11 +226,13 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
         }).toList();
       }).toList();
 
+      if (!mounted) return;
       setState(() {
         _columnNames = cols;
         _rows = outRows;
         _rowsOnPage = outRows.length;
         _loading = false;
+        _installStagingBuffer(cols, outRows);
       });
     } catch (e) {
       if (!mounted) return;
@@ -204,8 +243,10 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     }
   }
 
-  bool get _canGoPrevious => _offset > 0;
+  bool get _canGoPrevious => _offset > 0 && !_loading && !_isDirty;
+
   bool get _canGoNext {
+    if (_loading || _isDirty) return false;
     final total = _totalRowCount;
     if (total != null) {
       return _offset + _rowsOnPage < total;
@@ -230,6 +271,81 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     unawaited(_fetch());
   }
 
+  Future<void> _onRefresh() async {
+    if (!await _confirmDiscardIfNeeded()) return;
+    if (!mounted) return;
+    await _fetch(refreshCount: true);
+  }
+
+  Future<void> _onNavigateHome() async {
+    final home = widget.onNavigateHome;
+    if (home == null) return;
+    if (!await _confirmDiscardIfNeeded()) return;
+    if (!mounted) return;
+    home();
+  }
+
+  Future<void> _applyStagedChanges() async {
+    final buffer = _stagingBuffer;
+    if (buffer == null || !buffer.isDirty || _isSaving) return;
+    setState(() => _isSaving = true);
+    final outcome = await applyTableViewStagedChanges(
+      context: context,
+      buffer: buffer,
+      dialect: SqlDialect.sqlite,
+      tableName: widget.tableName,
+      primaryKeys: _primaryKeys,
+      columnDataTypes: _columnDataTypes.isEmpty ? null : _columnDataTypes,
+      execute: (plan) async {
+        final conn = _connection;
+        if (conn == null || !conn.isConnected) {
+          throw StateError('Could not connect to SQLite.');
+        }
+        await conn.execute('BEGIN TRANSACTION');
+        try {
+          for (final stmt in plan.statements) {
+            await conn.execute(stmt.sql);
+          }
+          await conn.execute('COMMIT');
+        } catch (e) {
+          try {
+            await conn.execute('ROLLBACK');
+          } catch (_) {}
+          rethrow;
+        }
+      },
+    );
+    if (!mounted) return;
+    if (outcome.isApplied) {
+      final newRows = buffer.effectiveRows;
+      buffer.dispose();
+      setState(() {
+        _rows = newRows;
+        _rowsOnPage = newRows.length;
+        _stagingBuffer = replaceTableViewStagingBuffer(
+          previous: null,
+          columns: _columnNames,
+          rows: newRows,
+          enabled: _editingEnabled,
+        );
+        _isSaving = false;
+      });
+      showAppToast(
+        context: context,
+        message: '${outcome.statementCount} change(s) saved',
+        variant: AppToastVariant.success,
+      );
+      return;
+    }
+    setState(() => _isSaving = false);
+    if (outcome.isFailed && outcome.error != null) {
+      await showTableViewSaveFailedDialog(
+        context: context,
+        error: outcome.error!,
+      );
+    }
+  }
+
   Future<void> _showDdlDialog() async {
     final conn = _connection;
     if (conn == null || !conn.isConnected) return;
@@ -248,7 +364,8 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
       await showAppDialog<void>(
         context: context,
         builder: (ctx) => QueryaDialogCard(
-          constraints: const material.BoxConstraints(maxWidth: 640, maxHeight: 500),
+          constraints:
+              const material.BoxConstraints(maxWidth: 640, maxHeight: 500),
           child: material.Padding(
             padding: const material.EdgeInsets.all(20),
             child: material.Column(
@@ -261,7 +378,8 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
                 const Gap(16),
                 material.Expanded(
                   child: material.Container(
-                    decoration: SqlEditorChrome.inlineFieldDecorationFromContext(ctx),
+                    decoration:
+                        SqlEditorChrome.inlineFieldDecorationFromContext(ctx),
                     child: QueryaCodeEditor(
                       controller: material.TextEditingController(text: ddl),
                       language: QueryaCodeLanguage.sql,
@@ -307,412 +425,149 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     return 'Showing $start-$end row(s)';
   }
 
-  double _calcTableWidth(int colCount, double availableWidth) {
-    const double rowNumWidth = 52;
-    const double minColWidth = 150;
-    final calculated = rowNumWidth + colCount * minColWidth;
-    return calculated > availableWidth ? calculated : availableWidth;
-  }
-
-  material.Widget _rowNumberCell(ColorScheme cs, String text,
-      {bool isHeader = false}) {
-    return material.Container(
-      width: 52,
-      padding: const material.EdgeInsets.symmetric(horizontal: 8),
-      alignment: material.Alignment.centerRight,
-      decoration: material.BoxDecoration(
-        border: material.Border(
-          right: material.BorderSide(
-            color: cs.border.withValues(alpha: 0.22),
-            width: 1,
-          ),
-        ),
-      ),
-      child: material.Text(
-        text,
-        style: material.TextStyle(
-          fontSize: 11,
-          fontWeight:
-              isHeader ? material.FontWeight.w600 : material.FontWeight.w400,
-          color: isHeader ? cs.foreground : cs.mutedForeground,
-        ),
-      ),
+  String? _statusLine() {
+    final reason = tableViewEditDisabledReason(
+      isView: widget.isView,
+      customSqlActive: false,
+      hasPrimaryKey: _primaryKeys.isNotEmpty,
+      schemaLoaded: _schemaLoaded,
     );
+    final pag = _paginationLabel();
+    if (pag.isEmpty) return reason;
+    if (reason != null) return '$pag · $reason';
+    return pag;
   }
 
-  material.Widget _headerCell(ColorScheme cs, String name) {
-    final isSorted = _sortColumn == name;
-    return material.Expanded(
-      child: material.MouseRegion(
-        cursor: material.SystemMouseCursors.click,
-        child: material.GestureDetector(
-          behavior: material.HitTestBehavior.opaque,
-          onTap: () => _toggleSort(name),
-          child: material.Container(
-            padding: const material.EdgeInsets.symmetric(horizontal: 10),
-            alignment: material.Alignment.centerLeft,
-            decoration: material.BoxDecoration(
-              border: material.Border(
-                right: material.BorderSide(
-                  color: cs.border.withValues(alpha: 0.22),
-                  width: 1,
-                ),
-              ),
-            ),
-            child: material.Row(
-              children: [
-                material.Expanded(
-                  child: material.Text(
-                    name,
-                    overflow: material.TextOverflow.ellipsis,
-                    style: material.TextStyle(
-                      fontSize: 12,
-                      fontWeight: material.FontWeight.w600,
-                      color: isSorted ? cs.primary : cs.foreground,
-                    ),
-                  ),
-                ),
-                if (isSorted) ...[
-                  const Gap(4),
-                  material.Icon(
-                    _sortAscending
-                        ? material.Icons.arrow_upward_rounded
-                        : material.Icons.arrow_downward_rounded,
-                    size: 14,
-                    color: cs.primary,
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  material.Widget _dataCell(ColorScheme cs, String value) {
-    return material.Expanded(
-      child: material.Container(
-        padding: const material.EdgeInsets.symmetric(horizontal: 10),
-        alignment: material.Alignment.centerLeft,
-        decoration: material.BoxDecoration(
-          border: material.Border(
-            right: material.BorderSide(
-              color: cs.border.withValues(alpha: 0.15),
-              width: 1,
-            ),
-          ),
-        ),
-        child: material.SelectableText(
-          value,
-          maxLines: 1,
-          style: material.TextStyle(
-            fontSize: 12,
-            fontFamily: 'monospace',
-            color: value == 'NULL'
-                ? cs.mutedForeground.withValues(alpha: 0.7)
-                : cs.foreground,
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    if (_loading && _columnNames.isEmpty) {
-      return material.Container(
-        color: cs.background,
-        child: material.Center(
-          child: material.Row(
-            mainAxisSize: material.MainAxisSize.min,
-            children: [
-              const material.SizedBox(
-                width: 16,
-                height: 16,
-                child: material.CircularProgressIndicator(strokeWidth: 2),
-              ),
-              const Gap(12),
-              const Text('Loading table data...').muted().small(),
-            ],
-          ),
-        ),
-      );
-    }
-
-    if (_error != null) {
-      return material.Container(
-        color: cs.background,
-        child: material.Center(
-          child: material.Padding(
-            padding: const material.EdgeInsets.all(32),
-            child: material.Column(
-              mainAxisAlignment: material.MainAxisAlignment.center,
-              children: [
-                material.Icon(material.Icons.error_outline_rounded,
-                    size: 48, color: cs.destructive),
-                const Gap(16),
-                const Text('Query Error').large().semiBold(),
-                const Gap(8),
-                material.SelectableText(_error!,
-                    style: material.TextStyle(
-                        color: cs.mutedForeground, fontSize: 13)),
-                const Gap(24),
-                OutlineButton(
-                  onPressed: _connectAndLoad,
-                  leading: const material.Icon(material.Icons.refresh_rounded,
-                      size: 18),
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (_columnNames.isEmpty) {
-      return material.Container(
-        color: cs.background,
-        child: material.Center(
-          child: material.Padding(
-            padding: const material.EdgeInsets.all(32),
-            child: material.Column(
-              mainAxisSize: material.MainAxisSize.min,
-              children: [
-                const Text('No columns returned').muted().small(),
-                const Gap(24),
-                OutlineButton(
-                  onPressed: _connectAndLoad,
-                  leading: const material.Icon(material.Icons.refresh_rounded,
-                      size: 18),
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    const double rowHeight = 36;
-    const double headerHeight = 40;
-    final colCount = _columnNames.length;
+  material.Widget _buildChromeRow(ColorScheme cs) {
     final title = '${widget.tableName}${widget.isView ? ' (view)' : ''}';
-
     return material.Container(
-      color: cs.background,
-      child: material.Column(
-        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+      height: 48,
+      padding: const material.EdgeInsets.symmetric(horizontal: 12),
+      decoration: material.BoxDecoration(
+        color: cs.muted.withValues(alpha: 0.35),
+        border: material.Border(
+          bottom: material.BorderSide(
+            color: cs.border.withValues(alpha: 0.4),
+          ),
+        ),
+      ),
+      child: material.Row(
         children: [
-          material.Container(
-            height: 48,
-            padding: const material.EdgeInsets.symmetric(horizontal: 12),
-            decoration: material.BoxDecoration(
-              color: cs.muted.withValues(alpha: 0.35),
-              border: material.Border(
-                bottom: material.BorderSide(
-                  color: cs.border.withValues(alpha: 0.4),
+          if (widget.onNavigateHome != null) ...[
+            material.Tooltip(
+              message: 'Return to overview',
+              child: OutlineButton(
+                size: ButtonSize.small,
+                onPressed: () => unawaited(_onNavigateHome()),
+                leading: const material.Icon(
+                  material.Icons.dns_outlined,
+                  size: 14,
                 ),
+                child: const Text('Overview'),
               ),
             ),
-            child: material.Row(
-              children: [
-                if (widget.onNavigateHome != null) ...[
-                  material.Tooltip(
-                    message: 'Return to overview',
-                    child: OutlineButton(
-                      size: ButtonSize.small,
-                      onPressed: widget.onNavigateHome,
-                      leading: const material.Icon(
-                        material.Icons.dns_outlined,
-                        size: 14,
-                      ),
-                      child: const Text('Overview'),
-                    ),
-                  ),
-                  const Gap(10),
-                ],
-                material.Icon(
-                  widget.isView
-                      ? material.Icons.view_agenda_rounded
-                      : material.Icons.table_chart_rounded,
-                  size: 20,
-                  color: cs.primary,
-                ),
-                const Gap(8),
-                material.Expanded(
-                  child: material.Text(
-                    title,
-                    overflow: material.TextOverflow.ellipsis,
-                    maxLines: 1,
-                    style: material.TextStyle(
-                      fontSize: 13,
-                      fontWeight: material.FontWeight.w600,
-                      color: cs.foreground,
-                    ),
-                  ),
-                ),
-                material.Expanded(
-                  flex: 2,
-                  child: material.LayoutBuilder(
-                    builder: (context, constraints) {
-                      return material.SingleChildScrollView(
-                        scrollDirection: material.Axis.horizontal,
-                        child: material.ConstrainedBox(
-                          constraints: material.BoxConstraints(
-                            minWidth: constraints.maxWidth,
-                          ),
-                          child: material.Row(
-                            mainAxisAlignment: material.MainAxisAlignment.end,
-                            mainAxisSize: material.MainAxisSize.min,
-                            children: [
-                              material.Container(
-                                padding: const material.EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: material.BoxDecoration(
-                                  color: cs.muted.withValues(alpha: 0.4),
-                                  borderRadius: material.BorderRadius.circular(4),
-                                ),
-                                child: material.Text(
-                                  _paginationLabel(),
-                                  style: material.TextStyle(
-                                    fontSize: 11,
-                                    color: cs.mutedForeground,
-                                  ),
-                                ),
-                              ),
-                              const Gap(6),
-                              OutlineButton(
-                                size: ButtonSize.small,
-                                onPressed: _loading
-                                    ? null
-                                    : () => unawaited(_showDdlDialog()),
-                                child: const Text('DDL'),
-                              ),
-                              const Gap(4),
-                              OutlineButton(
-                                size: ButtonSize.small,
-                                onPressed: _loading
-                                    ? null
-                                    : () => unawaited(_fetch()),
-                                leading: const material.Icon(
-                                  material.Icons.refresh_rounded,
-                                  size: 14,
-                                ),
-                                child: const Text('Refresh'),
-                              ),
-                              const Gap(4),
-                              OutlineButton(
-                                size: ButtonSize.small,
-                                onPressed: (!_canGoPrevious || _loading)
-                                    ? null
-                                    : _goToPreviousPage,
-                                leading: const material.Icon(
-                                  material.Icons.chevron_left_rounded,
-                                  size: 16,
-                                ),
-                                child: const Text('Prev'),
-                              ),
-                              const Gap(4),
-                              OutlineButton(
-                                size: ButtonSize.small,
-                                onPressed: (!_canGoNext || _loading)
-                                    ? null
-                                    : _goToNextPage,
-                                leading: const material.Icon(
-                                  material.Icons.chevron_right_rounded,
-                                  size: 16,
-                                ),
-                                child: const Text('Next'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
+            const Gap(10),
+          ],
+          material.Icon(
+            widget.isView
+                ? material.Icons.view_agenda_rounded
+                : material.Icons.table_chart_rounded,
+            size: 20,
+            color: cs.primary,
+          ),
+          const Gap(8),
+          material.Expanded(
+            child: material.Text(
+              title,
+              overflow: material.TextOverflow.ellipsis,
+              maxLines: 1,
+              style: material.TextStyle(
+                fontSize: 13,
+                fontWeight: material.FontWeight.w600,
+                color: cs.foreground,
+              ),
             ),
           ),
           material.Expanded(
+            flex: 2,
             child: material.LayoutBuilder(
               builder: (context, constraints) {
-                return material.Scrollbar(
-                  controller: _horizontalController,
-                  thumbVisibility: true,
-                  notificationPredicate: (_) => true,
-                  child: material.SingleChildScrollView(
-                    controller: _horizontalController,
-                    scrollDirection: material.Axis.horizontal,
-                    child: material.SizedBox(
-                      width: _calcTableWidth(colCount, constraints.maxWidth),
-                      child: material.Column(
-                        children: [
-                          material.Container(
-                            height: headerHeight,
-                            decoration: material.BoxDecoration(
-                              color: cs.muted.withValues(alpha: 0.35),
-                              border: material.Border(
-                                bottom: material.BorderSide(
-                                    color: cs.border.withValues(alpha: 0.5)),
-                              ),
-                            ),
-                            child: material.Row(
-                              children: [
-                                _rowNumberCell(cs, '#', isHeader: true),
-                                for (var i = 0; i < colCount; i++)
-                                  _headerCell(cs, _columnNames[i]),
-                              ],
+                return material.SingleChildScrollView(
+                  scrollDirection: material.Axis.horizontal,
+                  child: material.ConstrainedBox(
+                    constraints: material.BoxConstraints(
+                      minWidth: constraints.maxWidth,
+                    ),
+                    child: material.Row(
+                      mainAxisAlignment: material.MainAxisAlignment.end,
+                      mainAxisSize: material.MainAxisSize.min,
+                      children: [
+                        material.Container(
+                          padding: const material.EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: material.BoxDecoration(
+                            color: cs.muted.withValues(alpha: 0.4),
+                            borderRadius: material.BorderRadius.circular(4),
+                          ),
+                          child: material.Text(
+                            _paginationLabel(),
+                            style: material.TextStyle(
+                              fontSize: 11,
+                              color: cs.mutedForeground,
                             ),
                           ),
-                          material.Expanded(
-                            child: material.Scrollbar(
-                              controller: _verticalController,
-                              thumbVisibility: true,
-                              child: material.ListView.builder(
-                                controller: _verticalController,
-                                itemCount: _rowsOnPage,
-                                itemExtent: rowHeight,
-                                itemBuilder: (context, rowIdx) {
-                                  final row = _rows[rowIdx];
-                                  final isEven = rowIdx % 2 == 0;
-                                  final displayRowNum = _offset + rowIdx + 1;
-                                  return material.RepaintBoundary(
-                                    child: material.Container(
-                                      height: rowHeight,
-                                      decoration: material.BoxDecoration(
-                                        color: isEven
-                                            ? material.Colors.transparent
-                                            : cs.muted.withValues(alpha: 0.12),
-                                        border: material.Border(
-                                          bottom: material.BorderSide(
-                                            color: cs.border
-                                                .withValues(alpha: 0.15),
-                                          ),
-                                        ),
-                                      ),
-                                      child: material.Row(
-                                        children: [
-                                          _rowNumberCell(cs, '$displayRowNum'),
-                                          for (var c = 0; c < colCount; c++)
-                                            _dataCell(cs,
-                                                row.length > c ? row[c] : ''),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
+                        ),
+                        const Gap(6),
+                        if (_stagingBuffer != null)
+                          TableBrowserPendingActions(
+                            buffer: _stagingBuffer!,
+                            onSave: () => unawaited(_applyStagedChanges()),
+                            isSaving: _isSaving,
                           ),
-                        ],
-                      ),
+                        OutlineButton(
+                          size: ButtonSize.small,
+                          onPressed: _loading
+                              ? null
+                              : () => unawaited(_showDdlDialog()),
+                          child: const Text('DDL'),
+                        ),
+                        const Gap(4),
+                        OutlineButton(
+                          size: ButtonSize.small,
+                          onPressed:
+                              _loading ? null : () => unawaited(_onRefresh()),
+                          leading: const material.Icon(
+                            material.Icons.refresh_rounded,
+                            size: 14,
+                          ),
+                          child: const Text('Refresh'),
+                        ),
+                        const Gap(4),
+                        OutlineButton(
+                          size: ButtonSize.small,
+                          onPressed: (!_canGoPrevious || _loading)
+                              ? null
+                              : _goToPreviousPage,
+                          leading: const material.Icon(
+                            material.Icons.chevron_left_rounded,
+                            size: 16,
+                          ),
+                          child: const Text('Prev'),
+                        ),
+                        const Gap(4),
+                        OutlineButton(
+                          size: ButtonSize.small,
+                          onPressed:
+                              (!_canGoNext || _loading) ? null : _goToNextPage,
+                          leading: const material.Icon(
+                            material.Icons.chevron_right_rounded,
+                            size: 16,
+                          ),
+                          child: const Text('Next'),
+                        ),
+                      ],
                     ),
                   ),
                 );
@@ -720,6 +575,52 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final buffer = _stagingBuffer;
+
+    return material.CallbackShortcuts(
+      bindings: {
+        const material.SingleActivator(LogicalKeyboardKey.f5): () {
+          if (!_loading) unawaited(_onRefresh());
+        },
+      },
+      child: material.Focus(
+        autofocus: true,
+        child: material.Container(
+          color: cs.background,
+          child: material.Column(
+            crossAxisAlignment: material.CrossAxisAlignment.stretch,
+            children: [
+              if (buffer == null)
+                _buildChromeRow(cs)
+              else
+                ListenableBuilder(
+                  listenable: buffer,
+                  builder: (context, _) => _buildChromeRow(cs),
+                ),
+              material.Expanded(
+                child: ResultsTab(
+                  columns: _columnNames,
+                  rows: _rows,
+                  errorMessage: _error,
+                  isLoading: _loading,
+                  statusLine: _statusLine(),
+                  showExportToolbar: true,
+                  stagingBuffer: _stagingBuffer,
+                  onApplyChanges:
+                      _stagingBuffer != null ? _applyStagedChanges : null,
+                  isSaving: _isSaving,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

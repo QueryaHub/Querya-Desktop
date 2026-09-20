@@ -1,13 +1,16 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:mysql_client/mysql_client.dart';
 import 'package:querya_desktop/core/database/mysql_connection.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
 import 'package:querya_desktop/core/database/result_row_string_convert.dart';
+import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/mysql/mysql_sql_editor_dialog.dart';
 import 'package:querya_desktop/features/mysql/mysql_table_utils.dart';
+import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 const _defaultLimit = 200;
@@ -46,13 +49,24 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
   int _rowsOnPage = 0;
   int? _totalRowCount;
   int _offset = 0;
-  String? _sortColumn;
-  bool _sortAscending = true;
   bool _customSqlActive = false;
   String? _customSql;
 
-  final _verticalController = material.ScrollController();
-  final _horizontalController = material.ScrollController();
+  DataGridStagingBuffer? _stagingBuffer;
+  List<String> _primaryKeys = [];
+  Map<String, String> _columnDataTypes = {};
+  bool _schemaLoaded = false;
+  bool _isSaving = false;
+
+  String get _tableTitle => '${widget.database}.${widget.tableName}';
+
+  bool get _isDirty => _stagingBuffer?.isDirty ?? false;
+
+  bool get _editingEnabled => tableViewEditingEnabled(
+        isView: widget.isView,
+        customSqlActive: _customSqlActive,
+        hasPrimaryKey: _primaryKeys.isNotEmpty,
+      );
 
   String _qualifiedFrom() {
     final d = MysqlConnection.quoteIdentifier(widget.database);
@@ -61,29 +75,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
   }
 
   String _browseDataSql() {
-    final orderBy = _sortColumn != null
-        ? ' ORDER BY ${MysqlConnection.quoteIdentifier(_sortColumn!)} ${_sortAscending ? "ASC" : "DESC"}'
-        : '';
-    return 'SELECT * FROM ${_qualifiedFrom()}$orderBy LIMIT ${widget.limit} OFFSET $_offset';
-  }
-
-  void _toggleSort(String columnName) {
-    if (_loading || _customSqlActive) return;
-    setState(() {
-      if (_sortColumn == columnName) {
-        if (_sortAscending) {
-          _sortAscending = false;
-        } else {
-          _sortColumn = null;
-          _sortAscending = true;
-        }
-      } else {
-        _sortColumn = columnName;
-        _sortAscending = true;
-      }
-      _offset = 0;
-    });
-    _fetch();
+    return 'SELECT * FROM ${_qualifiedFrom()} LIMIT ${widget.limit} OFFSET $_offset';
   }
 
   @override
@@ -99,10 +91,9 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
         oldWidget.database != widget.database ||
         oldWidget.tableName != widget.tableName ||
         oldWidget.isView != widget.isView) {
-      _sortColumn = null;
-      _sortAscending = true;
       _customSqlActive = false;
       _customSql = null;
+      _resetStaging();
       _disconnectCurrent(interruptIfBusy: true);
       _connectAndLoad();
     }
@@ -110,10 +101,18 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
 
   @override
   void dispose() {
-    _verticalController.dispose();
-    _horizontalController.dispose();
+    _resetStaging();
     _disconnectCurrent(interruptIfBusy: true);
     super.dispose();
+  }
+
+  void _resetStaging() {
+    _stagingBuffer?.dispose();
+    _stagingBuffer = null;
+    _primaryKeys = [];
+    _columnDataTypes = {};
+    _schemaLoaded = false;
+    _isSaving = false;
   }
 
   void _disconnectCurrent({bool interruptIfBusy = false}) {
@@ -141,6 +140,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       _offset = 0;
       _customSqlActive = false;
       _customSql = null;
+      _resetStaging();
     });
     try {
       final lease = await MysqlService.instance.acquire(
@@ -191,6 +191,45 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
     return out;
   }
 
+  Future<bool> _confirmDiscardIfNeeded() {
+    return confirmDiscardTableEditsIfDirty(
+      context: context,
+      buffer: _stagingBuffer,
+      tableTitle: _tableTitle,
+    );
+  }
+
+  Future<void> _ensureSchema(MysqlConnection conn) async {
+    if (_schemaLoaded) return;
+    if (widget.isView) {
+      _schemaLoaded = true;
+      _primaryKeys = [];
+      _columnDataTypes = {};
+      return;
+    }
+    try {
+      final schema = await conn.getTableSchema(
+        database: widget.database,
+        table: widget.tableName,
+      );
+      _primaryKeys = List<String>.from(schema.primaryKeys);
+      _columnDataTypes = columnDataTypesFromSchema(schema);
+    } catch (_) {
+      _primaryKeys = [];
+      _columnDataTypes = {};
+    }
+    _schemaLoaded = true;
+  }
+
+  void _installStagingBuffer(List<String> columns, List<List<String>> rows) {
+    _stagingBuffer = replaceTableViewStagingBuffer(
+      previous: _stagingBuffer,
+      columns: columns,
+      rows: rows,
+      enabled: _editingEnabled,
+    );
+  }
+
   Future<void> _fetch({bool refreshCount = false}) async {
     final conn = _connection;
     if (conn == null || !conn.isConnected) {
@@ -227,9 +266,13 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       final result = await conn.execute(dataSql);
       if (!mounted) return;
 
+      await _ensureSchema(conn);
+      if (!mounted) return;
+
       final colNames = _resultColumns(result);
       final stringRows = await _resultRowsAsync(result);
 
+      if (!mounted) return;
       setState(() {
         _columnNames = colNames;
         _rows = stringRows;
@@ -238,10 +281,8 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
           _totalRowCount = totalRows;
         }
         _loading = false;
+        _installStagingBuffer(colNames, stringRows);
       });
-      if (_verticalController.hasClients) {
-        _verticalController.jumpTo(0);
-      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -274,16 +315,15 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       final result = await conn.execute(sql);
       if (!mounted) return;
       final stringRows = await _resultRowsAsync(result);
+      if (!mounted) return;
       setState(() {
         _columnNames = _resultColumns(result);
         _rows = stringRows;
         _rowsOnPage = _rows.length;
         _totalRowCount = null;
         _loading = false;
+        _installStagingBuffer(_columnNames, stringRows);
       });
-      if (_verticalController.hasClients) {
-        _verticalController.jumpTo(0);
-      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -294,22 +334,24 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
     }
   }
 
-  void _onSqlRun(String sql) {
+  Future<void> _onSqlRun(String sql) async {
     final trimmed = sql.trim();
     if (!isAllowedMysqlSelectQuery(trimmed)) return;
+    if (!await _confirmDiscardIfNeeded()) return;
+    if (!mounted) return;
     final browse = _browseDataSql().trim();
     if (_browseSqlCompareKey(trimmed) == _browseSqlCompareKey(browse)) {
       setState(() {
         _customSqlActive = false;
         _customSql = null;
       });
-      unawaited(_fetch(refreshCount: true));
+      await _fetch(refreshCount: true);
     } else {
       setState(() {
         _customSqlActive = true;
         _customSql = trimmed;
       });
-      unawaited(_fetchCustom());
+      await _fetchCustom();
     }
   }
 
@@ -320,21 +362,23 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
           ? _customSql!
           : _browseDataSql(),
       browseSql: _browseDataSql(),
-      onRun: _onSqlRun,
+      onRun: (sql) => unawaited(_onSqlRun(sql)),
     );
   }
 
-  void _exitCustomMode() {
+  Future<void> _exitCustomMode() async {
+    if (!await _confirmDiscardIfNeeded()) return;
+    if (!mounted) return;
     setState(() {
       _customSqlActive = false;
       _customSql = null;
     });
-    unawaited(_fetch(refreshCount: true));
+    await _fetch(refreshCount: true);
   }
 
   void _goToPreviousPage() {
     if (_customSqlActive) return;
-    if (_offset <= 0 || _loading) return;
+    if (_offset <= 0 || _loading || _isDirty) return;
     setState(() {
       final next = _offset - widget.limit;
       _offset = next < 0 ? 0 : next;
@@ -344,7 +388,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
 
   void _goToNextPage() {
     if (_customSqlActive) return;
-    if (_loading) return;
+    if (_loading || _isDirty) return;
     final total = _totalRowCount;
     final limit = widget.limit;
     if (total != null && _offset + _rowsOnPage >= total) return;
@@ -355,11 +399,11 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
     unawaited(_fetch());
   }
 
-  bool get _canGoPrevious => !_customSqlActive && _offset > 0 && !_loading;
+  bool get _canGoPrevious =>
+      !_customSqlActive && _offset > 0 && !_loading && !_isDirty;
 
   bool get _canGoNext {
-    if (_customSqlActive) return false;
-    if (_loading) return false;
+    if (_customSqlActive || _loading || _isDirty) return false;
     final total = _totalRowCount;
     final limit = widget.limit;
     if (total != null) {
@@ -387,337 +431,242 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
     return '$start–$end';
   }
 
-  @override
-  material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+  String? _statusLine() {
+    final reason = tableViewEditDisabledReason(
+      isView: widget.isView,
+      customSqlActive: _customSqlActive,
+      hasPrimaryKey: _primaryKeys.isNotEmpty,
+      schemaLoaded: _schemaLoaded,
+    );
+    final pag = _paginationLabel();
+    if (reason != null) return '$pag · $reason';
+    return pag;
+  }
 
-    if (_loading) {
-      return material.Container(
-        color: cs.background,
-        child: material.Center(
-          child: material.Column(
-            mainAxisSize: material.MainAxisSize.min,
-            children: [
-              const material.SizedBox(
-                width: 28,
-                height: 28,
-                child: material.CircularProgressIndicator(strokeWidth: 2),
-              ),
-              const Gap(12),
-              const Text('Loading data...').muted().small(),
-            ],
-          ),
-        ),
+  Future<void> _onRefresh() async {
+    if (!await _confirmDiscardIfNeeded()) return;
+    if (!mounted) return;
+    if (_customSqlActive) {
+      await _fetchCustom();
+    } else {
+      await _fetch(refreshCount: true);
+    }
+  }
+
+  Future<void> _onNavigateHome() async {
+    final home = widget.onNavigateHome;
+    if (home == null) return;
+    if (!await _confirmDiscardIfNeeded()) return;
+    if (!mounted) return;
+    home();
+  }
+
+  Future<void> _applyStagedChanges() async {
+    final buffer = _stagingBuffer;
+    if (buffer == null || !buffer.isDirty || _isSaving) return;
+    setState(() => _isSaving = true);
+    final outcome = await applyTableViewStagedChanges(
+      context: context,
+      buffer: buffer,
+      dialect: SqlDialect.mysql,
+      tableName: widget.tableName,
+      schema: widget.database,
+      primaryKeys: _primaryKeys,
+      columnDataTypes: _columnDataTypes.isEmpty ? null : _columnDataTypes,
+      execute: (plan) async {
+        final conn = _connection;
+        if (conn == null || !conn.isConnected) {
+          throw StateError('Could not connect to MySQL.');
+        }
+        await conn.execute('START TRANSACTION');
+        try {
+          for (final stmt in plan.statements) {
+            await conn.execute(stmt.sql);
+          }
+          await conn.execute('COMMIT');
+        } catch (e) {
+          try {
+            await conn.execute('ROLLBACK');
+          } catch (_) {}
+          rethrow;
+        }
+      },
+    );
+    if (!mounted) return;
+    if (outcome.isApplied) {
+      final newRows = buffer.effectiveRows;
+      buffer.dispose();
+      setState(() {
+        _rows = newRows;
+        _rowsOnPage = newRows.length;
+        _stagingBuffer = replaceTableViewStagingBuffer(
+          previous: null,
+          columns: _columnNames,
+          rows: newRows,
+          enabled: _editingEnabled,
+        );
+        _isSaving = false;
+      });
+      showAppToast(
+        context: context,
+        message: '${outcome.statementCount} change(s) saved',
+        variant: AppToastVariant.success,
+      );
+      return;
+    }
+    setState(() => _isSaving = false);
+    if (outcome.isFailed && outcome.error != null) {
+      await showTableViewSaveFailedDialog(
+        context: context,
+        error: outcome.error!,
       );
     }
+  }
 
-    if (_error != null) {
-      return material.Container(
-        color: cs.background,
-        child: material.Center(
-          child: material.Padding(
-            padding: const material.EdgeInsets.all(32),
-            child: material.Column(
-              mainAxisSize: material.MainAxisSize.min,
-              children: [
-                material.Icon(material.Icons.error_outline_rounded,
-                    size: 48, color: cs.destructive),
-                const Gap(16),
-                const Text('Query Error').large().semiBold(),
-                const Gap(8),
-                material.SelectableText(_error!,
-                    style: material.TextStyle(
-                        color: cs.mutedForeground, fontSize: 13)),
-                const Gap(24),
-                OutlineButton(
-                  onPressed: () {
-                    if (_customSqlActive) {
-                      unawaited(_fetchCustom());
-                    } else {
-                      unawaited(_fetch(refreshCount: true));
-                    }
-                  },
-                  leading: const material.Icon(material.Icons.refresh_rounded,
-                      size: 18),
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (_columnNames.isEmpty) {
-      return material.Container(
-        color: cs.background,
-        child: material.Center(
-          child: material.Padding(
-            padding: const material.EdgeInsets.all(32),
-            child: material.Column(
-              mainAxisSize: material.MainAxisSize.min,
-              children: [
-                const Text('No columns returned').muted().small(),
-                const Gap(24),
-                OutlineButton(
-                  onPressed: () {
-                    if (_customSqlActive) {
-                      unawaited(_fetchCustom());
-                    } else {
-                      unawaited(_fetch(refreshCount: true));
-                    }
-                  },
-                  leading: const material.Icon(material.Icons.refresh_rounded,
-                      size: 18),
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    const double rowHeight = 36;
-    const double headerHeight = 40;
-    final colCount = _columnNames.length;
-    final title =
-        '${widget.database}.${widget.tableName}${widget.isView ? ' (view)' : ''}';
-
+  material.Widget _buildChromeRow(ColorScheme cs) {
+    final title = '$_tableTitle${widget.isView ? ' (view)' : ''}';
     return material.Container(
-      color: cs.background,
-      child: material.Column(
-        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+      height: 48,
+      padding: const material.EdgeInsets.symmetric(horizontal: 12),
+      decoration: material.BoxDecoration(
+        color: cs.muted.withValues(alpha: 0.35),
+        border: material.Border(
+          bottom: material.BorderSide(
+            color: cs.border.withValues(alpha: 0.4),
+          ),
+        ),
+      ),
+      child: material.Row(
         children: [
-          material.Container(
-            height: 48,
-            padding: const material.EdgeInsets.symmetric(horizontal: 12),
-            decoration: material.BoxDecoration(
-              color: cs.muted.withValues(alpha: 0.35),
-              border: material.Border(
-                bottom: material.BorderSide(
-                  color: cs.border.withValues(alpha: 0.4),
+          if (widget.onNavigateHome != null) ...[
+            material.Tooltip(
+              message: 'Return to server overview',
+              child: OutlineButton(
+                size: ButtonSize.small,
+                onPressed: () => unawaited(_onNavigateHome()),
+                leading: const material.Icon(
+                  material.Icons.dns_outlined,
+                  size: 14,
                 ),
+                child: const Text('Server'),
               ),
             ),
-            child: material.Row(
-              children: [
-                if (widget.onNavigateHome != null) ...[
-                  material.Tooltip(
-                    message: 'Return to server overview',
-                    child: OutlineButton(
-                      size: ButtonSize.small,
-                      onPressed: widget.onNavigateHome,
-                      leading: const material.Icon(
-                        material.Icons.dns_outlined,
-                        size: 14,
-                      ),
-                      child: const Text('Server'),
-                    ),
-                  ),
-                  const Gap(10),
-                ],
-                material.Icon(
-                  widget.isView
-                      ? material.Icons.view_agenda_rounded
-                      : material.Icons.table_chart_rounded,
-                  size: 20,
-                  color: cs.primary,
-                ),
-                const Gap(8),
-                material.Expanded(
-                  child: material.Text(
-                    title,
-                    overflow: material.TextOverflow.ellipsis,
-                    maxLines: 1,
-                    style: material.TextStyle(
-                      fontSize: 13,
-                      fontWeight: material.FontWeight.w600,
-                      color: cs.foreground,
-                    ),
-                  ),
-                ),
-                material.Expanded(
-                  flex: 2,
-                  child: material.LayoutBuilder(
-                    builder: (context, constraints) {
-                      return material.SingleChildScrollView(
-                        scrollDirection: material.Axis.horizontal,
-                        child: material.ConstrainedBox(
-                          constraints: material.BoxConstraints(
-                            minWidth: constraints.maxWidth,
-                          ),
-                          child: material.Row(
-                            mainAxisAlignment: material.MainAxisAlignment.end,
-                            mainAxisSize: material.MainAxisSize.min,
-                            children: [
-                              material.Container(
-                                padding: const material.EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: material.BoxDecoration(
-                                  color: cs.muted.withValues(alpha: 0.4),
-                                  borderRadius: material.BorderRadius.circular(4),
-                                ),
-                                child: material.Text(
-                                  _paginationLabel(),
-                                  style: material.TextStyle(
-                                    fontSize: 11,
-                                    color: cs.mutedForeground,
-                                  ),
-                                ),
-                              ),
-                              const Gap(6),
-                              OutlineButton(
-                                size: ButtonSize.small,
-                                onPressed: _openSqlEditor,
-                                leading: const material.Icon(
-                                  material.Icons.code_rounded,
-                                  size: 15,
-                                ),
-                                child: const Text('SQL'),
-                              ),
-                              if (_customSqlActive) ...[
-                                const Gap(4),
-                                OutlineButton(
-                                  size: ButtonSize.small,
-                                  onPressed: _exitCustomMode,
-                                  leading: const material.Icon(
-                                    material.Icons.table_chart_rounded,
-                                    size: 15,
-                                  ),
-                                  child: const Text('Browse'),
-                                ),
-                              ],
-                              const Gap(4),
-                              OutlineButton(
-                                size: ButtonSize.small,
-                                onPressed: (!_canGoPrevious || _loading)
-                                    ? null
-                                    : _goToPreviousPage,
-                                leading: const material.Icon(
-                                  material.Icons.chevron_left_rounded,
-                                  size: 16,
-                                ),
-                                child: const Text('Prev'),
-                              ),
-                              const Gap(4),
-                              OutlineButton(
-                                size: ButtonSize.small,
-                                onPressed: (!_canGoNext || _loading)
-                                    ? null
-                                    : _goToNextPage,
-                                leading: const material.Icon(
-                                  material.Icons.chevron_right_rounded,
-                                  size: 16,
-                                ),
-                                child: const Text('Next'),
-                              ),
-                              const Gap(8),
-                              OutlineButton(
-                                size: ButtonSize.small,
-                                onPressed: _loading
-                                    ? null
-                                    : () {
-                                        if (_customSqlActive) {
-                                          unawaited(_fetchCustom());
-                                        } else {
-                                          unawaited(_fetch(refreshCount: true));
-                                        }
-                                      },
-                                leading: const material.Icon(
-                                  material.Icons.refresh_rounded,
-                                  size: 14,
-                                ),
-                                child: const Text('Refresh'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
+            const Gap(10),
+          ],
+          material.Icon(
+            widget.isView
+                ? material.Icons.view_agenda_rounded
+                : material.Icons.table_chart_rounded,
+            size: 20,
+            color: cs.primary,
+          ),
+          const Gap(8),
+          material.Expanded(
+            child: material.Text(
+              title,
+              overflow: material.TextOverflow.ellipsis,
+              maxLines: 1,
+              style: material.TextStyle(
+                fontSize: 13,
+                fontWeight: material.FontWeight.w600,
+                color: cs.foreground,
+              ),
             ),
           ),
           material.Expanded(
+            flex: 2,
             child: material.LayoutBuilder(
               builder: (context, constraints) {
-                return material.Scrollbar(
-                  controller: _horizontalController,
-                  thumbVisibility: true,
-                  notificationPredicate: (_) => true,
-                  child: material.SingleChildScrollView(
-                    controller: _horizontalController,
-                    scrollDirection: material.Axis.horizontal,
-                    child: material.SizedBox(
-                      width: _calcTableWidth(colCount, constraints.maxWidth),
-                      child: material.Column(
-                        children: [
-                          material.Container(
-                            height: headerHeight,
-                            decoration: material.BoxDecoration(
-                              color: cs.muted.withValues(alpha: 0.35),
-                              border: material.Border(
-                                bottom: material.BorderSide(
-                                    color: cs.border.withValues(alpha: 0.5)),
-                              ),
-                            ),
-                            child: material.Row(
-                              children: [
-                                _rowNumberCell(cs, '#', isHeader: true),
-                                for (var i = 0; i < colCount; i++)
-                                  _headerCell(cs, _columnNames[i]),
-                              ],
+                return material.SingleChildScrollView(
+                  scrollDirection: material.Axis.horizontal,
+                  child: material.ConstrainedBox(
+                    constraints: material.BoxConstraints(
+                      minWidth: constraints.maxWidth,
+                    ),
+                    child: material.Row(
+                      mainAxisAlignment: material.MainAxisAlignment.end,
+                      mainAxisSize: material.MainAxisSize.min,
+                      children: [
+                        material.Container(
+                          padding: const material.EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: material.BoxDecoration(
+                            color: cs.muted.withValues(alpha: 0.4),
+                            borderRadius: material.BorderRadius.circular(4),
+                          ),
+                          child: material.Text(
+                            _paginationLabel(),
+                            style: material.TextStyle(
+                              fontSize: 11,
+                              color: cs.mutedForeground,
                             ),
                           ),
-                          material.Expanded(
-                            child: material.Scrollbar(
-                              controller: _verticalController,
-                              thumbVisibility: true,
-                              child: material.ListView.builder(
-                                controller: _verticalController,
-                                itemCount: _rowsOnPage,
-                                itemExtent: rowHeight,
-                                itemBuilder: (context, rowIdx) {
-                                  final row = _rows[rowIdx];
-                                  final isEven = rowIdx % 2 == 0;
-                                  final displayRowNum = _customSqlActive
-                                      ? rowIdx + 1
-                                      : _offset + rowIdx + 1;
-                                  return material.RepaintBoundary(
-                                    child: material.Container(
-                                      height: rowHeight,
-                                      decoration: material.BoxDecoration(
-                                        color: isEven
-                                            ? material.Colors.transparent
-                                            : cs.muted.withValues(alpha: 0.12),
-                                        border: material.Border(
-                                          bottom: material.BorderSide(
-                                            color: cs.border
-                                                .withValues(alpha: 0.15),
-                                          ),
-                                        ),
-                                      ),
-                                      child: material.Row(
-                                        children: [
-                                          _rowNumberCell(cs, '$displayRowNum'),
-                                          for (var c = 0; c < colCount; c++)
-                                            _dataCell(
-                                                cs,
-                                                row.length > c ? row[c] : ''),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
+                        ),
+                        const Gap(6),
+                        if (_stagingBuffer != null)
+                          TableBrowserPendingActions(
+                            buffer: _stagingBuffer!,
+                            onSave: () => unawaited(_applyStagedChanges()),
+                            isSaving: _isSaving,
+                          ),
+                        OutlineButton(
+                          size: ButtonSize.small,
+                          onPressed: _openSqlEditor,
+                          leading: const material.Icon(
+                            material.Icons.code_rounded,
+                            size: 15,
+                          ),
+                          child: const Text('SQL'),
+                        ),
+                        if (_customSqlActive) ...[
+                          const Gap(4),
+                          OutlineButton(
+                            size: ButtonSize.small,
+                            onPressed: () => unawaited(_exitCustomMode()),
+                            leading: const material.Icon(
+                              material.Icons.table_chart_rounded,
+                              size: 15,
                             ),
+                            child: const Text('Browse'),
                           ),
                         ],
-                      ),
+                        const Gap(4),
+                        OutlineButton(
+                          size: ButtonSize.small,
+                          onPressed: (!_canGoPrevious || _loading)
+                              ? null
+                              : _goToPreviousPage,
+                          leading: const material.Icon(
+                            material.Icons.chevron_left_rounded,
+                            size: 16,
+                          ),
+                          child: const Text('Prev'),
+                        ),
+                        const Gap(4),
+                        OutlineButton(
+                          size: ButtonSize.small,
+                          onPressed:
+                              (!_canGoNext || _loading) ? null : _goToNextPage,
+                          leading: const material.Icon(
+                            material.Icons.chevron_right_rounded,
+                            size: 16,
+                          ),
+                          child: const Text('Next'),
+                        ),
+                        const Gap(8),
+                        OutlineButton(
+                          size: ButtonSize.small,
+                          onPressed:
+                              _loading ? null : () => unawaited(_onRefresh()),
+                          leading: const material.Icon(
+                            material.Icons.refresh_rounded,
+                            size: 14,
+                          ),
+                          child: const Text('Refresh'),
+                        ),
+                      ],
                     ),
                   ),
                 );
@@ -729,110 +678,57 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
     );
   }
 
+  @override
+  material.Widget build(material.BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final buffer = _stagingBuffer;
+
+    return material.CallbackShortcuts(
+      bindings: {
+        const material.SingleActivator(LogicalKeyboardKey.f5): () {
+          if (!_loading) unawaited(_onRefresh());
+        },
+      },
+      child: material.Focus(
+        autofocus: true,
+        child: material.Container(
+          color: cs.background,
+          child: material.Column(
+            crossAxisAlignment: material.CrossAxisAlignment.stretch,
+            children: [
+              if (buffer == null)
+                _buildChromeRow(cs)
+              else
+                ListenableBuilder(
+                  listenable: buffer,
+                  builder: (context, _) => _buildChromeRow(cs),
+                ),
+              material.Expanded(
+                child: ResultsTab(
+                  columns: _columnNames,
+                  rows: _rows,
+                  errorMessage: _error,
+                  isLoading: _loading,
+                  statusLine: _statusLine(),
+                  showExportToolbar: true,
+                  stagingBuffer: _stagingBuffer,
+                  onApplyChanges:
+                      _stagingBuffer != null ? _applyStagedChanges : null,
+                  isSaving: _isSaving,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   static String _browseSqlCompareKey(String sql) {
     var s = sql.trim();
     while (s.endsWith(';')) {
       s = s.substring(0, s.length - 1).trimRight();
     }
     return s.replaceAll(RegExp(r'\s+'), ' ');
-  }
-
-  double _calcTableWidth(int colCount, double availableWidth) {
-    const double rowNumWidth = 52;
-    const double minColWidth = 150;
-    final calculated = rowNumWidth + colCount * minColWidth;
-    return calculated > availableWidth ? calculated : availableWidth;
-  }
-
-  material.Widget _rowNumberCell(ColorScheme cs, String text,
-      {bool isHeader = false}) {
-    return material.Container(
-      width: 52,
-      padding: const material.EdgeInsets.symmetric(horizontal: 8),
-      alignment: material.Alignment.centerRight,
-      decoration: material.BoxDecoration(
-        border: material.Border(
-          right: material.BorderSide(color: cs.border.withValues(alpha: 0.3)),
-        ),
-      ),
-      child: material.Text(
-        text,
-        style: material.TextStyle(
-          fontSize: 11,
-          fontWeight:
-              isHeader ? material.FontWeight.w600 : material.FontWeight.normal,
-          color: cs.mutedForeground.withValues(alpha: 0.7),
-          fontFamily: 'monospace',
-        ),
-      ),
-    );
-  }
-
-  material.Widget _headerCell(ColorScheme cs, String name) {
-    final isSorted = !_customSqlActive && _sortColumn == name;
-    return material.Expanded(
-      child: material.MouseRegion(
-        cursor: !_customSqlActive
-            ? material.SystemMouseCursors.click
-            : material.SystemMouseCursors.basic,
-        child: material.GestureDetector(
-          behavior: material.HitTestBehavior.opaque,
-          onTap: () => _toggleSort(name),
-          child: material.Container(
-            padding: const material.EdgeInsets.symmetric(horizontal: 10),
-            alignment: material.Alignment.centerLeft,
-            child: material.Row(
-              children: [
-                material.Expanded(
-                  child: material.Text(
-                    name,
-                    style: material.TextStyle(
-                      fontSize: 12,
-                      fontWeight: material.FontWeight.w600,
-                      color: isSorted ? cs.primary : cs.foreground,
-                    ),
-                    overflow: material.TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                ),
-                if (isSorted) ...[
-                  const Gap(4),
-                  material.Icon(
-                    _sortAscending
-                        ? material.Icons.arrow_upward_rounded
-                        : material.Icons.arrow_downward_rounded,
-                    size: 14,
-                    color: cs.primary,
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  material.Widget _dataCell(ColorScheme cs, String value) {
-    final isNull = value == 'NULL';
-    return material.Expanded(
-      child: material.Container(
-        padding: const material.EdgeInsets.symmetric(horizontal: 10),
-        alignment: material.Alignment.centerLeft,
-        child: material.Text(
-          value,
-          style: material.TextStyle(
-            fontSize: 12,
-            color: isNull
-                ? cs.mutedForeground.withValues(alpha: 0.5)
-                : cs.foreground,
-            fontStyle:
-                isNull ? material.FontStyle.italic : material.FontStyle.normal,
-          ),
-          overflow: material.TextOverflow.ellipsis,
-          maxLines: 1,
-        ),
-      ),
-    );
   }
 }
