@@ -74,6 +74,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
   Map<String, String> _columnDataTypes = {};
   Map<String, TableColumnMeta> _columnMeta = {};
   bool _schemaLoaded = false;
+  Object? _schemaError;
   bool _isSaving = false;
 
   String get _tableTitle => '${widget.schema}.${widget.tableName}';
@@ -85,6 +86,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         isMaterializedView: widget.isMaterializedView,
         customSqlActive: _customSqlActive,
         hasPrimaryKey: _primaryKeys.isNotEmpty,
+        schemaError: _schemaError,
       );
 
   @override
@@ -123,6 +125,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     _columnDataTypes = {};
     _columnMeta = {};
     _schemaLoaded = false;
+    _schemaError = null;
     _isSaving = false;
   }
 
@@ -220,23 +223,29 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     if (_schemaLoaded) return;
     if (widget.isView || widget.isMaterializedView) {
       _schemaLoaded = true;
+      _schemaError = null;
       _primaryKeys = [];
       _columnDataTypes = {};
       _columnMeta = {};
       return;
     }
-    try {
-      final schema = await conn.getTableSchema(
+    final loaded = await loadTableViewSchema(
+      () => conn.getTableSchema(
         schema: widget.schema,
         table: widget.tableName,
-      );
+      ),
+    );
+    final schema = loaded.schema;
+    if (schema != null) {
       _primaryKeys = List<String>.from(schema.primaryKeys);
       _columnDataTypes = columnDataTypesFromSchema(schema);
       _columnMeta = columnMetaFromSchema(schema);
-    } catch (_) {
+      _schemaError = null;
+    } else {
       _primaryKeys = [];
       _columnDataTypes = {};
       _columnMeta = {};
+      _schemaError = loaded.error;
     }
     _schemaLoaded = true;
   }
@@ -528,6 +537,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       customSqlActive: _customSqlActive,
       hasPrimaryKey: _primaryKeys.isNotEmpty,
       schemaLoaded: _schemaLoaded,
+      schemaError: _schemaError,
     );
     final pag = _paginationLabel();
     if (reason != null) return '$pag · $reason';
@@ -537,6 +547,8 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
   Future<void> _onRefresh() async {
     if (!await _confirmDiscardIfNeeded()) return;
     if (!mounted) return;
+    _schemaLoaded = false;
+    _schemaError = null;
     if (_customSqlActive) {
       await _fetchCustom();
     } else {

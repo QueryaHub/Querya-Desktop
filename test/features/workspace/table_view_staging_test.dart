@@ -63,6 +63,15 @@ void main() {
         ),
         isFalse,
       );
+      expect(
+        tableViewEditingEnabled(
+          isView: false,
+          customSqlActive: false,
+          hasPrimaryKey: true,
+          schemaError: StateError('permission denied'),
+        ),
+        isFalse,
+      );
     });
   });
 
@@ -132,6 +141,76 @@ void main() {
           schemaLoaded: true,
         ),
         isNull,
+      );
+      expect(
+        tableViewEditDisabledReason(
+          isView: false,
+          customSqlActive: false,
+          hasPrimaryKey: false,
+          schemaLoaded: true,
+          schemaError: StateError('permission denied'),
+        ),
+        'Cannot edit: schema unavailable. '
+        'Bad state: permission denied. Refresh to retry.',
+      );
+    });
+
+    test('schema load failure is not reported as a missing PK', () {
+      final reason = tableViewEditDisabledReason(
+        isView: false,
+        customSqlActive: false,
+        hasPrimaryKey: false,
+        schemaLoaded: true,
+        schemaError: Exception('information_schema denied'),
+      );
+      expect(reason, contains('schema unavailable'));
+      expect(reason, contains('information_schema denied'));
+      expect(reason, contains('Refresh to retry'));
+      expect(reason, isNot(contains('no primary key')));
+    });
+  });
+
+  group('loadTableViewSchema', () {
+    test('returns schema on success', () async {
+      const meta = TableSchemaMeta(
+        tableName: 'users',
+        primaryKeys: ['id'],
+      );
+      final loaded = await loadTableViewSchema(() async => meta);
+      expect(loaded.isOk, isTrue);
+      expect(loaded.schema, same(meta));
+      expect(loaded.error, isNull);
+    });
+
+    test('captures a throwing getTableSchema stub instead of empty PKs',
+        () async {
+      Future<TableSchemaMeta> throwingStub() async {
+        throw StateError('permission denied');
+      }
+
+      final loaded = await loadTableViewSchema(throwingStub);
+      expect(loaded.isOk, isFalse);
+      expect(loaded.schema, isNull);
+      expect(loaded.error, isA<StateError>());
+      expect(
+        tableViewEditDisabledReason(
+          isView: false,
+          customSqlActive: false,
+          hasPrimaryKey: loaded.schema?.hasPrimaryKey ?? false,
+          schemaLoaded: true,
+          schemaError: loaded.error,
+        ),
+        contains('schema unavailable'),
+      );
+      expect(
+        tableViewEditDisabledReason(
+          isView: false,
+          customSqlActive: false,
+          hasPrimaryKey: false,
+          schemaLoaded: true,
+          schemaError: loaded.error,
+        ),
+        isNot(contains('no primary key')),
       );
     });
   });

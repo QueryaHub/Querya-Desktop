@@ -5,6 +5,36 @@ import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart'
 import 'package:querya_desktop/features/workspace/dml_preview_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
+/// Outcome of [loadTableViewSchema] (success vs swallowed getTableSchema error).
+class TableViewSchemaLoad {
+  const TableViewSchemaLoad._({this.schema, this.error});
+
+  const TableViewSchemaLoad.ok(TableSchemaMeta schema) : this._(schema: schema);
+
+  const TableViewSchemaLoad.failed(Object error) : this._(error: error);
+
+  final TableSchemaMeta? schema;
+  final Object? error;
+
+  bool get isOk => schema != null;
+}
+
+/// Runs [fetch] and captures a failure instead of treating it as “no PK”.
+Future<TableViewSchemaLoad> loadTableViewSchema(
+  Future<TableSchemaMeta> Function() fetch,
+) async {
+  try {
+    return TableViewSchemaLoad.ok(await fetch());
+  } catch (e) {
+    return TableViewSchemaLoad.failed(e);
+  }
+}
+
+/// Status copy when [loadTableViewSchema] failed. Editing stays off.
+String tableViewSchemaUnavailableReason(Object error) {
+  return 'Cannot edit: schema unavailable. $error. Refresh to retry.';
+}
+
 /// Whether Table Browser should attach a [DataGridStagingBuffer] for this page.
 bool tableViewEditingEnabled({
   required bool isView,
@@ -12,8 +42,10 @@ bool tableViewEditingEnabled({
   required bool customSqlActive,
   required bool hasPrimaryKey,
   bool readOnly = false,
+  Object? schemaError,
 }) {
   if (readOnly || isView || isMaterializedView || customSqlActive) return false;
+  if (schemaError != null) return false;
   return hasPrimaryKey;
 }
 
@@ -25,10 +57,14 @@ String? tableViewEditDisabledReason({
   required bool hasPrimaryKey,
   required bool schemaLoaded,
   bool readOnly = false,
+  Object? schemaError,
 }) {
   if (readOnly) return 'Read-only session';
   if (isView || isMaterializedView) return 'Views are read-only';
   if (customSqlActive) return 'Custom SQL results are read-only';
+  if (schemaError != null) {
+    return tableViewSchemaUnavailableReason(schemaError);
+  }
   if (schemaLoaded && !hasPrimaryKey) {
     return 'Cannot edit: no primary key detected';
   }

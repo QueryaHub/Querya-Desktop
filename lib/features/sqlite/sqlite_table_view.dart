@@ -58,18 +58,19 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
   Map<String, String> _columnDataTypes = {};
   Map<String, TableColumnMeta> _columnMeta = {};
   bool _schemaLoaded = false;
+  Object? _schemaError;
   bool _isSaving = false;
 
   bool get _isDirty => _stagingBuffer?.isDirty ?? false;
 
-  bool get _readOnly =>
-      widget.isReadOnly || widget.connectionRow.useSSL;
+  bool get _readOnly => widget.isReadOnly || widget.connectionRow.useSSL;
 
   bool get _editingEnabled => tableViewEditingEnabled(
         isView: widget.isView,
         customSqlActive: false,
         hasPrimaryKey: _primaryKeys.isNotEmpty,
         readOnly: _readOnly,
+        schemaError: _schemaError,
       );
 
   String _qualifiedFrom() {
@@ -121,6 +122,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     _columnDataTypes = {};
     _columnMeta = {};
     _schemaLoaded = false;
+    _schemaError = null;
     _isSaving = false;
   }
 
@@ -218,13 +220,17 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     if (_schemaLoaded) return;
     if (widget.isView) {
       _schemaLoaded = true;
+      _schemaError = null;
       _primaryKeys = [];
       _columnDataTypes = {};
       _columnMeta = {};
       return;
     }
-    try {
-      final schema = await conn.getTableSchema(table: widget.tableName);
+    final loaded = await loadTableViewSchema(
+      () => conn.getTableSchema(table: widget.tableName),
+    );
+    final schema = loaded.schema;
+    if (schema != null) {
       _primaryKeys = sqliteTableBrowserPrimaryKeys(
         declaredPrimaryKeys: schema.primaryKeys,
         isView: widget.isView,
@@ -240,10 +246,12 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
             sqliteImplicitRowidColumn.dataType;
         _columnMeta[kSqliteImplicitRowid] = sqliteImplicitRowidColumn;
       }
-    } catch (_) {
+      _schemaError = null;
+    } else {
       _primaryKeys = [];
       _columnDataTypes = {};
       _columnMeta = {};
+      _schemaError = loaded.error;
     }
     _schemaLoaded = true;
   }
@@ -349,6 +357,8 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
   Future<void> _onRefresh() async {
     if (!await _confirmDiscardIfNeeded()) return;
     if (!mounted) return;
+    _schemaLoaded = false;
+    _schemaError = null;
     await _fetch();
   }
 
@@ -503,6 +513,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
       hasPrimaryKey: _primaryKeys.isNotEmpty,
       schemaLoaded: _schemaLoaded,
       readOnly: _readOnly,
+      schemaError: _schemaError,
     );
     final pag = _paginationLabel();
     if (pag.isEmpty) return reason;
