@@ -1,10 +1,10 @@
-# Pre-release checklist (release **0.4.11**)
+# Pre-release checklist (release **0.4.16**)
 
-Use this before tagging **`0.4.11`** or running the **Release** workflow.
-See [tags-and-releases.md](tags-and-releases.md), [CHANGELOG.md](../CHANGELOG.md), and epic [#341](https://github.com/QueryaHub/Querya-Desktop/issues/341).  
-Detailed QA track: issue [#344](https://github.com/QueryaHub/Querya-Desktop/issues/344).
+Use this before tagging **`0.4.16`** or running the **Release** workflow.
+See [tags-and-releases.md](tags-and-releases.md), [CHANGELOG.md](../CHANGELOG.md).
+Manual 120 Hz DevTools QA: issue [#739](https://github.com/QueryaHub/Querya-Desktop/issues/739) (does not block this cut).
 
-## Product smoke (manual) — 0.4.11
+## Product smoke (manual) — 0.4.16
 
 - [ ] Fresh profile / empty state: create one connection per supported type (PostgreSQL, MySQL, Redis, MongoDB, SQLite).
 - [ ] Reopen the app: connections still appear; **connect** succeeds (secrets migrated or loaded from secure store).
@@ -16,6 +16,9 @@ Detailed QA track: issue [#344](https://github.com/QueryaHub/Querya-Desktop/issu
 - [ ] **Extension table view** — open a sandboxed driver table (or fixture); toolbar filter + export present.
 - [ ] **Updater** — Check for Updates / badge sees Latest Release channel correctly after tag.
 - [ ] **Fluid shell** — tab strip sliding pill; dialog/dropdown fade-slide; Motion Off snaps (see also [perf-baseline.md](perf-baseline.md) Fluid §).
+- [ ] **Table Browser edit** — Postgres/MySQL/SQLite table with a PK: double-click cell, Save via DML preview; view / no-PK stays read-only.
+- [ ] **Command Palette** — Ctrl/Cmd+P runs a command; Ctrl/Cmd+K jumps to a table.
+- [ ] **Mongo field Save** — expand a document card, tap a non-`_id` field, Save to DB, card reloads.
 
 ## Regression smoke (prior releases)
 
@@ -66,14 +69,14 @@ Verify the 0.4.4 motion tokens, smooth animations, and high refresh rate support
 
 ## Versioning and release
 
-- [x] `pubspec.yaml` on the release branch is **`0.4.11+N`** (currently **`0.4.11+1`** on `dev` after #346).
-- [x] After merge to `main`, confirm any **Auto Version Bump** still yields a **0.4.11+…** product version (do not ship as 0.4.12).
-- [x] **Tag** `0.4.11` is placed on the **commit that includes all fixes** you want in binaries (a tag does not auto-include later commits; see [CONTRIBUTING.md](../CONTRIBUTING.md)).
-- [x] Run the **Release** workflow from GitHub Actions (see [tags-and-releases.md](tags-and-releases.md)).
+- [x] `pubspec.yaml` on the release branch is **`0.4.16+1`**.
+- [ ] After merge to `main`, confirm **Auto Version Bump** yields a **0.4.17+…** placeholder (do not ship binaries as 0.4.17).
+- [ ] **Tag** `0.4.16` is placed on the **main merge commit that includes `0.4.16+1`** (not the auto-bump commit).
+- [ ] Run the **Release** workflow via that tag (see [tags-and-releases.md](tags-and-releases.md)).
 - [ ] Verify **portable** zips (`*-linux.zip`, `*-windows.zip`, `*-macos.zip`), **installable** artifacts (`*.AppImage`, `*.deb`, `*.rpm`, `*.flatpak`, `*-windows-setup.exe`), and `SHA256SUMS.txt` on the GitHub Release.
 
 ## Docs
 
-- [x] [CHANGELOG.md](../CHANGELOG.md) has a dated **`## [0.4.11]`** section for the release (CI copies it into the GitHub Release body).
+- [x] [CHANGELOG.md](../CHANGELOG.md) has a dated **`## [0.4.16]`** section for the release (CI copies it into the GitHub Release body).
 - [x] [security.md](security.md) still matches behavior if storage changed.
-- [x] [roadmap.md](roadmap.md) marks 0.4.7–0.4.10 shipped and 0.4.11 as the packaging/next release.
+- [x] [roadmap.md](roadmap.md) marks 0.4.16 as this cut and 0.5.0 as next.

@@ -10,8 +10,9 @@ import 'package:url_launcher/url_launcher_string.dart';
 class PreferencesAboutSection extends StatelessWidget {
   const PreferencesAboutSection({super.key});
 
-  static const String appVersion = '0.4.15';
-  static const String githubRepoUrl = 'https://github.com/QueryaHub/Querya-Desktop';
+  static const String appVersion = '0.4.16';
+  static const String githubRepoUrl =
+      'https://github.com/QueryaHub/Querya-Desktop';
 
   @override
   Widget build(BuildContext context) {
@@ -55,9 +56,14 @@ class PreferencesAboutSection extends StatelessWidget {
                 child: material.Column(
                   crossAxisAlignment: material.CrossAxisAlignment.start,
                   children: [
-                    const Text('Querya Desktop').semiBold().large().foreground(),
+                    const Text('Querya Desktop')
+                        .semiBold()
+                        .large()
+                        .foreground(),
                     const material.SizedBox(height: 2),
-                    const Text('Version $appVersion (Desktop Build)').muted().small(),
+                    const Text('Version $appVersion (Desktop Build)')
+                        .muted()
+                        .small(),
                     const material.SizedBox(height: 4),
                     const Text('Fast, native multi-database management studio.')
                         .muted()
