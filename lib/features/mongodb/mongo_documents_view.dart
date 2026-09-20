@@ -1,15 +1,15 @@
+import 'dart:async' show unawaited;
 import 'dart:convert';
 
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
-import 'package:querya_desktop/core/editor/querya_code_editor.dart';
-import 'package:querya_desktop/core/editor/querya_code_language.dart';
+import 'package:querya_desktop/features/mongodb/mongo_field_codec.dart';
+import 'package:querya_desktop/features/workspace/grid_cell_popover_inspector.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
 const _defaultLimit = 25;
-const _prettyJsonEncoder = JsonEncoder.withIndent('  ');
 
 /// Paginated document browser for a MongoDB collection.
 class MongoDocumentsView extends material.StatefulWidget {
@@ -160,6 +160,31 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
     }
   }
 
+  Future<void> _inspectField(Map<String, dynamic> doc, String field) async {
+    if (field == '_id') return;
+    final id = doc['_id'];
+    if (id == null) return;
+    await showGridCellInspectorDialog(
+      context: context,
+      columnName: field,
+      initialValue: mongoFieldToDisplay(doc[field]),
+      dataTypeName: 'MongoDB field',
+      onSaveToDatabase: (value) async {
+        await MongoService.instance.updateDocument(
+          widget.connection,
+          widget.database,
+          widget.collection,
+          {'_id': id},
+          {
+            r'$set': {field: mongoDisplayToValue(value)}
+          },
+        );
+        if (!mounted) return;
+        await _load();
+      },
+    );
+  }
+
   Future<void> _deleteDocument(Map<String, dynamic> doc) async {
     final id = doc['_id'];
     if (id == null) return;
@@ -234,6 +259,8 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
                       shadcnCs: shadcnCs,
                       onView: () => widget.onDocumentTap?.call(_documents[i]),
                       onDelete: () => _deleteDocument(_documents[i]),
+                      onInspectField: (field) =>
+                          unawaited(_inspectField(_documents[i], field)),
                     );
                   },
                 ),
@@ -380,6 +407,7 @@ class _DocumentCard extends StatefulWidget {
     required this.shadcnCs,
     required this.onView,
     required this.onDelete,
+    required this.onInspectField,
   });
 
   final Map<String, dynamic> document;
@@ -388,6 +416,7 @@ class _DocumentCard extends StatefulWidget {
   final shadcn.ColorScheme shadcnCs;
   final VoidCallback onView;
   final VoidCallback onDelete;
+  final ValueChanged<String> onInspectField;
 
   @override
   State<_DocumentCard> createState() => _DocumentCardState();
@@ -396,8 +425,6 @@ class _DocumentCard extends StatefulWidget {
 class _DocumentCardState extends State<_DocumentCard> {
   bool _expanded = false;
   late String _keysPreviewText;
-  String? _prettyJsonCache;
-  material.TextEditingController? _jsonController;
 
   @override
   void initState() {
@@ -410,25 +437,11 @@ class _DocumentCardState extends State<_DocumentCard> {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.document, widget.document)) {
       _keysPreviewText = _computeKeysPreview(widget.document);
-      _prettyJsonCache = null;
-      _jsonController?.dispose();
-      _jsonController = null;
     }
   }
 
-  @override
-  void dispose() {
-    _jsonController?.dispose();
-    super.dispose();
-  }
-
   void _toggleExpanded() {
-    setState(() {
-      _expanded = !_expanded;
-      if (_expanded && _prettyJsonCache == null) {
-        _prettyJsonCache = _encodePrettyJson(widget.document);
-      }
-    });
+    setState(() => _expanded = !_expanded);
   }
 
   @override
@@ -506,27 +519,11 @@ class _DocumentCardState extends State<_DocumentCard> {
               padding: const material.EdgeInsets.only(
                   left: 16, right: 16, bottom: 10),
               child: _expanded
-                  ? material.Container(
-                      constraints:
-                          const material.BoxConstraints(maxHeight: 320),
-                      decoration: material.BoxDecoration(
-                        color: cs.muted.withValues(alpha: 0.15),
-                        borderRadius: material.BorderRadius.circular(6),
-                        border: material.Border.all(
-                          color: cs.border.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: QueryaCodeEditor(
-                        controller: _jsonController ??=
-                            material.TextEditingController(
-                          text: _prettyJsonCache ?? '',
-                        ),
-                        language: QueryaCodeLanguage.json,
-                        readOnly: true,
-                        fontSize: 12,
-                        variant: QueryaCodeEditorVariant.material,
-                        contentPadding: const material.EdgeInsets.all(10),
-                      ),
+                  ? _FieldList(
+                      document: widget.document,
+                      colorScheme: cs,
+                      shadcnCs: scs,
+                      onInspectField: widget.onInspectField,
                     )
                   : Text(
                       _keysPreviewText,
@@ -550,13 +547,94 @@ class _DocumentCardState extends State<_DocumentCard> {
     if (keys.isEmpty) return '{ }';
     return keys.join(', ');
   }
+}
 
-  static String _encodePrettyJson(Map<String, dynamic> doc) {
-    try {
-      return _prettyJsonEncoder.convert(doc);
-    } catch (_) {
-      return doc.toString();
-    }
+class _FieldList extends StatelessWidget {
+  const _FieldList({
+    required this.document,
+    required this.colorScheme,
+    required this.shadcnCs,
+    required this.onInspectField,
+  });
+
+  final Map<String, dynamic> document;
+  final ColorScheme colorScheme;
+  final shadcn.ColorScheme shadcnCs;
+  final ValueChanged<String> onInspectField;
+
+  @override
+  Widget build(BuildContext context) {
+    final fields = document.keys.toList();
+    return material.Container(
+      constraints: const material.BoxConstraints(maxHeight: 320),
+      decoration: material.BoxDecoration(
+        color: colorScheme.muted.withValues(alpha: 0.15),
+        borderRadius: material.BorderRadius.circular(6),
+        border: material.Border.all(
+          color: colorScheme.border.withValues(alpha: 0.3),
+        ),
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        padding: const material.EdgeInsets.symmetric(vertical: 4),
+        itemCount: fields.length,
+        separatorBuilder: (_, __) => material.Divider(
+          height: 1,
+          color: colorScheme.border.withValues(alpha: 0.2),
+        ),
+        itemBuilder: (context, i) {
+          final key = fields[i];
+          final canEdit = key != '_id';
+          final display = mongoFieldToDisplay(document[key]);
+          final oneLine = display.replaceAll('\n', ' ');
+          return material.InkWell(
+            onTap: canEdit ? () => onInspectField(key) : null,
+            child: material.Padding(
+              padding: const material.EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 6,
+              ),
+              child: Row(
+                children: [
+                  material.SizedBox(
+                    width: 120,
+                    child: Text(
+                      key,
+                      overflow: TextOverflow.ellipsis,
+                      style: material.TextStyle(
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                        fontWeight: material.FontWeight.w600,
+                        color: colorScheme.foreground,
+                      ),
+                    ),
+                  ),
+                  const Gap(8),
+                  material.Expanded(
+                    child: Text(
+                      oneLine,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      style: material.TextStyle(
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                        color: shadcnCs.mutedForeground,
+                      ),
+                    ),
+                  ),
+                  if (canEdit)
+                    material.Icon(
+                      material.Icons.edit_note_rounded,
+                      size: 16,
+                      color: shadcnCs.mutedForeground,
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 }
 
