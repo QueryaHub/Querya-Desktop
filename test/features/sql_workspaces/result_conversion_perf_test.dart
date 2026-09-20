@@ -20,9 +20,7 @@ void main() {
       expect(out[1], ['2', 'world', 'abc', 'NULL', 'false']);
     });
 
-    test(
-        'convertPostgresResultRowsToStrings maps nulls and primitives correctly',
-        () {
+    test('convertPostgresResultRowsToStrings maps nulls and primitives correctly', () {
       final rawRows = [
         [100, null, 'pg_test'],
         [null, 999, 'foo'],
