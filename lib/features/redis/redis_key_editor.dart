@@ -112,7 +112,11 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   Future<void> _saveString() async {
     try {
       await widget.connection.selectDatabase(widget.database);
-      await widget.connection.set(widget.keyName, _stringController.text);
+      await widget.connection.set(
+        widget.keyName,
+        _stringController.text,
+        keepTtl: true,
+      );
       if (!mounted) return;
       setState(() => _success = 'Value saved');
       _clearSuccessAfterDelay();

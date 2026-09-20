@@ -288,9 +288,46 @@ class RedisConnection {
   }
 
   /// SET key value [EX seconds].
-  Future<void> set(String key, String value, {int? ttlSeconds}) async {
+  ///
+  /// When [ttlSeconds] is omitted and [keepTtl] is true (the default), the
+  /// existing expiry is kept (`KEEPTTL`, Redis 6+). Falls back to `TTL` then
+  /// `SET … EX` on older servers. Does not recreate a key that is already gone
+  /// (TTL `-2` / `XX` miss).
+  Future<void> set(
+    String key,
+    String value, {
+    int? ttlSeconds,
+    bool keepTtl = true,
+  }) async {
     if (ttlSeconds != null && ttlSeconds > 0) {
       await sendCommand(['SET', key, value, 'EX', ttlSeconds]);
+      return;
+    }
+    if (!keepTtl) {
+      await sendCommand(['SET', key, value]);
+      return;
+    }
+    await _setPreservingTtl(key, value);
+  }
+
+  Future<void> _setPreservingTtl(String key, String value) async {
+    try {
+      final result = await sendCommand(['SET', key, value, 'KEEPTTL', 'XX']);
+      if (_isRedisNil(result)) {
+        throw StateError('Key no longer exists');
+      }
+      return;
+    } catch (e) {
+      if (e is StateError) rethrow;
+      if (!_isKeepTtlUnsupported(e)) rethrow;
+    }
+
+    final existingTtl = await ttl(key);
+    if (existingTtl == -2) {
+      throw StateError('Key no longer exists');
+    }
+    if (existingTtl > 0) {
+      await sendCommand(['SET', key, value, 'EX', existingTtl]);
     } else {
       await sendCommand(['SET', key, value]);
     }
@@ -510,6 +547,16 @@ class RedisConnectionTestFake extends RedisConnection {
         return null;
     }
   }
+}
+
+bool _isRedisNil(Object? result) =>
+    result == null || result.toString().toLowerCase() == 'null';
+
+bool _isKeepTtlUnsupported(Object error) {
+  final s = error.toString().toLowerCase();
+  return s.contains('syntax') ||
+      s.contains('keepttl') ||
+      s.contains('wrong number of arguments');
 }
 
 class RedisConnectionException implements Exception {
