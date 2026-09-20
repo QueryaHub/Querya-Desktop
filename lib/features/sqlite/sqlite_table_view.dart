@@ -91,7 +91,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
   @override
   void dispose() {
     _resetStaging();
-    _disconnectCurrent();
+    _disconnectCurrent(interruptIfBusy: true);
     super.dispose();
   }
 
@@ -105,7 +105,19 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     _isSaving = false;
   }
 
-  void _disconnectCurrent() {
+  void _disconnectCurrent({bool interruptIfBusy = false}) {
+    if (interruptIfBusy && _loading) {
+      SqliteService.instance.interrupt(
+        widget.connectionRow,
+        mode: SqliteSessionMode.readOnly,
+      );
+    }
+    if (interruptIfBusy && _isSaving) {
+      SqliteService.instance.interrupt(
+        widget.connectionRow,
+        mode: SqliteSessionMode.tableWrite,
+      );
+    }
     _lease?.release();
     _lease = null;
   }
@@ -126,7 +138,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     try {
       final lease = await SqliteService.instance.acquire(
         widget.connectionRow,
-        mode: SqliteSessionMode.readWrite,
+        mode: SqliteSessionMode.readOnly,
       );
       if (!mounted) {
         lease.release();
@@ -140,6 +152,20 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
         _error = e.toString();
         _loading = false;
       });
+    }
+  }
+
+  Future<T> _withTableWrite<T>(
+    Future<T> Function(SqliteConnection conn) fn,
+  ) async {
+    final lease = await SqliteService.instance.acquire(
+      widget.connectionRow,
+      mode: SqliteSessionMode.tableWrite,
+    );
+    try {
+      return await fn(lease.connection);
+    } finally {
+      lease.release();
     }
   }
 
@@ -304,22 +330,16 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
       columnDataTypes: _columnDataTypes.isEmpty ? null : _columnDataTypes,
       columnMeta: _columnMeta.isEmpty ? null : _columnMeta,
       execute: (plan) async {
-        final conn = _connection;
-        if (conn == null || !conn.isConnected) {
-          throw StateError('Could not connect to SQLite.');
-        }
-        await conn.execute('BEGIN TRANSACTION');
-        try {
-          for (final stmt in plan.statements) {
-            expectDmlMatchedRows(await conn.executeAffected(stmt.sql));
+        await _withTableWrite((conn) async {
+          if (!conn.isConnected) {
+            throw StateError('Could not connect to SQLite.');
           }
-          await conn.execute('COMMIT');
-        } catch (e) {
-          try {
-            await conn.execute('ROLLBACK');
-          } catch (_) {}
-          rethrow;
-        }
+          await conn.runInTransaction(() async {
+            for (final stmt in plan.statements) {
+              expectDmlMatchedRows(await conn.executeAffected(stmt.sql));
+            }
+          });
+        });
       },
     );
     if (!mounted) return;

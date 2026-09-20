@@ -22,7 +22,8 @@ class SqliteConnection {
       id: row.id ?? 0,
       name: row.name,
       path: row.host ?? '', // Store absolute file path in the 'host' field
-      readOnly: readOnly ?? row.useSSL, // Store read-only flag in the 'useSSL' field
+      readOnly:
+          readOnly ?? row.useSSL, // Store read-only flag in the 'useSSL' field
     );
   }
 
@@ -33,6 +34,7 @@ class SqliteConnection {
 
   Database? _db;
   bool _isConnected = false;
+  bool _inTransaction = false;
 
   bool get isConnected => _isConnected && _db != null;
 
@@ -67,6 +69,7 @@ class SqliteConnection {
 
   Future<void> disconnect() async {
     _isConnected = false;
+    _inTransaction = false;
     final d = _db;
     _db = null;
     try {
@@ -107,7 +110,7 @@ class SqliteConnection {
         .replaceAll(RegExp(r'/\*.*?\*/', dotAll: true), '')
         .trim()
         .toLowerCase();
-    
+
     // SQLite can execute PRAGMA, SELECT, EXPLAIN statements, which return data
     final isReadOnlyQuery = sqlLower.startsWith('select') ||
         sqlLower.startsWith('pragma') ||
@@ -126,6 +129,7 @@ class SqliteConnection {
         return await _db!.rawQuery(sql, arguments);
       } else {
         await _db!.execute(sql, arguments);
+        _noteTransactionSql(sqlLower);
         return [];
       }
     } on TimeoutException {
@@ -168,6 +172,32 @@ class SqliteConnection {
     }
   }
 
+  /// Whether this session has an open `BEGIN` (tracked from executed SQL).
+  Future<bool?> inOpenTransaction() async {
+    if (!isConnected) return null;
+    return _inTransaction;
+  }
+
+  /// Runs [body] inside a transaction. If the session already has a `BEGIN`,
+  /// DML joins it instead of nesting `BEGIN TRANSACTION`.
+  Future<void> runInTransaction(Future<void> Function() body) async {
+    final join = _inTransaction;
+    if (!join) {
+      await execute('BEGIN TRANSACTION');
+    }
+    try {
+      await body();
+      if (!join) await execute('COMMIT');
+    } catch (e) {
+      if (!join) {
+        try {
+          await execute('ROLLBACK');
+        } catch (_) {}
+      }
+      rethrow;
+    }
+  }
+
   /// Lists tables in the database.
   Future<List<String>> listTables() async {
     final rows = await execute(
@@ -189,10 +219,12 @@ class SqliteConnection {
     final rows = await execute(
       "SELECT name, tbl_name FROM sqlite_master WHERE type = 'index' AND name NOT LIKE 'sqlite_%' ORDER BY name",
     );
-    return rows.map((r) => {
-      'name': r['name'] as String,
-      'table': r['tbl_name'] as String,
-    }).toList();
+    return rows
+        .map((r) => {
+              'name': r['name'] as String,
+              'table': r['tbl_name'] as String,
+            })
+        .toList();
   }
 
   /// Lists column names for a table.
@@ -271,8 +303,10 @@ class SqliteConnection {
     final jmRows = await execute('PRAGMA journal_mode');
     final jm = (jmRows.isNotEmpty ? jmRows.first.values.first : '') ?? '';
 
-    final tblCountRows = await execute("SELECT count(*) AS c FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
-    final tblCount = (tblCountRows.isNotEmpty ? tblCountRows.first['c'] : 0) ?? 0;
+    final tblCountRows = await execute(
+        "SELECT count(*) AS c FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
+    final tblCount =
+        (tblCountRows.isNotEmpty ? tblCountRows.first['c'] : 0) ?? 0;
 
     return {
       'version': ver,
@@ -281,6 +315,21 @@ class SqliteConnection {
       'journal_mode': jm,
       'table_count': tblCount,
     };
+  }
+
+  void _noteTransactionSql(String sqlLower) {
+    if (sqlLower.startsWith('begin')) {
+      _inTransaction = true;
+      return;
+    }
+    if (sqlLower.startsWith('commit') || sqlLower.startsWith('end')) {
+      _inTransaction = false;
+      return;
+    }
+    if (sqlLower.startsWith('rollback') &&
+        !RegExp(r'^rollback\s+to\b').hasMatch(sqlLower)) {
+      _inTransaction = false;
+    }
   }
 
   static bool _isSqliteBusy(DatabaseException e) {

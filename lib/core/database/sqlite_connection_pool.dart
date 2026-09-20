@@ -6,8 +6,18 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 
 /// Session policy for pooled SQLite connections.
 enum SqliteSessionMode {
+  /// Tree catalog, overview, and Table Browser SELECT/COUNT.
   readOnly,
+
+  /// SQL editor. Must not be shared with Table Browser.
   readWrite,
+
+  /// Table Browser Save (own `Database` so BEGIN/ATTACH do not leak).
+  tableWrite,
+}
+
+extension SqliteSessionModeReadOnly on SqliteSessionMode {
+  bool get isReadOnlySession => this == SqliteSessionMode.readOnly;
 }
 
 /// Factory to build a connected SQLite connection.
@@ -63,8 +73,7 @@ class SqliteConnectionPool {
   final Map<String, _PoolEntry> _pool = {};
   final PoolEntryLock<SqliteConnection> _creationLock = PoolEntryLock();
 
-  String keyFor(int? id, SqliteSessionMode mode) =>
-      '${id ?? 0}::${mode.name}';
+  String keyFor(int? id, SqliteSessionMode mode) => '${id ?? 0}::${mode.name}';
 
   Future<SqliteLease> acquire(
     ConnectionRow row, {
@@ -159,6 +168,20 @@ class SqliteConnectionPool {
   }) {
     final k = keyFor(row.id, mode);
     _removeEntryClosing(k);
+  }
+
+  /// Force-closes every session mode for this connection id.
+  void interruptAllModes(ConnectionRow row) {
+    for (final mode in SqliteSessionMode.values) {
+      interrupt(row, mode: mode);
+    }
+  }
+
+  /// Whether the SQL-editor slot currently has an open transaction.
+  Future<bool> hasOpenSqlTransaction(ConnectionRow row) async {
+    final entry = _pool[keyFor(row.id, SqliteSessionMode.readWrite)];
+    if (entry == null || !entry.connection.isConnected) return false;
+    return await entry.connection.inOpenTransaction() ?? false;
   }
 
   Future<void> disconnectAll() async {

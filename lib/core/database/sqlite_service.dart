@@ -3,7 +3,11 @@ import 'package:querya_desktop/core/database/sqlite_connection_pool.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 
 export 'sqlite_connection_pool.dart'
-    show SqliteLease, SqliteSessionMode, SqliteConnectionPool;
+    show
+        SqliteLease,
+        SqliteSessionMode,
+        SqliteSessionModeReadOnly,
+        SqliteConnectionPool;
 
 Future<SqliteConnection> _defaultCreateAndConnect(
   ConnectionRow row, {
@@ -11,7 +15,7 @@ Future<SqliteConnection> _defaultCreateAndConnect(
 }) async {
   final conn = SqliteConnection.fromConnectionRow(
     row,
-    readOnly: mode == SqliteSessionMode.readOnly,
+    readOnly: mode.isReadOnlySession,
   );
   await conn.connect();
   return conn;
@@ -43,6 +47,13 @@ class SqliteService {
     SqliteSessionMode mode = SqliteSessionMode.readOnly,
   }) =>
       _pool.interrupt(row, mode: mode);
+
+  /// Force-closes every session mode for this connection id.
+  void interruptAllModes(ConnectionRow row) => _pool.interruptAllModes(row);
+
+  /// Whether the SQL-editor read-write slot has an open transaction.
+  Future<bool> hasOpenSqlTransaction(ConnectionRow row) =>
+      _pool.hasOpenSqlTransaction(row);
 
   Future<void> disconnectAll() => _pool.disconnectAll();
 }
