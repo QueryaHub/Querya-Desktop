@@ -124,6 +124,15 @@ Future<bool?> showDiscardTableEditsDialog({
   );
 }
 
+/// Throws if a DML statement matched no rows (stale PK / concurrent delete).
+void expectDmlMatchedRows(int affectedRows) {
+  if (affectedRows >= 1) return;
+  throw StateError(
+    'Save failed: a statement matched 0 rows. '
+    'The row may have been changed or deleted. Refresh and try again.',
+  );
+}
+
 Future<void> showTableViewSaveFailedDialog({
   required material.BuildContext context,
   required Object error,
@@ -183,6 +192,10 @@ class TableViewApplyOutcome {
 }
 
 /// Preview + execute a staging-buffer mutation plan for Table Browser.
+///
+/// [execute] must throw if any statement matched 0 rows (see
+/// [expectDmlMatchedRows]) so this returns [TableViewApplyOutcome.failed]
+/// and the caller keeps the staging buffer.
 Future<TableViewApplyOutcome> applyTableViewStagedChanges({
   required material.BuildContext context,
   required DataGridStagingBuffer buffer,

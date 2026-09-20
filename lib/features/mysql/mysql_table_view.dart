@@ -492,7 +492,8 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
         await conn.execute('START TRANSACTION');
         try {
           for (final stmt in plan.statements) {
-            await conn.execute(stmt.sql);
+            final rs = await conn.execute(stmt.sql);
+            expectDmlMatchedRows(rs.affectedRows.toInt());
           }
           await conn.execute('COMMIT');
         } catch (e) {

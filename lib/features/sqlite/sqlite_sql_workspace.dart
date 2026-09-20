@@ -386,8 +386,17 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         throw StateError('Could not connect to SQLite.');
       }
 
-      for (final stmt in plan.statements) {
-        await conn.execute(stmt.sql);
+      await conn.execute('BEGIN TRANSACTION');
+      try {
+        for (final stmt in plan.statements) {
+          expectDmlMatchedRows(await conn.executeAffected(stmt.sql));
+        }
+        await conn.execute('COMMIT');
+      } catch (e) {
+        try {
+          await conn.execute('ROLLBACK');
+        } catch (_) {}
+        rethrow;
       }
 
       if (!mounted) return;

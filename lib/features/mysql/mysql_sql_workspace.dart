@@ -427,8 +427,18 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
         throw StateError('Could not connect to MySQL.');
       }
 
-      for (final stmt in plan.statements) {
-        await conn.execute(stmt.sql);
+      await conn.execute('START TRANSACTION');
+      try {
+        for (final stmt in plan.statements) {
+          final rs = await conn.execute(stmt.sql);
+          expectDmlMatchedRows(rs.affectedRows.toInt());
+        }
+        await conn.execute('COMMIT');
+      } catch (e) {
+        try {
+          await conn.execute('ROLLBACK');
+        } catch (_) {}
+        rethrow;
       }
 
       if (!mounted) return;

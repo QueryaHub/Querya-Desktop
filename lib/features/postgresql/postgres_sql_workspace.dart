@@ -587,7 +587,10 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       final to = _statementTimeout();
       await runPostgresStatementsInTransaction(
         (sql) async {
-          await conn.execute(sql, timeout: to);
+          final result = await conn.execute(sql, timeout: to);
+          if (sql != 'BEGIN' && sql != 'COMMIT' && sql != 'ROLLBACK') {
+            expectDmlMatchedRows(result.affectedRows);
+          }
         },
         plan.statements.map((s) => s.sql),
       );
