@@ -82,7 +82,7 @@ void main() {
       });
     });
 
-    testWidgets('custom SQL mode — narrow', (tester) async {
+    testWidgets('pending Save/Revert — narrow', (tester) async {
       await expectNoLayoutOverflow(() async {
         await pumpWidgetWithSurfaceSize(
           tester,
@@ -92,9 +92,38 @@ void main() {
             darkTheme: AppTheme.dark,
             themeMode: ThemeMode.dark,
             home: material.Scaffold(
-              body: _toolbar(
-                title: 'custom query',
-                customSqlActive: true,
+              body: PostgresTableToolbar(
+                title: 'public.users',
+                paginationLabel: '1–50 of 200',
+                tableIcon: material.Icons.table_chart_rounded,
+                customSqlActive: false,
+                isMaterializedView: false,
+                loading: false,
+                canGoPrevious: true,
+                canGoNext: true,
+                onOpenSql: () {},
+                onOpenPrivileges: () {},
+                onRefreshMaterializedView: () {},
+                onExitCustomMode: () {},
+                onGoPrevious: () {},
+                onGoNext: () {},
+                onRefresh: () {},
+                pendingActions: material.Row(
+                  mainAxisSize: material.MainAxisSize.min,
+                  children: [
+                    const material.Text('2 pending changes'),
+                    OutlineButton(
+                      size: ButtonSize.small,
+                      onPressed: () {},
+                      child: const Text('Revert'),
+                    ),
+                    PrimaryButton(
+                      size: ButtonSize.small,
+                      onPressed: () {},
+                      child: const Text('Save'),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

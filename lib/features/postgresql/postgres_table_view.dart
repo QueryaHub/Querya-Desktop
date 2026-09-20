@@ -1,12 +1,17 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/result_row_string_convert.dart';
+import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/postgresql/postgres_sql_editor_dialog.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_privileges_dialog.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_toolbar.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_utils.dart';
+import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 class PostgresTableView extends material.StatefulWidget {
@@ -55,15 +60,27 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
 
   /// Zero-based offset for LIMIT/OFFSET pagination.
   int _offset = 0;
-  String? _sortColumn;
-  bool _sortAscending = true;
 
   /// When true, [dataSql] comes from [_customSql] (no pagination).
   bool _customSqlActive = false;
   String? _customSql;
 
-  final _verticalController = material.ScrollController();
-  final _horizontalController = material.ScrollController();
+  DataGridStagingBuffer? _stagingBuffer;
+  List<String> _primaryKeys = [];
+  Map<String, String> _columnDataTypes = {};
+  bool _schemaLoaded = false;
+  bool _isSaving = false;
+
+  String get _tableTitle => '${widget.schema}.${widget.tableName}';
+
+  bool get _isDirty => _stagingBuffer?.isDirty ?? false;
+
+  bool get _editingEnabled => tableViewEditingEnabled(
+        isView: widget.isView,
+        isMaterializedView: widget.isMaterializedView,
+        customSqlActive: _customSqlActive,
+        hasPrimaryKey: _primaryKeys.isNotEmpty,
+      );
 
   @override
   void initState() {
@@ -79,10 +96,9 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         oldWidget.schema != widget.schema ||
         oldWidget.tableName != widget.tableName ||
         oldWidget.isMaterializedView != widget.isMaterializedView) {
-      _sortColumn = null;
-      _sortAscending = true;
       _customSqlActive = false;
       _customSql = null;
+      _resetStaging();
       _disconnectCurrent();
       _connectAndLoad();
     }
@@ -90,10 +106,18 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
 
   @override
   void dispose() {
-    _verticalController.dispose();
-    _horizontalController.dispose();
+    _resetStaging();
     _disconnectCurrent(interruptIfBusy: true);
     super.dispose();
+  }
+
+  void _resetStaging() {
+    _stagingBuffer?.dispose();
+    _stagingBuffer = null;
+    _primaryKeys = [];
+    _columnDataTypes = {};
+    _schemaLoaded = false;
+    _isSaving = false;
   }
 
   void _disconnectCurrent({bool interruptIfBusy = false}) {
@@ -121,6 +145,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       _offset = 0;
       _customSqlActive = false;
       _customSql = null;
+      _resetStaging();
     });
     try {
       final lease = await PostgresService.instance.acquire(
@@ -156,29 +181,46 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
   String _browseDataSql() {
     final schemaQ = quotePostgresIdentifier(widget.schema);
     final tableQ = quotePostgresIdentifier(widget.tableName);
-    final orderBy = _sortColumn != null
-        ? ' ORDER BY ${quotePostgresIdentifier(_sortColumn!)} ${_sortAscending ? "ASC" : "DESC"}'
-        : '';
-    return 'SELECT * FROM $schemaQ.$tableQ$orderBy LIMIT ${widget.limit} OFFSET $_offset';
+    return 'SELECT * FROM $schemaQ.$tableQ LIMIT ${widget.limit} OFFSET $_offset';
   }
 
-  void _toggleSort(String columnName) {
-    if (_loading || _customSqlActive) return;
-    setState(() {
-      if (_sortColumn == columnName) {
-        if (_sortAscending) {
-          _sortAscending = false;
-        } else {
-          _sortColumn = null;
-          _sortAscending = true;
-        }
-      } else {
-        _sortColumn = columnName;
-        _sortAscending = true;
-      }
-      _offset = 0;
-    });
-    _fetch();
+  Future<bool> _confirmDiscardIfNeeded() {
+    return confirmDiscardTableEditsIfDirty(
+      context: context,
+      buffer: _stagingBuffer,
+      tableTitle: _tableTitle,
+    );
+  }
+
+  Future<void> _ensureSchema(PostgresConnection conn) async {
+    if (_schemaLoaded) return;
+    if (widget.isView || widget.isMaterializedView) {
+      _schemaLoaded = true;
+      _primaryKeys = [];
+      _columnDataTypes = {};
+      return;
+    }
+    try {
+      final schema = await conn.getTableSchema(
+        schema: widget.schema,
+        table: widget.tableName,
+      );
+      _primaryKeys = List<String>.from(schema.primaryKeys);
+      _columnDataTypes = columnDataTypesFromSchema(schema);
+    } catch (_) {
+      _primaryKeys = [];
+      _columnDataTypes = {};
+    }
+    _schemaLoaded = true;
+  }
+
+  void _installStagingBuffer(List<String> columns, List<List<String>> rows) {
+    _stagingBuffer = replaceTableViewStagingBuffer(
+      previous: _stagingBuffer,
+      columns: columns,
+      rows: rows,
+      enabled: _editingEnabled,
+    );
   }
 
   /// [refreshCount] runs `COUNT(*)` (e.g. first load or Refresh). Pagination only runs SELECT.
@@ -218,6 +260,9 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       final result = await conn.execute(dataSql);
       if (!mounted) return;
 
+      await _ensureSchema(conn);
+      if (!mounted) return;
+
       final colNames = List<String>.generate(
         result.schema.columns.length,
         (i) => result.schema.columns[i].columnName ?? 'col_$i',
@@ -239,10 +284,8 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
           _totalRowCount = totalRows;
         }
         _loading = false;
+        _installStagingBuffer(colNames, stringRows);
       });
-      if (_verticalController.hasClients) {
-        _verticalController.jumpTo(0);
-      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -294,10 +337,8 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         _rowsOnPage = stringRows.length;
         _totalRowCount = null;
         _loading = false;
+        _installStagingBuffer(colNames, stringRows);
       });
-      if (_verticalController.hasClients) {
-        _verticalController.jumpTo(0);
-      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -308,28 +349,32 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     }
   }
 
-  void _onSqlRun(String sql) {
+  Future<void> _onSqlRun(String sql) async {
     final trimmed = sql.trim();
     if (!isAllowedPostgresSelectQuery(trimmed)) return;
+    if (!await _confirmDiscardIfNeeded()) return;
+    if (!mounted) return;
     final browse = _browseDataSql().trim();
     if (_browseSqlCompareKey(trimmed) == _browseSqlCompareKey(browse)) {
       setState(() {
         _customSqlActive = false;
         _customSql = null;
       });
-      _fetch(refreshCount: true);
+      await _fetch(refreshCount: true);
     } else {
       setState(() {
         _customSqlActive = true;
         _customSql = trimmed;
       });
-      _fetchCustom();
+      await _fetchCustom();
     }
   }
 
   Future<void> _refreshMaterializedView() async {
     final conn = _connection;
     if (conn == null || !conn.isConnected || _loading) return;
+    if (!await _confirmDiscardIfNeeded()) return;
+    if (!mounted) return;
     try {
       await conn.refreshMaterializedView(widget.schema, widget.tableName);
       if (!mounted) return;
@@ -362,31 +407,33 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
           ? _customSql!
           : _browseDataSql(),
       browseSql: _browseDataSql(),
-      onRun: _onSqlRun,
+      onRun: (sql) => unawaited(_onSqlRun(sql)),
     );
   }
 
-  void _exitCustomMode() {
+  Future<void> _exitCustomMode() async {
+    if (!await _confirmDiscardIfNeeded()) return;
+    if (!mounted) return;
     setState(() {
       _customSqlActive = false;
       _customSql = null;
     });
-    _fetch(refreshCount: true);
+    await _fetch(refreshCount: true);
   }
 
   void _goToPreviousPage() {
     if (_customSqlActive) return;
-    if (_offset <= 0 || _loading) return;
+    if (_offset <= 0 || _loading || _isDirty) return;
     setState(() {
       final next = _offset - widget.limit;
       _offset = next < 0 ? 0 : next;
     });
-    _fetch();
+    unawaited(_fetch());
   }
 
   void _goToNextPage() {
     if (_customSqlActive) return;
-    if (_loading) return;
+    if (_loading || _isDirty) return;
     final total = _totalRowCount;
     final limit = widget.limit;
     if (total != null && _offset + _rowsOnPage >= total) return;
@@ -394,14 +441,14 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     setState(() {
       _offset += limit;
     });
-    _fetch();
+    unawaited(_fetch());
   }
 
-  bool get _canGoPrevious => !_customSqlActive && _offset > 0 && !_loading;
+  bool get _canGoPrevious =>
+      !_customSqlActive && _offset > 0 && !_loading && !_isDirty;
 
   bool get _canGoNext {
-    if (_customSqlActive) return false;
-    if (_loading) return false;
+    if (_customSqlActive || _loading || _isDirty) return false;
     final total = _totalRowCount;
     final limit = widget.limit;
     if (total != null) {
@@ -429,221 +476,165 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     return '$start–$end';
   }
 
+  String? _statusLine() {
+    final reason = tableViewEditDisabledReason(
+      isView: widget.isView,
+      isMaterializedView: widget.isMaterializedView,
+      customSqlActive: _customSqlActive,
+      hasPrimaryKey: _primaryKeys.isNotEmpty,
+      schemaLoaded: _schemaLoaded,
+    );
+    final pag = _paginationLabel();
+    if (reason != null) return '$pag · $reason';
+    return pag;
+  }
+
+  Future<void> _onRefresh() async {
+    if (!await _confirmDiscardIfNeeded()) return;
+    if (!mounted) return;
+    if (_customSqlActive) {
+      await _fetchCustom();
+    } else {
+      await _fetch(refreshCount: true);
+    }
+  }
+
+  Future<void> _onNavigateHome() async {
+    final home = widget.onNavigateHome;
+    if (home == null) return;
+    if (!await _confirmDiscardIfNeeded()) return;
+    if (!mounted) return;
+    home();
+  }
+
+  Future<void> _applyStagedChanges() async {
+    final buffer = _stagingBuffer;
+    if (buffer == null || !buffer.isDirty || _isSaving) return;
+    setState(() => _isSaving = true);
+    final outcome = await applyTableViewStagedChanges(
+      context: context,
+      buffer: buffer,
+      dialect: SqlDialect.postgres,
+      tableName: widget.tableName,
+      schema: widget.schema,
+      primaryKeys: _primaryKeys,
+      columnDataTypes: _columnDataTypes.isEmpty ? null : _columnDataTypes,
+      execute: (plan) async {
+        final conn = _connection;
+        if (conn == null || !conn.isConnected) {
+          throw StateError('Could not connect to PostgreSQL.');
+        }
+        await conn.execute(plan.toTransactionSql());
+      },
+    );
+    if (!mounted) return;
+    if (outcome.isApplied) {
+      final newRows = buffer.effectiveRows;
+      buffer.dispose();
+      setState(() {
+        _rows = newRows;
+        _rowsOnPage = newRows.length;
+        _stagingBuffer = replaceTableViewStagingBuffer(
+          previous: null,
+          columns: _columnNames,
+          rows: newRows,
+          enabled: _editingEnabled,
+        );
+        _isSaving = false;
+      });
+      showAppToast(
+        context: context,
+        message: '${outcome.statementCount} change(s) saved',
+        variant: AppToastVariant.success,
+      );
+      return;
+    }
+    setState(() => _isSaving = false);
+    if (outcome.isFailed && outcome.error != null) {
+      await showTableViewSaveFailedDialog(
+        context: context,
+        error: outcome.error!,
+      );
+    }
+  }
+
+  material.Widget _buildToolbar() {
+    PostgresTableToolbar toolbar() => PostgresTableToolbar(
+          title:
+              '$_tableTitle${widget.isMaterializedView ? ' (materialized view)' : widget.isView ? ' (view)' : ''}',
+          paginationLabel: _paginationLabel(),
+          tableIcon: widget.isMaterializedView
+              ? material.Icons.dynamic_feed_rounded
+              : widget.isView
+                  ? material.Icons.view_agenda_rounded
+                  : material.Icons.table_chart_rounded,
+          customSqlActive: _customSqlActive,
+          isMaterializedView: widget.isMaterializedView,
+          loading: _loading,
+          canGoPrevious: _canGoPrevious,
+          canGoNext: _canGoNext,
+          onNavigateHome: widget.onNavigateHome == null
+              ? null
+              : () => unawaited(_onNavigateHome()),
+          onOpenSql: _openSqlEditor,
+          onOpenPrivileges: _openPrivileges,
+          onRefreshMaterializedView: () =>
+              unawaited(_refreshMaterializedView()),
+          onExitCustomMode: () => unawaited(_exitCustomMode()),
+          onGoPrevious: _goToPreviousPage,
+          onGoNext: _goToNextPage,
+          onRefresh: () => unawaited(_onRefresh()),
+          pendingActions: _stagingBuffer == null
+              ? null
+              : TableBrowserPendingActions(
+                  buffer: _stagingBuffer!,
+                  onSave: () => unawaited(_applyStagedChanges()),
+                  isSaving: _isSaving,
+                ),
+        );
+    final buffer = _stagingBuffer;
+    if (buffer == null) return toolbar();
+    return ListenableBuilder(
+      listenable: buffer,
+      builder: (context, _) => toolbar(),
+    );
+  }
+
   @override
   material.Widget build(material.BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    if (_loading) {
-      return material.Container(
-        color: cs.background,
-        child: material.Center(
+    return material.CallbackShortcuts(
+      bindings: {
+        const material.SingleActivator(LogicalKeyboardKey.f5): () {
+          if (!_loading) unawaited(_onRefresh());
+        },
+      },
+      child: material.Focus(
+        autofocus: true,
+        child: material.Container(
+          color: cs.background,
           child: material.Column(
-            mainAxisSize: material.MainAxisSize.min,
+            crossAxisAlignment: material.CrossAxisAlignment.stretch,
             children: [
-              const material.SizedBox(
-                width: 28,
-                height: 28,
-                child: material.CircularProgressIndicator(strokeWidth: 2),
+              _buildToolbar(),
+              material.Expanded(
+                child: ResultsTab(
+                  columns: _columnNames,
+                  rows: _rows,
+                  errorMessage: _error,
+                  isLoading: _loading,
+                  statusLine: _statusLine(),
+                  showExportToolbar: true,
+                  stagingBuffer: _stagingBuffer,
+                  onApplyChanges:
+                      _stagingBuffer != null ? _applyStagedChanges : null,
+                  isSaving: _isSaving,
+                ),
               ),
-              const Gap(12),
-              const Text('Loading data...').muted().small(),
             ],
           ),
         ),
-      );
-    }
-
-    if (_error != null) {
-      return material.Container(
-        color: cs.background,
-        child: material.Center(
-          child: material.Padding(
-            padding: const material.EdgeInsets.all(32),
-            child: material.Column(
-              mainAxisSize: material.MainAxisSize.min,
-              children: [
-                material.Icon(material.Icons.error_outline_rounded,
-                    size: 48, color: cs.destructive),
-                const Gap(16),
-                const Text('Query Error').large().semiBold(),
-                const Gap(8),
-                material.SelectableText(_error!,
-                    style: material.TextStyle(
-                        color: cs.mutedForeground, fontSize: 13)),
-                const Gap(24),
-                OutlineButton(
-                  onPressed: () {
-                    if (_customSqlActive) {
-                      _fetchCustom();
-                    } else {
-                      _fetch(refreshCount: true);
-                    }
-                  },
-                  leading: const material.Icon(material.Icons.refresh_rounded,
-                      size: 18),
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (_columnNames.isEmpty) {
-      return material.Container(
-        color: cs.background,
-        child: material.Center(
-          child: material.Padding(
-            padding: const material.EdgeInsets.all(32),
-            child: material.Column(
-              mainAxisSize: material.MainAxisSize.min,
-              children: [
-                const Text('No columns returned').muted().small(),
-                const Gap(24),
-                OutlineButton(
-                  onPressed: () {
-                    if (_customSqlActive) {
-                      _fetchCustom();
-                    } else {
-                      _fetch(refreshCount: true);
-                    }
-                  },
-                  leading: const material.Icon(material.Icons.refresh_rounded,
-                      size: 18),
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    const double rowHeight = 36;
-    const double headerHeight = 40;
-    final colCount = _columnNames.length;
-
-    return material.Container(
-      color: cs.background,
-      child: material.Column(
-        crossAxisAlignment: material.CrossAxisAlignment.stretch,
-        children: [
-          PostgresTableToolbar(
-            title:
-                '${widget.schema}.${widget.tableName}${widget.isMaterializedView ? ' (materialized view)' : widget.isView ? ' (view)' : ''}',
-            paginationLabel: _paginationLabel(),
-            tableIcon: widget.isMaterializedView
-                ? material.Icons.dynamic_feed_rounded
-                : widget.isView
-                    ? material.Icons.view_agenda_rounded
-                    : material.Icons.table_chart_rounded,
-            customSqlActive: _customSqlActive,
-            isMaterializedView: widget.isMaterializedView,
-            loading: _loading,
-            canGoPrevious: _canGoPrevious,
-            canGoNext: _canGoNext,
-            onNavigateHome: widget.onNavigateHome,
-            onOpenSql: _openSqlEditor,
-            onOpenPrivileges: _openPrivileges,
-            onRefreshMaterializedView: _refreshMaterializedView,
-            onExitCustomMode: _exitCustomMode,
-            onGoPrevious: _goToPreviousPage,
-            onGoNext: _goToNextPage,
-            onRefresh: () {
-              if (_customSqlActive) {
-                _fetchCustom();
-              } else {
-                _fetch(refreshCount: true);
-              }
-            },
-          ),
-          // Table grid
-          material.Expanded(
-            child: material.LayoutBuilder(
-              builder: (context, constraints) {
-                return material.Scrollbar(
-                  controller: _horizontalController,
-                  thumbVisibility: true,
-                  notificationPredicate: (_) => true,
-                  child: material.SingleChildScrollView(
-                    controller: _horizontalController,
-                    scrollDirection: material.Axis.horizontal,
-                    child: material.SizedBox(
-                      width: _calcTableWidth(colCount, constraints.maxWidth),
-                      child: material.Column(
-                        children: [
-                          // Header
-                          material.Container(
-                            height: headerHeight,
-                            decoration: material.BoxDecoration(
-                              color: cs.muted.withValues(alpha: 0.35),
-                              border: material.Border(
-                                bottom: material.BorderSide(
-                                    color: cs.border.withValues(alpha: 0.5)),
-                              ),
-                            ),
-                            child: material.Row(
-                              children: [
-                                _rowNumberCell(cs, '#', isHeader: true),
-                                for (var i = 0; i < colCount; i++)
-                                  _headerCell(cs, _columnNames[i]),
-                              ],
-                            ),
-                          ),
-                          // Data rows via ListView.builder for virtualization
-                          material.Expanded(
-                            child: material.Scrollbar(
-                              controller: _verticalController,
-                              thumbVisibility: true,
-                              child: material.ListView.builder(
-                                controller: _verticalController,
-                                itemCount: _rowsOnPage,
-                                itemExtent: rowHeight,
-                                itemBuilder: (context, rowIdx) {
-                                  final row = _rows[rowIdx];
-                                  final isEven = rowIdx % 2 == 0;
-                                  final displayRowNum = _customSqlActive
-                                      ? rowIdx + 1
-                                      : _offset + rowIdx + 1;
-                                  return material.RepaintBoundary(
-                                    child: material.Container(
-                                      height: rowHeight,
-                                      decoration: material.BoxDecoration(
-                                        color: isEven
-                                            ? material.Colors.transparent
-                                            : cs.muted.withValues(alpha: 0.12),
-                                        border: material.Border(
-                                          bottom: material.BorderSide(
-                                            color: cs.border
-                                                .withValues(alpha: 0.15),
-                                          ),
-                                        ),
-                                      ),
-                                      child: material.Row(
-                                        children: [
-                                          _rowNumberCell(cs, '$displayRowNum'),
-                                          for (var c = 0; c < colCount; c++)
-                                            _dataCell(
-                                                cs,
-                                                row.length > c ? row[c] : ''),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -655,104 +646,5 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       s = s.substring(0, s.length - 1).trimRight();
     }
     return s.replaceAll(RegExp(r'\s+'), ' ');
-  }
-
-  double _calcTableWidth(int colCount, double availableWidth) {
-    const double rowNumWidth = 52;
-    const double minColWidth = 150;
-    final calculated = rowNumWidth + colCount * minColWidth;
-    return calculated > availableWidth ? calculated : availableWidth;
-  }
-
-  material.Widget _rowNumberCell(ColorScheme cs, String text,
-      {bool isHeader = false}) {
-    return material.Container(
-      width: 52,
-      padding: const material.EdgeInsets.symmetric(horizontal: 8),
-      alignment: material.Alignment.centerRight,
-      decoration: material.BoxDecoration(
-        border: material.Border(
-          right: material.BorderSide(color: cs.border.withValues(alpha: 0.3)),
-        ),
-      ),
-      child: material.Text(
-        text,
-        style: material.TextStyle(
-          fontSize: 11,
-          fontWeight:
-              isHeader ? material.FontWeight.w600 : material.FontWeight.normal,
-          color: cs.mutedForeground.withValues(alpha: 0.7),
-          fontFamily: 'monospace',
-        ),
-      ),
-    );
-  }
-
-  material.Widget _headerCell(ColorScheme cs, String name) {
-    final isSorted = !_customSqlActive && _sortColumn == name;
-    return material.Expanded(
-      child: material.MouseRegion(
-        cursor: !_customSqlActive
-            ? material.SystemMouseCursors.click
-            : material.SystemMouseCursors.basic,
-        child: material.GestureDetector(
-          behavior: material.HitTestBehavior.opaque,
-          onTap: () => _toggleSort(name),
-          child: material.Container(
-            padding: const material.EdgeInsets.symmetric(horizontal: 10),
-            alignment: material.Alignment.centerLeft,
-            child: material.Row(
-              children: [
-                material.Expanded(
-                  child: material.Text(
-                    name,
-                    style: material.TextStyle(
-                      fontSize: 12,
-                      fontWeight: material.FontWeight.w600,
-                      color: isSorted ? cs.primary : cs.foreground,
-                    ),
-                    overflow: material.TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                ),
-                if (isSorted) ...[
-                  const Gap(4),
-                  material.Icon(
-                    _sortAscending
-                        ? material.Icons.arrow_upward_rounded
-                        : material.Icons.arrow_downward_rounded,
-                    size: 14,
-                    color: cs.primary,
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  material.Widget _dataCell(ColorScheme cs, String value) {
-    final isNull = value == 'NULL';
-    return material.Expanded(
-      child: material.Container(
-        padding: const material.EdgeInsets.symmetric(horizontal: 10),
-        alignment: material.Alignment.centerLeft,
-        child: material.Text(
-          value,
-          style: material.TextStyle(
-            fontSize: 12,
-            color: isNull
-                ? cs.mutedForeground.withValues(alpha: 0.5)
-                : cs.foreground,
-            fontStyle:
-                isNull ? material.FontStyle.italic : material.FontStyle.normal,
-          ),
-          overflow: material.TextOverflow.ellipsis,
-          maxLines: 1,
-        ),
-      ),
-    );
   }
 }
