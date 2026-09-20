@@ -1,10 +1,10 @@
 import 'dart:async' show unawaited;
-import 'dart:convert';
 
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
+import 'package:querya_desktop/features/mongodb/mongo_ejson.dart';
 import 'package:querya_desktop/features/mongodb/mongo_field_codec.dart';
 import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
 import 'package:querya_desktop/features/workspace/grid_cell_popover_inspector.dart';
@@ -47,6 +47,7 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
 
   final _filterController = material.TextEditingController();
   Map<String, dynamic>? _activeFilter;
+  String? _emptyFilterHint;
 
   @override
   void initState() {
@@ -94,6 +95,11 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
         _totalCount = count;
         _documents = docs;
         _loading = false;
+        _emptyFilterHint = docs.isEmpty &&
+                _activeFilter != null &&
+                mongoFilterNeedsObjectIdHint(_activeFilter!)
+            ? kMongoFilterIdStringHint
+            : null;
       });
     } catch (e) {
       if (mounted) {
@@ -111,7 +117,7 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
       _activeFilter = null;
     } else {
       try {
-        _activeFilter = json.decode(text) as Map<String, dynamic>;
+        _activeFilter = mongoFilterFromJson(text);
       } catch (e) {
         setState(() {
           _error = 'Invalid JSON filter: $e';
@@ -119,6 +125,7 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
         return;
       }
     }
+    _emptyFilterHint = null;
     _skip = 0;
     _load();
   }
@@ -126,6 +133,7 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
   void _clearFilter() {
     _filterController.clear();
     _activeFilter = null;
+    _emptyFilterHint = null;
     _skip = 0;
     _load();
   }
@@ -258,7 +266,8 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
               ? material.Center(
                   child: material.Padding(
                     padding: const material.EdgeInsets.all(48),
-                    child: const Text('No documents found').muted(),
+                    child: Text(_emptyFilterHint ?? 'No documents found')
+                        .muted(),
                   ),
                 )
               : material.ListView.separated(
@@ -303,7 +312,9 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
           material.Expanded(
             child: TextField(
               controller: _filterController,
-              placeholder: const Text('Filter (JSON) e.g. {"name": "John"}'),
+              placeholder: const Text(
+                r'Filter (JSON / EJSON) e.g. {"_id": {"$oid": "…"}}',
+              ),
               onSubmitted: (_) => _applyFilter(),
             ),
           ),
