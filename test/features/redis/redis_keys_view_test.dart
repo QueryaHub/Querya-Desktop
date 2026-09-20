@@ -66,4 +66,67 @@ void main() {
     expect(find.text('No keys found'), findsOneWidget);
     await fake.disconnect();
   });
+
+  testWidgets(
+      'RedisKeysView hides delete and shows Read-only session when locked',
+      (tester) async {
+    final fake = RedisConnectionTestFake(
+      firstScanKeys: const ['key_a'],
+      dbSizeResult: 1,
+    );
+    await fake.connect();
+
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.Scaffold(
+          body: material.SizedBox(
+            width: 800,
+            height: 600,
+            child: RedisKeysView(
+              connection: fake,
+              database: 0,
+              isReadOnly: true,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('key_a'), findsOneWidget);
+    expect(find.text('Read-only session'), findsOneWidget);
+    expect(find.byTooltip('Delete key'), findsNothing);
+    await fake.disconnect();
+  });
+
+  testWidgets('RedisKeysView shows delete when the session is writable',
+      (tester) async {
+    final fake = RedisConnectionTestFake(
+      firstScanKeys: const ['key_a'],
+      dbSizeResult: 1,
+    );
+    await fake.connect();
+
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.Scaffold(
+          body: material.SizedBox(
+            width: 800,
+            height: 600,
+            child: RedisKeysView(
+              connection: fake,
+              database: 0,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Delete key'), findsOneWidget);
+    expect(find.text('Read-only session'), findsNothing);
+    await fake.disconnect();
+  });
 }

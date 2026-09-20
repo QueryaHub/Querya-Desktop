@@ -14,6 +14,7 @@ class RedisKeyEditor extends material.StatefulWidget {
     required this.keyType,
     this.onBack,
     this.onKeyDeleted,
+    this.isReadOnly = false,
   });
 
   final RedisConnection connection;
@@ -22,6 +23,7 @@ class RedisKeyEditor extends material.StatefulWidget {
   final String keyType;
   final VoidCallback? onBack;
   final VoidCallback? onKeyDeleted;
+  final bool isReadOnly;
 
   @override
   material.State<RedisKeyEditor> createState() => _RedisKeyEditorState();
@@ -110,6 +112,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   }
 
   Future<void> _saveString() async {
+    if (widget.isReadOnly) return;
     try {
       await widget.connection.selectDatabase(widget.database);
       await widget.connection.set(
@@ -127,6 +130,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   }
 
   Future<void> _deleteKey() async {
+    if (widget.isReadOnly) return;
     try {
       await widget.connection.selectDatabase(widget.database);
       await widget.connection.del(widget.keyName);
@@ -138,6 +142,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   }
 
   Future<void> _setTtl(int seconds) async {
+    if (widget.isReadOnly) return;
     try {
       await widget.connection.selectDatabase(widget.database);
       if (seconds > 0) {
@@ -159,6 +164,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
 
   // Hash operations
   Future<void> _hashSet(String field, String value) async {
+    if (widget.isReadOnly) return;
     try {
       await widget.connection.selectDatabase(widget.database);
       await widget.connection.hset(widget.keyName, field, value);
@@ -170,6 +176,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   }
 
   Future<void> _hashDel(String field) async {
+    if (widget.isReadOnly) return;
     try {
       await widget.connection.selectDatabase(widget.database);
       await widget.connection.hdel(widget.keyName, field);
@@ -182,6 +189,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
 
   // List operations
   Future<void> _listPush(String value) async {
+    if (widget.isReadOnly) return;
     try {
       await widget.connection.selectDatabase(widget.database);
       await widget.connection.rpush(widget.keyName, value);
@@ -194,6 +202,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
 
   // Set operations
   Future<void> _setAdd(String member) async {
+    if (widget.isReadOnly) return;
     try {
       await widget.connection.selectDatabase(widget.database);
       await widget.connection.sadd(widget.keyName, member);
@@ -205,6 +214,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   }
 
   Future<void> _setRemove(String member) async {
+    if (widget.isReadOnly) return;
     try {
       await widget.connection.selectDatabase(widget.database);
       await widget.connection.srem(widget.keyName, member);
@@ -217,6 +227,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
 
   // ZSet operations
   Future<void> _zsetAdd(String member, double score) async {
+    if (widget.isReadOnly) return;
     try {
       await widget.connection.selectDatabase(widget.database);
       await widget.connection.zadd(widget.keyName, score, member);
@@ -228,6 +239,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   }
 
   Future<void> _zsetRemove(String member) async {
+    if (widget.isReadOnly) return;
     try {
       await widget.connection.selectDatabase(widget.database);
       await widget.connection.zrem(widget.keyName, member);
@@ -406,19 +418,19 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
             ),
           ),
           const Gap(8),
-          // TTL button
-          material.Tooltip(
-            message: 'Set TTL',
-            child: material.InkWell(
-              onTap: () => _showTtlDialog(),
-              borderRadius: material.BorderRadius.circular(4),
-              child: material.Padding(
-                padding: const material.EdgeInsets.all(4),
-                child: material.Icon(material.Icons.timer_rounded,
-                    size: 16, color: scs.mutedForeground),
+          if (!widget.isReadOnly)
+            material.Tooltip(
+              message: 'Set TTL',
+              child: material.InkWell(
+                onTap: () => _showTtlDialog(),
+                borderRadius: material.BorderRadius.circular(4),
+                child: material.Padding(
+                  padding: const material.EdgeInsets.all(4),
+                  child: material.Icon(material.Icons.timer_rounded,
+                      size: 16, color: scs.mutedForeground),
+                ),
               ),
             ),
-          ),
           const Gap(4),
           // Refresh
           material.Tooltip(
@@ -433,20 +445,21 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
               ),
             ),
           ),
-          const Gap(4),
-          // Delete
-          material.Tooltip(
-            message: 'Delete key',
-            child: material.InkWell(
-              onTap: _deleteKey,
-              borderRadius: material.BorderRadius.circular(4),
-              child: material.Padding(
-                padding: const material.EdgeInsets.all(4),
-                child: material.Icon(material.Icons.delete_rounded,
-                    size: 16, color: context.semanticPalette.destructive),
+          if (!widget.isReadOnly) ...[
+            const Gap(4),
+            material.Tooltip(
+              message: 'Delete key',
+              child: material.InkWell(
+                onTap: _deleteKey,
+                borderRadius: material.BorderRadius.circular(4),
+                child: material.Padding(
+                  padding: const material.EdgeInsets.all(4),
+                  child: material.Icon(material.Icons.delete_rounded,
+                      size: 16, color: context.semanticPalette.destructive),
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -478,14 +491,16 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
         Row(
           children: [
             const Text('Value').semiBold(),
-            const Spacer(),
-            PrimaryButton(
-              onPressed: _saveString,
-              size: ButtonSize.small,
-              leading:
-                  const material.Icon(material.Icons.save_rounded, size: 14),
-              child: const Text('Save'),
-            ),
+            if (!widget.isReadOnly) ...[
+              const Spacer(),
+              PrimaryButton(
+                onPressed: _saveString,
+                size: ButtonSize.small,
+                leading:
+                    const material.Icon(material.Icons.save_rounded, size: 14),
+                child: const Text('Save'),
+              ),
+            ],
           ],
         ),
         const Gap(8),
@@ -498,6 +513,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
           ),
           child: material.TextField(
             controller: _stringController,
+            readOnly: widget.isReadOnly,
             maxLines: null,
             style: const material.TextStyle(
               fontSize: 13,
@@ -521,37 +537,39 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
         Text('Hash fields (${entries.length})').semiBold(),
-        const Gap(8),
-        material.Row(
-          children: [
-            material.Expanded(
-              child: TextField(
-                controller: _newFieldController,
-                placeholder: const Text('Field'),
+        if (!widget.isReadOnly) ...[
+          const Gap(8),
+          material.Row(
+            children: [
+              material.Expanded(
+                child: TextField(
+                  controller: _newFieldController,
+                  placeholder: const Text('Field'),
+                ),
               ),
-            ),
-            const Gap(8),
-            material.Expanded(
-              child: TextField(
-                controller: _newValueController,
-                placeholder: const Text('Value'),
+              const Gap(8),
+              material.Expanded(
+                child: TextField(
+                  controller: _newValueController,
+                  placeholder: const Text('Value'),
+                ),
               ),
-            ),
-            const Gap(8),
-            PrimaryButton(
-              onPressed: () {
-                final f = _newFieldController.text.trim();
-                final v = _newValueController.text;
-                if (f.isEmpty) return;
-                _hashSet(f, v);
-                _newFieldController.clear();
-                _newValueController.clear();
-              },
-              size: ButtonSize.small,
-              child: const Text('HSET'),
-            ),
-          ],
-        ),
+              const Gap(8),
+              PrimaryButton(
+                onPressed: () {
+                  final f = _newFieldController.text.trim();
+                  final v = _newValueController.text;
+                  if (f.isEmpty) return;
+                  _hashSet(f, v);
+                  _newFieldController.clear();
+                  _newValueController.clear();
+                },
+                size: ButtonSize.small,
+                child: const Text('HSET'),
+              ),
+            ],
+          ),
+        ],
         const Gap(12),
         material.Expanded(
           child: entries.isEmpty
@@ -564,7 +582,8 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
                     return _FieldRow(
                       field: entry.key,
                       value: entry.value,
-                      onDelete: () => _hashDel(entry.key),
+                      onDelete:
+                          widget.isReadOnly ? null : () => _hashDel(entry.key),
                       colorScheme: cs,
                       shadcnCs: scs,
                     );
@@ -582,29 +601,30 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
         Text('List items (${_listValue.length})').semiBold(),
-        const Gap(8),
-        // Add item
-        material.Row(
-          children: [
-            material.Expanded(
-              child: TextField(
-                controller: _newValueController,
-                placeholder: const Text('New item'),
+        if (!widget.isReadOnly) ...[
+          const Gap(8),
+          material.Row(
+            children: [
+              material.Expanded(
+                child: TextField(
+                  controller: _newValueController,
+                  placeholder: const Text('New item'),
+                ),
               ),
-            ),
-            const Gap(8),
-            PrimaryButton(
-              onPressed: () {
-                final v = _newValueController.text;
-                if (v.isEmpty) return;
-                _listPush(v);
-                _newValueController.clear();
-              },
-              size: ButtonSize.small,
-              child: const Text('RPUSH'),
-            ),
-          ],
-        ),
+              const Gap(8),
+              PrimaryButton(
+                onPressed: () {
+                  final v = _newValueController.text;
+                  if (v.isEmpty) return;
+                  _listPush(v);
+                  _newValueController.clear();
+                },
+                size: ButtonSize.small,
+                child: const Text('RPUSH'),
+              ),
+            ],
+          ),
+        ],
         const Gap(12),
         material.Expanded(
           child: _listValue.isEmpty
@@ -631,29 +651,30 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
         Text('Set members (${_setValue.length})').semiBold(),
-        const Gap(8),
-        // Add member
-        material.Row(
-          children: [
-            material.Expanded(
-              child: TextField(
-                controller: _newValueController,
-                placeholder: const Text('New member'),
+        if (!widget.isReadOnly) ...[
+          const Gap(8),
+          material.Row(
+            children: [
+              material.Expanded(
+                child: TextField(
+                  controller: _newValueController,
+                  placeholder: const Text('New member'),
+                ),
               ),
-            ),
-            const Gap(8),
-            PrimaryButton(
-              onPressed: () {
-                final v = _newValueController.text.trim();
-                if (v.isEmpty) return;
-                _setAdd(v);
-                _newValueController.clear();
-              },
-              size: ButtonSize.small,
-              child: const Text('SADD'),
-            ),
-          ],
-        ),
+              const Gap(8),
+              PrimaryButton(
+                onPressed: () {
+                  final v = _newValueController.text.trim();
+                  if (v.isEmpty) return;
+                  _setAdd(v);
+                  _newValueController.clear();
+                },
+                size: ButtonSize.small,
+                child: const Text('SADD'),
+              ),
+            ],
+          ),
+        ],
         const Gap(12),
         material.Expanded(
           child: _setValue.isEmpty
@@ -663,7 +684,9 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
                   separatorBuilder: (_, __) => const Gap(4),
                   itemBuilder: (context, index) => _MemberRow(
                     member: _setValue[index],
-                    onDelete: () => _setRemove(_setValue[index]),
+                    onDelete: widget.isReadOnly
+                        ? null
+                        : () => _setRemove(_setValue[index]),
                     colorScheme: cs,
                     shadcnCs: scs,
                   ),
@@ -680,39 +703,40 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
         Text('Sorted set (${_zsetValue.length})').semiBold(),
-        const Gap(8),
-        // Add member
-        material.Row(
-          children: [
-            material.Expanded(
-              flex: 2,
-              child: TextField(
-                controller: _newValueController,
-                placeholder: const Text('Member'),
+        if (!widget.isReadOnly) ...[
+          const Gap(8),
+          material.Row(
+            children: [
+              material.Expanded(
+                flex: 2,
+                child: TextField(
+                  controller: _newValueController,
+                  placeholder: const Text('Member'),
+                ),
               ),
-            ),
-            const Gap(8),
-            material.Expanded(
-              child: TextField(
-                controller: _newFieldController,
-                placeholder: const Text('Score'),
+              const Gap(8),
+              material.Expanded(
+                child: TextField(
+                  controller: _newFieldController,
+                  placeholder: const Text('Score'),
+                ),
               ),
-            ),
-            const Gap(8),
-            PrimaryButton(
-              onPressed: () {
-                final m = _newValueController.text.trim();
-                final s = double.tryParse(_newFieldController.text.trim());
-                if (m.isEmpty || s == null) return;
-                _zsetAdd(m, s);
-                _newValueController.clear();
-                _newFieldController.clear();
-              },
-              size: ButtonSize.small,
-              child: const Text('ZADD'),
-            ),
-          ],
-        ),
+              const Gap(8),
+              PrimaryButton(
+                onPressed: () {
+                  final m = _newValueController.text.trim();
+                  final s = double.tryParse(_newFieldController.text.trim());
+                  if (m.isEmpty || s == null) return;
+                  _zsetAdd(m, s);
+                  _newValueController.clear();
+                  _newFieldController.clear();
+                },
+                size: ButtonSize.small,
+                child: const Text('ZADD'),
+              ),
+            ],
+          ),
+        ],
         const Gap(12),
         material.Expanded(
           child: _zsetValue.isEmpty
@@ -725,7 +749,8 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
                     return _ScoredMemberRow(
                       member: member,
                       score: score,
-                      onDelete: () => _zsetRemove(member),
+                      onDelete:
+                          widget.isReadOnly ? null : () => _zsetRemove(member),
                       colorScheme: cs,
                       shadcnCs: scs,
                     );
@@ -860,14 +885,14 @@ class _FieldRow extends StatelessWidget {
   const _FieldRow({
     required this.field,
     required this.value,
-    required this.onDelete,
+    this.onDelete,
     required this.colorScheme,
     required this.shadcnCs,
   });
 
   final String field;
   final String value;
-  final VoidCallback onDelete;
+  final VoidCallback? onDelete;
   final ColorScheme colorScheme;
   final shadcn.ColorScheme shadcnCs;
 
@@ -908,15 +933,16 @@ class _FieldRow extends StatelessWidget {
             ),
           ),
           const Gap(8),
-          material.InkWell(
-            onTap: onDelete,
-            borderRadius: material.BorderRadius.circular(4),
-            child: material.Padding(
-              padding: const material.EdgeInsets.all(4),
-              child: material.Icon(material.Icons.close_rounded,
-                  size: 14, color: context.semanticPalette.destructive),
+          if (onDelete != null)
+            material.InkWell(
+              onTap: onDelete,
+              borderRadius: material.BorderRadius.circular(4),
+              child: material.Padding(
+                padding: const material.EdgeInsets.all(4),
+                child: material.Icon(material.Icons.close_rounded,
+                    size: 14, color: context.semanticPalette.destructive),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -979,13 +1005,13 @@ class _IndexedValueRow extends StatelessWidget {
 class _MemberRow extends StatelessWidget {
   const _MemberRow({
     required this.member,
-    required this.onDelete,
+    this.onDelete,
     required this.colorScheme,
     required this.shadcnCs,
   });
 
   final String member;
-  final VoidCallback onDelete;
+  final VoidCallback? onDelete;
   final ColorScheme colorScheme;
   final shadcn.ColorScheme shadcnCs;
 
@@ -1012,15 +1038,16 @@ class _MemberRow extends StatelessWidget {
             ),
           ),
           const Gap(8),
-          material.InkWell(
-            onTap: onDelete,
-            borderRadius: material.BorderRadius.circular(4),
-            child: material.Padding(
-              padding: const material.EdgeInsets.all(4),
-              child: material.Icon(material.Icons.close_rounded,
-                  size: 14, color: context.semanticPalette.destructive),
+          if (onDelete != null)
+            material.InkWell(
+              onTap: onDelete,
+              borderRadius: material.BorderRadius.circular(4),
+              child: material.Padding(
+                padding: const material.EdgeInsets.all(4),
+                child: material.Icon(material.Icons.close_rounded,
+                    size: 14, color: context.semanticPalette.destructive),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -1031,14 +1058,14 @@ class _ScoredMemberRow extends StatelessWidget {
   const _ScoredMemberRow({
     required this.member,
     required this.score,
-    required this.onDelete,
+    this.onDelete,
     required this.colorScheme,
     required this.shadcnCs,
   });
 
   final String member;
   final double score;
-  final VoidCallback onDelete;
+  final VoidCallback? onDelete;
   final ColorScheme colorScheme;
   final shadcn.ColorScheme shadcnCs;
 
@@ -1082,15 +1109,16 @@ class _ScoredMemberRow extends StatelessWidget {
             ),
           ),
           const Gap(8),
-          material.InkWell(
-            onTap: onDelete,
-            borderRadius: material.BorderRadius.circular(4),
-            child: material.Padding(
-              padding: const material.EdgeInsets.all(4),
-              child: material.Icon(material.Icons.close_rounded,
-                  size: 14, color: context.semanticPalette.destructive),
+          if (onDelete != null)
+            material.InkWell(
+              onTap: onDelete,
+              borderRadius: material.BorderRadius.circular(4),
+              child: material.Padding(
+                padding: const material.EdgeInsets.all(4),
+                child: material.Icon(material.Icons.close_rounded,
+                    size: 14, color: context.semanticPalette.destructive),
+              ),
             ),
-          ),
         ],
       ),
     );

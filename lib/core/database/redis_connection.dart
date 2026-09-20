@@ -90,7 +90,8 @@ class RedisConnection {
     var effectiveConnectionString = _connectionString;
 
     if ((effectivePassword == null || effectivePassword.isEmpty) &&
-        (effectiveConnectionString == null || effectiveConnectionString.isEmpty) &&
+        (effectiveConnectionString == null ||
+            effectiveConnectionString.isEmpty) &&
         id > 0) {
       try {
         final secrets = await ConnectionSecretsStore.readForConnection(id);
@@ -116,7 +117,8 @@ class RedisConnection {
     }
     if (effectivePassword != null && effectivePassword.isNotEmpty) {
       if (username != null && username!.trim().isNotEmpty) {
-        await _command!.send_object(['AUTH', username!.trim(), effectivePassword]);
+        await _command!
+            .send_object(['AUTH', username!.trim(), effectivePassword]);
       } else {
         await _command!.send_object(['AUTH', effectivePassword]);
       }
@@ -131,6 +133,13 @@ class RedisConnection {
       throw RedisConnectionException('PING failed');
     }
     _isConnected = true;
+    if (_clientReadOnly) {
+      try {
+        await _command!.send_object(['READONLY']);
+      } catch (_) {
+        // Standalone / older servers: READONLY is cluster-replica only.
+      }
+    }
     scrubCredentials();
   }
 
@@ -174,6 +183,28 @@ class RedisConnection {
   }
 
   // ─── Data commands ─────────────────────────────────────────────────────
+
+  bool _clientReadOnly = false;
+
+  /// Title-bar / session lock. Write helpers throw; [connect] may send
+  /// `READONLY` (Redis Cluster replica; ignored or missing on standalone).
+  bool get clientReadOnly => _clientReadOnly;
+
+  /// Sets the local write lock and, when already connected, sends
+  /// `READONLY` / `READWRITE`. Errors from older servers are ignored.
+  Future<void> applyClientReadOnly(bool readOnly) async {
+    _clientReadOnly = readOnly;
+    if (!isConnected) return;
+    try {
+      await sendCommand([readOnly ? 'READONLY' : 'READWRITE']);
+    } catch (_) {}
+  }
+
+  void _assertWritable() {
+    if (_clientReadOnly) {
+      throw StateError('Redis connection is read-only');
+    }
+  }
 
   /// Raw command helper.
   Future<dynamic> sendCommand(List<dynamic> args) async {
@@ -273,8 +304,7 @@ class RedisConnection {
       final types = await Future.wait(typeFutures);
       final ttls = await Future.wait(ttlFutures);
       return [
-        for (var i = 0; i < keys.length; i++)
-          (type: types[i], ttl: ttls[i]),
+        for (var i = 0; i < keys.length; i++) (type: types[i], ttl: ttls[i]),
       ];
     } finally {
       cmd?.pipe_end();
@@ -299,6 +329,7 @@ class RedisConnection {
     int? ttlSeconds,
     bool keepTtl = true,
   }) async {
+    _assertWritable();
     if (ttlSeconds != null && ttlSeconds > 0) {
       await sendCommand(['SET', key, value, 'EX', ttlSeconds]);
       return;
@@ -347,11 +378,13 @@ class RedisConnection {
 
   /// HSET key field value.
   Future<void> hset(String key, String field, String value) async {
+    _assertWritable();
     await sendCommand(['HSET', key, field, value]);
   }
 
   /// HDEL key field.
   Future<void> hdel(String key, String field) async {
+    _assertWritable();
     await sendCommand(['HDEL', key, field]);
   }
 
@@ -372,6 +405,7 @@ class RedisConnection {
 
   /// RPUSH key value.
   Future<void> rpush(String key, String value) async {
+    _assertWritable();
     await sendCommand(['RPUSH', key, value]);
   }
 
@@ -392,11 +426,13 @@ class RedisConnection {
 
   /// SADD key member.
   Future<void> sadd(String key, String member) async {
+    _assertWritable();
     await sendCommand(['SADD', key, member]);
   }
 
   /// SREM key member.
   Future<void> srem(String key, String member) async {
+    _assertWritable();
     await sendCommand(['SREM', key, member]);
   }
 
@@ -424,32 +460,38 @@ class RedisConnection {
 
   /// ZADD key score member.
   Future<void> zadd(String key, double score, String member) async {
+    _assertWritable();
     await sendCommand(['ZADD', key, score, member]);
   }
 
   /// ZREM key member.
   Future<void> zrem(String key, String member) async {
+    _assertWritable();
     await sendCommand(['ZREM', key, member]);
   }
 
   /// DEL key.
   Future<int> del(String key) async {
+    _assertWritable();
     final result = await sendCommand(['DEL', key]);
     return result is int ? result : int.tryParse(result.toString()) ?? 0;
   }
 
   /// RENAME old new.
   Future<void> rename(String oldKey, String newKey) async {
+    _assertWritable();
     await sendCommand(['RENAME', oldKey, newKey]);
   }
 
   /// EXPIRE key seconds.
   Future<void> expire(String key, int seconds) async {
+    _assertWritable();
     await sendCommand(['EXPIRE', key, seconds]);
   }
 
   /// PERSIST key (remove TTL).
   Future<void> persist(String key) async {
+    _assertWritable();
     await sendCommand(['PERSIST', key]);
   }
 
@@ -481,6 +523,7 @@ class RedisConnectionTestFake extends RedisConnection {
     this.firstScanKeys = const ['alpha', 'beta'],
     this.secondScanKeys = const <String>[],
     this.dbSizeResult = 2,
+    this.getResult,
   }) : super(
           id: -1,
           name: 'test-fake',
@@ -491,6 +534,7 @@ class RedisConnectionTestFake extends RedisConnection {
   final List<String> firstScanKeys;
   final List<String> secondScanKeys;
   final int dbSizeResult;
+  final String? getResult;
 
   bool _firstScanDone = false;
 
@@ -543,6 +587,11 @@ class RedisConnectionTestFake extends RedisConnection {
         return 'string';
       case 'TTL':
         return -1;
+      case 'GET':
+        return getResult;
+      case 'READONLY':
+      case 'READWRITE':
+        return 'OK';
       default:
         return null;
     }

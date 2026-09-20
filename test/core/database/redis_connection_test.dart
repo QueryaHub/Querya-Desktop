@@ -136,4 +136,30 @@ void main() {
       expect(ex.toString(), 'something went wrong');
     });
   });
+
+  group('RedisConnection clientReadOnly', () {
+    test('SET and DEL throw while the session lock is on', () async {
+      final fake = RedisConnectionTestFake();
+      await fake.connect();
+      await fake.applyClientReadOnly(true);
+
+      expect(fake.clientReadOnly, isTrue);
+      await expectLater(
+        fake.set('k', 'v'),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            'Redis connection is read-only',
+          ),
+        ),
+      );
+      await expectLater(fake.del('k'), throwsA(isA<StateError>()));
+
+      await fake.applyClientReadOnly(false);
+      expect(fake.clientReadOnly, isFalse);
+      expect(await fake.del('k'), 0);
+      await fake.disconnect();
+    });
+  });
 }
