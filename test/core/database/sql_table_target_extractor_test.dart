@@ -197,5 +197,35 @@ void main() {
       expect(plan.toTransactionSql(), startsWith('BEGIN TRANSACTION;'));
       expect(plan.statements.single.sql, isNot(contains('"zip" = \'01234\'')));
     });
+
+    test('simple SELECT * FROM db.t uses the MySQL PK and column types', () {
+      final target =
+          SqlTableTargetExtractor.extract('SELECT * FROM db.t');
+      expect(target, const SqlTableTarget(tableName: 't', schema: 'db'));
+
+      final buffer = DataGridStagingBuffer(
+        columns: const ['id', 'zip'],
+        rows: const [
+          ['1', '01234'],
+        ],
+      );
+      buffer.setCell(0, 1, '00789');
+
+      final plan = buffer.generateMutationPlan(
+        dialect: SqlDialect.mysql,
+        tableName: target!.tableName,
+        schema: target.schema,
+        primaryKeys: const ['id'],
+        columnDataTypes: const {'id': 'int', 'zip': 'varchar'},
+      );
+
+      expect(plan.statementCount, 1);
+      expect(
+        plan.statements.single.sql,
+        'UPDATE `db`.`t` SET `zip` = \'00789\' WHERE `id` = 1',
+      );
+      expect(plan.toTransactionSql(), startsWith('START TRANSACTION;'));
+      expect(plan.statements.single.sql, isNot(contains('`zip` = \'01234\'')));
+    });
   });
 }

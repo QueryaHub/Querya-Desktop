@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **MySQL SQL-grid Save (#804)** — Result-grid Save runs only for a simple single-table `SELECT` with a PK in the result (`getTableSchema`). JOIN, comma-`FROM`, and no-PK results stay read-only. DML uses the PK and `columnDataTypes`; applies still wrap `START TRANSACTION` / `COMMIT` / `ROLLBACK` (join an already-open SQL transaction).
 - **SQLite SQL-grid Save (#795)** — Result-grid Save runs only for a simple single-table `SELECT` with a PK in the result (`getTableSchema`). JOIN, comma-`FROM`, and no-PK results stay read-only. DML uses the PK and `columnDataTypes`; applies still wrap `BEGIN TRANSACTION` / `COMMIT` / `ROLLBACK` (join an already-open `BEGIN`).
 - **Postgres SQL-grid Save (#786)** — Result-grid Save runs only for a simple single-table `SELECT` with a PK present in the result (`getTableSchema`). JOIN, comma-`FROM`, subqueries, and VALUES stay read-only. DML `WHERE` uses the PK and `columnDataTypes` instead of every displayed column.
 - **Redis Overview/Explorer sockets (#812)** — Overview INFO and Explorer SCAN/GET/`SELECT` use separate pooled sockets (`stats` vs `explorer`) so opening a DB no longer kills keep-alive Overview, and Home Refresh no longer steals Explorer. User Disconnect closes both roles.

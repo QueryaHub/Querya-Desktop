@@ -296,6 +296,8 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       session.rows = [];
       session.affectedRows = null;
       session.statusLine = null;
+      session.resultGridPrimaryKeys = const [];
+      session.resultGridColumnDataTypes = null;
     });
     QueryaShellStatus.instance.beginBusy(message: 'Running query…');
     final sw = Stopwatch()..start();
@@ -354,13 +356,38 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
         affected = _affectedInt(rs.affectedRows);
       }
 
+      final target = SqlTableTargetExtractor.extract(userSql);
+      var pks = const <String>[];
+      Map<String, String>? types;
+      final schemaName = target?.schema ?? _poolDatabaseKey();
+      if (target != null && cols.isNotEmpty && schemaName.isNotEmpty) {
+        try {
+          final meta = await conn.getTableSchema(
+            database: schemaName,
+            table: target.tableName,
+          );
+          pks = List<String>.from(meta.primaryKeys);
+          types = columnDataTypesFromSchema(meta);
+        } catch (_) {
+          pks = const [];
+          types = null;
+        }
+      }
+      final canSave = sqlResultGridSaveEnabled(
+        sql: userSql,
+        resultColumns: cols,
+        primaryKeys: pks,
+      );
+
       setState(() {
         session.columns = cols;
         session.rows = outRows;
         session.affectedRows = affected;
         session.lastExecutedSql = userSql;
+        session.resultGridPrimaryKeys = canSave ? pks : const [];
+        session.resultGridColumnDataTypes = types;
         session.stagingBuffer?.dispose();
-        session.stagingBuffer = cols.isNotEmpty
+        session.stagingBuffer = canSave
             ? DataGridStagingBuffer(columns: cols, rows: outRows)
             : null;
         if (cols.isEmpty && outRows.isEmpty) {
@@ -424,15 +451,27 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
     final target = session.lastExecutedSql != null
         ? SqlTableTargetExtractor.extract(session.lastExecutedSql!)
         : null;
-    final tableName = target?.tableName ?? 'table';
-    final schemaName = target?.schema;
+    if (target == null ||
+        !sqlResultGridSaveEnabled(
+          sql: session.lastExecutedSql,
+          resultColumns: session.columns,
+          primaryKeys: session.resultGridPrimaryKeys,
+        )) {
+      return;
+    }
+    final schemaName = target.schema ??
+        (widget.connectionRow.databaseName?.trim().isNotEmpty == true
+            ? widget.connectionRow.databaseName!.trim()
+            : null);
 
     setState(() => session.savingChanges = true);
     try {
       final plan = session.stagingBuffer!.generateMutationPlan(
         dialect: SqlDialect.mysql,
-        tableName: tableName,
+        tableName: target.tableName,
         schema: schemaName,
+        primaryKeys: session.resultGridPrimaryKeys,
+        columnDataTypes: session.resultGridColumnDataTypes,
       );
       if (plan.isEmpty) {
         setState(() => session.savingChanges = false);
@@ -798,8 +837,15 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
               affectedRows: session.affectedRows,
               statusLine: session.statusLine,
               stagingBuffer: session.stagingBuffer,
-              onApplyChanges:
-                  widget.isReadOnly ? null : () => _applyStagedChanges(session),
+              columnDataTypes: session.resultGridColumnDataTypes,
+              onApplyChanges: widget.isReadOnly ||
+                      !sqlResultGridSaveEnabled(
+                        sql: session.lastExecutedSql,
+                        resultColumns: session.columns,
+                        primaryKeys: session.resultGridPrimaryKeys,
+                      )
+                  ? null
+                  : () => _applyStagedChanges(session),
               isSaving: session.savingChanges,
             ),
           ),
