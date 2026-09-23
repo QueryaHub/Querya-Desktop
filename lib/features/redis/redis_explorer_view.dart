@@ -146,6 +146,13 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
     });
   }
 
+  void _onKeyRenamed(RedisBulkValue newKey) {
+    setState(() {
+      _selectedKey = newKey;
+      _refreshEpoch++;
+    });
+  }
+
   // ─── Breadcrumbs ────────────────────────────────────────────────────────
 
   List<_Crumb> get _crumbs {
@@ -280,6 +287,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
         keyType: _selectedKeyType ?? 'unknown',
         onBack: _navigateToKeys,
         onKeyDeleted: _navigateToKeys,
+        onKeyRenamed: _onKeyRenamed,
         isReadOnly: widget.isReadOnly,
       );
     }

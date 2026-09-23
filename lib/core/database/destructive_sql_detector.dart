@@ -13,7 +13,8 @@ enum DestructiveSqlType {
   redisDel,
   redisHdel,
   redisSrem,
-  redisZrem;
+  redisZrem,
+  redisRename;
 
   String get label => switch (this) {
         DestructiveSqlType.dropDatabase => 'DROP DATABASE',
@@ -29,6 +30,7 @@ enum DestructiveSqlType {
         DestructiveSqlType.redisHdel => 'HDEL',
         DestructiveSqlType.redisSrem => 'SREM',
         DestructiveSqlType.redisZrem => 'ZREM',
+        DestructiveSqlType.redisRename => 'RENAME',
       };
 
   String get riskLevel => switch (this) {
@@ -43,6 +45,7 @@ enum DestructiveSqlType {
         DestructiveSqlType.redisHdel => 'HIGH',
         DestructiveSqlType.redisSrem => 'HIGH',
         DestructiveSqlType.redisZrem => 'HIGH',
+        DestructiveSqlType.redisRename => 'HIGH',
         DestructiveSqlType.dropMaterializedView => 'MEDIUM',
         DestructiveSqlType.dropView => 'MEDIUM',
       };
@@ -86,6 +89,8 @@ class DestructiveSqlOperation {
           'Permanently removes set member "$targetName".',
         DestructiveSqlType.redisZrem =>
           'Permanently removes sorted-set member "$targetName".',
+        DestructiveSqlType.redisRename =>
+          'Renaming will overwrite existing key "$targetName". The existing value will be permanently lost.',
       };
 }
 

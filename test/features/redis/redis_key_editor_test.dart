@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/database/redis_bulk.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/features/redis/redis_key_editor.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
 import '../../support/querya_theme_test_shell.dart';
 
@@ -13,6 +15,7 @@ void main() {
     required RedisConnectionTestFake fake,
     required bool isReadOnly,
     material.VoidCallback? onKeyDeleted,
+    material.ValueChanged<RedisBulkValue>? onKeyRenamed,
     material.Size size = const material.Size(800, 600),
     String keyType = 'string',
     String keyName = 'session:1',
@@ -30,6 +33,7 @@ void main() {
               keyType: keyType,
               isReadOnly: isReadOnly,
               onKeyDeleted: onKeyDeleted,
+              onKeyRenamed: onKeyRenamed,
             ),
           ),
         ),
@@ -259,6 +263,110 @@ void main() {
     expect(find.text('fffe01'), findsOneWidget);
     expect(find.text('Save'), findsNothing);
     expect(find.text('[255, 254, 1]'), findsNothing);
+    await fake.disconnect();
+  });
+
+  testWidgets('RedisKeyEditor hides Rename key when read-only', (tester) async {
+    final fake = RedisConnectionTestFake(getResult: 'hello');
+    await fake.connect();
+
+    await pumpEditor(tester, fake: fake, isReadOnly: true);
+
+    expect(find.byTooltip('Rename key'), findsNothing);
+    await fake.disconnect();
+  });
+
+  testWidgets('RedisKeyEditor renames key when target does not exist',
+      (tester) async {
+    final fake = RedisConnectionTestFake(getResult: 'hello');
+    await fake.connect();
+    RedisBulkValue? renamedKey;
+
+    await pumpEditor(
+      tester,
+      fake: fake,
+      isReadOnly: false,
+      onKeyRenamed: (k) => renamedKey = k,
+    );
+
+    expect(find.byTooltip('Rename key'), findsOneWidget);
+    await tester.tap(find.byTooltip('Rename key'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Rename Key'), findsOneWidget);
+    // Enter new key name
+    final textField = find.byType(shadcn.TextField);
+    await tester.enterText(textField, 'session:renamed');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Rename'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('session:renamed'), findsOneWidget);
+    expect(renamedKey?.label, 'session:renamed');
+    expect(fake.sentCommands.contains('EXISTS'), isTrue);
+    expect(fake.sentCommands.contains('RENAME'), isTrue);
+    await tester.pump(const Duration(seconds: 3));
+    await fake.disconnect();
+  });
+
+  testWidgets(
+      'RedisKeyEditor prompts overwrite confirmation when target key exists',
+      (tester) async {
+    final fake = RedisConnectionTestFake(
+      getResult: 'hello',
+      firstScanKeys: const ['session:exists'],
+    );
+    await fake.connect();
+    RedisBulkValue? renamedKey;
+
+    await pumpEditor(
+      tester,
+      fake: fake,
+      isReadOnly: false,
+      onKeyRenamed: (k) => renamedKey = k,
+    );
+
+    await tester.tap(find.byTooltip('Rename key'));
+    await tester.pumpAndSettle();
+
+    final textField = find.byType(shadcn.TextField);
+    await tester.enterText(textField, 'session:exists');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Rename'));
+    await tester.pumpAndSettle();
+
+    // Destructive confirmation dialog should appear
+    expect(find.text('RENAME session:1 session:exists'), findsOneWidget);
+
+    // Cancel first
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(renamedKey, isNull);
+    expect(find.text('session:1'), findsOneWidget);
+
+    // Now try again and confirm
+    await tester.tap(find.byTooltip('Rename key'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(shadcn.TextField), 'session:exists');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Rename'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('RENAME session:1 session:exists'), findsOneWidget);
+    // Destructive dialog requires acknowledging checkbox for high risk
+    await tester.tap(find.byType(material.Checkbox));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Execute Destructive Statement'));
+    await tester.pumpAndSettle();
+
+    expect(renamedKey?.label, 'session:exists');
+    expect(find.text('session:exists'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
     await fake.disconnect();
   });
 }

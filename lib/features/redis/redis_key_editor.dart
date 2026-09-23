@@ -18,6 +18,7 @@ class RedisKeyEditor extends material.StatefulWidget {
     this.keyArg,
     this.onBack,
     this.onKeyDeleted,
+    this.onKeyRenamed,
     this.isReadOnly = false,
   });
 
@@ -30,6 +31,7 @@ class RedisKeyEditor extends material.StatefulWidget {
   final Object? keyArg;
   final VoidCallback? onBack;
   final VoidCallback? onKeyDeleted;
+  final ValueChanged<RedisBulkValue>? onKeyRenamed;
   final bool isReadOnly;
 
   @override
@@ -63,6 +65,8 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   bool _hasMore = false;
   bool _loadingMore = false;
   late String _effectiveType;
+  late String _currentKeyName;
+  Object? _currentKeyArg;
 
   // For adding new items
   final _newFieldController = material.TextEditingController();
@@ -71,8 +75,20 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   @override
   void initState() {
     super.initState();
+    _currentKeyName = widget.keyName;
+    _currentKeyArg = widget.keyArg;
     _effectiveType = _normalizedType(widget.keyType);
     _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant RedisKeyEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.keyName != widget.keyName ||
+        oldWidget.keyArg != widget.keyArg) {
+      _currentKeyName = widget.keyName;
+      _currentKeyArg = widget.keyArg;
+    }
   }
 
   @override
@@ -83,7 +99,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     super.dispose();
   }
 
-  Object get _cmdKey => widget.keyArg ?? widget.keyName;
+  Object get _cmdKey => _currentKeyArg ?? _currentKeyName;
 
   bool get _stringIsBinary =>
       _effectiveType == 'string' &&
@@ -271,13 +287,56 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     }
   }
 
+  Future<void> _renameKey() async {
+    if (widget.isReadOnly) return;
+    final targetName = await showAppDialog<String>(
+      context: context,
+      builder: (ctx) => _RedisRenameDialogContent(
+        initialKey: _currentKeyName,
+      ),
+    );
+    if (targetName == null || targetName.trim().isEmpty) return;
+    final trimmedNew = targetName.trim();
+    if (trimmedNew == _currentKeyName) return;
+
+    try {
+      await widget.connection.selectDatabase(widget.database);
+      final exists = (await widget.connection.exists(trimmedNew)) > 0;
+      if (exists && mounted) {
+        final confirmed = await confirmDestructiveAction(
+          context: context,
+          type: DestructiveSqlType.redisRename,
+          targetName: trimmedNew,
+          commandPreview: 'RENAME $_currentKeyName $trimmedNew',
+          connectionName: widget.connection.name,
+        );
+        if (!mounted || !confirmed) return;
+      }
+
+      await widget.connection.rename(_cmdKey, trimmedNew);
+      if (!mounted) return;
+      final newBulk = RedisBulkValue.fromReply(trimmedNew);
+      setState(() {
+        _currentKeyName = trimmedNew;
+        _currentKeyArg = trimmedNew;
+        _success = 'Key renamed to $trimmedNew';
+      });
+      _clearSuccessAfterDelay();
+      widget.onKeyRenamed?.call(newBulk);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = 'Rename failed: $e');
+      }
+    }
+  }
+
   Future<void> _deleteKey() async {
     if (widget.isReadOnly) return;
     final confirmed = await confirmDestructiveAction(
       context: context,
       type: DestructiveSqlType.redisDel,
-      targetName: '${widget.keyName} ($_effectiveType)',
-      commandPreview: 'DEL ${widget.keyName}',
+      targetName: '$_currentKeyName ($_effectiveType)',
+      commandPreview: 'DEL $_currentKeyName',
       connectionName: widget.connection.name,
     );
     if (!mounted || !confirmed) return;
@@ -571,7 +630,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
           const Gap(10),
           material.Expanded(
             child: material.Text(
-              widget.keyName,
+              _currentKeyName,
               overflow: material.TextOverflow.ellipsis,
               maxLines: 1,
               style: material.TextStyle(
@@ -600,6 +659,24 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
             ),
           ),
           const Gap(8),
+          if (!widget.isReadOnly) ...[
+            material.Tooltip(
+              message: 'Rename key',
+              child: material.InkWell(
+                onTap: _renameKey,
+                borderRadius: material.BorderRadius.circular(4),
+                child: material.Padding(
+                  padding: const material.EdgeInsets.all(4),
+                  child: material.Icon(
+                    material.Icons.drive_file_rename_outline_rounded,
+                    size: 16,
+                    color: scs.mutedForeground,
+                  ),
+                ),
+              ),
+            ),
+            const Gap(4),
+          ],
           if (!widget.isReadOnly)
             material.Tooltip(
               message: 'Set TTL',
@@ -1112,6 +1189,69 @@ class _RedisTtlDialogContentState
             Navigator.of(context).pop();
           },
           child: const Text('Apply'),
+        ),
+      ],
+    );
+  }
+}
+
+class _RedisRenameDialogContent extends material.StatefulWidget {
+  const _RedisRenameDialogContent({
+    required this.initialKey,
+  });
+
+  final String initialKey;
+
+  @override
+  material.State<_RedisRenameDialogContent> createState() =>
+      _RedisRenameDialogContentState();
+}
+
+class _RedisRenameDialogContentState
+    extends material.State<_RedisRenameDialogContent> {
+  late final material.TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = material.TextEditingController(text: widget.initialKey);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    return AlertDialog(
+      title: const Text('Rename Key'),
+      content: material.Column(
+        mainAxisSize: material.MainAxisSize.min,
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
+          const Text('Enter new key name').muted().small(),
+          const Gap(8),
+          TextField(
+            controller: _controller,
+            placeholder: const Text('New key name'),
+          ),
+        ],
+      ),
+      actions: [
+        GhostButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        PrimaryButton(
+          onPressed: () {
+            final val = _controller.text.trim();
+            if (val.isNotEmpty) {
+              Navigator.of(context).pop(val);
+            }
+          },
+          child: const Text('Rename'),
         ),
       ],
     );
