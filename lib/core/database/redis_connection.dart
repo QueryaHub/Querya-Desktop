@@ -458,6 +458,20 @@ class RedisConnection {
     await sendCommand(['RPUSH', redisCommandArg(key), value]);
   }
 
+  /// LSET key index value.
+  Future<void> lset(Object key, int index, String value) async {
+    _assertWritable();
+    await sendCommand(['LSET', redisCommandArg(key), index, value]);
+  }
+
+  /// LREM key count element.
+  Future<int> lrem(Object key, int count, Object element) async {
+    _assertWritable();
+    final result = await sendCommand(
+        ['LREM', redisCommandArg(key), count, redisCommandArg(element)]);
+    return redisReplyInt(result);
+  }
+
   /// SMEMBERS key.
   Future<List<RedisBulkValue>> smembers(Object key) async {
     final result = await sendCommand(['SMEMBERS', redisCommandArg(key)]);
@@ -604,7 +618,7 @@ class RedisConnectionTestFake extends RedisConnection {
     this.secondScanKeys = const <String>[],
     this.dbSizeResult = 2,
     this.getResult,
-    this.listItems = const <String>[],
+    List<String>? listItems,
     this.llenResult,
     this.hashFirstPage = const <String, String>{},
     this.hashSecondPage = const <String, String>{},
@@ -618,7 +632,9 @@ class RedisConnectionTestFake extends RedisConnection {
     this.failType = false,
     this.getBytesResult,
     this.binaryScanKeys = const <List<int>>[],
-  }) : super(
+  })  : listItems =
+            listItems != null ? List<String>.from(listItems) : <String>[],
+        super(
           id: -1,
           name: 'test-fake',
           host: 'localhost',
@@ -776,6 +792,41 @@ class RedisConnectionTestFake extends RedisConnection {
         final target = args[2].toString();
         final allKeys = [...firstScanKeys, ...secondScanKeys];
         return allKeys.contains(target) ? 0 : 1;
+      case 'RPUSH':
+        listItems.add(args[2].toString());
+        return 'OK';
+      case 'LSET':
+        final idx = int.tryParse(args[2].toString()) ?? 0;
+        final val = args[3].toString();
+        if (idx >= 0 && idx < listItems.length) {
+          listItems[idx] = val;
+        }
+        return 'OK';
+      case 'LREM':
+        final count = int.tryParse(args[2].toString()) ?? 0;
+        final val = args[3].toString();
+        var removed = 0;
+        if (count == 0) {
+          removed = listItems.where((e) => e == val).length;
+          listItems.removeWhere((e) => e == val);
+        } else if (count > 0) {
+          for (var i = 0; i < count; i++) {
+            final idx = listItems.indexOf(val);
+            if (idx != -1) {
+              listItems.removeAt(idx);
+              removed++;
+            }
+          }
+        } else {
+          for (var i = 0; i < count.abs(); i++) {
+            final idx = listItems.lastIndexOf(val);
+            if (idx != -1) {
+              listItems.removeAt(idx);
+              removed++;
+            }
+          }
+        }
+        return removed;
       default:
         return null;
     }

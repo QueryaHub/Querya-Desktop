@@ -369,4 +369,108 @@ void main() {
     await tester.pump(const Duration(seconds: 3));
     await fake.disconnect();
   });
+
+  testWidgets('RedisKeyEditor list item hides edit and delete when read-only',
+      (tester) async {
+    final fake = RedisConnectionTestFake(
+      listItems: ['task1'],
+    );
+    await fake.connect();
+
+    await pumpEditor(
+      tester,
+      fake: fake,
+      isReadOnly: true,
+      keyType: 'list',
+      keyName: 'jobs',
+    );
+
+    expect(find.text('task1'), findsOneWidget);
+    expect(find.byTooltip('Edit item'), findsNothing);
+    expect(find.byTooltip('Delete item'), findsNothing);
+    await fake.disconnect();
+  });
+
+  testWidgets('RedisKeyEditor list item edits element via LSET',
+      (tester) async {
+    final fake = RedisConnectionTestFake(
+      listItems: ['task1'],
+    );
+    await fake.connect();
+
+    await pumpEditor(
+      tester,
+      fake: fake,
+      isReadOnly: false,
+      keyType: 'list',
+      keyName: 'jobs',
+    );
+
+    expect(find.text('task1'), findsOneWidget);
+    expect(find.byTooltip('Edit item'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Edit item'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit Item [0]'), findsOneWidget);
+    final field = find.descendant(
+      of: find.byType(shadcn.AlertDialog),
+      matching: find.byType(shadcn.TextField),
+    );
+    await tester.enterText(field, 'task1_updated');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(fake.sentCommands.contains('LSET'), isTrue);
+    expect(fake.listItems, ['task1_updated']);
+    expect(find.text('task1_updated'), findsOneWidget);
+    await fake.disconnect();
+  });
+
+  testWidgets('RedisKeyEditor list item deletes element with confirmation',
+      (tester) async {
+    final fake = RedisConnectionTestFake(
+      listItems: ['task1'],
+    );
+    await fake.connect();
+
+    await pumpEditor(
+      tester,
+      fake: fake,
+      isReadOnly: false,
+      keyType: 'list',
+      keyName: 'jobs',
+    );
+
+    expect(find.text('task1'), findsOneWidget);
+    expect(find.byTooltip('Delete item'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Delete item'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('LREM jobs 1 task1'), findsOneWidget);
+
+    // Cancel first
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(fake.listItems, ['task1']);
+    expect(find.text('task1'), findsOneWidget);
+
+    // Now confirm delete
+    await tester.tap(find.byTooltip('Delete item'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(material.Checkbox));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Execute Destructive Statement'));
+    await tester.pumpAndSettle();
+
+    expect(fake.sentCommands.contains('LREM'), isTrue);
+    expect(fake.listItems.isEmpty, isTrue);
+    expect(find.text('No items'), findsOneWidget);
+    await fake.disconnect();
+  });
 }
