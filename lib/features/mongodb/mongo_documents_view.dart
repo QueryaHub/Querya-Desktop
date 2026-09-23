@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
+import 'package:querya_desktop/features/mongodb/mongo_add_document_dialog.dart';
 import 'package:querya_desktop/features/mongodb/mongo_ejson.dart';
 import 'package:querya_desktop/features/mongodb/mongo_field_codec.dart';
 import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
@@ -153,12 +154,19 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
   }
 
   Future<void> _addDocument() async {
+    final doc = await showMongoAddDocumentDialog(
+      context,
+      database: widget.database,
+      collection: widget.collection,
+    );
+    if (doc == null) return;
+
     try {
       await MongoService.instance.insertDocument(
         widget.connection,
         widget.database,
         widget.collection,
-        <String, dynamic>{},
+        doc,
       );
       await _load();
     } catch (e) {
