@@ -468,5 +468,83 @@ void main() {
       );
       expect(ok, isTrue);
     });
+
+    testWidgets('shows dialog and returns false when dirty and Cancel pressed',
+        (tester) async {
+      await tester.pumpWidget(
+        ShadcnApp(
+          theme: AppTheme.dark,
+          home: const material.Scaffold(body: material.SizedBox()),
+        ),
+      );
+      final ctx = tester.element(find.byType(material.Scaffold));
+      final buffer = DataGridStagingBuffer(
+        columns: ['id', 'name'],
+        rows: [
+          ['1', 'Alice'],
+        ],
+      );
+      addTearDown(buffer.dispose);
+      buffer.setCell(0, 1, 'Bob');
+      expect(buffer.isDirty, isTrue);
+
+      bool? result;
+      // Trigger confirmation asynchronously
+      confirmDiscardTableEditsIfDirty(
+        context: ctx,
+        buffer: buffer,
+        tableTitle: 'public.users',
+      ).then((val) => result = val);
+
+      await tester.pumpAndSettle();
+      expect(find.text('Unsaved changes in "public.users"'), findsOneWidget);
+      expect(
+        find.text(
+          'This table has 1 pending change that have not been saved. Continuing will discard them.',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(result, isFalse);
+      expect(buffer.isDirty, isTrue);
+    });
+
+    testWidgets('shows dialog and returns true when dirty and Discard pressed',
+        (tester) async {
+      await tester.pumpWidget(
+        ShadcnApp(
+          theme: AppTheme.dark,
+          home: const material.Scaffold(body: material.SizedBox()),
+        ),
+      );
+      final ctx = tester.element(find.byType(material.Scaffold));
+      final buffer = DataGridStagingBuffer(
+        columns: ['id', 'name'],
+        rows: [
+          ['1', 'Alice'],
+        ],
+      );
+      addTearDown(buffer.dispose);
+      buffer.setCell(0, 1, 'Bob');
+      expect(buffer.isDirty, isTrue);
+
+      bool? result;
+      confirmDiscardTableEditsIfDirty(
+        context: ctx,
+        buffer: buffer,
+        tableTitle: 'Query 1',
+      ).then((val) => result = val);
+
+      await tester.pumpAndSettle();
+      expect(find.text('Unsaved changes in "Query 1"'), findsOneWidget);
+
+      await tester.tap(find.text('Discard'));
+      await tester.pumpAndSettle();
+
+      expect(result, isTrue);
+    });
   });
 }

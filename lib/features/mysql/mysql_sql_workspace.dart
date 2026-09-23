@@ -275,6 +275,17 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
     }
     if (userSql.isEmpty) return;
 
+    final safeToProceed = await confirmDiscardTableEditsIfDirty(
+      context: context,
+      buffer: session.stagingBuffer,
+      tableTitle: session.title,
+    );
+    if (!safeToProceed) return;
+    if (session.stagingBuffer != null && session.stagingBuffer!.isDirty) {
+      session.stagingBuffer?.dispose();
+      session.stagingBuffer = null;
+    }
+
     final confirmDestructive =
         await AppSettings.instance.getConfirmDestructiveOperations();
     if (confirmDestructive) {
