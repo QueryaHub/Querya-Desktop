@@ -545,9 +545,23 @@ class RedisConnection {
   }
 
   /// RENAME old new.
-  Future<void> rename(String oldKey, String newKey) async {
+  Future<void> rename(Object oldKey, String newKey) async {
     _assertWritable();
-    await sendCommand(['RENAME', oldKey, newKey]);
+    await sendCommand(['RENAME', redisCommandArg(oldKey), newKey]);
+  }
+
+  /// RENAMENX old new. Returns 1 if key was renamed, 0 if newKey already exists.
+  Future<int> renamenx(Object oldKey, String newKey) async {
+    _assertWritable();
+    final result =
+        await sendCommand(['RENAMENX', redisCommandArg(oldKey), newKey]);
+    return redisReplyInt(result);
+  }
+
+  /// EXISTS key. Returns 1 if key exists, 0 if missing.
+  Future<int> exists(Object key) async {
+    final result = await sendCommand(['EXISTS', redisCommandArg(key)]);
+    return redisReplyInt(result);
   }
 
   /// EXPIRE key seconds.
@@ -752,6 +766,16 @@ class RedisConnectionTestFake extends RedisConnection {
       case 'READONLY':
       case 'READWRITE':
         return 'OK';
+      case 'EXISTS':
+        final target = args[1].toString();
+        final allKeys = [...firstScanKeys, ...secondScanKeys];
+        return allKeys.contains(target) ? 1 : 0;
+      case 'RENAME':
+        return 'OK';
+      case 'RENAMENX':
+        final target = args[2].toString();
+        final allKeys = [...firstScanKeys, ...secondScanKeys];
+        return allKeys.contains(target) ? 0 : 1;
       default:
         return null;
     }
