@@ -45,6 +45,24 @@ class MongoConnection {
   Db? _db;
   bool _isConnected = false;
 
+  /// Effective database name from [database] configuration or connection URI path.
+  String? get effectiveDatabase {
+    if (database != null && database!.trim().isNotEmpty) {
+      return database!.trim();
+    }
+    final rawUri = _sessionUri ?? _connectionString;
+    if (rawUri != null && rawUri.isNotEmpty) {
+      try {
+        final parsed = Uri.parse(rawUri);
+        final path = parsed.path.replaceFirst('/', '').trim();
+        if (path.isNotEmpty) {
+          return path;
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
   /// Scrubs sensitive in-memory credentials once the network handshake completes.
   ///
   /// Getters [password] and [connectionString] become null. The live session
@@ -298,6 +316,12 @@ class MongoConnection {
           .where((name) => name.isNotEmpty)
           .toList();
     } catch (e) {
+      final fallback = effectiveDatabase;
+      if (fallback != null &&
+          fallback.isNotEmpty &&
+          fallback.toLowerCase() != 'admin') {
+        return [fallback];
+      }
       rethrow;
     }
   }
