@@ -135,6 +135,19 @@ class _MongoDatabasesViewState extends State<MongoDatabasesView> {
         });
       }
     } catch (e) {
+      final fallback = _connection?.effectiveDatabase;
+      if (fallback != null &&
+          fallback.isNotEmpty &&
+          fallback.toLowerCase() != 'admin') {
+        if (mounted) {
+          setState(() {
+            _databases = [_DatabaseInfo(name: fallback, sizeOnDisk: null)];
+            _isLoading = false;
+            _error = null;
+          });
+        }
+        return;
+      }
       if (mounted) {
         setState(() {
           _error = 'Failed to list databases: $e';
