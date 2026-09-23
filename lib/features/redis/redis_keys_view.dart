@@ -76,39 +76,55 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
   }
 
   Future<void> _scanBatch() async {
-    final (nextCursor, keyNames) = await widget.connection.scan(
-      cursor: _cursor,
-      match: _matchPattern.isEmpty ? null : _matchPattern,
-      count: 100,
-    );
+    var currentCursor = _cursor;
+    final accumulatedKeys = <RedisBulkValue>[];
+    const maxIterations = 10;
+    var iterations = 0;
+
+    do {
+      final (nextCursor, keyNames) = await widget.connection.scan(
+        cursor: currentCursor,
+        match: _matchPattern.isEmpty ? null : _matchPattern,
+        count: 100,
+      );
+      currentCursor = nextCursor;
+      accumulatedKeys.addAll(keyNames);
+      iterations++;
+    } while (accumulatedKeys.length < 50 &&
+        currentCursor != 0 &&
+        iterations < maxIterations);
 
     // One pipelined burst of TYPE+TTL (not N× Future.wait round-trips).
     List<_KeyInfo> infos;
     String? typeTtlError;
-    try {
-      final metas = await widget.connection.typesAndTtls(keyNames);
-      infos = [
-        for (var i = 0; i < keyNames.length; i++)
-          _KeyInfo(
-            name: keyNames[i],
-            type: metas[i].type,
-            ttl: metas[i].ttl,
-          ),
-      ];
-    } catch (e) {
-      // Still show keys with unknown type/TTL; surface the failure non-blocking.
-      infos = [
-        for (final name in keyNames)
-          _KeyInfo(name: name, type: 'unknown', ttl: -1),
-      ];
-      typeTtlError = 'Failed to load key types/TTLs: $e';
+    if (accumulatedKeys.isNotEmpty) {
+      try {
+        final metas = await widget.connection.typesAndTtls(accumulatedKeys);
+        infos = [
+          for (var i = 0; i < accumulatedKeys.length; i++)
+            _KeyInfo(
+              name: accumulatedKeys[i],
+              type: metas[i].type,
+              ttl: metas[i].ttl,
+            ),
+        ];
+      } catch (e) {
+        // Still show keys with unknown type/TTL; surface the failure non-blocking.
+        infos = [
+          for (final name in accumulatedKeys)
+            _KeyInfo(name: name, type: 'unknown', ttl: -1),
+        ];
+        typeTtlError = 'Failed to load key types/TTLs: $e';
+      }
+    } else {
+      infos = [];
     }
 
     if (!mounted) return;
     setState(() {
       _keys.addAll(infos);
-      _cursor = nextCursor;
-      _hasMore = nextCursor != 0;
+      _cursor = currentCursor;
+      _hasMore = currentCursor != 0;
       _error = typeTtlError;
     });
   }
@@ -195,7 +211,25 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
               ? material.Center(
                   child: material.Padding(
                     padding: const material.EdgeInsets.all(48),
-                    child: const Text('No keys found').muted(),
+                    child: material.Column(
+                      mainAxisSize: material.MainAxisSize.min,
+                      children: [
+                        Text(_hasMore
+                                ? 'No keys found in scanned range'
+                                : 'No keys found')
+                            .muted(),
+                        if (_hasMore) ...[
+                          const Gap(16),
+                          OutlineButton(
+                            onPressed: _loadingMore ? null : _loadMore,
+                            size: ButtonSize.small,
+                            child: _loadingMore
+                                ? const Text('Scanning...')
+                                : const Text('Continue scanning'),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 )
               : material.ListView.builder(
