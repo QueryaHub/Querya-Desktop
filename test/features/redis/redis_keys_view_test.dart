@@ -199,6 +199,83 @@ void main() {
     expect(find.text('[255, 254]'), findsNothing);
     await fake.disconnect();
   });
+
+  testWidgets(
+      'RedisKeysView loops through empty SCAN batch until keys are found',
+      (tester) async {
+    final fake = _MultiStepScanFake(
+      steps: [
+        // Step 1: empty keys, next cursor 10
+        (nextCursor: 10, keys: <String>[]),
+        // Step 2: found key, next cursor 0
+        (nextCursor: 0, keys: <String>['target_key']),
+      ],
+      dbSizeResult: 1,
+    );
+    await fake.connect();
+
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.Scaffold(
+          body: material.SizedBox(
+            width: 800,
+            height: 600,
+            child: RedisKeysView(
+              connection: fake,
+              database: 0,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('target_key'), findsOneWidget);
+    expect(fake.scanCallCount, 2);
+    await fake.disconnect();
+  });
+
+  testWidgets(
+      'RedisKeysView shows Continue scanning when empty after iteration limit',
+      (tester) async {
+    // 10 empty steps with cursor > 0, then 1 step with keys
+    final fake = _MultiStepScanFake(
+      steps: [
+        for (var i = 1; i <= 10; i++) (nextCursor: i, keys: <String>[]),
+        (nextCursor: 0, keys: <String>['late_key']),
+      ],
+      dbSizeResult: 1,
+    );
+    await fake.connect();
+
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.Scaffold(
+          body: material.SizedBox(
+            width: 800,
+            height: 600,
+            child: RedisKeysView(
+              connection: fake,
+              database: 0,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('No keys found in scanned range'), findsOneWidget);
+    expect(find.text('Continue scanning'), findsOneWidget);
+    expect(fake.scanCallCount, 10);
+
+    // Tap continue scanning
+    await tester.tap(find.text('Continue scanning'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('late_key'), findsOneWidget);
+    expect(fake.scanCallCount, 11);
+    await fake.disconnect();
+  });
 }
 
 class _DelTrackingFake extends RedisConnectionTestFake {
@@ -210,5 +287,30 @@ class _DelTrackingFake extends RedisConnectionTestFake {
   Future<int> del(Object key) async {
     deleted.add(key is RedisBulkValue ? key.label : key.toString());
     return super.del(key);
+  }
+}
+
+class _MultiStepScanFake extends RedisConnectionTestFake {
+  _MultiStepScanFake({
+    required this.steps,
+    super.dbSizeResult,
+  });
+
+  final List<({int nextCursor, List<String> keys})> steps;
+  int scanCallCount = 0;
+
+  @override
+  Future<dynamic> sendCommand(List<dynamic> args) async {
+    final op = args.first.toString().toUpperCase();
+    if (op == 'SCAN') {
+      final stepIndex = scanCallCount;
+      scanCallCount++;
+      if (stepIndex < steps.length) {
+        final step = steps[stepIndex];
+        return [step.nextCursor, step.keys];
+      }
+      return [0, <String>[]];
+    }
+    return super.sendCommand(args);
   }
 }
