@@ -417,6 +417,41 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     }
   }
 
+  Future<void> _listSet(int index, String newValue) async {
+    if (widget.isReadOnly) return;
+    try {
+      await widget.connection.selectDatabase(widget.database);
+      await widget.connection.lset(_cmdKey, index, newValue);
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'LSET failed: $e');
+    }
+  }
+
+  Future<void> _listRemove(int index, RedisBulkValue item) async {
+    if (widget.isReadOnly) return;
+    final confirmed = await confirmDestructiveAction(
+      context: context,
+      type: DestructiveSqlType.redisLrem,
+      targetName: '[$index] ${item.label}',
+      commandPreview: 'LREM $_currentKeyName 1 ${item.label}',
+      connectionName: widget.connection.name,
+    );
+    if (!mounted || !confirmed) return;
+    try {
+      await widget.connection.selectDatabase(widget.database);
+      final sentinel =
+          '__QUERYA_DEL_${DateTime.now().microsecondsSinceEpoch}__';
+      await widget.connection.lset(_cmdKey, index, sentinel);
+      await widget.connection.lrem(_cmdKey, 1, sentinel);
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'LREM failed: $e');
+    }
+  }
+
   // Set operations
   Future<void> _setAdd(String member) async {
     if (widget.isReadOnly) return;
@@ -946,6 +981,24 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
                   itemBuilder: (context, i) => _IndexedValueRow(
                     index: i,
                     value: _listValue[i].label,
+                    onEdit: widget.isReadOnly
+                        ? null
+                        : () async {
+                            final edited = await showAppDialog<String>(
+                              context: context,
+                              builder: (ctx) => _RedisEditListDialogContent(
+                                index: i,
+                                initialValue: _listValue[i].label,
+                              ),
+                            );
+                            if (edited != null &&
+                                edited != _listValue[i].label) {
+                              await _listSet(i, edited);
+                            }
+                          },
+                    onDelete: widget.isReadOnly
+                        ? null
+                        : () => _listRemove(i, _listValue[i]),
                     colorScheme: cs,
                     shadcnCs: scs,
                   ),
@@ -1258,6 +1311,68 @@ class _RedisRenameDialogContentState
   }
 }
 
+class _RedisEditListDialogContent extends material.StatefulWidget {
+  const _RedisEditListDialogContent({
+    required this.index,
+    required this.initialValue,
+  });
+
+  final int index;
+  final String initialValue;
+
+  @override
+  material.State<_RedisEditListDialogContent> createState() =>
+      _RedisEditListDialogContentState();
+}
+
+class _RedisEditListDialogContentState
+    extends material.State<_RedisEditListDialogContent> {
+  late final material.TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = material.TextEditingController(text: widget.initialValue);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    return AlertDialog(
+      title: Text('Edit Item [${widget.index}]'),
+      content: material.Column(
+        mainAxisSize: material.MainAxisSize.min,
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
+          const Text('Enter new value').muted().small(),
+          const Gap(8),
+          TextField(
+            controller: _controller,
+            placeholder: const Text('Value'),
+          ),
+        ],
+      ),
+      actions: [
+        GhostButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        PrimaryButton(
+          onPressed: () {
+            Navigator.of(context).pop(_controller.text);
+          },
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
 // ─── Shared row widgets ─────────────────────────────────────────────────────
 
 class _FieldRow extends StatelessWidget {
@@ -1332,12 +1447,16 @@ class _IndexedValueRow extends StatelessWidget {
   const _IndexedValueRow({
     required this.index,
     required this.value,
+    this.onEdit,
+    this.onDelete,
     required this.colorScheme,
     required this.shadcnCs,
   });
 
   final int index;
   final String value;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
   final ColorScheme colorScheme;
   final shadcn.ColorScheme shadcnCs;
 
@@ -1375,6 +1494,36 @@ class _IndexedValueRow extends StatelessWidget {
               ),
             ),
           ),
+          if (onEdit != null) ...[
+            const Gap(8),
+            material.Tooltip(
+              message: 'Edit item',
+              child: material.InkWell(
+                onTap: onEdit,
+                borderRadius: material.BorderRadius.circular(4),
+                child: material.Padding(
+                  padding: const material.EdgeInsets.all(4),
+                  child: material.Icon(material.Icons.edit_outlined,
+                      size: 14, color: shadcnCs.mutedForeground),
+                ),
+              ),
+            ),
+          ],
+          if (onDelete != null) ...[
+            const Gap(8),
+            material.Tooltip(
+              message: 'Delete item',
+              child: material.InkWell(
+                onTap: onDelete,
+                borderRadius: material.BorderRadius.circular(4),
+                child: material.Padding(
+                  padding: const material.EdgeInsets.all(4),
+                  child: material.Icon(material.Icons.close_rounded,
+                      size: 14, color: context.semanticPalette.destructive),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
