@@ -49,6 +49,9 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
 
   SqlQueryTabSession get _activeSession => _sessions[_activeSessionIndex];
 
+  @material.visibleForTesting
+  SqlQueryTabSession get activeSession => _activeSession;
+
   SqliteLease? _lease;
   bool? _txOpen;
 
@@ -263,6 +266,17 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       userSql = session.controller.text.trim();
     }
     if (userSql.isEmpty) return;
+
+    final safeToProceed = await confirmDiscardTableEditsIfDirty(
+      context: context,
+      buffer: session.stagingBuffer,
+      tableTitle: session.title,
+    );
+    if (!safeToProceed) return;
+    if (session.stagingBuffer != null && session.stagingBuffer!.isDirty) {
+      session.stagingBuffer?.dispose();
+      session.stagingBuffer = null;
+    }
 
     final confirmDestructive =
         await AppSettings.instance.getConfirmDestructiveOperations();
