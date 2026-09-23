@@ -554,7 +554,7 @@ class _DocumentCardState extends State<_DocumentCard> {
               padding: const material.EdgeInsets.only(
                   left: 16, right: 16, bottom: 10),
               child: _expanded
-                  ? _FieldList(
+                  ? MongoFieldList(
                       document: widget.document,
                       colorScheme: cs,
                       shadcnCs: scs,
@@ -584,8 +584,10 @@ class _DocumentCardState extends State<_DocumentCard> {
   }
 }
 
-class _FieldList extends StatelessWidget {
-  const _FieldList({
+@material.visibleForTesting
+class MongoFieldList extends StatelessWidget {
+  const MongoFieldList({
+    super.key,
     required this.document,
     required this.colorScheme,
     required this.shadcnCs,
@@ -597,77 +599,104 @@ class _FieldList extends StatelessWidget {
   final shadcn.ColorScheme shadcnCs;
   final ValueChanged<String> onInspectField;
 
+  Widget _buildFieldRow(String key) {
+    final canEdit = key != '_id';
+    final display = mongoFieldToDisplay(document[key]);
+    final oneLine = display.replaceAll('\n', ' ');
+    return material.InkWell(
+      onTap: canEdit ? () => onInspectField(key) : null,
+      child: material.Padding(
+        padding: const material.EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: 6,
+        ),
+        child: Row(
+          children: [
+            material.SizedBox(
+              width: 120,
+              child: Text(
+                key,
+                overflow: TextOverflow.ellipsis,
+                style: material.TextStyle(
+                  fontSize: 12,
+                  fontFamily: 'monospace',
+                  fontWeight: material.FontWeight.w600,
+                  color: colorScheme.foreground,
+                ),
+              ),
+            ),
+            const Gap(8),
+            material.Expanded(
+              child: Text(
+                oneLine,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+                style: material.TextStyle(
+                  fontSize: 12,
+                  fontFamily: 'monospace',
+                  color: shadcnCs.mutedForeground,
+                ),
+              ),
+            ),
+            if (canEdit)
+              material.Icon(
+                material.Icons.edit_note_rounded,
+                size: 16,
+                color: shadcnCs.mutedForeground,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDivider() => material.Divider(
+        height: 1,
+        color: colorScheme.border.withValues(alpha: 0.2),
+      );
+
   @override
   Widget build(BuildContext context) {
     final fields = document.keys.toList();
+    if (fields.isEmpty) return const material.SizedBox.shrink();
+
+    final decoration = material.BoxDecoration(
+      color: colorScheme.muted.withValues(alpha: 0.15),
+      borderRadius: material.BorderRadius.circular(6),
+      border: material.Border.all(
+        color: colorScheme.border.withValues(alpha: 0.3),
+      ),
+    );
+
+    // For documents with <= 10 fields, render a lightweight Column with zero
+    // scroll machinery or shrinkWrap measurement passes.
+    if (fields.length <= 10) {
+      final children = <Widget>[];
+      for (var i = 0; i < fields.length; i++) {
+        if (i > 0) children.add(_buildDivider());
+        children.add(_buildFieldRow(fields[i]));
+      }
+      return material.Container(
+        decoration: decoration,
+        padding: const material.EdgeInsets.symmetric(vertical: 4),
+        child: material.Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: material.CrossAxisAlignment.stretch,
+          children: children,
+        ),
+      );
+    }
+
+    // For wide documents (> 10 fields), render a bounded virtualized list
+    // without shrinkWrap to avoid layout recalculation spikes on scroll.
     return material.Container(
       constraints: const material.BoxConstraints(maxHeight: 320),
-      decoration: material.BoxDecoration(
-        color: colorScheme.muted.withValues(alpha: 0.15),
-        borderRadius: material.BorderRadius.circular(6),
-        border: material.Border.all(
-          color: colorScheme.border.withValues(alpha: 0.3),
-        ),
-      ),
+      decoration: decoration,
       child: ListView.separated(
-        shrinkWrap: true,
         padding: const material.EdgeInsets.symmetric(vertical: 4),
         itemCount: fields.length,
-        separatorBuilder: (_, __) => material.Divider(
-          height: 1,
-          color: colorScheme.border.withValues(alpha: 0.2),
-        ),
-        itemBuilder: (context, i) {
-          final key = fields[i];
-          final canEdit = key != '_id';
-          final display = mongoFieldToDisplay(document[key]);
-          final oneLine = display.replaceAll('\n', ' ');
-          return material.InkWell(
-            onTap: canEdit ? () => onInspectField(key) : null,
-            child: material.Padding(
-              padding: const material.EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 6,
-              ),
-              child: Row(
-                children: [
-                  material.SizedBox(
-                    width: 120,
-                    child: Text(
-                      key,
-                      overflow: TextOverflow.ellipsis,
-                      style: material.TextStyle(
-                        fontSize: 12,
-                        fontFamily: 'monospace',
-                        fontWeight: material.FontWeight.w600,
-                        color: colorScheme.foreground,
-                      ),
-                    ),
-                  ),
-                  const Gap(8),
-                  material.Expanded(
-                    child: Text(
-                      oneLine,
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                      style: material.TextStyle(
-                        fontSize: 12,
-                        fontFamily: 'monospace',
-                        color: shadcnCs.mutedForeground,
-                      ),
-                    ),
-                  ),
-                  if (canEdit)
-                    material.Icon(
-                      material.Icons.edit_note_rounded,
-                      size: 16,
-                      color: shadcnCs.mutedForeground,
-                    ),
-                ],
-              ),
-            ),
-          );
-        },
+        separatorBuilder: (_, __) => _buildDivider(),
+        itemBuilder: (context, i) => _buildFieldRow(fields[i]),
       ),
     );
   }
