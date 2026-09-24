@@ -15,10 +15,12 @@ class SqlQueryTabSession {
     this.filePath,
     double initialFraction = 0.65,
   })  : controller = material.TextEditingController(text: initialSql ?? ''),
+        _savedSql = initialSql ?? '',
         topFraction = material.ValueNotifier<double>(initialFraction) {
+    controller.addListener(_onTextChanged);
     UnsavedWorkRegistry.instance.register(
       this,
-      () => isModified || (stagingBuffer?.isDirty ?? false),
+      () => isDirty,
     );
   }
 
@@ -28,6 +30,7 @@ class SqlQueryTabSession {
   final material.TextEditingController controller;
   final material.ValueNotifier<double> topFraction;
 
+  String _savedSql;
   bool running = false;
   String? error;
   List<String> columns = const [];
@@ -38,6 +41,31 @@ class SqlQueryTabSession {
   String? lastExecutedSql;
   bool savingChanges = false;
   bool isModified = false;
+
+  void _onTextChanged() {
+    final modified = controller.text != _savedSql;
+    if (modified != isModified) {
+      isModified = modified;
+    }
+  }
+
+  /// True if the tab has uncommitted changes (modified text, unsaved query draft, or dirty staging buffer).
+  bool get isDirty {
+    if (stagingBuffer?.isDirty ?? false) return true;
+    if (filePath == null) {
+      return controller.text.trim().isNotEmpty;
+    }
+    return isModified;
+  }
+
+  /// Marks the current query text as saved to disk or loaded from file.
+  void markSaved({String? newFilePath}) {
+    _savedSql = controller.text;
+    isModified = false;
+    if (newFilePath != null) {
+      filePath = newFilePath;
+    }
+  }
 
   /// PK columns for SQL-grid Save, empty when Save is disabled.
   List<String> resultGridPrimaryKeys = const [];
@@ -51,15 +79,14 @@ class SqlQueryTabSession {
       text: next,
       selection: material.TextSelection.collapsed(offset: next.length),
     );
-    isModified = true;
   }
 
   void clearSql() {
     controller.clear();
-    isModified = true;
   }
 
   void dispose() {
+    controller.removeListener(_onTextChanged);
     UnsavedWorkRegistry.instance.unregister(this);
     controller.dispose();
     topFraction.dispose();
