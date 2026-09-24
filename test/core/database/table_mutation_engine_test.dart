@@ -537,5 +537,67 @@ void main() {
       );
       expect(mysql.statements.first.sql, 'INSERT INTO `t` () VALUES ()');
     });
+
+    test('resolves primary key with case-insensitive casing (e.g. ID vs id)', () {
+      final plan = TableMutationEngine.generatePlan(
+        dialect: SqlDialect.postgres,
+        tableName: 'users',
+        columns: ['id', 'username', 'email'],
+        primaryKeys: ['ID'],
+        originalRows: [
+          ['42', 'alice', 'alice@example.com'],
+        ],
+        modifiedCells: {
+          0: {1: 'alice_new'},
+        },
+        insertedRows: const [],
+        deletedRowIndices: const {},
+      );
+
+      expect(plan.hasPrimaryKey, isTrue);
+      expect(plan.statementCount, 1);
+      final stmt = plan.statements.first;
+      expect(stmt.type, MutationType.update);
+      // Must generate WHERE "id" = 42, NOT match all columns
+      expect(
+        stmt.sql,
+        'UPDATE "users" SET "username" = \'alice_new\' WHERE "id" = 42',
+      );
+    });
+
+    test('resolves primary key and column names when enclosed in quotes or with different casing', () {
+      final plan = TableMutationEngine.generatePlan(
+        dialect: SqlDialect.postgres,
+        tableName: 'accounts',
+        columns: ['"ACCOUNT_ID"', 'status'],
+        primaryKeys: ['account_id'],
+        originalRows: [
+          ['100', 'active'],
+        ],
+        modifiedCells: const {},
+        insertedRows: const [],
+        deletedRowIndices: {0},
+      );
+
+      expect(plan.hasPrimaryKey, isTrue);
+      expect(plan.statementCount, 1);
+      final stmt = plan.statements.first;
+      expect(stmt.type, MutationType.delete);
+      expect(
+        stmt.sql,
+        'DELETE FROM "accounts" WHERE "ACCOUNT_ID" = 100',
+      );
+    });
+
+    test('unquotes and normalizes identifiers helper methods', () {
+      expect(TableMutationEngine.unquoteIdentifier('"my_col"'), 'my_col');
+      expect(TableMutationEngine.unquoteIdentifier('`my_col`'), 'my_col');
+      expect(TableMutationEngine.unquoteIdentifier('[my_col]'), 'my_col');
+      expect(TableMutationEngine.unquoteIdentifier('my_col'), 'my_col');
+
+      expect(TableMutationEngine.normalizeIdentifier('"USER_ID"'), 'user_id');
+      expect(TableMutationEngine.normalizeIdentifier('`USER_ID`'), 'user_id');
+      expect(TableMutationEngine.normalizeIdentifier('user_id'), 'user_id');
+    });
   });
 }
