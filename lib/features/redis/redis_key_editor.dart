@@ -16,6 +16,7 @@ class RedisKeyEditor extends material.StatefulWidget {
     required this.keyName,
     required this.keyType,
     this.keyArg,
+    this.controller,
     this.onBack,
     this.onKeyDeleted,
     this.onKeyRenamed,
@@ -29,6 +30,8 @@ class RedisKeyEditor extends material.StatefulWidget {
 
   /// Wire key for GET/SET/DEL when [keyName] is only a UTF-8/hex label.
   final Object? keyArg;
+  /// Optional controller for querying dirty-state from the parent widget.
+  final RedisKeyEditorController? controller;
   final VoidCallback? onBack;
   final VoidCallback? onKeyDeleted;
   final ValueChanged<RedisBulkValue>? onKeyRenamed;
@@ -36,6 +39,22 @@ class RedisKeyEditor extends material.StatefulWidget {
 
   @override
   material.State<RedisKeyEditor> createState() => _RedisKeyEditorState();
+}
+
+/// Controller that lets the parent widget ask whether it is safe to navigate
+/// away from this editor (i.e. no unsaved string value edits).
+class RedisKeyEditorController {
+  _RedisKeyEditorState? _state;
+
+  /// Returns `true` when navigation is safe (not dirty, or user confirmed
+  /// discarding their edits).
+  Future<bool> canNavigateAway() =>
+      _state?._confirmDiscardStringEdits() ?? Future.value(true);
+
+  void _attach(_RedisKeyEditorState state) => _state = state;
+  void _detach(_RedisKeyEditorState state) {
+    if (_state == state) _state = null;
+  }
 }
 
 class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
@@ -47,6 +66,8 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   // String value
   RedisBulkValue? _stringValue;
   final _stringController = material.TextEditingController();
+  /// The text that was last loaded from the server (null = not yet loaded).
+  String? _savedStringText;
 
   // Hash value
   Map<RedisBulkValue, RedisBulkValue> _hashValue = {};
@@ -75,6 +96,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   @override
   void initState() {
     super.initState();
+    widget.controller?._attach(this);
     _currentKeyName = widget.keyName;
     _currentKeyArg = widget.keyArg;
     _effectiveType = _normalizedType(widget.keyType);
@@ -93,6 +115,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
 
   @override
   void dispose() {
+    widget.controller?._detach(this);
     _stringController.dispose();
     _newFieldController.dispose();
     _newValueController.dispose();
@@ -105,6 +128,41 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       _effectiveType == 'string' &&
       _stringValue != null &&
       !_stringValue!.isUtf8;
+
+  /// True when the user has unsaved edits in the string text field.
+  bool get _isStringDirty =>
+      _effectiveType == 'string' &&
+      !_stringIsBinary &&
+      _savedStringText != null &&
+      _stringController.text != _savedStringText;
+
+  /// Shows a discard-confirmation dialog if there are unsaved string edits.
+  /// Returns `true` when it is safe to proceed (either not dirty or confirmed).
+  Future<bool> _confirmDiscardStringEdits() async {
+    if (!_isStringDirty) return true;
+    if (!mounted) return false;
+    final confirmed = await showAppDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Unsaved changes'),
+        content: const Text(
+          'You have unsaved edits to this string value. '
+          'Do you want to discard them?',
+        ),
+        actions: [
+          OutlineButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          DestructiveButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
+  }
 
   String _normalizedType(String type) {
     final t = type.trim().toLowerCase();
@@ -141,7 +199,9 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       switch (_effectiveType) {
         case 'string':
           _stringValue = await widget.connection.get(_cmdKey);
-          _stringController.text = _stringValue?.text ?? '';
+          final loaded = _stringValue?.text ?? '';
+          _stringController.text = loaded;
+          _savedStringText = loaded;
         case 'hash':
         case 'list':
         case 'set':
@@ -730,7 +790,10 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
           material.Tooltip(
             message: 'Refresh',
             child: material.InkWell(
-              onTap: _load,
+              onTap: () async {
+                if (!await _confirmDiscardStringEdits()) return;
+                await _load();
+              },
               borderRadius: material.BorderRadius.circular(4),
               child: material.Padding(
                 padding: const material.EdgeInsets.all(4),

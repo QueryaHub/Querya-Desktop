@@ -57,6 +57,9 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
   RedisBulkValue? _selectedKey;
   String? _selectedKeyType;
 
+  // Key used to reach _RedisKeyEditorState.canNavigateAway() from the explorer.
+  RedisKeyEditorController? _keyEditorController;
+
   @override
   void initState() {
     super.initState();
@@ -136,19 +139,27 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
     setState(() {
       _selectedKey = key;
       _selectedKeyType = type;
+      _keyEditorController = RedisKeyEditorController();
     });
   }
 
-  void _navigateToKeys() {
+  Future<void> _navigateToKeys() async {
+    if (_keyEditorController != null &&
+        !await _keyEditorController!.canNavigateAway()) {
+      return;
+    }
+    if (!mounted) return;
     setState(() {
       _selectedKey = null;
       _selectedKeyType = null;
+      _keyEditorController = null;
     });
   }
 
   void _onKeyRenamed(RedisBulkValue newKey) {
     setState(() {
       _selectedKey = newKey;
+      _keyEditorController = RedisKeyEditorController();
       _refreshEpoch++;
     });
   }
@@ -175,7 +186,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
     }
     switch (crumb.level) {
       case _Level.keys:
-        _navigateToKeys();
+        unawaited(_navigateToKeys());
       case _Level.key:
         break;
       case _Level.stats:
@@ -277,16 +288,18 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
   material.Widget _buildContent(RedisConnection conn) {
     // Key editor
     if (_selectedKey != null) {
+      final controller = _keyEditorController ??= RedisKeyEditorController();
       return RedisKeyEditor(
         key: ValueKey(
             'key_${widget.database}_${_selectedKey!.label}_$_refreshEpoch'),
+        controller: controller,
         connection: conn,
         database: widget.database,
         keyName: _selectedKey!.label,
         keyArg: _selectedKey!.commandArg,
         keyType: _selectedKeyType ?? 'unknown',
-        onBack: _navigateToKeys,
-        onKeyDeleted: _navigateToKeys,
+        onBack: () => unawaited(_navigateToKeys()),
+        onKeyDeleted: () => unawaited(_navigateToKeys()),
         onKeyRenamed: _onKeyRenamed,
         isReadOnly: widget.isReadOnly,
       );
