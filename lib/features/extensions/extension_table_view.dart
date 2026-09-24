@@ -53,6 +53,9 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
 
   ExtensionDriverCapabilities? _capabilities;
   DataGridStagingBuffer? _stagingBuffer;
+  bool _schemaLoaded = false;
+  Object? _schemaError;
+  List<String> _primaryKeys = const [];
   bool _isSaving = false;
 
   bool _restartingDriver = false;
@@ -80,6 +83,12 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
 
   Future<void> _restartDriver() async {
     if (_restartingDriver) return;
+    if (!await _confirmDiscardIfNeeded()) return;
+    if (!mounted) return;
+    _stagingBuffer?.dispose();
+    _stagingBuffer = null;
+    _schemaLoaded = false;
+    _schemaError = null;
     setState(() {
       _restartingDriver = true;
     });
@@ -122,13 +131,19 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
     if (oldWidget.connectionRow.id != widget.connectionRow.id ||
         oldWidget.database != widget.database ||
         oldWidget.tableName != widget.tableName) {
-      _offset = 0;
-      _totalRows = null;
-      _filterController.clear();
-      _filterActive = false;
-      _stagingBuffer?.dispose();
-      _stagingBuffer = null;
-      unawaited(_loadPage(refreshCount: true));
+      unawaited(() async {
+        if (!await _confirmDiscardIfNeeded()) return;
+        if (!mounted) return;
+        _stagingBuffer?.dispose();
+        _stagingBuffer = null;
+        _schemaLoaded = false;
+        _schemaError = null;
+        _offset = 0;
+        _totalRows = null;
+        _filterController.clear();
+        _filterActive = false;
+        await _loadPage(refreshCount: true);
+      }());
     }
   }
 
@@ -140,16 +155,89 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
     super.dispose();
   }
 
+  String get _tableTitle => '${widget.database}.${widget.tableName}';
+
+  bool get _isDirty => _stagingBuffer?.isDirty == true;
+
+  Future<bool> _confirmDiscardIfNeeded() {
+    return confirmDiscardTableEditsIfDirty(
+      context: context,
+      buffer: _stagingBuffer,
+      tableTitle: _tableTitle,
+    );
+  }
+
+  /// Guards navigation with a discard confirmation and then runs [action]
+  /// before triggering a page load.
+  Future<void> _navigateAndLoad(void Function() action) async {
+    if (!await _confirmDiscardIfNeeded()) return;
+    if (!mounted) return;
+    _stagingBuffer?.dispose();
+    _stagingBuffer = null;
+    action();
+    unawaited(_loadPage(refreshCount: true));
+  }
+
+  Future<void> _onRefresh() async {
+    if (!await _confirmDiscardIfNeeded()) return;
+    if (!mounted) return;
+    _stagingBuffer?.dispose();
+    _stagingBuffer = null;
+    _schemaLoaded = false;
+    _schemaError = null;
+    await _loadPage(refreshCount: true);
+  }
+
+  Future<void> _ensureSchema() async {
+    if (_schemaLoaded) return;
+    if (widget.isView || _capabilities?.supportsMutations != true) {
+      _schemaLoaded = true;
+      _schemaError = null;
+      _primaryKeys = const [];
+      return;
+    }
+    final loaded = await loadTableViewSchema(
+      () => ExtensionDriverSession.instance.getTableSchema(
+        widget.connectionRow,
+        database: widget.database,
+        tableName: widget.tableName,
+      ),
+    );
+    final schema = loaded.schema;
+    if (schema != null) {
+      _primaryKeys = List<String>.from(schema.primaryKeys);
+      _schemaError = null;
+    } else {
+      _primaryKeys = const [];
+      _schemaError = loaded.error;
+    }
+    _schemaLoaded = true;
+  }
+
   void _updateStatusLine() {
     final total = _totalRows;
     final shownFrom = _rows.isEmpty ? 0 : _offset + 1;
     final shownTo = _offset + _rows.length;
+    final String pag;
     if (total == null) {
-      _statusLine = _loading
+      pag = _loading
           ? 'Loading data...'
           : 'Showing $shownTo row(s) (Calculating count...).';
     } else {
-      _statusLine = 'Rows $shownFrom–$shownTo of $total.';
+      pag = 'Rows $shownFrom–$shownTo of $total.';
+    }
+    final reason = tableViewEditDisabledReason(
+      isView: widget.isView,
+      customSqlActive: false,
+      hasPrimaryKey: _primaryKeys.isNotEmpty,
+      schemaLoaded: _schemaLoaded,
+      readOnly: _capabilities != null && !_capabilities!.supportsMutations,
+      schemaError: _schemaError,
+    );
+    if (reason != null) {
+      _statusLine = '$pag · $reason';
+    } else {
+      _statusLine = pag;
     }
   }
 
@@ -208,18 +296,26 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
         'SELECT * FROM $_qualifiedName$_whereClause LIMIT ${widget.pageSize} OFFSET $_offset',
       );
 
+      await _ensureSchema();
+
       if (!mounted) return;
       setState(() {
         _columns = dataResult.columns;
         _rows = dataResult.rows;
         _loading = false;
-        _stagingBuffer?.dispose();
-        if (!widget.isView && (_capabilities?.supportsMutations == true)) {
-          _stagingBuffer =
-              DataGridStagingBuffer(columns: _columns, rows: _rows);
-        } else {
-          _stagingBuffer = null;
-        }
+        final editingEnabled = tableViewEditingEnabled(
+          isView: widget.isView,
+          customSqlActive: false,
+          hasPrimaryKey: _primaryKeys.isNotEmpty,
+          readOnly: _capabilities?.supportsMutations != true,
+          schemaError: _schemaError,
+        );
+        _stagingBuffer = replaceTableViewStagingBuffer(
+          previous: _stagingBuffer,
+          columns: _columns,
+          rows: _rows,
+          enabled: editingEnabled,
+        );
         _updateStatusLine();
       });
 
@@ -238,14 +334,22 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
     final buffer = _stagingBuffer;
     if (buffer == null || !buffer.isDirty) return;
 
+    final primaryKeys = _primaryKeys;
+    if (primaryKeys.isEmpty) {
+      if (mounted) {
+        showAppToast(
+          context: context,
+          message:
+              'Cannot save: no primary key is available for ${widget.tableName}. '
+              'Edits would match all rows.',
+          variant: AppToastVariant.error,
+        );
+      }
+      return;
+    }
+
     setState(() => _isSaving = true);
     try {
-      final schema = await ExtensionDriverSession.instance.getTableSchema(
-        widget.connectionRow,
-        database: widget.database,
-        tableName: widget.tableName,
-      );
-
       final mutations = <Map<String, dynamic>>[];
 
       // 1. Updates
@@ -255,16 +359,10 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
         final origRow = buffer.originalRows[rowIndex];
 
         final whereMap = <String, dynamic>{};
-        if (schema.primaryKeys.isNotEmpty) {
-          for (final pk in schema.primaryKeys) {
-            final idx = _columns.indexOf(pk);
-            if (idx != -1 && idx < origRow.length) {
-              whereMap[pk] = origRow[idx];
-            }
-          }
-        } else {
-          for (var c = 0; c < _columns.length; c++) {
-            whereMap[_columns[c]] = c < origRow.length ? origRow[c] : null;
+        for (final pk in primaryKeys) {
+          final idx = _columns.indexOf(pk);
+          if (idx != -1 && idx < origRow.length) {
+            whereMap[pk] = origRow[idx];
           }
         }
 
@@ -304,16 +402,10 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
       for (final rowIndex in buffer.deletedRowIndices) {
         final origRow = buffer.originalRows[rowIndex];
         final whereMap = <String, dynamic>{};
-        if (schema.primaryKeys.isNotEmpty) {
-          for (final pk in schema.primaryKeys) {
-            final idx = _columns.indexOf(pk);
-            if (idx != -1 && idx < origRow.length) {
-              whereMap[pk] = origRow[idx];
-            }
-          }
-        } else {
-          for (var c = 0; c < _columns.length; c++) {
-            whereMap[_columns[c]] = c < origRow.length ? origRow[c] : null;
+        for (final pk in primaryKeys) {
+          final idx = _columns.indexOf(pk);
+          if (idx != -1 && idx < origRow.length) {
+            whereMap[pk] = origRow[idx];
           }
         }
         mutations.add({
@@ -330,10 +422,17 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
           mutations: mutations,
         );
         if (!mounted) return;
-        final count = res['affectedRows'] ?? mutations.length;
+        final affectedRows = res['affectedRows'];
+        if (affectedRows is! int) {
+          throw StateError(
+            'Save failed: driver did not return an affectedRows count.',
+          );
+        }
+        expectDmlMatchedRows(affectedRows);
+
         showAppToast(
           context: context,
-          message: 'Successfully applied $count mutation(s).',
+          message: 'Successfully applied $affectedRows mutation(s).',
           variant: AppToastVariant.success,
         );
         unawaited(_loadPage(refreshCount: true));
@@ -351,16 +450,18 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
   }
 
   void _applyFilter() {
-    _offset = 0;
-    _totalRows = null;
-    unawaited(_loadPage(refreshCount: true));
+    unawaited(_navigateAndLoad(() {
+      _offset = 0;
+      _totalRows = null;
+    }));
   }
 
   void _clearFilter() {
     _filterController.clear();
-    _offset = 0;
-    _totalRows = null;
-    unawaited(_loadPage(refreshCount: true));
+    unawaited(_navigateAndLoad(() {
+      _offset = 0;
+      _totalRows = null;
+    }));
   }
 
   Future<void> _openDdlDialog() async {
@@ -437,9 +538,10 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
     }
   }
 
-  bool get _canGoBack => _offset > 0;
+  bool get _canGoBack => _offset > 0 && !_isDirty;
 
   bool get _canGoForward {
+    if (_isDirty) return false;
     final total = _totalRows;
     if (total == null) return _rows.length >= widget.pageSize;
     return _offset + widget.pageSize < total;
@@ -447,14 +549,16 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
 
   void _previousPage() {
     if (!_canGoBack || _loading) return;
-    _offset = (_offset - widget.pageSize).clamp(0, 1 << 30);
-    unawaited(_loadPage());
+    unawaited(_navigateAndLoad(() {
+      _offset = (_offset - widget.pageSize).clamp(0, 1 << 30);
+    }));
   }
 
   void _nextPage() {
     if (!_canGoForward || _loading) return;
-    _offset += widget.pageSize;
-    unawaited(_loadPage());
+    unawaited(_navigateAndLoad(() {
+      _offset += widget.pageSize;
+    }));
   }
 
   @override
@@ -473,7 +577,13 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
           loading: _loading,
           canGoPrevious: _canGoBack && !_loading,
           canGoNext: _canGoForward && !_loading,
-          onNavigateHome: widget.onNavigateHome,
+          onNavigateHome: widget.onNavigateHome != null
+              ? () => unawaited(() async {
+                    if (!await _confirmDiscardIfNeeded()) return;
+                    if (!mounted) return;
+                    widget.onNavigateHome!();
+                  }())
+              : null,
           filterActive: _filterActive || _filterController.text.isNotEmpty,
           filterText: _filterController.text,
           onToggleFilter: () {
@@ -484,7 +594,7 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
           onOpenDdl: _openDdlDialog,
           onGoPrevious: _previousPage,
           onGoNext: _nextPage,
-          onRefresh: () => _loadPage(refreshCount: true),
+          onRefresh: () => unawaited(_onRefresh()),
           onRestartDriver: () => unawaited(_restartDriver()),
           isRestarting: _restartingDriver,
           onCopyFormat: (format) {
