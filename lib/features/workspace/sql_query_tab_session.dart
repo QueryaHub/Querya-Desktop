@@ -15,10 +15,12 @@ class SqlQueryTabSession {
     this.filePath,
     double initialFraction = 0.65,
   })  : controller = material.TextEditingController(text: initialSql ?? ''),
+        _savedSql = initialSql ?? '',
         topFraction = material.ValueNotifier<double>(initialFraction) {
+    controller.addListener(_onTextChanged);
     UnsavedWorkRegistry.instance.register(
       this,
-      () => isModified || (stagingBuffer?.isDirty ?? false),
+      () => isDirty,
     );
   }
 
@@ -28,6 +30,7 @@ class SqlQueryTabSession {
   final material.TextEditingController controller;
   final material.ValueNotifier<double> topFraction;
 
+  String _savedSql;
   bool running = false;
   String? error;
   List<String> columns = const [];
@@ -37,7 +40,34 @@ class SqlQueryTabSession {
   DataGridStagingBuffer? stagingBuffer;
   String? lastExecutedSql;
   bool savingChanges = false;
-  bool isModified = false;
+  bool? _manualModified;
+
+  /// True if the SQL query text has unsaved changes or was manually marked modified.
+  bool get isModified =>
+      _manualModified ??
+      (filePath != null
+          ? controller.text != _savedSql
+          : controller.text.trim().isNotEmpty);
+
+  set isModified(bool value) {
+    _manualModified = value;
+  }
+
+  void _onTextChanged() {
+    _manualModified = null;
+  }
+
+  /// True if the tab has uncommitted changes (modified text, unsaved query draft, or dirty staging buffer).
+  bool get isDirty => isModified || (stagingBuffer?.isDirty ?? false);
+
+  /// Marks the current query text as saved to disk or loaded from file.
+  void markSaved({String? newFilePath}) {
+    _savedSql = controller.text;
+    _manualModified = false;
+    if (newFilePath != null) {
+      filePath = newFilePath;
+    }
+  }
 
   /// PK columns for SQL-grid Save, empty when Save is disabled.
   List<String> resultGridPrimaryKeys = const [];
@@ -51,15 +81,14 @@ class SqlQueryTabSession {
       text: next,
       selection: material.TextSelection.collapsed(offset: next.length),
     );
-    isModified = true;
   }
 
   void clearSql() {
     controller.clear();
-    isModified = true;
   }
 
   void dispose() {
+    controller.removeListener(_onTextChanged);
     UnsavedWorkRegistry.instance.unregister(this);
     controller.dispose();
     topFraction.dispose();

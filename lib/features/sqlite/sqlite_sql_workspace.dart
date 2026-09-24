@@ -145,10 +145,26 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
     if (index < 0 || index >= _sessions.length) return;
     if (_sessions.length <= 1) return;
     final session = _sessions[index];
-    if (session.stagingBuffer != null && session.stagingBuffer!.isDirty) {
+    if (session.isDirty) {
+      final hasDirtyStaging =
+          session.stagingBuffer != null && session.stagingBuffer!.isDirty;
+      final hasUnsavedText = session.isModified ||
+          (session.filePath == null && session.controller.text.trim().isNotEmpty);
+      final String message;
+      if (hasDirtyStaging && hasUnsavedText) {
+        message =
+            'This query tab contains unsaved query text and staged database changes. Closing the tab will discard them.';
+      } else if (hasDirtyStaging) {
+        message =
+            'This query tab contains staged database changes that have not been applied yet. Closing the tab will discard these changes.';
+      } else {
+        message =
+            'This query tab contains unsaved SQL query text. Closing the tab will discard your changes.';
+      }
       final confirmed = await showUnsavedTabChangesDialog(
         context: context,
         tabTitle: session.title,
+        message: message,
       );
       if (confirmed != true) return;
     }
@@ -547,7 +563,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
           selection: material.TextSelection.collapsed(offset: text.length),
         );
         session.title = file.name;
-        session.filePath = file.path;
+        session.markSaved(newFilePath: file.path);
         setState(() {});
       } else {
         _addNewTab(initialSql: text, title: file.name, filePath: file.path);
@@ -568,6 +584,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       final existingPath = session.filePath;
       if (existingPath != null && existingPath.isNotEmpty) {
         await File(existingPath).writeAsString(session.controller.text);
+        session.markSaved();
         if (!mounted) return;
         showAppToast(
           context: context,
@@ -591,8 +608,8 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       await File(path).writeAsString(session.controller.text);
       if (!mounted) return;
       setState(() {
-        session.filePath = path;
         session.title = File(path).uri.pathSegments.last;
+        session.markSaved(newFilePath: path);
       });
       showAppToast(
         context: context,

@@ -49,6 +49,56 @@ void main() {
       tab1.dispose();
       tab2.dispose();
     });
+
+    test('tracks text modifications and markSaved updates', () {
+      final session = SqlQueryTabSession(
+        id: 'tab_file',
+        title: 'File Tab',
+        initialSql: 'SELECT 1;',
+        filePath: '/tmp/test.sql',
+      );
+
+      expect(session.isModified, isFalse);
+      expect(session.isDirty, isFalse);
+
+      // Typing new text marks modified & dirty
+      session.controller.text = 'SELECT 1;\nSELECT 2;';
+      expect(session.isModified, isTrue);
+      expect(session.isDirty, isTrue);
+
+      // Typing back to initial text resets modified & dirty
+      session.controller.text = 'SELECT 1;';
+      expect(session.isModified, isFalse);
+      expect(session.isDirty, isFalse);
+
+      // Mutate and save
+      session.controller.text = 'SELECT * FROM users;';
+      expect(session.isModified, isTrue);
+      session.markSaved(newFilePath: '/tmp/users.sql');
+      expect(session.isModified, isFalse);
+      expect(session.isDirty, isFalse);
+      expect(session.filePath, '/tmp/users.sql');
+
+      session.dispose();
+    });
+
+    test('unsaved draft query without filePath is treated as dirty', () {
+      final session = SqlQueryTabSession(
+        id: 'tab_draft',
+        title: 'Draft Tab',
+      );
+
+      expect(session.isModified, isFalse);
+      expect(session.isDirty, isFalse);
+
+      session.controller.text = 'SELECT 42;';
+      expect(session.isDirty, isTrue);
+
+      session.controller.text = '   ';
+      expect(session.isDirty, isFalse);
+
+      session.dispose();
+    });
   });
 
   group('SqlQueryTabBar widget', () {
@@ -144,6 +194,36 @@ void main() {
 
       expect(dialogResult, isTrue);
       buffer.dispose();
+    });
+
+    testWidgets('shows custom message in unsaved tab changes dialog', (tester) async {
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Builder(
+            builder: (context) {
+              return material.TextButton(
+                onPressed: () {
+                  showUnsavedTabChangesDialog(
+                    context: context,
+                    tabTitle: 'Query 1',
+                    message: 'Custom query text warning',
+                  );
+                },
+                child: const material.Text('Open Custom Dialog'),
+              );
+            },
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open Custom Dialog'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Unsaved Changes in "Query 1"'), findsOneWidget);
+      expect(find.text('Custom query text warning'), findsOneWidget);
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
     });
   });
 

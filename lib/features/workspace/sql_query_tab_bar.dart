@@ -59,6 +59,7 @@ class SqlQueryTabBar extends material.StatelessWidget {
 Future<bool?> showUnsavedTabChangesDialog({
   required material.BuildContext context,
   required String tabTitle,
+  String? message,
 }) {
   return showAppDialog<bool>(
     context: context,
@@ -73,8 +74,9 @@ Future<bool?> showUnsavedTabChangesDialog({
             children: [
               Text('Unsaved Changes in "$tabTitle"').semiBold().large(),
               const Gap(8),
-              const Text(
-                'This query tab contains staged database changes that have not been applied yet. Closing the tab will discard these changes.',
+              Text(
+                message ??
+                    'This query tab contains staged database changes that have not been applied yet. Closing the tab will discard these changes.',
               ).muted().small(),
               const Gap(20),
               material.Align(
