@@ -43,11 +43,18 @@ class _DataGridValuePanelState extends material.State<DataGridValuePanel> {
   ValuePanelLanguage _selectedLanguage = ValuePanelLanguage.auto;
   String? _validationError;
   bool _wordWrap = true;
+  bool _preserveCompact = false;
   Timer? _debounceTimer;
+
+  static bool _isCompact(String input) {
+    final trimmed = input.trim();
+    return !trimmed.contains('\n') && !trimmed.contains('\r');
+  }
 
   @override
   void initState() {
     super.initState();
+    _preserveCompact = _isCompact(widget.cellValue);
     _controller = material.TextEditingController(text: _formatInitialValue(widget.cellValue));
     _controller.addListener(_onTextChanged);
     _validateContent();
@@ -67,6 +74,7 @@ class _DataGridValuePanelState extends material.State<DataGridValuePanel> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.cellValue != widget.cellValue) {
       _debounceTimer?.cancel();
+      _preserveCompact = _isCompact(widget.cellValue);
       _controller.text = _formatInitialValue(widget.cellValue);
       _validateContent();
     }
@@ -81,6 +89,9 @@ class _DataGridValuePanelState extends material.State<DataGridValuePanel> {
   }
 
   String _formatInitialValue(String input) {
+    if (_isCompact(input)) {
+      return input;
+    }
     final trimmed = input.trim();
     if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
         (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
@@ -119,28 +130,26 @@ class _DataGridValuePanelState extends material.State<DataGridValuePanel> {
     return ValuePanelLanguage.text;
   }
 
-  void _validateContent() {
-    final text = _controller.text.trim();
-    if (text.isEmpty) {
-      if (_validationError != null) {
-        setState(() => _validationError = null);
-      }
-      return;
-    }
+  String? _computeValidationError([String? textToValidate]) {
+    final text = (textToValidate ?? _controller.text).trim();
+    if (text.isEmpty) return null;
 
     final lang = _effectiveLanguage;
-    String? err;
-
     if (lang == ValuePanelLanguage.json) {
       try {
         jsonDecode(text);
+        return null;
       } catch (e) {
-        err = 'Invalid JSON: $e';
+        return 'Invalid JSON: $e';
       }
     } else if (lang == ValuePanelLanguage.xml) {
-      err = XmlHtmlFormatter.validate(text);
+      return XmlHtmlFormatter.validate(text);
     }
+    return null;
+  }
 
+  void _validateContent() {
+    final err = _computeValidationError();
     if (err != _validationError) {
       setState(() => _validationError = err);
     }
@@ -166,12 +175,45 @@ class _DataGridValuePanelState extends material.State<DataGridValuePanel> {
       try {
         final parsed = jsonDecode(_controller.text);
         final compact = jsonEncode(parsed);
-        setState(() => _controller.text = compact);
+        setState(() {
+          _controller.text = compact;
+          _preserveCompact = true;
+        });
       } catch (_) {}
     } else if (lang == ValuePanelLanguage.xml) {
       final compact = XmlHtmlFormatter.minify(_controller.text);
-      setState(() => _controller.text = compact);
+      setState(() {
+        _controller.text = compact;
+        _preserveCompact = true;
+      });
     }
+  }
+
+  void _handleUpdateValue() {
+    _debounceTimer?.cancel();
+    final err = _computeValidationError();
+    if (err != null) {
+      setState(() => _validationError = err);
+      return;
+    }
+
+    String textToSave = _controller.text;
+    final lang = _effectiveLanguage;
+
+    if (_preserveCompact) {
+      if (lang == ValuePanelLanguage.json) {
+        try {
+          final parsed = jsonDecode(textToSave);
+          textToSave = jsonEncode(parsed);
+        } catch (_) {}
+      } else if (lang == ValuePanelLanguage.xml) {
+        try {
+          textToSave = XmlHtmlFormatter.minify(textToSave);
+        } catch (_) {}
+      }
+    }
+
+    widget.onUpdateValue?.call(textToSave);
   }
 
   QueryaCodeLanguage _toQueryaLanguage(ValuePanelLanguage lang) {
@@ -389,17 +431,54 @@ class _DataGridValuePanelState extends material.State<DataGridValuePanel> {
                   ),
                 ),
               ),
-              child: material.ElevatedButton(
-                onPressed: () {
-                  widget.onUpdateValue!(_controller.text);
-                },
-                style: material.ElevatedButton.styleFrom(
-                  backgroundColor: cs.primary,
-                  foregroundColor: cs.primaryForeground,
-                  padding: const material.EdgeInsets.symmetric(vertical: 8),
-                  minimumSize: material.Size.zero,
-                ),
-                child: const Text('Update Cell Value').small().bold(),
+              child: material.Column(
+                mainAxisSize: material.MainAxisSize.min,
+                crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                children: [
+                  if (activeLang == ValuePanelLanguage.json || activeLang == ValuePanelLanguage.xml) ...[
+                    material.Padding(
+                      padding: const material.EdgeInsets.only(bottom: 6),
+                      child: material.Row(
+                        children: [
+                          material.SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: material.Checkbox(
+                              value: _preserveCompact,
+                              onChanged: (val) {
+                                setState(() => _preserveCompact = val ?? false);
+                              },
+                              materialTapTargetSize: material.MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
+                          const Gap(6),
+                          material.GestureDetector(
+                            onTap: () {
+                              setState(() => _preserveCompact = !_preserveCompact);
+                            },
+                            child: Text(
+                              'Preserve compact formatting',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: cs.foreground,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  material.ElevatedButton(
+                    onPressed: _validationError != null ? null : _handleUpdateValue,
+                    style: material.ElevatedButton.styleFrom(
+                      backgroundColor: cs.primary,
+                      foregroundColor: cs.primaryForeground,
+                      padding: const material.EdgeInsets.symmetric(vertical: 8),
+                      minimumSize: material.Size.zero,
+                    ),
+                    child: const Text('Update Cell Value').small().bold(),
+                  ),
+                ],
               ),
             ),
         ],
