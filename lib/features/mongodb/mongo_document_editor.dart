@@ -66,7 +66,9 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
   void didUpdateWidget(covariant MongoDocumentEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.refreshToken != widget.refreshToken) {
-      _reloadFromServer();
+      material.WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_reloadFromServer());
+      });
     }
   }
 
@@ -74,6 +76,11 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
   Future<void> _reloadFromServer() async {
     final id = widget.document['_id'];
     if (id == null) return;
+    if (_dirty) {
+      if (!await confirmDiscardUnsavedWorkIfNeeded(context)) return;
+      if (!mounted) return;
+      setState(() => _dirty = false);
+    }
     setState(() {
       _error = null;
       _success = null;

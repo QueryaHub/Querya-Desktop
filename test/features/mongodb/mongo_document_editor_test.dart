@@ -173,4 +173,94 @@ void main() {
     );
     expect(UnsavedWorkRegistry.instance.hasUnsaved, isFalse);
   });
+
+  testWidgets(
+      'dirty Refresh Cancel keeps edits; Discard reloads from server',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const material.Size(800, 700));
+
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.SizedBox(
+          width: 800,
+          height: 700,
+          child: MongoDocumentEditor(
+            connection: connection,
+            database: 'db',
+            collection: 'items',
+            document: const {'_id': 'abc', 'a': 1},
+            refreshToken: 0,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await pumpSyntaxHighlightDebounce(tester);
+
+    await tester.enterText(
+      find.byType(material.EditableText),
+      '{"_id":"abc","a":999}',
+    );
+    await tester.pump();
+    expect(UnsavedWorkRegistry.instance.hasUnsaved, isTrue);
+
+    // Bump refreshToken (simulate breadcrumb toolbar Refresh)
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.SizedBox(
+          width: 800,
+          height: 700,
+          child: MongoDocumentEditor(
+            connection: connection,
+            database: 'db',
+            collection: 'items',
+            document: const {'_id': 'abc', 'a': 1},
+            refreshToken: 1,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Dialog must appear
+    expect(find.text('Unsaved changes'), findsOneWidget);
+
+    // Cancel must keep edits
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    final editable = tester.widget<material.EditableText>(
+      find.byType(material.EditableText),
+    );
+    expect(editable.controller.text, contains('999'));
+    expect(UnsavedWorkRegistry.instance.hasUnsaved, isTrue);
+
+    // Bump refreshToken again
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.SizedBox(
+          width: 800,
+          height: 700,
+          child: MongoDocumentEditor(
+            connection: connection,
+            database: 'db',
+            collection: 'items',
+            document: const {'_id': 'abc', 'a': 1},
+            refreshToken: 2,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unsaved changes'), findsOneWidget);
+    await tester.tap(find.text('Discard'));
+    await tester.pumpAndSettle();
+
+    expect(UnsavedWorkRegistry.instance.hasUnsaved, isFalse);
+
+    await tester.pumpWidget(
+      queryaThemeTestShell(child: const material.SizedBox()),
+    );
+  });
 }
