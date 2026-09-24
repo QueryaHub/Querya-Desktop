@@ -218,20 +218,38 @@ abstract final class GridGroupingsEngine {
     }
   }
 
-  /// Exports pivot summary to CSV format.
+  /// Exports pivot summary to CSV format, recursively including nested sub-groups.
   static String exportPivotToCsv({
     required List<GroupedCategory> groups,
     required String groupByColumnName,
     GroupAggregationConfig aggConfig = const GroupAggregationConfig(),
+    bool useCompoundKeys = false,
   }) {
     final buffer = StringBuffer();
     buffer.writeln('Group Key,Count,Percentage,Aggregate');
 
-    for (final g in groups) {
+    void writeCategory(GroupedCategory g, [String parentPath = '']) {
       final aggStr = g.aggValue != null ? g.aggValue!.toStringAsFixed(2) : '-';
+      final String keyText;
+      if (useCompoundKeys && parentPath.isNotEmpty) {
+        keyText = '$parentPath > ${g.groupKey}';
+      } else {
+        final indent = '  ' * g.level;
+        keyText = '$indent${g.groupKey}';
+      }
+      final escapedKey = keyText.replaceAll('"', '""');
       buffer.writeln(
-        '"${g.groupKey.replaceAll('"', '""')}",${g.count},${g.percentage.toStringAsFixed(2)}%,$aggStr',
+        '"$escapedKey",${g.count},${g.percentage.toStringAsFixed(2)}%,$aggStr',
       );
+
+      for (final sub in g.subGroups) {
+        final nextParent = parentPath.isEmpty ? g.groupKey : '$parentPath > ${g.groupKey}';
+        writeCategory(sub, nextParent);
+      }
+    }
+
+    for (final g in groups) {
+      writeCategory(g);
     }
 
     return buffer.toString();
