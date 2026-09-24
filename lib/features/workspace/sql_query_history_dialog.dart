@@ -1,18 +1,22 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
-/// Shows recent SQL for this connection + database; choosing a row replaces the editor text.
+/// Shows recent SQL for this connection + database; choosing a row replaces the editor text
+/// or prompts if the editor has uncommitted content.
 void showSqlQueryHistoryDialog({
   required BuildContext context,
   required int connectionId,
   String? databaseName,
   required material.TextEditingController sqlController,
+  void Function(String sql)? onOpenInNewTab,
+  @visibleForTesting Future<List<SqlQueryHistoryEntry>> Function()? loadHistory,
 }) {
   showAppDialog<void>(
     context: context,
@@ -20,8 +24,16 @@ void showSqlQueryHistoryDialog({
       connectionId: connectionId,
       databaseName: databaseName,
       sqlController: sqlController,
+      onOpenInNewTab: onOpenInNewTab,
+      loadHistory: loadHistory,
     ),
   );
+}
+
+enum _HistoryApplyAction {
+  replace,
+  openInNewTab,
+  copy,
 }
 
 class _SqlQueryHistoryDialogContent extends material.StatefulWidget {
@@ -29,11 +41,15 @@ class _SqlQueryHistoryDialogContent extends material.StatefulWidget {
     required this.connectionId,
     required this.databaseName,
     required this.sqlController,
+    this.onOpenInNewTab,
+    this.loadHistory,
   });
 
   final int connectionId;
   final String? databaseName;
   final material.TextEditingController sqlController;
+  final void Function(String sql)? onOpenInNewTab;
+  final Future<List<SqlQueryHistoryEntry>> Function()? loadHistory;
 
   @override
   material.State<_SqlQueryHistoryDialogContent> createState() =>
@@ -51,6 +67,9 @@ class _SqlQueryHistoryDialogContentState
   }
 
   Future<List<SqlQueryHistoryEntry>> _load() async {
+    if (widget.loadHistory != null) {
+      return widget.loadHistory!();
+    }
     final cap = await AppSettings.instance.getSqlHistoryMaxEntries();
     return LocalDb.instance.listSqlQueryHistory(
       connectionId: widget.connectionId,
@@ -125,13 +144,107 @@ class _SqlQueryHistoryDialogContentState
     _reload();
   }
 
-  void _apply(SqlQueryHistoryEntry e) {
-    final text = e.sqlText;
+  void _applyDirectly(String text) {
     widget.sqlController.value = material.TextEditingValue(
       text: text,
       selection: material.TextSelection.collapsed(offset: text.length),
     );
     material.Navigator.of(context).pop();
+  }
+
+  Future<void> _copyToClipboard(String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    showAppToast(
+      context: context,
+      message: 'Query copied to clipboard',
+      variant: AppToastVariant.success,
+    );
+  }
+
+  void _openInNewTab(String text) {
+    widget.onOpenInNewTab?.call(text);
+    material.Navigator.of(context).pop();
+  }
+
+  Future<void> _onEntryTapped(SqlQueryHistoryEntry e) async {
+    final current = widget.sqlController.text;
+    final isEditorEmpty = current.trim().isEmpty;
+    final isSame = current.trim() == e.sqlText.trim();
+
+    if (isEditorEmpty || isSame) {
+      _applyDirectly(e.sqlText);
+      return;
+    }
+
+    final action = await _confirmOverwrite(e.sqlText);
+    if (!mounted || action == null) return;
+
+    switch (action) {
+      case _HistoryApplyAction.replace:
+        _applyDirectly(e.sqlText);
+        break;
+      case _HistoryApplyAction.openInNewTab:
+        _openInNewTab(e.sqlText);
+        break;
+      case _HistoryApplyAction.copy:
+        await _copyToClipboard(e.sqlText);
+        break;
+    }
+  }
+
+  Future<_HistoryApplyAction?> _confirmOverwrite(String sql) async {
+    return showAppDialog<_HistoryApplyAction>(
+      context: context,
+      builder: (ctx) => QueryaDialogCard(
+        constraints: const material.BoxConstraints(maxWidth: 440),
+        child: material.Padding(
+          padding: const material.EdgeInsets.all(20),
+          child: material.Column(
+            mainAxisSize: material.MainAxisSize.min,
+            crossAxisAlignment: material.CrossAxisAlignment.start,
+            children: [
+              const Text('Replace editor content?').semiBold().large(),
+              const Gap(8),
+              const Text(
+                'The active tab already contains query text. Overwriting it will discard unsaved text.',
+              ).muted().small(),
+              const Gap(20),
+              material.Align(
+                alignment: material.Alignment.centerRight,
+                child: material.Wrap(
+                  alignment: material.WrapAlignment.end,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    GhostButton(
+                      onPressed: () => material.Navigator.of(ctx).pop(null),
+                      child: const Text('Cancel'),
+                    ),
+                    OutlineButton(
+                      onPressed: () => material.Navigator.of(ctx)
+                          .pop(_HistoryApplyAction.copy),
+                      child: const Text('Copy to Clipboard'),
+                    ),
+                    if (widget.onOpenInNewTab != null)
+                      OutlineButton(
+                        onPressed: () => material.Navigator.of(ctx)
+                            .pop(_HistoryApplyAction.openInNewTab),
+                        child: const Text('Open in New Tab'),
+                      ),
+                    DestructiveButton(
+                      onPressed: () => material.Navigator.of(ctx)
+                          .pop(_HistoryApplyAction.replace),
+                      child: const Text('Replace'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -204,29 +317,64 @@ class _SqlQueryHistoryDialogContentState
                         return material.Material(
                           color: material.Colors.transparent,
                           child: material.InkWell(
-                            onTap: () => _apply(e),
+                            onTap: () => unawaited(_onEntryTapped(e)),
                             child: material.Padding(
                               padding: const material.EdgeInsets.symmetric(
                                 horizontal: 12,
-                                vertical: 10,
+                                vertical: 8,
                               ),
-                              child: material.Column(
-                                crossAxisAlignment:
-                                    material.CrossAxisAlignment.start,
+                              child: material.Row(
                                 children: [
-                                  material.Text(
-                                    _previewOneLine(e.sqlText),
-                                    maxLines: 2,
-                                    overflow: material.TextOverflow.ellipsis,
-                                    style: material.TextStyle(
-                                      fontFamily: QueryaTypography.mono,
-                                      fontSize: 12,
-                                      color: scheme.foreground,
+                                  material.Expanded(
+                                    child: material.Column(
+                                      crossAxisAlignment:
+                                          material.CrossAxisAlignment.start,
+                                      children: [
+                                        material.Text(
+                                          _previewOneLine(e.sqlText),
+                                          maxLines: 2,
+                                          overflow:
+                                              material.TextOverflow.ellipsis,
+                                          style: material.TextStyle(
+                                            fontFamily: QueryaTypography.mono,
+                                            fontSize: 12,
+                                            color: scheme.foreground,
+                                          ),
+                                        ),
+                                        if (when != null) ...[
+                                          const material.SizedBox(height: 4),
+                                          Text(when).muted().xSmall(),
+                                        ],
+                                      ],
                                     ),
                                   ),
-                                  if (when != null) ...[
-                                    const material.SizedBox(height: 4),
-                                    Text(when).muted().xSmall(),
+                                  const Gap(8),
+                                  material.Tooltip(
+                                    message: 'Copy to clipboard',
+                                    child: IconButton.ghost(
+                                      density: ButtonDensity.compact,
+                                      onPressed: () =>
+                                          unawaited(_copyToClipboard(e.sqlText)),
+                                      icon: const material.Icon(
+                                        material.Icons.copy_rounded,
+                                        size: 15,
+                                      ),
+                                    ),
+                                  ),
+                                  if (widget.onOpenInNewTab != null) ...[
+                                    const Gap(4),
+                                    material.Tooltip(
+                                      message: 'Open in new tab',
+                                      child: IconButton.ghost(
+                                        density: ButtonDensity.compact,
+                                        onPressed: () =>
+                                            _openInNewTab(e.sqlText),
+                                        icon: const material.Icon(
+                                          material.Icons.open_in_new_rounded,
+                                          size: 15,
+                                        ),
+                                      ),
+                                    ),
                                   ],
                                 ],
                               ),
