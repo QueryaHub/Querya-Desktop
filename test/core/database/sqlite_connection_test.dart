@@ -554,5 +554,25 @@ void main() {
         'SQLite database is corrupt or not a database: /x',
       );
     });
+
+    test('inferQueryColumns returns column names when query returns zero rows', () async {
+      final conn = SqliteConnection(
+        id: 99,
+        name: 'mem',
+        path: ':memory:',
+      );
+      addTearDown(conn.disconnect);
+      await conn.connect();
+      await conn.execute('CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT);');
+
+      final colsAll = await conn.inferQueryColumns('SELECT * FROM users WHERE 1=0;');
+      expect(colsAll, ['id', 'name', 'email']);
+
+      final colsProjected = await conn.inferQueryColumns('SELECT id, name AS full_name FROM users WHERE id = -1;');
+      expect(colsProjected, ['id', 'full_name']);
+
+      final colsComputed = await conn.inferQueryColumns('SELECT 1 AS flag, COUNT(*) AS cnt WHERE 1=0;');
+      expect(colsComputed, ['flag', 'cnt']);
+    });
   });
 }
