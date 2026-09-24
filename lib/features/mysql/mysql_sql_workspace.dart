@@ -871,6 +871,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
                       connectionId: widget.connectionRow.id!,
                       databaseName: widget.connectionRow.databaseName,
                       sqlController: session.controller,
+                      onOpenInNewTab: (sql) => _addNewTab(initialSql: sql),
                     );
                   }
                 : null,

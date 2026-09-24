@@ -943,6 +943,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
                       connectionId: widget.connectionRow.id!,
                       databaseName: _effectiveSessionDatabase(),
                       sqlController: session.controller,
+                      onOpenInNewTab: (sql) => _addNewTab(initialSql: sql),
                     );
                   }
                 : null,
