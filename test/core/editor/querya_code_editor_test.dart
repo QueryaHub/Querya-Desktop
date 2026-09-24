@@ -156,9 +156,15 @@ void main() {
     await pumpSyntaxHighlightDebounce(tester);
 
     changeCount = 0;
-    await tester.enterText(find.byType(material.EditableText), 'SELECT 3;');
+    controller2.text = 'SELECT 3;';
     await tester.pump();
 
+    // Verify onChanged fired exactly once (no duplicate listener registered)
+    expect(changeCount, 1);
+
+    // Verify old controller was detached
+    controller1.text = 'SELECT 999;';
+    await tester.pump();
     expect(changeCount, 1);
   });
 }

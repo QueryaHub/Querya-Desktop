@@ -126,12 +126,12 @@ class _QueryaCodeEditorState extends State<QueryaCodeEditor> {
     _syncing = false;
   }
 
-  void _disposeHighlight() {
+  void _disposeHighlight([material.TextEditingController? externalToDetach]) {
     final highlight = _highlightController;
     if (highlight == null) return;
     highlight.removeListener(_onTextChanged);
     highlight.removeListener(_syncToExternal);
-    widget.controller?.removeListener(_syncFromExternal);
+    (externalToDetach ?? widget.controller)?.removeListener(_syncFromExternal);
     if (_ownsHighlightController) {
       highlight.dispose();
     }
@@ -230,7 +230,7 @@ class _QueryaCodeEditorState extends State<QueryaCodeEditor> {
     if (oldWidget.controller != widget.controller) {
       _highlightController?.removeListener(_onTextChanged);
       _plainController?.removeListener(_onTextChanged);
-      _disposeHighlight();
+      _disposeHighlight(oldWidget.controller);
       if (_plainController != null) {
         _plainController!.removeListener(_onTextChanged);
         if (_ownsPlainController) {
