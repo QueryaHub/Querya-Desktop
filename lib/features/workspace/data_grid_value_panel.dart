@@ -41,6 +41,7 @@ class DataGridValuePanel extends material.StatefulWidget {
 class _DataGridValuePanelState extends material.State<DataGridValuePanel> {
   late final material.TextEditingController _controller;
   ValuePanelLanguage _selectedLanguage = ValuePanelLanguage.auto;
+  late ValuePanelLanguage _initialDetectedLanguage;
   String? _validationError;
   bool _wordWrap = true;
   bool _preserveCompact = false;
@@ -51,9 +52,29 @@ class _DataGridValuePanelState extends material.State<DataGridValuePanel> {
     return !trimmed.contains('\n') && !trimmed.contains('\r');
   }
 
+  static ValuePanelLanguage _detectLanguage(String input) {
+    final trimmed = input.trim();
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      return ValuePanelLanguage.json;
+    }
+    if (trimmed.startsWith('<')) {
+      return ValuePanelLanguage.xml;
+    }
+    final upper = trimmed.toUpperCase();
+    if (upper.startsWith('SELECT ') ||
+        upper.startsWith('INSERT ') ||
+        upper.startsWith('UPDATE ') ||
+        upper.startsWith('CREATE ') ||
+        upper.startsWith('WITH ')) {
+      return ValuePanelLanguage.sql;
+    }
+    return ValuePanelLanguage.text;
+  }
+
   @override
   void initState() {
     super.initState();
+    _initialDetectedLanguage = _detectLanguage(widget.cellValue);
     _preserveCompact = _isCompact(widget.cellValue);
     _controller = material.TextEditingController(text: _formatInitialValue(widget.cellValue));
     _controller.addListener(_onTextChanged);
@@ -74,6 +95,7 @@ class _DataGridValuePanelState extends material.State<DataGridValuePanel> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.cellValue != widget.cellValue) {
       _debounceTimer?.cancel();
+      _initialDetectedLanguage = _detectLanguage(widget.cellValue);
       _preserveCompact = _isCompact(widget.cellValue);
       _controller.text = _formatInitialValue(widget.cellValue);
       _validateContent();
@@ -112,11 +134,10 @@ class _DataGridValuePanelState extends material.State<DataGridValuePanel> {
       return _selectedLanguage;
     }
     final trimmed = _controller.text.trim();
-    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-        (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
       return ValuePanelLanguage.json;
     }
-    if (trimmed.startsWith('<') && trimmed.endsWith('>')) {
+    if (trimmed.startsWith('<')) {
       return ValuePanelLanguage.xml;
     }
     final upper = trimmed.toUpperCase();
@@ -126,6 +147,9 @@ class _DataGridValuePanelState extends material.State<DataGridValuePanel> {
         upper.startsWith('CREATE ') ||
         upper.startsWith('WITH ')) {
       return ValuePanelLanguage.sql;
+    }
+    if (_initialDetectedLanguage != ValuePanelLanguage.text && trimmed.isNotEmpty) {
+      return _initialDetectedLanguage;
     }
     return ValuePanelLanguage.text;
   }
