@@ -31,11 +31,10 @@ void main() {
       QueryaCodeLanguage.sql,
     );
 
-    final initialLargeText = List.filled(500, 'SELECT id FROM users; -- row').join('\n');
-    expect(initialLargeText.length, greaterThan(kSyntaxHighlightIsolateThreshold));
-
+    // 1. Initialize controller with small text (< threshold) to populate _cachedSpan synchronously
+    const smallText = 'SELECT id FROM users;';
     final controller = QueryaHighlightController(
-      text: initialLargeText,
+      text: smallText,
       language: QueryaCodeLanguage.sql,
       lightHighlighter: lightHighlighter,
       darkHighlighter: darkHighlighter,
@@ -58,37 +57,40 @@ void main() {
       ),
     );
 
-    // Initial buildTextSpan while isolate is pending
+    // Initial highlight for small text populates _cachedSpan
     var span = controller.buildTextSpan(
       context: buildContext,
       withComposing: false,
     );
-    expect(span.toPlainText(), initialLargeText);
+    expect(span.toPlainText(), smallText);
+    expect(span.children, isNotNull);
 
-    // Wait for isolate highlight and debounce to finish
-    await tester.pumpAndSettle(const Duration(milliseconds: 300));
+    // 2. Switch to large text (> 8KB). Stale _cachedSpan from smallText must NOT be returned.
+    final largeText = List.filled(500, 'SELECT id FROM users; -- row').join('\n');
+    expect(largeText.length, greaterThan(kSyntaxHighlightIsolateThreshold));
+    controller.text = largeText;
 
-    // Now cached span is present
     span = controller.buildTextSpan(
       context: buildContext,
       withComposing: false,
     );
-    expect(span.toPlainText(), initialLargeText);
-    expect(span.children, isNotEmpty);
+    // span.toPlainText() MUST match largeText, never stale smallText
+    expect(span.toPlainText(), largeText);
+    expect(span.toPlainText() == controller.text, isTrue);
 
-    // User edits text by adding a character or typing
-    final modifiedLargeText = '$initialLargeText\n-- extra line';
+    // 3. User edits text while isolate highlight is pending (typing characters)
+    final modifiedLargeText = '$largeText\n-- extra query';
     controller.text = modifiedLargeText;
 
-    // Immediately before isolate finishes, buildTextSpan MUST match modifiedLargeText
     span = controller.buildTextSpan(
       context: buildContext,
       withComposing: false,
     );
     expect(span.toPlainText(), modifiedLargeText);
+    expect(span.toPlainText() == controller.text, isTrue);
 
-    // User deletes characters
-    final deletedText = modifiedLargeText.substring(0, modifiedLargeText.length - 20);
+    // 4. User deletes characters
+    final deletedText = modifiedLargeText.substring(0, modifiedLargeText.length - 25);
     controller.text = deletedText;
 
     span = controller.buildTextSpan(
@@ -96,6 +98,7 @@ void main() {
       withComposing: false,
     );
     expect(span.toPlainText(), deletedText);
+    expect(span.toPlainText() == controller.text, isTrue);
 
     controller.dispose();
   });
