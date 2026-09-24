@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
+import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/extensions/models/extension_driver_capabilities.dart';
 import 'package:querya_desktop/features/main_screen/data_grid_staging_buffer.dart';
+import 'package:querya_desktop/features/workspace/table_view_staging.dart';
 
 void main() {
   group('ExtensionDriver Mutation Standard & Staging', () {
@@ -103,6 +105,139 @@ void main() {
 
       expect(mutations[2]['type'], 'delete');
       expect(mutations[2]['where'], {'id': '2'});
+    });
+
+    test('Extension driver mutation response validation requires integer affectedRows >= 1', () {
+      // 1. Missing affectedRows count
+      void validateResponse(dynamic res) {
+        if (res is! Map) throw StateError('Response is not map');
+        final affected = res['affectedRows'];
+        if (affected is! int) {
+          throw StateError('Save failed: driver did not return an affectedRows count.');
+        }
+        expectDmlMatchedRows(affected);
+      }
+
+      expect(
+        () => validateResponse({}),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Save failed: driver did not return an affectedRows count.'),
+        )),
+      );
+
+      // 2. Non-integer affectedRows
+      expect(
+        () => validateResponse({'affectedRows': '1'}),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Save failed: driver did not return an affectedRows count.'),
+        )),
+      );
+
+      // 3. Zero affectedRows matches no rows (expectDmlMatchedRows throws)
+      expect(
+        () => validateResponse({'affectedRows': 0}),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Save failed: a statement matched 0 rows.'),
+        )),
+      );
+
+      // 4. Positive affectedRows succeeds
+      expect(() => validateResponse({'affectedRows': 3}), returnsNormally);
+    });
+
+    test('Schema fetch failure is captured as unavailable and disables staging', () async {
+      final failedLoad = await loadTableViewSchema(() async {
+        throw StateError('Extension driver rpc timeout');
+      });
+
+      expect(failedLoad.isOk, isFalse);
+      expect(failedLoad.error, isA<StateError>());
+
+      final enabled = tableViewEditingEnabled(
+        isView: false,
+        customSqlActive: false,
+        hasPrimaryKey: false,
+        readOnly: false,
+        schemaError: failedLoad.error,
+      );
+      expect(enabled, isFalse);
+
+      final reason = tableViewEditDisabledReason(
+        isView: false,
+        customSqlActive: false,
+        hasPrimaryKey: false,
+        schemaLoaded: true,
+        readOnly: false,
+        schemaError: failedLoad.error,
+      );
+      expect(reason, contains('Cannot edit: schema unavailable.'));
+      expect(reason, contains('Extension driver rpc timeout'));
+    });
+
+    test('Table without primary keys disables staging with no PK reason', () async {
+      final successLoad = await loadTableViewSchema(() async {
+        return const TableSchemaMeta(tableName: 'logs', columns: [], primaryKeys: []);
+      });
+
+      expect(successLoad.isOk, isTrue);
+      expect(successLoad.schema!.primaryKeys, isEmpty);
+
+      final enabled = tableViewEditingEnabled(
+        isView: false,
+        customSqlActive: false,
+        hasPrimaryKey: successLoad.schema!.primaryKeys.isNotEmpty,
+        readOnly: false,
+        schemaError: null,
+      );
+      expect(enabled, isFalse);
+
+      final reason = tableViewEditDisabledReason(
+        isView: false,
+        customSqlActive: false,
+        hasPrimaryKey: successLoad.schema!.primaryKeys.isNotEmpty,
+        schemaLoaded: true,
+        readOnly: false,
+        schemaError: null,
+      );
+      expect(reason, 'Cannot edit: no primary key detected');
+    });
+
+    test('Table with primary key and mutation support enables staging', () async {
+      final successLoad = await loadTableViewSchema(() async {
+        return const TableSchemaMeta(
+          tableName: 'users',
+          columns: [],
+          primaryKeys: ['id'],
+        );
+      });
+
+      expect(successLoad.isOk, isTrue);
+      expect(successLoad.schema!.primaryKeys, ['id']);
+
+      final enabled = tableViewEditingEnabled(
+        isView: false,
+        customSqlActive: false,
+        hasPrimaryKey: successLoad.schema!.primaryKeys.isNotEmpty,
+        readOnly: false,
+        schemaError: null,
+      );
+      expect(enabled, isTrue);
+
+      final reason = tableViewEditDisabledReason(
+        isView: false,
+        customSqlActive: false,
+        hasPrimaryKey: successLoad.schema!.primaryKeys.isNotEmpty,
+        schemaLoaded: true,
+        readOnly: false,
+        schemaError: null,
+      );
+      expect(reason, isNull);
     });
   });
 }

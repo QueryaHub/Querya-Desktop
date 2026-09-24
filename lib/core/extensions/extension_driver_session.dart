@@ -445,21 +445,18 @@ class ExtensionDriverSession {
     required String tableName,
   }) async {
     final bridge = await ensureConnected(row);
-    try {
-      final result = await bridge.sendRequest('db.getTableSchema', {
-        'connectionId': row.id,
-        'database': database,
-        if (schema != null && schema.isNotEmpty) 'schema': schema,
-        'tableName': tableName,
-      });
-      if (result is Map) {
-        return TableSchemaMeta.fromJson(Map<String, dynamic>.from(result));
-      }
-      return TableSchemaMeta(tableName: tableName, schema: schema);
-    } catch (e) {
-      debugPrint('ExtensionDriverSession getTableSchema fallback ($e)');
-      return TableSchemaMeta(tableName: tableName, schema: schema);
+    final result = await bridge.sendRequest('db.getTableSchema', {
+      'connectionId': row.id,
+      'database': database,
+      if (schema != null && schema.isNotEmpty) 'schema': schema,
+      'tableName': tableName,
+    });
+    if (result is Map) {
+      return TableSchemaMeta.fromJson(Map<String, dynamic>.from(result));
     }
+    throw StateError(
+      'Driver db.getTableSchema returned unexpected payload: $result',
+    );
   }
 
   /// Executes batch data mutations (insert, update, delete) via `db.mutate`.
