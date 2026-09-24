@@ -40,28 +40,30 @@ class SqlQueryTabSession {
   DataGridStagingBuffer? stagingBuffer;
   String? lastExecutedSql;
   bool savingChanges = false;
-  bool isModified = false;
+  bool? _manualModified;
+
+  /// True if the SQL query text has unsaved changes or was manually marked modified.
+  bool get isModified =>
+      _manualModified ??
+      (filePath != null
+          ? controller.text != _savedSql
+          : controller.text.trim().isNotEmpty);
+
+  set isModified(bool value) {
+    _manualModified = value;
+  }
 
   void _onTextChanged() {
-    final modified = controller.text != _savedSql;
-    if (modified != isModified) {
-      isModified = modified;
-    }
+    _manualModified = null;
   }
 
   /// True if the tab has uncommitted changes (modified text, unsaved query draft, or dirty staging buffer).
-  bool get isDirty {
-    if (stagingBuffer?.isDirty ?? false) return true;
-    if (filePath == null) {
-      return controller.text.trim().isNotEmpty;
-    }
-    return isModified;
-  }
+  bool get isDirty => isModified || (stagingBuffer?.isDirty ?? false);
 
   /// Marks the current query text as saved to disk or loaded from file.
   void markSaved({String? newFilePath}) {
     _savedSql = controller.text;
-    isModified = false;
+    _manualModified = false;
     if (newFilePath != null) {
       filePath = newFilePath;
     }
