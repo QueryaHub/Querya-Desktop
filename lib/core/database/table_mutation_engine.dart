@@ -304,8 +304,8 @@ abstract final class TableMutationEngine {
         final stagedVal = mod.value;
         if (colIndex < columns.length) {
           final colName = columns[colIndex];
-          final quotedCol = quoteIdentifier(colName, dialect);
-          final colType = columnDataTypes?[colName];
+          final quotedCol = quoteIdentifier(unquoteIdentifier(colName), dialect);
+          final colType = _lookupDataType(columnDataTypes, colName);
           final literal = formatLiteral(stagedVal, dialect, dataTypeName: colType);
           setClauses.add('$quotedCol = $literal');
         }
@@ -339,7 +339,7 @@ abstract final class TableMutationEngine {
 
       for (var c = 0; c < columns.length; c++) {
         final colName = columns[c];
-        final meta = columnMeta?[colName];
+        final meta = _lookupColumnMeta(columnMeta, colName);
         if (meta?.omitOnInsert == true) continue;
 
         final cellVal = c < row.length ? row[c] : (meta == null ? 'NULL' : '');
@@ -349,8 +349,8 @@ abstract final class TableMutationEngine {
           continue;
         }
 
-        final quotedCol = quoteIdentifier(colName, dialect);
-        final colType = columnDataTypes?[colName] ?? meta?.dataType;
+        final quotedCol = quoteIdentifier(unquoteIdentifier(colName), dialect);
+        final colType = _lookupDataType(columnDataTypes, colName) ?? meta?.dataType;
         colNames.add(quotedCol);
         values.add(formatLiteral(cellVal, dialect, dataTypeName: colType));
       }
@@ -401,8 +401,67 @@ abstract final class TableMutationEngine {
       tableName: tableName,
       schema: schema,
       statements: statements,
-      hasPrimaryKey: primaryKeys.isNotEmpty,
+      hasPrimaryKey: _hasMatchingPrimaryKey(columns: columns, primaryKeys: primaryKeys),
     );
+  }
+
+  /// Strips enclosing quotes (`"`, ``` ` ```, or `[]`) from an identifier if present.
+  static String unquoteIdentifier(String identifier) {
+    var s = identifier.trim();
+    if ((s.startsWith('"') && s.endsWith('"') && s.length >= 2) ||
+        (s.startsWith('`') && s.endsWith('`') && s.length >= 2) ||
+        (s.startsWith('[') && s.endsWith(']') && s.length >= 2)) {
+      s = s.substring(1, s.length - 1);
+    }
+    return s;
+  }
+
+  /// Normalizes an identifier by stripping enclosing quotes and lowercasing.
+  static String normalizeIdentifier(String identifier) {
+    return unquoteIdentifier(identifier).toLowerCase();
+  }
+
+  static String? _lookupDataType(Map<String, String>? columnDataTypes, String colName) {
+    if (columnDataTypes == null || columnDataTypes.isEmpty) return null;
+    if (columnDataTypes.containsKey(colName)) return columnDataTypes[colName];
+    final unquoted = unquoteIdentifier(colName);
+    if (columnDataTypes.containsKey(unquoted)) return columnDataTypes[unquoted];
+    final norm = normalizeIdentifier(colName);
+    for (final entry in columnDataTypes.entries) {
+      if (normalizeIdentifier(entry.key) == norm) {
+        return entry.value;
+      }
+    }
+    return null;
+  }
+
+  static TableColumnMeta? _lookupColumnMeta(
+    Map<String, TableColumnMeta>? columnMeta,
+    String colName,
+  ) {
+    if (columnMeta == null || columnMeta.isEmpty) return null;
+    if (columnMeta.containsKey(colName)) return columnMeta[colName];
+    final unquoted = unquoteIdentifier(colName);
+    if (columnMeta.containsKey(unquoted)) return columnMeta[unquoted];
+    final norm = normalizeIdentifier(colName);
+    for (final entry in columnMeta.entries) {
+      if (normalizeIdentifier(entry.key) == norm) {
+        return entry.value;
+      }
+    }
+    return null;
+  }
+
+  static bool _hasMatchingPrimaryKey({
+    required List<String> columns,
+    required List<String> primaryKeys,
+  }) {
+    if (primaryKeys.isEmpty) return false;
+    return primaryKeys.any((pk) {
+      if (columns.contains(pk)) return true;
+      final normPk = normalizeIdentifier(pk);
+      return columns.any((c) => normalizeIdentifier(c) == normPk);
+    });
   }
 
   static String _buildWhereClause({
@@ -416,14 +475,20 @@ abstract final class TableMutationEngine {
 
     if (primaryKeys.isNotEmpty) {
       for (final pk in primaryKeys) {
-        final colIdx = columns.indexOf(pk);
+        var colIdx = columns.indexOf(pk);
+        if (colIdx == -1) {
+          final normPk = normalizeIdentifier(pk);
+          colIdx = columns.indexWhere((c) => normalizeIdentifier(c) == normPk);
+        }
         if (colIdx != -1 && colIdx < row.length) {
-          final colName = quoteIdentifier(pk, dialect);
+          final matchedCol = columns[colIdx];
+          final colName = quoteIdentifier(unquoteIdentifier(matchedCol), dialect);
           final val = row[colIdx];
           if (val == 'NULL' || val == 'null') {
             clauses.add('$colName IS NULL');
           } else {
-            final colType = columnDataTypes?[pk];
+            final colType = _lookupDataType(columnDataTypes, matchedCol) ??
+                _lookupDataType(columnDataTypes, pk);
             clauses.add('$colName = ${formatLiteral(val, dialect, dataTypeName: colType)}');
           }
         }
@@ -434,12 +499,12 @@ abstract final class TableMutationEngine {
     if (clauses.isEmpty) {
       for (var c = 0; c < columns.length; c++) {
         final colName = columns[c];
-        final quotedCol = quoteIdentifier(colName, dialect);
+        final quotedCol = quoteIdentifier(unquoteIdentifier(colName), dialect);
         final val = c < row.length ? row[c] : 'NULL';
         if (val == 'NULL' || val == 'null') {
           clauses.add('$quotedCol IS NULL');
         } else {
-          final colType = columnDataTypes?[colName];
+          final colType = _lookupDataType(columnDataTypes, colName);
           clauses.add('$quotedCol = ${formatLiteral(val, dialect, dataTypeName: colType)}');
         }
       }
