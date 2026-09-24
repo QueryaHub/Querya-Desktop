@@ -114,4 +114,58 @@ void main() {
     await tester.enterText(find.byType(material.EditableText), 'hello');
     expect(last, 'hello');
   });
+
+  testWidgets(
+      'updating controller does not register duplicate listener on highlight controller',
+      (tester) async {
+    final controller1 = material.TextEditingController(text: 'SELECT 1;');
+    final controller2 = material.TextEditingController(text: 'SELECT 2;');
+    int changeCount = 0;
+
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.SizedBox(
+          width: 400,
+          height: 200,
+          child: QueryaCodeEditor(
+            controller: controller1,
+            language: QueryaCodeLanguage.sql,
+            onChanged: (_) => changeCount++,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await pumpSyntaxHighlightDebounce(tester);
+
+    // Update widget with new controller reference
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.SizedBox(
+          width: 400,
+          height: 200,
+          child: QueryaCodeEditor(
+            controller: controller2,
+            language: QueryaCodeLanguage.sql,
+            onChanged: (_) => changeCount++,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await pumpSyntaxHighlightDebounce(tester);
+
+    changeCount = 0;
+    controller2.text = 'SELECT 3;';
+    await tester.pump();
+
+    // Verify onChanged fired exactly once (no duplicate listener registered)
+    expect(changeCount, 1);
+
+    // Verify old controller was detached
+    controller1.text = 'SELECT 999;';
+    await tester.pump();
+    expect(changeCount, 1);
+  });
 }
+
