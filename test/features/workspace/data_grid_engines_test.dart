@@ -312,5 +312,49 @@ void main() {
       expect(csv, contains('Group Key,Count,Percentage,Aggregate'));
       expect(csv, contains('"ACTIVE",3,60.00%,600.00'));
     });
+
+    test('exports multi-level hierarchical pivot table to CSV with nested sub-groups', () {
+      final multiLevelRows = [
+        ['USA', 'NY', '100'],
+        ['USA', 'CA', '200'],
+        ['UK', 'London', '300'],
+      ];
+
+      final groups = GridGroupingsEngine.buildGroups(
+        groupColIndices: [0, 1],
+        rows: multiLevelRows,
+        aggConfig: const GroupAggregationConfig(
+          aggType: GroupingAggType.sum,
+          targetColIndex: 2,
+        ),
+      );
+
+      expect(groups.first.hasSubGroups, isTrue);
+
+      // Default indented export
+      final csvIndented = GridGroupingsEngine.exportPivotToCsv(
+        groups: groups,
+        groupByColumnName: 'Country',
+      );
+
+      expect(csvIndented, contains('"USA",2,66.67%,300.00'));
+      expect(csvIndented, contains('"  CA",1,33.33%,200.00'));
+      expect(csvIndented, contains('"  NY",1,33.33%,100.00'));
+      expect(csvIndented, contains('"UK",1,33.33%,300.00'));
+      expect(csvIndented, contains('"  London",1,33.33%,300.00'));
+
+      // Compound keys export
+      final csvCompound = GridGroupingsEngine.exportPivotToCsv(
+        groups: groups,
+        groupByColumnName: 'Country',
+        useCompoundKeys: true,
+      );
+
+      expect(csvCompound, contains('"USA",2,66.67%,300.00'));
+      expect(csvCompound, contains('"USA > CA",1,33.33%,200.00'));
+      expect(csvCompound, contains('"USA > NY",1,33.33%,100.00'));
+      expect(csvCompound, contains('"UK",1,33.33%,300.00'));
+      expect(csvCompound, contains('"UK > London",1,33.33%,300.00'));
+    });
   });
 }
