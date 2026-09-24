@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:querya_desktop/core/database/sql_table_target_extractor.dart';
 import 'package:querya_desktop/core/database/sqlite_sql.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -307,6 +308,49 @@ class SqliteConnection {
   Future<List<String>> listColumnNames({required String table}) async {
     final rows = await execute('PRAGMA table_info(${quoteIdentifier(table)})');
     return rows.map((r) => r['name'] as String).toList();
+  }
+
+  /// Attempts to infer column names for a query (even when it yields zero rows)
+  /// using an ephemeral TEMP VIEW, or falling back to single-table schema.
+  Future<List<String>> inferQueryColumns(String sql) async {
+    if (!isConnected || _db == null) return const [];
+    final trimmed = sqliteStripSqlComments(sql).trim();
+    if (trimmed.isEmpty) return const [];
+
+    // 1. Try temporary view probe in SQLite's in-memory temp schema.
+    const viewName = '_querya_zero_row_col_probe';
+    try {
+      var cleanSql = trimmed;
+      while (cleanSql.endsWith(';')) {
+        cleanSql = cleanSql.substring(0, cleanSql.length - 1).trim();
+      }
+      // Note: We execute on _db! directly to bypass readOnly restriction,
+      // as temp views only touch in-memory session temp schema.
+      await _db!.execute('CREATE TEMP VIEW IF NOT EXISTS $viewName AS $cleanSql');
+      final rows = await _db!.rawQuery('PRAGMA table_info($viewName)');
+      final cols = rows
+          .map((r) => r['name'] as String? ?? '')
+          .where((n) => n.isNotEmpty)
+          .toList();
+      await _db!.execute('DROP VIEW IF EXISTS $viewName');
+      if (cols.isNotEmpty) {
+        return cols;
+      }
+    } catch (_) {
+      try {
+        await _db!.execute('DROP VIEW IF EXISTS $viewName');
+      } catch (_) {}
+    }
+
+    // 2. Fallback: single-table target extraction
+    final target = SqlTableTargetExtractor.extract(trimmed);
+    if (target != null) {
+      try {
+        return await listColumnNames(table: target.tableName);
+      } catch (_) {}
+    }
+
+    return const [];
   }
 
   /// Retrieves schema metadata and primary keys for [table].

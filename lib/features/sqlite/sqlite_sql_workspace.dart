@@ -351,6 +351,8 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       final cols = <String>[];
       if (results.isNotEmpty) {
         cols.addAll(results.first.keys);
+      } else if (sqliteSqlIsReadOnlyQuery(userSql)) {
+        cols.addAll(await conn.inferQueryColumns(userSql));
       }
 
       final truncated = results.length > cap;
