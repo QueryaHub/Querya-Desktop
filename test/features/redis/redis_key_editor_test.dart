@@ -473,4 +473,148 @@ void main() {
     expect(find.text('No items'), findsOneWidget);
     await fake.disconnect();
   });
+  testWidgets(
+      'RedisKeyEditor Refresh proceeds without dialog when string is unedited',
+      (tester) async {
+    final fake = RedisConnectionTestFake(getResult: 'original');
+    await fake.connect();
+
+    await pumpEditor(tester, fake: fake, isReadOnly: false);
+    // One GET on initial load
+    expect(fake.sentCommands.where((c) => c == 'GET').length, 1);
+
+    await tester.tap(find.byTooltip('Refresh'));
+    await tester.pumpAndSettle();
+
+    // No discard dialog, GET called again
+    expect(find.text('Unsaved changes'), findsNothing);
+    expect(fake.sentCommands.where((c) => c == 'GET').length, 2);
+    await fake.disconnect();
+  });
+
+  testWidgets(
+      'RedisKeyEditor Refresh shows discard dialog when string is dirty',
+      (tester) async {
+    final fake = RedisConnectionTestFake(getResult: 'original');
+    await fake.connect();
+
+    await pumpEditor(tester, fake: fake, isReadOnly: false);
+    expect(fake.sentCommands.where((c) => c == 'GET').length, 1);
+
+    // Edit the string value
+    final textField = find.byType(material.TextField).first;
+    await tester.tap(textField);
+    await tester.enterText(textField, 'edited');
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('Refresh'));
+    await tester.pumpAndSettle();
+
+    // Discard dialog should appear
+    expect(find.text('Unsaved changes'), findsOneWidget);
+
+    // Cancel — no reload
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(fake.sentCommands.where((c) => c == 'GET').length, 1);
+
+    // Try refresh again and confirm discard
+    await tester.tap(find.byTooltip('Refresh'));
+    await tester.pumpAndSettle();
+    expect(find.text('Unsaved changes'), findsOneWidget);
+    await tester.tap(find.text('Discard'));
+    await tester.pumpAndSettle();
+
+    expect(fake.sentCommands.where((c) => c == 'GET').length, 2);
+    await fake.disconnect();
+  });
+
+  testWidgets(
+      'RedisKeyEditorController.canNavigateAway returns true when string is clean',
+      (tester) async {
+    final fake = RedisConnectionTestFake(getResult: 'hello');
+    await fake.connect();
+    final controller = RedisKeyEditorController();
+
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.Scaffold(
+          body: material.SizedBox(
+            width: 800,
+            height: 600,
+            child: RedisKeyEditor(
+              connection: fake,
+              database: 0,
+              keyName: 'session:1',
+              keyType: 'string',
+              isReadOnly: false,
+              controller: controller,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final canLeave = await controller.canNavigateAway();
+    expect(canLeave, isTrue);
+    await fake.disconnect();
+  });
+
+  testWidgets(
+      'RedisKeyEditorController.canNavigateAway shows dialog when string is dirty',
+      (tester) async {
+    final fake = RedisConnectionTestFake(getResult: 'hello');
+    await fake.connect();
+    final controller = RedisKeyEditorController();
+
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.Scaffold(
+          body: material.SizedBox(
+            width: 800,
+            height: 600,
+            child: RedisKeyEditor(
+              connection: fake,
+              database: 0,
+              keyName: 'session:1',
+              keyType: 'string',
+              isReadOnly: false,
+              controller: controller,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Dirty the field
+    final textField = find.byType(material.TextField).first;
+    await tester.tap(textField);
+    await tester.enterText(textField, 'dirty value');
+    await tester.pump();
+
+    // Trigger navigation guard — dialog should appear
+    bool? result;
+    final future = controller.canNavigateAway().then((v) => result = v);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unsaved changes'), findsOneWidget);
+
+    // Dismiss with Cancel — guard returns false
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    await future;
+    expect(result, isFalse);
+
+    // Trigger again — dismiss with Discard — guard returns true
+    bool? result2;
+    final future2 = controller.canNavigateAway().then((v) => result2 = v);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Discard'));
+    await tester.pumpAndSettle();
+    await future2;
+    expect(result2, isTrue);
+    await fake.disconnect();
+  });
 }
