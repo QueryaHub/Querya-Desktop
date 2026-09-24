@@ -240,7 +240,6 @@ class _QueryaCodeEditorState extends State<QueryaCodeEditor> {
       }
       if (_useHighlighting) {
         _ensureHighlightController(context.queryaTheme);
-        _highlightController!.addListener(_onTextChanged);
       } else {
         _initPlainController(widget.controller);
         _plainController!.addListener(_onTextChanged);
