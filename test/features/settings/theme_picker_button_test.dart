@@ -635,6 +635,73 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(material.ListView), findsNothing);
     });
+
+    testWidgets('rapid trigger toggle during exit delay cancels close and keeps theme picker open',
+        (tester) async {
+      final themes = _fakeThemes(5);
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: ThemePickerButton(
+              themes: themes,
+              selectedThemeId: 'theme-0',
+              onSelected: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Open menu
+      await tester.tap(find.text('Theme 00'));
+      await tester.pumpAndSettle();
+      expect(find.byType(material.ListView), findsOneWidget);
+
+      // Tap trigger to close (starts exit delay)
+      await tester.tap(find.text('Theme 00').first);
+      await tester.pump(const Duration(milliseconds: 30));
+      expect(find.byType(material.ListView), findsOneWidget);
+
+      // Rapid tap trigger again during exit delay -> cancels close and reopens
+      await tester.tap(find.text('Theme 00').first);
+      await tester.pumpAndSettle();
+
+      // Menu must remain open, ListView must be visible
+      expect(find.byType(material.ListView), findsOneWidget);
+    });
+
+    testWidgets('menu enter mounts initially with 0 opacity before animating to 1',
+        (tester) async {
+      final themes = _fakeThemes(5);
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: ThemePickerButton(
+              themes: themes,
+              selectedThemeId: 'theme-0',
+              onSelected: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.text('Theme 00'));
+      await tester.pump(); // Frame 1: mounted in overlay with opacity 0
+      final opacityWidget = tester.widget<material.AnimatedOpacity>(
+        find.byType(material.AnimatedOpacity).first,
+      );
+      expect(opacityWidget.opacity, 0.0);
+
+      await tester.pump(); // Frame 2: post-frame callback runs, animates to 1.0
+      await tester.pumpAndSettle();
+      final settledOpacity = tester.widget<material.AnimatedOpacity>(
+        find.byType(material.AnimatedOpacity).first,
+      );
+      expect(settledOpacity.opacity, 1.0);
+    });
   });
 
   group('filterThemeDefinitions metadata', () {
