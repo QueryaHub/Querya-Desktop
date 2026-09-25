@@ -19,6 +19,7 @@ import 'package:querya_desktop/core/ui/querya_shell_status.dart';
 import 'package:querya_desktop/features/sqlite/sqlite_result_utils.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
+import 'package:querya_desktop/features/workspace/sql_result_grid_schema.dart';
 import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -319,6 +320,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       session.statusLine = null;
       session.resultGridPrimaryKeys = const [];
       session.resultGridColumnDataTypes = null;
+      session.resultGridColumnMeta = null;
     });
     QueryaShellStatus.instance.beginBusy(message: 'Running query…');
     final sw = Stopwatch()..start();
@@ -368,18 +370,28 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       final outRows = await convertResultRowsToStringsAdaptive(rawRows);
 
       final target = SqlTableTargetExtractor.extract(userSql);
-      var pks = const <String>[];
-      Map<String, String>? types;
+      var gridSchema = SqlResultGridSchema.none;
       if (target != null && cols.isNotEmpty) {
+        // Views have no rowid, so they never fall back to it.
+        var isView = false;
         try {
-          final meta = await conn.getTableSchema(table: target.tableName);
-          pks = List<String>.from(meta.primaryKeys);
-          types = columnDataTypesFromSchema(meta);
+          final kind = await conn.execute(
+            'SELECT type FROM sqlite_master WHERE name = ?',
+            [target.tableName],
+          );
+          isView = kind.isNotEmpty && kind.first['type'] == 'view';
         } catch (_) {
-          pks = const [];
-          types = null;
+          // Unknown kind: treat as a table (the schema load surfaces real errors).
         }
+        gridSchema = SqlResultGridSchema.fromLoad(
+          await loadTableViewSchema(
+            () => conn.getTableSchema(table: target.tableName),
+          ),
+          sqliteImplicitRowid: !isView,
+        );
       }
+      final pks = gridSchema.primaryKeys;
+      final editHint = gridSchema.editHint(cols);
       final canSave = sqlResultGridSaveEnabled(
         sql: userSql,
         resultColumns: cols,
@@ -392,7 +404,8 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         session.affectedRows = null;
         session.lastExecutedSql = userSql;
         session.resultGridPrimaryKeys = canSave ? pks : const [];
-        session.resultGridColumnDataTypes = types;
+        session.resultGridColumnDataTypes = gridSchema.columnDataTypes;
+        session.resultGridColumnMeta = gridSchema.columnMeta;
         session.stagingBuffer?.dispose();
         session.stagingBuffer = canSave
             ? DataGridStagingBuffer(
@@ -404,9 +417,13 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         if (cols.isEmpty && outRows.isEmpty) {
           session.statusLine = 'Command completed.';
         } else if (truncated || (injectedLimit && results.length >= cap)) {
-          session.statusLine = 'Showing first $cap row(s) (result capped).';
+          session.statusLine = withEditHint(
+            'Showing first $cap row(s) (result capped).',
+            editHint,
+          );
         } else {
-          session.statusLine = '${results.length} row(s).';
+          session.statusLine =
+              withEditHint('${results.length} row(s).', editHint);
         }
         session.running = false;
       });
@@ -479,6 +496,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         schema: target.schema,
         primaryKeys: session.resultGridPrimaryKeys,
         columnDataTypes: session.resultGridColumnDataTypes,
+        columnMeta: session.resultGridColumnMeta,
       );
       if (plan.isEmpty) {
         setState(() => session.savingChanges = false);

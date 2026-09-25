@@ -21,6 +21,7 @@ import 'package:querya_desktop/features/postgresql/postgres_result_utils.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_utils.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
+import 'package:querya_desktop/features/workspace/sql_result_grid_schema.dart';
 import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -454,6 +455,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       session.statusLine = null;
       session.resultGridPrimaryKeys = const [];
       session.resultGridColumnDataTypes = null;
+      session.resultGridColumnMeta = null;
     });
     QueryaShellStatus.instance.beginBusy(message: 'Running query…');
     final sw = Stopwatch()..start();
@@ -513,21 +515,19 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       );
 
       final target = SqlTableTargetExtractor.extract(userSql);
-      var pks = const <String>[];
-      Map<String, String>? types;
+      var gridSchema = SqlResultGridSchema.none;
       if (target != null && cols.isNotEmpty) {
-        try {
-          final meta = await conn.getTableSchema(
-            schema: target.schema ?? 'public',
-            table: target.tableName,
-          );
-          pks = List<String>.from(meta.primaryKeys);
-          types = columnDataTypesFromSchema(meta);
-        } catch (_) {
-          pks = const [];
-          types = null;
-        }
+        gridSchema = SqlResultGridSchema.fromLoad(
+          await loadTableViewSchema(
+            () => conn.getTableSchema(
+              schema: target.schema ?? 'public',
+              table: target.tableName,
+            ),
+          ),
+        );
       }
+      final pks = gridSchema.primaryKeys;
+      final editHint = gridSchema.editHint(cols);
       final canSave = sqlResultGridSaveEnabled(
         sql: userSql,
         resultColumns: cols,
@@ -540,7 +540,8 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         session.affectedRows = result.affectedRows;
         session.lastExecutedSql = userSql;
         session.resultGridPrimaryKeys = canSave ? pks : const [];
-        session.resultGridColumnDataTypes = types;
+        session.resultGridColumnDataTypes = gridSchema.columnDataTypes;
+        session.resultGridColumnMeta = gridSchema.columnMeta;
         session.stagingBuffer?.dispose();
         session.stagingBuffer = canSave
             ? DataGridStagingBuffer(
@@ -554,9 +555,12 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
               'Command completed. Rows affected: ${result.affectedRows}.';
         } else {
           final truncated = result.length >= cap;
-          session.statusLine = truncated
-              ? 'Showing first $cap row(s) (result capped).'
-              : '${result.length} row(s).';
+          session.statusLine = withEditHint(
+            truncated
+                ? 'Showing first $cap row(s) (result capped).'
+                : '${result.length} row(s).',
+            editHint,
+          );
         }
         session.running = false;
       });
@@ -635,6 +639,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         schema: target.schema ?? 'public',
         primaryKeys: session.resultGridPrimaryKeys,
         columnDataTypes: session.resultGridColumnDataTypes,
+        columnMeta: session.resultGridColumnMeta,
       );
       if (plan.isEmpty) {
         setState(() => session.savingChanges = false);

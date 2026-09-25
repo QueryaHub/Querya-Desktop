@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/actions/sql_script_format.dart';
+import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/unsaved_work_registry.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 
@@ -74,6 +75,10 @@ class SqlQueryTabSession {
 
   /// Column types from [getTableSchema] for DML literals, if resolved.
   Map<String, String>? resultGridColumnDataTypes;
+
+  /// Column flags (generated / default / nullable) so INSERT can omit columns
+  /// the database fills in, same as Table Browser.
+  Map<String, TableColumnMeta>? resultGridColumnMeta;
 
   void formatSql() {
     final next = formatSqlScript(controller.text);
