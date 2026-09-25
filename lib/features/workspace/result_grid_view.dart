@@ -735,13 +735,40 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     _lastKnownStagedRowCount = currentRows.length;
 
     setState(() {
-      if (_sortColumnIndex != null || rowCountChanged) {
+      if (rowCountChanged) {
+        _updateSortedRows();
+        _widthsNeedUpdate = true;
+      } else if (widget.rowIndicesMapping == null) {
+        _refreshSortedRowValues(currentRows);
+      } else if (_sortColumnIndex != null) {
         _updateSortedRows();
       }
-      if (rowCountChanged) {
-        _widthsNeedUpdate = true;
-      }
     });
+  }
+
+  /// Applies staged cell values to the displayed rows without re-sorting.
+  ///
+  /// A cell edit does not add or remove rows, so the current visual order is
+  /// kept (the edited row does not jump while typing) and only the row list is
+  /// rebuilt in O(N). Sorting again happens on a sort-column change, a row
+  /// insert / delete, or when the user re-applies the sort.
+  void _refreshSortedRowValues(List<List<String>> rows) {
+    if (_sortColumnIndex == null || _sortOrder == null) {
+      _sortedRows = rows;
+      return;
+    }
+    final order = _sortedToModelIndices;
+    if (order.length != rows.length) {
+      _updateSortedRows();
+      return;
+    }
+    // Drop any in-flight isolate sort: it was computed from older values.
+    _sortVersion++;
+    _sortedRows = List<List<String>>.generate(
+      order.length,
+      (i) => rows[order[i]],
+      growable: false,
+    );
   }
 
   @override
@@ -772,7 +799,17 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
         _editingCell = null;
         widget.onRowSelected?.call(null);
       }
-      _updateSortedRows();
+      // With a staging buffer and no filter mapping the displayed rows come from
+      // the buffer, and a cell edit is applied by [_onStagingBufferChanged]. The
+      // parent handing over a fresh `rows` list for that edit must not re-sort.
+      final onlyRowsChanged = oldWidget.columns == widget.columns &&
+          oldWidget.stagingBuffer == widget.stagingBuffer &&
+          oldWidget.rowIndicesMapping == widget.rowIndicesMapping;
+      final rowsFollowBuffer =
+          widget.stagingBuffer != null && widget.rowIndicesMapping == null;
+      if (!(onlyRowsChanged && rowsFollowBuffer)) {
+        _updateSortedRows();
+      }
     }
   }
 
