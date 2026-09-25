@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' as foundation;
-import 'package:flutter/gestures.dart' show kSecondaryMouseButton;
+import 'package:flutter/gestures.dart'
+    show kPrimaryMouseButton, kSecondaryMouseButton;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart'
     show Clipboard, ClipboardData, HardwareKeyboard, LogicalKeyboardKey;
@@ -705,6 +707,17 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
 
   int _lastKnownStagedRowCount = -1;
 
+  bool _isPointerDown = false;
+  bool _isDragSelecting = false;
+  bool _hasJustDragSelected = false;
+  Offset _pointerDownGlobalPos = Offset.zero;
+  Offset _pointerDownLocalPos = Offset.zero;
+  Offset? _lastPointerLocalPos;
+  Timer? _autoScrollTimer;
+  List<double> _currentDisplayOffsets = const [0];
+  double _currentAvailableWidth = 0.0;
+  double _currentRowsViewportHeight = 0.0;
+
   @override
   void initState() {
     super.initState();
@@ -765,6 +778,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
 
   @override
   void dispose() {
+    _stopAutoScroll();
     widget.stagingBuffer?.removeListener(_onStagingBufferChanged);
     _horizontalController.removeListener(_onHorizontalScroll);
     _horizontalController.dispose();
@@ -1098,7 +1112,223 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     }
   }
 
+  ResultGridCellCoordinate? _cellAtOffset({
+    required Offset localPosition,
+    required double rowHeight,
+  }) {
+    if (_sortedRows.isEmpty || widget.columns.isEmpty) return null;
+    final rowCount = _sortedRows.length;
+    final colCount = widget.columns.length;
+
+    final verticalOffset =
+        _verticalController.hasClients ? _verticalController.offset : 0.0;
+    final tableY = localPosition.dy + verticalOffset;
+    final rowIndex = (tableY / rowHeight).floor().clamp(0, rowCount - 1);
+
+    final tableX = localPosition.dx;
+    final offsets = _currentDisplayOffsets.length >= colCount + 1
+        ? _currentDisplayOffsets
+        : _columnOffsets;
+    int colIndex = colCount - 1;
+    for (var i = 0; i < colCount; i++) {
+      if (i + 1 < offsets.length && tableX < offsets[i + 1]) {
+        colIndex = i;
+        break;
+      }
+    }
+    colIndex = colIndex.clamp(0, colCount - 1);
+
+    return ResultGridCellCoordinate(rowIndex, colIndex);
+  }
+
+  void _onGridPointerDown(
+    PointerDownEvent event, {
+    required double rowHeight,
+  }) {
+    if (event.buttons != kPrimaryMouseButton) return;
+    if (_sortedRows.isEmpty || widget.columns.isEmpty) return;
+
+    if (_editingCell != null) {
+      _cancelEdit();
+    }
+
+    _isPointerDown = true;
+    _isDragSelecting = false;
+    _hasJustDragSelected = false;
+    _pointerDownGlobalPos = event.position;
+    _pointerDownLocalPos = event.localPosition;
+    _lastPointerLocalPos = event.localPosition;
+  }
+
+  void _onGridPointerMove(
+    PointerMoveEvent event, {
+    required double rowHeight,
+  }) {
+    if (!_isPointerDown) return;
+    _lastPointerLocalPos = event.localPosition;
+
+    if (!_isDragSelecting) {
+      final delta = (event.position - _pointerDownGlobalPos).distance;
+      if (delta > 4.0) {
+        _isDragSelecting = true;
+        _hasJustDragSelected = false;
+        final startCell = _cellAtOffset(
+          localPosition: _pointerDownLocalPos,
+          rowHeight: rowHeight,
+        );
+        if (startCell != null) {
+          final isShift = HardwareKeyboard.instance.isShiftPressed;
+          if (!isShift || _selectionAnchor == null) {
+            _selectionAnchor = startCell;
+          }
+          _selectionFocus = startCell;
+          _selection = ResultGridSelection.fromPoints(
+            anchor: _selectionAnchor!,
+            focus: startCell,
+          );
+          _focusNode.requestFocus();
+          final modelRow = _toModelRowIndex(startCell.row);
+          widget.onRowSelected?.call(modelRow);
+          _notifySelectionAndFocus();
+          setState(() {});
+        }
+        _startAutoScroll(rowHeight);
+      }
+    }
+
+    if (_isDragSelecting) {
+      final currentCell = _cellAtOffset(
+        localPosition: event.localPosition,
+        rowHeight: rowHeight,
+      );
+      if (currentCell != null && currentCell != _selectionFocus) {
+        setState(() {
+          _selectionFocus = currentCell;
+          _selection = ResultGridSelection.fromPoints(
+            anchor: _selectionAnchor ?? currentCell,
+            focus: currentCell,
+          );
+        });
+        final modelRow = _toModelRowIndex(currentCell.row);
+        widget.onRowSelected?.call(modelRow);
+        _notifySelectionAndFocus();
+      }
+    }
+  }
+
+  void _onGridPointerUp(PointerUpEvent event) {
+    if (_isDragSelecting) {
+      _hasJustDragSelected = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _hasJustDragSelected = false;
+      });
+    }
+    _isPointerDown = false;
+    _isDragSelecting = false;
+    _stopAutoScroll();
+  }
+
+  void _onGridPointerCancel(PointerCancelEvent event) {
+    _isPointerDown = false;
+    _isDragSelecting = false;
+    _stopAutoScroll();
+  }
+
+  void _startAutoScroll(double rowHeight) {
+    _autoScrollTimer?.cancel();
+    _autoScrollTimer = Timer.periodic(const Duration(milliseconds: 20), (_) {
+      if (!_isDragSelecting || _lastPointerLocalPos == null || !mounted) {
+        _stopAutoScroll();
+        return;
+      }
+      _performAutoScrollAndSelection(rowHeight);
+    });
+  }
+
+  void _stopAutoScroll() {
+    _autoScrollTimer?.cancel();
+    _autoScrollTimer = null;
+  }
+
+  void _performAutoScrollAndSelection(double rowHeight) {
+    if (!mounted) {
+      _stopAutoScroll();
+      return;
+    }
+    final pos = _lastPointerLocalPos;
+    if (pos == null) return;
+
+    const edgeMargin = 32.0;
+    const maxVelocity = 15.0;
+
+    double dyScroll = 0.0;
+    if (pos.dy < edgeMargin) {
+      final factor = ((edgeMargin - pos.dy) / edgeMargin).clamp(0.0, 3.0);
+      dyScroll = -maxVelocity * factor;
+    } else if (pos.dy > _currentRowsViewportHeight - edgeMargin) {
+      final factor =
+          ((pos.dy - (_currentRowsViewportHeight - edgeMargin)) / edgeMargin)
+              .clamp(0.0, 3.0);
+      dyScroll = maxVelocity * factor;
+    }
+
+    double dxScroll = 0.0;
+    final hOffset =
+        _horizontalController.hasClients ? _horizontalController.offset : 0.0;
+    final screenX = pos.dx - hOffset;
+    if (screenX < edgeMargin) {
+      final factor = ((edgeMargin - screenX) / edgeMargin).clamp(0.0, 3.0);
+      dxScroll = -maxVelocity * factor;
+    } else if (screenX > _currentAvailableWidth - edgeMargin) {
+      final factor =
+          ((screenX - (_currentAvailableWidth - edgeMargin)) / edgeMargin)
+              .clamp(0.0, 3.0);
+      dxScroll = maxVelocity * factor;
+    }
+
+    if (dyScroll != 0.0 && _verticalController.hasClients) {
+      final targetY = (_verticalController.offset + dyScroll).clamp(
+        0.0,
+        _verticalController.position.maxScrollExtent,
+      );
+      if (targetY != _verticalController.offset) {
+        _verticalController.jumpTo(targetY);
+      }
+    }
+
+    if (dxScroll != 0.0 && _horizontalController.hasClients) {
+      final targetX = (_horizontalController.offset + dxScroll).clamp(
+        0.0,
+        _horizontalController.position.maxScrollExtent,
+      );
+      if (targetX != _horizontalController.offset) {
+        _horizontalController.jumpTo(targetX);
+      }
+    }
+
+    final currentCell = _cellAtOffset(
+      localPosition: pos,
+      rowHeight: rowHeight,
+    );
+    if (currentCell != null && currentCell != _selectionFocus) {
+      setState(() {
+        _selectionFocus = currentCell;
+        _selection = ResultGridSelection.fromPoints(
+          anchor: _selectionAnchor ?? currentCell,
+          focus: currentCell,
+        );
+      });
+      final modelRow = _toModelRowIndex(currentCell.row);
+      widget.onRowSelected?.call(modelRow);
+      _notifySelectionAndFocus();
+    }
+  }
+
   void _onCellTap(int row, int column, {bool isShift = false}) {
+    if (_isDragSelecting || _hasJustDragSelected) {
+      _hasJustDragSelected = false;
+      return;
+    }
     _focusNode.requestFocus();
     final modelRow = _toModelRowIndex(row);
     widget.onRowSelected?.call(modelRow);
@@ -1498,8 +1728,6 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
       _widthsNeedUpdate = false;
     }
     final cs = Theme.of(context).colorScheme;
-    final rowHeight = _scaledRowHeight(context);
-    final headerHeight = _scaledHeaderHeight(context);
 
     return material.CallbackShortcuts(
       bindings: {
@@ -1780,6 +2008,12 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
           child: material.LayoutBuilder(
             builder: (context, constraints) {
               final availableWidth = constraints.maxWidth;
+              final headerHeight = _scaledHeaderHeight(context);
+              final rowHeight = _scaledRowHeight(context);
+              final rowsViewportHeight =
+                  math.max(0.0, constraints.maxHeight - headerHeight);
+              _currentAvailableWidth = availableWidth;
+              _currentRowsViewportHeight = rowsViewportHeight;
 
               var displayWidths = _columnWidths;
               var tableWidth = _tableWidth;
@@ -1800,6 +2034,10 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
               } else if (tableWidth < availableWidth) {
                 tableWidth = availableWidth;
               }
+
+              _currentDisplayOffsets = identical(displayWidths, _columnWidths)
+                  ? _columnOffsets
+                  : computeResultGridColumnOffsets(displayWidths);
 
               final window = _columnWindow(displayWidths, availableWidth);
 
@@ -1831,11 +2069,19 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
                           child: material.Scrollbar(
                             controller: _verticalController,
                             thumbVisibility: true,
-                            child: material.ListView.builder(
-                              controller: _verticalController,
-                              itemCount: _sortedRows.length,
-                              itemExtent: rowHeight,
-                              itemBuilder: (context, rowIndex) {
+                            child: material.Listener(
+                              behavior: material.HitTestBehavior.translucent,
+                              onPointerDown: (e) =>
+                                  _onGridPointerDown(e, rowHeight: rowHeight),
+                              onPointerMove: (e) =>
+                                  _onGridPointerMove(e, rowHeight: rowHeight),
+                              onPointerUp: _onGridPointerUp,
+                              onPointerCancel: _onGridPointerCancel,
+                              child: material.ListView.builder(
+                                controller: _verticalController,
+                                itemCount: _sortedRows.length,
+                                itemExtent: rowHeight,
+                                itemBuilder: (context, rowIndex) {
                                 final row = _sortedRows[rowIndex];
                                 final isEven = rowIndex.isEven;
                                 return _DataRow(
@@ -1874,7 +2120,8 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
                             ),
                           ),
                         ),
-                      ],
+                      ),
+                    ],
                     ),
                   ),
                 ),
