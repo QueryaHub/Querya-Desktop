@@ -93,6 +93,32 @@ void main() {
       expect(tx.endsWith('COMMIT;\n'), isTrue);
     });
 
+    test('addresses unkeyed SQLite rows by implicit rowid in UPDATE and DELETE',
+        () {
+      final plan = TableMutationEngine.generatePlan(
+        dialect: SqlDialect.sqlite,
+        tableName: 'notes',
+        columns: const ['rowid', 'body'],
+        primaryKeys: ['rowid'],
+        originalRows: const [
+          ['7', 'dup'],
+          ['8', 'dup'],
+        ],
+        modifiedCells: {
+          0: {1: 'edited'},
+        },
+        insertedRows: [],
+        deletedRowIndices: {1},
+      );
+
+      expect(plan.statementCount, 2);
+      expect(
+        plan.statements[0].sql,
+        'UPDATE "notes" SET "body" = \'edited\' WHERE "rowid" = 7',
+      );
+      expect(plan.statements[1].sql, 'DELETE FROM "notes" WHERE "rowid" = 8');
+    });
+
     test('generates UPDATE statement for MySQL dialect with backticks', () {
       final plan = TableMutationEngine.generatePlan(
         dialect: SqlDialect.mysql,

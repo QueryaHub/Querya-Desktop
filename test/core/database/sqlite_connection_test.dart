@@ -432,6 +432,51 @@ void main() {
       expect(rows.first['name'], 'keep');
     });
 
+    test('duplicate-row UPDATE without a key rolls back instead of succeeding',
+        () async {
+      await conn.connect();
+      await conn.execute('CREATE TABLE t (name TEXT)');
+      await conn.execute("INSERT INTO t (name) VALUES ('dup'), ('dup')");
+
+      await expectLater(
+        conn.runInTransaction(() async {
+          expectDmlMatchedRows(
+            await conn.executeAffected(
+              "UPDATE t SET name = 'changed' WHERE name = 'dup'",
+            ),
+          );
+        }),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('matched 2 rows instead of 1'),
+          ),
+        ),
+      );
+
+      final rows = await conn.execute('SELECT name FROM t');
+      expect(rows.map((r) => r['name']), ['dup', 'dup']);
+    });
+
+    test('rowid-addressed UPDATE touches only one of the duplicate rows',
+        () async {
+      await conn.connect();
+      await conn.execute('CREATE TABLE t (name TEXT)');
+      await conn.execute("INSERT INTO t (name) VALUES ('dup'), ('dup')");
+
+      await conn.runInTransaction(() async {
+        expectDmlMatchedRows(
+          await conn.executeAffected(
+            "UPDATE t SET name = 'changed' WHERE \"rowid\" = 1",
+          ),
+        );
+      });
+
+      final rows = await conn.execute('SELECT name FROM t ORDER BY rowid');
+      expect(rows.map((r) => r['name']), ['changed', 'dup']);
+    });
+
     test('handles quotes in quoteIdentifier helper', () {
       expect(
           SqliteConnection.quoteIdentifier('normal_table'), '"normal_table"');
