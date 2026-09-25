@@ -134,11 +134,15 @@ class _PostgresWorkspaceHomeState
                   child: Text('Return to ${widget.lastSelectedPostgresObject!.name}'),
                 ),
               ],
-              const Spacer(),
-              QueryaTabStrip(
-                labels: const ['Overview', 'SQL'],
-                selectedIndex: _tab,
-                onSelected: (index) => unawaited(_selectTab(index)),
+              material.Expanded(
+                child: material.Align(
+                  alignment: material.Alignment.centerRight,
+                  child: QueryaTabStrip(
+                    labels: const ['Overview', 'SQL'],
+                    selectedIndex: _tab,
+                    onSelected: (index) => unawaited(_selectTab(index)),
+                  ),
+                ),
               ),
             ],
           ),

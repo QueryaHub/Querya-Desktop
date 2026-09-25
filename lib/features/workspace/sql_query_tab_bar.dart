@@ -36,16 +36,13 @@ class SqlQueryTabBar extends material.StatelessWidget {
       child: material.Row(
         children: [
           material.Expanded(
-            child: material.SingleChildScrollView(
-              scrollDirection: material.Axis.horizontal,
-              child: QueryaTabStrip(
-                labels: sessions.map((s) => s.title).toList(),
-                selectedIndex: selectedIndex,
-                onSelected: onSelect,
-                onClose: onClose,
-                onAdd: onAdd,
-                canClose: sessions.length > 1 ? (_) => true : (_) => false,
-              ),
+            child: QueryaTabStrip(
+              labels: sessions.map((s) => s.title).toList(),
+              selectedIndex: selectedIndex,
+              onSelected: onSelect,
+              onClose: onClose,
+              onAdd: onAdd,
+              canClose: sessions.length > 1 ? (_) => true : (_) => false,
             ),
           ),
         ],

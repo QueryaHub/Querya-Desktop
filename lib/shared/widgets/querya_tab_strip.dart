@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -23,6 +24,7 @@ class QueryaTabStrip extends material.StatefulWidget {
     this.onClose,
     this.onAdd,
     this.canClose,
+    this.scrollController,
   }) : assert(labels.length > 0);
 
   final List<String> labels;
@@ -31,12 +33,13 @@ class QueryaTabStrip extends material.StatefulWidget {
   final material.ValueChanged<int>? onClose;
   final material.VoidCallback? onAdd;
   final bool Function(int index)? canClose;
+  final material.ScrollController? scrollController;
 
   @override
-  material.State<QueryaTabStrip> createState() => _QueryaTabStripState();
+  material.State<QueryaTabStrip> createState() => QueryaTabStripState();
 }
 
-class _QueryaTabStripState extends material.State<QueryaTabStrip>
+class QueryaTabStripState extends material.State<QueryaTabStrip>
     with material.TickerProviderStateMixin {
   late List<material.FocusNode> _focusNodes;
   late List<bool> _focused;
@@ -45,14 +48,32 @@ class _QueryaTabStripState extends material.State<QueryaTabStrip>
 
   late final QueryaSpringController _indicatorLeft;
   late final QueryaSpringController _indicatorWidth;
+  material.ScrollController? _internalScrollController;
+  material.ScrollController get _effectiveScrollController =>
+      widget.scrollController ??
+      (_internalScrollController ??= material.ScrollController());
+
   var _indicatorReady = false;
   var _layoutScheduled = false;
+
+  @material.visibleForTesting
+  List<material.GlobalKey> get tabKeysForTesting => List.unmodifiable(_tabKeys);
+
+  @material.visibleForTesting
+  bool get indicatorReadyForTesting => _indicatorReady;
+
+  @material.visibleForTesting
+  material.ScrollController get scrollControllerForTesting =>
+      _effectiveScrollController;
 
   @override
   void initState() {
     super.initState();
     _indicatorLeft = QueryaSpringController(vsync: this);
     _indicatorWidth = QueryaSpringController(vsync: this);
+    if (widget.scrollController == null) {
+      _internalScrollController = material.ScrollController();
+    }
     _createFocusState();
   }
 
@@ -79,10 +100,16 @@ class _QueryaTabStripState extends material.State<QueryaTabStrip>
   @override
   void didUpdateWidget(covariant QueryaTabStrip oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.scrollController != widget.scrollController) {
+      if (oldWidget.scrollController == null && widget.scrollController != null) {
+        _internalScrollController?.dispose();
+        _internalScrollController = null;
+      } else if (oldWidget.scrollController != null && widget.scrollController == null) {
+        _internalScrollController = material.ScrollController();
+      }
+    }
     if (oldWidget.labels.length != widget.labels.length) {
-      _disposeFocusNodes();
-      _createFocusState();
-      _indicatorReady = false;
+      _syncTabState(oldWidget.labels.length, widget.labels.length);
     }
     if (oldWidget.selectedIndex != widget.selectedIndex ||
         oldWidget.labels.length != widget.labels.length ||
@@ -97,8 +124,27 @@ class _QueryaTabStripState extends material.State<QueryaTabStrip>
       (index) =>
           material.FocusNode(debugLabel: 'Querya tab ${widget.labels[index]}'),
     );
-    _focused = List.filled(widget.labels.length, false);
+    _focused = List.filled(widget.labels.length, false, growable: true);
     _tabKeys = List.generate(widget.labels.length, (_) => material.GlobalKey());
+  }
+
+  void _syncTabState(int oldLength, int newLength) {
+    if (newLength > oldLength) {
+      for (var i = oldLength; i < newLength; i++) {
+        _focusNodes.add(
+          material.FocusNode(debugLabel: 'Querya tab ${widget.labels[i]}'),
+        );
+        _focused.add(false);
+        _tabKeys.add(material.GlobalKey());
+      }
+    } else if (newLength < oldLength) {
+      for (var i = newLength; i < oldLength; i++) {
+        _focusNodes[i].dispose();
+      }
+      _focusNodes.removeRange(newLength, oldLength);
+      _focused.removeRange(newLength, oldLength);
+      _tabKeys.removeRange(newLength, oldLength);
+    }
   }
 
   void _disposeFocusNodes() {
@@ -112,6 +158,7 @@ class _QueryaTabStripState extends material.State<QueryaTabStrip>
     _indicatorLeft.dispose();
     _indicatorWidth.dispose();
     _disposeFocusNodes();
+    _internalScrollController?.dispose();
     super.dispose();
   }
 
@@ -167,11 +214,17 @@ class _QueryaTabStripState extends material.State<QueryaTabStrip>
       _indicatorLeft.jumpTo(offset.dx);
       _indicatorWidth.jumpTo(width);
       setState(() => _indicatorReady = true);
-      return;
+    } else {
+      _indicatorLeft.animateTo(offset.dx);
+      _indicatorWidth.animateTo(width);
     }
 
-    _indicatorLeft.animateTo(offset.dx);
-    _indicatorWidth.animateTo(width);
+    material.Scrollable.ensureVisible(
+      tabContext,
+      alignmentPolicy: material.ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+      duration: context.motionDuration(QueryaMotion.fast),
+      curve: context.motionCurve(QueryaMotion.enter),
+    );
   }
 
   @override
@@ -293,7 +346,7 @@ class _QueryaTabStripState extends material.State<QueryaTabStrip>
       ],
     );
 
-    return material.KeyedSubtree(
+    final stripContent = material.KeyedSubtree(
       key: _stripKey,
       child: material.Stack(
         alignment: material.Alignment.centerLeft,
@@ -306,6 +359,36 @@ class _QueryaTabStripState extends material.State<QueryaTabStrip>
             ),
           tabs,
         ],
+      ),
+    );
+
+    return material.IntrinsicWidth(
+      child: material.Listener(
+        onPointerSignal: (signal) {
+          if (signal is PointerScrollEvent &&
+              _effectiveScrollController.hasClients) {
+            if (signal.scrollDelta.dy != 0 && signal.scrollDelta.dx == 0) {
+              final target = (_effectiveScrollController.offset +
+                      signal.scrollDelta.dy)
+                  .clamp(
+                0.0,
+                _effectiveScrollController.position.maxScrollExtent,
+              );
+              if (target != _effectiveScrollController.offset) {
+                _effectiveScrollController.jumpTo(target);
+              }
+            }
+          }
+        },
+        child: material.ScrollConfiguration(
+          behavior:
+              const material.ScrollBehavior().copyWith(scrollbars: false),
+          child: material.SingleChildScrollView(
+            controller: _effectiveScrollController,
+            scrollDirection: material.Axis.horizontal,
+            child: stripContent,
+          ),
+        ),
       ),
     );
   }
