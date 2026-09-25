@@ -629,6 +629,36 @@ void main() {
       );
     });
 
+    test("client handshake requests CLIENT_FOUND_ROWS", () {
+      final handshake = MySQLPacket.decodeInitialHandshake(
+        Uint8List.fromList(
+          HEX.decode(
+            '4d0000000a352e372e33352d3338007b000000181e73526349597c00ffff080200ffc1150000000000000000000007317a2531721d587825181d006d7973716c5f6e61746976655f70617373776f726400',
+          ),
+        ),
+      ).payload as MySQLPacketInitialHandshake;
+
+      final response = MySQLPacketHandshakeResponse41.createWithNativePassword(
+        username: 'root',
+        password: 'secret',
+        initialHandshakePayload: handshake,
+      );
+      final sslRequest = MySQLPacketSSLRequest.createDefault(
+        initialHandshakePayload: handshake,
+        connectWithDB: false,
+      );
+
+      // So UPDATE reports matched (not changed) rows, like PostgreSQL / SQLite.
+      expect(
+        response.capabilityFlags & mysqlCapFlagClientFoundRows,
+        mysqlCapFlagClientFoundRows,
+      );
+      expect(
+        sslRequest.capabilityFlags & mysqlCapFlagClientFoundRows,
+        mysqlCapFlagClientFoundRows,
+      );
+    });
+
     test("testing response ok packet", () {
       final buffer = Uint8List.fromList(HEX.decode('0700000200000002000000'));
       final packet = MySQLPacket.decodeGenericPacket(buffer);
