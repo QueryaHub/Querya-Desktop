@@ -101,6 +101,66 @@ void main() {
       expect(resIlike, equals([1]));
     });
 
+    test('LIKE is case-sensitive while ILIKE ignores case', () {
+      List<int> run(String f) => GridFilterEngine.filterRowIndices(
+            filterText: f,
+            columns: columns,
+            rows: rows,
+          );
+      expect(run("status LIKE 'act%'"), isEmpty);
+      expect(run("status ILIKE 'act%'"), equals([0, 2]));
+    });
+
+    test('NOT LIKE / NOT ILIKE invert the match', () {
+      List<int> run(String f) => GridFilterEngine.filterRowIndices(
+            filterText: f,
+            columns: columns,
+            rows: rows,
+          );
+      expect(run("status NOT LIKE 'ACT%'"), equals([1, 3]));
+      expect(run("status NOT ILIKE '%pend%'"), equals([0, 2, 3]));
+      expect(run("status NOT LIKE 'act%'"), equals([0, 1, 2, 3]));
+    });
+
+    test('LIKE supports _ wildcard and treats regex metacharacters literally',
+        () {
+      final specialRows = [
+        ['a.c'],
+        ['abc'],
+        ['a+c'],
+        ['(x)'],
+      ];
+      List<int> run(String f) => GridFilterEngine.filterRowIndices(
+            filterText: f,
+            columns: ['v'],
+            rows: specialRows,
+          );
+      expect(run("v LIKE 'a_c'"), equals([0, 1, 2]));
+      expect(run("v LIKE 'a.c'"), equals([0]));
+      expect(run("v LIKE 'a+c'"), equals([2]));
+      expect(run("v LIKE '(x)'"), equals([3]));
+    });
+
+    test('LIKE inside AND / OR gives the same result on every row', () {
+      final many = [
+        for (var i = 0; i < 2000; i++) ['$i', i.isEven ? 'ACTIVE' : 'PENDING'],
+      ];
+      final res = GridFilterEngine.filterRowIndices(
+        filterText: "status LIKE 'ACT%' AND id LIKE '%9' OR status ILIKE 'pen%' AND id LIKE '1%'",
+        columns: ['id', 'status'],
+        rows: many,
+      );
+      final expected = [
+        for (var i = 0; i < many.length; i++)
+          if ((many[i][1].startsWith('ACT') && many[i][0].endsWith('9')) ||
+              (many[i][1].toLowerCase().startsWith('pen') &&
+                  many[i][0].startsWith('1')))
+            i,
+      ];
+      expect(res, equals(expected));
+      expect(res, isNotEmpty);
+    });
+
     test('filters with IN and NOT IN list of literals', () {
       final resIn = GridFilterEngine.filterRowIndices(
         filterText: "status IN ('PENDING', 'CANCELLED')",
