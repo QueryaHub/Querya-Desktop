@@ -794,11 +794,13 @@ class _PgObjectGroup extends StatefulWidget {
 class _PgObjectGroupState extends State<_PgObjectGroup> {
   bool _expanded = false;
   final _filterController = material.TextEditingController();
+  final _filterDebouncer = FilterDebouncer();
   String _filter = '';
   final Set<String> _pinnedItems = {};
 
   @override
   void dispose() {
+    _filterDebouncer.cancel();
     _filterController.dispose();
     super.dispose();
   }
@@ -861,11 +863,16 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
                   TreeObjectFilterBar(
                     controller: _filterController,
                     hintText: 'Filter ${widget.label.toLowerCase()}...',
-                    onChanged: (val) => setState(() => _filter = val),
-                    onClear: () => setState(() {
-                      _filter = '';
-                      _filterController.clear();
+                    onChanged: (val) => _filterDebouncer.run(() {
+                      if (mounted) setState(() => _filter = val);
                     }),
+                    onClear: () {
+                      _filterDebouncer.cancel();
+                      setState(() {
+                        _filter = '';
+                        _filterController.clear();
+                      });
+                    },
                     filteredCount: sorted.length,
                     totalCount: widget.items.length,
                   ),
