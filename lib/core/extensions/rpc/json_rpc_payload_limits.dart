@@ -11,6 +11,14 @@ const int kDefaultJsonRpcMaxLineBytes = 32 * 1024 * 1024;
 /// Lines above this UTF-8 length are `jsonDecode`d off the UI isolate.
 const int kJsonRpcOffIsolateDecodeThresholdBytes = 64 * 1024;
 
+/// Lines waiting to be handled before the plugin's stdout is paused.
+const int kDefaultJsonRpcMaxBufferedLines = 256;
+
+/// Total size of lines waiting to be handled before stdout is paused. A single
+/// larger line is still accepted (up to the line limit); it just pauses reading
+/// until it has been handled.
+const int kDefaultJsonRpcMaxBufferedBytes = 16 * 1024 * 1024;
+
 /// Thrown when a plugin emits a newline-delimited JSON line larger than the
 /// configured maximum.
 class JsonRpcPayloadTooLargeException implements Exception {
@@ -108,6 +116,10 @@ class _BoundedUtf8LineSplitter
       cancelOnError: true,
     );
 
+    // Pausing the consumer must pause the byte source too; otherwise the
+    // controller buffers every decoded line while the plugin keeps writing.
+    controller.onPause = sub.pause;
+    controller.onResume = sub.resume;
     controller.onCancel = () => sub.cancel();
     return controller.stream;
   }
