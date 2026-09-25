@@ -95,6 +95,93 @@ void main() {
       expect(res.isDestructive, isFalse);
     });
 
+    test('detects unconditional UPDATE without WHERE', () {
+      final res =
+          DestructiveSqlDetector.inspect("UPDATE users SET role = 'admin';");
+      expect(res.isDestructive, isTrue);
+      final op = res.operations.single;
+      expect(op.type, DestructiveSqlType.unconditionalUpdate);
+      expect(op.targetName, 'users');
+      expect(op.type.riskLevel, 'HIGH');
+      expect(op.description, contains('users'));
+      expect(res.maxRiskLevel, 'HIGH');
+    });
+
+    test('unconditional UPDATE reports schema-qualified and quoted targets', () {
+      expect(
+        DestructiveSqlDetector.inspect('UPDATE public."accounts" SET balance = 0')
+            .operations
+            .single
+            .targetName,
+        'public.accounts',
+      );
+      expect(
+        DestructiveSqlDetector.inspect('UPDATE ONLY accounts a SET balance = 0')
+            .operations
+            .single
+            .targetName,
+        'accounts',
+      );
+      expect(
+        DestructiveSqlDetector.inspect('update `db`.`t` set x = 1')
+            .operations
+            .single
+            .targetName,
+        'db.t',
+      );
+    });
+
+    test('does NOT flag UPDATE with WHERE, including multi-line and lowercase', () {
+      expect(
+        DestructiveSqlDetector.inspect('UPDATE users SET a = 1 WHERE id = 1')
+            .isDestructive,
+        isFalse,
+      );
+      expect(
+        DestructiveSqlDetector.inspect('update users\nset a = 1\nwhere id = 1;')
+            .isDestructive,
+        isFalse,
+      );
+    });
+
+    test('a WHERE inside a SET subquery does not make UPDATE conditional', () {
+      final res = DestructiveSqlDetector.inspect(
+        'UPDATE users SET plan = (SELECT p FROM plans WHERE p.id = 1)',
+      );
+      expect(res.operations.single.type, DestructiveSqlType.unconditionalUpdate);
+    });
+
+    test('ignores WHERE hidden in comments or strings for UPDATE', () {
+      final res = DestructiveSqlDetector.inspect(
+        "UPDATE users SET note = 'where x' -- WHERE id = 1",
+      );
+      expect(res.operations.single.type, DestructiveSqlType.unconditionalUpdate);
+    });
+
+    test('does not flag INSERT ... ON CONFLICT DO UPDATE or SELECT FOR UPDATE',
+        () {
+      expect(
+        DestructiveSqlDetector.inspect(
+          'INSERT INTO t (id, n) VALUES (1, 2) ON CONFLICT (id) DO UPDATE SET n = 2',
+        ).isDestructive,
+        isFalse,
+      );
+      expect(
+        DestructiveSqlDetector.inspect('SELECT * FROM t FOR UPDATE').isDestructive,
+        isFalse,
+      );
+    });
+
+    test('flags each unconditional UPDATE in a multi-statement script', () {
+      final res = DestructiveSqlDetector.inspect(
+        'UPDATE a SET x = 1; UPDATE b SET y = 2 WHERE id = 3; DELETE FROM c;',
+      );
+      expect(res.operations.map((o) => o.type), [
+        DestructiveSqlType.unconditionalUpdate,
+        DestructiveSqlType.unconditionalDelete,
+      ]);
+    });
+
     test('ignores destructive keywords inside dollar-quoted strings', () {
       final res = DestructiveSqlDetector.inspect(r'''
         CREATE OR REPLACE FUNCTION clean_data() RETURNS void AS $$
