@@ -120,7 +120,7 @@ class _MysqlWorkspaceHomeState extends material.State<MysqlWorkspaceHome> {
                       Text('Return to ${widget.lastSelectedMysqlObject!.name}'),
                 ),
               ],
-              Expanded(
+              material.Expanded(
                 child: material.Align(
                   alignment: material.Alignment.centerRight,
                   child: QueryaTabStrip(

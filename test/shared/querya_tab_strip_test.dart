@@ -418,7 +418,7 @@ void main() {
             width: 120,
             child: QueryaTabStrip(
               scrollController: scrollController,
-              labels: const ['First Long Tab', 'Second Long Tab', 'Third Long Tab'],
+              labels: const ['Tab 1', 'Tab 2', 'Tab 3', 'Tab 4'],
               selectedIndex: 0,
               onSelected: (_) {},
             ),
@@ -447,7 +447,7 @@ void main() {
             width: 120,
             child: QueryaTabStrip(
               scrollController: scrollController,
-              labels: const ['First Long Tab', 'Second Long Tab', 'Third Long Tab'],
+              labels: const ['Tab 1', 'Tab 2', 'Tab 3', 'Tab 4'],
               selectedIndex: 0,
               onSelected: (_) {},
             ),
@@ -488,7 +488,7 @@ void main() {
               width: 120,
               child: QueryaTabStrip(
                 scrollController: scrollController,
-                labels: const ['First Long Tab', 'Second Long Tab', 'Third Long Tab'],
+                labels: const ['Tab 1', 'Tab 2', 'Tab 3', 'Tab 4'],
                 selectedIndex: selected,
                 onSelected: (i) => setState(() => selected = i),
               ),
@@ -502,8 +502,8 @@ void main() {
 
     expect(scrollController.offset, 0.0);
 
-    // Switch selection to the third tab
-    selected = 2;
+    // Switch selection to the fourth tab
+    selected = 3;
     await tester.pumpWidget(
       stripShell(
         child: material.StatefulBuilder(
@@ -512,7 +512,7 @@ void main() {
               width: 120,
               child: QueryaTabStrip(
                 scrollController: scrollController,
-                labels: const ['First Long Tab', 'Second Long Tab', 'Third Long Tab'],
+                labels: const ['Tab 1', 'Tab 2', 'Tab 3', 'Tab 4'],
                 selectedIndex: selected,
                 onSelected: (i) => setState(() => selected = i),
               ),

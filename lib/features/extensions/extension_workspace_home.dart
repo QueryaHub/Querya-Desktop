@@ -119,7 +119,7 @@ class _ExtensionWorkspaceHomeState
                   child: Text('Return to ${widget.lastSelectedExtensionObject!.name}'),
                 ),
               ],
-              Expanded(
+              material.Expanded(
                 child: material.Align(
                   alignment: material.Alignment.centerRight,
                   child: QueryaTabStrip(

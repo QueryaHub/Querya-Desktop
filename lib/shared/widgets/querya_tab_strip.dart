@@ -124,7 +124,7 @@ class QueryaTabStripState extends material.State<QueryaTabStrip>
       (index) =>
           material.FocusNode(debugLabel: 'Querya tab ${widget.labels[index]}'),
     );
-    _focused = List.filled(widget.labels.length, false);
+    _focused = List.filled(widget.labels.length, false, growable: true);
     _tabKeys = List.generate(widget.labels.length, (_) => material.GlobalKey());
   }
 
@@ -221,7 +221,7 @@ class QueryaTabStripState extends material.State<QueryaTabStrip>
 
     material.Scrollable.ensureVisible(
       tabContext,
-      alignment: 0.5,
+      alignmentPolicy: material.ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
       duration: context.motionDuration(QueryaMotion.fast),
       curve: context.motionCurve(QueryaMotion.enter),
     );

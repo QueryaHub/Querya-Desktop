@@ -134,7 +134,7 @@ class _PostgresWorkspaceHomeState
                   child: Text('Return to ${widget.lastSelectedPostgresObject!.name}'),
                 ),
               ],
-              Expanded(
+              material.Expanded(
                 child: material.Align(
                   alignment: material.Alignment.centerRight,
                   child: QueryaTabStrip(

@@ -112,7 +112,7 @@ class _SqliteWorkspaceHomeState extends material.State<SqliteWorkspaceHome> {
                       'Return to ${widget.lastSelectedSqliteObject!.name}'),
                 ),
               ],
-              Expanded(
+              material.Expanded(
                 child: material.Align(
                   alignment: material.Alignment.centerRight,
                   child: QueryaTabStrip(
