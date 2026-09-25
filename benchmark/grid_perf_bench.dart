@@ -5,6 +5,7 @@
 // MODE: scroll (horizontal pan) | edit (staged cell edits on a sorted grid)
 //       | select (mouse-drag selection through ResultsTab, incl. stats)
 //       | dialog (open / close showAppDialog repeatedly over a busy grid)
+//       | rerun (a new result set every 400 ms, like re-running a query)
 import 'dart:async';
 import 'dart:developer' as developer;
 import 'dart:io';
@@ -14,6 +15,7 @@ import 'dart:ui';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/semantics.dart' show SemanticsBinding;
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/features/workspace/result_grid_view.dart';
@@ -28,6 +30,7 @@ const rowCount = int.fromEnvironment('ROWS', defaultValue: 5000);
 const colCount = int.fromEnvironment('COLS', defaultValue: 120);
 const seconds = int.fromEnvironment('SECS', defaultValue: 6);
 final dialogHost = GlobalKey();
+final rerunData = ValueNotifier<(List<String>, List<List<String>>)>((const [], const []));
 const profile = bool.fromEnvironment('PROFILE', defaultValue: false);
 
 vms.VmService? _vm;
@@ -60,7 +63,12 @@ void main() {
   runApp(ShadcnApp(
     theme: td,
     home: material.Scaffold(
-      body: mode == 'dialog'
+      body: mode == 'rerun'
+          ? ValueListenableBuilder(
+              valueListenable: rerunData,
+              builder: (_, d, __) => ResultsTab(columns: d.$1, rows: d.$2),
+            )
+          : mode == 'dialog'
           ? KeyedSubtree(
               key: dialogHost,
               child: ListenableBuilder(
@@ -138,6 +146,8 @@ Future<void> _run(DataGridStagingBuffer buffer) async {
   if (profile) {
     await _connectVm();
     await _vm?.clearCpuSamples(_isolateId!);
+    await _vm?.setVMTimelineFlags(['Embedder', 'Dart', 'GC']);
+    await _vm?.clearVMTimeline();
   }
   timings.clear();
   final startMicros = DateTime.now().microsecondsSinceEpoch;
@@ -170,7 +180,22 @@ Future<void> _run(DataGridStagingBuffer buffer) async {
       await Future<void>.delayed(const Duration(milliseconds: 600));
     }
   }
-  while (mode != 'dialog' && DateTime.now().isBefore(end)) {
+  if (mode == 'rerun') {
+    var n = 0;
+    while (DateTime.now().isBefore(end)) {
+      n++;
+      final cols = [for (var c = 0; c < 20; c++) 'column_${c}_$n'];
+      rerunData.value = (
+        cols,
+        [
+          for (var r = 0; r < 5000; r++)
+            [for (var c = 0; c < 20; c++) c % 4 == 0 ? '${r * c + n}' : 'value $r/$c run $n'],
+        ],
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+    }
+  }
+  while (mode != 'dialog' && mode != 'rerun' && DateTime.now().isBefore(end)) {
     await SchedulerBinding.instance.endOfFrame;
     if (mode == 'scroll') {
       final p = pos!;
@@ -193,7 +218,10 @@ Future<void> _run(DataGridStagingBuffer buffer) async {
   }
   await Future<void>.delayed(const Duration(seconds: 1));
   _report();
-  if (profile) await _reportCpu(startMicros);
+  if (profile) {
+    await _reportCpu(startMicros);
+    await _reportTimeline();
+  }
   exit(0);
 }
 
@@ -214,10 +242,22 @@ void _report() {
       'over8.33ms=${over(v)}/${v.length}';
   final view = PlatformDispatcher.instance.views.first;
   stdout.writeln('BENCH window=${view.physicalSize.width.toInt()}x${view.physicalSize.height.toInt()} dpr=${view.devicePixelRatio}');
+  stdout.writeln('BENCH semantics=${SemanticsBinding.instance.semanticsEnabled}');
   stdout.writeln('BENCH mode=$mode rows=$rowCount cols=$colCount frames=${timings.length}');
   stdout.writeln('BENCH ${row('build ', build)}');
   stdout.writeln('BENCH ${row('raster', raster)}');
   stdout.writeln('BENCH ${row('total ', total)}');
+  // Real smoothness: gap between consecutive presented frames. At 120 Hz a gap
+  // above ~12.5 ms means at least one vsync was missed (a visible stutter).
+  final starts = [for (final t in timings) t.timestampInMicroseconds(FramePhase.vsyncStart)]..sort();
+  final gaps = [for (var i = 1; i < starts.length; i++) (starts[i] - starts[i - 1]) / 1000.0];
+  if (gaps.isNotEmpty) {
+    final missed = gaps.where((g) => g > 12.5).length;
+    final secs = (starts.last - starts.first) / 1e6;
+    stdout.writeln('BENCH frames: ${timings.length} in ${secs.toStringAsFixed(1)} s = ${(timings.length / secs).toStringAsFixed(0)} fps, '
+        'gap p50=${pct(gaps, .5).toStringAsFixed(2)} p99=${pct(gaps, .99).toStringAsFixed(2)} max=${pct(gaps, 1).toStringAsFixed(1)} ms, '
+        'stutters(>12.5ms)=$missed');
+  }
 }
 
 Future<void> _reportCpu(int startMicros) async {
@@ -280,4 +320,48 @@ void _dragStep(Offset start, int i) {
     buttons: kPrimaryButton,
   ));
   _lastDrag = pos;
+}
+
+/// Sums engine / framework timeline slices per thread, so raster-thread cost
+/// can be broken down (the Dart CPU profile only sees the UI isolate).
+Future<void> _reportTimeline() async {
+  final vm = _vm;
+  if (vm == null) return;
+  final tl = await vm.getVMTimeline();
+  final threadNames = <int, String>{};
+  final open = <int, List<(String, int)>>{};
+  final total = <String, double>{};
+  final count = <String, int>{};
+  void add(int tid, String name, int durUs) {
+    final key = '${threadNames[tid] ?? tid} :: $name';
+    total[key] = (total[key] ?? 0) + durUs / 1000.0;
+    count[key] = (count[key] ?? 0) + 1;
+  }
+  final events = [for (final e in tl.traceEvents ?? const <vms.TimelineEvent>[]) e.json!];
+  for (final e in events) {
+    if (e['ph'] == 'M' && e['name'] == 'thread_name') {
+      threadNames[e['tid'] as int] = '${(e['args'] as Map)['name']}';
+    }
+  }
+  for (final e in events) {
+    final tid = e['tid'] as int? ?? 0;
+    final name = '${e['name']}';
+    switch (e['ph']) {
+      case 'X':
+        add(tid, name, (e['dur'] as num? ?? 0).toInt());
+      case 'B':
+        (open[tid] ??= []).add((name, (e['ts'] as num).toInt()));
+      case 'E':
+        final stack = open[tid];
+        if (stack != null && stack.isNotEmpty) {
+          final (n, ts) = stack.removeLast();
+          add(tid, n, (e['ts'] as num).toInt() - ts);
+        }
+    }
+  }
+  final sorted = total.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+  stdout.writeln('TIMELINE == top slices by total ms (thread :: name, count) ==');
+  for (final x in sorted.take(45)) {
+    stdout.writeln('TIMELINE ${x.value.toStringAsFixed(1).padLeft(9)} ms  n=${count[x.key]}  ${x.key}');
+  }
 }
