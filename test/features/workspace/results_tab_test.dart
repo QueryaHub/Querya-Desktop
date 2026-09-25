@@ -1193,7 +1193,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.byTooltip('No pending changes to commit'),
+        find.byTooltip('No pending changes to save'),
         findsOneWidget,
       );
 
@@ -1202,15 +1202,56 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.byTooltip('Revert all unstaged edits (Ctrl+Z / Cmd+Z)'),
+        find.byTooltip('Discard all pending edits (Ctrl+Z / Cmd+Z)'),
         findsOneWidget,
       );
       expect(
-        find.byTooltip('Commit staged changes to database (Ctrl+S / Cmd+S)'),
+        find.byTooltip('Review and save pending changes (Ctrl+S / Cmd+S)'),
         findsOneWidget,
       );
 
       buffer.dispose();
+    });
+
+    testWidgets('narrow toolbar keeps Save visible and shows row actions as icons',
+        (tester) async {
+      final buffer = DataGridStagingBuffer(
+        columns: ['id', 'name'],
+        rows: [
+          ['1', 'Alice'],
+        ],
+      );
+      addTearDown(buffer.dispose);
+      buffer.setCell(0, 1, 'Grace');
+
+      await tester.pumpWidget(
+        resultsShell(
+          child: material.Scaffold(
+            body: material.Align(
+              alignment: material.Alignment.topLeft,
+              child: material.SizedBox(
+                width: 420,
+                height: 60,
+                child: DataGridStagingToolbar(
+                  stagingBuffer: buffer,
+                  onApplyChanges: () {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Add Row'), findsNothing);
+      expect(find.byIcon(material.Icons.add_rounded), findsOneWidget);
+      final save = find.text('Save');
+      expect(save, findsOneWidget);
+      expect(find.text('Revert All'), findsNothing);
+      expect(find.byIcon(material.Icons.undo_rounded), findsOneWidget);
+      final right = tester.getBottomRight(save).dx;
+      expect(right, lessThanOrEqualTo(420));
+      expect(tester.takeException(), isNull);
     });
   });
 

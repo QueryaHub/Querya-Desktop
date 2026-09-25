@@ -94,6 +94,12 @@ class SqliteConnection {
         path,
         options: OpenDatabaseOptions(
           readOnly: readOnly,
+          // Every SqliteConnection needs its own handle. With the sqflite
+          // default (singleInstance: true) a second open of the same path
+          // returns the first Database: a Save session would reuse a
+          // read-only browse handle, and closing any pooled session would
+          // close the file for every other session too.
+          singleInstance: false,
           onOpen: (db) async {
             await db.execute('PRAGMA busy_timeout = 5000');
             await db.rawQuery('SELECT 1');

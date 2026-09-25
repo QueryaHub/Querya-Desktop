@@ -267,8 +267,32 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     );
   }
 
+  /// Browse connection, re-acquired when the pooled session was closed under
+  /// us (tree Disconnect, another view interrupting the shared slot).
+  Future<SqliteConnection?> _ensureBrowseConnection() async {
+    final current = _connection;
+    if (current != null && current.isConnected) return current;
+    _lease?.release();
+    _lease = null;
+    try {
+      final lease = await SqliteService.instance.acquire(
+        widget.connectionRow,
+        mode: SqliteSessionMode.readOnly,
+      );
+      if (!mounted) {
+        lease.release();
+        return null;
+      }
+      _lease = lease;
+      return lease.connection;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _fetch() async {
-    final conn = _connection;
+    final conn = await _ensureBrowseConnection();
+    if (!mounted) return;
     if (conn == null || !conn.isConnected) {
       if (mounted && _loading) {
         setState(() {
@@ -410,7 +434,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
         });
         showAppToast(
           context: context,
-          message: '${outcome.statementCount} change(s) saved',
+          message: tableViewSavedMessage(outcome.statementCount),
           variant: AppToastVariant.success,
         );
         await _fetch();
@@ -432,7 +456,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
       });
       showAppToast(
         context: context,
-        message: '${outcome.statementCount} change(s) saved',
+        message: tableViewSavedMessage(outcome.statementCount),
         variant: AppToastVariant.success,
       );
       return;
@@ -447,8 +471,8 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
   }
 
   Future<void> _showDdlDialog() async {
-    final conn = _connection;
-    if (conn == null || !conn.isConnected) return;
+    final conn = await _ensureBrowseConnection();
+    if (!mounted || conn == null || !conn.isConnected) return;
     final navigator = material.Navigator.of(context, rootNavigator: true);
     unawaited(showAppDialog<void>(
       context: context,
@@ -622,12 +646,6 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
                           ),
                         ),
                         const Gap(6),
-                        if (_stagingBuffer != null)
-                          TableBrowserPendingActions(
-                            buffer: _stagingBuffer!,
-                            onSave: () => unawaited(_applyStagedChanges()),
-                            isSaving: _isSaving,
-                          ),
                         OutlineButton(
                           size: ButtonSize.small,
                           onPressed: _loading

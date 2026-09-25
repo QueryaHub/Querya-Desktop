@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/features/workspace/dml_preview_dialog.dart';
+import 'package:querya_desktop/features/workspace/save_error_description.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Outcome of [loadTableViewSchema] (success vs swallowed getTableSchema error).
@@ -188,36 +190,143 @@ void expectDmlMatchedRows(int affectedRows) {
   );
 }
 
+/// Success toast after Save, e.g. `1 change saved`, `3 changes saved`.
+String tableViewSavedMessage(int count) =>
+    '$count ${count == 1 ? 'change' : 'changes'} saved';
+
+/// Explains a failed Save in plain language; the raw error is one click away.
 Future<void> showTableViewSaveFailedDialog({
   required material.BuildContext context,
   required Object error,
 }) {
+  final info = describeSaveError(error);
   return showAppDialog<void>(
     context: context,
-    builder: (ctx) => QueryaDialogCard(
-      constraints: const material.BoxConstraints(maxWidth: 420),
+    builder: (ctx) => _SaveFailedDialog(info: info),
+  );
+}
+
+class _SaveFailedDialog extends material.StatefulWidget {
+  const _SaveFailedDialog({required this.info});
+
+  final SaveErrorDescription info;
+
+  @override
+  material.State<_SaveFailedDialog> createState() => _SaveFailedDialogState();
+}
+
+class _SaveFailedDialogState extends material.State<_SaveFailedDialog> {
+  bool _showDetails = false;
+  bool _copied = false;
+
+  Future<void> _copy() async {
+    await Clipboard.setData(ClipboardData(text: widget.info.details));
+    if (!mounted) return;
+    setState(() => _copied = true);
+  }
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final info = widget.info;
+    return QueryaDialogCard(
+      constraints: const material.BoxConstraints(maxWidth: 480),
       child: material.Padding(
         padding: const material.EdgeInsets.all(20),
         child: material.Column(
           mainAxisSize: material.MainAxisSize.min,
           crossAxisAlignment: material.CrossAxisAlignment.start,
           children: [
-            const Text('Save Changes Failed').semiBold().large(),
-            const Gap(8),
-            Text(error.toString()).muted().small(),
-            const Gap(20),
-            material.Align(
-              alignment: material.Alignment.centerRight,
-              child: PrimaryButton(
-                onPressed: () => material.Navigator.of(ctx).pop(),
-                child: const Text('OK'),
+            material.Row(
+              children: [
+                material.Icon(
+                  material.Icons.error_outline_rounded,
+                  size: 20,
+                  color: cs.destructive,
+                ),
+                const Gap(8),
+                material.Expanded(child: Text(info.title).semiBold().large()),
+              ],
+            ),
+            const Gap(10),
+            Text(info.message).small(),
+            if (info.hint != null) ...[
+              const Gap(6),
+              Text(info.hint!).muted().small(),
+            ],
+            const Gap(10),
+            const Text('No changes were applied. Your edits are still pending.')
+                .muted()
+                .xSmall(),
+            const Gap(12),
+            material.InkWell(
+              onTap: () => setState(() => _showDetails = !_showDetails),
+              borderRadius: material.BorderRadius.circular(4),
+              child: material.Padding(
+                padding: const material.EdgeInsets.symmetric(vertical: 4),
+                child: material.Row(
+                  mainAxisSize: material.MainAxisSize.min,
+                  children: [
+                    material.Icon(
+                      _showDetails
+                          ? material.Icons.expand_less_rounded
+                          : material.Icons.expand_more_rounded,
+                      size: 16,
+                      color: cs.mutedForeground,
+                    ),
+                    const Gap(4),
+                    const Text('Details').muted().xSmall(),
+                  ],
+                ),
               ),
+            ),
+            if (_showDetails)
+              material.Container(
+                width: double.infinity,
+                constraints: const material.BoxConstraints(maxHeight: 180),
+                margin: const material.EdgeInsets.only(top: 6),
+                padding: const material.EdgeInsets.all(10),
+                decoration: material.BoxDecoration(
+                  color: cs.muted.withValues(alpha: 0.4),
+                  borderRadius: material.BorderRadius.circular(6),
+                ),
+                child: material.SingleChildScrollView(
+                  child: material.SelectableText(
+                    info.details,
+                    style: material.TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      color: cs.mutedForeground,
+                    ),
+                  ),
+                ),
+              ),
+            const Gap(18),
+            material.Row(
+              mainAxisAlignment: material.MainAxisAlignment.end,
+              children: [
+                OutlineButton(
+                  onPressed: _copy,
+                  leading: material.Icon(
+                    _copied
+                        ? material.Icons.check_rounded
+                        : material.Icons.copy_rounded,
+                    size: 14,
+                  ),
+                  child: Text(_copied ? 'Copied' : 'Copy details'),
+                ),
+                const Gap(8),
+                PrimaryButton(
+                  onPressed: () => material.Navigator.of(context).pop(),
+                  child: const Text('OK'),
+                ),
+              ],
             ),
           ],
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 /// Result of [applyTableViewStagedChanges].
@@ -288,84 +397,5 @@ Future<TableViewApplyOutcome> applyTableViewStagedChanges({
     return TableViewApplyOutcome.applied(plan.statementCount);
   } catch (e) {
     return TableViewApplyOutcome.failed(e);
-  }
-}
-
-/// Compact Save / Revert + pending badge for Table Browser chrome.
-class TableBrowserPendingActions extends material.StatelessWidget {
-  const TableBrowserPendingActions({
-    super.key,
-    required this.buffer,
-    required this.onSave,
-    required this.isSaving,
-  });
-
-  final DataGridStagingBuffer buffer;
-  final material.VoidCallback? onSave;
-  final bool isSaving;
-
-  @override
-  material.Widget build(material.BuildContext context) {
-    return ListenableBuilder(
-      listenable: buffer,
-      builder: (context, _) {
-        if (!buffer.isDirty) return const material.SizedBox.shrink();
-        final cs = Theme.of(context).colorScheme;
-        final n = buffer.changeCount;
-        return material.Row(
-          mainAxisSize: material.MainAxisSize.min,
-          children: [
-            material.Container(
-              padding: const material.EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 3,
-              ),
-              decoration: material.BoxDecoration(
-                color: cs.primary.withValues(alpha: 0.15),
-                borderRadius: material.BorderRadius.circular(4),
-                border: material.Border.all(
-                  color: cs.primary.withValues(alpha: 0.3),
-                ),
-              ),
-              child: material.Text(
-                '$n pending ${n == 1 ? 'change' : 'changes'}',
-                style: material.TextStyle(
-                  fontSize: 11,
-                  fontWeight: material.FontWeight.w600,
-                  color: cs.primary,
-                ),
-              ),
-            ),
-            const Gap(4),
-            OutlineButton(
-              size: ButtonSize.small,
-              onPressed: isSaving ? null : () => buffer.revertAll(),
-              leading: const material.Icon(
-                material.Icons.undo_rounded,
-                size: 14,
-              ),
-              child: const Text('Revert'),
-            ),
-            const Gap(4),
-            PrimaryButton(
-              size: ButtonSize.small,
-              onPressed: isSaving ? null : onSave,
-              leading: isSaving
-                  ? material.SizedBox(
-                      width: 12,
-                      height: 12,
-                      child: material.CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: cs.primaryForeground,
-                      ),
-                    )
-                  : const material.Icon(material.Icons.save_rounded, size: 14),
-              child: Text(isSaving ? 'Saving…' : 'Save'),
-            ),
-            const Gap(6),
-          ],
-        );
-      },
-    );
   }
 }

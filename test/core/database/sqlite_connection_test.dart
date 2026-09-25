@@ -699,4 +699,100 @@ void main() {
       expect(colsComputed, ['flag', 'cnt']);
     });
   });
+
+  group('SQLite sessions on the same file are independent', () {
+    late Directory dir;
+    late String path;
+
+    setUp(() async {
+      dir = await Directory.systemTemp.createTemp('querya_sqlite_sessions_');
+      path = '${dir.path}/shared.sqlite';
+      final setup = SqliteConnection(
+        id: 1,
+        name: 'setup',
+        path: path,
+        createIfMissing: true,
+      );
+      await setup.connect();
+      await setup.execute('CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT)');
+      await setup.execute("INSERT INTO t (v) VALUES ('a'), ('b')");
+      await setup.disconnect();
+    });
+
+    tearDown(() async {
+      if (await dir.exists()) await dir.delete(recursive: true);
+    });
+
+    test('a write session opened after a read-only browse session can write',
+        () async {
+      final browse =
+          SqliteConnection(id: 1, name: 'x', path: path, readOnly: true);
+      final write = SqliteConnection(id: 1, name: 'x', path: path);
+      await browse.connect();
+      await write.connect();
+      addTearDown(browse.disconnect);
+      addTearDown(write.disconnect);
+
+      expect(
+        await write.executeAffected("UPDATE t SET v = 'edited' WHERE id = 1"),
+        1,
+      );
+    });
+
+    test('closing one session does not close the file for the others',
+        () async {
+      final browse =
+          SqliteConnection(id: 1, name: 'x', path: path, readOnly: true);
+      final write = SqliteConnection(id: 1, name: 'x', path: path);
+      await browse.connect();
+      await write.connect();
+      addTearDown(browse.disconnect);
+
+      await write.executeAffected("UPDATE t SET v = 'saved' WHERE id = 2");
+      // The pool idle-closes the Save session a few seconds after Save.
+      await write.disconnect();
+
+      final rows = await browse.execute('SELECT v FROM t ORDER BY id');
+      expect(rows.map((r) => r['v']), ['a', 'saved']);
+    });
+
+    test('pool sessions for one connection survive each other being released',
+        () async {
+      final pool = SqliteConnectionPool(
+        createAndConnect: (row, {required mode}) async {
+          final c = SqliteConnection(
+            id: row.id!,
+            name: row.name,
+            path: path,
+            readOnly: mode.isReadOnlySession,
+          );
+          await c.connect();
+          return c;
+        },
+        idleDisposeDelay: Duration.zero,
+      );
+      addTearDown(pool.disconnectAll);
+      final row = ConnectionRow(
+        id: 1,
+        type: 'sqlite',
+        name: 'x',
+        host: path,
+        createdAt: '',
+      );
+
+      final browse = await pool.acquire(row);
+      final save = await pool.acquire(row, mode: SqliteSessionMode.tableWrite);
+      expect(
+        await save.connection
+            .executeAffected("UPDATE t SET v = 'pooled' WHERE id = 1"),
+        1,
+      );
+      save.release();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      final rows = await browse.connection.execute('SELECT v FROM t WHERE id = 1');
+      expect(rows.single['v'], 'pooled');
+      browse.release();
+    });
+  });
 }
