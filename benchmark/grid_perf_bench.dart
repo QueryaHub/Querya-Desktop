@@ -3,6 +3,7 @@
 // Frame-timing benchmark for VirtualResultGrid. Run in profile mode:
 //   flutter run --profile -d linux -t benchmark/grid_perf_bench.dart --dart-define=MODE=scroll
 // MODE: scroll (horizontal pan) | edit (staged cell edits on a sorted grid)
+//       | select (mouse-drag selection through ResultsTab, incl. stats)
 import 'dart:async';
 import 'dart:developer' as developer;
 import 'dart:io';
@@ -15,6 +16,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/features/workspace/result_grid_view.dart';
+import 'package:querya_desktop/features/workspace/results_tab.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:vm_service/vm_service.dart' as vms;
 import 'package:vm_service/vm_service_io.dart' as vms_io;
@@ -55,14 +57,23 @@ void main() {
   runApp(ShadcnApp(
     theme: td,
     home: material.Scaffold(
-      body: ListenableBuilder(
-        listenable: buffer,
-        builder: (_, __) => VirtualResultGrid(
-          columns: columns,
-          rows: buffer.effectiveRows,
-          stagingBuffer: buffer,
-        ),
-      ),
+      body: mode == 'select'
+          ? ListenableBuilder(
+              listenable: buffer,
+              builder: (_, __) => ResultsTab(
+                columns: columns,
+                rows: rows,
+                stagingBuffer: buffer,
+              ),
+            )
+          : ListenableBuilder(
+              listenable: buffer,
+              builder: (_, __) => VirtualResultGrid(
+                columns: columns,
+                rows: buffer.effectiveRows,
+                stagingBuffer: buffer,
+              ),
+            ),
     ),
   ));
   WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -97,6 +108,18 @@ Future<void> _tapText(String text) async {
 
 Future<void> _run(DataGridStagingBuffer buffer) async {
   if (mode == 'edit') await _tapText('col_0'); // sort ascending
+  Offset? dragStart;
+  if (mode == 'select') {
+    final e = _find((e) => e.widget is Text && (e.widget as Text).data == 'v2_1');
+    final box = e!.renderObject! as RenderBox;
+    dragStart = box.localToGlobal(box.size.center(Offset.zero));
+    GestureBinding.instance.handlePointerEvent(PointerDownEvent(
+      position: dragStart,
+      pointer: 7,
+      kind: PointerDeviceKind.mouse,
+      buttons: kPrimaryButton,
+    ));
+  }
   if (profile) {
     await _connectVm();
     await _vm?.clearCpuSamples(_isolateId!);
@@ -121,10 +144,19 @@ Future<void> _run(DataGridStagingBuffer buffer) async {
       final next = p.pixels + dir * 14;
       if (next > p.maxScrollExtent || next < 0) dir = -dir;
       p.jumpTo((p.pixels + dir * 14).clamp(0.0, p.maxScrollExtent));
+    } else if (mode == 'select') {
+      _dragStep(dragStart!, i++);
     } else {
       buffer.setCell((i * 37) % rowCount, 1 + i % 5, 'edit$i');
       i++;
     }
+  }
+  if (mode == 'select') {
+    GestureBinding.instance.handlePointerEvent(PointerUpEvent(
+      position: dragStart!,
+      pointer: 7,
+      kind: PointerDeviceKind.mouse,
+    ));
   }
   await Future<void>.delayed(const Duration(seconds: 1));
   _report();
@@ -197,4 +229,22 @@ Future<void> _reportCpu(int startMicros) async {
   }
   top('self time', self);
   top('inclusive time', incl);
+}
+
+/// Moves the held mouse pointer to a new cell each frame, zig-zagging down and
+/// across, so the drag selection (and its statistics) changes on every frame.
+Offset? _lastDrag;
+
+void _dragStep(Offset start, int i) {
+  final rowsDown = 1 + (i % 40); // sweep 1..40 rows
+  final colsAcross = 1 + ((i ~/ 40) % 6);
+  final pos = start + Offset(colsAcross * 110.0, rowsDown * 28.0);
+  GestureBinding.instance.handlePointerEvent(PointerMoveEvent(
+    position: pos,
+    delta: pos - (_lastDrag ?? start),
+    pointer: 7,
+    kind: PointerDeviceKind.mouse,
+    buttons: kPrimaryButton,
+  ));
+  _lastDrag = pos;
 }
