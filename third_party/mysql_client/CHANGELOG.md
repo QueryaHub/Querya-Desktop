@@ -1,3 +1,7 @@
+## Unreleased (Querya patch)
+
+- Request `CLIENT_FOUND_ROWS` in the client handshake so `affectedRows` is the number of matched rows, not changed rows
+
 ## 0.0.27
 
 - Add timeoutMs param to pool constructor
