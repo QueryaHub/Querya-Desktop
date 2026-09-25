@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:querya_desktop/core/storage/app_data_root.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
@@ -423,10 +424,19 @@ class LocalDb {
     return _sqliteInt(rows.first['id']);
   }
 
-  Future<List<ConnectionRow>> getConnections() async {
+  /// Returns all saved connections.
+  ///
+  /// By default, passwords and connection strings are NOT eagerly hydrated from
+  /// the platform secure store to avoid IPC bottlenecks, Keychain lockups, and
+  /// D-Bus timeouts during sidebar/startup population. Secrets are resolved
+  /// on-demand when a connection is initiated.
+  Future<List<ConnectionRow>> getConnections({bool hydrateSecrets = false}) async {
     final db = await _open();
     final rows =
         await db.query('connections', orderBy: 'sort_order ASC, name ASC');
+    if (!hydrateSecrets) {
+      return rows.map((m) => ConnectionRow.fromMap(m)).toList();
+    }
     final futures =
         rows.map((m) => _hydrateConnection(ConnectionRow.fromMap(m)));
     return Future.wait(futures);
@@ -434,23 +444,30 @@ class LocalDb {
 
   static Future<ConnectionRow> _hydrateConnection(ConnectionRow row) async {
     if (row.id == null) return row;
-    final secrets = await ConnectionSecretsStore.readForConnection(row.id!);
-    return ConnectionRow(
-      id: row.id,
-      type: row.type,
-      name: row.name,
-      host: row.host,
-      port: row.port,
-      username: row.username,
-      password: secrets.password ?? row.password,
-      databaseName: row.databaseName,
-      authSource: row.authSource,
-      useSSL: row.useSSL,
-      connectionString: secrets.connectionString ?? row.connectionString,
-      folderId: row.folderId,
-      sortOrder: row.sortOrder,
-      createdAt: row.createdAt,
-    );
+    try {
+      final secrets = await ConnectionSecretsStore.readForConnection(row.id!);
+      return row.copyWith(
+        password: secrets.password ?? row.password,
+        connectionString: secrets.connectionString ?? row.connectionString,
+      );
+    } catch (e) {
+      debugPrint('LocalDb._hydrateConnection failed for connection ${row.id}: $e');
+      return row;
+    }
+  }
+
+  /// Hydrates secrets for a single [ConnectionRow] on demand.
+  Future<ConnectionRow> hydrateConnection(ConnectionRow row) =>
+      _hydrateConnection(row);
+
+  /// Retrieves a single connection by [id], optionally hydrating secrets.
+  Future<ConnectionRow?> getConnectionById(int id, {bool hydrateSecrets = false}) async {
+    final db = await _open();
+    final rows = await db.query('connections', where: 'id = ?', whereArgs: [id]);
+    if (rows.isEmpty) return null;
+    final row = ConnectionRow.fromMap(rows.first);
+    if (!hydrateSecrets) return row;
+    return _hydrateConnection(row);
   }
 
   /// Inserts a row and returns the SQLite row id.

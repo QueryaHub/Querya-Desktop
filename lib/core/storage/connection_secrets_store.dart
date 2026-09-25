@@ -56,10 +56,14 @@ class ConnectionSecretsStore {
       readForConnection(
     int connectionId,
   ) async {
-    final password = await backend.read(_passwordKey(connectionId));
-    final connectionString =
-        await backend.read(_connectionStringKey(connectionId));
-    return (password: password, connectionString: connectionString);
+    try {
+      final password = await backend.read(_passwordKey(connectionId));
+      final connectionString =
+          await backend.read(_connectionStringKey(connectionId));
+      return (password: password, connectionString: connectionString);
+    } catch (_) {
+      return (password: null, connectionString: null);
+    }
   }
 
   static Future<void> deleteForConnection(int connectionId) async {
