@@ -689,32 +689,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     } catch (e) {
       if (mounted) {
         setState(() => session.savingChanges = false);
-        await showAppDialog<void>(
-          context: context,
-          builder: (ctx) => QueryaDialogCard(
-            constraints: const material.BoxConstraints(maxWidth: 420),
-            child: material.Padding(
-              padding: const material.EdgeInsets.all(20),
-              child: material.Column(
-                mainAxisSize: material.MainAxisSize.min,
-                crossAxisAlignment: material.CrossAxisAlignment.start,
-                children: [
-                  const Text('Save Changes Failed').semiBold().large(),
-                  const Gap(8),
-                  Text(e.toString()).muted().small(),
-                  const Gap(20),
-                  material.Align(
-                    alignment: material.Alignment.centerRight,
-                    child: PrimaryButton(
-                      onPressed: () => material.Navigator.of(ctx).pop(),
-                      child: const Text('OK'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
+        await showTableViewSaveFailedDialog(context: context, error: e);
       }
     }
   }

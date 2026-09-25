@@ -605,7 +605,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         });
         showAppToast(
           context: context,
-          message: '${outcome.statementCount} change(s) saved',
+          message: tableViewSavedMessage(outcome.statementCount),
           variant: AppToastVariant.success,
         );
         await _fetch(refreshCount: true);
@@ -627,7 +627,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       });
       showAppToast(
         context: context,
-        message: '${outcome.statementCount} change(s) saved',
+        message: tableViewSavedMessage(outcome.statementCount),
         variant: AppToastVariant.success,
       );
       return;
@@ -667,13 +667,6 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
           onGoPrevious: _goToPreviousPage,
           onGoNext: _goToNextPage,
           onRefresh: () => unawaited(_onRefresh()),
-          pendingActions: _stagingBuffer == null
-              ? null
-              : TableBrowserPendingActions(
-                  buffer: _stagingBuffer!,
-                  onSave: () => unawaited(_applyStagedChanges()),
-                  isSaving: _isSaving,
-                ),
         );
     final buffer = _stagingBuffer;
     if (buffer == null) return toolbar();

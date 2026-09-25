@@ -150,7 +150,8 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       final hasDirtyStaging =
           session.stagingBuffer != null && session.stagingBuffer!.isDirty;
       final hasUnsavedText = session.isModified ||
-          (session.filePath == null && session.controller.text.trim().isNotEmpty);
+          (session.filePath == null &&
+              session.controller.text.trim().isNotEmpty);
       final String message;
       if (hasDirtyStaging && hasUnsavedText) {
         message =
@@ -530,8 +531,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       session.stagingBuffer?.dispose();
       setState(() {
         session.rows = newRows;
-        session.stagingBuffer =
-            DataGridStagingBuffer(
+        session.stagingBuffer = DataGridStagingBuffer(
           columns: session.columns,
           rows: session.rows,
           primaryKeys: session.resultGridPrimaryKeys,
@@ -541,32 +541,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
     } catch (e) {
       if (mounted) {
         setState(() => session.savingChanges = false);
-        await showAppDialog<void>(
-          context: context,
-          builder: (ctx) => QueryaDialogCard(
-            constraints: const material.BoxConstraints(maxWidth: 420),
-            child: material.Padding(
-              padding: const material.EdgeInsets.all(20),
-              child: material.Column(
-                mainAxisSize: material.MainAxisSize.min,
-                crossAxisAlignment: material.CrossAxisAlignment.start,
-                children: [
-                  const Text('Save Changes Failed').semiBold().large(),
-                  const Gap(8),
-                  Text(e.toString()).muted().small(),
-                  const Gap(20),
-                  material.Align(
-                    alignment: material.Alignment.centerRight,
-                    child: PrimaryButton(
-                      onPressed: () => material.Navigator.of(ctx).pop(),
-                      child: const Text('OK'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
+        await showTableViewSaveFailedDialog(context: context, error: e);
       }
     }
   }

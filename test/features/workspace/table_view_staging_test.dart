@@ -456,46 +456,6 @@ void main() {
     });
   });
 
-  group('TableBrowserPendingActions', () {
-    testWidgets('shows pending badge and Save when dirty', (tester) async {
-      final buffer = DataGridStagingBuffer(
-        columns: ['id', 'name'],
-        rows: [
-          ['1', 'Ada'],
-        ],
-      );
-      addTearDown(buffer.dispose);
-      buffer.setCell(0, 1, 'Grace');
-
-      var saved = false;
-      await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
-          home: material.Scaffold(
-            body: TableBrowserPendingActions(
-              buffer: buffer,
-              onSave: () => saved = true,
-              isSaving: false,
-            ),
-          ),
-        ),
-      );
-
-      expect(find.text('1 pending change'), findsOneWidget);
-      expect(find.text('Save'), findsOneWidget);
-      expect(find.text('Revert'), findsOneWidget);
-
-      await tester.tap(find.text('Save'));
-      await tester.pump();
-      expect(saved, isTrue);
-
-      await tester.tap(find.text('Revert'));
-      await tester.pump();
-      expect(buffer.isDirty, isFalse);
-      expect(find.text('1 pending change'), findsNothing);
-    });
-  });
-
   group('confirmDiscardTableEditsIfDirty', () {
     testWidgets('returns true immediately when clean', (tester) async {
       await tester.pumpWidget(

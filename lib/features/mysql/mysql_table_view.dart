@@ -587,7 +587,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
         });
         showAppToast(
           context: context,
-          message: '${outcome.statementCount} change(s) saved',
+          message: tableViewSavedMessage(outcome.statementCount),
           variant: AppToastVariant.success,
         );
         await _fetch(refreshCount: true);
@@ -609,7 +609,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       });
       showAppToast(
         context: context,
-        message: '${outcome.statementCount} change(s) saved',
+        message: tableViewSavedMessage(outcome.statementCount),
         variant: AppToastVariant.success,
       );
       return;
@@ -705,12 +705,6 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
                           ),
                         ),
                         const Gap(6),
-                        if (_stagingBuffer != null)
-                          TableBrowserPendingActions(
-                            buffer: _stagingBuffer!,
-                            onSave: () => unawaited(_applyStagedChanges()),
-                            isSaving: _isSaving,
-                          ),
                         OutlineButton(
                           size: ButtonSize.small,
                           onPressed: _openSqlEditor,
