@@ -194,8 +194,8 @@ void main() {
       expect(find.byType(QueryaSwitchingBody), findsNWidgets(2));
       expect(find.byType(QueryaFadeSlide), findsWidgets);
       expect(find.byType(RedisExplorerView), findsOneWidget);
-      // Home stays keep-alive under SwitchingBody.
-      expect(find.byType(RedisView), findsOneWidget);
+      // Home stays keep-alive under SwitchingBody (offstaged once exit completes).
+      expect(find.byType(RedisView, skipOffstage: false), findsOneWidget);
 
       await pumpWidgetWithSurfaceSize(
         tester,
