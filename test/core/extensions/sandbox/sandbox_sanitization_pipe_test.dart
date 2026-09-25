@@ -102,6 +102,36 @@ QyNTUxOQAAACBA1m7X8J9H6P8Q9J8H6P8Q9J8H6P8Q9J8H6P8Q9J8H6Q==
       expect(out, contains('mysql://root:${SandboxSanitizer.redactionToken}@'));
       expect(out, contains('mongodb+srv://admin:${SandboxSanitizer.redactionToken}@'));
     });
+
+    test('redacts quoted passwords and tokens containing spaces (#918)', () {
+      final input = [
+        '{"password": "correct horse battery staple"}',
+        "val = {'api_key': 'super secret key with spaces'};",
+        'password: "my secret password123"',
+        "access_token: 'token with multiple spaces inside'",
+        'auth-token = "auth token with spaces"',
+        'password=plainSecret&other=1',
+        '{"secret": "nested \\"quoted\\" secret", "status": "ok"}',
+      ].join('\n');
+
+      final out = SandboxSanitizer.sanitize(input);
+
+      expect(out, isNot(contains('correct horse battery staple')));
+      expect(out, isNot(contains('super secret key with spaces')));
+      expect(out, isNot(contains('my secret password123')));
+      expect(out, isNot(contains('token with multiple spaces inside')));
+      expect(out, isNot(contains('auth token with spaces')));
+      expect(out, isNot(contains('plainSecret')));
+      expect(out, isNot(contains('nested \\"quoted\\" secret')));
+
+      expect(out, contains('{"password": "${SandboxSanitizer.redactionToken}"}'));
+      expect(out, contains("{'api_key': '${SandboxSanitizer.redactionToken}'}"));
+      expect(out, contains('password: "${SandboxSanitizer.redactionToken}"'));
+      expect(out, contains("access_token: '${SandboxSanitizer.redactionToken}'"));
+      expect(out, contains('auth-token = "${SandboxSanitizer.redactionToken}"'));
+      expect(out, contains('password=${SandboxSanitizer.redactionToken}&other=1'));
+      expect(out, contains('{"secret": "${SandboxSanitizer.redactionToken}", "status": "ok"}'));
+    });
   });
 
   group('SandboxRotatingLog', () {
