@@ -545,7 +545,11 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         session.resultGridColumnDataTypes = types;
         session.stagingBuffer?.dispose();
         session.stagingBuffer = canSave
-            ? DataGridStagingBuffer(columns: cols, rows: outRows)
+            ? DataGridStagingBuffer(
+                columns: cols,
+                rows: outRows,
+                primaryKeys: pks,
+              )
             : null;
         if (cols.isEmpty && outRows.isEmpty) {
           session.statusLine =
@@ -671,7 +675,11 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       setState(() {
         session.rows = newRows;
         session.stagingBuffer =
-            DataGridStagingBuffer(columns: session.columns, rows: session.rows);
+            DataGridStagingBuffer(
+          columns: session.columns,
+          rows: session.rows,
+          primaryKeys: session.resultGridPrimaryKeys,
+        );
         session.savingChanges = false;
       });
       await _refreshTxStatus();

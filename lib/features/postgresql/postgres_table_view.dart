@@ -256,6 +256,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       columns: columns,
       rows: rows,
       enabled: _editingEnabled,
+      primaryKeys: _primaryKeys,
     );
   }
 
@@ -606,6 +607,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
           columns: _columnNames,
           rows: newRows,
           enabled: _editingEnabled,
+          primaryKeys: _primaryKeys,
         );
         _isSaving = false;
       });

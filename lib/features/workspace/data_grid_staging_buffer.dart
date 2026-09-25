@@ -26,7 +26,9 @@ class DataGridStagingBuffer extends ChangeNotifier {
   DataGridStagingBuffer({
     required List<String> columns,
     required List<List<String>> rows,
+    List<String> primaryKeys = const [],
   })  : _originalColumns = List.unmodifiable(columns),
+        _primaryKeys = List.unmodifiable(primaryKeys),
         _originalRows = List.unmodifiable(
           rows.map((r) => List<String>.unmodifiable(r)).toList(),
         ) {
@@ -35,6 +37,10 @@ class DataGridStagingBuffer extends ChangeNotifier {
 
   final List<String> _originalColumns;
   final List<List<String>> _originalRows;
+
+  /// Primary key column names; blanked when a row is duplicated so the
+  /// database can generate a fresh key instead of hitting a unique violation.
+  final List<String> _primaryKeys;
 
   /// Map of `rowIndex -> (colIndex -> stagedValue)` for modified cells in baseline rows.
   final Map<int, Map<int, String>> _modifiedCells = {};
@@ -320,6 +326,25 @@ class DataGridStagingBuffer extends ChangeNotifier {
       columnDataTypes: columnDataTypes,
       columnMeta: columnMeta,
     );
+  }
+
+  /// Stages a copy of the row at [index] (baseline or already inserted) as a
+  /// new row with its primary key cells blanked.
+  ///
+  /// Composite or natural keys the database cannot generate stay blank for the
+  /// user to fill in before saving. No-op when [index] is out of range.
+  void duplicateRow(int index) {
+    if (index < 0 || index >= totalRowCount) return;
+    final pkNames = _primaryKeys
+        .map((pk) => TableMutationEngine.unquoteIdentifier(pk).toLowerCase())
+        .toSet();
+    final row = List<String>.generate(_originalColumns.length, (c) {
+      final name = TableMutationEngine.unquoteIdentifier(_originalColumns[c])
+          .toLowerCase();
+      if (pkNames.contains(name)) return '';
+      return _sanitizeNull(getCellValue(index, c));
+    });
+    addRow(row);
   }
 
   /// Returns the full list of effective rows (original with modifications applied + inserted rows).

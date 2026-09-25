@@ -146,6 +146,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
         columns: _columnNames,
         rows: _rows,
         enabled: _editingEnabled,
+        primaryKeys: _primaryKeys,
       );
     }
     if (mounted) setState(() {});
@@ -300,6 +301,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       columns: columns,
       rows: rows,
       enabled: _editingEnabled,
+      primaryKeys: _primaryKeys,
     );
   }
 
@@ -585,6 +587,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
           columns: _columnNames,
           rows: newRows,
           enabled: _editingEnabled,
+          primaryKeys: _primaryKeys,
         );
         _isSaving = false;
       });

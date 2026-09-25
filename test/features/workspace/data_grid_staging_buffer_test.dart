@@ -153,6 +153,62 @@ void main() {
       ]);
     });
 
+    test('duplicateRow blanks primary key cells and keeps other values', () {
+      final keyed = DataGridStagingBuffer(
+        columns: ['id', 'name', 'email'],
+        rows: [
+          ['42', 'Alice', 'alice@test.com'],
+        ],
+        primaryKeys: ['id'],
+      );
+      addTearDown(keyed.dispose);
+      keyed.setCell(0, 1, 'Alice Edited');
+
+      keyed.duplicateRow(0);
+
+      expect(keyed.insertedRowCount, 1);
+      expect(keyed.effectiveRows.last, ['', 'Alice Edited', 'alice@test.com']);
+      expect(keyed.getRowStatus(1), StagedRowStatus.inserted);
+    });
+
+    test(
+        'duplicateRow blanks every column of a composite key, case-insensitively',
+        () {
+      final keyed = DataGridStagingBuffer(
+        columns: ['Org', 'user_id', 'role'],
+        rows: [
+          ['1', '2', 'admin'],
+        ],
+        primaryKeys: ['org', '"user_id"'],
+      );
+      addTearDown(keyed.dispose);
+
+      keyed.duplicateRow(0);
+
+      expect(keyed.effectiveRows.last, ['', '', 'admin']);
+    });
+
+    test('duplicateRow copies staged NULLs as NULL and can copy inserted rows',
+        () {
+      buffer.setCellNull(0, 2);
+      buffer.duplicateRow(0);
+      expect(buffer.effectiveRows.last, ['1', 'Alice', 'NULL']);
+
+      buffer.duplicateRow(3); // the row inserted above
+      expect(buffer.insertedRowCount, 2);
+    });
+
+    test(
+        'duplicateRow without primary keys copies verbatim; bad index is a no-op',
+        () {
+      buffer.duplicateRow(1);
+      expect(buffer.effectiveRows.last, ['2', 'Bob', 'bob@test.com']);
+
+      buffer.duplicateRow(-1);
+      buffer.duplicateRow(99);
+      expect(buffer.insertedRowCount, 1);
+    });
+
     test('committedRows equals baseline when clean', () {
       expect(buffer.committedRows, buffer.originalRows);
     });

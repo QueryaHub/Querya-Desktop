@@ -90,10 +90,15 @@ DataGridStagingBuffer? replaceTableViewStagingBuffer({
   required List<String> columns,
   required List<List<String>> rows,
   required bool enabled,
+  List<String> primaryKeys = const [],
 }) {
   previous?.dispose();
   if (!enabled || columns.isEmpty) return null;
-  return DataGridStagingBuffer(columns: columns, rows: rows);
+  return DataGridStagingBuffer(
+    columns: columns,
+    rows: rows,
+    primaryKeys: primaryKeys,
+  );
 }
 
 /// Confirms discarding dirty staged edits. Returns true when it is safe to proceed.
