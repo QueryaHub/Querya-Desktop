@@ -666,7 +666,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       );
 
       if (!mounted) return;
-      final newRows = session.stagingBuffer!.effectiveRows;
+      final newRows = session.stagingBuffer!.committedRows;
       session.stagingBuffer?.dispose();
       setState(() {
         session.rows = newRows;

@@ -347,6 +347,46 @@ void main() {
       expect(executed, isFalse);
     });
 
+    testWidgets(
+        'applied save yields a baseline without deleted rows or NULL sentinels',
+        (tester) async {
+      await tester.pumpWidget(
+        ShadcnApp(
+          theme: AppTheme.dark,
+          home: const material.Scaffold(body: material.SizedBox()),
+        ),
+      );
+      final ctx = tester.element(find.byType(material.Scaffold));
+      final buffer = DataGridStagingBuffer(
+        columns: ['id', 'name'],
+        rows: [
+          ['1', 'Ada'],
+          ['2', 'Grace'],
+        ],
+      );
+      buffer.toggleDeleteRow(1);
+      buffer.setCellNull(0, 1);
+      addTearDown(buffer.dispose);
+
+      final future = applyTableViewStagedChanges(
+        context: ctx,
+        buffer: buffer,
+        dialect: SqlDialect.postgres,
+        tableName: 'users',
+        schema: 'public',
+        primaryKeys: ['id'],
+        execute: (_) async {},
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Apply Changes'));
+      final outcome = await future;
+
+      expect(outcome.isApplied, isTrue);
+      expect(buffer.committedRows, [
+        ['1', 'NULL'],
+      ]);
+    });
+
     testWidgets('0-row DML is failed and the staging buffer stays dirty',
         (tester) async {
       await tester.pumpWidget(

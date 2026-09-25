@@ -596,7 +596,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     );
     if (!mounted) return;
     if (outcome.isApplied) {
-      final newRows = buffer.effectiveRows;
+      final newRows = buffer.committedRows;
       buffer.dispose();
       setState(() {
         _rows = newRows;
