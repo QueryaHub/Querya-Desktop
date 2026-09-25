@@ -716,6 +716,11 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   Timer? _autoScrollTimer;
   List<double> _currentDisplayOffsets = const [0];
   double _currentAvailableWidth = 0.0;
+
+  /// Widths and window the last build used, so a scroll tick can tell whether
+  /// the set of built columns actually changes before it asks for a rebuild.
+  List<double> _currentDisplayWidths = const [];
+  ResultGridColumnWindow? _currentWindow;
   double _currentRowsViewportHeight = 0.0;
 
   @override
@@ -976,11 +981,26 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     }
   }
 
+  /// The scroll view already translates header and body together; the offset
+  /// only decides which columns are built (virtualized window). So rebuild only
+  /// when that window changes, not on every pan frame.
   void _onHorizontalScroll() {
     if (!_horizontalController.hasClients) return;
     final offset = _horizontalController.offset;
     if ((offset - _scrollOffset).abs() < 0.5) return;
-    setState(() => _scrollOffset = offset);
+    _scrollOffset = offset;
+
+    final current = _currentWindow;
+    if (current != null && _currentDisplayWidths.isNotEmpty) {
+      final next = computeVisibleColumnWindow(
+        columnWidths: _currentDisplayWidths,
+        columnOffsets: _currentDisplayOffsets,
+        scrollOffset: offset,
+        viewportWidth: _currentAvailableWidth,
+      );
+      if (next == current) return;
+    }
+    setState(() {});
   }
 
   void _onColumnResize(int index, double delta) {
@@ -2076,6 +2096,8 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
                   : computeResultGridColumnOffsets(displayWidths);
 
               final window = _columnWindow(displayWidths, availableWidth);
+              _currentDisplayWidths = displayWidths;
+              _currentWindow = window;
 
               return material.Scrollbar(
                 controller: _horizontalController,
