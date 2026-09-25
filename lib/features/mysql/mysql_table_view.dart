@@ -72,13 +72,20 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
 
   bool get _isDirty => _stagingBuffer?.isDirty ?? false;
 
-  bool get _editingEnabled => tableViewEditingEnabled(
+  /// Tables open in view mode; editing is switched on explicitly.
+  bool _editMode = false;
+
+  /// Whether this table could be edited (PK, not a view, writable).
+  bool get _canEdit => tableViewEditingEnabled(
         isView: widget.isView,
         customSqlActive: _customSqlActive,
         hasPrimaryKey: _primaryKeys.isNotEmpty,
         readOnly: widget.isReadOnly,
         schemaError: _schemaError,
       );
+
+  /// Edit mode is on and the table is editable.
+  bool get _editingEnabled => _canEdit && _editMode;
 
   String _qualifiedFrom() {
     final d = MysqlConnection.quoteIdentifier(widget.database);
@@ -172,6 +179,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
   }
 
   Future<void> _connectAndLoad() async {
+    _editMode = false;
     _disconnectCurrent();
     if (!mounted) return;
     setState(() {
@@ -255,6 +263,57 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       lease.release();
     }
   }
+
+  String? _editDisabledReason() => tableViewEditDisabledReason(
+      isView: widget.isView,
+      customSqlActive: _customSqlActive,
+      hasPrimaryKey: _primaryKeys.isNotEmpty,
+      schemaLoaded: _schemaLoaded,
+      readOnly: widget.isReadOnly,
+      schemaError: _schemaError,
+    );
+
+  void _enterEditMode() {
+    if (!_canEdit || _editMode) return;
+    setState(() {
+      _editMode = true;
+      _stagingBuffer = replaceTableViewStagingBuffer(
+        previous: _stagingBuffer,
+        columns: _columnNames,
+        rows: _rows,
+        enabled: _editingEnabled,
+        primaryKeys: _primaryKeys,
+      );
+    });
+  }
+
+  Future<void> _exitEditMode() async {
+    if (!_editMode) return;
+    if (!await _confirmDiscardIfNeeded()) return;
+    if (!mounted) return;
+    setState(() {
+      _editMode = false;
+      _stagingBuffer?.dispose();
+      _stagingBuffer = null;
+    });
+  }
+
+  void _toggleEditMode() {
+    if (_editMode) {
+      unawaited(_exitEditMode());
+    } else {
+      _enterEditMode();
+    }
+  }
+
+  material.Widget _editModeButton() => TableEditModeButton(
+        editMode: _editMode,
+        canEdit: _canEdit,
+        busy: _loading || _isSaving,
+        disabledReason: _editDisabledReason(),
+        onEdit: _enterEditMode,
+        onDone: () => unawaited(_exitEditMode()),
+      );
 
   Future<bool> _confirmDiscardIfNeeded() {
     return confirmDiscardTableEditsIfDirty(
@@ -705,6 +764,10 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
                           ),
                         ),
                         const Gap(6),
+                        if (!widget.isView) ...[
+                          _editModeButton(),
+                          const Gap(4),
+                        ],
                         OutlineButton(
                           size: ButtonSize.small,
                           onPressed: _openSqlEditor,
@@ -779,6 +842,10 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
 
     return material.CallbackShortcuts(
       bindings: {
+        const material.SingleActivator(LogicalKeyboardKey.keyE, control: true):
+            _toggleEditMode,
+        const material.SingleActivator(LogicalKeyboardKey.keyE, meta: true):
+            _toggleEditMode,
         const material.SingleActivator(LogicalKeyboardKey.f5): () {
           if (!_loading) unawaited(_onRefresh());
         },

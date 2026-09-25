@@ -190,6 +190,61 @@ void expectDmlMatchedRows(int affectedRows) {
   );
 }
 
+/// Header toggle between browsing a table and editing its rows.
+///
+/// Tables open in view mode; [onEdit] turns editing on (edit toolbar, editable
+/// cells) and [onDone] turns it off. When the table cannot be edited the
+/// button is disabled and [disabledReason] explains why.
+class TableEditModeButton extends material.StatelessWidget {
+  const TableEditModeButton({
+    super.key,
+    required this.editMode,
+    required this.canEdit,
+    required this.onEdit,
+    required this.onDone,
+    this.disabledReason,
+    this.busy = false,
+  });
+
+  final bool editMode;
+  final bool canEdit;
+  final material.VoidCallback onEdit;
+  final material.VoidCallback onDone;
+  final String? disabledReason;
+
+  /// Loading or saving: the toggle waits.
+  final bool busy;
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    if (editMode) {
+      return material.Tooltip(
+        message: 'Stop editing (Ctrl+E)',
+        waitDuration: const Duration(milliseconds: 400),
+        child: PrimaryButton(
+          size: ButtonSize.small,
+          onPressed: busy ? null : onDone,
+          leading: const material.Icon(material.Icons.check_rounded, size: 15),
+          child: const Text('Done'),
+        ),
+      );
+    }
+    final enabled = canEdit && !busy;
+    return material.Tooltip(
+      message: canEdit
+          ? 'Edit rows (Ctrl+E)'
+          : (disabledReason ?? 'This table cannot be edited'),
+      waitDuration: const Duration(milliseconds: 400),
+      child: OutlineButton(
+        size: ButtonSize.small,
+        onPressed: enabled ? onEdit : null,
+        leading: const material.Icon(material.Icons.edit_rounded, size: 14),
+        child: const Text('Edit'),
+      ),
+    );
+  }
+}
+
 /// Success toast after Save, e.g. `1 change saved`, `3 changes saved`.
 String tableViewSavedMessage(int count) =>
     '$count ${count == 1 ? 'change' : 'changes'} saved';

@@ -1,6 +1,7 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/editor/querya_code_editor.dart';
 import 'package:querya_desktop/core/editor/querya_code_language.dart';
@@ -56,6 +57,9 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
   bool _schemaLoaded = false;
   Object? _schemaError;
   List<String> _primaryKeys = const [];
+
+  /// Tables open in view mode; editing is switched on explicitly.
+  bool _editMode = false;
   bool _isSaving = false;
 
   bool _restartingDriver = false;
@@ -136,6 +140,7 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
         if (!mounted) return;
         _stagingBuffer?.dispose();
         _stagingBuffer = null;
+        _editMode = false;
         _schemaLoaded = false;
         _schemaError = null;
         _offset = 0;
@@ -158,6 +163,49 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
   String get _tableTitle => '${widget.database}.${widget.tableName}';
 
   bool get _isDirty => _stagingBuffer?.isDirty == true;
+
+  /// Whether this table could be edited (driver mutations, PK, not a view).
+  bool get _canEdit => tableViewEditingEnabled(
+        isView: widget.isView,
+        customSqlActive: false,
+        hasPrimaryKey: _primaryKeys.isNotEmpty,
+        readOnly: _capabilities?.supportsMutations != true,
+        schemaError: _schemaError,
+      );
+
+  String? _editDisabledReason() => tableViewEditDisabledReason(
+        isView: widget.isView,
+        customSqlActive: false,
+        hasPrimaryKey: _primaryKeys.isNotEmpty,
+        schemaLoaded: _schemaLoaded,
+        readOnly: _capabilities != null && !_capabilities!.supportsMutations,
+        schemaError: _schemaError,
+      );
+
+  void _enterEditMode() {
+    if (!_canEdit || _editMode) return;
+    setState(() {
+      _editMode = true;
+      _stagingBuffer = replaceTableViewStagingBuffer(
+        previous: _stagingBuffer,
+        columns: _columns,
+        rows: _rows,
+        enabled: true,
+        primaryKeys: _primaryKeys,
+      );
+    });
+  }
+
+  Future<void> _exitEditMode() async {
+    if (!_editMode) return;
+    if (!await _confirmDiscardIfNeeded()) return;
+    if (!mounted) return;
+    setState(() {
+      _editMode = false;
+      _stagingBuffer?.dispose();
+      _stagingBuffer = null;
+    });
+  }
 
   Future<bool> _confirmDiscardIfNeeded() {
     return confirmDiscardTableEditsIfDirty(
@@ -303,18 +351,11 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
         _columns = dataResult.columns;
         _rows = dataResult.rows;
         _loading = false;
-        final editingEnabled = tableViewEditingEnabled(
-          isView: widget.isView,
-          customSqlActive: false,
-          hasPrimaryKey: _primaryKeys.isNotEmpty,
-          readOnly: _capabilities?.supportsMutations != true,
-          schemaError: _schemaError,
-        );
         _stagingBuffer = replaceTableViewStagingBuffer(
           previous: _stagingBuffer,
           columns: _columns,
           rows: _rows,
-          enabled: editingEnabled,
+          enabled: _canEdit && _editMode,
           primaryKeys: _primaryKeys,
         );
         _updateStatusLine();
@@ -491,7 +532,8 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
       await showAppDialog<void>(
         context: context,
         builder: (ctx) => QueryaDialogCard(
-          constraints: const material.BoxConstraints(maxWidth: 640, maxHeight: 500),
+          constraints:
+              const material.BoxConstraints(maxWidth: 640, maxHeight: 500),
           child: material.Padding(
             padding: const material.EdgeInsets.all(20),
             child: material.Column(
@@ -504,7 +546,8 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
                 const Gap(16),
                 material.Expanded(
                   child: material.Container(
-                    decoration: SqlEditorChrome.inlineFieldDecorationFromContext(ctx),
+                    decoration:
+                        SqlEditorChrome.inlineFieldDecorationFromContext(ctx),
                     child: QueryaCodeEditor(
                       controller: material.TextEditingController(text: ddlText),
                       language: QueryaCodeLanguage.sql,
@@ -566,128 +609,155 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
   material.Widget build(material.BuildContext context) {
     final kind = widget.isView ? 'View' : 'Table';
 
-    return material.Column(
-      crossAxisAlignment: material.CrossAxisAlignment.stretch,
-      children: [
-        ExtensionTableToolbar(
-          title: '$kind · ${widget.database}.${widget.tableName}',
-          paginationLabel: _statusLine ?? 'Loading...',
-          tableIcon: widget.isView
-              ? material.Icons.view_list_rounded
-              : material.Icons.table_chart_outlined,
-          loading: _loading,
-          canGoPrevious: _canGoBack && !_loading,
-          canGoNext: _canGoForward && !_loading,
-          onNavigateHome: widget.onNavigateHome != null
-              ? () => unawaited(() async {
-                    if (!await _confirmDiscardIfNeeded()) return;
-                    if (!mounted) return;
-                    widget.onNavigateHome!();
-                  }())
-              : null,
-          filterActive: _filterActive || _filterController.text.isNotEmpty,
-          filterText: _filterController.text,
-          onToggleFilter: () {
-            setState(() {
-              _filterActive = !_filterActive;
-            });
-          },
-          onOpenDdl: _openDdlDialog,
-          onGoPrevious: _previousPage,
-          onGoNext: _nextPage,
-          onRefresh: () => unawaited(_onRefresh()),
-          onRestartDriver: () => unawaited(_restartDriver()),
-          isRestarting: _restartingDriver,
-          onCopyFormat: (format) {
-            unawaited(() async {
-              await DataExportService.copyToClipboard(
-                format,
-                columns: _columns,
-                rows: _rows,
-              );
-            }());
-          },
-          onSaveFormat: (format) {
-            unawaited(() async {
-              final outcome = await DataExportService.saveToFile(
-                format,
-                columns: _columns,
-                rows: _rows,
-              );
-              if (!context.mounted) return;
-              if (outcome == SaveExportOutcome.error) {
-                await _showSaveFileErrorDialog(context);
-              }
-            }());
-          },
-        ),
-        if (_filterActive)
-          material.Container(
-            padding: const material.EdgeInsets.symmetric(
-                horizontal: 16, vertical: 8),
-            decoration: material.BoxDecoration(
-              color: Theme.of(context).colorScheme.muted.withValues(alpha: 0.3),
-              border: material.Border(
-                bottom: material.BorderSide(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .border
-                      .withValues(alpha: 0.3),
+    void toggleEditMode() {
+      if (_editMode) {
+        unawaited(_exitEditMode());
+      } else {
+        _enterEditMode();
+      }
+    }
+
+    return material.CallbackShortcuts(
+      bindings: {
+        const material.SingleActivator(LogicalKeyboardKey.keyE, control: true):
+            toggleEditMode,
+        const material.SingleActivator(LogicalKeyboardKey.keyE, meta: true):
+            toggleEditMode,
+      },
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
+          ExtensionTableToolbar(
+            title: '$kind · ${widget.database}.${widget.tableName}',
+            paginationLabel: _statusLine ?? 'Loading...',
+            tableIcon: widget.isView
+                ? material.Icons.view_list_rounded
+                : material.Icons.table_chart_outlined,
+            loading: _loading,
+            canGoPrevious: _canGoBack && !_loading,
+            canGoNext: _canGoForward && !_loading,
+            onNavigateHome: widget.onNavigateHome != null
+                ? () => unawaited(() async {
+                      if (!await _confirmDiscardIfNeeded()) return;
+                      if (!mounted) return;
+                      widget.onNavigateHome!();
+                    }())
+                : null,
+            filterActive: _filterActive || _filterController.text.isNotEmpty,
+            filterText: _filterController.text,
+            onToggleFilter: () {
+              setState(() {
+                _filterActive = !_filterActive;
+              });
+            },
+            onOpenDdl: _openDdlDialog,
+            onGoPrevious: _previousPage,
+            onGoNext: _nextPage,
+            onRefresh: () => unawaited(_onRefresh()),
+            onRestartDriver: () => unawaited(_restartDriver()),
+            isRestarting: _restartingDriver,
+            editAction: widget.isView
+                ? null
+                : TableEditModeButton(
+                    editMode: _editMode,
+                    canEdit: _canEdit,
+                    busy: _loading,
+                    disabledReason: _editDisabledReason(),
+                    onEdit: _enterEditMode,
+                    onDone: () => unawaited(_exitEditMode()),
+                  ),
+            onCopyFormat: (format) {
+              unawaited(() async {
+                await DataExportService.copyToClipboard(
+                  format,
+                  columns: _columns,
+                  rows: _rows,
+                );
+              }());
+            },
+            onSaveFormat: (format) {
+              unawaited(() async {
+                final outcome = await DataExportService.saveToFile(
+                  format,
+                  columns: _columns,
+                  rows: _rows,
+                );
+                if (!context.mounted) return;
+                if (outcome == SaveExportOutcome.error) {
+                  await _showSaveFileErrorDialog(context);
+                }
+              }());
+            },
+          ),
+          if (_filterActive)
+            material.Container(
+              padding: const material.EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 8),
+              decoration: material.BoxDecoration(
+                color:
+                    Theme.of(context).colorScheme.muted.withValues(alpha: 0.3),
+                border: material.Border(
+                  bottom: material.BorderSide(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .border
+                        .withValues(alpha: 0.3),
+                  ),
                 ),
               ),
-            ),
-            child: material.Row(
-              children: [
-                const material.Text('WHERE ').semiBold().small(),
-                const Gap(8),
-                material.Expanded(
-                  child: material.TextField(
-                    controller: _filterController,
-                    decoration: const material.InputDecoration(
-                      hintText: "e.g. id > 100 AND status = 'active'",
-                      isDense: true,
-                      border: material.OutlineInputBorder(),
+              child: material.Row(
+                children: [
+                  const material.Text('WHERE ').semiBold().small(),
+                  const Gap(8),
+                  material.Expanded(
+                    child: material.TextField(
+                      controller: _filterController,
+                      decoration: const material.InputDecoration(
+                        hintText: "e.g. id > 100 AND status = 'active'",
+                        isDense: true,
+                        border: material.OutlineInputBorder(),
+                      ),
+                      onSubmitted: (_) => _applyFilter(),
                     ),
-                    onSubmitted: (_) => _applyFilter(),
                   ),
-                ),
-                const Gap(8),
-                OutlineButton(
-                  size: ButtonSize.small,
-                  onPressed: _applyFilter,
-                  child: const Text('Apply'),
-                ),
-                if (_filterController.text.isNotEmpty) ...[
-                  const Gap(6),
-                  GhostButton(
+                  const Gap(8),
+                  OutlineButton(
                     size: ButtonSize.small,
-                    onPressed: _clearFilter,
-                    child: const Text('Clear'),
+                    onPressed: _applyFilter,
+                    child: const Text('Apply'),
                   ),
+                  if (_filterController.text.isNotEmpty) ...[
+                    const Gap(6),
+                    GhostButton(
+                      size: ButtonSize.small,
+                      onPressed: _clearFilter,
+                      child: const Text('Clear'),
+                    ),
+                  ],
                 ],
-              ],
+              ),
+            ),
+          material.Expanded(
+            child: ResultsTab(
+              columns: _columns,
+              rows: _rows,
+              errorMessage: _error,
+              isLoading: _loading,
+              statusLine: _statusLine,
+              showExportToolbar: false,
+              stagingBuffer: _stagingBuffer,
+              onApplyChanges: _stagingBuffer != null ? _onApplyChanges : null,
+              isSaving: _isSaving,
+              errorAction: _isDriverError
+                  ? ExtensionDriverRecoveryBanner(
+                      onRestart: () => unawaited(_restartDriver()),
+                      isRestarting: _restartingDriver,
+                    )
+                  : null,
             ),
           ),
-        material.Expanded(
-          child: ResultsTab(
-            columns: _columns,
-            rows: _rows,
-            errorMessage: _error,
-            isLoading: _loading,
-            statusLine: _statusLine,
-            showExportToolbar: false,
-            stagingBuffer: _stagingBuffer,
-            onApplyChanges: _stagingBuffer != null ? _onApplyChanges : null,
-            isSaving: _isSaving,
-            errorAction: _isDriverError
-                ? ExtensionDriverRecoveryBanner(
-                    onRestart: () => unawaited(_restartDriver()),
-                    isRestarting: _restartingDriver,
-                  )
-                : null,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

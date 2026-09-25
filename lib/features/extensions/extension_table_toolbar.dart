@@ -25,6 +25,7 @@ class ExtensionTableToolbar extends material.StatelessWidget {
     this.onNavigateHome,
     this.onRestartDriver,
     this.isRestarting = false,
+    this.editAction,
   });
 
   final String title;
@@ -46,6 +47,9 @@ class ExtensionTableToolbar extends material.StatelessWidget {
   final VoidCallback? onNavigateHome;
   final VoidCallback? onRestartDriver;
   final bool isRestarting;
+
+  /// View / edit mode toggle ([TableEditModeButton]).
+  final material.Widget? editAction;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -125,6 +129,10 @@ class ExtensionTableToolbar extends material.StatelessWidget {
                           ),
                         ),
                         const Gap(6),
+                        if (editAction != null) ...[
+                          editAction!,
+                          const Gap(4),
+                        ],
                         OutlineButton(
                           size: ButtonSize.small,
                           onPressed: onOpenDdl,
