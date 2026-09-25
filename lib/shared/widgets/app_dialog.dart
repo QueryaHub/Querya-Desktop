@@ -101,27 +101,16 @@ class _BlurredDialogScaffoldState extends State<_BlurredDialogScaffold> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Backdrop: static blur; only opacity/dim animate (blur sigma is expensive).
+          // Backdrop: blur strength and tint animate directly. No Opacity wraps
+          // the BackdropFilter, so no extra full-screen offscreen layer is
+          // composited on every frame of the enter / exit transition.
           Positioned.fill(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: widget.barrierDismissible ? widget.onDismiss : null,
               child: AnimatedBuilder(
                 animation: curved,
-                child: ClipRect(
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                    child: const ColoredBox(
-                      color: Color(0x52000000), // black @ 0.32
-                    ),
-                  ),
-                ),
-                builder: (ctx, child) {
-                  return Opacity(
-                    opacity: curved.value.clamp(0.0, 1.0),
-                    child: child,
-                  );
-                },
+                builder: (ctx, _) => _DialogBackdrop(progress: curved.value),
               ),
             ),
           ),
@@ -136,6 +125,36 @@ class _BlurredDialogScaffoldState extends State<_BlurredDialogScaffold> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Frosted, dimmed dialog backdrop at [progress] (0 = none, 1 = full).
+///
+/// Both blur sigma and tint alpha scale with [progress], so the frost fades in
+/// and out without pop-in and without an enclosing `Opacity`.
+class _DialogBackdrop extends StatelessWidget {
+  const _DialogBackdrop({required this.progress});
+
+  /// Full-strength blur sigma.
+  static const double sigma = 8;
+
+  /// Full-strength tint alpha (black @ 0.32).
+  static const double tintAlpha = 0.32;
+
+  final double progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = progress.clamp(0.0, 1.0);
+    if (t <= 0) return const SizedBox.expand();
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: sigma * t, sigmaY: sigma * t),
+        child: ColoredBox(
+          color: const Color(0xFF000000).withValues(alpha: tintAlpha * t),
+        ),
       ),
     );
   }

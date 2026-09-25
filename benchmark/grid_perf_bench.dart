@@ -1,9 +1,10 @@
-// ignore_for_file: depend_on_referenced_packages
+// ignore_for_file: depend_on_referenced_packages, use_build_context_synchronously
 
 // Frame-timing benchmark for VirtualResultGrid. Run in profile mode:
 //   flutter run --profile -d linux -t benchmark/grid_perf_bench.dart --dart-define=MODE=scroll
 // MODE: scroll (horizontal pan) | edit (staged cell edits on a sorted grid)
 //       | select (mouse-drag selection through ResultsTab, incl. stats)
+//       | dialog (open / close showAppDialog repeatedly over a busy grid)
 import 'dart:async';
 import 'dart:developer' as developer;
 import 'dart:io';
@@ -17,6 +18,7 @@ import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/features/workspace/result_grid_view.dart';
 import 'package:querya_desktop/features/workspace/results_tab.dart';
+import 'package:querya_desktop/shared/widgets/app_dialog.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:vm_service/vm_service.dart' as vms;
 import 'package:vm_service/vm_service_io.dart' as vms_io;
@@ -25,6 +27,7 @@ const mode = String.fromEnvironment('MODE', defaultValue: 'scroll');
 const rowCount = int.fromEnvironment('ROWS', defaultValue: 5000);
 const colCount = int.fromEnvironment('COLS', defaultValue: 120);
 const seconds = int.fromEnvironment('SECS', defaultValue: 6);
+final dialogHost = GlobalKey();
 const profile = bool.fromEnvironment('PROFILE', defaultValue: false);
 
 vms.VmService? _vm;
@@ -57,7 +60,19 @@ void main() {
   runApp(ShadcnApp(
     theme: td,
     home: material.Scaffold(
-      body: mode == 'select'
+      body: mode == 'dialog'
+          ? KeyedSubtree(
+              key: dialogHost,
+              child: ListenableBuilder(
+                listenable: buffer,
+                builder: (_, __) => VirtualResultGrid(
+                  columns: columns,
+                  rows: buffer.effectiveRows,
+                  stagingBuffer: buffer,
+                ),
+              ),
+            )
+          : mode == 'select'
           ? ListenableBuilder(
               listenable: buffer,
               builder: (_, __) => ResultsTab(
@@ -137,7 +152,25 @@ Future<void> _run(DataGridStagingBuffer buffer) async {
         : null;
   }
   var dir = 1.0;
-  while (DateTime.now().isBefore(end)) {
+  if (mode == 'dialog') {
+    final ctx = dialogHost.currentContext!;
+    while (DateTime.now().isBefore(end)) {
+      unawaited(showAppDialog<void>(
+        context: ctx,
+        builder: (_) => const Center(
+          child: SizedBox(
+            width: 420,
+            height: 260,
+            child: Card(child: Center(child: Text('bench dialog'))),
+          ),
+        ),
+      ));
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      Navigator.of(ctx).pop();
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+    }
+  }
+  while (mode != 'dialog' && DateTime.now().isBefore(end)) {
     await SchedulerBinding.instance.endOfFrame;
     if (mode == 'scroll') {
       final p = pos!;
