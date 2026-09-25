@@ -21,6 +21,7 @@ import 'package:querya_desktop/core/ui/querya_shell_status.dart';
 import 'package:querya_desktop/features/mysql/mysql_sql_tx_guard.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
+import 'package:querya_desktop/features/workspace/sql_result_grid_schema.dart';
 import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -327,6 +328,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       session.statusLine = null;
       session.resultGridPrimaryKeys = const [];
       session.resultGridColumnDataTypes = null;
+      session.resultGridColumnMeta = null;
     });
     QueryaShellStatus.instance.beginBusy(message: 'Running query…');
     final sw = Stopwatch()..start();
@@ -393,22 +395,20 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       }
 
       final target = SqlTableTargetExtractor.extract(userSql);
-      var pks = const <String>[];
-      Map<String, String>? types;
+      var gridSchema = SqlResultGridSchema.none;
       final schemaName = target?.schema ?? _poolDatabaseKey();
       if (target != null && cols.isNotEmpty && schemaName.isNotEmpty) {
-        try {
-          final meta = await conn.getTableSchema(
-            database: schemaName,
-            table: target.tableName,
-          );
-          pks = List<String>.from(meta.primaryKeys);
-          types = columnDataTypesFromSchema(meta);
-        } catch (_) {
-          pks = const [];
-          types = null;
-        }
+        gridSchema = SqlResultGridSchema.fromLoad(
+          await loadTableViewSchema(
+            () => conn.getTableSchema(
+              database: schemaName,
+              table: target.tableName,
+            ),
+          ),
+        );
       }
+      final pks = gridSchema.primaryKeys;
+      final editHint = gridSchema.editHint(cols);
       final canSave = sqlResultGridSaveEnabled(
         sql: userSql,
         resultColumns: cols,
@@ -421,7 +421,8 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
         session.affectedRows = affected;
         session.lastExecutedSql = userSql;
         session.resultGridPrimaryKeys = canSave ? pks : const [];
-        session.resultGridColumnDataTypes = types;
+        session.resultGridColumnDataTypes = gridSchema.columnDataTypes;
+        session.resultGridColumnMeta = gridSchema.columnMeta;
         session.stagingBuffer?.dispose();
         session.stagingBuffer = canSave
             ? DataGridStagingBuffer(
@@ -435,9 +436,12 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
               ? 'OK. Rows affected: $affected.'
               : 'Command completed.';
         } else {
-          session.statusLine = truncated
-              ? 'Showing first $cap row(s) (result capped).'
-              : '$n row(s).';
+          session.statusLine = withEditHint(
+            truncated
+                ? 'Showing first $cap row(s) (result capped).'
+                : '$n row(s).',
+            editHint,
+          );
         }
         session.running = false;
       });
@@ -512,6 +516,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
         schema: schemaName,
         primaryKeys: session.resultGridPrimaryKeys,
         columnDataTypes: session.resultGridColumnDataTypes,
+        columnMeta: session.resultGridColumnMeta,
       );
       if (plan.isEmpty) {
         setState(() => session.savingChanges = false);
