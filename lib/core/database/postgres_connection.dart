@@ -160,7 +160,7 @@ class PostgresConnection {
     if ((sslRootCert != null && sslRootCert!.trim().isNotEmpty) ||
         (sslCert != null && sslCert!.trim().isNotEmpty) ||
         (sslKey != null && sslKey!.trim().isNotEmpty)) {
-      securityContext = SecurityContext();
+      securityContext = SecurityContext(withTrustedRoots: true);
       if (sslCert != null && sslCert!.trim().isNotEmpty) {
         securityContext.useCertificateChain(sslCert!.trim());
       }

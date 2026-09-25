@@ -109,5 +109,42 @@ void main() {
 
       expect(await orphanDir.exists(), isFalse);
     });
+
+    test('buildSecurityContext returns null when paths.hasAny is false', () {
+      const paths = SslCertificatePaths();
+      final ctx = buildSecurityContext(paths);
+      expect(ctx, isNull);
+    });
+
+    test('buildSecurityContext initializes SecurityContext with system trusted roots', () async {
+      final testDir = await Directory.systemTemp.createTemp('querya_sec_ctx_');
+      final certFile = File('${testDir.path}/client.crt');
+      final keyFile = File('${testDir.path}/client.key');
+      await certFile.writeAsString('-----BEGIN CERTIFICATE-----\nTEST_CERT\n-----END CERTIFICATE-----\n');
+      await keyFile.writeAsString('-----BEGIN PRIVATE KEY-----\nTEST_KEY\n-----END PRIVATE KEY-----\n');
+
+      final paths = SslCertificatePaths(
+        clientCert: certFile.path,
+        clientKey: keyFile.path,
+      );
+      final ctx = buildSecurityContext(paths);
+      expect(ctx, isNotNull);
+
+      await testDir.delete(recursive: true);
+    });
+
+    test('buildSecurityContext applies custom root CA certificate', () async {
+      final testDir = await Directory.systemTemp.createTemp('querya_sec_ctx_root_');
+      final rootFile = File('${testDir.path}/root.crt');
+      await rootFile.writeAsString('-----BEGIN CERTIFICATE-----\nROOT_CA\n-----END CERTIFICATE-----\n');
+
+      final paths = SslCertificatePaths(
+        rootCert: rootFile.path,
+      );
+      final ctx = buildSecurityContext(paths);
+      expect(ctx, isNotNull);
+
+      await testDir.delete(recursive: true);
+    });
   });
 }
