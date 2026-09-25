@@ -88,7 +88,7 @@ Uri syncSslParamsIntoUri(String uriText, SslCertificatePaths paths) {
 
 SecurityContext? buildSecurityContext(SslCertificatePaths paths) {
   if (!paths.hasAny) return null;
-  final context = SecurityContext();
+  final context = SecurityContext(withTrustedRoots: true);
   if (SslCertificatePaths._nonEmpty(paths.clientCert)) {
     context.useCertificateChain(paths.clientCert!.trim());
   }
