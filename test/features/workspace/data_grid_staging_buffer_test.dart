@@ -121,7 +121,45 @@ void main() {
       expect(eff[3], ['4', 'David', 'david@test.com']);
     });
 
-    test('effectiveRows returns identical reference when clean and caches unmodifiable list when dirty', () {
+    test(
+        'effectiveRows keeps deleted rows aligned and maps staged NULL to NULL',
+        () {
+      buffer.toggleDeleteRow(1);
+      buffer.setCellNull(0, 2);
+      buffer.addRow(['4', TableMutationEngine.kNullSentinel, 'd@test.com']);
+
+      final eff = buffer.effectiveRows;
+      expect(eff.length, 4);
+      expect(eff[0], ['1', 'Alice', 'NULL']);
+      expect(eff[1], ['2', 'Bob', 'bob@test.com']);
+      expect(eff[3], ['4', 'NULL', 'd@test.com']);
+      expect(
+        eff.expand((r) => r).any((v) => v.contains('\u0000')),
+        isFalse,
+      );
+    });
+
+    test('committedRows drops deleted rows and sanitizes NULL sentinels', () {
+      buffer.toggleDeleteRow(1);
+      buffer.setCell(1, 1, 'ignored'); // edit on a row that is also deleted
+      buffer.setCellNull(0, 2);
+      buffer.addRow(['4', TableMutationEngine.kNullSentinel, 'd@test.com']);
+
+      final committed = buffer.committedRows;
+      expect(committed, [
+        ['1', 'Alice', 'NULL'],
+        ['3', 'Charlie', 'charlie@test.com'],
+        ['4', 'NULL', 'd@test.com'],
+      ]);
+    });
+
+    test('committedRows equals baseline when clean', () {
+      expect(buffer.committedRows, buffer.originalRows);
+    });
+
+    test(
+        'effectiveRows returns identical reference when clean and caches unmodifiable list when dirty',
+        () {
       // When clean, effectiveRows returns the exact baseline instance (zero allocation)
       final cleanRows1 = buffer.effectiveRows;
       final cleanRows2 = buffer.effectiveRows;
@@ -160,7 +198,9 @@ void main() {
       expect(buffer.getCellValue(0, 1), 'NULL');
     });
 
-    test('generateMutationPlan builds correct DML statements from staged modifications', () {
+    test(
+        'generateMutationPlan builds correct DML statements from staged modifications',
+        () {
       buffer.setCell(0, 1, 'Alice Updated');
       buffer.addRow(['4', 'Diana', 'diana@test.com']);
       buffer.toggleDeleteRow(2);
@@ -174,14 +214,19 @@ void main() {
 
       expect(plan.statementCount, 3);
       expect(plan.statements[0].type, MutationType.update);
-      expect(plan.statements[0].sql, 'UPDATE "public"."users" SET "name" = \'Alice Updated\' WHERE "id" = 1');
+      expect(plan.statements[0].sql,
+          'UPDATE "public"."users" SET "name" = \'Alice Updated\' WHERE "id" = 1');
       expect(plan.statements[1].type, MutationType.insert);
-      expect(plan.statements[1].sql, 'INSERT INTO "public"."users" ("id", "name", "email") VALUES (4, \'Diana\', \'diana@test.com\')');
+      expect(plan.statements[1].sql,
+          'INSERT INTO "public"."users" ("id", "name", "email") VALUES (4, \'Diana\', \'diana@test.com\')');
       expect(plan.statements[2].type, MutationType.delete);
-      expect(plan.statements[2].sql, 'DELETE FROM "public"."users" WHERE "id" = 3');
+      expect(plan.statements[2].sql,
+          'DELETE FROM "public"."users" WHERE "id" = 3');
     });
 
-    test('dispose clears internal collections and prevents further listener notifications', () {
+    test(
+        'dispose clears internal collections and prevents further listener notifications',
+        () {
       buffer.setCell(0, 1, 'Alice Modified');
       buffer.addRow(['4', 'Diana', 'diana@test.com']);
       buffer.toggleDeleteRow(2);

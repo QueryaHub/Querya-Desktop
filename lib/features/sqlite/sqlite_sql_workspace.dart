@@ -504,7 +504,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       await _refreshTxStatus();
 
       if (!mounted) return;
-      final newRows = session.stagingBuffer!.effectiveRows;
+      final newRows = session.stagingBuffer!.committedRows;
       session.stagingBuffer?.dispose();
       setState(() {
         session.rows = newRows;

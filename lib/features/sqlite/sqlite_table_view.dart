@@ -398,7 +398,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     );
     if (!mounted) return;
     if (outcome.isApplied) {
-      final newRows = buffer.effectiveRows;
+      final newRows = buffer.committedRows;
       buffer.dispose();
       setState(() {
         _rows = newRows;

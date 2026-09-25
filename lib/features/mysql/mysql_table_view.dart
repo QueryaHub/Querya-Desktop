@@ -575,7 +575,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
     );
     if (!mounted) return;
     if (outcome.isApplied) {
-      final newRows = buffer.effectiveRows;
+      final newRows = buffer.committedRows;
       buffer.dispose();
       setState(() {
         _rows = newRows;

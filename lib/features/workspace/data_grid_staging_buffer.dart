@@ -98,7 +98,8 @@ class DataGridStagingBuffer extends ChangeNotifier {
       return '';
     }
     final insertIdx = row - _originalRows.length;
-    if (insertIdx < _insertedRows.length && col < _insertedRows[insertIdx].length) {
+    if (insertIdx < _insertedRows.length &&
+        col < _insertedRows[insertIdx].length) {
       final ins = _insertedRows[insertIdx][col];
       return ins == TableMutationEngine.kNullSentinel ? 'NULL' : ins;
     }
@@ -118,7 +119,8 @@ class DataGridStagingBuffer extends ChangeNotifier {
       return false;
     }
     final insertIdx = row - _originalRows.length;
-    if (insertIdx < _insertedRows.length && col < _insertedRows[insertIdx].length) {
+    if (insertIdx < _insertedRows.length &&
+        col < _insertedRows[insertIdx].length) {
       final ins = _insertedRows[insertIdx][col];
       return ins == 'NULL' || ins == TableMutationEngine.kNullSentinel;
     }
@@ -127,7 +129,10 @@ class DataGridStagingBuffer extends ChangeNotifier {
 
   /// Returns original baseline cell value, or null if row is inserted.
   String? getOriginalCellValue(int row, int col) {
-    if (row >= 0 && row < _originalRows.length && col >= 0 && col < _originalRows[row].length) {
+    if (row >= 0 &&
+        row < _originalRows.length &&
+        col >= 0 &&
+        col < _originalRows[row].length) {
       return _originalRows[row][col];
     }
     return null;
@@ -169,7 +174,8 @@ class DataGridStagingBuffer extends ChangeNotifier {
     if (row < 0 || col < 0) return;
 
     if (row < _originalRows.length) {
-      final orig = col < _originalRows[row].length ? _originalRows[row][col] : '';
+      final orig =
+          col < _originalRows[row].length ? _originalRows[row][col] : '';
       if (value == orig) {
         if (_modifiedCells.containsKey(row)) {
           _modifiedCells[row]!.remove(col);
@@ -281,7 +287,8 @@ class DataGridStagingBuffer extends ChangeNotifier {
   /// Read-only snapshot of modified cells mapping.
   Map<int, Map<int, String>> get modifiedCells =>
       Map<int, Map<int, String>>.unmodifiable(
-        _modifiedCells.map((k, v) => MapEntry(k, Map<int, String>.unmodifiable(v))),
+        _modifiedCells
+            .map((k, v) => MapEntry(k, Map<int, String>.unmodifiable(v))),
       );
 
   /// Read-only list of newly inserted rows.
@@ -317,6 +324,10 @@ class DataGridStagingBuffer extends ChangeNotifier {
 
   /// Returns the full list of effective rows (original with modifications applied + inserted rows).
   ///
+  /// Row indices stay aligned with the grid (rows marked for deletion are still
+  /// present so they can render struck through); use [committedRows] for the
+  /// baseline after a successful save. Staged NULLs are shown as `'NULL'`.
+  ///
   /// Optimized for zero allocations when [isDirty] is false, and caches
   /// the effective row list to prevent breaking widget memoization.
   List<List<String>> get effectiveRows {
@@ -326,14 +337,27 @@ class DataGridStagingBuffer extends ChangeNotifier {
     if (_cachedEffectiveRows != null) {
       return _cachedEffectiveRows!;
     }
+    _cachedEffectiveRows = List.unmodifiable(_buildRows(includeDeleted: true));
+    return _cachedEffectiveRows!;
+  }
+
+  /// Rows as they exist in the database once the staged changes are applied:
+  /// deleted baseline rows are dropped and staged NULLs become `'NULL'`.
+  ///
+  /// Use this as the new baseline after a successful save.
+  List<List<String>> get committedRows =>
+      List.unmodifiable(_buildRows(includeDeleted: false));
+
+  List<List<String>> _buildRows({required bool includeDeleted}) {
     final result = <List<String>>[];
     for (var r = 0; r < _originalRows.length; r++) {
+      if (!includeDeleted && _deletedRowIndices.contains(r)) continue;
       final mods = _modifiedCells[r];
       if (mods != null) {
         final row = List<String>.from(_originalRows[r]);
         for (final entry in mods.entries) {
           if (entry.key < row.length) {
-            row[entry.key] = entry.value;
+            row[entry.key] = _sanitizeNull(entry.value);
           }
         }
         result.add(row);
@@ -342,11 +366,17 @@ class DataGridStagingBuffer extends ChangeNotifier {
       }
     }
     for (final ins in _insertedRows) {
-      result.add(ins);
+      result.add(
+        ins.any((v) => v == TableMutationEngine.kNullSentinel)
+            ? ins.map(_sanitizeNull).toList()
+            : ins,
+      );
     }
-    _cachedEffectiveRows = List.unmodifiable(result);
-    return _cachedEffectiveRows!;
+    return result;
   }
+
+  static String _sanitizeNull(String value) =>
+      value == TableMutationEngine.kNullSentinel ? 'NULL' : value;
 
   @override
   void dispose() {
@@ -358,4 +388,3 @@ class DataGridStagingBuffer extends ChangeNotifier {
     super.dispose();
   }
 }
-
