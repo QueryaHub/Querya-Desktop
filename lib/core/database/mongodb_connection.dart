@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:mongo_dart/mongo_dart.dart';
 import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
@@ -35,6 +37,9 @@ class MongoConnection {
   /// Handshake URI for this live session (includes auth). Not persisted; not
   /// exposed via [password] / [connectionString] after [scrubCredentials].
   String? _sessionUri;
+
+  /// Temporary client PEM certificate key file path created for this connection.
+  String? _tempClientPemPath;
 
   final Map<String, Db> _openedDbs = {};
   final Map<String, Future<Db>> _openingDbs = {};
@@ -198,6 +203,7 @@ class MongoConnection {
     } catch (e) {
       _isConnected = false;
       _db = null;
+      await _cleanupTempTlsKey();
       rethrow;
     }
   }
@@ -219,6 +225,12 @@ class MongoConnection {
       clientKey: paths.clientKey,
     );
     if (clientPem != null) {
+      if (clientPem != paths.clientCert) {
+        if (_tempClientPemPath != null && _tempClientPemPath != clientPem) {
+          unawaited(cleanupMongoTlsTempFile(_tempClientPemPath));
+        }
+        _tempClientPemPath = clientPem;
+      }
       params[kMongoTlsCertificateKeyFileParam] = clientPem;
     }
     if (useSSL || paths.hasAny) {
@@ -247,6 +259,15 @@ class MongoConnection {
       } catch (e) {
         debugPrint('MongoConnection.disconnect: $e');
       }
+    }
+    await _cleanupTempTlsKey();
+  }
+
+  Future<void> _cleanupTempTlsKey() async {
+    final path = _tempClientPemPath;
+    _tempClientPemPath = null;
+    if (path != null) {
+      await cleanupMongoTlsTempFile(path);
     }
   }
 

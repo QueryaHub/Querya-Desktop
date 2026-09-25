@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
 
@@ -41,6 +43,71 @@ void main() {
       expect(translated.queryParameters['sslkey'], '/client.key');
       expect(translated.queryParameters.containsKey('sslrootcert'), isFalse);
       expect(translated.queryParameters.containsKey('sslcert'), isFalse);
+    });
+
+    test('resolveMongoTlsCertificateKeyFile restricts permissions and merges cert and key', () async {
+      final testDir = await Directory.systemTemp.createTemp('querya_test_input_');
+      final certFile = File('${testDir.path}/test_cert.pem');
+      final keyFile = File('${testDir.path}/test_key.pem');
+      await certFile.writeAsString('-----BEGIN CERTIFICATE-----\nTEST_CERT\n-----END CERTIFICATE-----\n');
+      await keyFile.writeAsString('-----BEGIN PRIVATE KEY-----\nTEST_KEY\n-----END PRIVATE KEY-----\n');
+
+      final pemPath = await resolveMongoTlsCertificateKeyFile(
+        clientCert: certFile.path,
+        clientKey: keyFile.path,
+      );
+
+      expect(pemPath, isNotNull);
+      expect(pemPath, contains(kMongoTlsTempPrefix));
+
+      final createdFile = File(pemPath!);
+      expect(await createdFile.exists(), isTrue);
+
+      final content = await createdFile.readAsString();
+      expect(content, contains('TEST_CERT'));
+      expect(content, contains('TEST_KEY'));
+
+      if (!Platform.isWindows) {
+        final fileStat = createdFile.statSync();
+        // Mode mask 0x1ff (0777). 0600 octal == 0x180 (384).
+        expect(fileStat.mode & 0x1ff, equals(0x180));
+
+        final dirStat = createdFile.parent.statSync();
+        // 0700 octal == 0x1c0 (448).
+        expect(dirStat.mode & 0x1ff, equals(0x1c0));
+      }
+
+      // Cleanup test file
+      await cleanupMongoTlsTempFile(pemPath);
+      expect(await createdFile.exists(), isFalse);
+      expect(await createdFile.parent.exists(), isFalse);
+
+      await testDir.delete(recursive: true);
+    });
+
+    test('cleanupMongoTlsTempFile does not delete files outside kMongoTlsTempPrefix', () async {
+      final testDir = await Directory.systemTemp.createTemp('querya_other_dir_');
+      final safeFile = File('${testDir.path}/important.pem');
+      await safeFile.writeAsString('CRITICAL DATA');
+
+      await cleanupMongoTlsTempFile(safeFile.path);
+
+      expect(await safeFile.exists(), isTrue);
+      expect(await testDir.exists(), isTrue);
+
+      await testDir.delete(recursive: true);
+    });
+
+    test('cleanupStaleMongoTlsTempFiles removes orphaned temporary directories', () async {
+      final orphanDir = await Directory.systemTemp.createTemp(kMongoTlsTempPrefix);
+      final orphanFile = File('${orphanDir.path}/client.pem');
+      await orphanFile.writeAsString('stale key');
+
+      expect(await orphanDir.exists(), isTrue);
+
+      await cleanupStaleMongoTlsTempFiles();
+
+      expect(await orphanDir.exists(), isFalse);
     });
   });
 }

@@ -131,7 +131,13 @@ Uri translateQueryaSslParamsForMongo(Uri uri) {
   return uri.replace(queryParameters: params.isEmpty ? null : params);
 }
 
+/// Prefix used for temporary MongoDB TLS certificate files.
+const kMongoTlsTempPrefix = 'querya_mongo_tls_';
+
 /// Resolves a client PEM path for mongo_dart when cert and key are separate files.
+///
+/// Sets restrictive file permissions (0600 file / 0700 dir on POSIX) to protect
+/// the plaintext private key from unauthorized local access.
 Future<String?> resolveMongoTlsCertificateKeyFile({
   required String? clientCert,
   required String? clientKey,
@@ -143,10 +149,60 @@ Future<String?> resolveMongoTlsCertificateKeyFile({
 
   final certBytes = await File(certPath).readAsString();
   final keyBytes = await File(keyPath).readAsString();
-  final dir = await Directory.systemTemp.createTemp('querya_mongo_tls_');
+  final dir = await Directory.systemTemp.createTemp(kMongoTlsTempPrefix);
+  if (!Platform.isWindows) {
+    try {
+      await Process.run('chmod', ['700', dir.path]);
+    } catch (_) {}
+  }
   final merged = File('${dir.path}/client.pem');
-  await merged.writeAsString('$certBytes\n$keyBytes\n');
+  await merged.writeAsString('$certBytes\n$keyBytes\n', flush: true);
+  if (!Platform.isWindows) {
+    try {
+      await Process.run('chmod', ['600', merged.path]);
+    } catch (_) {}
+  }
   return merged.path;
+}
+
+/// Reliably deletes a temporary MongoDB TLS certificate file and its parent temp directory.
+Future<void> cleanupMongoTlsTempFile(String? filePath) async {
+  if (filePath == null || filePath.trim().isEmpty) return;
+  try {
+    final file = File(filePath);
+    final parent = file.parent;
+    final parentName =
+        parent.uri.pathSegments.where((s) => s.isNotEmpty).lastOrNull ?? '';
+    // Security check: ONLY delete if it is inside our querya_mongo_tls_ directory.
+    if (!parentName.startsWith(kMongoTlsTempPrefix)) {
+      return;
+    }
+    if (await file.exists()) {
+      await file.delete();
+    }
+    if (await parent.exists()) {
+      await parent.delete(recursive: true);
+    }
+  } catch (_) {}
+}
+
+/// Cleans up any stale temporary MongoDB TLS directories left from previous sessions.
+Future<void> cleanupStaleMongoTlsTempFiles() async {
+  try {
+    final tempDir = Directory.systemTemp;
+    if (!await tempDir.exists()) return;
+    await for (final entity in tempDir.list()) {
+      if (entity is Directory) {
+        final name =
+            entity.uri.pathSegments.where((s) => s.isNotEmpty).lastOrNull ?? '';
+        if (name.startsWith(kMongoTlsTempPrefix)) {
+          try {
+            await entity.delete(recursive: true);
+          } catch (_) {}
+        }
+      }
+    }
+  } catch (_) {}
 }
 
 String buildRedisConnectionUri({
