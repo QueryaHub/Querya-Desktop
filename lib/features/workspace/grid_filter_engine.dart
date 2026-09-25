@@ -125,6 +125,7 @@ class _PredicateNode extends _FilterAstNode {
     this.inValues = const [],
     this.betweenMin,
     this.betweenMax,
+    this.likeRegex,
   });
 
   final int colIndex;
@@ -133,6 +134,10 @@ class _PredicateNode extends _FilterAstNode {
   final List<String> inValues;
   final String? betweenMin;
   final String? betweenMax;
+
+  /// Compiled once at parse time for LIKE / ILIKE (and NOT variants), so the
+  /// per-row scan does not rebuild the same RegExp for every row.
+  final RegExp? likeRegex;
 
   @override
   bool evaluate(List<String> row, List<String> lowerColumns) {
@@ -172,21 +177,25 @@ class _PredicateNode extends _FilterAstNode {
 
     // LIKE / NOT LIKE
     if (upperOp == 'LIKE') {
-      final regex = _likeToRegExp(targetValue, caseSensitive: true);
+      final regex =
+          likeRegex ?? _likeToRegExp(targetValue, caseSensitive: true);
       return regex.hasMatch(cellValue);
     }
     if (upperOp == 'NOT LIKE') {
-      final regex = _likeToRegExp(targetValue, caseSensitive: true);
+      final regex =
+          likeRegex ?? _likeToRegExp(targetValue, caseSensitive: true);
       return !regex.hasMatch(cellValue);
     }
 
     // ILIKE / NOT ILIKE
     if (upperOp == 'ILIKE') {
-      final regex = _likeToRegExp(targetValue, caseSensitive: false);
+      final regex =
+          likeRegex ?? _likeToRegExp(targetValue, caseSensitive: false);
       return regex.hasMatch(cellValue);
     }
     if (upperOp == 'NOT ILIKE') {
-      final regex = _likeToRegExp(targetValue, caseSensitive: false);
+      final regex =
+          likeRegex ?? _likeToRegExp(targetValue, caseSensitive: false);
       return !regex.hasMatch(cellValue);
     }
 
@@ -497,6 +506,10 @@ abstract final class _FilterLexer {
               colIndex: colIdx,
               op: op,
               targetValue: patVal.value,
+              likeRegex: _PredicateNode._likeToRegExp(
+                patVal.value,
+                caseSensitive: likeType == 'LIKE',
+              ),
             ),
             consumedChars: (lPos - start) + patVal.consumedChars,
           );
