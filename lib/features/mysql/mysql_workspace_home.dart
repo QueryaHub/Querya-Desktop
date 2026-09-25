@@ -120,11 +120,15 @@ class _MysqlWorkspaceHomeState extends material.State<MysqlWorkspaceHome> {
                       Text('Return to ${widget.lastSelectedMysqlObject!.name}'),
                 ),
               ],
-              const Spacer(),
-              QueryaTabStrip(
-                labels: const ['Overview', 'SQL'],
-                selectedIndex: _tab,
-                onSelected: (index) => unawaited(_selectTab(index)),
+              Expanded(
+                child: material.Align(
+                  alignment: material.Alignment.centerRight,
+                  child: QueryaTabStrip(
+                    labels: const ['Overview', 'SQL'],
+                    selectedIndex: _tab,
+                    onSelected: (index) => unawaited(_selectTab(index)),
+                  ),
+                ),
               ),
             ],
           ),

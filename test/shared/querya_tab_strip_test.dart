@@ -1,4 +1,4 @@
-import 'dart:ui' show Tristate;
+import 'dart:ui' show PointerDeviceKind, Tristate;
 
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
@@ -327,5 +327,203 @@ void main() {
       indicatorOf(tester).left,
       closeTo(sql.left - strip.left, 1.0),
     );
+  });
+
+  testWidgets(
+      'preserves existing GlobalKey instances when tab count changes (incremental sync)',
+      (tester) async {
+    var labels = ['Server', 'SQL'];
+    var selected = 0;
+
+    await tester.pumpWidget(
+      stripShell(
+        child: material.StatefulBuilder(
+          builder: (context, setState) => material.Center(
+            child: QueryaTabStrip(
+              labels: labels,
+              selectedIndex: selected,
+              onSelected: (index) => setState(() => selected = index),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    final state = tester.state<QueryaTabStripState>(find.byType(QueryaTabStrip));
+    final initialKeys = List<material.GlobalKey>.from(state.tabKeysForTesting);
+    expect(initialKeys.length, 2);
+    expect(state.indicatorReadyForTesting, isTrue);
+
+    // Add a third tab
+    labels = ['Server', 'SQL', 'History'];
+    await tester.pumpWidget(
+      stripShell(
+        child: material.StatefulBuilder(
+          builder: (context, setState) => material.Center(
+            child: QueryaTabStrip(
+              labels: labels,
+              selectedIndex: selected,
+              onSelected: (index) => setState(() => selected = index),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // Verify existing keys were preserved, new key appended, and indicatorReady stayed true
+    final updatedKeys = state.tabKeysForTesting;
+    expect(updatedKeys.length, 3);
+    expect(updatedKeys[0], same(initialKeys[0]));
+    expect(updatedKeys[1], same(initialKeys[1]));
+    expect(updatedKeys[2], isNot(same(initialKeys[0])));
+    expect(updatedKeys[2], isNot(same(initialKeys[1])));
+    expect(state.indicatorReadyForTesting, isTrue);
+
+    // Remove tabs down to 1
+    labels = ['Server'];
+    await tester.pumpWidget(
+      stripShell(
+        child: material.StatefulBuilder(
+          builder: (context, setState) => material.Center(
+            child: QueryaTabStrip(
+              labels: labels,
+              selectedIndex: 0,
+              onSelected: (index) => setState(() => selected = index),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final singleKeyList = state.tabKeysForTesting;
+    expect(singleKeyList.length, 1);
+    expect(singleKeyList[0], same(initialKeys[0]));
+    expect(state.indicatorReadyForTesting, isTrue);
+  });
+
+  testWidgets(
+      'handles narrow width constraints without RenderFlex overflow and scrolls horizontally',
+      (tester) async {
+    final scrollController = material.ScrollController();
+    addTearDown(scrollController.dispose);
+
+    await tester.pumpWidget(
+      stripShell(
+        child: material.Center(
+          child: material.SizedBox(
+            width: 120,
+            child: QueryaTabStrip(
+              scrollController: scrollController,
+              labels: const ['First Long Tab', 'Second Long Tab', 'Third Long Tab'],
+              selectedIndex: 0,
+              onSelected: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    // No overflow occurred (Flutter test framework fails if RenderFlex overflowed)
+    expect(find.byType(QueryaTabStrip), findsOneWidget);
+    expect(scrollController.hasClients, isTrue);
+    expect(scrollController.position.maxScrollExtent, greaterThan(0.0));
+  });
+
+  testWidgets('supports pointer scroll event for mouse wheel scrolling',
+      (tester) async {
+    final scrollController = material.ScrollController();
+    addTearDown(scrollController.dispose);
+
+    await tester.pumpWidget(
+      stripShell(
+        child: material.Center(
+          child: material.SizedBox(
+            width: 120,
+            child: QueryaTabStrip(
+              scrollController: scrollController,
+              labels: const ['First Long Tab', 'Second Long Tab', 'Third Long Tab'],
+              selectedIndex: 0,
+              onSelected: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(scrollController.offset, 0.0);
+
+    // Send vertical mouse wheel scroll
+    final center = tester.getCenter(find.byType(QueryaTabStrip));
+    final pointer = TestPointer(1, PointerDeviceKind.mouse);
+    await tester.sendEventToBinding(
+      pointer.hover(center),
+    );
+    await tester.sendEventToBinding(
+      pointer.scroll(const material.Offset(0, 40)),
+    );
+    await tester.pump();
+
+    expect(scrollController.offset, 40.0);
+  });
+
+  testWidgets('auto-scrolls to selected tab when selection changes',
+      (tester) async {
+    final scrollController = material.ScrollController();
+    addTearDown(scrollController.dispose);
+    var selected = 0;
+
+    await tester.pumpWidget(
+      stripShell(
+        child: material.StatefulBuilder(
+          builder: (context, setState) => material.Center(
+            child: material.SizedBox(
+              width: 120,
+              child: QueryaTabStrip(
+                scrollController: scrollController,
+                labels: const ['First Long Tab', 'Second Long Tab', 'Third Long Tab'],
+                selectedIndex: selected,
+                onSelected: (i) => setState(() => selected = i),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(scrollController.offset, 0.0);
+
+    // Switch selection to the third tab
+    selected = 2;
+    await tester.pumpWidget(
+      stripShell(
+        child: material.StatefulBuilder(
+          builder: (context, setState) => material.Center(
+            child: material.SizedBox(
+              width: 120,
+              child: QueryaTabStrip(
+                scrollController: scrollController,
+                labels: const ['First Long Tab', 'Second Long Tab', 'Third Long Tab'],
+                selectedIndex: selected,
+                onSelected: (i) => setState(() => selected = i),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(scrollController.offset, greaterThan(0.0));
   });
 }

@@ -112,11 +112,15 @@ class _SqliteWorkspaceHomeState extends material.State<SqliteWorkspaceHome> {
                       'Return to ${widget.lastSelectedSqliteObject!.name}'),
                 ),
               ],
-              const Spacer(),
-              QueryaTabStrip(
-                labels: const ['Overview', 'SQL'],
-                selectedIndex: _tab,
-                onSelected: _selectTab,
+              Expanded(
+                child: material.Align(
+                  alignment: material.Alignment.centerRight,
+                  child: QueryaTabStrip(
+                    labels: const ['Overview', 'SQL'],
+                    selectedIndex: _tab,
+                    onSelected: _selectTab,
+                  ),
+                ),
               ),
             ],
           ),
