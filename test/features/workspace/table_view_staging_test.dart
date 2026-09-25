@@ -559,4 +559,86 @@ void main() {
       expect(result, isTrue);
     });
   });
+
+  group('TableEditModeButton', () {
+    Future<void> pump(WidgetTester tester, material.Widget child) =>
+        tester.pumpWidget(
+          ShadcnApp(
+            theme: AppTheme.dark,
+            home: material.Scaffold(body: material.Center(child: child)),
+          ),
+        );
+
+    testWidgets('view mode offers Edit and calls onEdit', (tester) async {
+      var edits = 0;
+      await pump(
+        tester,
+        TableEditModeButton(
+          editMode: false,
+          canEdit: true,
+          onEdit: () => edits++,
+          onDone: () {},
+        ),
+      );
+      expect(find.text('Edit'), findsOneWidget);
+      expect(find.text('Done'), findsNothing);
+      expect(find.byTooltip('Edit rows (Ctrl+E)'), findsOneWidget);
+      await tester.tap(find.text('Edit'));
+      expect(edits, 1);
+    });
+
+    testWidgets('edit mode offers Done and calls onDone', (tester) async {
+      var done = 0;
+      await pump(
+        tester,
+        TableEditModeButton(
+          editMode: true,
+          canEdit: true,
+          onEdit: () {},
+          onDone: () => done++,
+        ),
+      );
+      expect(find.text('Done'), findsOneWidget);
+      expect(find.text('Edit'), findsNothing);
+      await tester.tap(find.text('Done'));
+      expect(done, 1);
+    });
+
+    testWidgets('disabled when the table cannot be edited, with the reason',
+        (tester) async {
+      var edits = 0;
+      await pump(
+        tester,
+        TableEditModeButton(
+          editMode: false,
+          canEdit: false,
+          disabledReason: 'Cannot edit: no primary key detected',
+          onEdit: () => edits++,
+          onDone: () {},
+        ),
+      );
+      expect(
+        find.byTooltip('Cannot edit: no primary key detected'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Edit'));
+      expect(edits, 0);
+    });
+
+    testWidgets('busy blocks the toggle', (tester) async {
+      var edits = 0;
+      await pump(
+        tester,
+        TableEditModeButton(
+          editMode: false,
+          canEdit: true,
+          busy: true,
+          onEdit: () => edits++,
+          onDone: () {},
+        ),
+      );
+      await tester.tap(find.text('Edit'));
+      expect(edits, 0);
+    });
+  });
 }

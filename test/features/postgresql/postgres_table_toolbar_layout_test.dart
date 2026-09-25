@@ -108,7 +108,7 @@ void main() {
                 onGoPrevious: () {},
                 onGoNext: () {},
                 onRefresh: () {},
-                pendingActions: material.Row(
+                editAction: material.Row(
                   mainAxisSize: material.MainAxisSize.min,
                   children: [
                     const material.Text('2 pending changes'),
