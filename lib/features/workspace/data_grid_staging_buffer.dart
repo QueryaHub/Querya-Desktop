@@ -169,6 +169,17 @@ class DataGridStagingBuffer extends ChangeNotifier {
     return StagedCellStatus.clean;
   }
 
+  /// Fingerprint of the staged state that changes how [row] is drawn (row
+  /// status and which cells are modified). Lets a grid skip rebuilding rows
+  /// whose staged state is unchanged.
+  int rowRenderSignature(int row) {
+    final mods = row >= 0 ? _modifiedCells[row] : null;
+    return Object.hash(
+      getRowStatus(row),
+      mods == null || mods.isEmpty ? 0 : Object.hashAllUnordered(mods.keys),
+    );
+  }
+
   /// Explicitly sets the cell to SQL NULL.
   void setCellNull(int row, int col) {
     setCell(row, col, TableMutationEngine.kNullSentinel);

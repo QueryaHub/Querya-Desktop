@@ -209,6 +209,28 @@ void main() {
       expect(buffer.insertedRowCount, 1);
     });
 
+    test('rowRenderSignature changes only with the staged state of that row',
+        () {
+      final clean0 = buffer.rowRenderSignature(0);
+      final clean1 = buffer.rowRenderSignature(1);
+      expect(buffer.rowRenderSignature(0), clean0);
+
+      buffer.setCell(0, 1, 'Alice Edited');
+      expect(buffer.rowRenderSignature(0), isNot(clean0));
+      expect(buffer.rowRenderSignature(1), clean1, reason: 'other rows unchanged');
+
+      final oneCell = buffer.rowRenderSignature(0);
+      buffer.setCell(0, 2, 'x@y.z');
+      expect(buffer.rowRenderSignature(0), isNot(oneCell));
+
+      buffer.revertRow(0);
+      expect(buffer.rowRenderSignature(0), clean0);
+
+      buffer.toggleDeleteRow(1);
+      expect(buffer.rowRenderSignature(1), isNot(clean1));
+      expect(buffer.rowRenderSignature(-1), isA<int>());
+    });
+
     test('committedRows equals baseline when clean', () {
       expect(buffer.committedRows, buffer.originalRows);
     });
