@@ -228,4 +228,95 @@ void main() {
       expect(stagingBuffer.getCellValue(0, 0), equals('Charlie'));
     });
   });
+
+  group('VirtualResultGrid keeps sorted order stable while editing (#875)', () {
+    Future<DataGridStagingBuffer> pumpSorted(
+      WidgetTester tester, {
+      required bool rebuildParent,
+    }) async {
+      final columns = ['name', 'age'];
+      final buffer = DataGridStagingBuffer(
+        columns: columns,
+        rows: [
+          ['Charlie', '30'], // model 0
+          ['Alice', '10'], // model 1
+          ['Bob', '20'], // model 2
+        ],
+      );
+      addTearDown(buffer.dispose);
+
+      await tester.pumpWidget(
+        _testShell(
+          child: material.SizedBox(
+            width: 800,
+            height: 600,
+            child: rebuildParent
+                // Like ResultsTab: a fresh `rows` list on every buffer change.
+                ? material.ListenableBuilder(
+                    listenable: buffer,
+                    builder: (_, __) => VirtualResultGrid(
+                      columns: columns,
+                      rows: buffer.effectiveRows,
+                      stagingBuffer: buffer,
+                    ),
+                  )
+                : VirtualResultGrid(
+                    columns: columns,
+                    rows: buffer.effectiveRows,
+                    stagingBuffer: buffer,
+                  ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('name'));
+      await tester.pumpAndSettle();
+      return buffer;
+    }
+
+    double y(WidgetTester tester, String text) =>
+        tester.getTopLeft(find.text(text)).dy;
+
+    for (final rebuildParent in [false, true]) {
+      testWidgets(
+          'editing a cell keeps the row in place and shows the new value '
+          '(parent rebuilds: $rebuildParent)', (tester) async {
+        final buffer = await pumpSorted(tester, rebuildParent: rebuildParent);
+        // Sorted ascending: Alice, Bob, Charlie.
+        expect(y(tester, 'Alice') < y(tester, 'Bob'), isTrue);
+
+        buffer.setCell(1, 0, 'Zed'); // Alice -> Zed (model row 1)
+        await tester.pumpAndSettle();
+
+        expect(find.text('Alice'), findsNothing);
+        // Zed stays first instead of jumping below Charlie.
+        expect(y(tester, 'Zed') < y(tester, 'Bob'), isTrue);
+        expect(y(tester, 'Bob') < y(tester, 'Charlie'), isTrue);
+      });
+
+      testWidgets(
+          'edits keep mapping visual rows to the right model row '
+          '(parent rebuilds: $rebuildParent)', (tester) async {
+        final buffer = await pumpSorted(tester, rebuildParent: rebuildParent);
+
+        buffer.setCell(1, 1, '99');
+        await tester.pumpAndSettle();
+        await _secondaryClick(tester, find.text('Alice'));
+        await tester.tap(find.text('Delete Row'));
+        await tester.pumpAndSettle();
+
+        expect(buffer.getRowStatus(1), StagedRowStatus.deleted);
+        expect(buffer.getRowStatus(0), StagedRowStatus.unchanged);
+      });
+    }
+
+    testWidgets('inserting a row still re-sorts', (tester) async {
+      final buffer = await pumpSorted(tester, rebuildParent: true);
+
+      buffer.addRow(['Aaron', '5']);
+      await tester.pumpAndSettle();
+
+      expect(y(tester, 'Aaron') < y(tester, 'Alice'), isTrue);
+    });
+  });
 }
