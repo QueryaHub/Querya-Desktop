@@ -144,6 +144,81 @@ void main() {
       expect(find.text('Alpha'), findsNothing);
     });
 
+    testWidgets('rapid trigger toggle during exit delay cancels close and keeps menu open',
+        (tester) async {
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: QueryaMotionScope(
+            level: QueryaMotionLevel.full,
+            child: material.Scaffold(
+              body: QueryaDropdown<String>(
+                value: 'a',
+                items: const [
+                  QueryaDropdownItem(value: 'a', label: 'Alpha'),
+                  QueryaDropdownItem(value: 'b', label: 'Beta'),
+                ],
+                onSelected: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Open menu
+      await tester.tap(find.text('Alpha'));
+      await tester.pumpAndSettle();
+      expect(find.text('Beta'), findsOneWidget);
+
+      // Tap trigger to close (starts exit delay)
+      await tester.tap(find.text('Alpha').first);
+      await tester.pump(const Duration(milliseconds: 30));
+      expect(find.text('Beta'), findsWidgets);
+
+      // Rapid tap trigger again during exit delay -> cancels close and reopens
+      await tester.tap(find.text('Alpha').first);
+      await tester.pumpAndSettle();
+
+      // Menu must remain open, Beta must be visible
+      expect(find.text('Beta'), findsWidgets);
+    });
+
+    testWidgets('menu enter mounts initially with 0 opacity before animating to 1',
+        (tester) async {
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: QueryaMotionScope(
+            level: QueryaMotionLevel.full,
+            child: material.Scaffold(
+              body: QueryaDropdown<String>(
+                value: 'a',
+                items: const [
+                  QueryaDropdownItem(value: 'a', label: 'Alpha'),
+                  QueryaDropdownItem(value: 'b', label: 'Beta'),
+                ],
+                onSelected: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.text('Alpha'));
+      await tester.pump(); // Frame 1: mounted in overlay with opacity 0
+      final opacityWidget = tester.widget<material.AnimatedOpacity>(
+        find.byType(material.AnimatedOpacity),
+      );
+      expect(opacityWidget.opacity, 0.0);
+
+      await tester.pump(); // Frame 2: post frame callback runs, animates to 1.0
+      await tester.pumpAndSettle();
+      final settledOpacity = tester.widget<material.AnimatedOpacity>(
+        find.byType(material.AnimatedOpacity),
+      );
+      expect(settledOpacity.opacity, 1.0);
+    });
+
     testWidgets('menu anchor constrains width to trigger', (tester) async {
       await tester.pumpWidget(
         queryaThemeTestShell(
