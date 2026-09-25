@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/extensions/extension_support.dart';
@@ -10,6 +12,9 @@ import 'package:querya_desktop/core/motion/querya_cross_fade_stack.dart';
 import 'package:querya_desktop/features/extensions/presentation/widgets/extension_card.dart';
 import 'package:querya_desktop/features/extensions/presentation/widgets/extension_sideload_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
+
+/// Pause after the last keystroke before the marketplace is queried.
+const kMarketplaceSearchDebounce = Duration(milliseconds: 250);
 
 void showExtensionManagerDialog(material.BuildContext context) {
   showAppDialog<void>(
@@ -39,11 +44,23 @@ class _ExtensionManagerContentState
   final Map<String, double> _installingProgress = {};
   bool _sideloading = false;
   String? _sideloadError;
+  Timer? _searchDebounce;
+
+  /// Bumped on every keystroke and on dispose; only the response that still
+  /// matches it is applied, so slow older requests cannot overwrite newer ones.
+  int _searchSeq = 0;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchSeq++;
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -60,13 +77,31 @@ class _ExtensionManagerContentState
     }
   }
 
-  Future<void> _onSearchChanged(String query) async {
-    if (query.trim().isEmpty) {
-      final market = await MarketplaceRepository.instance.getTrending();
-      if (mounted) setState(() => _marketplace = market);
-    } else {
-      final market = await MarketplaceRepository.instance.search(query);
-      if (mounted) setState(() => _marketplace = market);
+  void _onSearchChanged(String query) {
+    _searchDebounce?.cancel();
+    final seq = ++_searchSeq;
+    _searchDebounce = Timer(
+      kMarketplaceSearchDebounce,
+      () => unawaited(_runSearch(query, seq)),
+    );
+  }
+
+  Future<void> _runSearch(String query, int seq) async {
+    try {
+      final market = query.trim().isEmpty
+          ? await MarketplaceRepository.instance.getTrending()
+          : await MarketplaceRepository.instance.search(query);
+      if (!mounted || seq != _searchSeq) return;
+      setState(() => _marketplace = market);
+    } catch (e) {
+      if (!mounted || seq != _searchSeq) return;
+      showAppToast(
+        context: context,
+        message: e is MarketplaceException
+            ? e.message
+            : 'Marketplace search failed.',
+        variant: AppToastVariant.error,
+      );
     }
   }
 
