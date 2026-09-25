@@ -163,9 +163,20 @@ Future<bool?> showDiscardTableEditsDialog({
   );
 }
 
-/// Throws if a DML statement matched no rows (stale PK / concurrent delete).
+/// Throws unless a staged single-row DML statement matched exactly one row.
+///
+/// 0 rows means a stale key or concurrent delete; 2+ rows means an unkeyed
+/// table has duplicates and the statement would silently rewrite all of them.
+/// Callers run statements in a transaction, so throwing rolls the batch back.
 void expectDmlMatchedRows(int affectedRows) {
-  if (affectedRows >= 1) return;
+  if (affectedRows == 1) return;
+  if (affectedRows > 1) {
+    throw StateError(
+      'Save failed: a statement matched $affectedRows rows instead of 1. '
+      'The table has duplicate rows or no unique key. '
+      'No changes were applied.',
+    );
+  }
   throw StateError(
     'Save failed: a statement matched 0 rows. '
     'The row may have been changed or deleted. Refresh and try again.',

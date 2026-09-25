@@ -107,7 +107,7 @@ void main() {
       expect(mutations[2]['where'], {'id': '2'});
     });
 
-    test('Extension driver mutation response validation requires integer affectedRows >= 1', () {
+    test('Extension driver mutation response validation requires integer affectedRows == 1', () {
       // 1. Missing affectedRows count
       void validateResponse(dynamic res) {
         if (res is! Map) throw StateError('Response is not map');
@@ -147,8 +147,18 @@ void main() {
         )),
       );
 
-      // 4. Positive affectedRows succeeds
-      expect(() => validateResponse({'affectedRows': 3}), returnsNormally);
+      // 4. Multiple matched rows would silently rewrite duplicates
+      expect(
+        () => validateResponse({'affectedRows': 3}),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('matched 3 rows instead of 1'),
+        )),
+      );
+
+      // 5. Exactly one affected row succeeds
+      expect(() => validateResponse({'affectedRows': 1}), returnsNormally);
     });
 
     test('Schema fetch failure is captured as unavailable and disables staging', () async {

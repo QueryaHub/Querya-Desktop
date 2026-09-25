@@ -385,9 +385,21 @@ void main() {
   });
 
   group('expectDmlMatchedRows', () {
-    test('allows 1+ affected rows', () {
+    test('allows exactly 1 affected row', () {
       expect(() => expectDmlMatchedRows(1), returnsNormally);
-      expect(() => expectDmlMatchedRows(3), returnsNormally);
+    });
+
+    test('throws when a statement matched multiple rows', () {
+      expect(
+        () => expectDmlMatchedRows(3),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('matched 3 rows instead of 1'),
+          ),
+        ),
+      );
     });
 
     test('throws on 0-row DML so Save is a failure', () {
