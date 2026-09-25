@@ -577,6 +577,22 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
     );
     if (!mounted) return;
     if (outcome.isApplied) {
+      if (buffer.insertedRowCount > 0) {
+        // Inserted rows have no database-generated keys / defaults yet, so a
+        // follow-up UPDATE / DELETE on them would match 0 rows. Reload the page.
+        buffer.dispose();
+        setState(() {
+          _stagingBuffer = null;
+          _isSaving = false;
+        });
+        showAppToast(
+          context: context,
+          message: '${outcome.statementCount} change(s) saved',
+          variant: AppToastVariant.success,
+        );
+        await _fetch(refreshCount: true);
+        return;
+      }
       final newRows = buffer.committedRows;
       buffer.dispose();
       setState(() {
