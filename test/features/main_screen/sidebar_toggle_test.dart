@@ -8,6 +8,8 @@ import 'package:querya_desktop/core/motion/querya_spring_controller.dart';
 import 'package:querya_desktop/core/storage/app_data_root.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/connections/connections_panel.dart';
+import 'package:querya_desktop/features/main_screen/main_screen.dart';
 import 'package:querya_desktop/features/main_screen/querya_window_title_bar.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
@@ -140,6 +142,113 @@ void main() {
       await tester.pumpAndSettle(const Duration(seconds: 1));
       expect(controller.value, closeTo(260, 0.01));
       expect(controller.isAnimating, isFalse);
+    });
+
+    testWidgets('eliminates offscreen Opacity compositing when expanded (#900)',
+        (tester) async {
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: const material.SizedBox(
+            width: 1200,
+            height: 800,
+            child: MainScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final connectionsPanel = find.byType(ConnectionsPanel);
+      expect(connectionsPanel, findsOneWidget);
+
+      final repaintBoundary = find.ancestor(
+        of: connectionsPanel,
+        matching: find.byType(material.RepaintBoundary),
+      );
+      expect(repaintBoundary, findsWidgets);
+
+      final opacityAncestor = find.ancestor(
+        of: connectionsPanel,
+        matching: find.byType(material.Opacity),
+      );
+      expect(opacityAncestor, findsNothing);
+
+      final activeOffstageAncestor = find.ancestor(
+        of: connectionsPanel,
+        matching: find.byWidgetPredicate(
+          (w) => w is material.Offstage && w.offstage,
+        ),
+      );
+      expect(activeOffstageAncestor, findsNothing);
+    });
+
+    testWidgets(
+        'offstages connection panel and pauses tickers when sidebar is collapsed (#900)',
+        (tester) async {
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: const material.SizedBox(
+            width: 1200,
+            height: 800,
+            child: MainScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final toggleButton =
+          find.byKey(const Key('title_bar_toggle_sidebar_button'));
+      expect(toggleButton, findsOneWidget);
+
+      await tester.tap(toggleButton);
+      await tester.pumpAndSettle();
+
+      final connectionsPanel =
+          find.byType(ConnectionsPanel, skipOffstage: false);
+      expect(connectionsPanel, findsOneWidget);
+
+      final offstageFinder = find.ancestor(
+        of: connectionsPanel,
+        matching: find.byWidgetPredicate(
+          (w) => w is material.Offstage && w.offstage,
+          skipOffstage: false,
+        ),
+      );
+      expect(offstageFinder, findsOneWidget);
+
+      final tickerModeFinder = find.ancestor(
+        of: connectionsPanel,
+        matching: find.byWidgetPredicate(
+          (w) => w is material.TickerMode && !w.enabled,
+          skipOffstage: false,
+        ),
+      );
+      expect(tickerModeFinder, findsOneWidget);
+
+      final opacityAncestor = find.ancestor(
+        of: connectionsPanel,
+        matching: find.byType(material.Opacity, skipOffstage: false),
+      );
+      expect(opacityAncestor, findsNothing);
+
+      await tester.tap(toggleButton);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.ancestor(
+          of: find.byType(ConnectionsPanel),
+          matching: find.byWidgetPredicate(
+            (w) => w is material.Offstage && w.offstage,
+          ),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.ancestor(
+          of: find.byType(ConnectionsPanel),
+          matching: find.byType(material.Opacity),
+        ),
+        findsNothing,
+      );
     });
   });
 }

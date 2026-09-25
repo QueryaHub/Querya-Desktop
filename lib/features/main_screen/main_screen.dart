@@ -1175,6 +1175,7 @@ class _MainContentSplitState extends State<_MainContentSplit>
   static const double _maxLeftWidth = 500;
   static const double _minWorkspaceWidth = 64;
   static const double _resizeHandleWidth = 6;
+  static const double _collapseThreshold = 1.0;
 
   /// High-responsiveness critically damped spring for fluid sidebar toggling (~0.22s).
   static const SpringDescription _sidebarSpring = SpringDescription(
@@ -1336,7 +1337,6 @@ class _MainContentSplitState extends State<_MainContentSplit>
       builder: (context, constraints) {
         _lastMaxWidth = constraints.maxWidth;
         final currentW = _widthSpring.value.clamp(0.0, constraints.maxWidth);
-        final isFullyCollapsed = currentW <= 0.001 && !_widthSpring.isAnimating;
         final progress = _lastExpandedWidth > 0
             ? (currentW / _lastExpandedWidth).clamp(0.0, 1.0)
             : 0.0;
@@ -1345,51 +1345,139 @@ class _MainContentSplitState extends State<_MainContentSplit>
         final handleOpacity = (progress * 5.0).clamp(0.0, 1.0);
         final contentOpacity = (progress * 2.2).clamp(0.0, 1.0);
         final parallaxOffset = (progress - 1.0) * 36.0;
+        final isCollapsed =
+            currentW <= _collapseThreshold || contentOpacity <= 0.0;
+
+        final slot = material.RepaintBoundary(
+          child: _ConnectionsPanelSlot(
+            connectionsPanelKey: widget.connectionsPanelKey,
+            workspace: widget.workspace,
+            onConnectionSelected: widget.onConnectionSelected,
+            onRedisDatabaseSelected:
+                widget.onRedisDatabaseSelected,
+            onMongoDBDatabaseSelected:
+                widget.onMongoDBDatabaseSelected,
+            onPostgresObjectSelected:
+                widget.onPostgresObjectSelected,
+            onPostgresOpenSqlWorkspace:
+                widget.onPostgresOpenSqlWorkspace,
+            onMysqlObjectSelected: widget.onMysqlObjectSelected,
+            onMysqlOpenSqlWorkspace:
+                widget.onMysqlOpenSqlWorkspace,
+            onSqliteObjectSelected:
+                widget.onSqliteObjectSelected,
+            onSqliteOpenSqlWorkspace:
+                widget.onSqliteOpenSqlWorkspace,
+            onExtensionObjectSelected:
+                widget.onExtensionObjectSelected,
+          ),
+        );
+
+        final material.Widget slotContent;
+        if (isCollapsed) {
+          slotContent = Offstage(
+            offstage: true,
+            child: TickerMode(
+              enabled: false,
+              child: slot,
+            ),
+          );
+        } else if (contentOpacity < 1.0) {
+          slotContent = Opacity(
+            opacity: contentOpacity,
+            child: slot,
+          );
+        } else {
+          slotContent = slot;
+        }
+
+        final material.Widget positionedSlot =
+            (isCollapsed || parallaxOffset.abs() <= 0.001)
+                ? slotContent
+                : Transform.translate(
+                    offset: Offset(parallaxOffset, 0),
+                    child: slotContent,
+                  );
+
+        final handleWidget = IgnorePointer(
+          ignoring: currentW <= 20.0 || !_sidebarVisible,
+          child: QueryaSplitHandle(
+            key: const Key('main_content_resize_handle'),
+            axis: Axis.horizontal,
+            semanticsLabel:
+                'Resize connections and workspace panes',
+            onDragDelta: (dx) {
+              final ml = constraints.maxWidth -
+                  _resizeHandleWidth -
+                  _minWorkspaceWidth;
+              if (ml <= 0) return;
+              final nextW = _clampLeftWidth(
+                _widthSpring.value + dx,
+                constraints.maxWidth,
+              );
+              _lastExpandedWidth = nextW;
+              _widthSpring.jumpTo(nextW);
+            },
+            onDiscreteResize: () => _widthPersist
+                .onDiscreteResize(() => _lastExpandedWidth),
+            onDragEnd: (details) {
+              _widthPersist.cancelDiscreteTimer();
+              final velocity = details.primaryVelocity ??
+                  details.velocity.pixelsPerSecond.dx;
+              final useSprings =
+                  QueryaSpring.springsEnabled(context);
+              _widthSpring.useSprings = useSprings;
+              if (_widthSpring.value < 100 && velocity < -50) {
+                _sidebarVisible = false;
+                widget.onSidebarVisibilityChanged?.call(false);
+                _widthSpring.animateTo(0.0, velocity: velocity);
+                unawaited(
+                    AppSettings.instance.setSidebarVisible(false));
+              } else {
+                _sidebarVisible = true;
+                widget.onSidebarVisibilityChanged?.call(true);
+                _lastExpandedWidth = _clampLeftWidth(
+                  _widthSpring.value,
+                  constraints.maxWidth,
+                );
+                _widthSpring.animateTo(
+                  _lastExpandedWidth,
+                  velocity: velocity,
+                );
+                unawaited(
+                    AppSettings.instance.setSidebarVisible(true));
+                _schedulePersistAfterSettle();
+              }
+            },
+          ),
+        );
+
+        final material.Widget handleContent;
+        if (handleOpacity >= 1.0) {
+          handleContent = handleWidget;
+        } else if (handleOpacity <= 0.0) {
+          handleContent = const material.SizedBox.shrink();
+        } else {
+          handleContent = Opacity(
+            opacity: handleOpacity,
+            child: handleWidget,
+          );
+        }
 
         return Row(
           children: [
-            if (!isFullyCollapsed)
-              ClipRect(
-                child: SizedBox(
-                  width: currentW,
-                  child: OverflowBox(
-                    minWidth: _lastExpandedWidth,
-                    maxWidth: _lastExpandedWidth,
-                    alignment: Alignment.topLeft,
-                    child: Transform.translate(
-                      offset: Offset(parallaxOffset, 0),
-                      child: Opacity(
-                        opacity: contentOpacity,
-                        child: material.RepaintBoundary(
-                          child: _ConnectionsPanelSlot(
-                            connectionsPanelKey: widget.connectionsPanelKey,
-                            workspace: widget.workspace,
-                            onConnectionSelected: widget.onConnectionSelected,
-                            onRedisDatabaseSelected:
-                                widget.onRedisDatabaseSelected,
-                            onMongoDBDatabaseSelected:
-                                widget.onMongoDBDatabaseSelected,
-                            onPostgresObjectSelected:
-                                widget.onPostgresObjectSelected,
-                            onPostgresOpenSqlWorkspace:
-                                widget.onPostgresOpenSqlWorkspace,
-                            onMysqlObjectSelected: widget.onMysqlObjectSelected,
-                            onMysqlOpenSqlWorkspace:
-                                widget.onMysqlOpenSqlWorkspace,
-                            onSqliteObjectSelected:
-                                widget.onSqliteObjectSelected,
-                            onSqliteOpenSqlWorkspace:
-                                widget.onSqliteOpenSqlWorkspace,
-                            onExtensionObjectSelected:
-                                widget.onExtensionObjectSelected,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+            ClipRect(
+              child: SizedBox(
+                width: currentW,
+                child: OverflowBox(
+                  minWidth: _lastExpandedWidth,
+                  maxWidth: _lastExpandedWidth,
+                  alignment: Alignment.topLeft,
+                  child: positionedSlot,
                 ),
               ),
-            if (!isFullyCollapsed)
+            ),
+            if (!isCollapsed)
               SizedBox(
                 width: currentHandleW,
                 child: ClipRect(
@@ -1397,61 +1485,7 @@ class _MainContentSplitState extends State<_MainContentSplit>
                     minWidth: _resizeHandleWidth,
                     maxWidth: _resizeHandleWidth,
                     alignment: Alignment.center,
-                    child: Opacity(
-                      opacity: handleOpacity,
-                      child: IgnorePointer(
-                        ignoring: currentW <= 20.0 || !_sidebarVisible,
-                        child: QueryaSplitHandle(
-                          key: const Key('main_content_resize_handle'),
-                          axis: Axis.horizontal,
-                          semanticsLabel:
-                              'Resize connections and workspace panes',
-                          onDragDelta: (dx) {
-                            final ml = constraints.maxWidth -
-                                _resizeHandleWidth -
-                                _minWorkspaceWidth;
-                            if (ml <= 0) return;
-                            final nextW = _clampLeftWidth(
-                              _widthSpring.value + dx,
-                              constraints.maxWidth,
-                            );
-                            _lastExpandedWidth = nextW;
-                            _widthSpring.jumpTo(nextW);
-                          },
-                          onDiscreteResize: () => _widthPersist
-                              .onDiscreteResize(() => _lastExpandedWidth),
-                          onDragEnd: (details) {
-                            _widthPersist.cancelDiscreteTimer();
-                            final velocity = details.primaryVelocity ??
-                                details.velocity.pixelsPerSecond.dx;
-                            final useSprings =
-                                QueryaSpring.springsEnabled(context);
-                            _widthSpring.useSprings = useSprings;
-                            if (_widthSpring.value < 100 && velocity < -50) {
-                              _sidebarVisible = false;
-                              widget.onSidebarVisibilityChanged?.call(false);
-                              _widthSpring.animateTo(0.0, velocity: velocity);
-                              unawaited(
-                                  AppSettings.instance.setSidebarVisible(false));
-                            } else {
-                              _sidebarVisible = true;
-                              widget.onSidebarVisibilityChanged?.call(true);
-                              _lastExpandedWidth = _clampLeftWidth(
-                                _widthSpring.value,
-                                constraints.maxWidth,
-                              );
-                              _widthSpring.animateTo(
-                                _lastExpandedWidth,
-                                velocity: velocity,
-                              );
-                              unawaited(
-                                  AppSettings.instance.setSidebarVisible(true));
-                              _schedulePersistAfterSettle();
-                            }
-                          },
-                        ),
-                      ),
-                    ),
+                    child: handleContent,
                   ),
                 ),
               ),
