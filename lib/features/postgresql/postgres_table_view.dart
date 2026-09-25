@@ -6,7 +6,6 @@ import 'package:postgres/postgres.dart';
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/postgres_sql.dart';
-import 'package:querya_desktop/core/database/result_row_string_convert.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -268,7 +267,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       for (final row in result)
         List<Object?>.generate(row.length, (i) => row[i]),
     ];
-    final converted = convertPostgresResultRowsToStrings(
+    return convertPostgresResultRowsToStringsAdaptive(
       PostgresResultConvertJob(
         rowValues: rawRows,
         columnTypeOids: [
@@ -279,7 +278,6 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         ],
       ),
     );
-    return convertResultRowsToStringsAdaptive(converted);
   }
 
   /// [refreshCount] re-reads `reltuples` (e.g. first load or Refresh). Pagination only runs SELECT.

@@ -10,7 +10,6 @@ import 'package:postgres/postgres.dart' as pg;
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/postgres_sql.dart';
-import 'package:querya_desktop/core/database/result_row_string_convert.dart';
 import 'package:querya_desktop/core/database/sql_table_target_extractor.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
@@ -504,7 +503,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         n++;
       }
 
-      final converted = convertPostgresResultRowsToStrings(
+      final outRows = await convertPostgresResultRowsToStringsAdaptive(
         PostgresResultConvertJob(
           rowValues: rawRows,
           columnTypeOids: [
@@ -512,7 +511,6 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
           ],
         ),
       );
-      final outRows = await convertResultRowsToStringsAdaptive(converted);
 
       final target = SqlTableTargetExtractor.extract(userSql);
       var pks = const <String>[];
