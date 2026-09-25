@@ -319,4 +319,74 @@ void main() {
       expect(y(tester, 'Aaron') < y(tester, 'Alice'), isTrue);
     });
   });
+
+  group('VirtualResultGrid horizontal scroll rebuilds (#879)', () {
+    const colCount = 40;
+    final columns = [for (var c = 0; c < colCount; c++) 'column_$c'];
+    final rows = [
+      for (var r = 0; r < 5; r++) [for (var c = 0; c < colCount; c++) 'v${r}_$c'],
+    ];
+
+    Future<void> pumpWide(WidgetTester tester) async {
+      await tester.pumpWidget(
+        _testShell(
+          child: material.SizedBox(
+            width: 600,
+            height: 400,
+            child: VirtualResultGrid(columns: columns, rows: rows),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    Finder firstRow() => find.byKey(const material.ValueKey('result-row-0'));
+
+    Finder hScrollable() => find.byWidgetPredicate(
+          (w) => w is Scrollable && w.axis == Axis.horizontal,
+        );
+
+    testWidgets('a small pan inside the same column window does not rebuild rows',
+        (tester) async {
+      await pumpWide(tester);
+      final before = tester.widget(firstRow());
+      expect(find.text('column_0'), findsOneWidget);
+
+      // A few pixels stays inside the current (overscanned) window.
+      final position = tester.state<ScrollableState>(hScrollable()).position;
+      position.jumpTo(3);
+      await tester.pump();
+      expect(position.pixels, 3);
+
+      expect(identical(tester.widget(firstRow()), before), isTrue,
+          reason: 'rows must not be rebuilt for a pan that keeps the window');
+      await tester.pumpAndSettle(); // let the scrollbar fade timer finish
+    });
+
+    testWidgets('panning far enough builds the newly visible columns',
+        (tester) async {
+      await pumpWide(tester);
+      expect(find.text('column_39'), findsNothing);
+
+      final position = tester.state<ScrollableState>(hScrollable()).position;
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pumpAndSettle();
+
+      expect(find.text('column_39'), findsOneWidget);
+      expect(find.text('v0_39'), findsOneWidget);
+      expect(find.text('column_0'), findsNothing);
+    });
+
+    testWidgets('scrolling back restores the first columns', (tester) async {
+      await pumpWide(tester);
+      final position = tester.state<ScrollableState>(hScrollable()).position;
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      position.jumpTo(0);
+      await tester.pumpAndSettle();
+
+      expect(find.text('column_0'), findsOneWidget);
+      expect(find.text('column_39'), findsNothing);
+    });
+  });
 }
