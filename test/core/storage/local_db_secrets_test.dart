@@ -98,7 +98,15 @@ void main() {
 
       final list = await LocalDb.instance.getConnections();
       final loaded = list.singleWhere((c) => c.id == id);
-      expect(loaded.password, 'redis-secret');
+      // Secrets are resolved lazily on demand, not eagerly in getConnections()
+      expect(loaded.password, isNull);
+
+      final hydrated = await LocalDb.instance.hydrateConnection(loaded);
+      expect(hydrated.password, 'redis-secret');
+
+      final eagerlyHydrated = (await LocalDb.instance.getConnections(hydrateSecrets: true))
+          .singleWhere((c) => c.id == id);
+      expect(eagerlyHydrated.password, 'redis-secret');
     });
 
     test('removeConnection deletes secure-store entries', () async {
@@ -146,7 +154,7 @@ void main() {
       );
       await LocalDb.instance.updateConnection(updatedRow);
 
-      final list = await LocalDb.instance.getConnections();
+      final list = await LocalDb.instance.getConnections(hydrateSecrets: true);
       final loaded = list.singleWhere((c) => c.id == id);
       expect(loaded.name, 'PG_Updated');
       expect(loaded.host, 'db.example.com');
@@ -234,7 +242,7 @@ void main() {
         throwsA(isA<StateError>()),
       );
 
-      final list = await LocalDb.instance.getConnections();
+      final list = await LocalDb.instance.getConnections(hydrateSecrets: true);
       final loaded = list.singleWhere((c) => c.id == id);
       expect(loaded.name, 'PG_Before');
       expect(loaded.host, 'localhost');
@@ -273,10 +281,65 @@ void main() {
       expect(merged.host, 'db.example.com');
 
       await LocalDb.instance.updateConnection(merged);
-      final loaded = (await LocalDb.instance.getConnections())
+      final loaded = (await LocalDb.instance.getConnections(hydrateSecrets: true))
           .singleWhere((c) => c.id == id);
       expect(loaded.password, 'keep-me');
       expect(loaded.name, 'PG Renamed');
+    });
+
+    test('getConnections does not read secure store by default', () async {
+      const row = ConnectionRow(
+        type: 'mysql',
+        name: 'MySQL_Lazy',
+        host: 'localhost',
+        port: 3306,
+        username: 'root',
+        password: 'super-secret-pw',
+        createdAt: '2026-01-01T00:00:00Z',
+      );
+      final id = await LocalDb.instance.addConnection(row);
+
+      // failNextRead should NOT be triggered because getConnections() does not read secrets!
+      testMemorySecrets.failNextRead = StateError('should not be called');
+
+      final list = await LocalDb.instance.getConnections();
+      final conn = list.singleWhere((c) => c.id == id);
+      expect(conn.name, 'MySQL_Lazy');
+      expect(conn.password, isNull);
+
+      // failNextRead is still set because read was never called
+      expect(testMemorySecrets.failNextRead, isNotNull);
+      testMemorySecrets.failNextRead = null;
+    });
+
+    test(
+        'readForConnection and _hydrateConnection handle Keychain error gracefully without throwing',
+        () async {
+      const row = ConnectionRow(
+        type: 'mysql',
+        name: 'MySQL_Faulty',
+        host: 'localhost',
+        port: 3306,
+        username: 'root',
+        password: 'secret-password',
+        createdAt: '2026-01-01T00:00:00Z',
+      );
+      final id = await LocalDb.instance.addConnection(row);
+
+      testMemorySecrets.failNextRead = StateError('org.freedesktop.DBus.Error.NoReply');
+
+      // readForConnection should return nulls instead of throwing
+      final secrets = await ConnectionSecretsStore.readForConnection(id);
+      expect(secrets.password, isNull);
+      expect(secrets.connectionString, isNull);
+
+      testMemorySecrets.failNextRead = StateError('Keychain locked');
+
+      // getConnections(hydrateSecrets: true) should still succeed and return the connection row
+      final list = await LocalDb.instance.getConnections(hydrateSecrets: true);
+      final conn = list.singleWhere((c) => c.id == id);
+      expect(conn.name, 'MySQL_Faulty');
+      expect(conn.password, isNull);
     });
   });
 }
