@@ -24,7 +24,7 @@ import 'theme_remote_install_service.dart';
 import '../extensions/extension_paths.dart';
 
 /// Active theme state: preset, optional imported colors, user overrides.
-class ThemeController extends ChangeNotifier {
+class ThemeController extends ChangeNotifier with WidgetsBindingObserver {
   static const String builtinQueryaDarkId = 'querya-dark';
   static const String builtinQueryaLightId = 'querya-light';
 
@@ -79,6 +79,8 @@ class ThemeController extends ChangeNotifier {
   ThemeFolderWatcher? _themeFolderWatcher;
   bool _editorPreviewActive = false;
   String? _editorPreviewRestoreThemeId;
+  Brightness? _lastPlatformBrightness;
+  bool _isObservingBrightness = false;
 
   QueryaTheme? _cachedLightTheme;
   QueryaTheme? _cachedDarkTheme;
@@ -89,6 +91,9 @@ class ThemeController extends ChangeNotifier {
   ColorScheme? _cachedMaterialThemeScheme;
 
   ThemeMode get themeMode => _themeMode;
+
+  @visibleForTesting
+  bool get isObservingPlatformBrightness => _isObservingBrightness;
 
   /// Preference toggle for theme cross-fades.
   ///
@@ -238,8 +243,21 @@ class ThemeController extends ChangeNotifier {
     await _themeFolderWatcher?.stop();
   }
 
+  WidgetsBinding? get _binding {
+    try {
+      return WidgetsBinding.instance;
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   void dispose() {
+    if (_isObservingBrightness) {
+      _binding?.removeObserver(this);
+      _isObservingBrightness = false;
+      _lastPlatformBrightness = null;
+    }
     unawaited(stopThemeFolderWatcher());
     super.dispose();
   }
@@ -254,7 +272,35 @@ class ThemeController extends ChangeNotifier {
     _cachedMaterialThemeScheme = null;
   }
 
+  void _updateBrightnessObserver() {
+    final binding = _binding;
+    if (binding == null) return;
+    final shouldObserve = _themeMode == ThemeMode.system;
+    if (shouldObserve && !_isObservingBrightness) {
+      _lastPlatformBrightness = binding.platformDispatcher.platformBrightness;
+      binding.addObserver(this);
+      _isObservingBrightness = true;
+    } else if (!shouldObserve && _isObservingBrightness) {
+      binding.removeObserver(this);
+      _isObservingBrightness = false;
+      _lastPlatformBrightness = null;
+    }
+  }
+
+  @override
+  void didChangePlatformBrightness() {
+    if (_themeMode != ThemeMode.system) return;
+    final binding = _binding;
+    if (binding == null) return;
+    final current = binding.platformDispatcher.platformBrightness;
+    if (_lastPlatformBrightness != current) {
+      _lastPlatformBrightness = current;
+      _notifyThemeChanged();
+    }
+  }
+
   void _notifyThemeChanged() {
+    _updateBrightnessObserver();
     _invalidateThemeCache();
     notifyListeners();
   }
@@ -660,8 +706,11 @@ class ThemeController extends ChangeNotifier {
 
   Brightness _effectiveBrightness() {
     if (_themeMode == ThemeMode.system) {
-      final b = WidgetsBinding.instance.platformDispatcher.platformBrightness;
-      return b;
+      final binding = _binding;
+      if (binding != null) {
+        return binding.platformDispatcher.platformBrightness;
+      }
+      return Brightness.dark;
     }
     return _themeMode == ThemeMode.light ? Brightness.light : Brightness.dark;
   }
