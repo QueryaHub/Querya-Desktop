@@ -10,9 +10,27 @@ bool isArchiveExtractPathWithinRoot(String rootPath, String targetPath) {
   return p.equals(root, target) || p.isWithin(root, target);
 }
 
-/// Rejects archive entry names that attempt absolute paths or traversal.
+final _controlCharacters = RegExp(r'[\x00-\x1F\x7F]');
+final _windowsDriveLetter = RegExp(r'(?:^|[/\\])[a-zA-Z]:');
+final _windowsReservedDevice = RegExp(
+  r'^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..*)?$',
+  caseSensitive: false,
+);
+
+/// Rejects archive entry names that attempt absolute paths, directory traversal,
+/// Windows drive letters, Windows reserved device names, or control characters.
 bool isArchiveEntryNameSafe(String entryName) {
+  if (entryName.isEmpty) return false;
+  if (_controlCharacters.hasMatch(entryName)) return false;
   if (entryName.contains('..')) return false;
   if (entryName.startsWith('/') || entryName.startsWith('\\')) return false;
+  if (_windowsDriveLetter.hasMatch(entryName)) return false;
+
+  final segments = entryName.split(RegExp(r'[/\\]'));
+  for (final segment in segments) {
+    final trimmed = segment.trimRight();
+    if (_windowsReservedDevice.hasMatch(trimmed)) return false;
+  }
+
   return true;
 }
