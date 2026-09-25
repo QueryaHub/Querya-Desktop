@@ -22,7 +22,7 @@ class SandboxSanitizer {
 
   /// Common password / token assignment forms in dumps.
   static final _passwordAssignment = RegExp(
-    r'''\b(password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token)\b(\s*[:=]\s*)(["']?)([^\s"'&,;]+)(["']?)''',
+    r'''(['"]?)\b(password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token)\b\1(\s*[:=]\s*)(?:"((?:[^"\\\r\n]|\\.)*)"|'((?:[^'\\\r\n]|\\.)*)'|([^\s"'&,;]+))''',
     caseSensitive: false,
   );
 
@@ -48,9 +48,16 @@ class SandboxSanitizer {
       return '${m[1]}:$redactionToken@';
     });
     out = out.replaceAllMapped(_passwordAssignment, (m) {
-      final quote = m[3] ?? '';
-      final endQuote = m[5] ?? '';
-      return '${m[1]}${m[2]}$quote$redactionToken$endQuote';
+      final qKey = m[1] ?? '';
+      final key = m[2] ?? '';
+      final sep = m[3] ?? '';
+      if (m[4] != null) {
+        return '$qKey$key$qKey$sep"$redactionToken"';
+      } else if (m[5] != null) {
+        return "$qKey$key$qKey$sep'$redactionToken'";
+      } else {
+        return '$qKey$key$qKey$sep$redactionToken';
+      }
     });
     out = out.replaceAllMapped(_bearer, (m) {
       return '${m[1]}$redactionToken';
