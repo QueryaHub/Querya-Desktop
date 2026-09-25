@@ -6,6 +6,7 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
 import 'package:querya_desktop/core/database/sqlite_service.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
+import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/features/sqlite/sqlite_table_utils.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/features/workspace/table_view_staging.dart';
@@ -216,8 +217,7 @@ void main() {
       expect(cols, contains('name'));
 
       final rows = [
-        for (final row in rs)
-          [for (final c in cols) '${row[c]}'],
+        for (final row in rs) [for (final c in cols) '${row[c]}'],
       ];
       final buffer = DataGridStagingBuffer(columns: cols, rows: rows);
       addTearDown(buffer.dispose);
@@ -239,6 +239,80 @@ void main() {
       expect(await conn.executeAffected(plan.statements.first.sql), 1);
       final after = await conn.execute('SELECT name FROM t');
       expect(after.first['name'], 'Grace');
+    });
+
+    test('row inserted with a generated key is editable only after a reload',
+        () async {
+      await conn.connect();
+      await conn.execute(
+        'CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)',
+      );
+      await conn.execute("INSERT INTO t (id, name) VALUES (1, 'Ada')");
+
+      const columnMeta = {
+        'id': TableColumnMeta(
+          name: 'id',
+          dataType: 'INTEGER',
+          isPrimaryKey: true,
+          hasServerDefault: true,
+        ),
+      };
+      const types = {'id': 'INTEGER', 'name': 'TEXT'};
+
+      Future<List<List<String>>> browse() async {
+        final rs = await conn.execute('SELECT id, name FROM t ORDER BY id');
+        return [
+          for (final row in rs) ['${row['id']}', '${row['name']}'],
+        ];
+      }
+
+      DataGridStagingBuffer bufferFor(List<List<String>> rows) =>
+          DataGridStagingBuffer(
+            columns: const ['id', 'name'],
+            rows: rows,
+            primaryKeys: const ['id'],
+          );
+
+      // Insert a new row with a blank (generated) key.
+      final insertBuffer = bufferFor(await browse());
+      addTearDown(insertBuffer.dispose);
+      insertBuffer.addRow(['', 'Grace']);
+      final insertPlan = insertBuffer.generateMutationPlan(
+        dialect: SqlDialect.sqlite,
+        tableName: 't',
+        primaryKeys: const ['id'],
+        columnDataTypes: types,
+        columnMeta: columnMeta,
+      );
+      expect(insertPlan.statements.single.sql, isNot(contains('"id"')));
+      expectDmlMatchedRows(
+        await conn.executeAffected(insertPlan.statements.single.sql),
+      );
+
+      Future<int> renameLastRow(List<List<String>> baseline) async {
+        final buffer = bufferFor(baseline);
+        addTearDown(buffer.dispose);
+        buffer.setCell(baseline.length - 1, 1, 'Grace Hopper');
+        final plan = buffer.generateMutationPlan(
+          dialect: SqlDialect.sqlite,
+          tableName: 't',
+          primaryKeys: const ['id'],
+          columnDataTypes: types,
+          columnMeta: columnMeta,
+        );
+        return conn.executeAffected(plan.statements.single.sql);
+      }
+
+      // The locally committed baseline still has the blank key: 0 rows match.
+      final staleBaseline = insertBuffer.committedRows;
+      expect(staleBaseline.last, ['', 'Grace']);
+      expect(await renameLastRow(staleBaseline), 0);
+
+      // A reload from the database resolves the key, so the edit applies.
+      final reloaded = await browse();
+      expect(reloaded.last, ['2', 'Grace']);
+      expect(await renameLastRow(reloaded), 1);
+      expect((await browse()).last, ['2', 'Grace Hopper']);
     });
 
     test('WITHOUT ROWID tables keep the declared PK, not implicit rowid',
@@ -600,7 +674,8 @@ void main() {
       );
     });
 
-    test('inferQueryColumns returns column names when query returns zero rows', () async {
+    test('inferQueryColumns returns column names when query returns zero rows',
+        () async {
       final conn = SqliteConnection(
         id: 99,
         name: 'mem',
@@ -608,15 +683,19 @@ void main() {
       );
       addTearDown(conn.disconnect);
       await conn.connect();
-      await conn.execute('CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT);');
+      await conn.execute(
+          'CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT);');
 
-      final colsAll = await conn.inferQueryColumns('SELECT * FROM users WHERE 1=0;');
+      final colsAll =
+          await conn.inferQueryColumns('SELECT * FROM users WHERE 1=0;');
       expect(colsAll, ['id', 'name', 'email']);
 
-      final colsProjected = await conn.inferQueryColumns('SELECT id, name AS full_name FROM users WHERE id = -1;');
+      final colsProjected = await conn.inferQueryColumns(
+          'SELECT id, name AS full_name FROM users WHERE id = -1;');
       expect(colsProjected, ['id', 'full_name']);
 
-      final colsComputed = await conn.inferQueryColumns('SELECT 1 AS flag, COUNT(*) AS cnt WHERE 1=0;');
+      final colsComputed = await conn
+          .inferQueryColumns('SELECT 1 AS flag, COUNT(*) AS cnt WHERE 1=0;');
       expect(colsComputed, ['flag', 'cnt']);
     });
   });
