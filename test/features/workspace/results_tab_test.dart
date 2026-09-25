@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/motion/querya_fade_slide.dart';
 import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
@@ -1210,6 +1211,90 @@ void main() {
       );
 
       buffer.dispose();
+    });
+  });
+
+  group('ResultsTab selection updates (#885)', () {
+    final rows = [
+      for (var r = 0; r < 6; r++) ['${r + 1}', '${(r + 1) * 10}', 'name$r'],
+    ];
+
+    Future<void> pumpTab(WidgetTester tester) async {
+      await tester.pumpWidget(
+        resultsShell(
+          child: material.Scaffold(
+            body: ResultsTab(
+              columns: const ['id', 'amount', 'name'],
+              rows: rows,
+              stagingBuffer: DataGridStagingBuffer(
+                columns: const ['id', 'amount', 'name'],
+                rows: rows,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    // onTap resolves only after the double-tap timeout.
+    Future<void> tapCell(WidgetTester tester, String text) async {
+      await tester.tap(find.text(text));
+      await tester.pump(const Duration(milliseconds: 350));
+    }
+
+    testWidgets('a selection step does not rebuild the tab or its grid',
+        (tester) async {
+      await pumpTab(tester);
+      final gridBefore = tester.widget(find.byType(VirtualResultGrid));
+
+      await tapCell(tester, '20');
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump(kSelectionStatsDebounce * 2);
+      await tester.pumpAndSettle();
+
+      // ResultsTab.build creates a new grid widget; the same instance means
+      // the tab did not rebuild for any selection / focus / stats change.
+      expect(identical(tester.widget(find.byType(VirtualResultGrid)), gridBefore),
+          isTrue);
+    });
+
+    testWidgets('selection stats appear after the debounce, once', (tester) async {
+      await pumpTab(tester);
+      await tapCell(tester, '10');
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      // Shift+Down extends the range over 10, 20, 30, 40.
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+
+      // Not computed yet inside the debounce window.
+      expect(find.text('Sum: '), findsNothing);
+
+      await tester.pump(kSelectionStatsDebounce + const Duration(milliseconds: 10));
+      await tester.pumpAndSettle();
+      expect(find.text('Sum: '), findsOneWidget);
+    });
+
+    testWidgets('clearing the selection resets stats immediately',
+        (tester) async {
+      await pumpTab(tester);
+      await tapCell(tester, '10');
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.pump(kSelectionStatsDebounce * 2);
+      await tester.pumpAndSettle();
+      expect(find.text('Sum: '), findsOneWidget);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      // Pending timers must be gone after dispose.
+      await tester.pumpWidget(const material.SizedBox());
+      await tester.pump(kSelectionStatsDebounce * 2);
+      expect(tester.takeException(), isNull);
     });
   });
 }
