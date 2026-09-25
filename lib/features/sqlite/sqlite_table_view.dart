@@ -136,6 +136,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
         columns: _columnNames,
         rows: _rows,
         enabled: _editingEnabled,
+        primaryKeys: _primaryKeys,
       );
     }
     if (mounted) setState(() {});
@@ -262,6 +263,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
       columns: columns,
       rows: rows,
       enabled: _editingEnabled,
+      primaryKeys: _primaryKeys,
     );
   }
 
@@ -408,6 +410,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
           columns: _columnNames,
           rows: newRows,
           enabled: _editingEnabled,
+          primaryKeys: _primaryKeys,
         );
         _isSaving = false;
       });

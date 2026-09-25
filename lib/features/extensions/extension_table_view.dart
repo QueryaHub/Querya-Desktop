@@ -315,6 +315,7 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
           columns: _columns,
           rows: _rows,
           enabled: editingEnabled,
+          primaryKeys: _primaryKeys,
         );
         _updateStatusLine();
       });

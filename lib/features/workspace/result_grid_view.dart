@@ -1509,8 +1509,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
 
   void _handleDuplicateRow(int row) {
     if (widget.stagingBuffer == null || row >= _sortedRows.length) return;
-    final rowData = _sortedRows[row];
-    widget.stagingBuffer!.addRow(List<String>.from(rowData));
+    widget.stagingBuffer!.duplicateRow(_toModelRowIndex(row));
   }
 
   void _handleToggleDeleteRow(int row) {
