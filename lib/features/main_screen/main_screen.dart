@@ -1464,6 +1464,12 @@ class _MainContentSplitState extends State<_MainContentSplit>
           );
         }
 
+        final isAnimating = _widthSpring.isAnimating;
+        final remainingWidth =
+            math.max(0.0, constraints.maxWidth - currentW - currentHandleW);
+        final workspaceLaidOutWidth =
+            isAnimating ? constraints.maxWidth : remainingWidth;
+
         return Row(
           children: [
             ClipRect(
@@ -1490,49 +1496,60 @@ class _MainContentSplitState extends State<_MainContentSplit>
                 ),
               ),
             Expanded(
-              child: material.RepaintBoundary(
-                child: ValueListenableBuilder<MainScreenWorkspaceState>(
-                  valueListenable: widget.workspace,
-                  builder: (context, ws, _) {
-                    return WorkspacePanel(
-                      activeConnection: ws.activeConnection,
-                      selectedRedisDb: ws.activeRedisDb,
-                      selectedMongoDb: ws.activeMongoDB,
-                      selectedPostgresObject: ws.selectedPostgresObject,
-                      postgresSqlTabRequestToken: ws.postgresSqlTabRequestToken,
-                      postgresSqlEditorContext: ws.postgresSqlEditorContext,
-                      postgresSqlEditorContextToken:
-                          ws.postgresSqlEditorContextToken,
-                      selectedMysqlObject: ws.selectedMysqlObject,
-                      mysqlSqlTabRequestToken: ws.mysqlSqlTabRequestToken,
-                      selectedSqliteObject: ws.selectedSqliteObject,
-                      sqliteSqlTabRequestToken: ws.sqliteSqlTabRequestToken,
-                      selectedExtensionObject: ws.selectedExtensionObject,
-                      lastSelectedPostgresObject: ws.lastSelectedPostgresObject,
-                      lastSelectedMysqlObject: ws.lastSelectedMysqlObject,
-                      lastSelectedSqliteObject: ws.lastSelectedSqliteObject,
-                      lastSelectedExtensionObject:
-                          ws.lastSelectedExtensionObject,
-                      lastSelectedMongoDb: ws.lastSelectedMongoDb,
-                      lastSelectedRedisDb: ws.lastSelectedRedisDb,
-                      onNavigateHome: () {
-                        widget.workspace.value =
-                            widget.workspace.value.unselectActiveObject();
+              key: const ValueKey('main_content_workspace_expanded'),
+              child: ClipRect(
+                child: OverflowBox(
+                  alignment: Alignment.topLeft,
+                  minWidth: workspaceLaidOutWidth,
+                  maxWidth: workspaceLaidOutWidth,
+                  child: material.RepaintBoundary(
+                    child: ValueListenableBuilder<MainScreenWorkspaceState>(
+                      valueListenable: widget.workspace,
+                      builder: (context, ws, _) {
+                        return WorkspacePanel(
+                          activeConnection: ws.activeConnection,
+                          selectedRedisDb: ws.activeRedisDb,
+                          selectedMongoDb: ws.activeMongoDB,
+                          selectedPostgresObject: ws.selectedPostgresObject,
+                          postgresSqlTabRequestToken:
+                              ws.postgresSqlTabRequestToken,
+                          postgresSqlEditorContext:
+                              ws.postgresSqlEditorContext,
+                          postgresSqlEditorContextToken:
+                              ws.postgresSqlEditorContextToken,
+                          selectedMysqlObject: ws.selectedMysqlObject,
+                          mysqlSqlTabRequestToken: ws.mysqlSqlTabRequestToken,
+                          selectedSqliteObject: ws.selectedSqliteObject,
+                          sqliteSqlTabRequestToken: ws.sqliteSqlTabRequestToken,
+                          selectedExtensionObject: ws.selectedExtensionObject,
+                          lastSelectedPostgresObject:
+                              ws.lastSelectedPostgresObject,
+                          lastSelectedMysqlObject: ws.lastSelectedMysqlObject,
+                          lastSelectedSqliteObject: ws.lastSelectedSqliteObject,
+                          lastSelectedExtensionObject:
+                              ws.lastSelectedExtensionObject,
+                          lastSelectedMongoDb: ws.lastSelectedMongoDb,
+                          lastSelectedRedisDb: ws.lastSelectedRedisDb,
+                          onNavigateHome: () {
+                            widget.workspace.value =
+                                widget.workspace.value.unselectActiveObject();
+                          },
+                          onRestoreLastSelectedObject: () {
+                            unawaited(_restoreLastSelectedObject());
+                          },
+                          isReadOnly: ws.isReadOnly,
+                          onRequestNewConnection: widget.onRequestNewConnection,
+                          onRequestNewConnectionFromUrl:
+                              widget.onRequestNewConnectionFromUrl,
+                          onRequestOpenSqlite: widget.onRequestOpenSqlite,
+                          onRequestLaunchDemo: widget.onRequestLaunchDemo,
+                          onRequestOpenTour: widget.onRequestOpenTour,
+                          onOpenConnection: widget.onOpenConnection,
+                          initialMongoCollection: widget.initialMongoCollection,
+                        );
                       },
-                      onRestoreLastSelectedObject: () {
-                        unawaited(_restoreLastSelectedObject());
-                      },
-                      isReadOnly: ws.isReadOnly,
-                      onRequestNewConnection: widget.onRequestNewConnection,
-                      onRequestNewConnectionFromUrl:
-                          widget.onRequestNewConnectionFromUrl,
-                      onRequestOpenSqlite: widget.onRequestOpenSqlite,
-                      onRequestLaunchDemo: widget.onRequestLaunchDemo,
-                      onRequestOpenTour: widget.onRequestOpenTour,
-                      onOpenConnection: widget.onOpenConnection,
-                      initialMongoCollection: widget.initialMongoCollection,
-                    );
-                  },
+                    ),
+                  ),
                 ),
               ),
             ),
