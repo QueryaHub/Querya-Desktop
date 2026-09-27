@@ -2,9 +2,9 @@
 
 Living document for planned work. Not a commitment order; adjust as priorities change.
 
-**GitHub Latest Release:** [0.4.16](https://github.com/QueryaHub/Querya-Desktop/releases/tag/0.4.16) (2026-09-20).  
-**This cut:** **0.4.17** — driver/grid correctness after 0.4.16 (schema vs PK, SQLite `rowid`, Mongo writes, SQL sessions/types) — [CHANGELOG.md](../CHANGELOG.md) `[0.4.17]`, tracking [#880](https://github.com/QueryaHub/Querya-Desktop/issues/880).  
-**Next product release:** **0.5.0** — live Marketplace download and install — see below. Hidden bugs pass 2 (#867–#873) and algorithm/perf (#874–#879) slip to the next patch.
+**GitHub Latest Release:** [0.4.17](https://github.com/QueryaHub/Querya-Desktop/releases/tag/0.4.17) (2026-09-20).  
+**This cut:** **0.4.18** — shell/motion perf (<0.5ms build), data-loss guards, driver session correctness, and high-refresh grid reliability — [CHANGELOG.md](../CHANGELOG.md) `[0.4.18]`.  
+**Next product release:** **0.5.0** — live Marketplace download and install — see below.
 
 ## Theme system
 
@@ -30,8 +30,8 @@ Living document for planned work. Not a commitment order; adjust as priorities c
 - **Shipped in 0.4.11-b:** security (#395–#402), Linux `.rpm` / Flatpak / AUR (#386), perf (#414), UI reliability (#445), code-review fixes (#463) — [CHANGELOG.md](../CHANGELOG.md) `[0.4.11-b]`.
 - **Shipped in 0.4.13–0.4.15:** interactive Data Grid, fluid motion, multi-tab SQL, preferences/keymap — [CHANGELOG.md](../CHANGELOG.md).
 - **Shipped in 0.4.16:** Table Browser in-place DML, Command Palette + Quick Switcher, workspace chrome / connections-tree parity, Mongo per-field Save to DB, updater hardening — [CHANGELOG.md](../CHANGELOG.md) `[0.4.16]`.
-- **0.4.17 (this cut):** driver/grid correctness after 0.4.16 — schema vs PK (#772), SQLite `rowid` (#774), Mongo writes/filter/discard (#776/#778/#782/#783), Postgres/MySQL/SQLite/Redis session and type round-trips — [CHANGELOG.md](../CHANGELOG.md) `[0.4.17]`, tracking [#880](https://github.com/QueryaHub/Querya-Desktop/issues/880).
-- **Next patch:** hidden bugs pass 2 ([#867](https://github.com/QueryaHub/Querya-Desktop/issues/867)–[#873](https://github.com/QueryaHub/Querya-Desktop/issues/873)) and algorithm/perf ([#874](https://github.com/QueryaHub/Querya-Desktop/issues/874)–[#879](https://github.com/QueryaHub/Querya-Desktop/issues/879)). Manual 120 Hz DevTools sign-off remains [#739](https://github.com/QueryaHub/Querya-Desktop/issues/739) (optional).
+- **Shipped in 0.4.17:** driver/grid correctness after 0.4.16 — schema vs PK (#772), SQLite `rowid` (#774), Mongo writes/filter/discard (#776/#778/#782/#783), Postgres/MySQL/SQLite/Redis session and type round-trips — [CHANGELOG.md](../CHANGELOG.md) `[0.4.17]`.
+- **0.4.18 (this cut):** shell/motion perf (<0.5ms build, #984/#1004), data-loss guard rails (#867–#873, #910, #912, #1007), driver correctness, and grid reliability (#1005–#1011) — [CHANGELOG.md](../CHANGELOG.md) `[0.4.18]`.
 - **Planned 0.5.0:** Marketplace Launch — live download, `sha256` validation, install themes (and later DB drivers) from the network.
 
 ## Query history and favorites
