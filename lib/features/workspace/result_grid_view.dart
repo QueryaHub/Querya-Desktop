@@ -1255,6 +1255,17 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     if (_sortedRows.isEmpty || widget.columns.isEmpty) return;
 
     if (_editingCell != null) {
+      final downCell = _cellAtOffset(
+        localPosition: event.localPosition,
+        rowHeight: rowHeight,
+      );
+      if (downCell == _editingCell) {
+        // The press landed on the cell currently being edited (e.g. to move
+        // the caret or select text inside the open GridCellEditor) — let the
+        // editor's own gesture handling deal with it instead of cancelling
+        // the in-progress edit out from under the user (#1006).
+        return;
+      }
       _cancelEdit();
     }
 
