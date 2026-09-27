@@ -516,6 +516,21 @@ class ExtensionDriverSession {
     }
   }
 
+  /// Stops every live session backed by [extensionId] (across all its open
+  /// connections), releasing the driver process and any file handles it
+  /// holds. Call this before overwriting or deleting an installed
+  /// extension's files — on Windows a running `bin/<driver>.exe` otherwise
+  /// holds a mandatory lock that makes the overwrite/delete fail (#891).
+  Future<void> stopAllForExtension(String extensionId) async {
+    final ids = [
+      for (final entry in _manifests.entries)
+        if (entry.value.id == extensionId) entry.key,
+    ];
+    for (final id in ids) {
+      await disconnect(id);
+    }
+  }
+
   Map<String, Object?> _decodeOptions(String? raw) {
     if (raw == null || raw.trim().isEmpty) return {};
     try {

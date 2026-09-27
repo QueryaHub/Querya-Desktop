@@ -16,6 +16,12 @@ void main() {
       await ExtensionDriverSession.instance.disconnectAll();
     });
 
+    test('stopAllForExtension is a no-op when no session exists (#891)',
+        () async {
+      await ExtensionDriverSession.instance
+          .stopAllForExtension('queryahub.no-such-driver');
+    });
+
     test('ConnectionRow.isExtensionDriver', () {
       const withExt = ConnectionRow(
         type: 'clickhouse',
