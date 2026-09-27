@@ -82,9 +82,53 @@ class ConnectionSecretsStore {
     int connectionId,
   ) async {
     try {
-      final password = await backend.read(_passwordKey(connectionId));
-      final connectionString =
+      var password = await backend.read(_passwordKey(connectionId));
+      var connectionString =
           await backend.read(_connectionStringKey(connectionId));
+
+      // Fallback: If either secret wasn't found under the namespaced key,
+      // lazily check the legacy unnamespaced key (#1008). This guards against
+      // transient keyring failures during the one-time DB upgrade migration,
+      // and writes through to adopt the legacy secret immediately.
+      if (password == null || connectionString == null) {
+        try {
+          String? legacyPassword;
+          String? legacyConnectionString;
+          if (password == null) {
+            legacyPassword =
+                await backend.read(_legacyPasswordKey(connectionId));
+          }
+          if (connectionString == null) {
+            legacyConnectionString =
+                await backend.read(_legacyConnectionStringKey(connectionId));
+          }
+          if (legacyPassword != null || legacyConnectionString != null) {
+            final effectivePassword = password ?? legacyPassword;
+            final effectiveConnectionString =
+                connectionString ?? legacyConnectionString;
+            await writeForConnection(
+              connectionId,
+              password: effectivePassword,
+              connectionString: effectiveConnectionString,
+            );
+            if (legacyPassword != null) {
+              try {
+                await backend.delete(_legacyPasswordKey(connectionId));
+              } catch (_) {}
+            }
+            if (legacyConnectionString != null) {
+              try {
+                await backend.delete(_legacyConnectionStringKey(connectionId));
+              } catch (_) {}
+            }
+            password = effectivePassword;
+            connectionString = effectiveConnectionString;
+          }
+        } catch (_) {
+          // Best-effort lazy adoption; return whatever was already read.
+        }
+      }
+
       return (password: password, connectionString: connectionString);
     } catch (_) {
       return (password: null, connectionString: null);
@@ -94,6 +138,10 @@ class ConnectionSecretsStore {
   static Future<void> deleteForConnection(int connectionId) async {
     await backend.delete(_passwordKey(connectionId));
     await backend.delete(_connectionStringKey(connectionId));
+    try {
+      await backend.delete(_legacyPasswordKey(connectionId));
+      await backend.delete(_legacyConnectionStringKey(connectionId));
+    } catch (_) {}
   }
 
   /// One-time migration (issue #986): before keyring keys were namespaced by

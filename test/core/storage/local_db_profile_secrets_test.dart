@@ -137,4 +137,73 @@ void main() {
     expect(await testMemorySecrets.read('querya.v1.conn.$id.password'), isNull);
     expect(ConnectionSecretsStore.profileId, profileId);
   });
+
+  test(
+      'readForConnection lazily adopts legacy unnamespaced secret on demand (#1008)',
+      () async {
+    PathProviderPlatform.instance = _FakePathProvider(rootA.path);
+    final id = await LocalDb.instance.addConnection(const ConnectionRow(
+      type: 'postgres',
+      name: 'UnmigratedLegacy',
+      host: 'legacy-pg-host',
+      port: 5432,
+      createdAt: '2026-01-01T00:00:00Z',
+    ));
+    final profileId = ConnectionSecretsStore.profileId!;
+
+    // Simulate an unmigrated secret (e.g. transient keyring lock during DB upgrade):
+    // only the legacy unnamespaced keys exist.
+    await testMemorySecrets.write('querya.v1.conn.$id.password', 'lazy-pw');
+    await testMemorySecrets.write(
+        'querya.v1.conn.$id.connection_string', 'postgres://user:lazy-pw@host/db');
+
+    // Neither adoptLegacyKeysForConnection nor writeForConnection was called.
+    // readForConnection must fall back to the legacy keys, adopt them write-through,
+    // and return the credentials.
+    final secrets = await ConnectionSecretsStore.readForConnection(id);
+    expect(secrets.password, 'lazy-pw');
+    expect(secrets.connectionString, 'postgres://user:lazy-pw@host/db');
+
+    // The legacy keys should now be cleaned up, and namespaced keys populated.
+    expect(await testMemorySecrets.read('querya.v1.conn.$id.password'), isNull);
+    expect(await testMemorySecrets.read('querya.v1.conn.$id.connection_string'),
+        isNull);
+    expect(
+      await testMemorySecrets.read(
+          'querya.v1.profile.$profileId.conn.$id.password'),
+      'lazy-pw',
+    );
+    expect(
+      await testMemorySecrets.read(
+          'querya.v1.profile.$profileId.conn.$id.connection_string'),
+      'postgres://user:lazy-pw@host/db',
+    );
+  });
+
+  test('deleteForConnection removes both namespaced and legacy keys (#1008)',
+      () async {
+    PathProviderPlatform.instance = _FakePathProvider(rootA.path);
+    final id = await LocalDb.instance.addConnection(const ConnectionRow(
+      type: 'postgres',
+      name: 'ToDelete',
+      host: 'host',
+      port: 5432,
+      createdAt: '2026-01-01T00:00:00Z',
+    ));
+    final profileId = ConnectionSecretsStore.profileId!;
+
+    await testMemorySecrets.write(
+        'querya.v1.profile.$profileId.conn.$id.password', 'pw');
+    await testMemorySecrets.write(
+        'querya.v1.conn.$id.password', 'stray-legacy-pw');
+
+    await ConnectionSecretsStore.deleteForConnection(id);
+
+    expect(
+      await testMemorySecrets.read(
+          'querya.v1.profile.$profileId.conn.$id.password'),
+      isNull,
+    );
+    expect(await testMemorySecrets.read('querya.v1.conn.$id.password'), isNull);
+  });
 }
