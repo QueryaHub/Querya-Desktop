@@ -11,6 +11,7 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
 import 'package:querya_desktop/features/main_screen/main_screen.dart';
 import 'package:querya_desktop/features/main_screen/querya_window_title_bar.dart';
+import 'package:querya_desktop/features/main_screen/workspace_panel.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import '../../support/querya_theme_test_shell.dart';
@@ -248,6 +249,81 @@ void main() {
           matching: find.byType(material.Opacity),
         ),
         findsNothing,
+      );
+    });
+
+    testWidgets(
+        'isolates workspace layout constraints during sidebar spring animation (#984)',
+        (tester) async {
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: const material.SizedBox(
+            width: 1200,
+            height: 800,
+            child: MainScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final RenderBox mainScreenBox =
+          tester.renderObject<RenderBox>(find.byType(MainScreen));
+      final totalWidth = mainScreenBox.size.width;
+      final expectedExpandedWidth = totalWidth - 260.0 - 6.0;
+
+      // Initially expanded: width is totalWidth - 260 - 6.
+      final initialWorkspaceBox =
+          tester.renderObject<RenderBox>(find.byType(WorkspacePanel));
+      expect(
+        initialWorkspaceBox.constraints.maxWidth,
+        closeTo(expectedExpandedWidth, 0.5),
+      );
+
+      final toggleButton =
+          find.byKey(const Key('title_bar_toggle_sidebar_button'));
+      expect(toggleButton, findsOneWidget);
+
+      // Trigger collapse toggle.
+      await tester.tap(toggleButton);
+      await tester.pump();
+
+      // Intermediate animation frames while collapsing: workspace constraints
+      // must remain held at constraints.maxWidth, skipping per-frame re-layouts.
+      for (var i = 0; i < 8; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        final intermediateBox =
+            tester.renderObject<RenderBox>(find.byType(WorkspacePanel));
+        expect(intermediateBox.constraints.maxWidth, totalWidth);
+      }
+
+      await tester.pumpAndSettle();
+
+      // Settled collapsed: full width.
+      final settledCollapsedBox =
+          tester.renderObject<RenderBox>(find.byType(WorkspacePanel));
+      expect(settledCollapsedBox.constraints.maxWidth, totalWidth);
+
+      // Trigger expand toggle.
+      await tester.tap(toggleButton);
+      await tester.pump();
+
+      // Intermediate animation frames while expanding: workspace constraints
+      // must remain held stable at constraints.maxWidth instead of shrinking every frame.
+      for (var i = 0; i < 8; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        final intermediateBox =
+            tester.renderObject<RenderBox>(find.byType(WorkspacePanel));
+        expect(intermediateBox.constraints.maxWidth, totalWidth);
+      }
+
+      await tester.pumpAndSettle();
+
+      // Settled expanded: exactly expectedExpandedWidth.
+      final settledExpandedBox =
+          tester.renderObject<RenderBox>(find.byType(WorkspacePanel));
+      expect(
+        settledExpandedBox.constraints.maxWidth,
+        closeTo(expectedExpandedWidth, 0.5),
       );
     });
   });
