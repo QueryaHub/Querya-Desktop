@@ -696,6 +696,19 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   bool _userHasResized = false;
   double _scrollOffset = 0;
 
+  /// Cache for [distributeResultGridSpareWidth] (#982): sampling every
+  /// column's header/content width is O(columns x sampled rows) and only
+  /// needs to rerun when [_columnWidths] itself was recomputed (a new list,
+  /// so `identical` catches it) or the viewport width changed, not on every
+  /// `LayoutBuilder` layout pass.
+  List<double> _distributedWidths = const [];
+  List<double>? _distributedForColumnWidths;
+  double? _distributedForAvailableWidth;
+
+  /// Counts calls to [distributeResultGridSpareWidth], i.e. cache misses.
+  @material.visibleForTesting
+  int columnWidthDistributionCount = 0;
+
   int? _sortColumnIndex;
   ResultGridSortOrder? _sortOrder;
   int _sortVersion = 0;
@@ -2098,14 +2111,23 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
               if (!_userHasResized &&
                   tableWidth < availableWidth &&
                   _columnWidths.isNotEmpty) {
-                displayWidths = distributeResultGridSpareWidth(
-                  columnWidths: _columnWidths,
-                  columns: widget.columns,
-                  rows: _baseRows,
-                  availableWidth: availableWidth,
-                  maxColumnWidth:
-                      context.scaled(ResultGridMetrics.maxColumnWidth),
-                );
+                if (identical(_distributedForColumnWidths, _columnWidths) &&
+                    _distributedForAvailableWidth == availableWidth) {
+                  displayWidths = _distributedWidths;
+                } else {
+                  displayWidths = distributeResultGridSpareWidth(
+                    columnWidths: _columnWidths,
+                    columns: widget.columns,
+                    rows: _baseRows,
+                    availableWidth: availableWidth,
+                    maxColumnWidth:
+                        context.scaled(ResultGridMetrics.maxColumnWidth),
+                  );
+                  _distributedWidths = displayWidths;
+                  _distributedForColumnWidths = _columnWidths;
+                  _distributedForAvailableWidth = availableWidth;
+                  columnWidthDistributionCount++;
+                }
                 final distributedWidth =
                     displayWidths.fold<double>(0.0, (sum, w) => sum + w);
                 tableWidth = math.max(distributedWidth, availableWidth);
