@@ -123,6 +123,11 @@ List<double> computeResultGridColumnWidths({
   return widths;
 }
 
+/// Counts calls to `_GridCell._buildContextMenuItems` — should only fire when
+/// a cell's context menu is actually opened (#983), not on every cell build.
+@material.visibleForTesting
+int gridCellContextMenuItemsBuiltCount = 0;
+
 /// Distributes spare viewport width adaptively to columns that benefit from expansion,
 /// avoiding artificial stretching of compact columns.
 List<double> distributeResultGridSpareWidth({
@@ -2794,6 +2799,7 @@ class _GridCell extends material.StatelessWidget {
           onRevertRow == other.onRevertRow;
 
   List<MenuItem> _buildContextMenuItems(material.BuildContext context) {
+    gridCellContextMenuItemsBuiltCount++;
     final preview = text.length > 24 ? '${text.substring(0, 22)}…' : text;
     final isNull = text == 'NULL';
     final numVal = num.tryParse(text);
@@ -3090,7 +3096,10 @@ class _GridCell extends material.StatelessWidget {
           }
         },
         child: ContextMenu(
-          items: _buildContextMenuItems(context),
+          // Lazy: right-clicking a cell is rare relative to how often cells
+          // get rebuilt (scroll, selection, ...); building the item list
+          // eagerly on every build was pure waste (#983).
+          itemsBuilder: _buildContextMenuItems,
           child: content,
         ),
       ),
