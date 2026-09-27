@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/redis_bulk.dart';
@@ -473,6 +475,138 @@ void main() {
     expect(find.text('No items'), findsOneWidget);
     await fake.disconnect();
   });
+
+  testWidgets(
+      'RedisKeyEditor list item edit aborts when element changed concurrently',
+      (tester) async {
+    final fake = RedisConnectionTestFake(
+      listItems: ['task1'],
+    );
+    await fake.connect();
+
+    await pumpEditor(
+      tester,
+      fake: fake,
+      isReadOnly: false,
+      keyType: 'list',
+      keyName: 'jobs',
+    );
+
+    expect(find.text('task1'), findsOneWidget);
+    await tester.tap(find.byTooltip('Edit item'));
+    await tester.pumpAndSettle();
+
+    // Concurrent writer modifies item at index 0 before user saves
+    fake.listItems[0] = 'task1_concurrent_edit';
+
+    final field = find.descendant(
+      of: find.byType(shadcn.AlertDialog),
+      matching: find.byType(shadcn.TextField),
+    );
+    await tester.enterText(field, 'task1_my_edit');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    // LSET should not have overwritten the concurrent edit
+    expect(fake.listItems[0], 'task1_concurrent_edit');
+    expect(
+      find.textContaining('changed concurrently; reloaded latest.'),
+      findsOneWidget,
+    );
+    expect(find.text('task1_concurrent_edit'), findsOneWidget);
+    await fake.disconnect();
+  });
+
+  testWidgets(
+      'RedisKeyEditor list item delete aborts when element changed concurrently',
+      (tester) async {
+    final fake = RedisConnectionTestFake(
+      listItems: ['task1'],
+    );
+    await fake.connect();
+
+    await pumpEditor(
+      tester,
+      fake: fake,
+      isReadOnly: false,
+      keyType: 'list',
+      keyName: 'jobs',
+    );
+
+    await tester.tap(find.byTooltip('Delete item'));
+    await tester.pumpAndSettle();
+
+    // Concurrent writer modifies item at index 0 before user confirms deletion
+    fake.listItems[0] = 'task1_concurrent_shift';
+
+    await tester.tap(find.byType(material.Checkbox));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Execute Destructive Statement'));
+    await tester.pumpAndSettle();
+
+    // Deletion aborted; concurrent item preserved
+    expect(fake.listItems, ['task1_concurrent_shift']);
+    expect(
+      find.textContaining('changed concurrently; reloaded latest.'),
+      findsOneWidget,
+    );
+    expect(find.text('task1_concurrent_shift'), findsOneWidget);
+    await fake.disconnect();
+  });
+
+  testWidgets(
+      'RedisKeyEditor binary list item hides edit button and shows binary badge',
+      (tester) async {
+    final fake = RedisConnectionTestFake(
+      listItems: [
+        Uint8List.fromList([0x00, 0xff, 0xfe]),
+      ],
+    );
+    await fake.connect();
+
+    await pumpEditor(
+      tester,
+      fake: fake,
+      isReadOnly: false,
+      keyType: 'list',
+      keyName: 'bin_jobs',
+    );
+
+    expect(find.text('binary'), findsOneWidget);
+    expect(find.byTooltip('Edit item'), findsNothing);
+    expect(find.byTooltip('Delete item'), findsOneWidget);
+    await fake.disconnect();
+  });
+
+  testWidgets(
+      'RedisKeyEditor cleans up orphaned delete sentinel on list load',
+      (tester) async {
+    final fake = RedisConnectionTestFake(
+      listItems: [
+        'normal_item',
+        '__QUERYA_DEL_123456789__',
+        'another_item',
+      ],
+    );
+    await fake.connect();
+
+    await pumpEditor(
+      tester,
+      fake: fake,
+      isReadOnly: false,
+      keyType: 'list',
+      keyName: 'clean_jobs',
+    );
+
+    expect(find.text('normal_item'), findsOneWidget);
+    expect(find.text('another_item'), findsOneWidget);
+    expect(find.text('__QUERYA_DEL_123456789__'), findsNothing);
+    expect(fake.sentCommands.contains('LREM'), isTrue);
+    await fake.disconnect();
+  });
+
   testWidgets(
       'RedisKeyEditor Refresh proceeds without dialog when string is unedited',
       (tester) async {

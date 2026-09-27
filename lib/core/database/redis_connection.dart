@@ -458,6 +458,16 @@ class RedisConnection {
     await sendCommand(['RPUSH', redisCommandArg(key), value]);
   }
 
+  /// LINDEX key index.
+  Future<RedisBulkValue?> lindex(Object key, int index) async {
+    final result =
+        await sendCommand(['LINDEX', redisCommandArg(key), index]);
+    if (result == null || _isRedisNil(result)) {
+      return null;
+    }
+    return RedisBulkValue.fromReply(result);
+  }
+
   /// LSET key index value.
   Future<void> lset(Object key, int index, String value) async {
     _assertWritable();
@@ -618,7 +628,7 @@ class RedisConnectionTestFake extends RedisConnection {
     this.secondScanKeys = const <String>[],
     this.dbSizeResult = 2,
     this.getResult,
-    List<String>? listItems,
+    List<dynamic>? listItems,
     this.llenResult,
     this.hashFirstPage = const <String, String>{},
     this.hashSecondPage = const <String, String>{},
@@ -633,7 +643,7 @@ class RedisConnectionTestFake extends RedisConnection {
     this.getBytesResult,
     this.binaryScanKeys = const <List<int>>[],
   })  : listItems =
-            listItems != null ? List<String>.from(listItems) : <String>[],
+            listItems != null ? List<dynamic>.from(listItems) : <dynamic>[],
         super(
           id: -1,
           name: 'test-fake',
@@ -645,7 +655,7 @@ class RedisConnectionTestFake extends RedisConnection {
   final List<String> secondScanKeys;
   final int dbSizeResult;
   final String? getResult;
-  final List<String> listItems;
+  final List<dynamic> listItems;
   final int? llenResult;
   final Map<String, String> hashFirstPage;
   final Map<String, String> hashSecondPage;
@@ -795,6 +805,12 @@ class RedisConnectionTestFake extends RedisConnection {
       case 'RPUSH':
         listItems.add(args[2].toString());
         return 'OK';
+      case 'LINDEX':
+        final lindexIdx = int.tryParse(args[2].toString()) ?? 0;
+        if (lindexIdx >= 0 && lindexIdx < listItems.length) {
+          return listItems[lindexIdx];
+        }
+        return null;
       case 'LSET':
         final idx = int.tryParse(args[2].toString()) ?? 0;
         final val = args[3].toString();
@@ -832,7 +848,7 @@ class RedisConnectionTestFake extends RedisConnection {
     }
   }
 
-  List<String> _sliceList(List<String> items, List<dynamic> args) {
+  List<dynamic> _sliceList(List<dynamic> items, List<dynamic> args) {
     if (items.isEmpty) return const [];
     final start = int.tryParse(args[2].toString()) ?? 0;
     var stop = int.tryParse(args[3].toString()) ?? -1;
