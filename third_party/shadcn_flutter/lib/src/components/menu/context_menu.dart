@@ -591,12 +591,18 @@ class _ContextMenuState extends State<ContextMenu> {
     super.didUpdateWidget(oldWidget);
     final items = widget.items;
     final oldItems = oldWidget.items;
-    if (items != null &&
-        oldItems != null &&
-        !listEquals(items, oldItems)) {
-      WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
-        if (mounted) _children?.value = items;
-      });
+    if (items != null) {
+      if (oldItems == null || _children == null) {
+        _children?.dispose();
+        _children = ValueNotifier(items);
+      } else if (!listEquals(items, oldItems)) {
+        WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+          if (mounted) _children?.value = items;
+        });
+      }
+    } else if (oldItems != null || _children != null) {
+      _children?.dispose();
+      _children = null;
     }
   }
 
