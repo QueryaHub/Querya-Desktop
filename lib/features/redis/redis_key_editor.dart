@@ -291,7 +291,16 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
             start,
             start + redisCollectionPageSize - 1,
           );
-          _listValue.addAll(chunk);
+          if (!widget.isReadOnly) {
+            for (final item in chunk) {
+              if (_isOrphanedDeleteSentinel(item)) {
+                widget.connection.lrem(_cmdKey, 0, item.commandArg).ignore();
+              }
+            }
+          }
+          final cleanChunk =
+              chunk.where((item) => !_isOrphanedDeleteSentinel(item)).toList();
+          _listValue.addAll(cleanChunk);
           _hasMore = _listValue.length < _collectionTotal;
         case 'set':
           if (reset) {
@@ -477,10 +486,24 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     }
   }
 
-  Future<void> _listSet(int index, String newValue) async {
+  Future<void> _listSet(
+    int index,
+    String newValue, {
+    RedisBulkValue? expectedCurrent,
+  }) async {
     if (widget.isReadOnly) return;
     try {
       await widget.connection.selectDatabase(widget.database);
+      if (expectedCurrent != null) {
+        final current = await widget.connection.lindex(_cmdKey, index);
+        if (current == null || current != expectedCurrent) {
+          await _load();
+          if (!mounted) return;
+          setState(() => _error =
+              'List item at index $index changed concurrently; reloaded latest.');
+          return;
+        }
+      }
       await widget.connection.lset(_cmdKey, index, newValue);
       await _load();
     } catch (e) {
@@ -501,15 +524,37 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     if (!mounted || !confirmed) return;
     try {
       await widget.connection.selectDatabase(widget.database);
+      final current = await widget.connection.lindex(_cmdKey, index);
+      if (current == null || current != item) {
+        await _load();
+        if (!mounted) return;
+        setState(() => _error =
+            'List item at index $index changed concurrently; reloaded latest.');
+        return;
+      }
       final sentinel =
           '__QUERYA_DEL_${DateTime.now().microsecondsSinceEpoch}__';
-      await widget.connection.lset(_cmdKey, index, sentinel);
-      await widget.connection.lrem(_cmdKey, 1, sentinel);
+      try {
+        await widget.connection.lset(_cmdKey, index, sentinel);
+        await widget.connection.lrem(_cmdKey, 1, sentinel);
+      } catch (e) {
+        try {
+          await widget.connection.lrem(_cmdKey, 1, sentinel);
+        } catch (_) {}
+        rethrow;
+      }
       await _load();
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = 'LREM failed: $e');
     }
+  }
+
+  bool _isOrphanedDeleteSentinel(RedisBulkValue value) {
+    final text = value.text;
+    return text != null &&
+        text.startsWith('__QUERYA_DEL_') &&
+        text.endsWith('__');
   }
 
   // Set operations
@@ -1044,19 +1089,22 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
                   itemBuilder: (context, i) => _IndexedValueRow(
                     index: i,
                     value: _listValue[i].label,
-                    onEdit: widget.isReadOnly
+                    isBinary: !_listValue[i].isUtf8,
+                    onEdit: widget.isReadOnly || !_listValue[i].isUtf8
                         ? null
                         : () async {
+                            final initialText =
+                                _listValue[i].text ?? _listValue[i].label;
                             final edited = await showAppDialog<String>(
                               context: context,
                               builder: (ctx) => _RedisEditListDialogContent(
                                 index: i,
-                                initialValue: _listValue[i].label,
+                                initialValue: initialText,
                               ),
                             );
-                            if (edited != null &&
-                                edited != _listValue[i].label) {
-                              await _listSet(i, edited);
+                            if (edited != null && edited != initialText) {
+                              await _listSet(i, edited,
+                                  expectedCurrent: _listValue[i]);
                             }
                           },
                     onDelete: widget.isReadOnly
@@ -1510,6 +1558,7 @@ class _IndexedValueRow extends StatelessWidget {
   const _IndexedValueRow({
     required this.index,
     required this.value,
+    this.isBinary = false,
     this.onEdit,
     this.onDelete,
     required this.colorScheme,
@@ -1518,6 +1567,7 @@ class _IndexedValueRow extends StatelessWidget {
 
   final int index;
   final String value;
+  final bool isBinary;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final ColorScheme colorScheme;
@@ -1557,6 +1607,25 @@ class _IndexedValueRow extends StatelessWidget {
               ),
             ),
           ),
+          if (isBinary) ...[
+            const Gap(8),
+            material.Container(
+              padding: const material.EdgeInsets.symmetric(
+                  horizontal: 5, vertical: 1.5),
+              decoration: material.BoxDecoration(
+                color: shadcnCs.muted,
+                borderRadius: material.BorderRadius.circular(3),
+              ),
+              child: Text(
+                'binary',
+                style: material.TextStyle(
+                  fontSize: 10,
+                  fontFamily: 'monospace',
+                  color: shadcnCs.mutedForeground,
+                ),
+              ),
+            ),
+          ],
           if (onEdit != null) ...[
             const Gap(8),
             material.Tooltip(
