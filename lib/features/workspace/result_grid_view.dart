@@ -2523,11 +2523,34 @@ class _DataRow extends material.StatefulWidget {
   @override
   material.State<_DataRow> createState() => _DataRowState();
 
+  /// One label for the whole row (visible columns only), read by screen
+  /// readers instead of a separate semantics node per cell — see #981.
+  String _semanticsLabel(StagedRowStatus rowStatus) {
+    final buffer = StringBuffer('Row ${modelRowIndex + 1}');
+    switch (rowStatus) {
+      case StagedRowStatus.deleted:
+        buffer.write(' (deleted)');
+      case StagedRowStatus.inserted:
+        buffer.write(' (new)');
+      case StagedRowStatus.modified:
+        buffer.write(' (modified)');
+      case StagedRowStatus.unchanged:
+        break;
+    }
+    for (var c = window.first; c <= window.last && c < columns.length; c++) {
+      buffer.write(', ${columns[c]}: ${c < row.length ? row[c] : ''}');
+    }
+    return buffer.toString();
+  }
+
   material.Widget _buildRow(Map<int, _GridCell> cache) {
     final rowStatus =
         stagingBuffer?.getRowStatus(modelRowIndex) ?? StagedRowStatus.unchanged;
 
-    return material.RepaintBoundary(
+    return material.Semantics(
+      container: true,
+      label: _semanticsLabel(rowStatus),
+      child: material.RepaintBoundary(
       child: material.SizedBox(
         height: height,
         child: material.Row(
@@ -2596,6 +2619,7 @@ class _DataRow extends material.StatefulWidget {
               ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -3032,15 +3056,21 @@ class _GridCell extends material.StatelessWidget {
       child: content,
     );
 
-    return material.Listener(
-      onPointerDown: (event) {
-        if (event.buttons == kSecondaryMouseButton) {
-          onSecondaryTap?.call(row, column);
-        }
-      },
-      child: ContextMenu(
-        items: _buildContextMenuItems(context),
-        child: content,
+    // The row this cell belongs to carries one semantics node with a label
+    // for all its visible cells (see _DataRow._semanticsLabel, #981); a
+    // GestureDetector/Tooltip/Text node per cell on top of that would be
+    // redundant and is one of the grid's largest per-frame costs.
+    return material.ExcludeSemantics(
+      child: material.Listener(
+        onPointerDown: (event) {
+          if (event.buttons == kSecondaryMouseButton) {
+            onSecondaryTap?.call(row, column);
+          }
+        },
+        child: ContextMenu(
+          items: _buildContextMenuItems(context),
+          child: content,
+        ),
       ),
     );
   }
