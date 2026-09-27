@@ -250,6 +250,10 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     }
     if (oldWidget.isReadOnly != widget.isReadOnly) {
       _dropLease();
+      // Cached panes closed over the old widget.isReadOnly in their
+      // onApplyChanges callback (#1007): rebuild every tab so Save reflects
+      // the lock immediately instead of only on that tab's next query run.
+      _invalidateAllPanes();
     }
     _syncPostgresSqlTreeContext();
   }
@@ -653,7 +657,8 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
 
   Future<void> _applyStagedChanges([SqlQueryTabSession? targetSession]) async {
     final session = targetSession ?? _activeSession;
-    if (session.stagingBuffer == null ||
+    if (widget.isReadOnly ||
+        session.stagingBuffer == null ||
         !session.stagingBuffer!.isDirty ||
         session.savingChanges) {
       return;
