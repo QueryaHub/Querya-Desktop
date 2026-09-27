@@ -55,14 +55,20 @@ class ExtensionDriverSession {
   }) {
     return resolveExtensionCommandTarget(
       extensionId: extensionId,
-      liveConnectionIds: [
-        for (final entry in _bridges.entries)
-          if (entry.value.isStarted) entry.key,
-      ],
+      liveConnectionIds: liveConnectionIdsForExtension(extensionId),
       extensionIdFor: (id) => _manifests[id]?.id,
       preferredConnectionId: preferredConnectionId,
     );
   }
+
+  /// Connection ids with a live, started session for [extensionId] — the
+  /// candidates a connection picker should offer when [targetForExtension]
+  /// returns [ExtensionCommandTargetKind.ambiguous] (#892).
+  List<int> liveConnectionIdsForExtension(String extensionId) => [
+        for (final entry in _bridges.entries)
+          if (entry.value.isStarted && _manifests[entry.key]?.id == extensionId)
+            entry.key,
+      ];
 
   PluginRpcBridge? _startedBridge(int connectionId) {
     final bridge = _bridges[connectionId];
