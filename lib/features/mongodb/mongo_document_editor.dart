@@ -24,6 +24,7 @@ class MongoDocumentEditor extends material.StatefulWidget {
     this.refreshToken = 0,
     this.onBack,
     this.onDocumentUpdated,
+    this.onDocumentSaved,
     this.onDocumentDeleted,
   });
 
@@ -37,6 +38,11 @@ class MongoDocumentEditor extends material.StatefulWidget {
 
   final VoidCallback? onBack;
   final VoidCallback? onDocumentUpdated;
+
+  /// Called after a successful Save, without leaving the editor — e.g. to
+  /// invalidate the parent's cached documents list in the background so it
+  /// shows the new field values whenever the user does navigate back.
+  final VoidCallback? onDocumentSaved;
   final VoidCallback? onDocumentDeleted;
 
   @override
@@ -184,6 +190,7 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
         _dirty = false;
         _success = 'Document saved successfully';
       });
+      widget.onDocumentSaved?.call();
       // Clear success after a delay
       Future.delayed(const Duration(seconds: 3), () {
         if (mounted) setState(() => _success = null);
