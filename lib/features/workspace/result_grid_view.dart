@@ -4,7 +4,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' as foundation;
 import 'package:flutter/gestures.dart'
-    show kPrimaryMouseButton, kSecondaryMouseButton;
+    show kDoubleTapTimeout, kPrimaryMouseButton, kSecondaryMouseButton;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart'
     show Clipboard, ClipboardData, HardwareKeyboard, LogicalKeyboardKey;
@@ -717,6 +717,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   int? _sortColumnIndex;
   ResultGridSortOrder? _sortOrder;
   int _sortVersion = 0;
+
   /// Last widget built per visual row, reused when a rebuild would produce the
   /// same row (see [_DataRow.sameAs]).
   final Map<int, _DataRow> _rowWidgets = {};
@@ -736,6 +737,14 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   Offset _pointerDownGlobalPos = Offset.zero;
   Offset _pointerDownLocalPos = Offset.zero;
   Offset? _lastPointerLocalPos;
+
+  /// Grid-level tap/double-tap tracking (#983): a single cell click used to
+  /// mean a per-cell `GestureDetector`; replaced by hit-testing the down
+  /// position on pointer-up (see [_cellAtOffset]) and comparing against the
+  /// last qualifying tap to detect a double-tap, removing a whole
+  /// GestureDetector instance per visible cell.
+  DateTime? _lastTapUpTime;
+  ResultGridCellCoordinate? _lastTapCell;
   Timer? _autoScrollTimer;
   List<double> _currentDisplayOffsets = const [0];
   double _currentAvailableWidth = 0.0;
@@ -1313,12 +1322,42 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     }
   }
 
-  void _onGridPointerUp(PointerUpEvent event) {
+  void _onGridPointerUp(
+    PointerUpEvent event, {
+    required double rowHeight,
+  }) {
     if (_isDragSelecting) {
       _hasJustDragSelected = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _hasJustDragSelected = false;
       });
+    } else if (_isPointerDown) {
+      // A plain click (never crossed the drag threshold): resolve which
+      // cell was pressed — the down position is the more accurate "which
+      // cell did the user click" signal than wherever the pointer lifted —
+      // and treat it as a tap, or as a double-tap if it lands on the same
+      // cell as the last qualifying tap within the platform's double-tap
+      // window (#983: replaces a per-cell GestureDetector).
+      final cell = _cellAtOffset(
+        localPosition: _pointerDownLocalPos,
+        rowHeight: rowHeight,
+      );
+      if (cell != null) {
+        final now = DateTime.now();
+        final isDoubleTap = _lastTapCell == cell &&
+            _lastTapUpTime != null &&
+            now.difference(_lastTapUpTime!) <= kDoubleTapTimeout;
+        final isShift = HardwareKeyboard.instance.isShiftPressed;
+        _onCellTap(cell.row, cell.column, isShift: isShift);
+        if (isDoubleTap) {
+          _startEditing(cell.row, cell.column);
+          _lastTapUpTime = null;
+          _lastTapCell = null;
+        } else {
+          _lastTapUpTime = now;
+          _lastTapCell = cell;
+        }
+      }
     }
     _isPointerDown = false;
     _isDragSelecting = false;
@@ -2176,72 +2215,84 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
                           child: material.Scrollbar(
                             controller: _verticalController,
                             thumbVisibility: true,
-                            child: material.Listener(
-                              behavior: material.HitTestBehavior.translucent,
-                              onPointerDown: (e) =>
-                                  _onGridPointerDown(e, rowHeight: rowHeight),
-                              onPointerMove: (e) =>
-                                  _onGridPointerMove(e, rowHeight: rowHeight),
-                              onPointerUp: _onGridPointerUp,
-                              onPointerCancel: _onGridPointerCancel,
-                              child: material.ListView.builder(
-                                controller: _verticalController,
-                                itemCount: _sortedRows.length,
-                                itemExtent: rowHeight,
-                                itemBuilder: (context, rowIndex) {
-                                final row = _sortedRows[rowIndex];
-                                final isEven = rowIndex.isEven;
-                                final candidate = _DataRow(
-                                  key: ValueKey('result-row-$rowIndex'),
-                                  rowIndex: rowIndex,
-                                  modelRowIndex: _toModelRowIndex(rowIndex),
-                                  row: row,
-                                  columns: widget.columns,
-                                  columnWidths: displayWidths,
-                                  window: window,
-                                  height: rowHeight,
-                                  colorScheme: cs,
-                                  striped: !isEven,
-                                  selection: _selectionForRow(rowIndex),
-                                  stagingBuffer: widget.stagingBuffer,
-                                  stagedSignature: widget.stagingBuffer
-                                          ?.rowRenderSignature(
-                                              _toModelRowIndex(rowIndex)) ??
-                                      0,
-                                  editingCell: _editingCell?.row == rowIndex
-                                      ? _editingCell
-                                      : null,
-                                  canFilter: widget.onFilterRequested != null,
-                                  onCellTap: _onCellTap,
-                                  onCellDoubleTap: _startEditing,
-                                  onCellSecondaryTap: _onCellSecondaryTap,
-                                  onCommitEdit: _commitEdit,
-                                  onCancelEdit: _cancelEdit,
-                                  onOpenInspector: _openInspector,
-                                  onCopyCell: _handleCopyCell,
-                                  onFilterByValue: _handleFilterByValue,
-                                  onFilterComparison: _handleFilterComparison,
-                                  onSetNull: _handleSetNull,
-                                  onSetEmpty: _handleSetEmpty,
-                                  onRevertCell: _handleRevertCell,
-                                  onDuplicateRow: _handleDuplicateRow,
-                                  onToggleDeleteRow: _handleToggleDeleteRow,
-                                  onRevertRow: _handleRevertRow,
-                                  columnDataTypes: widget.columnDataTypes,
-                                );
-                                final previous = _rowWidgets[rowIndex];
-                                if (previous != null &&
-                                    previous.sameAs(candidate)) {
-                                  return previous;
-                                }
-                                _rowWidgets[rowIndex] = candidate;
-                                return candidate;
-                              },
+                            // One grid-level cursor region instead of one
+                            // MouseRegion per visible cell (#983). Matches
+                            // the previous per-cell behavior exactly: cursor
+                            // was already uniform across every cell based
+                            // solely on whether a staging buffer exists, not
+                            // on which specific cell is hovered.
+                            child: material.MouseRegion(
+                              cursor: widget.stagingBuffer != null
+                                  ? material.SystemMouseCursors.text
+                                  : material.SystemMouseCursors.basic,
+                              child: material.Listener(
+                                behavior: material.HitTestBehavior.translucent,
+                                onPointerDown: (e) =>
+                                    _onGridPointerDown(e, rowHeight: rowHeight),
+                                onPointerMove: (e) =>
+                                    _onGridPointerMove(e, rowHeight: rowHeight),
+                                onPointerUp: (e) =>
+                                    _onGridPointerUp(e, rowHeight: rowHeight),
+                                onPointerCancel: _onGridPointerCancel,
+                                child: material.ListView.builder(
+                                  controller: _verticalController,
+                                  itemCount: _sortedRows.length,
+                                  itemExtent: rowHeight,
+                                  itemBuilder: (context, rowIndex) {
+                                    final row = _sortedRows[rowIndex];
+                                    final isEven = rowIndex.isEven;
+                                    final candidate = _DataRow(
+                                      key: ValueKey('result-row-$rowIndex'),
+                                      rowIndex: rowIndex,
+                                      modelRowIndex: _toModelRowIndex(rowIndex),
+                                      row: row,
+                                      columns: widget.columns,
+                                      columnWidths: displayWidths,
+                                      window: window,
+                                      height: rowHeight,
+                                      colorScheme: cs,
+                                      striped: !isEven,
+                                      selection: _selectionForRow(rowIndex),
+                                      stagingBuffer: widget.stagingBuffer,
+                                      stagedSignature: widget.stagingBuffer
+                                              ?.rowRenderSignature(
+                                                  _toModelRowIndex(rowIndex)) ??
+                                          0,
+                                      editingCell: _editingCell?.row == rowIndex
+                                          ? _editingCell
+                                          : null,
+                                      canFilter:
+                                          widget.onFilterRequested != null,
+                                      onCellSecondaryTap: _onCellSecondaryTap,
+                                      onCommitEdit: _commitEdit,
+                                      onCancelEdit: _cancelEdit,
+                                      onOpenInspector: _openInspector,
+                                      onCopyCell: _handleCopyCell,
+                                      onFilterByValue: _handleFilterByValue,
+                                      onFilterComparison:
+                                          _handleFilterComparison,
+                                      onSetNull: _handleSetNull,
+                                      onSetEmpty: _handleSetEmpty,
+                                      onRevertCell: _handleRevertCell,
+                                      onDuplicateRow: _handleDuplicateRow,
+                                      onToggleDeleteRow: _handleToggleDeleteRow,
+                                      onRevertRow: _handleRevertRow,
+                                      columnDataTypes: widget.columnDataTypes,
+                                    );
+                                    final previous = _rowWidgets[rowIndex];
+                                    if (previous != null &&
+                                        previous.sameAs(candidate)) {
+                                      return previous;
+                                    }
+                                    _rowWidgets[rowIndex] = candidate;
+                                    return candidate;
+                                  },
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
                     ),
                   ),
                 ),
@@ -2442,8 +2493,6 @@ class _DataRow extends material.StatefulWidget {
     this.stagedSignature = 0,
     this.editingCell,
     this.canFilter = false,
-    this.onCellTap,
-    this.onCellDoubleTap,
     this.onCellSecondaryTap,
     this.onCommitEdit,
     this.onCancelEdit,
@@ -2477,8 +2526,6 @@ class _DataRow extends material.StatefulWidget {
   final int stagedSignature;
   final ResultGridCellCoordinate? editingCell;
   final bool canFilter;
-  final void Function(int row, int col, {bool isShift})? onCellTap;
-  final void Function(int row, int col)? onCellDoubleTap;
   final void Function(int row, int col)? onCellSecondaryTap;
   final void Function(
     int row,
@@ -2515,7 +2562,7 @@ class _DataRow extends material.StatefulWidget {
   /// only rebuilds the rows whose inputs actually changed.
   bool sameAs(_DataRow other) =>
       identical(this, other) ||
-          rowIndex == other.rowIndex &&
+      rowIndex == other.rowIndex &&
           modelRowIndex == other.modelRowIndex &&
           identical(row, other.row) &&
           identical(columns, other.columns) &&
@@ -2530,8 +2577,6 @@ class _DataRow extends material.StatefulWidget {
           stagedSignature == other.stagedSignature &&
           editingCell == other.editingCell &&
           canFilter == other.canFilter &&
-          onCellTap == other.onCellTap &&
-          onCellDoubleTap == other.onCellDoubleTap &&
           onCellSecondaryTap == other.onCellSecondaryTap &&
           onCommitEdit == other.onCommitEdit &&
           onCancelEdit == other.onCancelEdit &&
@@ -2578,75 +2623,74 @@ class _DataRow extends material.StatefulWidget {
       container: true,
       label: _semanticsLabel(rowStatus),
       child: material.RepaintBoundary(
-      child: material.SizedBox(
-        height: height,
-        child: material.Row(
-          children: [
-            if (window.leadingWidth > 0)
-              material.SizedBox(
-                key: const material.ValueKey('lead'),
-                width: window.leadingWidth,
-              ),
-            for (var c = window.first; c <= window.last; c++)
-              _reuseCell(
-                cache,
-                c,
-                _GridCell(
-                key: material.ValueKey<int>(c),
-                row: rowIndex,
-                column: c,
-                columnName: c < columns.length ? columns[c] : '',
-                text: c < row.length ? row[c] : '',
-                width: columnWidths[c],
-                colorScheme: colorScheme,
-                striped: striped,
-                rowStatus: rowStatus,
-                cellStatus: stagingBuffer?.getCellStatus(modelRowIndex, c) ??
-                    StagedCellStatus.clean,
-                isSelected: selection?.contains(rowIndex, c) ?? false,
-                isEditing:
-                    editingCell?.row == rowIndex && editingCell?.column == c,
-                isSelectionTop: selection != null &&
-                    selection!.contains(rowIndex, c) &&
-                    rowIndex == selection!.startRow,
-                isSelectionBottom: selection != null &&
-                    selection!.contains(rowIndex, c) &&
-                    rowIndex == selection!.endRow,
-                isSelectionLeft: selection != null &&
-                    selection!.contains(rowIndex, c) &&
-                    c == selection!.startColumn,
-                isSelectionRight: selection != null &&
-                    selection!.contains(rowIndex, c) &&
-                    c == selection!.endColumn,
-                canFilter: canFilter,
-                hasStagingBuffer: stagingBuffer != null,
-                dataTypeName:
-                    columnDataTypes?[c < columns.length ? columns[c] : ''],
-                onTap: onCellTap,
-                onDoubleTap: onCellDoubleTap,
-                onSecondaryTap: onCellSecondaryTap,
-                onCommitEdit: onCommitEdit,
-                onCancelEdit: onCancelEdit,
-                onOpenInspector: onOpenInspector,
-                onCopyCell: onCopyCell,
-                onFilterByValue: onFilterByValue,
-                onFilterComparison: onFilterComparison,
-                onSetNull: onSetNull,
-                onSetEmpty: onSetEmpty,
-                onRevertCell: onRevertCell,
-                onDuplicateRow: onDuplicateRow,
-                onToggleDeleteRow: onToggleDeleteRow,
-                onRevertRow: onRevertRow,
+        child: material.SizedBox(
+          height: height,
+          child: material.Row(
+            children: [
+              if (window.leadingWidth > 0)
+                material.SizedBox(
+                  key: const material.ValueKey('lead'),
+                  width: window.leadingWidth,
                 ),
-              ),
-            if (window.trailingWidth > 0)
-              material.SizedBox(
-                key: const material.ValueKey('trail'),
-                width: window.trailingWidth,
-              ),
-          ],
+              for (var c = window.first; c <= window.last; c++)
+                _reuseCell(
+                  cache,
+                  c,
+                  _GridCell(
+                    key: material.ValueKey<int>(c),
+                    row: rowIndex,
+                    column: c,
+                    columnName: c < columns.length ? columns[c] : '',
+                    text: c < row.length ? row[c] : '',
+                    width: columnWidths[c],
+                    colorScheme: colorScheme,
+                    striped: striped,
+                    rowStatus: rowStatus,
+                    cellStatus:
+                        stagingBuffer?.getCellStatus(modelRowIndex, c) ??
+                            StagedCellStatus.clean,
+                    isSelected: selection?.contains(rowIndex, c) ?? false,
+                    isEditing: editingCell?.row == rowIndex &&
+                        editingCell?.column == c,
+                    isSelectionTop: selection != null &&
+                        selection!.contains(rowIndex, c) &&
+                        rowIndex == selection!.startRow,
+                    isSelectionBottom: selection != null &&
+                        selection!.contains(rowIndex, c) &&
+                        rowIndex == selection!.endRow,
+                    isSelectionLeft: selection != null &&
+                        selection!.contains(rowIndex, c) &&
+                        c == selection!.startColumn,
+                    isSelectionRight: selection != null &&
+                        selection!.contains(rowIndex, c) &&
+                        c == selection!.endColumn,
+                    canFilter: canFilter,
+                    hasStagingBuffer: stagingBuffer != null,
+                    dataTypeName:
+                        columnDataTypes?[c < columns.length ? columns[c] : ''],
+                    onSecondaryTap: onCellSecondaryTap,
+                    onCommitEdit: onCommitEdit,
+                    onCancelEdit: onCancelEdit,
+                    onOpenInspector: onOpenInspector,
+                    onCopyCell: onCopyCell,
+                    onFilterByValue: onFilterByValue,
+                    onFilterComparison: onFilterComparison,
+                    onSetNull: onSetNull,
+                    onSetEmpty: onSetEmpty,
+                    onRevertCell: onRevertCell,
+                    onDuplicateRow: onDuplicateRow,
+                    onToggleDeleteRow: onToggleDeleteRow,
+                    onRevertRow: onRevertRow,
+                  ),
+                ),
+              if (window.trailingWidth > 0)
+                material.SizedBox(
+                  key: const material.ValueKey('trail'),
+                  width: window.trailingWidth,
+                ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -2654,7 +2698,8 @@ class _DataRow extends material.StatefulWidget {
 
 /// Returns the cell built last time for [column] when it would look the same,
 /// so the framework skips it; otherwise remembers and returns [candidate].
-_GridCell _reuseCell(Map<int, _GridCell> cache, int column, _GridCell candidate) {
+_GridCell _reuseCell(
+    Map<int, _GridCell> cache, int column, _GridCell candidate) {
   final previous = cache[column];
   if (previous != null && previous.sameAs(candidate)) return previous;
   cache[column] = candidate;
@@ -2694,8 +2739,6 @@ class _GridCell extends material.StatelessWidget {
     this.canFilter = false,
     this.hasStagingBuffer = false,
     this.dataTypeName,
-    this.onTap,
-    this.onDoubleTap,
     this.onSecondaryTap,
     this.onCommitEdit,
     this.onCancelEdit,
@@ -2729,8 +2772,6 @@ class _GridCell extends material.StatelessWidget {
   final bool canFilter;
   final bool hasStagingBuffer;
   final String? dataTypeName;
-  final void Function(int row, int col, {bool isShift})? onTap;
-  final void Function(int row, int col)? onDoubleTap;
   final void Function(int row, int col)? onSecondaryTap;
   final void Function(
     int row,
@@ -2764,7 +2805,7 @@ class _GridCell extends material.StatelessWidget {
   /// scrolling the column window keeps the cells that stay visible untouched.
   bool sameAs(_GridCell other) =>
       identical(this, other) ||
-          row == other.row &&
+      row == other.row &&
           column == other.column &&
           columnName == other.columnName &&
           text == other.text &&
@@ -2782,8 +2823,6 @@ class _GridCell extends material.StatelessWidget {
           canFilter == other.canFilter &&
           hasStagingBuffer == other.hasStagingBuffer &&
           dataTypeName == other.dataTypeName &&
-          onTap == other.onTap &&
-          onDoubleTap == other.onDoubleTap &&
           onSecondaryTap == other.onSecondaryTap &&
           onCommitEdit == other.onCommitEdit &&
           onCancelEdit == other.onCancelEdit &&
@@ -3051,19 +3090,12 @@ class _GridCell extends material.StatelessWidget {
       ),
     );
 
-    final interactiveCell = material.GestureDetector(
-      behavior: material.HitTestBehavior.opaque,
-      onTap: () {
-        final isShift = HardwareKeyboard.instance.isShiftPressed;
-        onTap?.call(row, column, isShift: isShift);
-      },
-      onDoubleTap: () {
-        onDoubleTap?.call(row, column);
-      },
-      child: cell,
-    );
-
-    material.Widget content = interactiveCell;
+    // Tap / double-tap / drag-select are handled by one Listener at the grid
+    // level (_onGridPointerDown/Move/Up + _cellAtOffset hit-testing) instead
+    // of a GestureDetector per cell, and the cursor by one grid-level
+    // MouseRegion instead of one per cell (#983) — both were previously
+    // among the ~10 widgets/render objects built for every visible cell.
+    material.Widget content = cell;
     final tooltip = ResultGridMetrics.cellTooltipMessage(
       text: text,
       dataTypeName: dataTypeName,
@@ -3076,13 +3108,6 @@ class _GridCell extends material.StatelessWidget {
         child: content,
       );
     }
-
-    content = material.MouseRegion(
-      cursor: hasStagingBuffer
-          ? material.SystemMouseCursors.text
-          : material.SystemMouseCursors.basic,
-      child: content,
-    );
 
     // The row this cell belongs to carries one semantics node with a label
     // for all its visible cells (see _DataRow._semanticsLabel, #981); a

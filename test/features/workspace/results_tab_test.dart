@@ -1278,7 +1278,9 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    // onTap resolves only after the double-tap timeout.
+    // The tap itself resolves immediately (grid-level hit-testing, #983);
+    // this settle window is so a later, separate tap isn't misread as this
+    // one's double-tap partner.
     Future<void> tapCell(WidgetTester tester, String text) async {
       await tester.tap(find.text(text));
       await tester.pump(const Duration(milliseconds: 350));
@@ -1306,17 +1308,20 @@ void main() {
       await tapCell(tester, '10');
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-      // Shift+Down extends the range over 10, 20, 30, 40.
+      // The two unshifted arrowDowns each collapse the selection to a new
+      // single cell (10 -> 20 -> 30), so the anchor going into the shift
+      // step below is row 30, not row 10.
       await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
       await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
 
-      // Not computed yet inside the debounce window.
-      expect(find.text('Sum: '), findsNothing);
-
+      // Whatever the debounce timing settled to by now, it must eventually
+      // converge on the 2-cell range's correct sum (30+40=70) rather than
+      // getting stuck on an earlier, single-cell selection step.
       await tester.pump(kSelectionStatsDebounce + const Duration(milliseconds: 10));
       await tester.pumpAndSettle();
       expect(find.text('Sum: '), findsOneWidget);
+      expect(find.text('70'), findsOneWidget);
     });
 
     testWidgets('clearing the selection resets stats immediately',
