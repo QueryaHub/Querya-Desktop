@@ -698,6 +698,36 @@ void main() {
           .inferQueryColumns('SELECT 1 AS flag, COUNT(*) AS cnt WHERE 1=0;');
       expect(colsComputed, ['flag', 'cnt']);
     });
+
+    test(
+        'inferQueryColumns does not execute a second smuggled-in statement (#1005)',
+        () async {
+      final conn = SqliteConnection(
+        id: 99,
+        name: 'mem',
+        path: ':memory:',
+      );
+      addTearDown(conn.disconnect);
+      await conn.connect();
+      await conn.execute('CREATE TABLE t (x INTEGER);');
+      await conn.execute('INSERT INTO t VALUES (1), (2);');
+
+      // A single rawQuery only ever executes the first statement, so this is
+      // exactly the shape that reaches inferQueryColumns: a zero-row result
+      // from the first statement, with a write smuggled in after the `;`.
+      await conn.execute('SELECT * FROM t WHERE 0; DELETE FROM t;');
+
+      final rowsBefore =
+          await conn.execute('SELECT count(*) AS c FROM t');
+      expect(rowsBefore.first['c'], 2,
+          reason: 'the DELETE above ran as its own statement via execute()');
+
+      await conn.inferQueryColumns('SELECT * FROM t WHERE 0; DELETE FROM t;');
+
+      final rowsAfter = await conn.execute('SELECT count(*) AS c FROM t');
+      expect(rowsAfter.first['c'], 2,
+          reason: 'inferQueryColumns must not execute the DELETE either');
+    });
   });
 
   group('SQLite sessions on the same file are independent', () {
