@@ -9,6 +9,8 @@ import 'package:querya_desktop/core/extensions/models/extension_contributions.da
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/extensions/rpc/json_rpc_stdio_client.dart';
 import 'package:querya_desktop/core/extensions/rpc/plugin_rpc_exceptions.dart';
+import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/extensions/extension_connection_picker_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Pushes [ExtensionManifest.contributedCommands] into [QueryaCommandRegistry].
@@ -29,6 +31,28 @@ class ExtensionCommandSync {
 
   /// Test override for toasts (palette is already closed).
   void Function(String message)? toastOverride;
+
+  /// Test/DI override for the ambiguous-target connection picker. Returns
+  /// the chosen connection id, or null if the user cancelled.
+  Future<int?> Function(
+    ExtensionManifest manifest,
+    CommandContribution command,
+    List<ConnectionRow> candidates,
+    BuildContext context,
+  )? pickerOverride;
+
+  /// Test/DI override for target resolution — bypasses the live-session
+  /// lookup (which needs a real driver process to populate) so the
+  /// none/ambiguous/ready branches of [_invoke] can each be exercised
+  /// deterministically. Defaults to [ExtensionDriverSession.targetForExtension].
+  ExtensionCommandTarget Function(
+    String extensionId, {
+    int? preferredConnectionId,
+  })? targetOverride;
+
+  /// Test/DI override for the ambiguous-branch candidate id list. Defaults
+  /// to [ExtensionDriverSession.liveConnectionIdsForExtension].
+  List<int> Function(String extensionId)? liveConnectionIdsOverride;
 
   bool isEnabled(String extensionId) => !_disabledIds.contains(extensionId);
 
@@ -85,7 +109,8 @@ class ExtensionCommandSync {
       final preferred =
           QueryaCommandHost.maybeOf(context)?.selectedConnectionId;
       final session = ExtensionDriverSession.instance;
-      final target = session.targetForExtension(
+      final resolveTarget = targetOverride ?? session.targetForExtension;
+      final target = resolveTarget(
         manifest.id,
         preferredConnectionId: preferred,
       );
@@ -99,35 +124,85 @@ class ExtensionCommandSync {
           );
           return;
         case ExtensionCommandTargetKind.ambiguous:
-          _toast(
+          final connectionId = await _pickAmbiguousTarget(
+            manifest,
+            command,
+            session,
             context,
-            'Select a ${manifest.name} connection to run “${command.title}”.',
-            variant: AppToastVariant.info,
           );
-          return;
+          if (connectionId == null) return;
+          if (!context.mounted) return;
+          await _executeOn(session, manifest, command, connectionId, context);
         case ExtensionCommandTargetKind.ready:
-          final bridge = session.activeBridgeForExtension(
-            manifest.id,
-            preferredConnectionId: target.connectionId,
+          await _executeOn(
+            session,
+            manifest,
+            command,
+            target.connectionId!,
+            context,
           );
-          if (bridge == null) {
-            _toast(
-              context,
-              'Connect a ${manifest.name} session to run “${command.title}”.',
-              variant: AppToastVariant.info,
-            );
-            return;
-          }
-          await bridge.sendRequest('commands.execute', {
-            'id': command.id,
-            'commandId': command.id,
-            'connectionId': target.connectionId,
-          });
       }
     } catch (error) {
       if (!context.mounted) return;
       _toast(context, _messageFor(command, error));
     }
+  }
+
+  /// Resolves an [ExtensionCommandTargetKind.ambiguous] target: shows a
+  /// connection picker over the live sessions for [manifest.id] and returns
+  /// the chosen connection id, or null if the user cancelled (#892).
+  Future<int?> _pickAmbiguousTarget(
+    ExtensionManifest manifest,
+    CommandContribution command,
+    ExtensionDriverSession session,
+    BuildContext context,
+  ) async {
+    final resolveIds =
+        liveConnectionIdsOverride ?? session.liveConnectionIdsForExtension;
+    final ids = resolveIds(manifest.id);
+    final candidates = [
+      for (final id in ids) await LocalDb.instance.getConnectionById(id),
+    ].whereType<ConnectionRow>().toList();
+
+    if (!context.mounted) return null;
+    final override = pickerOverride;
+    if (override != null) {
+      return override(manifest, command, candidates, context);
+    }
+
+    if (candidates.isEmpty) return null;
+    return showExtensionConnectionPickerDialog(
+      context: context,
+      extensionName: manifest.name,
+      commandTitle: command.title,
+      connections: candidates,
+    );
+  }
+
+  Future<void> _executeOn(
+    ExtensionDriverSession session,
+    ExtensionManifest manifest,
+    CommandContribution command,
+    int connectionId,
+    BuildContext context,
+  ) async {
+    final bridge = session.activeBridgeForExtension(
+      manifest.id,
+      preferredConnectionId: connectionId,
+    );
+    if (bridge == null) {
+      _toast(
+        context,
+        'Connect a ${manifest.name} session to run “${command.title}”.',
+        variant: AppToastVariant.info,
+      );
+      return;
+    }
+    await bridge.sendRequest('commands.execute', {
+      'id': command.id,
+      'commandId': command.id,
+      'connectionId': connectionId,
+    });
   }
 
   void _toast(
@@ -167,6 +242,9 @@ class ExtensionCommandSync {
     _lastManifests = const [];
     invokeOverride = null;
     toastOverride = null;
+    pickerOverride = null;
+    targetOverride = null;
+    liveConnectionIdsOverride = null;
     QueryaCommandRegistry.instance
         .unregisterWhere((command) => command.sourceExtensionId != null);
   }
