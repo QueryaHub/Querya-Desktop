@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'lazy_offstage.dart';
 import 'querya_motion.dart';
 import 'querya_motion_context.dart';
 
@@ -108,10 +109,13 @@ class _SwitchingLayerState extends State<_SwitchingLayer> {
     // Isolate paint; pause child tickers when inactive (opacity anim still runs).
     // Inactive child is offstaged once the exit transition completes to avoid
     // redundant layout passes during desktop window resizing (#901).
+    // LazyOffstage (not Offstage) additionally skips re-laying the hidden
+    // child out on every frame a sibling's size changes, e.g. the sidebar
+    // toggle spring resizing the workspace's Expanded (#984).
     final content = TickerMode(
       enabled: widget.active,
       child: RepaintBoundary(
-        child: Offstage(
+        child: LazyOffstage(
           offstage: _offstage,
           child: widget.child,
         ),
