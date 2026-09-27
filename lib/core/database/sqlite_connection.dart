@@ -324,28 +324,37 @@ class SqliteConnection {
     if (trimmed.isEmpty) return const [];
 
     // 1. Try temporary view probe in SQLite's in-memory temp schema.
-    const viewName = '_querya_zero_row_col_probe';
-    try {
-      var cleanSql = trimmed;
-      while (cleanSql.endsWith(';')) {
-        cleanSql = cleanSql.substring(0, cleanSql.length - 1).trim();
-      }
-      // Note: We execute on _db! directly to bypass readOnly restriction,
-      // as temp views only touch in-memory session temp schema.
-      await _db!.execute('CREATE TEMP VIEW IF NOT EXISTS $viewName AS $cleanSql');
-      final rows = await _db!.rawQuery('PRAGMA table_info($viewName)');
-      final cols = rows
-          .map((r) => r['name'] as String? ?? '')
-          .where((n) => n.isNotEmpty)
-          .toList();
-      await _db!.execute('DROP VIEW IF EXISTS $viewName');
-      if (cols.isNotEmpty) {
-        return cols;
-      }
-    } catch (_) {
+    //
+    // `Database.execute` (unlike `rawQuery`) runs every statement it's given,
+    // not just the first — so if `trimmed` smuggled in a second statement
+    // after a `;`, wrapping it in `CREATE TEMP VIEW ... AS $cleanSql` would
+    // execute that second statement for real (#1005). Only ever probe when
+    // `trimmed` is a single statement.
+    if (!sqliteHasMultipleStatements(trimmed)) {
+      const viewName = '_querya_zero_row_col_probe';
       try {
+        var cleanSql = trimmed;
+        while (cleanSql.endsWith(';')) {
+          cleanSql = cleanSql.substring(0, cleanSql.length - 1).trim();
+        }
+        // Note: We execute on _db! directly to bypass readOnly restriction,
+        // as temp views only touch in-memory session temp schema.
+        await _db!
+            .execute('CREATE TEMP VIEW IF NOT EXISTS $viewName AS $cleanSql');
+        final rows = await _db!.rawQuery('PRAGMA table_info($viewName)');
+        final cols = rows
+            .map((r) => r['name'] as String? ?? '')
+            .where((n) => n.isNotEmpty)
+            .toList();
         await _db!.execute('DROP VIEW IF EXISTS $viewName');
-      } catch (_) {}
+        if (cols.isNotEmpty) {
+          return cols;
+        }
+      } catch (_) {
+        try {
+          await _db!.execute('DROP VIEW IF EXISTS $viewName');
+        } catch (_) {}
+      }
     }
 
     // 2. Fallback: single-table target extraction
