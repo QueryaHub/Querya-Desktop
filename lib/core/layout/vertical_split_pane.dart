@@ -4,6 +4,12 @@ import 'package:querya_desktop/core/layout/querya_split_handle.dart';
 import 'package:querya_desktop/core/motion/querya_spring.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
+/// Counts full rebuilds of [VerticalSplitPane]'s body (cache misses) — should
+/// only fire when the pane's height or its top/bottom/fraction/etc. inputs
+/// actually change, not on every width-only layout pass (#984).
+@visibleForTesting
+int verticalSplitPaneBodyBuildCount = 0;
+
 /// Holds top/bottom panes for [VerticalSplitPane] [ValueListenableBuilder.child].
 class SplitPanePair extends StatelessWidget {
   const SplitPanePair({super.key, required this.top, required this.bottom});
@@ -46,6 +52,16 @@ class _VerticalSplitPaneState extends State<VerticalSplitPane>
   late final QueryaDragSettleController _settle;
   var _syncingFromSettle = false;
 
+  /// Cache for the built [ValueListenableBuilder]/[Column] subtree (#984):
+  /// the outer [LayoutBuilder] only needs `constraints.maxHeight`, but
+  /// Flutter reruns its builder on *any* constraints change, including
+  /// width-only changes from an ancestor animation (e.g. the sidebar
+  /// toggle) that don't affect this pane's own height at all. Reusing the
+  /// same widget instance when the height and all other inputs are
+  /// unchanged lets Flutter's element diffing skip rebuilding it.
+  double? _cachedHeight;
+  Widget? _cachedBody;
+
   @override
   void initState() {
     super.initState();
@@ -64,6 +80,14 @@ class _VerticalSplitPaneState extends State<VerticalSplitPane>
       oldWidget.fraction.removeListener(_onFractionExternal);
       widget.fraction.addListener(_onFractionExternal);
       _settle.jumpTo(widget.fraction.value);
+    }
+    if (!identical(oldWidget.top, widget.top) ||
+        !identical(oldWidget.bottom, widget.bottom) ||
+        oldWidget.fraction != widget.fraction ||
+        oldWidget.minFraction != widget.minFraction ||
+        oldWidget.maxFraction != widget.maxFraction ||
+        oldWidget.handleKey != widget.handleKey) {
+      _cachedBody = null;
     }
   }
 
@@ -98,7 +122,12 @@ class _VerticalSplitPaneState extends State<VerticalSplitPane>
     return LayoutBuilder(
       builder: (context, constraints) {
         final totalHeight = constraints.maxHeight;
-        return ValueListenableBuilder<double>(
+        final cached = _cachedBody;
+        if (cached != null && _cachedHeight == totalHeight) {
+          return cached;
+        }
+        verticalSplitPaneBodyBuildCount++;
+        final body = ValueListenableBuilder<double>(
           valueListenable: widget.fraction,
           builder: (context, value, panes) {
             final pair = panes! as SplitPanePair;
@@ -148,6 +177,9 @@ class _VerticalSplitPaneState extends State<VerticalSplitPane>
           },
           child: SplitPanePair(top: widget.top, bottom: widget.bottom),
         );
+        _cachedHeight = totalHeight;
+        _cachedBody = body;
+        return body;
       },
     );
   }
