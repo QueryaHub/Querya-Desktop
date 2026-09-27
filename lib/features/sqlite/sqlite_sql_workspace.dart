@@ -71,6 +71,16 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
   @material.visibleForTesting
   SqlQueryTabSession get activeSession => _activeSession;
 
+  /// Forces the active tab's pane to rebuild from its current session state
+  /// on the next frame, as if a query had just finished running in it —
+  /// lets tests simulate "a tab already has staged edits" without going
+  /// through a real query execution.
+  @material.visibleForTesting
+  void debugRebuildActivePane() {
+    _invalidatePane(_activeSession);
+    setState(() {});
+  }
+
   SqliteLease? _lease;
   bool? _txOpen;
 
@@ -223,6 +233,10 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
     if (oldWidget.isReadOnly != widget.isReadOnly) {
       _lease?.release();
       _lease = null;
+      // Cached panes closed over the old widget.isReadOnly in their
+      // onApplyChanges callback (#1007): rebuild every tab so Save reflects
+      // the lock immediately instead of only on that tab's next query run.
+      _invalidateAllPanes();
     }
   }
 
@@ -502,7 +516,8 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
 
   Future<void> _applyStagedChanges([SqlQueryTabSession? targetSession]) async {
     final session = targetSession ?? _activeSession;
-    if (session.stagingBuffer == null ||
+    if (widget.isReadOnly ||
+        session.stagingBuffer == null ||
         !session.stagingBuffer!.isDirty ||
         session.savingChanges) {
       return;

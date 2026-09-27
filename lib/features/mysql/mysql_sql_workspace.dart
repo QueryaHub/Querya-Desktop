@@ -215,6 +215,10 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
     if (oldWidget.isReadOnly != widget.isReadOnly) {
       _lease?.release();
       _lease = null;
+      // Cached panes closed over the old widget.isReadOnly in their
+      // onApplyChanges callback (#1007): rebuild every tab so Save reflects
+      // the lock immediately instead of only on that tab's next query run.
+      _invalidateAllPanes();
     }
   }
 
@@ -520,7 +524,8 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
 
   Future<void> _applyStagedChanges([SqlQueryTabSession? targetSession]) async {
     final session = targetSession ?? _activeSession;
-    if (session.stagingBuffer == null ||
+    if (widget.isReadOnly ||
+        session.stagingBuffer == null ||
         !session.stagingBuffer!.isDirty ||
         session.savingChanges) {
       return;
