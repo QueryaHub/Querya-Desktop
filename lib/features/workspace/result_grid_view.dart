@@ -721,6 +721,10 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   /// Last widget built per visual row, reused when a rebuild would produce the
   /// same row (see [_DataRow.sameAs]).
   final Map<int, _DataRow> _rowWidgets = {};
+
+  @material.visibleForTesting
+  int get rowWidgetsCacheCount => _rowWidgets.length;
+
   List<List<String>> _sortedRows = const [];
   List<int> _sortedToModelIndices = const [];
 
@@ -806,6 +810,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
       (i) => rows[order[i]],
       growable: false,
     );
+    _rowWidgets.removeWhere((idx, _) => idx >= _sortedRows.length);
   }
 
   @override
@@ -820,6 +825,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     if (oldWidget.stagingBuffer != widget.stagingBuffer) {
       oldWidget.stagingBuffer?.removeListener(_onStagingBufferChanged);
       widget.stagingBuffer?.addListener(_onStagingBufferChanged);
+      _rowWidgets.clear();
     }
     if (oldWidget.columns != widget.columns ||
         oldWidget.rows != widget.rows ||
@@ -834,6 +840,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
         _selectionFocus = null;
         _selection = null;
         _editingCell = null;
+        _rowWidgets.clear();
         widget.onRowSelected?.call(null);
       }
       // With a staging buffer and no filter mapping the displayed rows come from
@@ -853,6 +860,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   @override
   void dispose() {
     _stopAutoScroll();
+    _rowWidgets.clear();
     widget.stagingBuffer?.removeListener(_onStagingBufferChanged);
     _horizontalController.removeListener(_onHorizontalScroll);
     _horizontalController.dispose();
@@ -1122,6 +1130,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   }
 
   void _updateSortedRows({bool asyncIfLarge = true}) {
+    _rowWidgets.clear();
     final rows = _baseRows;
     if (_sortColumnIndex == null || _sortOrder == null) {
       _sortedRows = rows;
@@ -1172,6 +1181,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
 
   void _applySortedData(
       SortedResultGridData sortedData, List<List<String>> rows) {
+    _rowWidgets.clear();
     _sortedRows = sortedData.rows;
     if (widget.rowIndicesMapping != null) {
       final mapping = widget.rowIndicesMapping!;
@@ -2296,6 +2306,12 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
                                       return previous;
                                     }
                                     _rowWidgets[rowIndex] = candidate;
+                                    if (_rowWidgets.length > 200) {
+                                      _rowWidgets.removeWhere(
+                                        (idx, _) =>
+                                            (idx - rowIndex).abs() > 100,
+                                      );
+                                    }
                                     return candidate;
                                   },
                                 ),
