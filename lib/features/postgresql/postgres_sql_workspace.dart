@@ -72,6 +72,20 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
 
   SqlQueryTabSession get _activeSession => _sessions[_activeSessionIndex];
 
+  /// Built session panes, keyed by [SqlQueryTabSession.id].
+  ///
+  /// Switching tabs only changes [_activeSessionIndex]; reusing the same
+  /// widget instance for untouched sessions lets Flutter's element diffing
+  /// (`identical(oldWidget, newWidget)`) skip rebuilding their subtrees, so a
+  /// switch only rebuilds the tab strip and swaps the visible `IndexedStack`
+  /// child instead of rebuilding every tab's editor and results grid.
+  final Map<String, material.Widget> _paneCache = {};
+
+  void _invalidatePane(SqlQueryTabSession session) =>
+      _paneCache.remove(session.id);
+
+  void _invalidateAllPanes() => _paneCache.clear();
+
   PgLease? _lease;
 
   /// Database used for the current lease (for [PostgresService.interrupt]).
@@ -132,10 +146,12 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       onPrevTab: _prevTab,
       onFormat: () {
         _activeSession.formatSql();
+        _invalidatePane(_activeSession);
         setState(() {});
       },
       onClear: () {
         _activeSession.clearSql();
+        _invalidatePane(_activeSession);
         setState(() {});
       },
       onOpenWithContent: (sql, filePath, title) {
@@ -148,6 +164,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
           );
           session.title = title;
           session.filePath = filePath;
+          _invalidatePane(session);
           setState(() {});
         } else {
           _addNewTab(initialSql: sql, title: title, filePath: filePath);
@@ -203,6 +220,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     setState(() {
       _sessions.removeAt(index);
       session.dispose();
+      _paneCache.remove(session.id);
       if (_activeSessionIndex >= _sessions.length) {
         _activeSessionIndex = _sessions.length - 1;
       }
@@ -280,6 +298,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     final hist = await AppSettings.instance.getSqlHistoryMaxEntries();
     final font = await AppSettings.instance.getSqlEditorFontSize();
     if (!mounted) return;
+    _invalidateAllPanes();
     setState(() {
       _queryTimeoutSeconds = t;
       _resultMaxRows = rows;
@@ -289,6 +308,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
   }
 
   void _onStmtTimeoutChanged(int? v) {
+    _invalidateAllPanes();
     setState(() => _queryTimeoutSeconds = v);
     unawaited(AppSettings.instance.setPostgresSqlStmtTimeoutSeconds(v));
   }
@@ -321,17 +341,24 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
   Future<void> _refreshTxStatus() async {
     final conn = _lease?.connection;
     if (conn == null || !conn.isConnected) {
-      if (mounted) setState(() => _txOpen = null);
+      if (mounted) {
+        _invalidateAllPanes();
+        setState(() => _txOpen = null);
+      }
       _notifyTransactionOpen();
       return;
     }
     final v = await conn.inOpenTransaction();
-    if (mounted) setState(() => _txOpen = v);
+    if (mounted) {
+      _invalidateAllPanes();
+      setState(() => _txOpen = v);
+    }
     _notifyTransactionOpen();
   }
 
   Future<void> _runTxCommand(String cmd) async {
     final session = _activeSession;
+    _invalidatePane(session);
     setState(() {
       session.running = true;
       session.error = null;
@@ -341,6 +368,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       final conn = _lease?.connection;
       if (conn == null || !conn.isConnected) {
         if (mounted) {
+          _invalidatePane(session);
           setState(() {
             session.error = 'Could not connect to PostgreSQL.';
             session.running = false;
@@ -351,6 +379,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       final to = _statementTimeout();
       await conn.execute(cmd, timeout: to);
       if (!mounted) return;
+      _invalidatePane(session);
       setState(() {
         session.columns = [];
         session.rows = [];
@@ -361,6 +390,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     } on TimeoutException catch (e) {
       unawaited(_lease?.connection.forceClose());
       if (mounted) {
+        _invalidatePane(session);
         setState(() {
           session.error = 'Query timed out: ${e.message ?? e}';
           session.running = false;
@@ -368,6 +398,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       }
     } on pg.ServerException catch (e) {
       if (mounted) {
+        _invalidatePane(session);
         setState(() {
           session.error = e.message;
           session.running = false;
@@ -375,6 +406,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       }
     } catch (e) {
       if (mounted) {
+        _invalidatePane(session);
         setState(() {
           session.error = e.toString();
           session.running = false;
@@ -403,6 +435,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     for (final s in _sessions) {
       s.dispose();
     }
+    _paneCache.clear();
     super.dispose();
   }
 
@@ -446,6 +479,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
 
     var sql = injectSqlLimit(userSql, _resultMaxRows);
 
+    _invalidatePane(session);
     setState(() {
       session.running = true;
       session.error = null;
@@ -465,6 +499,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       final conn = _lease?.connection;
       if (conn == null || !conn.isConnected) {
         if (mounted) {
+          _invalidatePane(session);
           setState(() {
             session.error = 'Could not connect to PostgreSQL.';
             session.running = false;
@@ -534,6 +569,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         primaryKeys: pks,
       );
 
+      _invalidatePane(session);
       setState(() {
         session.columns = cols;
         session.rows = outRows;
@@ -585,6 +621,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     } on TimeoutException catch (e) {
       unawaited(_lease?.connection.forceClose());
       if (mounted) {
+        _invalidatePane(session);
         setState(() {
           session.error = 'Query timed out: ${e.message ?? e}';
           session.running = false;
@@ -593,6 +630,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       }
     } on pg.ServerException catch (e) {
       if (mounted) {
+        _invalidatePane(session);
         setState(() {
           session.error = e.message;
           session.running = false;
@@ -601,6 +639,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       }
     } catch (e) {
       if (mounted) {
+        _invalidatePane(session);
         setState(() {
           session.error = e.toString();
           session.running = false;
@@ -631,6 +670,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       return;
     }
 
+    _invalidatePane(session);
     setState(() => session.savingChanges = true);
     try {
       final plan = session.stagingBuffer!.generateMutationPlan(
@@ -642,6 +682,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         columnMeta: session.resultGridColumnMeta,
       );
       if (plan.isEmpty) {
+        _invalidatePane(session);
         setState(() => session.savingChanges = false);
         return;
       }
@@ -651,6 +692,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         plan: plan,
       );
       if (confirmed != true) {
+        _invalidatePane(session);
         setState(() => session.savingChanges = false);
         return;
       }
@@ -675,6 +717,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       if (!mounted) return;
       final newRows = session.stagingBuffer!.committedRows;
       session.stagingBuffer?.dispose();
+      _invalidatePane(session);
       setState(() {
         session.rows = newRows;
         session.stagingBuffer =
@@ -688,6 +731,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       await _refreshTxStatus();
     } catch (e) {
       if (mounted) {
+        _invalidatePane(session);
         setState(() => session.savingChanges = false);
         await showTableViewSaveFailedDialog(context: context, error: e);
       }
@@ -715,6 +759,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         );
         session.title = file.name;
         session.markSaved(newFilePath: file.path);
+        _invalidatePane(session);
         setState(() {});
       } else {
         _addNewTab(initialSql: text, title: file.name, filePath: file.path);
@@ -758,6 +803,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       if (path == null || path.isEmpty) return;
       await File(path).writeAsString(session.controller.text);
       if (!mounted) return;
+      _invalidatePane(session);
       setState(() {
         session.title = File(path).uri.pathSegments.last;
         session.markSaved(newFilePath: path);
@@ -891,7 +937,10 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
                   index: _activeSessionIndex,
                   children: [
                     for (final session in _sessions)
-                      _buildSessionPane(context, session),
+                      _paneCache.putIfAbsent(
+                        session.id,
+                        () => _buildSessionPane(context, session),
+                      ),
                   ],
                 ),
               ),
@@ -908,6 +957,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
   ) {
     final theme = Theme.of(context);
     return VerticalSplitPane(
+      key: material.ValueKey(session.id),
       fraction: session.topFraction,
       maxFraction: 0.85,
       top: Column(
@@ -918,7 +968,10 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
             onExecute: session.running ? null : () => _execute(session),
             running: session.running,
             autocommit: _autocommit,
-            onAutocommitChanged: (v) => setState(() => _autocommit = v),
+            onAutocommitChanged: (v) {
+              _invalidateAllPanes();
+              setState(() => _autocommit = v);
+            },
             queryTimeoutSeconds: _queryTimeoutSeconds,
             onQueryTimeoutChanged: _onStmtTimeoutChanged,
             onOpenPreferences: () => showPreferencesDialog(context),

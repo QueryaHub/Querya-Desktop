@@ -51,6 +51,20 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
 
   SqlQueryTabSession get _activeSession => _sessions[_activeSessionIndex];
 
+  /// Built session panes, keyed by [SqlQueryTabSession.id].
+  ///
+  /// Switching tabs only changes [_activeSessionIndex]; reusing the same
+  /// widget instance for untouched sessions lets Flutter's element diffing
+  /// (`identical(oldWidget, newWidget)`) skip rebuilding their subtrees, so a
+  /// switch only rebuilds the tab strip and swaps the visible `IndexedStack`
+  /// child instead of rebuilding every tab's editor and results grid.
+  final Map<String, material.Widget> _paneCache = {};
+
+  void _invalidatePane(SqlQueryTabSession session) =>
+      _paneCache.remove(session.id);
+
+  void _invalidateAllPanes() => _paneCache.clear();
+
   MysqlLease? _lease;
   bool? _txOpen;
 
@@ -98,10 +112,12 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       onPrevTab: _prevTab,
       onFormat: () {
         _activeSession.formatSql();
+        _invalidatePane(_activeSession);
         setState(() {});
       },
       onClear: () {
         _activeSession.clearSql();
+        _invalidatePane(_activeSession);
         setState(() {});
       },
       onOpenWithContent: (sql, filePath, title) {
@@ -114,6 +130,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
           );
           session.title = title;
           session.filePath = filePath;
+          _invalidatePane(session);
           setState(() {});
         } else {
           _addNewTab(initialSql: sql, title: title, filePath: filePath);
@@ -170,6 +187,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
     setState(() {
       _sessions.removeAt(index);
       session.dispose();
+      _paneCache.remove(session.id);
       if (_activeSessionIndex >= _sessions.length) {
         _activeSessionIndex = _sessions.length - 1;
       }
@@ -206,6 +224,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
     final hist = await AppSettings.instance.getSqlHistoryMaxEntries();
     final font = await AppSettings.instance.getSqlEditorFontSize();
     if (!mounted) return;
+    _invalidateAllPanes();
     setState(() {
       _queryTimeoutSeconds = t;
       _resultMaxRows = rows;
@@ -215,6 +234,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
   }
 
   void _onStmtTimeoutChanged(int? v) {
+    _invalidateAllPanes();
     setState(() => _queryTimeoutSeconds = v);
     unawaited(AppSettings.instance.setMysqlSqlStmtTimeoutSeconds(v));
   }
@@ -246,12 +266,18 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
   Future<void> _refreshTxStatus() async {
     final conn = _lease?.connection;
     if (conn == null || !conn.isConnected) {
-      if (mounted) setState(() => _txOpen = null);
+      if (mounted) {
+        _invalidateAllPanes();
+        setState(() => _txOpen = null);
+      }
       _notifyTransactionOpen();
       return;
     }
     final v = await conn.inOpenTransaction();
-    if (mounted) setState(() => _txOpen = v);
+    if (mounted) {
+      _invalidateAllPanes();
+      setState(() => _txOpen = v);
+    }
     _notifyTransactionOpen();
   }
 
@@ -279,6 +305,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
     for (final s in _sessions) {
       s.dispose();
     }
+    _paneCache.clear();
     super.dispose();
   }
 
@@ -320,6 +347,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       }
     }
 
+    _invalidatePane(session);
     setState(() {
       session.running = true;
       session.error = null;
@@ -339,6 +367,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       final conn = _lease?.connection;
       if (conn == null || !conn.isConnected) {
         if (mounted) {
+          _invalidatePane(session);
           setState(() {
             session.error = 'Could not connect to MySQL.';
             session.running = false;
@@ -416,6 +445,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
         primaryKeys: pks,
       );
 
+      _invalidatePane(session);
       setState(() {
         session.columns = cols;
         session.rows = outRows;
@@ -467,6 +497,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
     } on TimeoutException catch (e) {
       unawaited(_lease?.connection.forceClose());
       if (mounted) {
+        _invalidatePane(session);
         setState(() {
           session.error = e.toString();
           session.running = false;
@@ -475,6 +506,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       }
     } catch (e) {
       if (mounted) {
+        _invalidatePane(session);
         setState(() {
           session.error = e.toString();
           session.running = false;
@@ -509,6 +541,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
             ? widget.connectionRow.databaseName!.trim()
             : null);
 
+    _invalidatePane(session);
     setState(() => session.savingChanges = true);
     try {
       final plan = session.stagingBuffer!.generateMutationPlan(
@@ -520,6 +553,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
         columnMeta: session.resultGridColumnMeta,
       );
       if (plan.isEmpty) {
+        _invalidatePane(session);
         setState(() => session.savingChanges = false);
         return;
       }
@@ -529,6 +563,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
         plan: plan,
       );
       if (confirmed != true) {
+        _invalidatePane(session);
         setState(() => session.savingChanges = false);
         return;
       }
@@ -550,6 +585,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       if (!mounted) return;
       final newRows = session.stagingBuffer!.committedRows;
       session.stagingBuffer?.dispose();
+      _invalidatePane(session);
       setState(() {
         session.rows = newRows;
         session.stagingBuffer = DataGridStagingBuffer(
@@ -561,6 +597,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       });
     } catch (e) {
       if (mounted) {
+        _invalidatePane(session);
         setState(() => session.savingChanges = false);
         await showTableViewSaveFailedDialog(context: context, error: e);
       }
@@ -593,6 +630,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
         );
         session.title = file.name;
         session.markSaved(newFilePath: file.path);
+        _invalidatePane(session);
         setState(() {});
       } else {
         _addNewTab(initialSql: text, title: file.name, filePath: file.path);
@@ -636,6 +674,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       if (path == null || path.isEmpty) return;
       await File(path).writeAsString(session.controller.text);
       if (!mounted) return;
+      _invalidatePane(session);
       setState(() {
         session.title = File(path).uri.pathSegments.last;
         session.markSaved(newFilePath: path);
@@ -657,6 +696,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
 
   Future<void> _runTxCommand(String cmd) async {
     final session = _activeSession;
+    _invalidatePane(session);
     setState(() {
       session.running = true;
       session.error = null;
@@ -666,6 +706,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       final conn = _lease?.connection;
       if (conn == null || !conn.isConnected) {
         if (mounted) {
+          _invalidatePane(session);
           setState(() {
             session.error = 'Could not connect to MySQL.';
             session.running = false;
@@ -676,6 +717,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       final to = _statementTimeout();
       await conn.executeWithTimeout(cmd, timeout: to);
       if (!mounted) return;
+      _invalidatePane(session);
       setState(() {
         session.columns = [];
         session.rows = [];
@@ -686,6 +728,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
     } on TimeoutException catch (e) {
       unawaited(_lease?.connection.forceClose());
       if (mounted) {
+        _invalidatePane(session);
         setState(() {
           session.error = e.toString();
           session.running = false;
@@ -693,6 +736,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       }
     } catch (e) {
       if (mounted) {
+        _invalidatePane(session);
         setState(() {
           session.error = e.toString();
           session.running = false;
@@ -824,7 +868,10 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
                   index: _activeSessionIndex,
                   children: [
                     for (final session in _sessions)
-                      _buildSessionPane(context, session),
+                      _paneCache.putIfAbsent(
+                        session.id,
+                        () => _buildSessionPane(context, session),
+                      ),
                   ],
                 ),
               ),
@@ -841,6 +888,7 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
   ) {
     final theme = Theme.of(context);
     return VerticalSplitPane(
+      key: material.ValueKey(session.id),
       fraction: session.topFraction,
       maxFraction: 0.85,
       top: Column(

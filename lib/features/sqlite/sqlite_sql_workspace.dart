@@ -48,6 +48,24 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
   int _activeSessionIndex = 0;
   int _nextSessionId = 1;
 
+  /// Built session panes, keyed by [SqlQueryTabSession.id].
+  ///
+  /// Switching tabs only changes [_activeSessionIndex]; reusing the same
+  /// widget instance for untouched sessions lets Flutter's element diffing
+  /// (`identical(oldWidget, newWidget)`) skip rebuilding their subtrees, so a
+  /// switch only rebuilds the tab strip and swaps the visible `IndexedStack`
+  /// child instead of rebuilding every tab's editor and results grid.
+  final Map<String, material.Widget> _paneCache = {};
+
+  void _invalidatePane(SqlQueryTabSession session) =>
+      _paneCache.remove(session.id);
+
+  void _invalidateAllPanes() => _paneCache.clear();
+
+  /// Counts calls to [_buildSessionPane], i.e. pane cache misses.
+  @material.visibleForTesting
+  int paneBuildCount = 0;
+
   SqlQueryTabSession get _activeSession => _sessions[_activeSessionIndex];
 
   @material.visibleForTesting
@@ -99,10 +117,12 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       onPrevTab: _prevTab,
       onFormat: () {
         _activeSession.formatSql();
+        _invalidatePane(_activeSession);
         setState(() {});
       },
       onClear: () {
         _activeSession.clearSql();
+        _invalidatePane(_activeSession);
         setState(() {});
       },
       onExecute: () {
@@ -118,6 +138,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
           );
           session.title = title;
           session.filePath = filePath;
+          _invalidatePane(session);
           setState(() {});
         } else {
           _addNewTab(initialSql: sql, title: title, filePath: filePath);
@@ -174,6 +195,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
     setState(() {
       _sessions.removeAt(index);
       session.dispose();
+      _paneCache.remove(session.id);
       if (_activeSessionIndex >= _sessions.length) {
         _activeSessionIndex = _sessions.length - 1;
       }
@@ -210,6 +232,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
     final hist = await AppSettings.instance.getSqlHistoryMaxEntries();
     final font = await AppSettings.instance.getSqlEditorFontSize();
     if (!mounted) return;
+    _invalidateAllPanes();
     setState(() {
       _queryTimeoutSeconds = t;
       _resultMaxRows = rows;
@@ -219,6 +242,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
   }
 
   void _onStmtTimeoutChanged(int? v) {
+    _invalidateAllPanes();
     setState(() => _queryTimeoutSeconds = v);
     unawaited(AppSettings.instance.setSqliteSqlStmtTimeoutSeconds(v));
   }
@@ -271,6 +295,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       s.dispose();
     }
     _sessions.clear();
+    _paneCache.clear();
     super.dispose();
   }
 
@@ -312,6 +337,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       }
     }
 
+    _invalidatePane(session);
     setState(() {
       session.running = true;
       session.error = null;
@@ -331,6 +357,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       final conn = _lease?.connection;
       if (conn == null || !conn.isConnected) {
         if (mounted) {
+          _invalidatePane(session);
           setState(() {
             session.error = 'Could not connect to SQLite.';
             session.running = false;
@@ -399,6 +426,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         primaryKeys: pks,
       );
 
+      _invalidatePane(session);
       setState(() {
         session.columns = cols;
         session.rows = outRows;
@@ -451,6 +479,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
     } on TimeoutException catch (e) {
       unawaited(_lease?.connection.forceClose());
       if (mounted) {
+        _invalidatePane(session);
         setState(() {
           session.error = 'Query timed out: ${e.message ?? e}';
           session.running = false;
@@ -459,6 +488,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       }
     } catch (e) {
       if (mounted) {
+        _invalidatePane(session);
         setState(() {
           session.error = e.toString();
           session.running = false;
@@ -489,6 +519,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       return;
     }
 
+    _invalidatePane(session);
     setState(() => session.savingChanges = true);
     try {
       final plan = session.stagingBuffer!.generateMutationPlan(
@@ -500,6 +531,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         columnMeta: session.resultGridColumnMeta,
       );
       if (plan.isEmpty) {
+        _invalidatePane(session);
         setState(() => session.savingChanges = false);
         return;
       }
@@ -509,6 +541,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         plan: plan,
       );
       if (confirmed != true) {
+        _invalidatePane(session);
         setState(() => session.savingChanges = false);
         return;
       }
@@ -529,6 +562,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       if (!mounted) return;
       final newRows = session.stagingBuffer!.committedRows;
       session.stagingBuffer?.dispose();
+      _invalidatePane(session);
       setState(() {
         session.rows = newRows;
         session.stagingBuffer = DataGridStagingBuffer(
@@ -540,6 +574,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       });
     } catch (e) {
       if (mounted) {
+        _invalidatePane(session);
         setState(() => session.savingChanges = false);
         await showTableViewSaveFailedDialog(context: context, error: e);
       }
@@ -567,6 +602,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         );
         session.title = file.name;
         session.markSaved(newFilePath: file.path);
+        _invalidatePane(session);
         setState(() {});
       } else {
         _addNewTab(initialSql: text, title: file.name, filePath: file.path);
@@ -610,6 +646,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       if (path == null || path.isEmpty) return;
       await File(path).writeAsString(session.controller.text);
       if (!mounted) return;
+      _invalidatePane(session);
       setState(() {
         session.title = File(path).uri.pathSegments.last;
         session.markSaved(newFilePath: path);
@@ -750,7 +787,10 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
                   index: _activeSessionIndex,
                   children: [
                     for (final session in _sessions)
-                      _buildSessionPane(context, session),
+                      _paneCache.putIfAbsent(
+                        session.id,
+                        () => _buildSessionPane(context, session),
+                      ),
                   ],
                 ),
               ),
@@ -765,8 +805,10 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
     material.BuildContext context,
     SqlQueryTabSession session,
   ) {
+    paneBuildCount++;
     final theme = Theme.of(context);
     return VerticalSplitPane(
+      key: material.ValueKey(session.id),
       fraction: session.topFraction,
       maxFraction: 0.85,
       top: material.Column(
