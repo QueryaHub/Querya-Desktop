@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/motion/lazy_offstage.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
 import 'package:querya_desktop/core/motion/querya_switching_body.dart';
@@ -368,7 +369,7 @@ void main() {
   });
 
   testWidgets(
-      'inactive layer configures Offstage(offstage: true) once exit transition completes',
+      'inactive layer configures LazyOffstage(offstage: true) once exit transition completes',
       (tester) async {
     await tester.pumpWidget(
       wrap(
@@ -385,10 +386,11 @@ void main() {
 
     final offstageFinder = find.descendant(
       of: find.byType(QueryaSwitchingBody),
-      matching: find.byType(Offstage, skipOffstage: false),
+      matching: find.byType(LazyOffstage, skipOffstage: false),
     );
 
-    final offstagesInitial = tester.widgetList<Offstage>(offstageFinder).toList();
+    final offstagesInitial =
+        tester.widgetList<LazyOffstage>(offstageFinder).toList();
     expect(offstagesInitial.length, 2);
     // Active child A is onstage
     expect(offstagesInitial[0].offstage, isFalse);
@@ -411,14 +413,14 @@ void main() {
     // While animating, both are onstage
     await tester.pump(const Duration(milliseconds: 50));
     final offstagesAnimating =
-        tester.widgetList<Offstage>(offstageFinder).toList();
+        tester.widgetList<LazyOffstage>(offstageFinder).toList();
     expect(offstagesAnimating[0].offstage, isFalse);
     expect(offstagesAnimating[1].offstage, isFalse);
 
     // Once settled, child A is offstaged, child B is onstage
     await tester.pumpAndSettle();
     final offstagesSettled =
-        tester.widgetList<Offstage>(offstageFinder).toList();
+        tester.widgetList<LazyOffstage>(offstageFinder).toList();
     expect(offstagesSettled[0].offstage, isTrue);
     expect(offstagesSettled[1].offstage, isFalse);
   });
