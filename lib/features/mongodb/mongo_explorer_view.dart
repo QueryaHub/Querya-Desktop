@@ -56,6 +56,11 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
   /// Bumped when the user taps Refresh in the breadcrumb bar (reload active view).
   int _refreshToken = 0;
 
+  /// Bumped after a document Save so the documents list picks up the new
+  /// field values whenever the user navigates back to it, without forcing
+  /// the still-open document editor to re-fetch what it just wrote.
+  int _documentsListInvalidation = 0;
+
   // Navigation state
   String? _selectedDatabase;
   String? _selectedCollection;
@@ -325,6 +330,8 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
         refreshToken: _refreshToken,
         onBack: _navigateToDocuments,
         onDocumentUpdated: _navigateToDocuments,
+        onDocumentSaved: () =>
+            setState(() => _documentsListInvalidation++),
         onDocumentDeleted: _navigateToDocuments,
       );
     }
@@ -336,7 +343,7 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
         connection: conn,
         database: _selectedDatabase!,
         collection: _selectedCollection!,
-        refreshToken: _refreshToken,
+        refreshToken: _refreshToken + _documentsListInvalidation,
         onDocumentTap: _navigateToDocument,
       );
     }
