@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
+import 'package:querya_desktop/core/extensions/extension_driver_session.dart';
 import 'package:querya_desktop/core/extensions/extension_paths.dart';
 import 'package:querya_desktop/core/extensions/extension_support.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
@@ -21,15 +22,22 @@ class LocalExtensionInstaller {
   LocalExtensionInstaller({
     Future<Directory> Function()? extensionsDirectory,
     Future<void> Function()? reloadRegistry,
+    Future<void> Function(String extensionId)? stopSessionsForExtension,
   })  : _extensionsDirectory =
             extensionsDirectory ?? ExtensionPaths.ensureExtensionsDirectory,
-        _reloadRegistry = reloadRegistry ?? _defaultReloadRegistry;
+        _reloadRegistry = reloadRegistry ?? _defaultReloadRegistry,
+        _stopSessionsForExtension =
+            stopSessionsForExtension ?? _defaultStopSessionsForExtension;
 
   static Future<void> _defaultReloadRegistry() =>
       LocalExtensionRegistry.instance.reload();
 
+  static Future<void> _defaultStopSessionsForExtension(String extensionId) =>
+      ExtensionDriverSession.instance.stopAllForExtension(extensionId);
+
   final Future<Directory> Function() _extensionsDirectory;
   final Future<void> Function() _reloadRegistry;
+  final Future<void> Function(String extensionId) _stopSessionsForExtension;
 
   /// Reads [archiveFile], validates, extracts under `extensions/<id>/`, reloads.
   Future<ExtensionManifest> installFromArchive(
@@ -106,6 +114,11 @@ class LocalExtensionInstaller {
     }
 
     onProgress?.call(0.4);
+
+    // A running driver process for this extension holds its executable/DLL
+    // open; on Windows that mandatory lock makes the overwrite below fail
+    // with Access is denied (#891). Stop every live session first.
+    await _stopSessionsForExtension(manifest.id);
 
     final root = await _extensionsDirectory();
     final extDir = Directory(p.join(root.path, manifest.id));

@@ -271,5 +271,46 @@ void main() {
       final mode = await entry.stat().then((s) => s.mode);
       expect(mode & 0x111, isNot(0));
     });
+
+    test(
+        'stops running driver sessions for the extension before overwriting its directory (#891)',
+        () async {
+      final archive = Archive()
+        ..addFile(_jsonFile('manifest.json', {
+          'id': 'test.reinstall-driver',
+          'name': 'Driver',
+          'version': '1.0.0',
+          'publisher': 'Test',
+          'type': 'theme',
+          'engines': {'querya_desktop': '*'},
+        }));
+      final zip = await _writeZip(tempDir, archive, 'reinstall.zip');
+
+      final extDir = Directory(p.join(tempDir.path, 'test.reinstall-driver'));
+      final calls = <String>[];
+      var extDirExistedWhenStopped = false;
+
+      final installer = LocalExtensionInstaller(
+        stopSessionsForExtension: (extensionId) async {
+          calls.add(extensionId);
+          // A prior install of this same extension is already on disk when
+          // we're asked to stop its sessions, and it must still be there:
+          // the whole point is stopping the process *before* the directory
+          // gets deleted/overwritten, not after.
+          extDirExistedWhenStopped = await extDir.exists();
+        },
+      );
+
+      // Pre-existing install of the same extension id, simulating a running
+      // session that would otherwise lock its files on Windows.
+      await extDir.create(recursive: true);
+      await File(p.join(extDir.path, 'stale.txt')).writeAsString('old');
+
+      await installer.installFromArchive(zip);
+
+      expect(calls, ['test.reinstall-driver']);
+      expect(extDirExistedWhenStopped, isTrue);
+      expect(await File(p.join(extDir.path, 'stale.txt')).exists(), isFalse);
+    });
   });
 }

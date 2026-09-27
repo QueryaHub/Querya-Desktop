@@ -6,6 +6,7 @@ import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
+import 'package:querya_desktop/core/extensions/extension_driver_session.dart';
 import 'package:querya_desktop/core/extensions/extension_support.dart';
 import 'package:querya_desktop/core/extensions/extension_paths.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_policy.dart';
@@ -257,6 +258,11 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
 
   @override
   Future<void> uninstall(String extensionId) async {
+    // A running driver process for this extension holds its executable/DLL
+    // open; on Windows that mandatory lock makes the delete below fail with
+    // Access is denied (#891). Stop every live session first.
+    await ExtensionDriverSession.instance.stopAllForExtension(extensionId);
+
     final manifest = LocalExtensionRegistry.instance.manifests
         .where((e) => e.id == extensionId)
         .firstOrNull;
