@@ -6,11 +6,23 @@ import 'package:querya_desktop/features/mongodb/mongo_ejson.dart';
 /// Mongo forbids `$set` of `_id` on an existing document.
 bool mongoFieldIsReadOnly(String field) => field == '_id';
 
+/// True when `$set` would treat [field] as a nested path (`a.b`), not as a
+/// literal top-level key. `$set` has no escape for dots, so such a field cannot
+/// be updated on its own without rewriting a different subtree.
+bool mongoFieldNameIsDottedPath(String field) => field.contains('.');
+
 /// Throws if [field] cannot be updated with `$set` on an existing document.
 void mongoAssertFieldEditable(String field) {
   if (mongoFieldIsReadOnly(field)) {
     throw StateError(
       'MongoDB forbids \$set of _id on an existing document',
+    );
+  }
+  if (mongoFieldNameIsDottedPath(field)) {
+    throw StateError(
+      'Field "$field" contains a dot, so a single-field update would be '
+      'treated as a nested path and change a different value. '
+      'Edit the whole document in the JSON editor instead.',
     );
   }
 }

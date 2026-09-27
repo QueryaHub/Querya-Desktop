@@ -18,6 +18,8 @@ class JsonRpcStdioClient {
     required IOSink stdin,
     this.requestTimeout = const Duration(seconds: 10),
     this.maxLineBytes = kDefaultJsonRpcMaxLineBytes,
+    this.maxBufferedLines = kDefaultJsonRpcMaxBufferedLines,
+    this.maxBufferedBytes = kDefaultJsonRpcMaxBufferedBytes,
   })  : _stdin = stdin,
         _lines = stdout.transform(
           boundedUtf8LineSplitter(maxLineBytes: maxLineBytes),
@@ -35,6 +37,13 @@ class JsonRpcStdioClient {
   final Duration requestTimeout;
   final int maxLineBytes;
 
+  /// Backpressure: while more than this many lines (or [maxBufferedBytes]) are
+  /// waiting to be handled, the plugin's stdout is paused, so a driver that
+  /// streams faster than we decode fills the OS pipe instead of our memory.
+  /// Reading resumes once the backlog drops to half of either limit.
+  final int maxBufferedLines;
+  final int maxBufferedBytes;
+
   final Map<int, Completer<Object?>> _pending = {};
   var _nextId = 1;
   var _closed = false;
@@ -49,6 +58,16 @@ class JsonRpcStdioClient {
 
   /// Serializes async line handling so large-line isolate decode stays ordered.
   Future<void> _lineChain = Future<void>.value();
+
+  var _bufferedLines = 0;
+  var _bufferedBytes = 0;
+  var _readPaused = false;
+
+  /// Lines received but not yet handled (the backlog backpressure bounds).
+  int get bufferedLineCount => _bufferedLines;
+
+  /// True while stdout reading is paused because the backlog is too large.
+  bool get isReadPaused => _readPaused;
 
   /// Sends a JSON-RPC request and waits for the matching response.
   Future<Object?> sendRequest(
@@ -116,7 +135,24 @@ class JsonRpcStdioClient {
   }
 
   void _onLine(String line) {
-    _lineChain = _lineChain.then((_) => _handleLine(line));
+    _bufferedLines++;
+    _bufferedBytes += line.length;
+    if (!_readPaused &&
+        (_bufferedLines > maxBufferedLines ||
+            _bufferedBytes > maxBufferedBytes)) {
+      _readPaused = true;
+      _subscription?.pause();
+    }
+    _lineChain = _lineChain.then((_) => _handleLine(line)).whenComplete(() {
+      _bufferedLines--;
+      _bufferedBytes -= line.length;
+      if (_readPaused &&
+          _bufferedLines <= maxBufferedLines ~/ 2 &&
+          _bufferedBytes <= maxBufferedBytes ~/ 2) {
+        _readPaused = false;
+        _subscription?.resume();
+      }
+    });
   }
 
   Future<void> _handleLine(String line) async {
@@ -162,12 +198,17 @@ class JsonRpcStdioClient {
 
   void _onDone() {
     _fatalError ??= StateError('Plugin stdout closed');
-    for (final pending in _pending.values) {
-      if (!pending.isCompleted) {
-        pending.completeError(_fatalError!);
+    // Replies already received may still be queued (a large line is decoded in
+    // an isolate). Fail what is left only after the backlog has been handled,
+    // so a plugin that answers and exits does not lose its last responses.
+    _lineChain = _lineChain.whenComplete(() {
+      for (final pending in _pending.values) {
+        if (!pending.isCompleted) {
+          pending.completeError(_fatalError!);
+        }
       }
-    }
-    _pending.clear();
+      _pending.clear();
+    });
   }
 }
 

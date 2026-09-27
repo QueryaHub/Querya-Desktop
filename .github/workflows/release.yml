@@ -135,6 +135,11 @@ jobs:
       - name: Build Linux (release)
         run: flutter build linux --release
 
+      - name: Splice in vsync-patched Linux engine (querya-desktop#980)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./scripts/linux/apply_patched_engine.sh
+
       - name: Zip Linux artifact (portable)
         run: |
           cd build/linux/x64/release/bundle

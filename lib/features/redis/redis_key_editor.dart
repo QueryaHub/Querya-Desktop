@@ -16,8 +16,10 @@ class RedisKeyEditor extends material.StatefulWidget {
     required this.keyName,
     required this.keyType,
     this.keyArg,
+    this.controller,
     this.onBack,
     this.onKeyDeleted,
+    this.onKeyRenamed,
     this.isReadOnly = false,
   });
 
@@ -28,12 +30,31 @@ class RedisKeyEditor extends material.StatefulWidget {
 
   /// Wire key for GET/SET/DEL when [keyName] is only a UTF-8/hex label.
   final Object? keyArg;
+  /// Optional controller for querying dirty-state from the parent widget.
+  final RedisKeyEditorController? controller;
   final VoidCallback? onBack;
   final VoidCallback? onKeyDeleted;
+  final ValueChanged<RedisBulkValue>? onKeyRenamed;
   final bool isReadOnly;
 
   @override
   material.State<RedisKeyEditor> createState() => _RedisKeyEditorState();
+}
+
+/// Controller that lets the parent widget ask whether it is safe to navigate
+/// away from this editor (i.e. no unsaved string value edits).
+class RedisKeyEditorController {
+  _RedisKeyEditorState? _state;
+
+  /// Returns `true` when navigation is safe (not dirty, or user confirmed
+  /// discarding their edits).
+  Future<bool> canNavigateAway() =>
+      _state?._confirmDiscardStringEdits() ?? Future.value(true);
+
+  void _attach(_RedisKeyEditorState state) => _state = state;
+  void _detach(_RedisKeyEditorState state) {
+    if (_state == state) _state = null;
+  }
 }
 
 class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
@@ -45,6 +66,8 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   // String value
   RedisBulkValue? _stringValue;
   final _stringController = material.TextEditingController();
+  /// The text that was last loaded from the server (null = not yet loaded).
+  String? _savedStringText;
 
   // Hash value
   Map<RedisBulkValue, RedisBulkValue> _hashValue = {};
@@ -63,6 +86,8 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   bool _hasMore = false;
   bool _loadingMore = false;
   late String _effectiveType;
+  late String _currentKeyName;
+  Object? _currentKeyArg;
 
   // For adding new items
   final _newFieldController = material.TextEditingController();
@@ -71,24 +96,73 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   @override
   void initState() {
     super.initState();
+    widget.controller?._attach(this);
+    _currentKeyName = widget.keyName;
+    _currentKeyArg = widget.keyArg;
     _effectiveType = _normalizedType(widget.keyType);
     _load();
   }
 
   @override
+  void didUpdateWidget(covariant RedisKeyEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.keyName != widget.keyName ||
+        oldWidget.keyArg != widget.keyArg) {
+      _currentKeyName = widget.keyName;
+      _currentKeyArg = widget.keyArg;
+    }
+  }
+
+  @override
   void dispose() {
+    widget.controller?._detach(this);
     _stringController.dispose();
     _newFieldController.dispose();
     _newValueController.dispose();
     super.dispose();
   }
 
-  Object get _cmdKey => widget.keyArg ?? widget.keyName;
+  Object get _cmdKey => _currentKeyArg ?? _currentKeyName;
 
   bool get _stringIsBinary =>
       _effectiveType == 'string' &&
       _stringValue != null &&
       !_stringValue!.isUtf8;
+
+  /// True when the user has unsaved edits in the string text field.
+  bool get _isStringDirty =>
+      _effectiveType == 'string' &&
+      !_stringIsBinary &&
+      _savedStringText != null &&
+      _stringController.text != _savedStringText;
+
+  /// Shows a discard-confirmation dialog if there are unsaved string edits.
+  /// Returns `true` when it is safe to proceed (either not dirty or confirmed).
+  Future<bool> _confirmDiscardStringEdits() async {
+    if (!_isStringDirty) return true;
+    if (!mounted) return false;
+    final confirmed = await showAppDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Unsaved changes'),
+        content: const Text(
+          'You have unsaved edits to this string value. '
+          'Do you want to discard them?',
+        ),
+        actions: [
+          OutlineButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          DestructiveButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
+  }
 
   String _normalizedType(String type) {
     final t = type.trim().toLowerCase();
@@ -125,7 +199,9 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       switch (_effectiveType) {
         case 'string':
           _stringValue = await widget.connection.get(_cmdKey);
-          _stringController.text = _stringValue?.text ?? '';
+          final loaded = _stringValue?.text ?? '';
+          _stringController.text = loaded;
+          _savedStringText = loaded;
         case 'hash':
         case 'list':
         case 'set':
@@ -215,7 +291,16 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
             start,
             start + redisCollectionPageSize - 1,
           );
-          _listValue.addAll(chunk);
+          if (!widget.isReadOnly) {
+            for (final item in chunk) {
+              if (_isOrphanedDeleteSentinel(item)) {
+                widget.connection.lrem(_cmdKey, 0, item.commandArg).ignore();
+              }
+            }
+          }
+          final cleanChunk =
+              chunk.where((item) => !_isOrphanedDeleteSentinel(item)).toList();
+          _listValue.addAll(cleanChunk);
           _hasMore = _listValue.length < _collectionTotal;
         case 'set':
           if (reset) {
@@ -271,13 +356,56 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     }
   }
 
+  Future<void> _renameKey() async {
+    if (widget.isReadOnly) return;
+    final targetName = await showAppDialog<String>(
+      context: context,
+      builder: (ctx) => _RedisRenameDialogContent(
+        initialKey: _currentKeyName,
+      ),
+    );
+    if (targetName == null || targetName.trim().isEmpty) return;
+    final trimmedNew = targetName.trim();
+    if (trimmedNew == _currentKeyName) return;
+
+    try {
+      await widget.connection.selectDatabase(widget.database);
+      final exists = (await widget.connection.exists(trimmedNew)) > 0;
+      if (exists && mounted) {
+        final confirmed = await confirmDestructiveAction(
+          context: context,
+          type: DestructiveSqlType.redisRename,
+          targetName: trimmedNew,
+          commandPreview: 'RENAME $_currentKeyName $trimmedNew',
+          connectionName: widget.connection.name,
+        );
+        if (!mounted || !confirmed) return;
+      }
+
+      await widget.connection.rename(_cmdKey, trimmedNew);
+      if (!mounted) return;
+      final newBulk = RedisBulkValue.fromReply(trimmedNew);
+      setState(() {
+        _currentKeyName = trimmedNew;
+        _currentKeyArg = trimmedNew;
+        _success = 'Key renamed to $trimmedNew';
+      });
+      _clearSuccessAfterDelay();
+      widget.onKeyRenamed?.call(newBulk);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = 'Rename failed: $e');
+      }
+    }
+  }
+
   Future<void> _deleteKey() async {
     if (widget.isReadOnly) return;
     final confirmed = await confirmDestructiveAction(
       context: context,
       type: DestructiveSqlType.redisDel,
-      targetName: '${widget.keyName} ($_effectiveType)',
-      commandPreview: 'DEL ${widget.keyName}',
+      targetName: '$_currentKeyName ($_effectiveType)',
+      commandPreview: 'DEL $_currentKeyName',
       connectionName: widget.connection.name,
     );
     if (!mounted || !confirmed) return;
@@ -356,6 +484,77 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       if (!mounted) return;
       setState(() => _error = 'RPUSH failed: $e');
     }
+  }
+
+  Future<void> _listSet(
+    int index,
+    String newValue, {
+    RedisBulkValue? expectedCurrent,
+  }) async {
+    if (widget.isReadOnly) return;
+    try {
+      await widget.connection.selectDatabase(widget.database);
+      if (expectedCurrent != null) {
+        final current = await widget.connection.lindex(_cmdKey, index);
+        if (current == null || current != expectedCurrent) {
+          await _load();
+          if (!mounted) return;
+          setState(() => _error =
+              'List item at index $index changed concurrently; reloaded latest.');
+          return;
+        }
+      }
+      await widget.connection.lset(_cmdKey, index, newValue);
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'LSET failed: $e');
+    }
+  }
+
+  Future<void> _listRemove(int index, RedisBulkValue item) async {
+    if (widget.isReadOnly) return;
+    final confirmed = await confirmDestructiveAction(
+      context: context,
+      type: DestructiveSqlType.redisLrem,
+      targetName: '[$index] ${item.label}',
+      commandPreview: 'LREM $_currentKeyName 1 ${item.label}',
+      connectionName: widget.connection.name,
+    );
+    if (!mounted || !confirmed) return;
+    try {
+      await widget.connection.selectDatabase(widget.database);
+      final current = await widget.connection.lindex(_cmdKey, index);
+      if (current == null || current != item) {
+        await _load();
+        if (!mounted) return;
+        setState(() => _error =
+            'List item at index $index changed concurrently; reloaded latest.');
+        return;
+      }
+      final sentinel =
+          '__QUERYA_DEL_${DateTime.now().microsecondsSinceEpoch}__';
+      try {
+        await widget.connection.lset(_cmdKey, index, sentinel);
+        await widget.connection.lrem(_cmdKey, 1, sentinel);
+      } catch (e) {
+        try {
+          await widget.connection.lrem(_cmdKey, 1, sentinel);
+        } catch (_) {}
+        rethrow;
+      }
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'LREM failed: $e');
+    }
+  }
+
+  bool _isOrphanedDeleteSentinel(RedisBulkValue value) {
+    final text = value.text;
+    return text != null &&
+        text.startsWith('__QUERYA_DEL_') &&
+        text.endsWith('__');
   }
 
   // Set operations
@@ -571,7 +770,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
           const Gap(10),
           material.Expanded(
             child: material.Text(
-              widget.keyName,
+              _currentKeyName,
               overflow: material.TextOverflow.ellipsis,
               maxLines: 1,
               style: material.TextStyle(
@@ -600,6 +799,24 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
             ),
           ),
           const Gap(8),
+          if (!widget.isReadOnly) ...[
+            material.Tooltip(
+              message: 'Rename key',
+              child: material.InkWell(
+                onTap: _renameKey,
+                borderRadius: material.BorderRadius.circular(4),
+                child: material.Padding(
+                  padding: const material.EdgeInsets.all(4),
+                  child: material.Icon(
+                    material.Icons.drive_file_rename_outline_rounded,
+                    size: 16,
+                    color: scs.mutedForeground,
+                  ),
+                ),
+              ),
+            ),
+            const Gap(4),
+          ],
           if (!widget.isReadOnly)
             material.Tooltip(
               message: 'Set TTL',
@@ -618,7 +835,10 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
           material.Tooltip(
             message: 'Refresh',
             child: material.InkWell(
-              onTap: _load,
+              onTap: () async {
+                if (!await _confirmDiscardStringEdits()) return;
+                await _load();
+              },
               borderRadius: material.BorderRadius.circular(4),
               child: material.Padding(
                 padding: const material.EdgeInsets.all(4),
@@ -869,6 +1089,27 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
                   itemBuilder: (context, i) => _IndexedValueRow(
                     index: i,
                     value: _listValue[i].label,
+                    isBinary: !_listValue[i].isUtf8,
+                    onEdit: widget.isReadOnly || !_listValue[i].isUtf8
+                        ? null
+                        : () async {
+                            final initialText =
+                                _listValue[i].text ?? _listValue[i].label;
+                            final edited = await showAppDialog<String>(
+                              context: context,
+                              builder: (ctx) => _RedisEditListDialogContent(
+                                index: i,
+                                initialValue: initialText,
+                              ),
+                            );
+                            if (edited != null && edited != initialText) {
+                              await _listSet(i, edited,
+                                  expectedCurrent: _listValue[i]);
+                            }
+                          },
+                    onDelete: widget.isReadOnly
+                        ? null
+                        : () => _listRemove(i, _listValue[i]),
                     colorScheme: cs,
                     shadcnCs: scs,
                   ),
@@ -1118,6 +1359,131 @@ class _RedisTtlDialogContentState
   }
 }
 
+class _RedisRenameDialogContent extends material.StatefulWidget {
+  const _RedisRenameDialogContent({
+    required this.initialKey,
+  });
+
+  final String initialKey;
+
+  @override
+  material.State<_RedisRenameDialogContent> createState() =>
+      _RedisRenameDialogContentState();
+}
+
+class _RedisRenameDialogContentState
+    extends material.State<_RedisRenameDialogContent> {
+  late final material.TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = material.TextEditingController(text: widget.initialKey);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    return AlertDialog(
+      title: const Text('Rename Key'),
+      content: material.Column(
+        mainAxisSize: material.MainAxisSize.min,
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
+          const Text('Enter new key name').muted().small(),
+          const Gap(8),
+          TextField(
+            controller: _controller,
+            placeholder: const Text('New key name'),
+          ),
+        ],
+      ),
+      actions: [
+        GhostButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        PrimaryButton(
+          onPressed: () {
+            final val = _controller.text.trim();
+            if (val.isNotEmpty) {
+              Navigator.of(context).pop(val);
+            }
+          },
+          child: const Text('Rename'),
+        ),
+      ],
+    );
+  }
+}
+
+class _RedisEditListDialogContent extends material.StatefulWidget {
+  const _RedisEditListDialogContent({
+    required this.index,
+    required this.initialValue,
+  });
+
+  final int index;
+  final String initialValue;
+
+  @override
+  material.State<_RedisEditListDialogContent> createState() =>
+      _RedisEditListDialogContentState();
+}
+
+class _RedisEditListDialogContentState
+    extends material.State<_RedisEditListDialogContent> {
+  late final material.TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = material.TextEditingController(text: widget.initialValue);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    return AlertDialog(
+      title: Text('Edit Item [${widget.index}]'),
+      content: material.Column(
+        mainAxisSize: material.MainAxisSize.min,
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
+          const Text('Enter new value').muted().small(),
+          const Gap(8),
+          TextField(
+            controller: _controller,
+            placeholder: const Text('Value'),
+          ),
+        ],
+      ),
+      actions: [
+        GhostButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        PrimaryButton(
+          onPressed: () {
+            Navigator.of(context).pop(_controller.text);
+          },
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
 // ─── Shared row widgets ─────────────────────────────────────────────────────
 
 class _FieldRow extends StatelessWidget {
@@ -1192,12 +1558,18 @@ class _IndexedValueRow extends StatelessWidget {
   const _IndexedValueRow({
     required this.index,
     required this.value,
+    this.isBinary = false,
+    this.onEdit,
+    this.onDelete,
     required this.colorScheme,
     required this.shadcnCs,
   });
 
   final int index;
   final String value;
+  final bool isBinary;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
   final ColorScheme colorScheme;
   final shadcn.ColorScheme shadcnCs;
 
@@ -1235,6 +1607,55 @@ class _IndexedValueRow extends StatelessWidget {
               ),
             ),
           ),
+          if (isBinary) ...[
+            const Gap(8),
+            material.Container(
+              padding: const material.EdgeInsets.symmetric(
+                  horizontal: 5, vertical: 1.5),
+              decoration: material.BoxDecoration(
+                color: shadcnCs.muted,
+                borderRadius: material.BorderRadius.circular(3),
+              ),
+              child: Text(
+                'binary',
+                style: material.TextStyle(
+                  fontSize: 10,
+                  fontFamily: 'monospace',
+                  color: shadcnCs.mutedForeground,
+                ),
+              ),
+            ),
+          ],
+          if (onEdit != null) ...[
+            const Gap(8),
+            material.Tooltip(
+              message: 'Edit item',
+              child: material.InkWell(
+                onTap: onEdit,
+                borderRadius: material.BorderRadius.circular(4),
+                child: material.Padding(
+                  padding: const material.EdgeInsets.all(4),
+                  child: material.Icon(material.Icons.edit_outlined,
+                      size: 14, color: shadcnCs.mutedForeground),
+                ),
+              ),
+            ),
+          ],
+          if (onDelete != null) ...[
+            const Gap(8),
+            material.Tooltip(
+              message: 'Delete item',
+              child: material.InkWell(
+                onTap: onDelete,
+                borderRadius: material.BorderRadius.circular(4),
+                child: material.Padding(
+                  padding: const material.EdgeInsets.all(4),
+                  child: material.Icon(material.Icons.close_rounded,
+                      size: 14, color: context.semanticPalette.destructive),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

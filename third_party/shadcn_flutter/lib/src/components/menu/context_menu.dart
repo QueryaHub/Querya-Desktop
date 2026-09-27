@@ -531,8 +531,15 @@ class ContextMenu extends StatefulWidget {
   /// The child widget that triggers the context menu.
   final Widget child;
 
-  /// Menu items to display in the context menu.
-  final List<MenuItem> items;
+  /// Menu items to display in the context menu. Exactly one of [items] or
+  /// [itemsBuilder] must be provided.
+  final List<MenuItem>? items;
+
+  /// Lazily computes menu items right when the menu is about to open,
+  /// instead of on every build of the widget wrapping [child] — useful when
+  /// building the item list itself isn't cheap and the menu opens rarely
+  /// (e.g. once per right-click on a data grid cell, not once per rebuild).
+  final List<MenuItem> Function(BuildContext context)? itemsBuilder;
 
   /// How hit testing behaves for the child.
   final HitTestBehavior behavior;
@@ -547,45 +554,70 @@ class ContextMenu extends StatefulWidget {
   ///
   /// Parameters:
   /// - [child] (`Widget`, required): Widget that triggers menu.
-  /// - [items] (`List<MenuItem>`, required): Menu items.
+  /// - [items] (`List<MenuItem>`, required unless [itemsBuilder] is given): Menu items.
+  /// - [itemsBuilder]: lazy alternative to [items]; see its doc.
   /// - [behavior] (`HitTestBehavior`, optional): Hit test behavior.
   /// - [direction] (`Axis`, optional): Menu layout direction.
   /// - [enabled] (`bool`, optional): Whether menu is enabled.
   const ContextMenu(
       {super.key,
       required this.child,
-      required this.items,
+      this.items,
+      this.itemsBuilder,
       this.behavior = HitTestBehavior.translucent,
       this.direction = Axis.vertical,
-      this.enabled = true});
+      this.enabled = true})
+      : assert(items != null || itemsBuilder != null,
+            'ContextMenu requires either items or itemsBuilder');
 
   @override
   State<ContextMenu> createState() => _ContextMenuState();
 }
 
 class _ContextMenuState extends State<ContextMenu> {
-  late ValueNotifier<List<MenuItem>> _children;
+  ValueNotifier<List<MenuItem>>? _children;
 
   @override
   void initState() {
     super.initState();
-    _children = ValueNotifier(widget.items);
+    final items = widget.items;
+    if (items != null) {
+      _children = ValueNotifier(items);
+    }
   }
 
   @override
   void didUpdateWidget(covariant ContextMenu oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!listEquals(widget.items, oldWidget.items)) {
-      WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
-        if (mounted) _children.value = widget.items;
-      });
+    final items = widget.items;
+    final oldItems = oldWidget.items;
+    if (items != null) {
+      if (oldItems == null || _children == null) {
+        _children?.dispose();
+        _children = ValueNotifier(items);
+      } else if (!listEquals(items, oldItems)) {
+        WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+          if (mounted) _children?.value = items;
+        });
+      }
+    } else if (oldItems != null || _children != null) {
+      _children?.dispose();
+      _children = null;
     }
   }
 
   @override
   void dispose() {
-    _children.dispose();
+    _children?.dispose();
     super.dispose();
+  }
+
+  ValueListenable<List<MenuItem>> _resolveChildren(BuildContext context) {
+    final eager = _children;
+    if (eager != null) return eager;
+    // itemsBuilder path: built fresh each time the menu opens, never cached
+    // across builds of the widget wrapping `child`.
+    return ValueNotifier(widget.itemsBuilder!(context));
   }
 
   @override
@@ -599,13 +631,13 @@ class _ContextMenuState extends State<ContextMenu> {
       onSecondaryTapDown: !widget.enabled
           ? null
           : (details) {
-              _showContextMenu(
-                  context, details.globalPosition, _children, widget.direction);
+              _showContextMenu(context, details.globalPosition,
+                  _resolveChildren(context), widget.direction);
             },
       onLongPressStart: enableLongPress && widget.enabled
           ? (details) {
-              _showContextMenu(
-                  context, details.globalPosition, _children, widget.direction);
+              _showContextMenu(context, details.globalPosition,
+                  _resolveChildren(context), widget.direction);
             }
           : null,
       child: widget.child,

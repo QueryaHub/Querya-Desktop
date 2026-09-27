@@ -112,4 +112,32 @@ void main() {
       expect(() => mongoAssertFieldEditable('name'), returnsNormally);
     });
   });
+  group('dotted top-level field names', () {
+    test('are detected as nested paths', () {
+      expect(mongoFieldNameIsDottedPath('a.b'), isTrue);
+      expect(mongoFieldNameIsDottedPath('.a'), isTrue);
+      expect(mongoFieldNameIsDottedPath('name'), isFalse);
+      expect(mongoFieldNameIsDottedPath('a_b'), isFalse);
+    });
+
+    test('single-field save is refused with an explicit error', () {
+      expect(
+        () => mongoAssertFieldEditable('a.b'),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            allOf(contains('"a.b"'), contains('JSON editor')),
+          ),
+        ),
+      );
+      expect(() => mongoAssertFieldEditable('ab'), returnsNormally);
+    });
+
+    test('dotted key is still readable in the inspector', () {
+      // Only Save is blocked; the dotted field itself is not read-only.
+      expect(mongoFieldIsReadOnly('a.b'), isFalse);
+      expect(mongoFieldToDisplay(1), '1');
+    });
+  });
 }

@@ -93,10 +93,8 @@ class Float64CompactColumn implements CompactColumn {
   String stringValueAt(int index, [StringInternPool? pool]) {
     if (isNull(index)) return 'NULL';
     final val = values[index];
-    if (val == val.toInt() && !val.isNaN && !val.isInfinite) {
-      return val.toInt().toString();
-    }
-    return val.toString();
+    final str = val.toString();
+    return pool != null ? pool.intern(str) : str;
   }
 }
 

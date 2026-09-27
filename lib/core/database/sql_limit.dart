@@ -1,6 +1,26 @@
 // Shared helpers for bounding ad-hoc SQL result sets (Postgres, SQLite, MySQL, …).
 
-/// Removes leading whitespace and `--` line comments (not `/* */`).
+/// Index just past a `/* ... */` comment starting at [start] (nested comments
+/// are balanced, as in PostgreSQL). Returns `sql.length` when unterminated.
+int _blockCommentEnd(String sql, int start) {
+  var depth = 0;
+  var i = start;
+  while (i < sql.length) {
+    if (sql.startsWith('/*', i)) {
+      depth++;
+      i += 2;
+    } else if (sql.startsWith('*/', i)) {
+      depth--;
+      i += 2;
+      if (depth == 0) return i;
+    } else {
+      i++;
+    }
+  }
+  return sql.length;
+}
+
+/// Removes leading whitespace, `--` line comments and `/* */` block comments.
 String stripLeadingWhitespaceAndLineComments(String sql) {
   var s = sql.trimLeft();
   while (true) {
@@ -9,6 +29,10 @@ String stripLeadingWhitespaceAndLineComments(String sql) {
       final nl = s.indexOf('\n');
       if (nl == -1) return '';
       s = s.substring(nl + 1).trimLeft();
+      continue;
+    }
+    if (s.startsWith('/*')) {
+      s = s.substring(_blockCommentEnd(s, 0)).trimLeft();
       continue;
     }
     return s;
@@ -25,51 +49,68 @@ final _fetchFirst = RegExp(
   caseSensitive: false,
 );
 
-/// Masks SQL string / identifier / dollar-quoted literals with spaces so
-/// keyword regexes do not match inside quotes (same length, same offsets).
-String maskSqlLiteralsForLimitScan(String sql) {
+/// Masks SQL comments and (unless [keepLiterals]) string / identifier /
+/// dollar-quoted literals with spaces so keyword regexes do not match inside
+/// them (same length, same offsets). Newlines inside comments are kept.
+String maskSqlLiteralsForLimitScan(String sql, {bool keepLiterals = false}) {
   final out = StringBuffer();
+
+  void blank(int from, int to) {
+    for (var k = from; k < to; k++) {
+      out.write(sql[k] == '\n' ? '\n' : ' ');
+    }
+  }
+
+  void literal(int from, int to) {
+    if (keepLiterals) {
+      out.write(sql.substring(from, to));
+    } else {
+      out.write(' ' * (to - from));
+    }
+  }
+
+  // Index just past a quoted run that starts at [start]; [q] escapes by doubling.
+  int quotedEnd(int start, int q) {
+    var i = start + 1;
+    while (i < sql.length) {
+      if (sql.codeUnitAt(i) == q) {
+        if (i + 1 < sql.length && sql.codeUnitAt(i + 1) == q) {
+          i += 2;
+          continue;
+        }
+        return i + 1;
+      }
+      i++;
+    }
+    return sql.length;
+  }
+
   var i = 0;
   while (i < sql.length) {
     final c = sql.codeUnitAt(i);
 
-    // Single-quoted string; '' is an escaped quote.
-    if (c == 0x27 /* ' */) {
-      out.write(' ');
-      i++;
-      while (i < sql.length) {
-        out.write(' ');
-        if (sql.codeUnitAt(i) == 0x27) {
-          if (i + 1 < sql.length && sql.codeUnitAt(i + 1) == 0x27) {
-            out.write(' ');
-            i += 2;
-            continue;
-          }
-          i++;
-          break;
-        }
-        i++;
-      }
+    // Line comment: -- to end of line (the newline itself is kept).
+    if (c == 0x2D /* - */ && sql.startsWith('--', i)) {
+      var end = sql.indexOf('\n', i);
+      if (end == -1) end = sql.length;
+      blank(i, end);
+      i = end;
       continue;
     }
 
-    // Double-quoted identifier.
-    if (c == 0x22 /* " */) {
-      out.write(' ');
-      i++;
-      while (i < sql.length) {
-        out.write(' ');
-        if (sql.codeUnitAt(i) == 0x22) {
-          if (i + 1 < sql.length && sql.codeUnitAt(i + 1) == 0x22) {
-            out.write(' ');
-            i += 2;
-            continue;
-          }
-          i++;
-          break;
-        }
-        i++;
-      }
+    // Block comment: /* ... */ (nested).
+    if (c == 0x2F /* / */ && sql.startsWith('/*', i)) {
+      final end = _blockCommentEnd(sql, i);
+      blank(i, end);
+      i = end;
+      continue;
+    }
+
+    // Single-quoted string or double-quoted identifier; doubled quote escapes.
+    if (c == 0x27 /* ' */ || c == 0x22 /* " */) {
+      final end = quotedEnd(i, c);
+      literal(i, end);
+      i = end;
       continue;
     }
 
@@ -81,7 +122,7 @@ String maskSqlLiteralsForLimitScan(String sql) {
         final close = sql.indexOf(tag, tagEnd + 1);
         if (close != -1) {
           final end = close + tag.length;
-          out.write(' ' * (end - i));
+          literal(i, end);
           i = end;
           continue;
         }
@@ -94,13 +135,31 @@ String maskSqlLiteralsForLimitScan(String sql) {
   return out.toString();
 }
 
-Match? _firstMatchOutsideLiterals(RegExp pattern, String sql) {
+/// Matches of [pattern] outside literals / comments and outside any
+/// parentheses, so `LIMIT` / `FETCH` inside a CTE or subquery is ignored.
+List<Match> _topLevelMatches(RegExp pattern, String sql) {
   final masked = maskSqlLiteralsForLimitScan(sql);
-  return pattern.firstMatch(masked);
+  final result = <Match>[];
+  var depth = 0;
+  var pos = 0;
+  for (final m in pattern.allMatches(masked)) {
+    for (; pos < m.start; pos++) {
+      final ch = masked.codeUnitAt(pos);
+      if (ch == 0x28 /* ( */) {
+        depth++;
+      } else if (ch == 0x29 /* ) */ && depth > 0) {
+        depth--;
+      }
+    }
+    if (depth == 0) result.add(m);
+  }
+  return result;
 }
 
-bool _hasMatchOutsideLiterals(RegExp pattern, String sql) {
-  return _firstMatchOutsideLiterals(pattern, sql) != null;
+/// The last top-level match: the outer query's own clause.
+Match? _outerMatch(RegExp pattern, String sql) {
+  final matches = _topLevelMatches(pattern, sql);
+  return matches.isEmpty ? null : matches.last;
 }
 
 /// Injects or clamps a `LIMIT` on read-only queries (`SELECT`, `WITH`, `VALUES`).
@@ -111,7 +170,9 @@ bool _hasMatchOutsideLiterals(RegExp pattern, String sql) {
 /// - `FETCH FIRST/NEXT n ROWS ONLY` where `n > limit` → clamped.
 /// - Non-select statements are returned unchanged.
 ///
-/// Matches ignore `LIMIT` / `FETCH` text inside string or quoted identifiers.
+/// Only the outer query's `LIMIT` / `FETCH` counts: clauses inside parentheses
+/// (CTEs, subqueries) and text inside literals or comments are ignored, and
+/// leading `--` / `/* */` comments do not hide the statement kind.
 /// Trailing semicolons are preserved after an injected clause.
 String injectSqlLimit(String sql, int limit) {
   if (limit <= 0) return sql;
@@ -127,7 +188,7 @@ String injectSqlLimit(String sql, int limit) {
     return sql;
   }
 
-  final limitAllMatch = _firstMatchOutsideLiterals(_limitAll, sql);
+  final limitAllMatch = _outerMatch(_limitAll, sql);
   if (limitAllMatch != null) {
     return sql.replaceRange(
       limitAllMatch.start,
@@ -136,7 +197,7 @@ String injectSqlLimit(String sql, int limit) {
     );
   }
 
-  final limitMatch = _firstMatchOutsideLiterals(_limitCount, sql);
+  final limitMatch = _outerMatch(_limitCount, sql);
   if (limitMatch != null) {
     final existing = int.tryParse(limitMatch.group(1)!);
     if (existing == null || existing <= limit) {
@@ -150,7 +211,7 @@ String injectSqlLimit(String sql, int limit) {
     );
   }
 
-  final fetchMatch = _firstMatchOutsideLiterals(_fetchFirst, sql);
+  final fetchMatch = _outerMatch(_fetchFirst, sql);
   if (fetchMatch != null) {
     final existing = int.tryParse(fetchMatch.group(1)!);
     if (existing == null || existing <= limit) {
@@ -163,24 +224,30 @@ String injectSqlLimit(String sql, int limit) {
     );
   }
 
-  if (_hasMatchOutsideLiterals(RegExp(r'\bLIMIT\b', caseSensitive: false), sql) ||
-      _hasMatchOutsideLiterals(RegExp(r'\bFETCH\b', caseSensitive: false), sql)) {
+  if (_outerMatch(RegExp(r'\bLIMIT\b', caseSensitive: false), sql) != null ||
+      _outerMatch(RegExp(r'\bFETCH\b', caseSensitive: false), sql) != null) {
     // Unrecognized LIMIT/FETCH shape — leave unchanged.
     return sql;
   }
 
-  var body = sql.trimRight();
-  var suffix = '';
-
-  while (true) {
-    if (body.isEmpty) break;
-    if (body.endsWith(';')) {
-      body = body.substring(0, body.length - 1).trimRight();
-      suffix = ';$suffix';
-      continue;
+  // Insert before trailing `;` / whitespace / comments (a trailing `-- note`
+  // must not swallow or precede the clause).
+  final masked = maskSqlLiteralsForLimitScan(sql, keepLiterals: true);
+  var end = masked.length;
+  while (end > 0) {
+    final ch = masked[end - 1];
+    if (ch == ';' || ch.trim().isEmpty) {
+      end--;
+    } else {
+      break;
     }
-    break;
   }
+  final body = sql.substring(0, end);
+  final tail = sql.substring(end);
+  final tailIsPlain = tail.replaceAll(RegExp(r'[;\s]'), '').isEmpty;
+  // Plain `;` / whitespace tails are normalized to their semicolons; a tail
+  // with comments is kept verbatim after the clause.
+  final suffix = tailIsPlain ? ';' * ';'.allMatches(tail).length : tail;
 
   return '$body\nLIMIT $limit$suffix';
 }

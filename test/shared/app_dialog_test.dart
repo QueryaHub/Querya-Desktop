@@ -121,27 +121,95 @@ void main() {
       builder: (c) => const SimpleDialog(title: Text('X')),
     );
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 40));
     expect(find.byType(BackdropFilter), findsWidgets);
     expect(find.byType(FadeTransition), findsWidgets);
     expect(find.byType(SlideTransition), findsWidgets);
     expect(find.byType(ScaleTransition), findsNothing);
   });
 
-  testWidgets('backdrop keeps static blur sigma; opacity carries enter',
-      (tester) async {
-    final ctx = await pumpHost(tester);
+  group('backdrop transition (#886)', () {
+    final fullFilter = ImageFilter.blur(sigmaX: 8, sigmaY: 8);
+    final fullTint = const Color(0xFF000000).withValues(alpha: 0.32);
 
-    showAppDialog<void>(
-      context: ctx,
-      builder: (c) => const SimpleDialog(title: Text('Blur')),
-    );
-    // Mid-enter: blur must stay sigma 8 (not sigma * t).
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 40));
+    Color tintOf(WidgetTester tester) {
+      final box = tester.widget<ColoredBox>(
+        find.descendant(
+          of: find.byType(BackdropFilter),
+          matching: find.byType(ColoredBox),
+        ),
+      );
+      return box.color;
+    }
 
-    final filter = tester.widget<BackdropFilter>(find.byType(BackdropFilter));
-    expect(filter.filter, ImageFilter.blur(sigmaX: 8, sigmaY: 8));
-    expect(find.byType(Opacity), findsWidgets);
+    testWidgets('blur and tint scale in during enter; no Opacity wraps the filter',
+        (tester) async {
+      final ctx = await pumpHost(tester);
+
+      showAppDialog<void>(
+        context: ctx,
+        builder: (c) => const SimpleDialog(title: Text('Blur')),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 40));
+
+      final filter = tester.widget<BackdropFilter>(find.byType(BackdropFilter));
+      expect(filter.filter, isNot(fullFilter), reason: 'sigma is still ramping');
+      expect(tintOf(tester).a, greaterThan(0));
+      expect(tintOf(tester).a, lessThan(fullTint.a));
+
+      // The frost must not sit under an Opacity (that forces an offscreen layer).
+      expect(
+        find.ancestor(
+          of: find.byType(BackdropFilter),
+          matching: find.byType(Opacity),
+        ),
+        findsNothing,
+      );
+    });
+
+    testWidgets('settles at full blur and tint', (tester) async {
+      final ctx = await pumpHost(tester);
+
+      showAppDialog<void>(
+        context: ctx,
+        builder: (c) => const SimpleDialog(title: Text('Settled')),
+      );
+      await tester.pumpAndSettle();
+
+      final filter = tester.widget<BackdropFilter>(find.byType(BackdropFilter));
+      expect(filter.filter, fullFilter);
+      expect(tintOf(tester), fullTint);
+      expect(
+        find.ancestor(
+          of: find.byType(BackdropFilter),
+          matching: find.byType(Opacity),
+        ),
+        findsNothing,
+      );
+    });
+
+    testWidgets('blur and tint fade out again on dismiss', (tester) async {
+      final ctx = await pumpHost(tester);
+
+      final future = showAppDialog<void>(
+        context: ctx,
+        builder: (c) => const SimpleDialog(title: Text('Leaving')),
+      );
+      await tester.pumpAndSettle();
+
+      Navigator.of(ctx, rootNavigator: true).pop();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 40));
+
+      final filter = tester.widget<BackdropFilter>(find.byType(BackdropFilter));
+      expect(filter.filter, isNot(fullFilter));
+      expect(tintOf(tester).a, lessThan(fullTint.a));
+
+      await tester.pumpAndSettle();
+      expect(find.byType(BackdropFilter), findsNothing);
+      await future;
+    });
   });
 
   testWidgets('enter uses standard duration under full motion', (tester) async {

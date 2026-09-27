@@ -101,6 +101,66 @@ void main() {
       expect(resIlike, equals([1]));
     });
 
+    test('LIKE is case-sensitive while ILIKE ignores case', () {
+      List<int> run(String f) => GridFilterEngine.filterRowIndices(
+            filterText: f,
+            columns: columns,
+            rows: rows,
+          );
+      expect(run("status LIKE 'act%'"), isEmpty);
+      expect(run("status ILIKE 'act%'"), equals([0, 2]));
+    });
+
+    test('NOT LIKE / NOT ILIKE invert the match', () {
+      List<int> run(String f) => GridFilterEngine.filterRowIndices(
+            filterText: f,
+            columns: columns,
+            rows: rows,
+          );
+      expect(run("status NOT LIKE 'ACT%'"), equals([1, 3]));
+      expect(run("status NOT ILIKE '%pend%'"), equals([0, 2, 3]));
+      expect(run("status NOT LIKE 'act%'"), equals([0, 1, 2, 3]));
+    });
+
+    test('LIKE supports _ wildcard and treats regex metacharacters literally',
+        () {
+      final specialRows = [
+        ['a.c'],
+        ['abc'],
+        ['a+c'],
+        ['(x)'],
+      ];
+      List<int> run(String f) => GridFilterEngine.filterRowIndices(
+            filterText: f,
+            columns: ['v'],
+            rows: specialRows,
+          );
+      expect(run("v LIKE 'a_c'"), equals([0, 1, 2]));
+      expect(run("v LIKE 'a.c'"), equals([0]));
+      expect(run("v LIKE 'a+c'"), equals([2]));
+      expect(run("v LIKE '(x)'"), equals([3]));
+    });
+
+    test('LIKE inside AND / OR gives the same result on every row', () {
+      final many = [
+        for (var i = 0; i < 2000; i++) ['$i', i.isEven ? 'ACTIVE' : 'PENDING'],
+      ];
+      final res = GridFilterEngine.filterRowIndices(
+        filterText: "status LIKE 'ACT%' AND id LIKE '%9' OR status ILIKE 'pen%' AND id LIKE '1%'",
+        columns: ['id', 'status'],
+        rows: many,
+      );
+      final expected = [
+        for (var i = 0; i < many.length; i++)
+          if ((many[i][1].startsWith('ACT') && many[i][0].endsWith('9')) ||
+              (many[i][1].toLowerCase().startsWith('pen') &&
+                  many[i][0].startsWith('1')))
+            i,
+      ];
+      expect(res, equals(expected));
+      expect(res, isNotEmpty);
+    });
+
     test('filters with IN and NOT IN list of literals', () {
       final resIn = GridFilterEngine.filterRowIndices(
         filterText: "status IN ('PENDING', 'CANCELLED')",
@@ -311,6 +371,50 @@ void main() {
 
       expect(csv, contains('Group Key,Count,Percentage,Aggregate'));
       expect(csv, contains('"ACTIVE",3,60.00%,600.00'));
+    });
+
+    test('exports multi-level hierarchical pivot table to CSV with nested sub-groups', () {
+      final multiLevelRows = [
+        ['USA', 'NY', '100'],
+        ['USA', 'CA', '200'],
+        ['UK', 'London', '300'],
+      ];
+
+      final groups = GridGroupingsEngine.buildGroups(
+        groupColIndices: [0, 1],
+        rows: multiLevelRows,
+        aggConfig: const GroupAggregationConfig(
+          aggType: GroupingAggType.sum,
+          targetColIndex: 2,
+        ),
+      );
+
+      expect(groups.first.hasSubGroups, isTrue);
+
+      // Default indented export
+      final csvIndented = GridGroupingsEngine.exportPivotToCsv(
+        groups: groups,
+        groupByColumnName: 'Country',
+      );
+
+      expect(csvIndented, contains('"USA",2,66.67%,300.00'));
+      expect(csvIndented, contains('"  CA",1,33.33%,200.00'));
+      expect(csvIndented, contains('"  NY",1,33.33%,100.00'));
+      expect(csvIndented, contains('"UK",1,33.33%,300.00'));
+      expect(csvIndented, contains('"  London",1,33.33%,300.00'));
+
+      // Compound keys export
+      final csvCompound = GridGroupingsEngine.exportPivotToCsv(
+        groups: groups,
+        groupByColumnName: 'Country',
+        useCompoundKeys: true,
+      );
+
+      expect(csvCompound, contains('"USA",2,66.67%,300.00'));
+      expect(csvCompound, contains('"USA > CA",1,33.33%,200.00'));
+      expect(csvCompound, contains('"USA > NY",1,33.33%,100.00'));
+      expect(csvCompound, contains('"UK",1,33.33%,300.00'));
+      expect(csvCompound, contains('"UK > London",1,33.33%,300.00'));
     });
   });
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/motion/querya_fade_slide.dart';
 import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
@@ -1192,7 +1193,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.byTooltip('No pending changes to commit'),
+        find.byTooltip('No pending changes to save'),
         findsOneWidget,
       );
 
@@ -1201,15 +1202,145 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.byTooltip('Revert all unstaged edits (Ctrl+Z / Cmd+Z)'),
+        find.byTooltip('Discard all pending edits (Ctrl+Z / Cmd+Z)'),
         findsOneWidget,
       );
       expect(
-        find.byTooltip('Commit staged changes to database (Ctrl+S / Cmd+S)'),
+        find.byTooltip('Review and save pending changes (Ctrl+S / Cmd+S)'),
         findsOneWidget,
       );
 
       buffer.dispose();
+    });
+
+    testWidgets('narrow toolbar keeps Save visible and shows row actions as icons',
+        (tester) async {
+      final buffer = DataGridStagingBuffer(
+        columns: ['id', 'name'],
+        rows: [
+          ['1', 'Alice'],
+        ],
+      );
+      addTearDown(buffer.dispose);
+      buffer.setCell(0, 1, 'Grace');
+
+      await tester.pumpWidget(
+        resultsShell(
+          child: material.Scaffold(
+            body: material.Align(
+              alignment: material.Alignment.topLeft,
+              child: material.SizedBox(
+                width: 420,
+                height: 60,
+                child: DataGridStagingToolbar(
+                  stagingBuffer: buffer,
+                  onApplyChanges: () {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Add Row'), findsNothing);
+      expect(find.byIcon(material.Icons.add_rounded), findsOneWidget);
+      final save = find.text('Save');
+      expect(save, findsOneWidget);
+      expect(find.text('Revert All'), findsNothing);
+      expect(find.byIcon(material.Icons.undo_rounded), findsOneWidget);
+      final right = tester.getBottomRight(save).dx;
+      expect(right, lessThanOrEqualTo(420));
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('ResultsTab selection updates (#885)', () {
+    final rows = [
+      for (var r = 0; r < 6; r++) ['${r + 1}', '${(r + 1) * 10}', 'name$r'],
+    ];
+
+    Future<void> pumpTab(WidgetTester tester) async {
+      await tester.pumpWidget(
+        resultsShell(
+          child: material.Scaffold(
+            body: ResultsTab(
+              columns: const ['id', 'amount', 'name'],
+              rows: rows,
+              stagingBuffer: DataGridStagingBuffer(
+                columns: const ['id', 'amount', 'name'],
+                rows: rows,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    // The tap itself resolves immediately (grid-level hit-testing, #983);
+    // this settle window is so a later, separate tap isn't misread as this
+    // one's double-tap partner.
+    Future<void> tapCell(WidgetTester tester, String text) async {
+      await tester.tap(find.text(text));
+      await tester.pump(const Duration(milliseconds: 350));
+    }
+
+    testWidgets('a selection step does not rebuild the tab or its grid',
+        (tester) async {
+      await pumpTab(tester);
+      final gridBefore = tester.widget(find.byType(VirtualResultGrid));
+
+      await tapCell(tester, '20');
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump(kSelectionStatsDebounce * 2);
+      await tester.pumpAndSettle();
+
+      // ResultsTab.build creates a new grid widget; the same instance means
+      // the tab did not rebuild for any selection / focus / stats change.
+      expect(identical(tester.widget(find.byType(VirtualResultGrid)), gridBefore),
+          isTrue);
+    });
+
+    testWidgets('selection stats appear after the debounce, once', (tester) async {
+      await pumpTab(tester);
+      await tapCell(tester, '10');
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      // The two unshifted arrowDowns each collapse the selection to a new
+      // single cell (10 -> 20 -> 30), so the anchor going into the shift
+      // step below is row 30, not row 10.
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+
+      // Whatever the debounce timing settled to by now, it must eventually
+      // converge on the 2-cell range's correct sum (30+40=70) rather than
+      // getting stuck on an earlier, single-cell selection step.
+      await tester.pump(kSelectionStatsDebounce + const Duration(milliseconds: 10));
+      await tester.pumpAndSettle();
+      expect(find.text('Sum: '), findsOneWidget);
+      expect(find.text('70'), findsOneWidget);
+    });
+
+    testWidgets('clearing the selection resets stats immediately',
+        (tester) async {
+      await pumpTab(tester);
+      await tapCell(tester, '10');
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.pump(kSelectionStatsDebounce * 2);
+      await tester.pumpAndSettle();
+      expect(find.text('Sum: '), findsOneWidget);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      // Pending timers must be gone after dispose.
+      await tester.pumpWidget(const material.SizedBox());
+      await tester.pump(kSelectionStatsDebounce * 2);
+      expect(tester.takeException(), isNull);
     });
   });
 }

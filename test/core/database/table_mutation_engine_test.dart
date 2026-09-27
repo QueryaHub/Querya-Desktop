@@ -93,6 +93,32 @@ void main() {
       expect(tx.endsWith('COMMIT;\n'), isTrue);
     });
 
+    test('addresses unkeyed SQLite rows by implicit rowid in UPDATE and DELETE',
+        () {
+      final plan = TableMutationEngine.generatePlan(
+        dialect: SqlDialect.sqlite,
+        tableName: 'notes',
+        columns: const ['rowid', 'body'],
+        primaryKeys: ['rowid'],
+        originalRows: const [
+          ['7', 'dup'],
+          ['8', 'dup'],
+        ],
+        modifiedCells: {
+          0: {1: 'edited'},
+        },
+        insertedRows: [],
+        deletedRowIndices: {1},
+      );
+
+      expect(plan.statementCount, 2);
+      expect(
+        plan.statements[0].sql,
+        'UPDATE "notes" SET "body" = \'edited\' WHERE "rowid" = 7',
+      );
+      expect(plan.statements[1].sql, 'DELETE FROM "notes" WHERE "rowid" = 8');
+    });
+
     test('generates UPDATE statement for MySQL dialect with backticks', () {
       final plan = TableMutationEngine.generatePlan(
         dialect: SqlDialect.mysql,
@@ -536,6 +562,68 @@ void main() {
         },
       );
       expect(mysql.statements.first.sql, 'INSERT INTO `t` () VALUES ()');
+    });
+
+    test('resolves primary key with case-insensitive casing (e.g. ID vs id)', () {
+      final plan = TableMutationEngine.generatePlan(
+        dialect: SqlDialect.postgres,
+        tableName: 'users',
+        columns: ['id', 'username', 'email'],
+        primaryKeys: ['ID'],
+        originalRows: [
+          ['42', 'alice', 'alice@example.com'],
+        ],
+        modifiedCells: {
+          0: {1: 'alice_new'},
+        },
+        insertedRows: const [],
+        deletedRowIndices: const {},
+      );
+
+      expect(plan.hasPrimaryKey, isTrue);
+      expect(plan.statementCount, 1);
+      final stmt = plan.statements.first;
+      expect(stmt.type, MutationType.update);
+      // Must generate WHERE "id" = 42, NOT match all columns
+      expect(
+        stmt.sql,
+        'UPDATE "users" SET "username" = \'alice_new\' WHERE "id" = 42',
+      );
+    });
+
+    test('resolves primary key and column names when enclosed in quotes or with different casing', () {
+      final plan = TableMutationEngine.generatePlan(
+        dialect: SqlDialect.postgres,
+        tableName: 'accounts',
+        columns: ['"ACCOUNT_ID"', 'status'],
+        primaryKeys: ['account_id'],
+        originalRows: [
+          ['100', 'active'],
+        ],
+        modifiedCells: const {},
+        insertedRows: const [],
+        deletedRowIndices: {0},
+      );
+
+      expect(plan.hasPrimaryKey, isTrue);
+      expect(plan.statementCount, 1);
+      final stmt = plan.statements.first;
+      expect(stmt.type, MutationType.delete);
+      expect(
+        stmt.sql,
+        'DELETE FROM "accounts" WHERE "ACCOUNT_ID" = 100',
+      );
+    });
+
+    test('unquotes and normalizes identifiers helper methods', () {
+      expect(TableMutationEngine.unquoteIdentifier('"my_col"'), 'my_col');
+      expect(TableMutationEngine.unquoteIdentifier('`my_col`'), 'my_col');
+      expect(TableMutationEngine.unquoteIdentifier('[my_col]'), 'my_col');
+      expect(TableMutationEngine.unquoteIdentifier('my_col'), 'my_col');
+
+      expect(TableMutationEngine.normalizeIdentifier('"USER_ID"'), 'user_id');
+      expect(TableMutationEngine.normalizeIdentifier('`USER_ID`'), 'user_id');
+      expect(TableMutationEngine.normalizeIdentifier('user_id'), 'user_id');
     });
   });
 }

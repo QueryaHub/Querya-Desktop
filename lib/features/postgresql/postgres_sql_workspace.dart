@@ -10,7 +10,6 @@ import 'package:postgres/postgres.dart' as pg;
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/postgres_sql.dart';
-import 'package:querya_desktop/core/database/result_row_string_convert.dart';
 import 'package:querya_desktop/core/database/sql_table_target_extractor.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
@@ -22,6 +21,7 @@ import 'package:querya_desktop/features/postgresql/postgres_result_utils.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_utils.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
+import 'package:querya_desktop/features/workspace/sql_result_grid_schema.dart';
 import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -71,6 +71,20 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
   int _nextSessionId = 1;
 
   SqlQueryTabSession get _activeSession => _sessions[_activeSessionIndex];
+
+  /// Built session panes, keyed by [SqlQueryTabSession.id].
+  ///
+  /// Switching tabs only changes [_activeSessionIndex]; reusing the same
+  /// widget instance for untouched sessions lets Flutter's element diffing
+  /// (`identical(oldWidget, newWidget)`) skip rebuilding their subtrees, so a
+  /// switch only rebuilds the tab strip and swaps the visible `IndexedStack`
+  /// child instead of rebuilding every tab's editor and results grid.
+  final Map<String, material.Widget> _paneCache = {};
+
+  void _invalidatePane(SqlQueryTabSession session) =>
+      _paneCache.remove(session.id);
+
+  void _invalidateAllPanes() => _paneCache.clear();
 
   PgLease? _lease;
 
@@ -132,10 +146,12 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       onPrevTab: _prevTab,
       onFormat: () {
         _activeSession.formatSql();
+        _invalidatePane(_activeSession);
         setState(() {});
       },
       onClear: () {
         _activeSession.clearSql();
+        _invalidatePane(_activeSession);
         setState(() {});
       },
       onOpenWithContent: (sql, filePath, title) {
@@ -148,6 +164,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
           );
           session.title = title;
           session.filePath = filePath;
+          _invalidatePane(session);
           setState(() {});
         } else {
           _addNewTab(initialSql: sql, title: title, filePath: filePath);
@@ -176,10 +193,26 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     if (index < 0 || index >= _sessions.length) return;
     if (_sessions.length <= 1) return;
     final session = _sessions[index];
-    if (session.stagingBuffer != null && session.stagingBuffer!.isDirty) {
+    if (session.isDirty) {
+      final hasDirtyStaging =
+          session.stagingBuffer != null && session.stagingBuffer!.isDirty;
+      final hasUnsavedText = session.isModified ||
+          (session.filePath == null && session.controller.text.trim().isNotEmpty);
+      final String message;
+      if (hasDirtyStaging && hasUnsavedText) {
+        message =
+            'This query tab contains unsaved query text and staged database changes. Closing the tab will discard them.';
+      } else if (hasDirtyStaging) {
+        message =
+            'This query tab contains staged database changes that have not been applied yet. Closing the tab will discard these changes.';
+      } else {
+        message =
+            'This query tab contains unsaved SQL query text. Closing the tab will discard your changes.';
+      }
       final confirmed = await showUnsavedTabChangesDialog(
         context: context,
         tabTitle: session.title,
+        message: message,
       );
       if (confirmed != true) return;
     }
@@ -187,6 +220,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     setState(() {
       _sessions.removeAt(index);
       session.dispose();
+      _paneCache.remove(session.id);
       if (_activeSessionIndex >= _sessions.length) {
         _activeSessionIndex = _sessions.length - 1;
       }
@@ -216,6 +250,10 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     }
     if (oldWidget.isReadOnly != widget.isReadOnly) {
       _dropLease();
+      // Cached panes closed over the old widget.isReadOnly in their
+      // onApplyChanges callback (#1007): rebuild every tab so Save reflects
+      // the lock immediately instead of only on that tab's next query run.
+      _invalidateAllPanes();
     }
     _syncPostgresSqlTreeContext();
   }
@@ -264,6 +302,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     final hist = await AppSettings.instance.getSqlHistoryMaxEntries();
     final font = await AppSettings.instance.getSqlEditorFontSize();
     if (!mounted) return;
+    _invalidateAllPanes();
     setState(() {
       _queryTimeoutSeconds = t;
       _resultMaxRows = rows;
@@ -273,6 +312,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
   }
 
   void _onStmtTimeoutChanged(int? v) {
+    _invalidateAllPanes();
     setState(() => _queryTimeoutSeconds = v);
     unawaited(AppSettings.instance.setPostgresSqlStmtTimeoutSeconds(v));
   }
@@ -305,17 +345,24 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
   Future<void> _refreshTxStatus() async {
     final conn = _lease?.connection;
     if (conn == null || !conn.isConnected) {
-      if (mounted) setState(() => _txOpen = null);
+      if (mounted) {
+        _invalidateAllPanes();
+        setState(() => _txOpen = null);
+      }
       _notifyTransactionOpen();
       return;
     }
     final v = await conn.inOpenTransaction();
-    if (mounted) setState(() => _txOpen = v);
+    if (mounted) {
+      _invalidateAllPanes();
+      setState(() => _txOpen = v);
+    }
     _notifyTransactionOpen();
   }
 
   Future<void> _runTxCommand(String cmd) async {
     final session = _activeSession;
+    _invalidatePane(session);
     setState(() {
       session.running = true;
       session.error = null;
@@ -325,6 +372,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       final conn = _lease?.connection;
       if (conn == null || !conn.isConnected) {
         if (mounted) {
+          _invalidatePane(session);
           setState(() {
             session.error = 'Could not connect to PostgreSQL.';
             session.running = false;
@@ -335,6 +383,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       final to = _statementTimeout();
       await conn.execute(cmd, timeout: to);
       if (!mounted) return;
+      _invalidatePane(session);
       setState(() {
         session.columns = [];
         session.rows = [];
@@ -345,6 +394,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     } on TimeoutException catch (e) {
       unawaited(_lease?.connection.forceClose());
       if (mounted) {
+        _invalidatePane(session);
         setState(() {
           session.error = 'Query timed out: ${e.message ?? e}';
           session.running = false;
@@ -352,6 +402,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       }
     } on pg.ServerException catch (e) {
       if (mounted) {
+        _invalidatePane(session);
         setState(() {
           session.error = e.message;
           session.running = false;
@@ -359,6 +410,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       }
     } catch (e) {
       if (mounted) {
+        _invalidatePane(session);
         setState(() {
           session.error = e.toString();
           session.running = false;
@@ -387,6 +439,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     for (final s in _sessions) {
       s.dispose();
     }
+    _paneCache.clear();
     super.dispose();
   }
 
@@ -400,6 +453,17 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       userSql = session.controller.text.trim();
     }
     if (userSql.isEmpty) return;
+
+    final safeToProceed = await confirmDiscardTableEditsIfDirty(
+      context: context,
+      buffer: session.stagingBuffer,
+      tableTitle: session.title,
+    );
+    if (!safeToProceed) return;
+    if (session.stagingBuffer != null && session.stagingBuffer!.isDirty) {
+      session.stagingBuffer?.dispose();
+      session.stagingBuffer = null;
+    }
 
     final confirmDestructive =
         await AppSettings.instance.getConfirmDestructiveOperations();
@@ -419,6 +483,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
 
     var sql = injectSqlLimit(userSql, _resultMaxRows);
 
+    _invalidatePane(session);
     setState(() {
       session.running = true;
       session.error = null;
@@ -428,6 +493,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       session.statusLine = null;
       session.resultGridPrimaryKeys = const [];
       session.resultGridColumnDataTypes = null;
+      session.resultGridColumnMeta = null;
     });
     QueryaShellStatus.instance.beginBusy(message: 'Running query…');
     final sw = Stopwatch()..start();
@@ -437,6 +503,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       final conn = _lease?.connection;
       if (conn == null || !conn.isConnected) {
         if (mounted) {
+          _invalidatePane(session);
           setState(() {
             session.error = 'Could not connect to PostgreSQL.';
             session.running = false;
@@ -477,7 +544,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         n++;
       }
 
-      final converted = convertPostgresResultRowsToStrings(
+      final outRows = await convertPostgresResultRowsToStringsAdaptive(
         PostgresResultConvertJob(
           rowValues: rawRows,
           columnTypeOids: [
@@ -485,49 +552,55 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
           ],
         ),
       );
-      final outRows = await convertResultRowsToStringsAdaptive(converted);
 
       final target = SqlTableTargetExtractor.extract(userSql);
-      var pks = const <String>[];
-      Map<String, String>? types;
+      var gridSchema = SqlResultGridSchema.none;
       if (target != null && cols.isNotEmpty) {
-        try {
-          final meta = await conn.getTableSchema(
-            schema: target.schema ?? 'public',
-            table: target.tableName,
-          );
-          pks = List<String>.from(meta.primaryKeys);
-          types = columnDataTypesFromSchema(meta);
-        } catch (_) {
-          pks = const [];
-          types = null;
-        }
+        gridSchema = SqlResultGridSchema.fromLoad(
+          await loadTableViewSchema(
+            () => conn.getTableSchema(
+              schema: target.schema ?? 'public',
+              table: target.tableName,
+            ),
+          ),
+        );
       }
+      final pks = gridSchema.primaryKeys;
+      final editHint = gridSchema.editHint(cols);
       final canSave = sqlResultGridSaveEnabled(
         sql: userSql,
         resultColumns: cols,
         primaryKeys: pks,
       );
 
+      _invalidatePane(session);
       setState(() {
         session.columns = cols;
         session.rows = outRows;
         session.affectedRows = result.affectedRows;
         session.lastExecutedSql = userSql;
         session.resultGridPrimaryKeys = canSave ? pks : const [];
-        session.resultGridColumnDataTypes = types;
+        session.resultGridColumnDataTypes = gridSchema.columnDataTypes;
+        session.resultGridColumnMeta = gridSchema.columnMeta;
         session.stagingBuffer?.dispose();
         session.stagingBuffer = canSave
-            ? DataGridStagingBuffer(columns: cols, rows: outRows)
+            ? DataGridStagingBuffer(
+                columns: cols,
+                rows: outRows,
+                primaryKeys: pks,
+              )
             : null;
         if (cols.isEmpty && outRows.isEmpty) {
           session.statusLine =
               'Command completed. Rows affected: ${result.affectedRows}.';
         } else {
           final truncated = result.length >= cap;
-          session.statusLine = truncated
-              ? 'Showing first $cap row(s) (result capped).'
-              : '${result.length} row(s).';
+          session.statusLine = withEditHint(
+            truncated
+                ? 'Showing first $cap row(s) (result capped).'
+                : '${result.length} row(s).',
+            editHint,
+          );
         }
         session.running = false;
       });
@@ -552,6 +625,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     } on TimeoutException catch (e) {
       unawaited(_lease?.connection.forceClose());
       if (mounted) {
+        _invalidatePane(session);
         setState(() {
           session.error = 'Query timed out: ${e.message ?? e}';
           session.running = false;
@@ -560,6 +634,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       }
     } on pg.ServerException catch (e) {
       if (mounted) {
+        _invalidatePane(session);
         setState(() {
           session.error = e.message;
           session.running = false;
@@ -568,6 +643,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       }
     } catch (e) {
       if (mounted) {
+        _invalidatePane(session);
         setState(() {
           session.error = e.toString();
           session.running = false;
@@ -581,7 +657,8 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
 
   Future<void> _applyStagedChanges([SqlQueryTabSession? targetSession]) async {
     final session = targetSession ?? _activeSession;
-    if (session.stagingBuffer == null ||
+    if (widget.isReadOnly ||
+        session.stagingBuffer == null ||
         !session.stagingBuffer!.isDirty ||
         session.savingChanges) {
       return;
@@ -598,6 +675,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       return;
     }
 
+    _invalidatePane(session);
     setState(() => session.savingChanges = true);
     try {
       final plan = session.stagingBuffer!.generateMutationPlan(
@@ -606,8 +684,10 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         schema: target.schema ?? 'public',
         primaryKeys: session.resultGridPrimaryKeys,
         columnDataTypes: session.resultGridColumnDataTypes,
+        columnMeta: session.resultGridColumnMeta,
       );
       if (plan.isEmpty) {
+        _invalidatePane(session);
         setState(() => session.savingChanges = false);
         return;
       }
@@ -617,6 +697,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
         plan: plan,
       );
       if (confirmed != true) {
+        _invalidatePane(session);
         setState(() => session.savingChanges = false);
         return;
       }
@@ -639,44 +720,25 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       );
 
       if (!mounted) return;
-      final newRows = session.stagingBuffer!.effectiveRows;
+      final newRows = session.stagingBuffer!.committedRows;
       session.stagingBuffer?.dispose();
+      _invalidatePane(session);
       setState(() {
         session.rows = newRows;
         session.stagingBuffer =
-            DataGridStagingBuffer(columns: session.columns, rows: session.rows);
+            DataGridStagingBuffer(
+          columns: session.columns,
+          rows: session.rows,
+          primaryKeys: session.resultGridPrimaryKeys,
+        );
         session.savingChanges = false;
       });
       await _refreshTxStatus();
     } catch (e) {
       if (mounted) {
+        _invalidatePane(session);
         setState(() => session.savingChanges = false);
-        await showAppDialog<void>(
-          context: context,
-          builder: (ctx) => QueryaDialogCard(
-            constraints: const material.BoxConstraints(maxWidth: 420),
-            child: material.Padding(
-              padding: const material.EdgeInsets.all(20),
-              child: material.Column(
-                mainAxisSize: material.MainAxisSize.min,
-                crossAxisAlignment: material.CrossAxisAlignment.start,
-                children: [
-                  const Text('Save Changes Failed').semiBold().large(),
-                  const Gap(8),
-                  Text(e.toString()).muted().small(),
-                  const Gap(20),
-                  material.Align(
-                    alignment: material.Alignment.centerRight,
-                    child: PrimaryButton(
-                      onPressed: () => material.Navigator.of(ctx).pop(),
-                      child: const Text('OK'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
+        await showTableViewSaveFailedDialog(context: context, error: e);
       }
     }
   }
@@ -701,7 +763,8 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
           selection: material.TextSelection.collapsed(offset: text.length),
         );
         session.title = file.name;
-        session.filePath = file.path;
+        session.markSaved(newFilePath: file.path);
+        _invalidatePane(session);
         setState(() {});
       } else {
         _addNewTab(initialSql: text, title: file.name, filePath: file.path);
@@ -722,6 +785,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       final existingPath = session.filePath;
       if (existingPath != null && existingPath.isNotEmpty) {
         await File(existingPath).writeAsString(session.controller.text);
+        session.markSaved();
         if (!mounted) return;
         showAppToast(
           context: context,
@@ -744,9 +808,10 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       if (path == null || path.isEmpty) return;
       await File(path).writeAsString(session.controller.text);
       if (!mounted) return;
+      _invalidatePane(session);
       setState(() {
-        session.filePath = path;
         session.title = File(path).uri.pathSegments.last;
+        session.markSaved(newFilePath: path);
       });
       showAppToast(
         context: context,
@@ -877,7 +942,10 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
                   index: _activeSessionIndex,
                   children: [
                     for (final session in _sessions)
-                      _buildSessionPane(context, session),
+                      _paneCache.putIfAbsent(
+                        session.id,
+                        () => _buildSessionPane(context, session),
+                      ),
                   ],
                 ),
               ),
@@ -894,6 +962,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
   ) {
     final theme = Theme.of(context);
     return VerticalSplitPane(
+      key: material.ValueKey(session.id),
       fraction: session.topFraction,
       maxFraction: 0.85,
       top: Column(
@@ -904,7 +973,10 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
             onExecute: session.running ? null : () => _execute(session),
             running: session.running,
             autocommit: _autocommit,
-            onAutocommitChanged: (v) => setState(() => _autocommit = v),
+            onAutocommitChanged: (v) {
+              _invalidateAllPanes();
+              setState(() => _autocommit = v);
+            },
             queryTimeoutSeconds: _queryTimeoutSeconds,
             onQueryTimeoutChanged: _onStmtTimeoutChanged,
             onOpenPreferences: () => showPreferencesDialog(context),
@@ -915,6 +987,7 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
                       connectionId: widget.connectionRow.id!,
                       databaseName: _effectiveSessionDatabase(),
                       sqlController: session.controller,
+                      onOpenInNewTab: (sql) => _addNewTab(initialSql: sql),
                     );
                   }
                 : null,

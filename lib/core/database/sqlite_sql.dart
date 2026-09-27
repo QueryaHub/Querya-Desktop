@@ -7,6 +7,54 @@ String sqliteStripSqlComments(String sql) {
       .replaceAll(RegExp(r'/\*.*?\*/', dotAll: true), '');
 }
 
+/// Whether [sql] contains more than one statement (a `;` outside any string /
+/// quoted-identifier literal, followed by further non-whitespace text).
+///
+/// A single trailing `;` (with or without trailing whitespace) does not
+/// count. Used to refuse operations that must not be handed more than one
+/// statement at a time, such as wrapping arbitrary user SQL in a probe
+/// `CREATE TEMP VIEW ... AS <sql>` — unlike `rawQuery`, `Database.execute`
+/// runs every statement it's given, so a second, unintended statement in the
+/// probed text would otherwise execute for real (#1005).
+bool sqliteHasMultipleStatements(String sql) {
+  final s = sqliteStripSqlComments(sql);
+  var i = 0;
+  while (i < s.length) {
+    final c = s[i];
+    if (c == "'" || c == '"' || c == '`') {
+      i++;
+      while (i < s.length) {
+        if (s[i] == c) {
+          i++;
+          if (i < s.length && s[i] == c) {
+            i++;
+            continue;
+          }
+          break;
+        }
+        i++;
+      }
+      continue;
+    }
+    if (c == '[') {
+      i++;
+      while (i < s.length && s[i] != ']') {
+        i++;
+      }
+      if (i < s.length) i++;
+      continue;
+    }
+    if (c == ';') {
+      final rest = s.substring(i + 1);
+      if (!RegExp(r'^[;\s]*$').hasMatch(rest)) return true;
+      i++;
+      continue;
+    }
+    i++;
+  }
+  return false;
+}
+
 /// Whether [sql] should use `rawQuery` and is allowed on a read-only connection.
 ///
 /// `WITH` is read-only only when the statement after the CTEs is `SELECT` /

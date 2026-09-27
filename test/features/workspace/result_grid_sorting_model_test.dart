@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
@@ -226,6 +227,295 @@ void main() {
       expect(stagingBuffer.isCellNull(1, 0), isTrue);
       expect(stagingBuffer.getCellStatus(0, 0), equals(StagedCellStatus.clean));
       expect(stagingBuffer.getCellValue(0, 0), equals('Charlie'));
+    });
+  });
+
+  group('VirtualResultGrid keeps sorted order stable while editing (#875)', () {
+    Future<DataGridStagingBuffer> pumpSorted(
+      WidgetTester tester, {
+      required bool rebuildParent,
+    }) async {
+      final columns = ['name', 'age'];
+      final buffer = DataGridStagingBuffer(
+        columns: columns,
+        rows: [
+          ['Charlie', '30'], // model 0
+          ['Alice', '10'], // model 1
+          ['Bob', '20'], // model 2
+        ],
+      );
+      addTearDown(buffer.dispose);
+
+      await tester.pumpWidget(
+        _testShell(
+          child: material.SizedBox(
+            width: 800,
+            height: 600,
+            child: rebuildParent
+                // Like ResultsTab: a fresh `rows` list on every buffer change.
+                ? material.ListenableBuilder(
+                    listenable: buffer,
+                    builder: (_, __) => VirtualResultGrid(
+                      columns: columns,
+                      rows: buffer.effectiveRows,
+                      stagingBuffer: buffer,
+                    ),
+                  )
+                : VirtualResultGrid(
+                    columns: columns,
+                    rows: buffer.effectiveRows,
+                    stagingBuffer: buffer,
+                  ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('name'));
+      await tester.pumpAndSettle();
+      return buffer;
+    }
+
+    double y(WidgetTester tester, String text) =>
+        tester.getTopLeft(find.text(text)).dy;
+
+    for (final rebuildParent in [false, true]) {
+      testWidgets(
+          'editing a cell keeps the row in place and shows the new value '
+          '(parent rebuilds: $rebuildParent)', (tester) async {
+        final buffer = await pumpSorted(tester, rebuildParent: rebuildParent);
+        // Sorted ascending: Alice, Bob, Charlie.
+        expect(y(tester, 'Alice') < y(tester, 'Bob'), isTrue);
+
+        buffer.setCell(1, 0, 'Zed'); // Alice -> Zed (model row 1)
+        await tester.pumpAndSettle();
+
+        expect(find.text('Alice'), findsNothing);
+        // Zed stays first instead of jumping below Charlie.
+        expect(y(tester, 'Zed') < y(tester, 'Bob'), isTrue);
+        expect(y(tester, 'Bob') < y(tester, 'Charlie'), isTrue);
+      });
+
+      testWidgets(
+          'edits keep mapping visual rows to the right model row '
+          '(parent rebuilds: $rebuildParent)', (tester) async {
+        final buffer = await pumpSorted(tester, rebuildParent: rebuildParent);
+
+        buffer.setCell(1, 1, '99');
+        await tester.pumpAndSettle();
+        await _secondaryClick(tester, find.text('Alice'));
+        await tester.tap(find.text('Delete Row'));
+        await tester.pumpAndSettle();
+
+        expect(buffer.getRowStatus(1), StagedRowStatus.deleted);
+        expect(buffer.getRowStatus(0), StagedRowStatus.unchanged);
+      });
+    }
+
+    testWidgets('inserting a row still re-sorts', (tester) async {
+      final buffer = await pumpSorted(tester, rebuildParent: true);
+
+      buffer.addRow(['Aaron', '5']);
+      await tester.pumpAndSettle();
+
+      expect(y(tester, 'Aaron') < y(tester, 'Alice'), isTrue);
+    });
+  });
+
+  group('VirtualResultGrid horizontal scroll rebuilds (#879)', () {
+    const colCount = 40;
+    final columns = [for (var c = 0; c < colCount; c++) 'column_$c'];
+    final rows = [
+      for (var r = 0; r < 5; r++) [for (var c = 0; c < colCount; c++) 'v${r}_$c'],
+    ];
+
+    Future<void> pumpWide(WidgetTester tester) async {
+      await tester.pumpWidget(
+        _testShell(
+          child: material.SizedBox(
+            width: 600,
+            height: 400,
+            child: VirtualResultGrid(columns: columns, rows: rows),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    Finder firstRow() => find.byKey(const material.ValueKey('result-row-0'));
+
+    Finder hScrollable() => find.byWidgetPredicate(
+          (w) => w is Scrollable && w.axis == Axis.horizontal,
+        );
+
+    testWidgets('a small pan inside the same column window does not rebuild rows',
+        (tester) async {
+      await pumpWide(tester);
+      final before = tester.widget(firstRow());
+      expect(find.text('column_0'), findsOneWidget);
+
+      // A few pixels stays inside the current (overscanned) window.
+      final position = tester.state<ScrollableState>(hScrollable()).position;
+      position.jumpTo(3);
+      await tester.pump();
+      expect(position.pixels, 3);
+
+      expect(identical(tester.widget(firstRow()), before), isTrue,
+          reason: 'rows must not be rebuilt for a pan that keeps the window');
+      await tester.pumpAndSettle(); // let the scrollbar fade timer finish
+    });
+
+    testWidgets('panning far enough builds the newly visible columns',
+        (tester) async {
+      await pumpWide(tester);
+      expect(find.text('column_39'), findsNothing);
+
+      final position = tester.state<ScrollableState>(hScrollable()).position;
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pumpAndSettle();
+
+      expect(find.text('column_39'), findsOneWidget);
+      expect(find.text('v0_39'), findsOneWidget);
+      expect(find.text('column_0'), findsNothing);
+    });
+
+    testWidgets('scrolling back restores the first columns', (tester) async {
+      await pumpWide(tester);
+      final position = tester.state<ScrollableState>(hScrollable()).position;
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      position.jumpTo(0);
+      await tester.pumpAndSettle();
+
+      expect(find.text('column_0'), findsOneWidget);
+      expect(find.text('column_39'), findsNothing);
+    });
+  });
+
+  group('VirtualResultGrid reuses unchanged rows and cells (#972)', () {
+    // Wider than the viewport, so content edits do not re-distribute spare
+    // column width (which legitimately rebuilds every row).
+    final columns = [for (var c = 0; c < 30; c++) 'col_$c'];
+    Future<DataGridStagingBuffer> pump(WidgetTester tester) async {
+      final buffer = DataGridStagingBuffer(
+        columns: columns,
+        rows: [
+          for (var r = 0; r < 6; r++) [for (var c = 0; c < 30; c++) 'r${r}c$c'],
+        ],
+      );
+      addTearDown(buffer.dispose);
+      await tester.pumpWidget(
+        _testShell(
+          child: material.SizedBox(
+            width: 800,
+            height: 600,
+            child: material.ListenableBuilder(
+              listenable: buffer,
+              builder: (_, __) => VirtualResultGrid(
+                columns: columns,
+                rows: buffer.effectiveRows,
+                stagingBuffer: buffer,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return buffer;
+    }
+
+    Widget rowWidget(WidgetTester tester, int i) =>
+        tester.widget(find.byKey(material.ValueKey('result-row-$i')));
+
+    testWidgets('editing one cell rebuilds only that row', (tester) async {
+      final buffer = await pump(tester);
+      final before = [for (var i = 0; i < 6; i++) rowWidget(tester, i)];
+
+      buffer.setCell(2, 1, 'edited');
+      await tester.pumpAndSettle();
+
+      for (var i = 0; i < 6; i++) {
+        expect(identical(rowWidget(tester, i), before[i]), i != 2,
+            reason: 'row $i');
+      }
+      expect(find.text('edited'), findsOneWidget);
+    });
+
+    testWidgets('a selection change only rebuilds rows in the old or new range',
+        (tester) async {
+      await pump(tester);
+      await tester.tap(find.text('r1c0'));
+      // onTap resolves only after the double-tap timeout.
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pumpAndSettle();
+      final before = [for (var i = 0; i < 6; i++) rowWidget(tester, i)];
+
+      // Arrow Down moves the selection from row 1 to row 2.
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+
+      for (var i = 0; i < 6; i++) {
+        final touched = i == 1 || i == 2;
+        expect(identical(rowWidget(tester, i), before[i]), !touched,
+            reason: 'row $i');
+      }
+    });
+
+    testWidgets('staged status changes still repaint the row', (tester) async {
+      final buffer = await pump(tester);
+      final before = rowWidget(tester, 3);
+
+      buffer.toggleDeleteRow(3);
+      await tester.pumpAndSettle();
+
+      expect(identical(rowWidget(tester, 3), before), isFalse);
+      expect(buffer.getRowStatus(3), StagedRowStatus.deleted);
+    });
+
+    testWidgets('cells that stay in the column window are reused on scroll',
+        (tester) async {
+      final wide = [for (var c = 0; c < 40; c++) 'column_$c'];
+      final rows = [
+        for (var r = 0; r < 3; r++) [for (var c = 0; c < 40; c++) 'v${r}_$c'],
+      ];
+      await tester.pumpWidget(
+        _testShell(
+          child: material.SizedBox(
+            width: 600,
+            height: 400,
+            child: VirtualResultGrid(columns: wide, rows: rows),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      Map<int, Widget> cells() {
+        final out = <int, Widget>{};
+        final rowFinder = find.byKey(const material.ValueKey('result-row-0'));
+        for (var c = 0; c < 40; c++) {
+          final f = find.descendant(
+            of: rowFinder,
+            matching: find.byKey(material.ValueKey<int>(c)),
+          );
+          if (f.evaluate().isNotEmpty) out[c] = tester.widget(f);
+        }
+        return out;
+      }
+
+      final before = cells();
+      final position = tester
+          .state<ScrollableState>(find.byWidgetPredicate(
+              (w) => w is Scrollable && w.axis == Axis.horizontal))
+          .position;
+      position.jumpTo(1200); // far enough to shift the window
+      await tester.pumpAndSettle();
+      final after = cells();
+
+      expect(after.keys.first, greaterThan(before.keys.first));
+      final shared = before.keys.toSet().intersection(after.keys.toSet());
+      expect(shared, isNotEmpty);
+      for (final c in shared) {
+        expect(identical(before[c], after[c]), isTrue, reason: 'column $c');
+      }
     });
   });
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
@@ -139,5 +140,122 @@ void main() {
       );
       expect(find.textContaining('Marketplace API'), findsOneWidget);
     });
+
+    group('marketplace search', () {
+      Future<_ControlledMarketplace> openMarketplace(
+        WidgetTester tester,
+      ) async {
+        final repo = _ControlledMarketplace();
+        MarketplaceRepository.instance = repo;
+        await tester.pumpWidget(
+          queryaThemeTestShell(
+            child: material.Builder(
+              builder: (ctx) => material.Scaffold(
+                body: material.Center(
+                  child: PrimaryButton(
+                    onPressed: () => showExtensionManagerDialog(ctx),
+                    child: const Text('Open Dialog'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('Open Dialog'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Marketplace'));
+        await tester.pumpAndSettle();
+        repo.searches.clear();
+        return repo;
+      }
+
+      testWidgets('debounces keystrokes into a single request', (tester) async {
+        final repo = await openMarketplace(tester);
+        final field = find.byType(TextField);
+
+        for (final q in ['c', 'cl', 'cli', 'click']) {
+          await tester.enterText(field, q);
+          await tester.pump(const Duration(milliseconds: 50));
+        }
+        expect(repo.searches, isEmpty);
+
+        await tester.pump(kMarketplaceSearchDebounce);
+        expect(repo.searches, ['click']);
+        repo.complete('click', [_manifest('click.ext', 'Click Result')]);
+        await tester.pumpAndSettle();
+        expect(find.text('Click Result'), findsOneWidget);
+      });
+
+      testWidgets('a stale response arriving late is ignored', (tester) async {
+        final repo = await openMarketplace(tester);
+        final field = find.byType(TextField);
+
+        await tester.enterText(field, 'click');
+        await tester.pump(kMarketplaceSearchDebounce);
+        await tester.enterText(field, 'clickhouse');
+        await tester.pump(kMarketplaceSearchDebounce);
+        expect(repo.searches, ['click', 'clickhouse']);
+
+        // Newer response first, older one afterwards.
+        repo.complete('clickhouse', [_manifest('ch.ext', 'ClickHouse Result')]);
+        await tester.pumpAndSettle();
+        repo.complete('click', [_manifest('c.ext', 'Stale Result')]);
+        await tester.pumpAndSettle();
+
+        expect(find.text('ClickHouse Result'), findsOneWidget);
+        expect(find.text('Stale Result'), findsNothing);
+      });
+
+      testWidgets('closing the dialog while a search is in flight is safe',
+          (tester) async {
+        final repo = await openMarketplace(tester);
+
+        await tester.enterText(find.byType(TextField), 'click');
+        await tester.pump(kMarketplaceSearchDebounce);
+        expect(repo.searches, ['click']);
+
+        // Dispose the dialog, then let the request finish.
+        await tester.pumpWidget(const material.SizedBox());
+        repo.complete('click', [_manifest('c.ext', 'Late Result')]);
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('typing then closing before the debounce fires sends nothing',
+          (tester) async {
+        final repo = await openMarketplace(tester);
+
+        await tester.enterText(find.byType(TextField), 'click');
+        await tester.pumpWidget(const material.SizedBox());
+        await tester.pump(kMarketplaceSearchDebounce * 2);
+
+        expect(repo.searches, isEmpty);
+      });
+    });
   });
+}
+
+ExtensionManifest _manifest(String id, String name) => ExtensionManifest(
+      id: id,
+      name: name,
+      version: '1.0.0',
+      publisher: 'QueryaHub',
+      type: ExtensionType.databaseDriver,
+      engines: const {'querya_desktop': '^0.4.7'},
+    );
+
+/// Marketplace whose `search` futures complete only when the test says so.
+class _ControlledMarketplace extends MockMarketplaceRepository {
+  final List<String> searches = [];
+  final Map<String, Completer<List<ExtensionManifest>>> _pending = {};
+
+  @override
+  Future<List<ExtensionManifest>> search(String query, {ExtensionType? type}) {
+    searches.add(query);
+    return (_pending[query] = Completer<List<ExtensionManifest>>()).future;
+  }
+
+  void complete(String query, List<ExtensionManifest> result) =>
+      _pending[query]!.complete(result);
 }

@@ -77,8 +77,34 @@ class _GridCellEditorState extends material.State<GridCellEditor> {
     super.dispose();
   }
 
-  void _handleKeyEvent(KeyEvent event) {
-    if (event is! KeyDownEvent) return;
+  bool _finished = false;
+
+  void _commit(
+    String value, {
+    bool moveNextCol = false,
+    bool movePrevCol = false,
+    bool moveNextRow = false,
+    bool movePrevRow = false,
+  }) {
+    if (_finished) return;
+    _finished = true;
+    widget.onCommit(
+      value,
+      moveNextCol: moveNextCol,
+      movePrevCol: movePrevCol,
+      moveNextRow: moveNextRow,
+      movePrevRow: movePrevRow,
+    );
+  }
+
+  void _cancel() {
+    if (_finished) return;
+    _finished = true;
+    widget.onCancel();
+  }
+
+  KeyEventResult _handleKeyEvent(material.FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
     final isShift = HardwareKeyboard.instance.isShiftPressed;
     final isAlt = HardwareKeyboard.instance.isAltPressed;
@@ -87,8 +113,8 @@ class _GridCellEditorState extends material.State<GridCellEditor> {
 
     // Alt+N / Ctrl+Alt+N -> Set NULL
     if (event.logicalKey == LogicalKeyboardKey.keyN && (isAlt || (isControl && isAlt))) {
-      widget.onCommit('NULL');
-      return;
+      _commit('NULL');
+      return KeyEventResult.handled;
     }
 
     // Alt+Enter or Ctrl+Enter -> Open Inspector
@@ -96,35 +122,37 @@ class _GridCellEditorState extends material.State<GridCellEditor> {
             event.logicalKey == LogicalKeyboardKey.numpadEnter) &&
         (isAlt || isControl)) {
       widget.onOpenInspector?.call();
-      return;
+      return KeyEventResult.handled;
     }
 
     // Enter / Shift+Enter -> Commit and navigate row
     if (event.logicalKey == LogicalKeyboardKey.enter ||
         event.logicalKey == LogicalKeyboardKey.numpadEnter) {
       if (isShift) {
-        widget.onCommit(_controller.text, movePrevRow: true);
+        _commit(_controller.text, movePrevRow: true);
       } else {
-        widget.onCommit(_controller.text, moveNextRow: true);
+        _commit(_controller.text, moveNextRow: true);
       }
-      return;
+      return KeyEventResult.handled;
     }
 
     // Tab / Shift+Tab -> Commit and navigate col
     if (event.logicalKey == LogicalKeyboardKey.tab) {
       if (isShift) {
-        widget.onCommit(_controller.text, movePrevCol: true);
+        _commit(_controller.text, movePrevCol: true);
       } else {
-        widget.onCommit(_controller.text, moveNextCol: true);
+        _commit(_controller.text, moveNextCol: true);
       }
-      return;
+      return KeyEventResult.handled;
     }
 
     // Escape -> Cancel
     if (event.logicalKey == LogicalKeyboardKey.escape) {
-      widget.onCancel();
-      return;
+      _cancel();
+      return KeyEventResult.handled;
     }
+
+    return KeyEventResult.ignored;
   }
 
   @override
@@ -149,7 +177,7 @@ class _GridCellEditorState extends material.State<GridCellEditor> {
       child: material.Row(
         children: [
           material.Expanded(
-            child: material.KeyboardListener(
+            child: material.Focus(
               focusNode: _focusNode,
               onKeyEvent: _handleKeyEvent,
               autofocus: true,
@@ -167,7 +195,7 @@ class _GridCellEditorState extends material.State<GridCellEditor> {
                   contentPadding: material.EdgeInsets.zero,
                 ),
                 onSubmitted: (value) {
-                  widget.onCommit(value, moveNextRow: true);
+                  _commit(value, moveNextRow: true);
                 },
               ),
             ),

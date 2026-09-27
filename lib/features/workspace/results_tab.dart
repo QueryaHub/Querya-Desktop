@@ -1,4 +1,4 @@
-import 'dart:async' show unawaited;
+import 'dart:async' show Timer, unawaited;
 
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
@@ -22,6 +22,23 @@ enum ResultViewMode {
 }
 
 /// Query output: grid, loading, error, or placeholder.
+/// Pause after the last selection change before aggregates are recomputed.
+const kSelectionStatsDebounce = Duration(milliseconds: 60);
+
+/// The cell that has keyboard focus, shown in the value inspector panel.
+@immutable
+class _FocusedCell {
+  const _FocusedCell({
+    required this.columnName,
+    required this.value,
+    required this.rowIndex,
+  });
+
+  final String columnName;
+  final String value;
+  final int? rowIndex;
+}
+
 class ResultsTab extends material.StatefulWidget {
   const ResultsTab({
     super.key,
@@ -59,18 +76,25 @@ class ResultsTab extends material.StatefulWidget {
 }
 
 class _ResultsTabState extends material.State<ResultsTab> {
-  int? _selectedRowIndex;
+  /// Selection / focus state lives in notifiers so a navigation step rebuilds
+  /// only the widgets that show it (toolbar, value panel, calc bar), not the
+  /// whole tab and its grid.
+  final _selectedRowIndex = material.ValueNotifier<int?>(null);
+  final _focusedCell = material.ValueNotifier<_FocusedCell?>(null);
+  final _selectionStats =
+      material.ValueNotifier<GridCalcStats>(GridCalcStats.empty);
+  Timer? _statsDebounce;
+
+  /// Bumped for every selection change; a stats result is applied only if it
+  /// still matches, so a slow older aggregation cannot overwrite a newer one.
+  int _statsSeq = 0;
+
   ResultViewMode _viewMode = ResultViewMode.grid;
 
   bool _showFilterBar = false;
   String _filterText = '';
 
   bool _showValuePanel = false;
-  String? _focusedColumnName;
-  String? _focusedCellValue;
-  int? _focusedRowIndex;
-
-  GridCalcStats _selectionStats = GridCalcStats.empty;
 
   String? _memoFilterText;
   List<String>? _memoColumns;
@@ -191,8 +215,35 @@ class _ResultsTabState extends material.State<ResultsTab> {
     }
   }
 
+  /// Selection aggregates are recomputed after a short pause, so holding an
+  /// arrow key or dragging a selection does not run the maths on every step.
+  void _onSelectionValues(List<String> values) {
+    final seq = ++_statsSeq;
+    _statsDebounce?.cancel();
+    if (values.isEmpty) {
+      _selectionStats.value = GridCalcStats.empty;
+      return;
+    }
+    _statsDebounce = Timer(kSelectionStatsDebounce, () {
+      if (values.length < GridSelectionCalcEngine.computeThreshold) {
+        _selectionStats.value = GridSelectionCalcEngine.compute(values);
+        return;
+      }
+      unawaited(
+        GridSelectionCalcEngine.computeAdaptive(values).then((stats) {
+          if (mounted && seq == _statsSeq) _selectionStats.value = stats;
+        }),
+      );
+    });
+  }
+
   @override
   void dispose() {
+    _statsDebounce?.cancel();
+    _statsSeq++;
+    _selectedRowIndex.dispose();
+    _focusedCell.dispose();
+    _selectionStats.dispose();
     DataGridCommandBridge.instance.unregister();
     _memoColumns = null;
     _memoEffectiveRows = null;
@@ -319,11 +370,14 @@ class _ResultsTabState extends material.State<ResultsTab> {
           QueryaAnimatedExpand(
             expanded: widget.stagingBuffer != null,
             child: widget.stagingBuffer != null
-                ? DataGridStagingToolbar(
-                    stagingBuffer: widget.stagingBuffer!,
-                    selectedRowIndex: _selectedRowIndex,
-                    onApplyChanges: widget.onApplyChanges,
-                    isSaving: widget.isSaving,
+                ? material.ValueListenableBuilder<int?>(
+                    valueListenable: _selectedRowIndex,
+                    builder: (_, selectedRow, __) => DataGridStagingToolbar(
+                      stagingBuffer: widget.stagingBuffer!,
+                      selectedRowIndex: selectedRow,
+                      onApplyChanges: widget.onApplyChanges,
+                      isSaving: widget.isSaving,
+                    ),
                   )
                 : const material.SizedBox.shrink(),
           ),
@@ -497,32 +551,14 @@ class _ResultsTabState extends material.State<ResultsTab> {
                           stagingBuffer: widget.stagingBuffer,
                           columnDataTypes: widget.columnDataTypes,
                           rowIndicesMapping: _cachedFilteredIndices,
-                          onRowSelected: (row) => setState(() => _selectedRowIndex = row),
-                          onSelectionValuesChanged: (values) {
-                            if (values.isEmpty) {
-                              setState(() => _selectionStats = GridCalcStats.empty);
-                              return;
-                            }
-                            if (values.length < GridSelectionCalcEngine.computeThreshold) {
-                              setState(() {
-                                _selectionStats = GridSelectionCalcEngine.compute(values);
-                              });
-                            } else {
-                              unawaited(
-                                GridSelectionCalcEngine.computeAdaptive(values).then((stats) {
-                                  if (mounted) {
-                                    setState(() => _selectionStats = stats);
-                                  }
-                                }),
-                              );
-                            }
-                          },
+                          onRowSelected: (row) => _selectedRowIndex.value = row,
+                          onSelectionValuesChanged: _onSelectionValues,
                           onCellFocused: (colName, cellVal, rowIdx) {
-                            setState(() {
-                              _focusedColumnName = colName;
-                              _focusedCellValue = cellVal;
-                              _focusedRowIndex = rowIdx;
-                            });
+                            _focusedCell.value = _FocusedCell(
+                              columnName: colName,
+                              value: cellVal,
+                              rowIndex: rowIdx,
+                            );
                           },
                           onFilterRequested: (filterExpr) {
                             setState(() {
@@ -540,34 +576,40 @@ class _ResultsTabState extends material.State<ResultsTab> {
                       ),
 
                       // Value Inspector Panel
-                      material.AnimatedSize(
-                        duration: context.motionDuration(QueryaMotion.standard),
-                        curve: context.motionCurve(QueryaMotion.enter),
-                        alignment: material.Alignment.centerRight,
-                        child: (_showValuePanel &&
-                                _focusedColumnName != null &&
-                                _focusedCellValue != null)
-                            ? DataGridValuePanel(
-                                columnName: _focusedColumnName!,
-                                cellValue: _focusedCellValue!,
-                                rowIndex: _focusedRowIndex,
-                                onClose: () => setState(() => _showValuePanel = false),
-                                onUpdateValue: widget.stagingBuffer != null &&
-                                        _focusedRowIndex != null &&
-                                        _focusedColumnName != null
-                                    ? (newVal) {
-                                        final colIdx = widget.columns.indexOf(_focusedColumnName!);
-                                        if (colIdx != -1) {
-                                          widget.stagingBuffer!.setCell(
-                                            _focusedRowIndex!,
-                                            colIdx,
-                                            newVal,
-                                          );
+                      material.ValueListenableBuilder<_FocusedCell?>(
+                        valueListenable: _focusedCell,
+                        builder: (context, focused, _) => material.AnimatedSize(
+                          duration:
+                              context.motionDuration(QueryaMotion.standard),
+                          curve: context.motionCurve(QueryaMotion.enter),
+                          alignment: material.Alignment.centerRight,
+                          child: (_showValuePanel && focused != null)
+                              ? DataGridValuePanel(
+                                  columnName: focused.columnName,
+                                  cellValue: focused.value,
+                                  rowIndex: focused.rowIndex,
+                                  onClose: () =>
+                                      setState(() => _showValuePanel = false),
+                                  onUpdateValue: widget.stagingBuffer != null &&
+                                          focused.rowIndex != null
+                                      ? (newVal) {
+                                          final colIdx = widget.columns
+                                              .indexOf(focused.columnName);
+                                          if (colIdx != -1) {
+                                            widget.stagingBuffer!.setCell(
+                                              focused.rowIndex!,
+                                              colIdx,
+                                              newVal,
+                                            );
+                                          }
                                         }
-                                      }
-                                    : null,
-                              )
-                            : const material.SizedBox(width: 0, height: double.infinity),
+                                      : null,
+                                )
+                              : const material.SizedBox(
+                                  width: 0,
+                                  height: double.infinity,
+                                ),
+                        ),
                       ),
                     ],
                   ),
@@ -576,7 +618,10 @@ class _ResultsTabState extends material.State<ResultsTab> {
 
         // Calc Bar Footer
         if (_viewMode == ResultViewMode.grid)
-          DataGridCalcBar(stats: _selectionStats),
+          material.ValueListenableBuilder<GridCalcStats>(
+            valueListenable: _selectionStats,
+            builder: (_, stats, __) => DataGridCalcBar(stats: stats),
+          ),
       ],
     ),
   );

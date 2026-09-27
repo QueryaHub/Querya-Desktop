@@ -55,14 +55,20 @@ class ExtensionDriverSession {
   }) {
     return resolveExtensionCommandTarget(
       extensionId: extensionId,
-      liveConnectionIds: [
-        for (final entry in _bridges.entries)
-          if (entry.value.isStarted) entry.key,
-      ],
+      liveConnectionIds: liveConnectionIdsForExtension(extensionId),
       extensionIdFor: (id) => _manifests[id]?.id,
       preferredConnectionId: preferredConnectionId,
     );
   }
+
+  /// Connection ids with a live, started session for [extensionId] — the
+  /// candidates a connection picker should offer when [targetForExtension]
+  /// returns [ExtensionCommandTargetKind.ambiguous] (#892).
+  List<int> liveConnectionIdsForExtension(String extensionId) => [
+        for (final entry in _bridges.entries)
+          if (entry.value.isStarted && _manifests[entry.key]?.id == extensionId)
+            entry.key,
+      ];
 
   PluginRpcBridge? _startedBridge(int connectionId) {
     final bridge = _bridges[connectionId];
@@ -445,21 +451,18 @@ class ExtensionDriverSession {
     required String tableName,
   }) async {
     final bridge = await ensureConnected(row);
-    try {
-      final result = await bridge.sendRequest('db.getTableSchema', {
-        'connectionId': row.id,
-        'database': database,
-        if (schema != null && schema.isNotEmpty) 'schema': schema,
-        'tableName': tableName,
-      });
-      if (result is Map) {
-        return TableSchemaMeta.fromJson(Map<String, dynamic>.from(result));
-      }
-      return TableSchemaMeta(tableName: tableName, schema: schema);
-    } catch (e) {
-      debugPrint('ExtensionDriverSession getTableSchema fallback ($e)');
-      return TableSchemaMeta(tableName: tableName, schema: schema);
+    final result = await bridge.sendRequest('db.getTableSchema', {
+      'connectionId': row.id,
+      'database': database,
+      if (schema != null && schema.isNotEmpty) 'schema': schema,
+      'tableName': tableName,
+    });
+    if (result is Map) {
+      return TableSchemaMeta.fromJson(Map<String, dynamic>.from(result));
     }
+    throw StateError(
+      'Driver db.getTableSchema returned unexpected payload: $result',
+    );
   }
 
   /// Executes batch data mutations (insert, update, delete) via `db.mutate`.
@@ -514,6 +517,21 @@ class ExtensionDriverSession {
 
   Future<void> disconnectAll() async {
     final ids = _bridges.keys.toList();
+    for (final id in ids) {
+      await disconnect(id);
+    }
+  }
+
+  /// Stops every live session backed by [extensionId] (across all its open
+  /// connections), releasing the driver process and any file handles it
+  /// holds. Call this before overwriting or deleting an installed
+  /// extension's files — on Windows a running `bin/<driver>.exe` otherwise
+  /// holds a mandatory lock that makes the overwrite/delete fail (#891).
+  Future<void> stopAllForExtension(String extensionId) async {
+    final ids = [
+      for (final entry in _manifests.entries)
+        if (entry.value.id == extensionId) entry.key,
+    ];
     for (final id in ids) {
       await disconnect(id);
     }

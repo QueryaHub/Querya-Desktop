@@ -79,6 +79,44 @@ void main() {
       );
       expect(target, const SqlTableTarget(tableName: 'events'));
     });
+
+    test('returns null for non-SELECT queries (DELETE, INSERT, UPDATE, EXPLAIN)', () {
+      expect(
+        SqlTableTargetExtractor.extract('DELETE FROM users WHERE id = 1 RETURNING id'),
+        isNull,
+      );
+      expect(
+        SqlTableTargetExtractor.extract('INSERT INTO archive SELECT * FROM users'),
+        isNull,
+      );
+      expect(
+        SqlTableTargetExtractor.extract('UPDATE users SET name = "foo" WHERE id = 1'),
+        isNull,
+      );
+      expect(
+        SqlTableTargetExtractor.extract('EXPLAIN SELECT * FROM users'),
+        isNull,
+      );
+      expect(
+        SqlTableTargetExtractor.extract('EXPLAIN ANALYZE SELECT * FROM users'),
+        isNull,
+      );
+      expect(
+        SqlTableTargetExtractor.extract('WITH cte AS (SELECT 1) SELECT * FROM users'),
+        isNull,
+      );
+    });
+
+    test('extracts table name from SELECT preceded by comments', () {
+      expect(
+        SqlTableTargetExtractor.extract('-- Fetch all users\nSELECT * FROM users'),
+        const SqlTableTarget(tableName: 'users'),
+      );
+      expect(
+        SqlTableTargetExtractor.extract('/* Block comment */ SELECT * FROM users'),
+        const SqlTableTarget(tableName: 'users'),
+      );
+    });
   });
 
   group('sqlResultGridSaveEnabled', () {

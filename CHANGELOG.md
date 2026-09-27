@@ -9,8 +9,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
-- Hidden bugs pass 2 — data-loss / fail-open: [#867](https://github.com/QueryaHub/Querya-Desktop/issues/867)–[#873](https://github.com/QueryaHub/Querya-Desktop/issues/873)
-- Algorithm / first paint / 120 Hz: [#874](https://github.com/QueryaHub/Querya-Desktop/issues/874)–[#879](https://github.com/QueryaHub/Querya-Desktop/issues/879)
+- Planned 0.5.0 — live Marketplace download and install
+- High-refresh Linux compositor investigations (#980)
+
+## [0.4.18] - 2026-09-28
+
+Shell and motion performance (sidebar layout isolation and offstage rendering), data-loss guard rails, driver session correctness, and high-refresh grid reliability.
+
+### Added
+
+- **Redis key rename (#921)** — Added key rename dialog with overwrite check and destructive action confirmation in key editor.
+- **MongoDB add document draft (#923)** — Opened draft editor dialog on Add Document instead of inserting empty object.
+
+### Performance & Motion
+
+- **Sidebar toggle layout isolation & offstage rendering (#984, #1004)** — Decoupled workspace layout from intermediate spring animation frames via `OverflowBox` and `ClipRect`, keeping constraints stable at window width during toggle/snapping animation ticks to eliminate per-frame reflows and active `LayoutBuilder` rebuilds (<0.5ms per frame build time). Added `LazyOffstage` to skip re-laying out hidden workspace layers in `QueryaSwitchingBody`.
+- **Sidebar spring optimization (#900)** — Optimized sidebar spring animation and eliminated full-slot offscreen `Opacity` compositing when expanded.
+- **Result grid row cache bounds (#1010)** — Evicted and bounded `_rowWidgets` memo cache on buffer swaps and vertical scroll to cap memory usage during heavy dataset exploration.
+- **MongoDB field list virtualization (#925)** — Replaced unvirtualized shrinkWrap ListView in `_FieldList` with Column / sliver to eliminate frame drops on large document schemas.
+- **Lazy connection secrets loading (#916)** — Resolved connection secrets lazily with graceful Keychain/Secret Service error handling.
+
+### Fixed
+
+- **Execute dirty guard (#867)** — Prevented discarding dirty result-grid edits when clicking Execute without staging or saving.
+- **Extensions table dirty guard & PK requirement (#869)** — Required primary key and guarded dirty edits in `ExtensionTableView`.
+- **MongoDB document editor dirty guard (#870)** — Guarded document editor Refresh and navigation against discarding unsaved JSON edits.
+- **Redis string key refresh dirty guard (#873)** — Guarded string key Refresh and crumb navigation against discarding unsaved edits.
+- **SQL tab unsaved text tracking (#910)** — Tracked query text modifications in `SqlQueryTabSession` to prevent unsaved data loss on tab/app close.
+- **SQL history overwrite confirmation (#912)** — Added confirmation prompt before restoring a query from history over non-empty editor tabs.
+- **SQL workspace read-only save desync (#1007)** — Immediately disabled Save button and staged edits when a dirty tab's connection turns read-only.
+- **SQLite multi-statement column inference & PK detection (#1005)** — Handled multi-statement comments and preserved column schema for compound primary keys in SQLite Table Browser.
+- **SQLite zero-row column headers (#914)** — Retained column headers when queries return zero rows in `SqliteSqlWorkspace`.
+- **SQL target extractor SELECT enforcement (#913)** — Enforced SELECT statement requirement in `SqlTableTargetExtractor`.
+- **Primary key casing normalization (#907)** — Normalized identifier casing when resolving primary keys across dialect backends in `TableMutationEngine`.
+- **Redis empty SCAN loop lockup (#920)** — Looped `SCAN` until keys are found or cursor reaches zero, preventing empty result lockups on sparse keyspaces.
+- **Redis list item edit & delete bounds (#922, #1009)** — Enabled item deletion and inline editing in list key editor; guarded against concurrent list edit index out of bounds and lossy binary conversions.
+- **MongoDB unauthorized listDatabases fallback (#924)** — Handled unauthorized `listDatabases` on the admin database by falling back gracefully to the connection database.
+- **Grid cell editor focus & click-away (#905, #1006)** — Prevented double commit and consumed Enter key events in `GridCellEditor`; fixed staged cell editor click-away unselecting cell and losing focus.
+- **Grid drag range selection (#904)** — Supported mouse drag range selection across cells in `ResultGridView`.
+- **Grid filter quoted literals & identifiers (#903)** — Supported quoted literals with spaces and quoted column identifiers in `GridFilterEngine`.
+- **Grid value panel validation & compact JSON (#906)** — Enforced validation on save, prevented saving invalid JSON/XML, and preserved compact JSON formatting in `DataGridValuePanel`.
+- **Grid groupings CSV export (#908)** — Included nested sub-groups when exporting pivot breakdowns to CSV in `GridGroupingsEngine`.
+- **Dropdown enter/exit animations (#902)** — Ensured enter animation interpolates smoothly and unblocked trigger during exit delay in `QueryaDropdown`.
+- **Tab strip scrollable & global keys (#898)** — Wrapped `QueryaTabStrip` in horizontal scrollable and preserved `GlobalKey`s on tab count change.
+- **System brightness listener (#899)** — Listened to `platformDispatcher.onPlatformBrightnessChanged` dynamically for `ThemeMode.system`.
+- **Code editor duplicate listener & highlight assertion (#909, #911)** — Eliminated duplicate text change listeners in `QueryaCodeEditor.didUpdateWidget` and prevented length mismatch assertion errors in `QueryaHighlightController` for scripts > 8KB.
+- **Context menu mode switch sync (#1011)** — Synced `_children` when `ContextMenu` switches between items and itemsBuilder to prevent layout overflow.
+
+### Security
+
+- **Archive entry path traversal guard (#919)** — Detected Windows drive letters and reserved device names in `isArchiveEntryNameSafe`.
+- **Sandbox sanitizer quoted secrets (#918)** — Sanitized quoted passwords and tokens containing spaces in `SandboxSanitizer`.
+- **System trusted root certificates (#917)** — Enabled system trusted root certificates in `buildSecurityContext`.
+- **MongoDB TLS temp PEM cleanup & permissions (#915)** — Restricted permissions and cleaned up temporary TLS PEM files for MongoDB.
+- **Legacy keyring secrets migration (#1008)** — Lazily adopted legacy keyring secrets on read with write-through to secure storage.
 
 ## [0.4.17] - 2026-09-20
 

@@ -21,7 +21,7 @@ class PostgresTableToolbar extends material.StatelessWidget {
     required this.onGoNext,
     required this.onRefresh,
     this.onNavigateHome,
-    this.pendingActions,
+    this.editAction,
   });
 
   final String title;
@@ -41,8 +41,8 @@ class PostgresTableToolbar extends material.StatelessWidget {
   final VoidCallback onRefresh;
   final VoidCallback? onNavigateHome;
 
-  /// Compact pending-change badge + Save / Revert (Table Browser staging).
-  final material.Widget? pendingActions;
+  /// View / edit mode toggle ([TableEditModeButton]).
+  final material.Widget? editAction;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -120,7 +120,10 @@ class PostgresTableToolbar extends material.StatelessWidget {
                           ),
                         ),
                         const Gap(6),
-                        if (pendingActions != null) pendingActions!,
+                        if (editAction != null) ...[
+                          editAction!,
+                          const Gap(4),
+                        ],
                         OutlineButton(
                           size: ButtonSize.small,
                           onPressed: onOpenSql,

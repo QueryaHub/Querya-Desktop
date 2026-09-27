@@ -1,6 +1,10 @@
+import 'dart:async' show Timer;
+
 import 'package:flutter/material.dart' as material
     show
         AlertDialog,
+        TextEditingValue,
+        ValueListenableBuilder,
         BuildContext,
         Column,
         Container,
@@ -164,6 +168,28 @@ material.Widget lazyConnectionTreeList({
       itemBuilder: itemBuilder,
     ),
   );
+}
+
+/// Pause after the last keystroke before a connections / tree filter is applied
+/// (same order as the data grid filter bar).
+const kTreeFilterDebounce = Duration(milliseconds: 150);
+
+/// Applies a text filter only once the user pauses typing, so each keystroke
+/// does not rebuild a whole tree subtree.
+class FilterDebouncer {
+  FilterDebouncer({this.delay = kTreeFilterDebounce});
+
+  final Duration delay;
+  Timer? _timer;
+
+  /// Runs [action] after [delay]; a newer call replaces a pending one.
+  void run(void Function() action) {
+    _timer?.cancel();
+    _timer = Timer(delay, action);
+  }
+
+  /// Drops a pending action (clear button, dispose).
+  void cancel() => _timer?.cancel();
 }
 
 /// Compact inline search/filter input for an expanded tree object group (e.g. Tables, Views).
@@ -534,6 +560,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
   final _searchController = material.TextEditingController();
   final _searchFocusNode = material.FocusNode();
   String _searchQuery = '';
+  final _searchDebouncer = FilterDebouncer();
 
   /// Ignores stale [setState] when multiple [_loadData] runs overlap (e.g. tests).
   int _loadDataGeneration = 0;
@@ -561,6 +588,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
   @override
   void dispose() {
     _treeSelection.dispose();
+    _searchDebouncer.cancel();
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
@@ -580,6 +608,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
 
   /// For testing global search filtering.
   void setSearchQueryForTest(String query) {
+    _searchDebouncer.cancel();
     _searchController.text = query;
     setState(() => _searchQuery = query);
   }
@@ -976,20 +1005,26 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                   ),
                   child: material.Row(
                     children: [
-                      material.Icon(
-                        material.Icons.search_rounded,
-                        size: 14,
-                        color: q.isNotEmpty
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.mutedForeground,
+                      // Driven by the text field itself, so it reacts to every
+                      // keystroke while the list filter below is debounced.
+                      material.ValueListenableBuilder<material.TextEditingValue>(
+                        valueListenable: _searchController,
+                        builder: (_, value, __) => material.Icon(
+                          material.Icons.search_rounded,
+                          size: 14,
+                          color: value.text.trim().isNotEmpty
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.mutedForeground,
+                        ),
                       ),
                       const Gap(6),
                       material.Expanded(
                         child: material.TextField(
                           controller: _searchController,
                           focusNode: _searchFocusNode,
-                          onChanged: (val) =>
-                              setState(() => _searchQuery = val),
+                          onChanged: (val) => _searchDebouncer.run(() {
+                            if (mounted) setState(() => _searchQuery = val);
+                          }),
                           style: material.TextStyle(
                             fontSize: 12,
                             color: theme.colorScheme.foreground,
@@ -1007,20 +1042,25 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                           ),
                         ),
                       ),
-                      if (q.isNotEmpty) ...[
-                        material.GestureDetector(
-                          behavior: material.HitTestBehavior.opaque,
-                          onTap: () {
-                            _searchController.clear();
-                            setState(() => _searchQuery = '');
-                          },
-                          child: material.Icon(
-                            material.Icons.close_rounded,
-                            size: 14,
-                            color: theme.colorScheme.mutedForeground,
-                          ),
-                        ),
-                      ],
+                      material.ValueListenableBuilder<material.TextEditingValue>(
+                        valueListenable: _searchController,
+                        builder: (_, value, __) =>
+                            value.text.trim().isEmpty
+                                ? const material.SizedBox.shrink()
+                                : material.GestureDetector(
+                                    behavior: material.HitTestBehavior.opaque,
+                                    onTap: () {
+                                      _searchDebouncer.cancel();
+                                      _searchController.clear();
+                                      setState(() => _searchQuery = '');
+                                    },
+                                    child: material.Icon(
+                                      material.Icons.close_rounded,
+                                      size: 14,
+                                      color: theme.colorScheme.mutedForeground,
+                                    ),
+                                  ),
+                      ),
                     ],
                   ),
                 ),

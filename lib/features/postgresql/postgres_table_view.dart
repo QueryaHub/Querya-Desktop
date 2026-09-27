@@ -6,7 +6,6 @@ import 'package:postgres/postgres.dart';
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/postgres_sql.dart';
-import 'package:querya_desktop/core/database/result_row_string_convert.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -81,13 +80,20 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
 
   bool get _isDirty => _stagingBuffer?.isDirty ?? false;
 
-  bool get _editingEnabled => tableViewEditingEnabled(
+  /// Tables open in view mode; editing is switched on explicitly.
+  bool _editMode = false;
+
+  /// Whether this table could be edited (PK, not a view, writable).
+  bool get _canEdit => tableViewEditingEnabled(
         isView: widget.isView,
         isMaterializedView: widget.isMaterializedView,
         customSqlActive: _customSqlActive,
         hasPrimaryKey: _primaryKeys.isNotEmpty,
         schemaError: _schemaError,
       );
+
+  /// Edit mode is on and the table is editable.
+  bool get _editingEnabled => _canEdit && _editMode;
 
   @override
   void initState() {
@@ -149,6 +155,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
   }
 
   Future<void> _connectAndLoad() async {
+    _editMode = false;
     _disconnectCurrent();
     if (!mounted) return;
     setState(() {
@@ -211,6 +218,57 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     }
   }
 
+  String? _editDisabledReason() => tableViewEditDisabledReason(
+      isView: widget.isView,
+      isMaterializedView: widget.isMaterializedView,
+      customSqlActive: _customSqlActive,
+      hasPrimaryKey: _primaryKeys.isNotEmpty,
+      schemaLoaded: _schemaLoaded,
+      schemaError: _schemaError,
+    );
+
+  void _enterEditMode() {
+    if (!_canEdit || _editMode) return;
+    setState(() {
+      _editMode = true;
+      _stagingBuffer = replaceTableViewStagingBuffer(
+        previous: _stagingBuffer,
+        columns: _columnNames,
+        rows: _rows,
+        enabled: _editingEnabled,
+        primaryKeys: _primaryKeys,
+      );
+    });
+  }
+
+  Future<void> _exitEditMode() async {
+    if (!_editMode) return;
+    if (!await _confirmDiscardIfNeeded()) return;
+    if (!mounted) return;
+    setState(() {
+      _editMode = false;
+      _stagingBuffer?.dispose();
+      _stagingBuffer = null;
+    });
+  }
+
+  void _toggleEditMode() {
+    if (_editMode) {
+      unawaited(_exitEditMode());
+    } else {
+      _enterEditMode();
+    }
+  }
+
+  material.Widget _editModeButton() => TableEditModeButton(
+        editMode: _editMode,
+        canEdit: _canEdit,
+        busy: _loading || _isSaving,
+        disabledReason: _editDisabledReason(),
+        onEdit: _enterEditMode,
+        onDone: () => unawaited(_exitEditMode()),
+      );
+
   Future<bool> _confirmDiscardIfNeeded() {
     return confirmDiscardTableEditsIfDirty(
       context: context,
@@ -256,6 +314,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       columns: columns,
       rows: rows,
       enabled: _editingEnabled,
+      primaryKeys: _primaryKeys,
     );
   }
 
@@ -267,7 +326,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       for (final row in result)
         List<Object?>.generate(row.length, (i) => row[i]),
     ];
-    final converted = convertPostgresResultRowsToStrings(
+    return convertPostgresResultRowsToStringsAdaptive(
       PostgresResultConvertJob(
         rowValues: rawRows,
         columnTypeOids: [
@@ -278,7 +337,6 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
         ],
       ),
     );
-    return convertResultRowsToStringsAdaptive(converted);
   }
 
   /// [refreshCount] re-reads `reltuples` (e.g. first load or Refresh). Pagination only runs SELECT.
@@ -596,7 +654,23 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     );
     if (!mounted) return;
     if (outcome.isApplied) {
-      final newRows = buffer.effectiveRows;
+      if (buffer.insertedRowCount > 0) {
+        // Inserted rows have no database-generated keys / defaults yet, so a
+        // follow-up UPDATE / DELETE on them would match 0 rows. Reload the page.
+        buffer.dispose();
+        setState(() {
+          _stagingBuffer = null;
+          _isSaving = false;
+        });
+        showAppToast(
+          context: context,
+          message: tableViewSavedMessage(outcome.statementCount),
+          variant: AppToastVariant.success,
+        );
+        await _fetch(refreshCount: true);
+        return;
+      }
+      final newRows = buffer.committedRows;
       buffer.dispose();
       setState(() {
         _rows = newRows;
@@ -606,12 +680,13 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
           columns: _columnNames,
           rows: newRows,
           enabled: _editingEnabled,
+          primaryKeys: _primaryKeys,
         );
         _isSaving = false;
       });
       showAppToast(
         context: context,
-        message: '${outcome.statementCount} change(s) saved',
+        message: tableViewSavedMessage(outcome.statementCount),
         variant: AppToastVariant.success,
       );
       return;
@@ -651,13 +726,9 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
           onGoPrevious: _goToPreviousPage,
           onGoNext: _goToNextPage,
           onRefresh: () => unawaited(_onRefresh()),
-          pendingActions: _stagingBuffer == null
+          editAction: widget.isView || widget.isMaterializedView
               ? null
-              : TableBrowserPendingActions(
-                  buffer: _stagingBuffer!,
-                  onSave: () => unawaited(_applyStagedChanges()),
-                  isSaving: _isSaving,
-                ),
+              : _editModeButton(),
         );
     final buffer = _stagingBuffer;
     if (buffer == null) return toolbar();
@@ -673,6 +744,10 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
 
     return material.CallbackShortcuts(
       bindings: {
+        const material.SingleActivator(LogicalKeyboardKey.keyE, control: true):
+            _toggleEditMode,
+        const material.SingleActivator(LogicalKeyboardKey.keyE, meta: true):
+            _toggleEditMode,
         const material.SingleActivator(LogicalKeyboardKey.f5): () {
           if (!_loading) unawaited(_onRefresh());
         },

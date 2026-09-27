@@ -121,7 +121,123 @@ void main() {
       expect(eff[3], ['4', 'David', 'david@test.com']);
     });
 
-    test('effectiveRows returns identical reference when clean and caches unmodifiable list when dirty', () {
+    test(
+        'effectiveRows keeps deleted rows aligned and maps staged NULL to NULL',
+        () {
+      buffer.toggleDeleteRow(1);
+      buffer.setCellNull(0, 2);
+      buffer.addRow(['4', TableMutationEngine.kNullSentinel, 'd@test.com']);
+
+      final eff = buffer.effectiveRows;
+      expect(eff.length, 4);
+      expect(eff[0], ['1', 'Alice', 'NULL']);
+      expect(eff[1], ['2', 'Bob', 'bob@test.com']);
+      expect(eff[3], ['4', 'NULL', 'd@test.com']);
+      expect(
+        eff.expand((r) => r).any((v) => v.contains('\u0000')),
+        isFalse,
+      );
+    });
+
+    test('committedRows drops deleted rows and sanitizes NULL sentinels', () {
+      buffer.toggleDeleteRow(1);
+      buffer.setCell(1, 1, 'ignored'); // edit on a row that is also deleted
+      buffer.setCellNull(0, 2);
+      buffer.addRow(['4', TableMutationEngine.kNullSentinel, 'd@test.com']);
+
+      final committed = buffer.committedRows;
+      expect(committed, [
+        ['1', 'Alice', 'NULL'],
+        ['3', 'Charlie', 'charlie@test.com'],
+        ['4', 'NULL', 'd@test.com'],
+      ]);
+    });
+
+    test('duplicateRow blanks primary key cells and keeps other values', () {
+      final keyed = DataGridStagingBuffer(
+        columns: ['id', 'name', 'email'],
+        rows: [
+          ['42', 'Alice', 'alice@test.com'],
+        ],
+        primaryKeys: ['id'],
+      );
+      addTearDown(keyed.dispose);
+      keyed.setCell(0, 1, 'Alice Edited');
+
+      keyed.duplicateRow(0);
+
+      expect(keyed.insertedRowCount, 1);
+      expect(keyed.effectiveRows.last, ['', 'Alice Edited', 'alice@test.com']);
+      expect(keyed.getRowStatus(1), StagedRowStatus.inserted);
+    });
+
+    test(
+        'duplicateRow blanks every column of a composite key, case-insensitively',
+        () {
+      final keyed = DataGridStagingBuffer(
+        columns: ['Org', 'user_id', 'role'],
+        rows: [
+          ['1', '2', 'admin'],
+        ],
+        primaryKeys: ['org', '"user_id"'],
+      );
+      addTearDown(keyed.dispose);
+
+      keyed.duplicateRow(0);
+
+      expect(keyed.effectiveRows.last, ['', '', 'admin']);
+    });
+
+    test('duplicateRow copies staged NULLs as NULL and can copy inserted rows',
+        () {
+      buffer.setCellNull(0, 2);
+      buffer.duplicateRow(0);
+      expect(buffer.effectiveRows.last, ['1', 'Alice', 'NULL']);
+
+      buffer.duplicateRow(3); // the row inserted above
+      expect(buffer.insertedRowCount, 2);
+    });
+
+    test(
+        'duplicateRow without primary keys copies verbatim; bad index is a no-op',
+        () {
+      buffer.duplicateRow(1);
+      expect(buffer.effectiveRows.last, ['2', 'Bob', 'bob@test.com']);
+
+      buffer.duplicateRow(-1);
+      buffer.duplicateRow(99);
+      expect(buffer.insertedRowCount, 1);
+    });
+
+    test('rowRenderSignature changes only with the staged state of that row',
+        () {
+      final clean0 = buffer.rowRenderSignature(0);
+      final clean1 = buffer.rowRenderSignature(1);
+      expect(buffer.rowRenderSignature(0), clean0);
+
+      buffer.setCell(0, 1, 'Alice Edited');
+      expect(buffer.rowRenderSignature(0), isNot(clean0));
+      expect(buffer.rowRenderSignature(1), clean1, reason: 'other rows unchanged');
+
+      final oneCell = buffer.rowRenderSignature(0);
+      buffer.setCell(0, 2, 'x@y.z');
+      expect(buffer.rowRenderSignature(0), isNot(oneCell));
+
+      buffer.revertRow(0);
+      expect(buffer.rowRenderSignature(0), clean0);
+
+      buffer.toggleDeleteRow(1);
+      expect(buffer.rowRenderSignature(1), isNot(clean1));
+      expect(buffer.rowRenderSignature(-1), isA<int>());
+    });
+
+    test('committedRows equals baseline when clean', () {
+      expect(buffer.committedRows, buffer.originalRows);
+    });
+
+    test(
+        'effectiveRows returns identical reference when clean and caches unmodifiable list when dirty',
+        () {
       // When clean, effectiveRows returns the exact baseline instance (zero allocation)
       final cleanRows1 = buffer.effectiveRows;
       final cleanRows2 = buffer.effectiveRows;
@@ -160,7 +276,9 @@ void main() {
       expect(buffer.getCellValue(0, 1), 'NULL');
     });
 
-    test('generateMutationPlan builds correct DML statements from staged modifications', () {
+    test(
+        'generateMutationPlan builds correct DML statements from staged modifications',
+        () {
       buffer.setCell(0, 1, 'Alice Updated');
       buffer.addRow(['4', 'Diana', 'diana@test.com']);
       buffer.toggleDeleteRow(2);
@@ -174,14 +292,19 @@ void main() {
 
       expect(plan.statementCount, 3);
       expect(plan.statements[0].type, MutationType.update);
-      expect(plan.statements[0].sql, 'UPDATE "public"."users" SET "name" = \'Alice Updated\' WHERE "id" = 1');
+      expect(plan.statements[0].sql,
+          'UPDATE "public"."users" SET "name" = \'Alice Updated\' WHERE "id" = 1');
       expect(plan.statements[1].type, MutationType.insert);
-      expect(plan.statements[1].sql, 'INSERT INTO "public"."users" ("id", "name", "email") VALUES (4, \'Diana\', \'diana@test.com\')');
+      expect(plan.statements[1].sql,
+          'INSERT INTO "public"."users" ("id", "name", "email") VALUES (4, \'Diana\', \'diana@test.com\')');
       expect(plan.statements[2].type, MutationType.delete);
-      expect(plan.statements[2].sql, 'DELETE FROM "public"."users" WHERE "id" = 3');
+      expect(plan.statements[2].sql,
+          'DELETE FROM "public"."users" WHERE "id" = 3');
     });
 
-    test('dispose clears internal collections and prevents further listener notifications', () {
+    test(
+        'dispose clears internal collections and prevents further listener notifications',
+        () {
       buffer.setCell(0, 1, 'Alice Modified');
       buffer.addRow(['4', 'Diana', 'diana@test.com']);
       buffer.toggleDeleteRow(2);

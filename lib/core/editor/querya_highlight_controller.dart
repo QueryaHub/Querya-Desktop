@@ -74,7 +74,7 @@ class QueryaHighlightController extends TextEditingController {
       style: style,
     );
 
-    if (_cachedSpan != null) {
+    if (_cachedSpan != null && _cachedText == text) {
       return TextSpan(style: style, children: [_cachedSpan!]);
     }
 

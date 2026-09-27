@@ -8,12 +8,15 @@ enum DestructiveSqlType {
   dropMaterializedView,
   truncateTable,
   unconditionalDelete,
+  unconditionalUpdate,
   dropCollection,
   deleteDocument,
   redisDel,
   redisHdel,
   redisSrem,
-  redisZrem;
+  redisZrem,
+  redisRename,
+  redisLrem;
 
   String get label => switch (this) {
         DestructiveSqlType.dropDatabase => 'DROP DATABASE',
@@ -23,12 +26,15 @@ enum DestructiveSqlType {
         DestructiveSqlType.dropMaterializedView => 'DROP MATERIALIZED VIEW',
         DestructiveSqlType.truncateTable => 'TRUNCATE TABLE',
         DestructiveSqlType.unconditionalDelete => 'UNCONDITIONAL DELETE',
+        DestructiveSqlType.unconditionalUpdate => 'UNCONDITIONAL UPDATE',
         DestructiveSqlType.dropCollection => 'DROP COLLECTION',
         DestructiveSqlType.deleteDocument => 'DELETE DOCUMENT',
         DestructiveSqlType.redisDel => 'DEL',
         DestructiveSqlType.redisHdel => 'HDEL',
         DestructiveSqlType.redisSrem => 'SREM',
         DestructiveSqlType.redisZrem => 'ZREM',
+        DestructiveSqlType.redisRename => 'RENAME',
+        DestructiveSqlType.redisLrem => 'LREM',
       };
 
   String get riskLevel => switch (this) {
@@ -37,12 +43,15 @@ enum DestructiveSqlType {
         DestructiveSqlType.dropTable => 'HIGH',
         DestructiveSqlType.truncateTable => 'HIGH',
         DestructiveSqlType.unconditionalDelete => 'HIGH',
+        DestructiveSqlType.unconditionalUpdate => 'HIGH',
         DestructiveSqlType.dropCollection => 'HIGH',
         DestructiveSqlType.deleteDocument => 'HIGH',
         DestructiveSqlType.redisDel => 'HIGH',
         DestructiveSqlType.redisHdel => 'HIGH',
         DestructiveSqlType.redisSrem => 'HIGH',
         DestructiveSqlType.redisZrem => 'HIGH',
+        DestructiveSqlType.redisRename => 'HIGH',
+        DestructiveSqlType.redisLrem => 'HIGH',
         DestructiveSqlType.dropMaterializedView => 'MEDIUM',
         DestructiveSqlType.dropView => 'MEDIUM',
       };
@@ -74,6 +83,8 @@ class DestructiveSqlOperation {
           'Quickly deletes all rows from table "$targetName" without transaction rollbacks in some engines.',
         DestructiveSqlType.unconditionalDelete =>
           'Deletes all rows from table "$targetName" (no WHERE clause detected).',
+        DestructiveSqlType.unconditionalUpdate =>
+          'Modifies all rows in table "$targetName" (no WHERE clause detected).',
         DestructiveSqlType.dropCollection =>
           'Permanently drops collection "$targetName" and all documents in it.',
         DestructiveSqlType.deleteDocument =>
@@ -86,6 +97,10 @@ class DestructiveSqlOperation {
           'Permanently removes set member "$targetName".',
         DestructiveSqlType.redisZrem =>
           'Permanently removes sorted-set member "$targetName".',
+        DestructiveSqlType.redisRename =>
+          'Renaming will overwrite existing key "$targetName". The existing value will be permanently lost.',
+        DestructiveSqlType.redisLrem =>
+          'Permanently removes list element "$targetName".',
       };
 }
 
@@ -147,6 +162,29 @@ abstract final class DestructiveSqlDetector {
     r'^\s*DELETE\s+FROM\s+(?:(?:["`]?([a-zA-Z0-9_]+)["`]?\.)?["`]?([a-zA-Z0-9_]+)["`]?)',
     caseSensitive: false,
   );
+
+  static final _updateRegex = RegExp(
+    r'^\s*UPDATE\s+(?:(?:LOW_PRIORITY|IGNORE|ONLY)\s+)*(?:(?:["`]?([a-zA-Z0-9_]+)["`]?\.)?["`]?([a-zA-Z0-9_]+)["`]?)',
+    caseSensitive: false,
+  );
+
+  /// True when [sanitized] has a WHERE outside any parentheses, so a WHERE
+  /// inside a subquery (`SET x = (SELECT ... WHERE ...)`) does not count.
+  static bool _hasTopLevelWhere(String sanitized) {
+    final top = StringBuffer();
+    var depth = 0;
+    for (var i = 0; i < sanitized.length; i++) {
+      final ch = sanitized[i];
+      if (ch == '(') {
+        depth++;
+      } else if (ch == ')') {
+        if (depth > 0) depth--;
+      } else if (depth == 0) {
+        top.write(ch);
+      }
+    }
+    return RegExp(r'\bWHERE\b', caseSensitive: false).hasMatch(top.toString());
+  }
 
   /// Strips comments and string literals to prevent false positives when keywords
   /// appear inside strings or comments.
@@ -439,9 +477,7 @@ abstract final class DestructiveSqlDetector {
       // 7. DELETE FROM table without WHERE
       final deleteMatch = _deleteRegex.firstMatch(sanitized);
       if (deleteMatch != null) {
-        final hasWhere =
-            RegExp(r'\bWHERE\b', caseSensitive: false).hasMatch(sanitized);
-        if (!hasWhere) {
+        if (!_hasTopLevelWhere(sanitized)) {
           final schema = deleteMatch.group(1);
           final table = deleteMatch.group(2) ?? 'table';
           final target =
@@ -454,6 +490,25 @@ abstract final class DestructiveSqlDetector {
             ),
           );
         }
+        continue;
+      }
+
+      // 8. UPDATE table SET ... without WHERE
+      final updateMatch = _updateRegex.firstMatch(sanitized);
+      if (updateMatch != null &&
+          RegExp(r'\bSET\b', caseSensitive: false).hasMatch(sanitized) &&
+          !_hasTopLevelWhere(sanitized)) {
+        final schema = updateMatch.group(1);
+        final table = updateMatch.group(2) ?? 'table';
+        final target =
+            (schema != null && schema.isNotEmpty) ? '$schema.$table' : table;
+        operations.add(
+          DestructiveSqlOperation(
+            type: DestructiveSqlType.unconditionalUpdate,
+            targetName: target,
+            rawStatement: rawStmt.trim(),
+          ),
+        );
       }
     }
 

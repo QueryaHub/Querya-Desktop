@@ -347,6 +347,46 @@ void main() {
       expect(executed, isFalse);
     });
 
+    testWidgets(
+        'applied save yields a baseline without deleted rows or NULL sentinels',
+        (tester) async {
+      await tester.pumpWidget(
+        ShadcnApp(
+          theme: AppTheme.dark,
+          home: const material.Scaffold(body: material.SizedBox()),
+        ),
+      );
+      final ctx = tester.element(find.byType(material.Scaffold));
+      final buffer = DataGridStagingBuffer(
+        columns: ['id', 'name'],
+        rows: [
+          ['1', 'Ada'],
+          ['2', 'Grace'],
+        ],
+      );
+      buffer.toggleDeleteRow(1);
+      buffer.setCellNull(0, 1);
+      addTearDown(buffer.dispose);
+
+      final future = applyTableViewStagedChanges(
+        context: ctx,
+        buffer: buffer,
+        dialect: SqlDialect.postgres,
+        tableName: 'users',
+        schema: 'public',
+        primaryKeys: ['id'],
+        execute: (_) async {},
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Apply Changes'));
+      final outcome = await future;
+
+      expect(outcome.isApplied, isTrue);
+      expect(buffer.committedRows, [
+        ['1', 'NULL'],
+      ]);
+    });
+
     testWidgets('0-row DML is failed and the staging buffer stays dirty',
         (tester) async {
       await tester.pumpWidget(
@@ -385,9 +425,21 @@ void main() {
   });
 
   group('expectDmlMatchedRows', () {
-    test('allows 1+ affected rows', () {
+    test('allows exactly 1 affected row', () {
       expect(() => expectDmlMatchedRows(1), returnsNormally);
-      expect(() => expectDmlMatchedRows(3), returnsNormally);
+    });
+
+    test('throws when a statement matched multiple rows', () {
+      expect(
+        () => expectDmlMatchedRows(3),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('matched 3 rows instead of 1'),
+          ),
+        ),
+      );
     });
 
     test('throws on 0-row DML so Save is a failure', () {
@@ -401,46 +453,6 @@ void main() {
           ),
         ),
       );
-    });
-  });
-
-  group('TableBrowserPendingActions', () {
-    testWidgets('shows pending badge and Save when dirty', (tester) async {
-      final buffer = DataGridStagingBuffer(
-        columns: ['id', 'name'],
-        rows: [
-          ['1', 'Ada'],
-        ],
-      );
-      addTearDown(buffer.dispose);
-      buffer.setCell(0, 1, 'Grace');
-
-      var saved = false;
-      await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
-          home: material.Scaffold(
-            body: TableBrowserPendingActions(
-              buffer: buffer,
-              onSave: () => saved = true,
-              isSaving: false,
-            ),
-          ),
-        ),
-      );
-
-      expect(find.text('1 pending change'), findsOneWidget);
-      expect(find.text('Save'), findsOneWidget);
-      expect(find.text('Revert'), findsOneWidget);
-
-      await tester.tap(find.text('Save'));
-      await tester.pump();
-      expect(saved, isTrue);
-
-      await tester.tap(find.text('Revert'));
-      await tester.pump();
-      expect(buffer.isDirty, isFalse);
-      expect(find.text('1 pending change'), findsNothing);
     });
   });
 
@@ -467,6 +479,166 @@ void main() {
         tableTitle: 'public.users',
       );
       expect(ok, isTrue);
+    });
+
+    testWidgets('shows dialog and returns false when dirty and Cancel pressed',
+        (tester) async {
+      await tester.pumpWidget(
+        ShadcnApp(
+          theme: AppTheme.dark,
+          home: const material.Scaffold(body: material.SizedBox()),
+        ),
+      );
+      final ctx = tester.element(find.byType(material.Scaffold));
+      final buffer = DataGridStagingBuffer(
+        columns: ['id', 'name'],
+        rows: [
+          ['1', 'Alice'],
+        ],
+      );
+      addTearDown(buffer.dispose);
+      buffer.setCell(0, 1, 'Bob');
+      expect(buffer.isDirty, isTrue);
+
+      bool? result;
+      // Trigger confirmation asynchronously
+      confirmDiscardTableEditsIfDirty(
+        context: ctx,
+        buffer: buffer,
+        tableTitle: 'public.users',
+      ).then((val) => result = val);
+
+      await tester.pumpAndSettle();
+      expect(find.text('Unsaved changes in "public.users"'), findsOneWidget);
+      expect(
+        find.text(
+          'This table has 1 pending change that have not been saved. Continuing will discard them.',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(result, isFalse);
+      expect(buffer.isDirty, isTrue);
+    });
+
+    testWidgets('shows dialog and returns true when dirty and Discard pressed',
+        (tester) async {
+      await tester.pumpWidget(
+        ShadcnApp(
+          theme: AppTheme.dark,
+          home: const material.Scaffold(body: material.SizedBox()),
+        ),
+      );
+      final ctx = tester.element(find.byType(material.Scaffold));
+      final buffer = DataGridStagingBuffer(
+        columns: ['id', 'name'],
+        rows: [
+          ['1', 'Alice'],
+        ],
+      );
+      addTearDown(buffer.dispose);
+      buffer.setCell(0, 1, 'Bob');
+      expect(buffer.isDirty, isTrue);
+
+      bool? result;
+      confirmDiscardTableEditsIfDirty(
+        context: ctx,
+        buffer: buffer,
+        tableTitle: 'Query 1',
+      ).then((val) => result = val);
+
+      await tester.pumpAndSettle();
+      expect(find.text('Unsaved changes in "Query 1"'), findsOneWidget);
+
+      await tester.tap(find.text('Discard'));
+      await tester.pumpAndSettle();
+
+      expect(result, isTrue);
+    });
+  });
+
+  group('TableEditModeButton', () {
+    Future<void> pump(WidgetTester tester, material.Widget child) =>
+        tester.pumpWidget(
+          ShadcnApp(
+            theme: AppTheme.dark,
+            home: material.Scaffold(body: material.Center(child: child)),
+          ),
+        );
+
+    testWidgets('view mode offers Edit and calls onEdit', (tester) async {
+      var edits = 0;
+      await pump(
+        tester,
+        TableEditModeButton(
+          editMode: false,
+          canEdit: true,
+          onEdit: () => edits++,
+          onDone: () {},
+        ),
+      );
+      expect(find.text('Edit'), findsOneWidget);
+      expect(find.text('Done'), findsNothing);
+      expect(find.byTooltip('Edit rows (Ctrl+E)'), findsOneWidget);
+      await tester.tap(find.text('Edit'));
+      expect(edits, 1);
+    });
+
+    testWidgets('edit mode offers Done and calls onDone', (tester) async {
+      var done = 0;
+      await pump(
+        tester,
+        TableEditModeButton(
+          editMode: true,
+          canEdit: true,
+          onEdit: () {},
+          onDone: () => done++,
+        ),
+      );
+      expect(find.text('Done'), findsOneWidget);
+      expect(find.text('Edit'), findsNothing);
+      await tester.tap(find.text('Done'));
+      expect(done, 1);
+    });
+
+    testWidgets('disabled when the table cannot be edited, with the reason',
+        (tester) async {
+      var edits = 0;
+      await pump(
+        tester,
+        TableEditModeButton(
+          editMode: false,
+          canEdit: false,
+          disabledReason: 'Cannot edit: no primary key detected',
+          onEdit: () => edits++,
+          onDone: () {},
+        ),
+      );
+      expect(
+        find.byTooltip('Cannot edit: no primary key detected'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Edit'));
+      expect(edits, 0);
+    });
+
+    testWidgets('busy blocks the toggle', (tester) async {
+      var edits = 0;
+      await pump(
+        tester,
+        TableEditModeButton(
+          editMode: false,
+          canEdit: true,
+          busy: true,
+          onEdit: () => edits++,
+          onDone: () {},
+        ),
+      );
+      await tester.tap(find.text('Edit'));
+      expect(edits, 0);
     });
   });
 }

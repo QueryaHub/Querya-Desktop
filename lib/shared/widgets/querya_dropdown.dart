@@ -70,6 +70,7 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
   List<QueryaDropdownItem<T>>? _cachedMenuItems;
   T? _cachedMenuValue;
   var _closingWithExit = false;
+  var _exitGeneration = 0;
 
   @override
   void initState() {
@@ -83,16 +84,25 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
     super.dispose();
   }
 
+  void _cancelExit() {
+    if (_closingWithExit) {
+      _exitGeneration++;
+      _closingWithExit = false;
+      _menuOpen.value = true;
+    }
+  }
+
   /// Plays exit fade-slide, then removes the [MenuAnchor] overlay.
   Future<void> _closeWithExit() async {
     if (!_controller.isOpen || _closingWithExit) return;
     _closingWithExit = true;
     _menuOpen.value = false;
+    final gen = ++_exitGeneration;
     final duration = context.motionDuration(QueryaMotion.standard);
     if (duration > QueryaMotion.instant) {
       await Future<void>.delayed(duration);
     }
-    if (!mounted) return;
+    if (!mounted || gen != _exitGeneration) return;
     if (_controller.isOpen) {
       _controller.close();
     }
@@ -231,7 +241,9 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
       child: material.InkWell(
         onTap: widget.enabled
             ? () {
-                if (controller.isOpen) {
+                if (_closingWithExit) {
+                  _cancelExit();
+                } else if (controller.isOpen) {
                   unawaited(_closeWithExit());
                 } else {
                   controller.open();
@@ -264,11 +276,13 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
     final anchor = material.MenuAnchor(
       controller: _controller,
       onOpen: () {
+        _exitGeneration++;
         _closingWithExit = false;
         _menuOpen.value = true;
       },
       onClose: () {
         // Outside-tap / focus loss: overlay already gone — snap state only.
+        _exitGeneration++;
         _closingWithExit = false;
         _menuOpen.value = false;
       },
@@ -336,7 +350,7 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
 ///
 /// Exit only runs when the parent delays [MenuController.close] (item pick /
 /// trigger). Outside-tap removes the overlay immediately (snap).
-class _QueryaDropdownMenuEnter extends material.StatelessWidget {
+class _QueryaDropdownMenuEnter extends material.StatefulWidget {
   const _QueryaDropdownMenuEnter({
     required this.openNotifier,
     required this.child,
@@ -346,23 +360,47 @@ class _QueryaDropdownMenuEnter extends material.StatelessWidget {
   final material.Widget child;
 
   @override
+  material.State<_QueryaDropdownMenuEnter> createState() =>
+      _QueryaDropdownMenuEnterState();
+}
+
+class _QueryaDropdownMenuEnterState
+    extends material.State<_QueryaDropdownMenuEnter> {
+  bool _entered = false;
+
+  @override
+  void initState() {
+    super.initState();
+    material.WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {
+          _entered = true;
+        });
+      }
+    });
+  }
+
+  @override
   material.Widget build(material.BuildContext context) {
     final duration = context.motionDuration(QueryaMotion.standard);
     final enter = context.motionCurve(QueryaMotion.enter);
     final exit = context.motionCurve(QueryaMotion.exit);
+    final instant = duration == QueryaMotion.instant;
+
     return material.ValueListenableBuilder<bool>(
-      valueListenable: openNotifier,
+      valueListenable: widget.openNotifier,
       builder: (context, open, _) {
-        final curve = open ? enter : exit;
+        final isOpen = (open && _entered) || (open && instant);
+        final curve = isOpen ? enter : exit;
         return material.AnimatedSlide(
-          offset: open ? material.Offset.zero : const material.Offset(0, -0.04),
+          offset: isOpen ? material.Offset.zero : const material.Offset(0, -0.04),
           duration: duration,
           curve: curve,
           child: material.AnimatedOpacity(
-            opacity: open ? 1 : 0,
+            opacity: isOpen ? 1 : 0,
             duration: duration,
             curve: curve,
-            child: child,
+            child: widget.child,
           ),
         );
       },

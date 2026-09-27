@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
+import 'package:querya_desktop/features/mongodb/mongo_add_document_dialog.dart';
 import 'package:querya_desktop/features/mongodb/mongo_ejson.dart';
 import 'package:querya_desktop/features/mongodb/mongo_field_codec.dart';
 import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
@@ -37,9 +38,40 @@ class MongoDocumentsView extends material.StatefulWidget {
       _MongoDocumentsViewState();
 }
 
+/// Total document count implied by one page alone, or null when it is unknown.
+///
+/// A short non-empty page (or an empty first page) ends the result set, so the
+/// total is `skip + pageLength` without a separate count round trip.
+int? mongoExactTotalFromPage({
+  required int skip,
+  required int limit,
+  required int pageLength,
+}) {
+  if (pageLength >= limit) return null;
+  if (pageLength == 0 && skip > 0) return null;
+  return skip + pageLength;
+}
+
+/// Whether a next page may exist: from the [total] when known, otherwise
+/// whenever the current page is full.
+bool mongoHasNextPage({
+  required int skip,
+  required int limit,
+  required int pageLength,
+  int? total,
+}) {
+  if (total != null) return skip + limit < total;
+  return pageLength >= limit;
+}
+
 class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
   List<Map<String, dynamic>> _documents = [];
-  int _totalCount = 0;
+  /// Exact match count, or null while the background count is still running
+  /// (the first page is painted from `find` alone).
+  int? _totalCount;
+
+  /// Bumped per load so a slow older find / count cannot overwrite a newer one.
+  int _loadSeq = 0;
   int _skip = 0;
   final int _limit = _defaultLimit;
   bool _loading = true;
@@ -69,19 +101,18 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
     super.dispose();
   }
 
-  Future<void> _load() async {
+  /// Loads the current page. Page navigation passes [keepTotal] so the known
+  /// total is reused instead of recounting on every page.
+  Future<void> _load({bool keepTotal = false}) async {
     if (!mounted) return;
+    final seq = ++_loadSeq;
+    final knownTotal = keepTotal ? _totalCount : null;
     setState(() {
       _loading = true;
       _error = null;
+      _totalCount = knownTotal;
     });
     try {
-      final count = await MongoService.instance.countDocuments(
-        widget.connection,
-        widget.database,
-        widget.collection,
-        filter: _activeFilter,
-      );
       final docs = await MongoService.instance.find(
         widget.connection,
         widget.database,
@@ -90,9 +121,17 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
         limit: _limit,
         skip: _skip,
       );
-      if (!mounted) return;
+      if (!mounted || seq != _loadSeq) return;
+      // A short, non-empty page (or an empty first page) pins the total
+      // without a count round trip.
+      final exactTotal = knownTotal ??
+          mongoExactTotalFromPage(
+            skip: _skip,
+            limit: _limit,
+            pageLength: docs.length,
+          );
       setState(() {
-        _totalCount = count;
+        _totalCount = exactTotal;
         _documents = docs;
         _loading = false;
         _emptyFilterHint = docs.isEmpty &&
@@ -101,14 +140,42 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
             ? kMongoFilterIdStringHint
             : null;
       });
+      if (exactTotal == null) unawaited(_loadCount(seq));
     } catch (e) {
-      if (mounted) {
+      if (mounted && seq == _loadSeq) {
         setState(() {
           _error = e.toString();
           _loading = false;
         });
       }
     }
+  }
+
+  /// Exact count after the first page is on screen. Failures leave the total
+  /// unknown ("N+ documents") instead of failing the list.
+  Future<void> _loadCount(int seq) async {
+    try {
+      final count = await MongoService.instance.countDocuments(
+        widget.connection,
+        widget.database,
+        widget.collection,
+        filter: _activeFilter,
+      );
+      if (!mounted || seq != _loadSeq) return;
+      setState(() => _totalCount = count);
+    } catch (_) {
+      // Keep the "maybe more" pagination.
+    }
+  }
+
+  /// True when a next page may exist: known total, else "page is full".
+  bool get _hasNextPage {
+    return mongoHasNextPage(
+      skip: _skip,
+      limit: _limit,
+      pageLength: _documents.length,
+      total: _totalCount,
+    );
   }
 
   void _applyFilter() {
@@ -139,26 +206,33 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
   }
 
   void _goNextPage() {
-    if (_skip + _limit < _totalCount) {
+    if (_hasNextPage) {
       _skip += _limit;
-      _load();
+      _load(keepTotal: true);
     }
   }
 
   void _goPrevPage() {
     if (_skip > 0) {
-      _skip = (_skip - _limit).clamp(0, _totalCount);
-      _load();
+      _skip = (_skip - _limit).clamp(0, _skip);
+      _load(keepTotal: true);
     }
   }
 
   Future<void> _addDocument() async {
+    final doc = await showMongoAddDocumentDialog(
+      context,
+      database: widget.database,
+      collection: widget.collection,
+    );
+    if (doc == null) return;
+
     try {
       await MongoService.instance.insertDocument(
         widget.connection,
         widget.database,
         widget.collection,
-        <String, dynamic>{},
+        doc,
       );
       await _load();
     } catch (e) {
@@ -370,9 +444,12 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
   Widget _buildPaginationBar(ColorScheme cs) {
     final shadcnCs = shadcn.Theme.of(context).colorScheme;
     final currentPage = (_skip / _limit).floor() + 1;
-    final totalPages = (_totalCount / _limit).ceil();
-    final from = _totalCount == 0 ? 0 : _skip + 1;
-    final to = (_skip + _limit).clamp(0, _totalCount);
+    final total = _totalCount;
+    final shown = _skip + _documents.length;
+    final totalPages = total == null ? null : (total / _limit).ceil();
+    final from = shown == _skip ? 0 : _skip + 1;
+    final to = shown;
+    final hasNext = _hasNextPage;
 
     return material.Container(
       constraints: const material.BoxConstraints(minHeight: 44),
@@ -386,7 +463,11 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
       ),
       child: Row(
         children: [
-          Text('$_totalCount documents').muted().small(),
+          Text(total != null
+                  ? '$total documents'
+                  : '$shown${hasNext ? '+' : ''} documents')
+              .muted()
+              .small(),
           const Spacer(),
           Text('$from – $to').muted().small(),
           const Gap(16),
@@ -403,16 +484,16 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
             ),
           ),
           const Gap(8),
-          Text('$currentPage / $totalPages').small(),
+          Text('$currentPage / ${totalPages ?? '?'}').small(),
           const Gap(8),
           material.InkWell(
-            onTap: _skip + _limit < _totalCount ? _goNextPage : null,
+            onTap: hasNext ? _goNextPage : null,
             child: material.Padding(
               padding: const material.EdgeInsets.all(4),
               child: material.Icon(
                 material.Icons.chevron_right_rounded,
                 size: 20,
-                color: _skip + _limit < _totalCount
+                color: hasNext
                     ? shadcnCs.foreground
                     : shadcnCs.mutedForeground,
               ),
@@ -546,7 +627,7 @@ class _DocumentCardState extends State<_DocumentCard> {
               padding: const material.EdgeInsets.only(
                   left: 16, right: 16, bottom: 10),
               child: _expanded
-                  ? _FieldList(
+                  ? MongoFieldList(
                       document: widget.document,
                       colorScheme: cs,
                       shadcnCs: scs,
@@ -576,8 +657,10 @@ class _DocumentCardState extends State<_DocumentCard> {
   }
 }
 
-class _FieldList extends StatelessWidget {
-  const _FieldList({
+@material.visibleForTesting
+class MongoFieldList extends StatelessWidget {
+  const MongoFieldList({
+    super.key,
     required this.document,
     required this.colorScheme,
     required this.shadcnCs,
@@ -589,77 +672,104 @@ class _FieldList extends StatelessWidget {
   final shadcn.ColorScheme shadcnCs;
   final ValueChanged<String> onInspectField;
 
+  Widget _buildFieldRow(String key) {
+    final canEdit = key != '_id';
+    final display = mongoFieldToDisplay(document[key]);
+    final oneLine = display.replaceAll('\n', ' ');
+    return material.InkWell(
+      onTap: canEdit ? () => onInspectField(key) : null,
+      child: material.Padding(
+        padding: const material.EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: 6,
+        ),
+        child: Row(
+          children: [
+            material.SizedBox(
+              width: 120,
+              child: Text(
+                key,
+                overflow: TextOverflow.ellipsis,
+                style: material.TextStyle(
+                  fontSize: 12,
+                  fontFamily: 'monospace',
+                  fontWeight: material.FontWeight.w600,
+                  color: colorScheme.foreground,
+                ),
+              ),
+            ),
+            const Gap(8),
+            material.Expanded(
+              child: Text(
+                oneLine,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+                style: material.TextStyle(
+                  fontSize: 12,
+                  fontFamily: 'monospace',
+                  color: shadcnCs.mutedForeground,
+                ),
+              ),
+            ),
+            if (canEdit)
+              material.Icon(
+                material.Icons.edit_note_rounded,
+                size: 16,
+                color: shadcnCs.mutedForeground,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDivider() => material.Divider(
+        height: 1,
+        color: colorScheme.border.withValues(alpha: 0.2),
+      );
+
   @override
   Widget build(BuildContext context) {
     final fields = document.keys.toList();
+    if (fields.isEmpty) return const material.SizedBox.shrink();
+
+    final decoration = material.BoxDecoration(
+      color: colorScheme.muted.withValues(alpha: 0.15),
+      borderRadius: material.BorderRadius.circular(6),
+      border: material.Border.all(
+        color: colorScheme.border.withValues(alpha: 0.3),
+      ),
+    );
+
+    // For documents with <= 10 fields, render a lightweight Column with zero
+    // scroll machinery or shrinkWrap measurement passes.
+    if (fields.length <= 10) {
+      final children = <Widget>[];
+      for (var i = 0; i < fields.length; i++) {
+        if (i > 0) children.add(_buildDivider());
+        children.add(_buildFieldRow(fields[i]));
+      }
+      return material.Container(
+        decoration: decoration,
+        padding: const material.EdgeInsets.symmetric(vertical: 4),
+        child: material.Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: material.CrossAxisAlignment.stretch,
+          children: children,
+        ),
+      );
+    }
+
+    // For wide documents (> 10 fields), render a bounded virtualized list
+    // without shrinkWrap to avoid layout recalculation spikes on scroll.
     return material.Container(
       constraints: const material.BoxConstraints(maxHeight: 320),
-      decoration: material.BoxDecoration(
-        color: colorScheme.muted.withValues(alpha: 0.15),
-        borderRadius: material.BorderRadius.circular(6),
-        border: material.Border.all(
-          color: colorScheme.border.withValues(alpha: 0.3),
-        ),
-      ),
+      decoration: decoration,
       child: ListView.separated(
-        shrinkWrap: true,
         padding: const material.EdgeInsets.symmetric(vertical: 4),
         itemCount: fields.length,
-        separatorBuilder: (_, __) => material.Divider(
-          height: 1,
-          color: colorScheme.border.withValues(alpha: 0.2),
-        ),
-        itemBuilder: (context, i) {
-          final key = fields[i];
-          final canEdit = key != '_id';
-          final display = mongoFieldToDisplay(document[key]);
-          final oneLine = display.replaceAll('\n', ' ');
-          return material.InkWell(
-            onTap: canEdit ? () => onInspectField(key) : null,
-            child: material.Padding(
-              padding: const material.EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 6,
-              ),
-              child: Row(
-                children: [
-                  material.SizedBox(
-                    width: 120,
-                    child: Text(
-                      key,
-                      overflow: TextOverflow.ellipsis,
-                      style: material.TextStyle(
-                        fontSize: 12,
-                        fontFamily: 'monospace',
-                        fontWeight: material.FontWeight.w600,
-                        color: colorScheme.foreground,
-                      ),
-                    ),
-                  ),
-                  const Gap(8),
-                  material.Expanded(
-                    child: Text(
-                      oneLine,
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                      style: material.TextStyle(
-                        fontSize: 12,
-                        fontFamily: 'monospace',
-                        color: shadcnCs.mutedForeground,
-                      ),
-                    ),
-                  ),
-                  if (canEdit)
-                    material.Icon(
-                      material.Icons.edit_note_rounded,
-                      size: 16,
-                      color: shadcnCs.mutedForeground,
-                    ),
-                ],
-              ),
-            ),
-          );
-        },
+        separatorBuilder: (_, __) => _buildDivider(),
+        itemBuilder: (context, i) => _buildFieldRow(fields[i]),
       ),
     );
   }

@@ -68,6 +68,7 @@ void main() {
   late ThemeRegistryService registry;
 
   setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
     tempDir =
         await Directory.systemTemp.createTemp('querya_theme_controller_test_');
     PathProviderPlatform.instance = _FakePathProvider(tempDir.path);
@@ -496,6 +497,72 @@ void main() {
       );
       expect(
           c.activeTheme.colorScheme.primary, parseQueryaThemeColor('#38BDF8'));
+    });
+  });
+
+  group('ThemeMode.system platform brightness listener (#899)', () {
+    test(
+        'listens to platform brightness when ThemeMode.system and updates activeTheme',
+        () async {
+      final c = ThemeController.instance;
+      await c.load();
+
+      // Initially not system, so should not observe
+      await c.setThemeMode(ThemeMode.dark);
+      expect(c.isObservingPlatformBrightness, isFalse);
+
+      // Set to system mode with dark platform brightness
+      TestWidgetsFlutterBinding.instance.platformDispatcher
+          .platformBrightnessTestValue = Brightness.dark;
+      await c.setThemeMode(ThemeMode.system);
+      expect(c.themeMode, ThemeMode.system);
+      expect(c.isObservingPlatformBrightness, isTrue);
+      expect(c.activeTheme.brightness, Brightness.dark);
+
+      // Track listener notifications
+      var notifyCount = 0;
+      void listener() => notifyCount++;
+      c.addListener(listener);
+
+      try {
+        // Change platform brightness to light
+        TestWidgetsFlutterBinding.instance.platformDispatcher
+            .platformBrightnessTestValue = Brightness.light;
+        c.didChangePlatformBrightness();
+
+        expect(notifyCount, 1);
+        expect(c.activeTheme.brightness, Brightness.light);
+
+        // Repeating same brightness does not fire redundant notification
+        c.didChangePlatformBrightness();
+        expect(notifyCount, 1);
+
+        // Change back to dark
+        TestWidgetsFlutterBinding.instance.platformDispatcher
+            .platformBrightnessTestValue = Brightness.dark;
+        c.didChangePlatformBrightness();
+        expect(notifyCount, 2);
+        expect(c.activeTheme.brightness, Brightness.dark);
+
+        // Switching away from system unregisters observer
+        await c.setThemeMode(ThemeMode.light);
+        expect(c.isObservingPlatformBrightness, isFalse);
+      } finally {
+        c.removeListener(listener);
+        TestWidgetsFlutterBinding.instance.platformDispatcher
+            .clearPlatformBrightnessTestValue();
+      }
+    });
+
+    test('cleans up brightness observer on resetToDefaults', () async {
+      final c = ThemeController.instance;
+      await c.load();
+      await c.setThemeMode(ThemeMode.system);
+      expect(c.isObservingPlatformBrightness, isTrue);
+
+      await c.resetToDefaults();
+      expect(c.themeMode, ThemeMode.dark);
+      expect(c.isObservingPlatformBrightness, isFalse);
     });
   });
 }

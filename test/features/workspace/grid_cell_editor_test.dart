@@ -49,6 +49,43 @@ void main() {
       expect(movedRow, isTrue);
     });
 
+    testWidgets('invokes onCommit exactly once on Enter key press without double commit',
+        (tester) async {
+      int commitCount = 0;
+      String? committed;
+      bool movedRow = false;
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Material(
+            child: GridCellEditor(
+              initialValue: 'Hello',
+              width: 200,
+              height: 36,
+              onCommit: (val,
+                  {moveNextCol = false,
+                  movePrevCol = false,
+                  moveNextRow = false,
+                  movePrevRow = false}) {
+                commitCount++;
+                committed = val;
+                movedRow = moveNextRow;
+              },
+              onCancel: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+
+      expect(commitCount, 1);
+      expect(committed, 'Hello');
+      expect(movedRow, isTrue);
+    });
+
     testWidgets('triggers onCancel when Escape key is pressed', (tester) async {
       bool cancelled = false;
 

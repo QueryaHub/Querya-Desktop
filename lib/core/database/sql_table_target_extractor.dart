@@ -56,7 +56,7 @@ abstract final class SqlTableTargetExtractor {
   static SqlTableTarget? extract(String sql) {
     final trimmed = sql.trim();
     if (trimmed.isEmpty) return null;
-    if (_startsWithKeyword(trimmed, 'with')) return null;
+    if (!_startsWithKeyword(trimmed, 'select')) return null;
     if (_indexOfTopLevelKeyword(trimmed, 'join') >= 0) return null;
     if (_indexOfTopLevelKeyword(trimmed, 'union') >= 0) return null;
     if (_indexOfTopLevelKeyword(trimmed, 'except') >= 0) return null;

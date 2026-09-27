@@ -19,6 +19,7 @@ import 'package:querya_desktop/core/ui/querya_shell_status.dart';
 import 'package:querya_desktop/features/sqlite/sqlite_result_utils.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
+import 'package:querya_desktop/features/workspace/sql_result_grid_schema.dart';
 import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -47,7 +48,38 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
   int _activeSessionIndex = 0;
   int _nextSessionId = 1;
 
+  /// Built session panes, keyed by [SqlQueryTabSession.id].
+  ///
+  /// Switching tabs only changes [_activeSessionIndex]; reusing the same
+  /// widget instance for untouched sessions lets Flutter's element diffing
+  /// (`identical(oldWidget, newWidget)`) skip rebuilding their subtrees, so a
+  /// switch only rebuilds the tab strip and swaps the visible `IndexedStack`
+  /// child instead of rebuilding every tab's editor and results grid.
+  final Map<String, material.Widget> _paneCache = {};
+
+  void _invalidatePane(SqlQueryTabSession session) =>
+      _paneCache.remove(session.id);
+
+  void _invalidateAllPanes() => _paneCache.clear();
+
+  /// Counts calls to [_buildSessionPane], i.e. pane cache misses.
+  @material.visibleForTesting
+  int paneBuildCount = 0;
+
   SqlQueryTabSession get _activeSession => _sessions[_activeSessionIndex];
+
+  @material.visibleForTesting
+  SqlQueryTabSession get activeSession => _activeSession;
+
+  /// Forces the active tab's pane to rebuild from its current session state
+  /// on the next frame, as if a query had just finished running in it —
+  /// lets tests simulate "a tab already has staged edits" without going
+  /// through a real query execution.
+  @material.visibleForTesting
+  void debugRebuildActivePane() {
+    _invalidatePane(_activeSession);
+    setState(() {});
+  }
 
   SqliteLease? _lease;
   bool? _txOpen;
@@ -95,10 +127,12 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       onPrevTab: _prevTab,
       onFormat: () {
         _activeSession.formatSql();
+        _invalidatePane(_activeSession);
         setState(() {});
       },
       onClear: () {
         _activeSession.clearSql();
+        _invalidatePane(_activeSession);
         setState(() {});
       },
       onExecute: () {
@@ -114,6 +148,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
           );
           session.title = title;
           session.filePath = filePath;
+          _invalidatePane(session);
           setState(() {});
         } else {
           _addNewTab(initialSql: sql, title: title, filePath: filePath);
@@ -142,10 +177,27 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
     if (index < 0 || index >= _sessions.length) return;
     if (_sessions.length <= 1) return;
     final session = _sessions[index];
-    if (session.stagingBuffer != null && session.stagingBuffer!.isDirty) {
+    if (session.isDirty) {
+      final hasDirtyStaging =
+          session.stagingBuffer != null && session.stagingBuffer!.isDirty;
+      final hasUnsavedText = session.isModified ||
+          (session.filePath == null &&
+              session.controller.text.trim().isNotEmpty);
+      final String message;
+      if (hasDirtyStaging && hasUnsavedText) {
+        message =
+            'This query tab contains unsaved query text and staged database changes. Closing the tab will discard them.';
+      } else if (hasDirtyStaging) {
+        message =
+            'This query tab contains staged database changes that have not been applied yet. Closing the tab will discard these changes.';
+      } else {
+        message =
+            'This query tab contains unsaved SQL query text. Closing the tab will discard your changes.';
+      }
       final confirmed = await showUnsavedTabChangesDialog(
         context: context,
         tabTitle: session.title,
+        message: message,
       );
       if (confirmed != true) return;
     }
@@ -153,6 +205,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
     setState(() {
       _sessions.removeAt(index);
       session.dispose();
+      _paneCache.remove(session.id);
       if (_activeSessionIndex >= _sessions.length) {
         _activeSessionIndex = _sessions.length - 1;
       }
@@ -180,6 +233,10 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
     if (oldWidget.isReadOnly != widget.isReadOnly) {
       _lease?.release();
       _lease = null;
+      // Cached panes closed over the old widget.isReadOnly in their
+      // onApplyChanges callback (#1007): rebuild every tab so Save reflects
+      // the lock immediately instead of only on that tab's next query run.
+      _invalidateAllPanes();
     }
   }
 
@@ -189,6 +246,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
     final hist = await AppSettings.instance.getSqlHistoryMaxEntries();
     final font = await AppSettings.instance.getSqlEditorFontSize();
     if (!mounted) return;
+    _invalidateAllPanes();
     setState(() {
       _queryTimeoutSeconds = t;
       _resultMaxRows = rows;
@@ -198,6 +256,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
   }
 
   void _onStmtTimeoutChanged(int? v) {
+    _invalidateAllPanes();
     setState(() => _queryTimeoutSeconds = v);
     unawaited(AppSettings.instance.setSqliteSqlStmtTimeoutSeconds(v));
   }
@@ -250,6 +309,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       s.dispose();
     }
     _sessions.clear();
+    _paneCache.clear();
     super.dispose();
   }
 
@@ -263,6 +323,17 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       userSql = session.controller.text.trim();
     }
     if (userSql.isEmpty) return;
+
+    final safeToProceed = await confirmDiscardTableEditsIfDirty(
+      context: context,
+      buffer: session.stagingBuffer,
+      tableTitle: session.title,
+    );
+    if (!safeToProceed) return;
+    if (session.stagingBuffer != null && session.stagingBuffer!.isDirty) {
+      session.stagingBuffer?.dispose();
+      session.stagingBuffer = null;
+    }
 
     final confirmDestructive =
         await AppSettings.instance.getConfirmDestructiveOperations();
@@ -280,6 +351,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       }
     }
 
+    _invalidatePane(session);
     setState(() {
       session.running = true;
       session.error = null;
@@ -289,6 +361,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       session.statusLine = null;
       session.resultGridPrimaryKeys = const [];
       session.resultGridColumnDataTypes = null;
+      session.resultGridColumnMeta = null;
     });
     QueryaShellStatus.instance.beginBusy(message: 'Running query…');
     final sw = Stopwatch()..start();
@@ -298,6 +371,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       final conn = _lease?.connection;
       if (conn == null || !conn.isConnected) {
         if (mounted) {
+          _invalidatePane(session);
           setState(() {
             session.error = 'Could not connect to SQLite.';
             session.running = false;
@@ -321,6 +395,8 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       final cols = <String>[];
       if (results.isNotEmpty) {
         cols.addAll(results.first.keys);
+      } else if (sqliteSqlIsReadOnlyQuery(userSql)) {
+        cols.addAll(await conn.inferQueryColumns(userSql));
       }
 
       final truncated = results.length > cap;
@@ -336,41 +412,61 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       final outRows = await convertResultRowsToStringsAdaptive(rawRows);
 
       final target = SqlTableTargetExtractor.extract(userSql);
-      var pks = const <String>[];
-      Map<String, String>? types;
+      var gridSchema = SqlResultGridSchema.none;
       if (target != null && cols.isNotEmpty) {
+        // Views have no rowid, so they never fall back to it.
+        var isView = false;
         try {
-          final meta = await conn.getTableSchema(table: target.tableName);
-          pks = List<String>.from(meta.primaryKeys);
-          types = columnDataTypesFromSchema(meta);
+          final kind = await conn.execute(
+            'SELECT type FROM sqlite_master WHERE name = ?',
+            [target.tableName],
+          );
+          isView = kind.isNotEmpty && kind.first['type'] == 'view';
         } catch (_) {
-          pks = const [];
-          types = null;
+          // Unknown kind: treat as a table (the schema load surfaces real errors).
         }
+        gridSchema = SqlResultGridSchema.fromLoad(
+          await loadTableViewSchema(
+            () => conn.getTableSchema(table: target.tableName),
+          ),
+          sqliteImplicitRowid: !isView,
+        );
       }
+      final pks = gridSchema.primaryKeys;
+      final editHint = gridSchema.editHint(cols);
       final canSave = sqlResultGridSaveEnabled(
         sql: userSql,
         resultColumns: cols,
         primaryKeys: pks,
       );
 
+      _invalidatePane(session);
       setState(() {
         session.columns = cols;
         session.rows = outRows;
         session.affectedRows = null;
         session.lastExecutedSql = userSql;
         session.resultGridPrimaryKeys = canSave ? pks : const [];
-        session.resultGridColumnDataTypes = types;
+        session.resultGridColumnDataTypes = gridSchema.columnDataTypes;
+        session.resultGridColumnMeta = gridSchema.columnMeta;
         session.stagingBuffer?.dispose();
         session.stagingBuffer = canSave
-            ? DataGridStagingBuffer(columns: cols, rows: outRows)
+            ? DataGridStagingBuffer(
+                columns: cols,
+                rows: outRows,
+                primaryKeys: pks,
+              )
             : null;
         if (cols.isEmpty && outRows.isEmpty) {
           session.statusLine = 'Command completed.';
         } else if (truncated || (injectedLimit && results.length >= cap)) {
-          session.statusLine = 'Showing first $cap row(s) (result capped).';
+          session.statusLine = withEditHint(
+            'Showing first $cap row(s) (result capped).',
+            editHint,
+          );
         } else {
-          session.statusLine = '${results.length} row(s).';
+          session.statusLine =
+              withEditHint('${results.length} row(s).', editHint);
         }
         session.running = false;
       });
@@ -397,6 +493,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
     } on TimeoutException catch (e) {
       unawaited(_lease?.connection.forceClose());
       if (mounted) {
+        _invalidatePane(session);
         setState(() {
           session.error = 'Query timed out: ${e.message ?? e}';
           session.running = false;
@@ -405,6 +502,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       }
     } catch (e) {
       if (mounted) {
+        _invalidatePane(session);
         setState(() {
           session.error = e.toString();
           session.running = false;
@@ -418,7 +516,8 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
 
   Future<void> _applyStagedChanges([SqlQueryTabSession? targetSession]) async {
     final session = targetSession ?? _activeSession;
-    if (session.stagingBuffer == null ||
+    if (widget.isReadOnly ||
+        session.stagingBuffer == null ||
         !session.stagingBuffer!.isDirty ||
         session.savingChanges) {
       return;
@@ -435,6 +534,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       return;
     }
 
+    _invalidatePane(session);
     setState(() => session.savingChanges = true);
     try {
       final plan = session.stagingBuffer!.generateMutationPlan(
@@ -443,8 +543,10 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         schema: target.schema,
         primaryKeys: session.resultGridPrimaryKeys,
         columnDataTypes: session.resultGridColumnDataTypes,
+        columnMeta: session.resultGridColumnMeta,
       );
       if (plan.isEmpty) {
+        _invalidatePane(session);
         setState(() => session.savingChanges = false);
         return;
       }
@@ -454,6 +556,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
         plan: plan,
       );
       if (confirmed != true) {
+        _invalidatePane(session);
         setState(() => session.savingChanges = false);
         return;
       }
@@ -472,43 +575,23 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       await _refreshTxStatus();
 
       if (!mounted) return;
-      final newRows = session.stagingBuffer!.effectiveRows;
+      final newRows = session.stagingBuffer!.committedRows;
       session.stagingBuffer?.dispose();
+      _invalidatePane(session);
       setState(() {
         session.rows = newRows;
-        session.stagingBuffer =
-            DataGridStagingBuffer(columns: session.columns, rows: session.rows);
+        session.stagingBuffer = DataGridStagingBuffer(
+          columns: session.columns,
+          rows: session.rows,
+          primaryKeys: session.resultGridPrimaryKeys,
+        );
         session.savingChanges = false;
       });
     } catch (e) {
       if (mounted) {
+        _invalidatePane(session);
         setState(() => session.savingChanges = false);
-        await showAppDialog<void>(
-          context: context,
-          builder: (ctx) => QueryaDialogCard(
-            constraints: const material.BoxConstraints(maxWidth: 420),
-            child: material.Padding(
-              padding: const material.EdgeInsets.all(20),
-              child: material.Column(
-                mainAxisSize: material.MainAxisSize.min,
-                crossAxisAlignment: material.CrossAxisAlignment.start,
-                children: [
-                  const Text('Save Changes Failed').semiBold().large(),
-                  const Gap(8),
-                  Text(e.toString()).muted().small(),
-                  const Gap(20),
-                  material.Align(
-                    alignment: material.Alignment.centerRight,
-                    child: PrimaryButton(
-                      onPressed: () => material.Navigator.of(ctx).pop(),
-                      child: const Text('OK'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
+        await showTableViewSaveFailedDialog(context: context, error: e);
       }
     }
   }
@@ -533,7 +616,8 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
           selection: material.TextSelection.collapsed(offset: text.length),
         );
         session.title = file.name;
-        session.filePath = file.path;
+        session.markSaved(newFilePath: file.path);
+        _invalidatePane(session);
         setState(() {});
       } else {
         _addNewTab(initialSql: text, title: file.name, filePath: file.path);
@@ -554,6 +638,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       final existingPath = session.filePath;
       if (existingPath != null && existingPath.isNotEmpty) {
         await File(existingPath).writeAsString(session.controller.text);
+        session.markSaved();
         if (!mounted) return;
         showAppToast(
           context: context,
@@ -576,9 +661,10 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       if (path == null || path.isEmpty) return;
       await File(path).writeAsString(session.controller.text);
       if (!mounted) return;
+      _invalidatePane(session);
       setState(() {
-        session.filePath = path;
         session.title = File(path).uri.pathSegments.last;
+        session.markSaved(newFilePath: path);
       });
       showAppToast(
         context: context,
@@ -716,7 +802,10 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
                   index: _activeSessionIndex,
                   children: [
                     for (final session in _sessions)
-                      _buildSessionPane(context, session),
+                      _paneCache.putIfAbsent(
+                        session.id,
+                        () => _buildSessionPane(context, session),
+                      ),
                   ],
                 ),
               ),
@@ -731,8 +820,10 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
     material.BuildContext context,
     SqlQueryTabSession session,
   ) {
+    paneBuildCount++;
     final theme = Theme.of(context);
     return VerticalSplitPane(
+      key: material.ValueKey(session.id),
       fraction: session.topFraction,
       maxFraction: 0.85,
       top: material.Column(
@@ -751,6 +842,7 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
                       connectionId: widget.connectionRow.id!,
                       databaseName: widget.connectionRow.databaseName,
                       sqlController: session.controller,
+                      onOpenInNewTab: (sql) => _addNewTab(initialSql: sql),
                     );
                   }
                 : null,

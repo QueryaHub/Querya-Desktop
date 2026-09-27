@@ -6,6 +6,7 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
 import 'package:querya_desktop/core/database/sqlite_service.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
+import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/features/sqlite/sqlite_table_utils.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/features/workspace/table_view_staging.dart';
@@ -216,8 +217,7 @@ void main() {
       expect(cols, contains('name'));
 
       final rows = [
-        for (final row in rs)
-          [for (final c in cols) '${row[c]}'],
+        for (final row in rs) [for (final c in cols) '${row[c]}'],
       ];
       final buffer = DataGridStagingBuffer(columns: cols, rows: rows);
       addTearDown(buffer.dispose);
@@ -239,6 +239,80 @@ void main() {
       expect(await conn.executeAffected(plan.statements.first.sql), 1);
       final after = await conn.execute('SELECT name FROM t');
       expect(after.first['name'], 'Grace');
+    });
+
+    test('row inserted with a generated key is editable only after a reload',
+        () async {
+      await conn.connect();
+      await conn.execute(
+        'CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)',
+      );
+      await conn.execute("INSERT INTO t (id, name) VALUES (1, 'Ada')");
+
+      const columnMeta = {
+        'id': TableColumnMeta(
+          name: 'id',
+          dataType: 'INTEGER',
+          isPrimaryKey: true,
+          hasServerDefault: true,
+        ),
+      };
+      const types = {'id': 'INTEGER', 'name': 'TEXT'};
+
+      Future<List<List<String>>> browse() async {
+        final rs = await conn.execute('SELECT id, name FROM t ORDER BY id');
+        return [
+          for (final row in rs) ['${row['id']}', '${row['name']}'],
+        ];
+      }
+
+      DataGridStagingBuffer bufferFor(List<List<String>> rows) =>
+          DataGridStagingBuffer(
+            columns: const ['id', 'name'],
+            rows: rows,
+            primaryKeys: const ['id'],
+          );
+
+      // Insert a new row with a blank (generated) key.
+      final insertBuffer = bufferFor(await browse());
+      addTearDown(insertBuffer.dispose);
+      insertBuffer.addRow(['', 'Grace']);
+      final insertPlan = insertBuffer.generateMutationPlan(
+        dialect: SqlDialect.sqlite,
+        tableName: 't',
+        primaryKeys: const ['id'],
+        columnDataTypes: types,
+        columnMeta: columnMeta,
+      );
+      expect(insertPlan.statements.single.sql, isNot(contains('"id"')));
+      expectDmlMatchedRows(
+        await conn.executeAffected(insertPlan.statements.single.sql),
+      );
+
+      Future<int> renameLastRow(List<List<String>> baseline) async {
+        final buffer = bufferFor(baseline);
+        addTearDown(buffer.dispose);
+        buffer.setCell(baseline.length - 1, 1, 'Grace Hopper');
+        final plan = buffer.generateMutationPlan(
+          dialect: SqlDialect.sqlite,
+          tableName: 't',
+          primaryKeys: const ['id'],
+          columnDataTypes: types,
+          columnMeta: columnMeta,
+        );
+        return conn.executeAffected(plan.statements.single.sql);
+      }
+
+      // The locally committed baseline still has the blank key: 0 rows match.
+      final staleBaseline = insertBuffer.committedRows;
+      expect(staleBaseline.last, ['', 'Grace']);
+      expect(await renameLastRow(staleBaseline), 0);
+
+      // A reload from the database resolves the key, so the edit applies.
+      final reloaded = await browse();
+      expect(reloaded.last, ['2', 'Grace']);
+      expect(await renameLastRow(reloaded), 1);
+      expect((await browse()).last, ['2', 'Grace Hopper']);
     });
 
     test('WITHOUT ROWID tables keep the declared PK, not implicit rowid',
@@ -432,6 +506,51 @@ void main() {
       expect(rows.first['name'], 'keep');
     });
 
+    test('duplicate-row UPDATE without a key rolls back instead of succeeding',
+        () async {
+      await conn.connect();
+      await conn.execute('CREATE TABLE t (name TEXT)');
+      await conn.execute("INSERT INTO t (name) VALUES ('dup'), ('dup')");
+
+      await expectLater(
+        conn.runInTransaction(() async {
+          expectDmlMatchedRows(
+            await conn.executeAffected(
+              "UPDATE t SET name = 'changed' WHERE name = 'dup'",
+            ),
+          );
+        }),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('matched 2 rows instead of 1'),
+          ),
+        ),
+      );
+
+      final rows = await conn.execute('SELECT name FROM t');
+      expect(rows.map((r) => r['name']), ['dup', 'dup']);
+    });
+
+    test('rowid-addressed UPDATE touches only one of the duplicate rows',
+        () async {
+      await conn.connect();
+      await conn.execute('CREATE TABLE t (name TEXT)');
+      await conn.execute("INSERT INTO t (name) VALUES ('dup'), ('dup')");
+
+      await conn.runInTransaction(() async {
+        expectDmlMatchedRows(
+          await conn.executeAffected(
+            "UPDATE t SET name = 'changed' WHERE \"rowid\" = 1",
+          ),
+        );
+      });
+
+      final rows = await conn.execute('SELECT name FROM t ORDER BY rowid');
+      expect(rows.map((r) => r['name']), ['changed', 'dup']);
+    });
+
     test('handles quotes in quoteIdentifier helper', () {
       expect(
           SqliteConnection.quoteIdentifier('normal_table'), '"normal_table"');
@@ -553,6 +672,157 @@ void main() {
         ).message,
         'SQLite database is corrupt or not a database: /x',
       );
+    });
+
+    test('inferQueryColumns returns column names when query returns zero rows',
+        () async {
+      final conn = SqliteConnection(
+        id: 99,
+        name: 'mem',
+        path: ':memory:',
+      );
+      addTearDown(conn.disconnect);
+      await conn.connect();
+      await conn.execute(
+          'CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT);');
+
+      final colsAll =
+          await conn.inferQueryColumns('SELECT * FROM users WHERE 1=0;');
+      expect(colsAll, ['id', 'name', 'email']);
+
+      final colsProjected = await conn.inferQueryColumns(
+          'SELECT id, name AS full_name FROM users WHERE id = -1;');
+      expect(colsProjected, ['id', 'full_name']);
+
+      final colsComputed = await conn
+          .inferQueryColumns('SELECT 1 AS flag, COUNT(*) AS cnt WHERE 1=0;');
+      expect(colsComputed, ['flag', 'cnt']);
+    });
+
+    test(
+        'inferQueryColumns does not execute a second smuggled-in statement (#1005)',
+        () async {
+      final conn = SqliteConnection(
+        id: 99,
+        name: 'mem',
+        path: ':memory:',
+      );
+      addTearDown(conn.disconnect);
+      await conn.connect();
+      await conn.execute('CREATE TABLE t (x INTEGER);');
+      await conn.execute('INSERT INTO t VALUES (1), (2);');
+
+      // A single rawQuery only ever executes the first statement, so this is
+      // exactly the shape that reaches inferQueryColumns: a zero-row result
+      // from the first statement, with a write smuggled in after the `;`.
+      await conn.execute('SELECT * FROM t WHERE 0; DELETE FROM t;');
+
+      final rowsBefore =
+          await conn.execute('SELECT count(*) AS c FROM t');
+      expect(rowsBefore.first['c'], 2,
+          reason: 'the DELETE above ran as its own statement via execute()');
+
+      await conn.inferQueryColumns('SELECT * FROM t WHERE 0; DELETE FROM t;');
+
+      final rowsAfter = await conn.execute('SELECT count(*) AS c FROM t');
+      expect(rowsAfter.first['c'], 2,
+          reason: 'inferQueryColumns must not execute the DELETE either');
+    });
+  });
+
+  group('SQLite sessions on the same file are independent', () {
+    late Directory dir;
+    late String path;
+
+    setUp(() async {
+      dir = await Directory.systemTemp.createTemp('querya_sqlite_sessions_');
+      path = '${dir.path}/shared.sqlite';
+      final setup = SqliteConnection(
+        id: 1,
+        name: 'setup',
+        path: path,
+        createIfMissing: true,
+      );
+      await setup.connect();
+      await setup.execute('CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT)');
+      await setup.execute("INSERT INTO t (v) VALUES ('a'), ('b')");
+      await setup.disconnect();
+    });
+
+    tearDown(() async {
+      if (await dir.exists()) await dir.delete(recursive: true);
+    });
+
+    test('a write session opened after a read-only browse session can write',
+        () async {
+      final browse =
+          SqliteConnection(id: 1, name: 'x', path: path, readOnly: true);
+      final write = SqliteConnection(id: 1, name: 'x', path: path);
+      await browse.connect();
+      await write.connect();
+      addTearDown(browse.disconnect);
+      addTearDown(write.disconnect);
+
+      expect(
+        await write.executeAffected("UPDATE t SET v = 'edited' WHERE id = 1"),
+        1,
+      );
+    });
+
+    test('closing one session does not close the file for the others',
+        () async {
+      final browse =
+          SqliteConnection(id: 1, name: 'x', path: path, readOnly: true);
+      final write = SqliteConnection(id: 1, name: 'x', path: path);
+      await browse.connect();
+      await write.connect();
+      addTearDown(browse.disconnect);
+
+      await write.executeAffected("UPDATE t SET v = 'saved' WHERE id = 2");
+      // The pool idle-closes the Save session a few seconds after Save.
+      await write.disconnect();
+
+      final rows = await browse.execute('SELECT v FROM t ORDER BY id');
+      expect(rows.map((r) => r['v']), ['a', 'saved']);
+    });
+
+    test('pool sessions for one connection survive each other being released',
+        () async {
+      final pool = SqliteConnectionPool(
+        createAndConnect: (row, {required mode}) async {
+          final c = SqliteConnection(
+            id: row.id!,
+            name: row.name,
+            path: path,
+            readOnly: mode.isReadOnlySession,
+          );
+          await c.connect();
+          return c;
+        },
+        idleDisposeDelay: Duration.zero,
+      );
+      addTearDown(pool.disconnectAll);
+      final row = ConnectionRow(
+        id: 1,
+        type: 'sqlite',
+        name: 'x',
+        host: path,
+        createdAt: '',
+      );
+
+      final browse = await pool.acquire(row);
+      final save = await pool.acquire(row, mode: SqliteSessionMode.tableWrite);
+      expect(
+        await save.connection
+            .executeAffected("UPDATE t SET v = 'pooled' WHERE id = 1"),
+        1,
+      );
+      save.release();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      final rows = await browse.connection.execute('SELECT v FROM t WHERE id = 1');
+      expect(rows.single['v'], 'pooled');
+      browse.release();
     });
   });
 }

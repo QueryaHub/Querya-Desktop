@@ -8,6 +8,9 @@ final MemorySecretsStorageBackend testMemorySecrets =
 class MemorySecretsStorageBackend implements SecretsStorageBackend {
   final Map<String, String> _values = {};
 
+  /// When non-null, the next [read] throws this error (then clears the flag).
+  Object? failNextRead;
+
   /// When non-null, the next [write] throws this error (then clears the flag).
   Object? failNextWrite;
 
@@ -15,7 +18,14 @@ class MemorySecretsStorageBackend implements SecretsStorageBackend {
   Object? failNextDelete;
 
   @override
-  Future<String?> read(String key) async => _values[key];
+  Future<String?> read(String key) async {
+    final fail = failNextRead;
+    if (fail != null) {
+      failNextRead = null;
+      throw fail;
+    }
+    return _values[key];
+  }
 
   @override
   Future<void> write(String key, String? value) async {
@@ -43,6 +53,7 @@ class MemorySecretsStorageBackend implements SecretsStorageBackend {
 
   void clear() {
     _values.clear();
+    failNextRead = null;
     failNextWrite = null;
     failNextDelete = null;
   }

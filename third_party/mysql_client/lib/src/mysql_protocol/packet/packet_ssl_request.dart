@@ -3,6 +3,7 @@ import 'package:buffer/buffer.dart';
 import 'package:mysql_client/mysql_protocol.dart';
 
 const _supportedCapabitilies = mysqlCapFlagClientProtocol41 |
+    mysqlCapFlagClientFoundRows |
     mysqlCapFlagClientSecureConnection |
     mysqlCapFlagClientPluginAuth |
     mysqlCapFlagClientPluginAuthLenEncClientData |

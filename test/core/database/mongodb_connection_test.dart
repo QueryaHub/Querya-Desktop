@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
+import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
 
 void main() {
   group('MongoConnection.buildConnectionUri', () {
@@ -252,6 +255,41 @@ void main() {
           contains('Not connected'),
         )),
       );
+    });
+  });
+
+  group('MongoConnection TLS temp file cleanup', () {
+    test('cleans up temporary client PEM file upon failed connect()', () async {
+      final testDir = await Directory.systemTemp.createTemp('querya_mongo_test_input_');
+      final certFile = File('${testDir.path}/client.crt');
+      final keyFile = File('${testDir.path}/client.key');
+      await certFile.writeAsString('-----BEGIN CERTIFICATE-----\nTEST_CERT\n-----END CERTIFICATE-----\n');
+      await keyFile.writeAsString('-----BEGIN PRIVATE KEY-----\nTEST_KEY\n-----END PRIVATE KEY-----\n');
+
+      final conn = MongoConnection(
+        id: 999,
+        name: 'test-tls-cleanup',
+        host: '127.0.0.1',
+        port: 65432,
+        useSSL: true,
+        connectionString: 'mongodb://127.0.0.1:65432/test?sslcert=${Uri.encodeComponent(certFile.path)}&sslkey=${Uri.encodeComponent(keyFile.path)}',
+      );
+
+      try {
+        await conn.connect();
+      } catch (_) {}
+
+      final tempDirs = Directory.systemTemp
+          .listSync()
+          .whereType<Directory>()
+          .where((d) {
+            final seg = d.uri.pathSegments.where((s) => s.isNotEmpty).lastOrNull ?? '';
+            return seg.startsWith(kMongoTlsTempPrefix);
+          })
+          .toList();
+      expect(tempDirs, isEmpty);
+
+      await testDir.delete(recursive: true);
     });
   });
 }

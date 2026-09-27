@@ -87,6 +87,32 @@ void main() {
     });
   });
 
+  group('FilterDebouncer', () {
+    testWidgets('runs only the last action after the pause', (tester) async {
+      final debouncer = FilterDebouncer();
+      final calls = <String>[];
+
+      debouncer.run(() => calls.add('a'));
+      await tester.pump(const Duration(milliseconds: 50));
+      debouncer.run(() => calls.add('ab'));
+      await tester.pump(const Duration(milliseconds: 50));
+      debouncer.run(() => calls.add('abc'));
+      expect(calls, isEmpty);
+
+      await tester.pump(kTreeFilterDebounce);
+      expect(calls, ['abc']);
+    });
+
+    testWidgets('cancel drops a pending action', (tester) async {
+      final debouncer = FilterDebouncer();
+      var ran = false;
+      debouncer.run(() => ran = true);
+      debouncer.cancel();
+      await tester.pump(kTreeFilterDebounce * 2);
+      expect(ran, isFalse);
+    });
+  });
+
   group('ConnectionsPanel global search and tree filtering', () {
     late Directory tempDir;
 
@@ -154,6 +180,87 @@ void main() {
         await LocalDb.instance.removeFolder(name);
       }
       await FoldersStorage.instance.reload();
+    });
+
+    testWidgets('typing in the sidebar filter applies once after the debounce',
+        (tester) async {
+      final panelKey = GlobalKey<ConnectionsPanelState>();
+
+      await tester.binding.setSurfaceSize(const material.Size(400, 700));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        ShadcnApp(
+          theme: AppTheme.dark,
+          home: material.SizedBox(
+            width: 400,
+            height: 700,
+            child: ConnectionsPanel(
+              key: panelKey,
+              skipInitialDbLoadForTest: true,
+            ),
+          ),
+        ),
+      );
+      await tester.runAsync(() async {
+        await panelKey.currentState!.reloadConnectionsFromDb();
+      });
+      await tester.pump();
+
+      final field = find.byType(material.TextField).first;
+      for (final q in ['a', 'an', 'ana', 'anal']) {
+        await tester.enterText(field, q);
+        await tester.pump(const Duration(milliseconds: 40));
+      }
+      // Still inside the debounce window: nothing filtered yet.
+      expect(find.text('Prod Postgres'), findsOneWidget);
+      expect(find.text('1/3'), findsNothing);
+
+      await tester.pump(kTreeFilterDebounce);
+      expect(find.text('Local Analytics'), findsOneWidget);
+      expect(find.text('Prod Postgres'), findsNothing);
+      expect(find.text('1/3'), findsOneWidget);
+    });
+
+    testWidgets('clear button resets the sidebar filter immediately',
+        (tester) async {
+      final panelKey = GlobalKey<ConnectionsPanelState>();
+
+      await tester.binding.setSurfaceSize(const material.Size(400, 700));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        ShadcnApp(
+          theme: AppTheme.dark,
+          home: material.SizedBox(
+            width: 400,
+            height: 700,
+            child: ConnectionsPanel(
+              key: panelKey,
+              skipInitialDbLoadForTest: true,
+            ),
+          ),
+        ),
+      );
+      await tester.runAsync(() async {
+        await panelKey.currentState!.reloadConnectionsFromDb();
+      });
+      await tester.pump();
+
+      await tester.enterText(find.byType(material.TextField).first, 'analytics');
+      await tester.pump(kTreeFilterDebounce);
+      expect(find.text('Prod MySQL'), findsNothing);
+
+      await tester.tap(find.byIcon(material.Icons.close_rounded).first);
+      await tester.pump();
+      expect(find.text('Prod MySQL'), findsOneWidget);
+
+      // A keystroke typed just before clearing must not re-apply afterwards.
+      await tester.enterText(find.byType(material.TextField).first, 'x');
+      await tester.pump(); // the clear button follows the text, not the debounce
+      await tester.tap(find.byIcon(material.Icons.close_rounded).first);
+      await tester.pump(kTreeFilterDebounce * 2);
+      expect(find.text('Prod MySQL'), findsOneWidget);
     });
 
     testWidgets('global search filters connections and auto-expands folder', (tester) async {

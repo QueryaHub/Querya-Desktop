@@ -65,13 +65,20 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
 
   bool get _readOnly => widget.isReadOnly || widget.connectionRow.useSSL;
 
-  bool get _editingEnabled => tableViewEditingEnabled(
+  /// Tables open in view mode; editing is switched on explicitly.
+  bool _editMode = false;
+
+  /// Whether this table could be edited (PK, not a view, writable).
+  bool get _canEdit => tableViewEditingEnabled(
         isView: widget.isView,
         customSqlActive: false,
         hasPrimaryKey: _primaryKeys.isNotEmpty,
         readOnly: _readOnly,
         schemaError: _schemaError,
       );
+
+  /// Edit mode is on and the table is editable.
+  bool get _editingEnabled => _canEdit && _editMode;
 
   String _qualifiedFrom() {
     return SqliteConnection.quoteIdentifier(widget.tableName);
@@ -136,6 +143,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
         columns: _columnNames,
         rows: _rows,
         enabled: _editingEnabled,
+        primaryKeys: _primaryKeys,
       );
     }
     if (mounted) setState(() {});
@@ -159,6 +167,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
   }
 
   Future<void> _connectAndLoad() async {
+    _editMode = false;
     _disconnectCurrent();
     if (!mounted) return;
     setState(() {
@@ -207,6 +216,57 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
       lease.release();
     }
   }
+
+  String? _editDisabledReason() => tableViewEditDisabledReason(
+      isView: widget.isView,
+      customSqlActive: false,
+      hasPrimaryKey: _primaryKeys.isNotEmpty,
+      schemaLoaded: _schemaLoaded,
+      readOnly: _readOnly,
+      schemaError: _schemaError,
+    );
+
+  void _enterEditMode() {
+    if (!_canEdit || _editMode) return;
+    setState(() {
+      _editMode = true;
+      _stagingBuffer = replaceTableViewStagingBuffer(
+        previous: _stagingBuffer,
+        columns: _columnNames,
+        rows: _rows,
+        enabled: _editingEnabled,
+        primaryKeys: _primaryKeys,
+      );
+    });
+  }
+
+  Future<void> _exitEditMode() async {
+    if (!_editMode) return;
+    if (!await _confirmDiscardIfNeeded()) return;
+    if (!mounted) return;
+    setState(() {
+      _editMode = false;
+      _stagingBuffer?.dispose();
+      _stagingBuffer = null;
+    });
+  }
+
+  void _toggleEditMode() {
+    if (_editMode) {
+      unawaited(_exitEditMode());
+    } else {
+      _enterEditMode();
+    }
+  }
+
+  material.Widget _editModeButton() => TableEditModeButton(
+        editMode: _editMode,
+        canEdit: _canEdit,
+        busy: _loading || _isSaving,
+        disabledReason: _editDisabledReason(),
+        onEdit: _enterEditMode,
+        onDone: () => unawaited(_exitEditMode()),
+      );
 
   Future<bool> _confirmDiscardIfNeeded() {
     return confirmDiscardTableEditsIfDirty(
@@ -262,11 +322,36 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
       columns: columns,
       rows: rows,
       enabled: _editingEnabled,
+      primaryKeys: _primaryKeys,
     );
   }
 
+  /// Browse connection, re-acquired when the pooled session was closed under
+  /// us (tree Disconnect, another view interrupting the shared slot).
+  Future<SqliteConnection?> _ensureBrowseConnection() async {
+    final current = _connection;
+    if (current != null && current.isConnected) return current;
+    _lease?.release();
+    _lease = null;
+    try {
+      final lease = await SqliteService.instance.acquire(
+        widget.connectionRow,
+        mode: SqliteSessionMode.readOnly,
+      );
+      if (!mounted) {
+        lease.release();
+        return null;
+      }
+      _lease = lease;
+      return lease.connection;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _fetch() async {
-    final conn = _connection;
+    final conn = await _ensureBrowseConnection();
+    if (!mounted) return;
     if (conn == null || !conn.isConnected) {
       if (mounted && _loading) {
         setState(() {
@@ -398,7 +483,23 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     );
     if (!mounted) return;
     if (outcome.isApplied) {
-      final newRows = buffer.effectiveRows;
+      if (buffer.insertedRowCount > 0) {
+        // Inserted rows have no database-generated keys / defaults yet, so a
+        // follow-up UPDATE / DELETE on them would match 0 rows. Reload the page.
+        buffer.dispose();
+        setState(() {
+          _stagingBuffer = null;
+          _isSaving = false;
+        });
+        showAppToast(
+          context: context,
+          message: tableViewSavedMessage(outcome.statementCount),
+          variant: AppToastVariant.success,
+        );
+        await _fetch();
+        return;
+      }
+      final newRows = buffer.committedRows;
       buffer.dispose();
       setState(() {
         _rows = newRows;
@@ -408,12 +509,13 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
           columns: _columnNames,
           rows: newRows,
           enabled: _editingEnabled,
+          primaryKeys: _primaryKeys,
         );
         _isSaving = false;
       });
       showAppToast(
         context: context,
-        message: '${outcome.statementCount} change(s) saved',
+        message: tableViewSavedMessage(outcome.statementCount),
         variant: AppToastVariant.success,
       );
       return;
@@ -428,8 +530,8 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
   }
 
   Future<void> _showDdlDialog() async {
-    final conn = _connection;
-    if (conn == null || !conn.isConnected) return;
+    final conn = await _ensureBrowseConnection();
+    if (!mounted || conn == null || !conn.isConnected) return;
     final navigator = material.Navigator.of(context, rootNavigator: true);
     unawaited(showAppDialog<void>(
       context: context,
@@ -603,12 +705,10 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
                           ),
                         ),
                         const Gap(6),
-                        if (_stagingBuffer != null)
-                          TableBrowserPendingActions(
-                            buffer: _stagingBuffer!,
-                            onSave: () => unawaited(_applyStagedChanges()),
-                            isSaving: _isSaving,
-                          ),
+                        if (!widget.isView) ...[
+                          _editModeButton(),
+                          const Gap(4),
+                        ],
                         OutlineButton(
                           size: ButtonSize.small,
                           onPressed: _loading
@@ -669,6 +769,10 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
 
     return material.CallbackShortcuts(
       bindings: {
+        const material.SingleActivator(LogicalKeyboardKey.keyE, control: true):
+            _toggleEditMode,
+        const material.SingleActivator(LogicalKeyboardKey.keyE, meta: true):
+            _toggleEditMode,
         const material.SingleActivator(LogicalKeyboardKey.f5): () {
           if (!_loading) unawaited(_onRefresh());
         },

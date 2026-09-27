@@ -70,4 +70,57 @@ void main() {
       expect(sqliteSqlIsReadOnlyQuery('CREATE TABLE t (id INT)'), isFalse);
     });
   });
+
+  group('sqliteHasMultipleStatements', () {
+    test('single statement, with or without a trailing semicolon', () {
+      expect(sqliteHasMultipleStatements('SELECT 1'), isFalse);
+      expect(sqliteHasMultipleStatements('SELECT 1;'), isFalse);
+      expect(sqliteHasMultipleStatements('SELECT 1;  '), isFalse);
+      expect(sqliteHasMultipleStatements('SELECT 1;;'), isFalse);
+    });
+
+    test('a second statement after a top-level semicolon is detected', () {
+      expect(
+        sqliteHasMultipleStatements('SELECT 1 WHERE 0; DELETE FROM t'),
+        isTrue,
+      );
+      expect(
+        sqliteHasMultipleStatements('SELECT 1; SELECT 2;'),
+        isTrue,
+      );
+    });
+
+    test('a semicolon inside a string / quoted identifier does not count',
+        () {
+      expect(
+        sqliteHasMultipleStatements("SELECT 'a;b'"),
+        isFalse,
+      );
+      expect(
+        sqliteHasMultipleStatements('SELECT "a;b" FROM t'),
+        isFalse,
+      );
+      expect(
+        sqliteHasMultipleStatements('SELECT * FROM [a;b]'),
+        isFalse,
+      );
+      // A doubled quote (escaped) inside the literal, followed by a real
+      // top-level `;` and a second statement, is still detected.
+      expect(
+        sqliteHasMultipleStatements("SELECT 'it''s; fine'; DELETE FROM t"),
+        isTrue,
+      );
+    });
+
+    test('a semicolon inside a comment does not count', () {
+      expect(
+        sqliteHasMultipleStatements('SELECT 1 -- ; not real\n'),
+        isFalse,
+      );
+      expect(
+        sqliteHasMultipleStatements('SELECT 1 /* ; not real */'),
+        isFalse,
+      );
+    });
+  });
 }

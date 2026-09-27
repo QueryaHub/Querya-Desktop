@@ -10,6 +10,7 @@ import 'core/layout/ui_scale_controller.dart';
 import 'core/motion/display_refresh_service.dart';
 import 'core/motion/querya_motion_controller.dart';
 import 'core/platform/file_launch_service.dart';
+import 'core/security/ssl_certificate_support.dart';
 import 'core/storage/local_db.dart';
 import 'core/theme/theme_controller.dart';
 import 'features/updater/update_controller.dart';
@@ -31,6 +32,7 @@ void main([List<String> args = const []]) async {
     await UiScaleController.instance.load();
     await QueryaMotionController.instance.load();
     unawaited(UpdateController.instance.initialize());
+    unawaited(cleanupStaleMongoTlsTempFiles());
     runApp(const QueryaApp());
     doWhenWindowReady(() {
       final win = appWindow;

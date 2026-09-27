@@ -97,5 +97,81 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
       expect(find.textContaining('Invalid JSON'), findsOneWidget);
     });
+
+    testWidgets('preserves compact JSON formatting when opened and saved', (tester) async {
+      String? updatedVal;
+      const initialJson = '{"name":"John","age":30}';
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Material(
+            child: DataGridValuePanel(
+              columnName: 'payload',
+              cellValue: initialJson,
+              rowIndex: 0,
+              onClose: () {},
+              onUpdateValue: (val) => updatedVal = val,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Controller should retain compact single line
+      final textField = tester.widget<material.TextField>(find.byType(material.TextField));
+      expect(textField.controller!.text, initialJson);
+      expect(find.text('Preserve compact formatting'), findsOneWidget);
+
+      // Tap Format - text in editor becomes indented
+      await tester.tap(find.text('Format'));
+      await tester.pumpAndSettle();
+      expect(textField.controller!.text, contains('\n'));
+
+      // Save while "Preserve compact formatting" is checked -> saved value is compacted
+      await tester.tap(find.text('Update Cell Value'));
+      await tester.pumpAndSettle();
+      expect(updatedVal, '{"name":"John","age":30}');
+
+      // Now uncheck "Preserve compact formatting" and save -> saved value is formatted
+      await tester.tap(find.text('Preserve compact formatting'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Update Cell Value'));
+      await tester.pumpAndSettle();
+      expect(updatedVal, contains('\n'));
+    });
+
+    testWidgets('blocks saving when validation error exists or on immediate invalid submit', (tester) async {
+      String? updatedVal;
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Material(
+            child: DataGridValuePanel(
+              columnName: 'payload',
+              cellValue: '{"valid":true}',
+              rowIndex: 0,
+              onClose: () {},
+              onUpdateValue: (val) => updatedVal = val,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Enter broken JSON and immediately click Update Cell Value before debounce
+      await tester.enterText(find.byType(material.TextField), '{"broken":');
+      await tester.tap(find.text('Update Cell Value'));
+      await tester.pumpAndSettle();
+
+      // Should not have updated
+      expect(updatedVal, isNull);
+      // Error banner should be displayed immediately
+      expect(find.textContaining('Invalid JSON'), findsOneWidget);
+
+      // Elevated button is now disabled because _validationError != null
+      final button = tester.widget<material.ElevatedButton>(find.byType(material.ElevatedButton));
+      expect(button.onPressed, isNull);
+    });
   });
 }

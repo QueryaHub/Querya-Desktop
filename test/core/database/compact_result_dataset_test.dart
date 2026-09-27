@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/compact_result_dataset.dart';
 
@@ -39,7 +41,7 @@ void main() {
       expect(dataset.cellAt(2, 1), 'NULL');
       expect(dataset.cellAt(3, 0), 'NULL');
       expect(dataset.cellAt(3, 2), 'NULL');
-      expect(dataset.cellAt(3, 1), '0');
+      expect(dataset.cellAt(3, 1), '0.0');
     });
 
     test('asLazyRowList provides transparent List<List<String>> indexable interface', () {
@@ -112,6 +114,53 @@ void main() {
       expect(viewportStopwatch.elapsedMilliseconds, lessThan(5));
       expect(viewportSlice[0][0], '50001');
       expect(viewportSlice[0][3], 'active');
+    });
+
+    test('Float64CompactColumn preserves decimal notation and floating-point precision', () {
+      final columns = ['rate', 'measurement', 'edge_cases'];
+      final rows = <List<Object?>>[
+        [1.0, 100.0, 0.0],
+        [42.0, -5.0, 3.141592653589793],
+        [0.0001, -0.0, 1e10],
+        [null, double.nan, double.infinity],
+      ];
+
+      final dataset = CompactResultDataset.fromRawRows(columns, rows);
+
+      expect(dataset.columns[0].kind, CompactColumnKind.float64);
+      expect(dataset.columns[1].kind, CompactColumnKind.float64);
+      expect(dataset.columns[2].kind, CompactColumnKind.float64);
+
+      expect(dataset.cellAt(0, 0), '1.0');
+      expect(dataset.cellAt(0, 1), '100.0');
+      expect(dataset.cellAt(0, 2), '0.0');
+
+      expect(dataset.cellAt(1, 0), '42.0');
+      expect(dataset.cellAt(1, 1), '-5.0');
+      expect(dataset.cellAt(1, 2), '3.141592653589793');
+
+      expect(dataset.cellAt(2, 0), '0.0001');
+      expect(dataset.cellAt(2, 1), '-0.0');
+      expect(dataset.cellAt(2, 2), '10000000000.0');
+
+      expect(dataset.cellAt(3, 0), 'NULL');
+      expect(dataset.cellAt(3, 1), 'NaN');
+      expect(dataset.cellAt(3, 2), 'Infinity');
+    });
+
+    test('Float64CompactColumn stringValueAt preserves decimal point for whole numbers directly', () {
+      final values = Float64List.fromList([1.0, 2.0, 0.0, 100.0]);
+      final nullBitmap = Uint8List(1);
+      final column = Float64CompactColumn(
+        values: values,
+        nullBitmap: nullBitmap,
+        length: 4,
+      );
+
+      expect(column.stringValueAt(0), '1.0');
+      expect(column.stringValueAt(1), '2.0');
+      expect(column.stringValueAt(2), '0.0');
+      expect(column.stringValueAt(3), '100.0');
     });
   });
 }

@@ -1,23 +1,19 @@
-# Pre-release checklist (release **0.4.17**)
+# Pre-release checklist (release **0.4.18**)
 
-Use this before tagging **`0.4.17`** or running the **Release** workflow.
+Use this before tagging **`0.4.18`** or running the **Release** workflow.
 See [tags-and-releases.md](tags-and-releases.md), [CHANGELOG.md](../CHANGELOG.md).
-Tracking: [#880](https://github.com/QueryaHub/Querya-Desktop/issues/880). Milestone [0.4.17](https://github.com/QueryaHub/Querya-Desktop/milestone/8).
 Manual 120 Hz DevTools QA: issue [#739](https://github.com/QueryaHub/Querya-Desktop/issues/739) (does not block this cut).
 
-## Product smoke (manual) — 0.4.17
+## Product smoke (manual) — 0.4.18
 
-- [ ] **Table Browser schema vs PK (#772)** — failed `getTableSchema` shows “schema unavailable”, not “no primary key”; Refresh retries schema.
-- [ ] **SQLite implicit rowid (#774)** — `CREATE TABLE t (name TEXT)` Table Browser can Save via `rowid`; `WITHOUT ROWID` stays on declared PK.
-- [ ] **Mongo 0-match (#776)** — inspector/JSON Save with a wrong `_id` is Save Failed, not a success toast.
-- [ ] **Mongo full-document Save (#778)** — JSON editor Save is `replaceOne`; deleting a nested key in JSON removes it on the server.
-- [ ] **Mongo dirty editor Back (#782)** — dirty JSON + breadcrumb Back: discard dialog; Cancel keeps the editor.
-- [ ] **Mongo JSON filter (#783)** — `{ "_id": { "$oid": "…" } }` and 24-char hex `_id` match ObjectId documents.
-- [ ] **SQL-grid Save** — simple single-table `SELECT` with a PK can Save; JOIN / no-PK stays read-only (Postgres #786, SQLite #795, MySQL #804).
-- [ ] **0-row DML (#773)** — Save that matches 0 rows fails and keeps the staging buffer.
-- [ ] **Table Browser edit (regression)** — Postgres/MySQL/SQLite table with a PK: double-click cell, Save via DML preview.
-- [ ] **Command Palette** — Ctrl/Cmd+P runs a command; Ctrl/Cmd+K jumps to a table.
-- [ ] **Mongo field Save** — inspector `$set` still 0-match fails (#776); JSON editor is `replaceOne`.
+- [ ] **Sidebar toggle layout isolation (#984)** — Ctrl+B toggles sidebar smoothly with zero LayoutBuilder rebuilds in workspace; build time < 0.5ms.
+- [ ] **LazyOffstage (#1004)** — inactive workspace layers stay offstage and skip redundant layouts.
+- [ ] **Dirty edit guards (#867, #869, #870, #873)** — Execute, navigation, and refresh never discard dirty grid or editor state silently.
+- [ ] **SQL tab unsaved tracking (#910)** — Unsaved SQL editor text triggers warning dialog on close.
+- [ ] **Redis key rename & list bounds (#921, #922, #1009)** — Key rename confirms overwrite; list edits do not overflow or lose binary data.
+- [ ] **Result grid row cache bounds (#1010)** — Heavy vertical scrolling stays within memory budget.
+- [ ] **SQLite compound PK & zero-row headers (#1005, #914)** — Multi-statement comments and compound PKs correctly detected.
+- [ ] **Context menu edge repositioning (#1011)** — Right-click menus at viewport edges do not overflow or crash.
 
 ## Regression smoke (prior releases)
 
@@ -74,14 +70,14 @@ Verify the 0.4.4 motion tokens, smooth animations, and high refresh rate support
 
 ## Versioning and release
 
-- [x] `pubspec.yaml` on the 0.4.17 track is **`0.4.17+1`**.
-- [ ] After merge to `main`, confirm **Auto Version Bump** yields a **0.4.18+…** placeholder (do not ship binaries as 0.4.18).
-- [ ] **Tag** `0.4.17` is placed on the **main merge commit that includes `0.4.17+1`** (not the auto-bump commit).
+- [x] `pubspec.yaml` on the 0.4.18 track is **`0.4.18+1`**.
+- [ ] After merge to `main`, confirm **Auto Version Bump** yields a **0.4.19+…** placeholder.
+- [ ] **Tag** `0.4.18` is placed on the **main merge commit that includes `0.4.18+1`** (not the auto-bump commit).
 - [ ] Run the **Release** workflow via that tag (see [tags-and-releases.md](tags-and-releases.md)).
 - [ ] Verify **portable** zips (`*-linux.zip`, `*-windows.zip`, `*-macos.zip`), **installable** artifacts (`*.AppImage`, `*.deb`, `*.rpm`, `*.flatpak`, `*-windows-setup.exe`), and `SHA256SUMS.txt` on the GitHub Release.
 
 ## Docs
 
-- [x] [CHANGELOG.md](../CHANGELOG.md) has a dated **`## [0.4.17]`** section for the release (CI copies it into the GitHub Release body).
+- [x] [CHANGELOG.md](../CHANGELOG.md) has a dated **`## [0.4.18]`** section for the release (CI copies it into the GitHub Release body).
 - [x] [security.md](security.md) still matches behavior if storage changed.
-- [x] [roadmap.md](roadmap.md) marks 0.4.17 as this cut and 0.5.0 as next.
+- [x] [roadmap.md](roadmap.md) marks 0.4.18 as this cut and 0.5.0 as next.

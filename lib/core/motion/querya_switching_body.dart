@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'lazy_offstage.dart';
 import 'querya_motion.dart';
 import 'querya_motion_context.dart';
 
@@ -51,7 +52,7 @@ class QueryaSwitchingBody extends StatelessWidget {
   }
 }
 
-class _SwitchingLayer extends StatelessWidget {
+class _SwitchingLayer extends StatefulWidget {
   const _SwitchingLayer({
     required this.active,
     required this.duration,
@@ -69,35 +70,80 @@ class _SwitchingLayer extends StatelessWidget {
   final Widget child;
 
   @override
+  State<_SwitchingLayer> createState() => _SwitchingLayerState();
+}
+
+class _SwitchingLayerState extends State<_SwitchingLayer> {
+  late bool _offstage;
+
+  @override
+  void initState() {
+    super.initState();
+    _offstage = !widget.active;
+  }
+
+  @override
+  void didUpdateWidget(covariant _SwitchingLayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active) {
+      _offstage = false;
+    } else if (oldWidget.active && !widget.active) {
+      if (widget.duration == Duration.zero) {
+        _offstage = true;
+      }
+    }
+  }
+
+  void _handleOpacityEnd() {
+    if (!mounted) return;
+    if (!widget.active && !_offstage) {
+      setState(() {
+        _offstage = true;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final curve = active ? inCurve : outCurve;
+    final curve = widget.active ? widget.inCurve : widget.outCurve;
     // Isolate paint; pause child tickers when inactive (opacity anim still runs).
+    // Inactive child is offstaged once the exit transition completes to avoid
+    // redundant layout passes during desktop window resizing (#901).
+    // LazyOffstage (not Offstage) additionally skips re-laying the hidden
+    // child out on every frame a sibling's size changes, e.g. the sidebar
+    // toggle spring resizing the workspace's Expanded (#984).
     final content = TickerMode(
-      enabled: active,
-      child: RepaintBoundary(child: child),
+      enabled: widget.active,
+      child: RepaintBoundary(
+        child: LazyOffstage(
+          offstage: _offstage,
+          child: widget.child,
+        ),
+      ),
     );
     Widget layer = AnimatedOpacity(
-      opacity: active ? 1 : 0,
-      duration: duration,
+      opacity: widget.active ? 1 : 0,
+      duration: widget.duration,
       curve: curve,
+      onEnd: _handleOpacityEnd,
       child: content,
     );
 
-    if (slide != Offset.zero) {
+    if (widget.slide != Offset.zero) {
       layer = AnimatedSlide(
-        offset: active ? Offset.zero : slide,
-        duration: duration,
+        offset: widget.active ? Offset.zero : widget.slide,
+        duration: widget.duration,
         curve: curve,
         child: layer,
       );
     }
 
     return IgnorePointer(
-      ignoring: !active,
+      ignoring: !widget.active,
       child: ExcludeFocus(
-        excluding: !active,
+        excluding: !widget.active,
         child: ExcludeSemantics(
-          excluding: !active,
+          excluding: !widget.active,
           child: layer,
         ),
       ),
