@@ -221,7 +221,9 @@ class _DataGridFilterBarState extends material.State<DataGridFilterBar> {
             showWhenUnlinked: false,
             offset: const material.Offset(24, 32),
             child: material.Material(
-              elevation: 4,
+              elevation: 2,
+              shadowColor: const material.Color(0x1F000000),
+              surfaceTintColor: material.Colors.transparent,
               borderRadius: material.BorderRadius.circular(6),
               color: cs.popover,
               child: material.Container(
@@ -239,7 +241,8 @@ class _DataGridFilterBarState extends material.State<DataGridFilterBar> {
                   itemBuilder: (ctx, i) {
                     final s = _suggestions[i];
                     final isHighlighted = i == _highlightedIndex;
-                    return material.InkWell(
+                    return material.GestureDetector(
+                      behavior: material.HitTestBehavior.opaque,
                       onTap: () => _applySuggestion(s),
                       child: material.Container(
                         padding: const material.EdgeInsets.symmetric(
@@ -285,13 +288,13 @@ class _DataGridFilterBarState extends material.State<DataGridFilterBar> {
         return material.Icon(
           material.Icons.code_rounded,
           size: 13,
-          color: material.Colors.amber.shade700,
+          color: cs.mutedForeground,
         );
       case FilterSuggestionKind.keyword:
         return material.Icon(
           material.Icons.vpn_key_outlined,
           size: 13,
-          color: material.Colors.green.shade600,
+          color: cs.mutedForeground.withValues(alpha: 0.8),
         );
     }
   }

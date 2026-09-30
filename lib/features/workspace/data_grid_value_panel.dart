@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/editor/querya_code_editor.dart';
 import 'package:querya_desktop/core/editor/querya_code_language.dart';
+import 'package:querya_desktop/shared/widgets/querya_dropdown.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import 'xml_html_formatter.dart';
@@ -315,39 +316,22 @@ class _DataGridValuePanelState extends material.State<DataGridValuePanel> {
             child: material.Row(
               children: [
                 // Language Dropdown / Pill
-                material.DropdownButton<ValuePanelLanguage>(
+                QueryaDropdown<ValuePanelLanguage>(
+                  compact: true,
                   value: _selectedLanguage,
-                  isDense: true,
-                  underline: const material.SizedBox(),
-                  icon: const material.Icon(material.Icons.arrow_drop_down, size: 16),
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: cs.foreground,
-                    fontWeight: FontWeight.w600,
-                  ),
                   items: const [
-                    material.DropdownMenuItem(
-                      value: ValuePanelLanguage.auto,
-                      child: Text('Auto'),
-                    ),
-                    material.DropdownMenuItem(
-                      value: ValuePanelLanguage.json,
-                      child: Text('JSON'),
-                    ),
-                    material.DropdownMenuItem(
-                      value: ValuePanelLanguage.xml,
-                      child: Text('XML/HTML'),
-                    ),
-                    material.DropdownMenuItem(
-                      value: ValuePanelLanguage.sql,
-                      child: Text('SQL'),
-                    ),
-                    material.DropdownMenuItem(
-                      value: ValuePanelLanguage.text,
-                      child: Text('Plain Text'),
-                    ),
+                    QueryaDropdownItem(
+                        value: ValuePanelLanguage.auto, label: 'Auto'),
+                    QueryaDropdownItem(
+                        value: ValuePanelLanguage.json, label: 'JSON'),
+                    QueryaDropdownItem(
+                        value: ValuePanelLanguage.xml, label: 'XML/HTML'),
+                    QueryaDropdownItem(
+                        value: ValuePanelLanguage.sql, label: 'SQL'),
+                    QueryaDropdownItem(
+                        value: ValuePanelLanguage.text, label: 'Plain Text'),
                   ],
-                  onChanged: (val) {
+                  onSelected: (val) {
                     if (val != null) {
                       setState(() => _selectedLanguage = val);
                       _validateContent();

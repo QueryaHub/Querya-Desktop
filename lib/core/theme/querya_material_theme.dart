@@ -21,6 +21,8 @@ material.ThemeData materialThemeFromQuerya(ColorScheme scheme) {
 
   return material.ThemeData(
     useMaterial3: true,
+    // Safety net: stray Material popups must not ripple.
+    splashFactory: material.NoSplash.splashFactory,
     colorScheme: materialScheme,
     dialogTheme: material.DialogThemeData(backgroundColor: scheme.popover),
     textTheme: material.TextTheme(
