@@ -5,6 +5,7 @@ import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/features/workspace/grid_groupings_engine.dart';
 import 'package:querya_desktop/features/workspace/result_grid_view.dart';
+import 'package:querya_desktop/shared/widgets/querya_dropdown.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// Groupings / Pivot view tab for tabular data with hierarchical grouping and custom aggregations.
@@ -139,21 +140,17 @@ class _DataGridGroupingsViewState
                 const Gap(6),
                 const Text('Group:').small().semiBold(),
                 const Gap(6),
-                material.DropdownButton<int>(
+                QueryaDropdown<int>(
+                  compact: true,
                   value: _selectedColIndices.isNotEmpty &&
                           _selectedColIndices.first < widget.columns.length
                       ? _selectedColIndices.first
                       : 0,
-                  isDense: true,
-                  underline: const material.SizedBox.shrink(),
-                  style: TextStyle(fontSize: 12, color: cs.foreground),
-                  items: List.generate(widget.columns.length, (i) {
-                    return material.DropdownMenuItem<int>(
-                      value: i,
-                      child: Text(widget.columns[i]),
-                    );
-                  }),
-                  onChanged: (idx) {
+                  items: [
+                    for (var i = 0; i < widget.columns.length; i++)
+                      QueryaDropdownItem(value: i, label: widget.columns[i]),
+                  ],
+                  onSelected: (idx) {
                     if (idx != null) {
                       setState(() {
                         _selectedColIndices = [idx];
@@ -177,18 +174,14 @@ class _DataGridGroupingsViewState
                 // Aggregation Selector
                 const Text('Agg:').small().semiBold(),
                 const Gap(6),
-                material.DropdownButton<GroupingAggType>(
+                QueryaDropdown<GroupingAggType>(
+                  compact: true,
                   value: _aggType,
-                  isDense: true,
-                  underline: const material.SizedBox.shrink(),
-                  style: TextStyle(fontSize: 12, color: cs.foreground),
-                  items: GroupingAggType.values.map((t) {
-                    return material.DropdownMenuItem<GroupingAggType>(
-                      value: t,
-                      child: Text(t.label),
-                    );
-                  }).toList(),
-                  onChanged: (val) {
+                  items: [
+                    for (final t in GroupingAggType.values)
+                      QueryaDropdownItem(value: t, label: t.label),
+                  ],
+                  onSelected: (val) {
                     if (val != null) {
                       setState(() {
                         _aggType = val;
@@ -199,21 +192,17 @@ class _DataGridGroupingsViewState
                 ),
                 if (_aggType != GroupingAggType.count) ...[
                   const Gap(4),
-                  material.DropdownButton<int>(
+                  QueryaDropdown<int>(
+                    compact: true,
                     value: _aggTargetColIndex != null &&
                             _aggTargetColIndex! < widget.columns.length
-                        ? _aggTargetColIndex
+                        ? _aggTargetColIndex!
                         : 0,
-                    isDense: true,
-                    underline: const material.SizedBox.shrink(),
-                    style: TextStyle(fontSize: 12, color: cs.foreground),
-                    items: List.generate(widget.columns.length, (i) {
-                      return material.DropdownMenuItem<int>(
-                        value: i,
-                        child: Text(widget.columns[i]),
-                      );
-                    }),
-                    onChanged: (idx) {
+                    items: [
+                      for (var i = 0; i < widget.columns.length; i++)
+                        QueryaDropdownItem(value: i, label: widget.columns[i]),
+                    ],
+                    onSelected: (idx) {
                       if (idx != null) {
                         setState(() {
                           _aggTargetColIndex = idx;
@@ -237,18 +226,14 @@ class _DataGridGroupingsViewState
                 // Sort Selector
                 const Text('Sort:').small().semiBold(),
                 const Gap(6),
-                material.DropdownButton<GroupSortBy>(
+                QueryaDropdown<GroupSortBy>(
+                  compact: true,
                   value: _sortBy,
-                  isDense: true,
-                  underline: const material.SizedBox.shrink(),
-                  style: TextStyle(fontSize: 12, color: cs.foreground),
-                  items: GroupSortBy.values.map((s) {
-                    return material.DropdownMenuItem<GroupSortBy>(
-                      value: s,
-                      child: Text(s.label),
-                    );
-                  }).toList(),
-                  onChanged: (val) {
+                  items: [
+                    for (final t in GroupSortBy.values)
+                      QueryaDropdownItem(value: t, label: t.label),
+                  ],
+                  onSelected: (val) {
                     if (val != null) {
                       setState(() {
                         _sortBy = val;
