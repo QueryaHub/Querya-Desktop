@@ -68,6 +68,10 @@ void main() {
       expect(script, contains('PID="4242"'));
       expect(script, contains("EXE='/opt/querya/querya_desktop'"));
       expect(script, contains('refusing replace'));
+      expect(script, contains("--exclude='QueryaData'"));
+      expect(script, contains("--exclude='.portable'"));
+      expect(script, contains("! -name 'QueryaData'"));
+      expect(script, contains("! -name '.portable'"));
       expect(script, contains('exec "\$EXE"'));
     });
 
