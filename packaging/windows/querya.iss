@@ -42,6 +42,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "assoc_sql"; Description: "Register Querya as an editor for .sql files"; GroupDescription: "File associations:"; Flags: unchecked
+Name: "assoc_sqlite"; Description: "Associate Querya with SQLite database files (.sqlite, .db)"; GroupDescription: "File associations:"; Flags: unchecked
 
 [Files]
 Source: "{#MyAppSourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -54,25 +56,25 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [Registry]
-; .sql file association and Open With
-Root: HKCR; Subkey: ".sql"; ValueType: string; ValueName: ""; ValueData: "Querya.SQL"; Flags: uninsdeletevalue
-Root: HKCR; Subkey: ".sql\OpenWithProgids"; ValueType: string; ValueName: "Querya.SQL"; ValueData: ""; Flags: uninsdeletevalue
-Root: HKCR; Subkey: "Querya.SQL"; ValueType: string; ValueName: ""; ValueData: "SQL Script File"; Flags: uninsdeletekey
-Root: HKCR; Subkey: "Querya.SQL\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"
-Root: HKCR; Subkey: "Querya.SQL\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
+; .sql file association (optional via task, does not hijack default without user consent)
+Root: HKCR; Subkey: ".sql"; ValueType: string; ValueName: ""; ValueData: "Querya.SQL"; Flags: uninsdeletevalue; Tasks: assoc_sql
+Root: HKCR; Subkey: ".sql\OpenWithProgids"; ValueType: string; ValueName: "Querya.SQL"; ValueData: ""; Flags: uninsdeletevalue; Tasks: assoc_sql
+Root: HKCR; Subkey: "Querya.SQL"; ValueType: string; ValueName: ""; ValueData: "SQL Script File"; Flags: uninsdeletekey; Tasks: assoc_sql
+Root: HKCR; Subkey: "Querya.SQL\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: assoc_sql
+Root: HKCR; Subkey: "Querya.SQL\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: assoc_sql
 
-; .sqlite, .sqlite3, .db, .db3 file associations and Open With
-Root: HKCR; Subkey: ".sqlite"; ValueType: string; ValueName: ""; ValueData: "Querya.SQLite"; Flags: uninsdeletevalue
-Root: HKCR; Subkey: ".sqlite\OpenWithProgids"; ValueType: string; ValueName: "Querya.SQLite"; ValueData: ""; Flags: uninsdeletevalue
-Root: HKCR; Subkey: ".sqlite3"; ValueType: string; ValueName: ""; ValueData: "Querya.SQLite"; Flags: uninsdeletevalue
-Root: HKCR; Subkey: ".sqlite3\OpenWithProgids"; ValueType: string; ValueName: "Querya.SQLite"; ValueData: ""; Flags: uninsdeletevalue
-Root: HKCR; Subkey: ".db"; ValueType: string; ValueName: ""; ValueData: "Querya.SQLite"; Flags: uninsdeletevalue
-Root: HKCR; Subkey: ".db\OpenWithProgids"; ValueType: string; ValueName: "Querya.SQLite"; ValueData: ""; Flags: uninsdeletevalue
-Root: HKCR; Subkey: ".db3"; ValueType: string; ValueName: ""; ValueData: "Querya.SQLite"; Flags: uninsdeletevalue
-Root: HKCR; Subkey: ".db3\OpenWithProgids"; ValueType: string; ValueName: "Querya.SQLite"; ValueData: ""; Flags: uninsdeletevalue
-Root: HKCR; Subkey: "Querya.SQLite"; ValueType: string; ValueName: ""; ValueData: "SQLite Database File"; Flags: uninsdeletekey
-Root: HKCR; Subkey: "Querya.SQLite\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"
-Root: HKCR; Subkey: "Querya.SQLite\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
+; .sqlite, .sqlite3, .db, .db3 file associations (optional via task)
+Root: HKCR; Subkey: ".sqlite"; ValueType: string; ValueName: ""; ValueData: "Querya.SQLite"; Flags: uninsdeletevalue; Tasks: assoc_sqlite
+Root: HKCR; Subkey: ".sqlite\OpenWithProgids"; ValueType: string; ValueName: "Querya.SQLite"; ValueData: ""; Flags: uninsdeletevalue; Tasks: assoc_sqlite
+Root: HKCR; Subkey: ".sqlite3"; ValueType: string; ValueName: ""; ValueData: "Querya.SQLite"; Flags: uninsdeletevalue; Tasks: assoc_sqlite
+Root: HKCR; Subkey: ".sqlite3\OpenWithProgids"; ValueType: string; ValueName: "Querya.SQLite"; ValueData: ""; Flags: uninsdeletevalue; Tasks: assoc_sqlite
+Root: HKCR; Subkey: ".db"; ValueType: string; ValueName: ""; ValueData: "Querya.SQLite"; Flags: uninsdeletevalue; Tasks: assoc_sqlite
+Root: HKCR; Subkey: ".db\OpenWithProgids"; ValueType: string; ValueName: "Querya.SQLite"; ValueData: ""; Flags: uninsdeletevalue; Tasks: assoc_sqlite
+Root: HKCR; Subkey: ".db3"; ValueType: string; ValueName: ""; ValueData: "Querya.SQLite"; Flags: uninsdeletevalue; Tasks: assoc_sqlite
+Root: HKCR; Subkey: ".db3\OpenWithProgids"; ValueType: string; ValueName: "Querya.SQLite"; ValueData: ""; Flags: uninsdeletevalue; Tasks: assoc_sqlite
+Root: HKCR; Subkey: "Querya.SQLite"; ValueType: string; ValueName: ""; ValueData: "SQLite Database File"; Flags: uninsdeletekey; Tasks: assoc_sqlite
+Root: HKCR; Subkey: "Querya.SQLite\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: assoc_sqlite
+Root: HKCR; Subkey: "Querya.SQLite\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: assoc_sqlite
 
 ; Windows Applications registry (ensures presence in modern Open With menu)
 Root: HKCR; Subkey: "Applications\{#MyAppExeName}"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "{#MyAppName}"; Flags: uninsdeletekey
