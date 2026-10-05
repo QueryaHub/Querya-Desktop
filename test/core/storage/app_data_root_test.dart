@@ -78,6 +78,28 @@ void main() {
       expect(await AppDataRoot.isPortableMode(), isTrue);
     });
 
+    test('.portable marker file automatically enables portable mode and creates QueryaData', () async {
+      final marker = File(p.join(installDir.path, '.portable'));
+      await marker.writeAsString('');
+
+      final portable = await AppDataRoot.resolvePortableRoot();
+      expect(portable, isNotNull);
+      expect(portable!.path, p.join(installDir.path, 'QueryaData'));
+      expect(await portable.exists(), isTrue);
+      expect(await AppDataRoot.isPortableMode(), isTrue);
+    });
+
+    test('portable.txt marker file enables portable mode', () async {
+      final marker = File(p.join(installDir.path, 'portable.txt'));
+      await marker.writeAsString('');
+
+      final portable = await AppDataRoot.resolvePortableRoot();
+      expect(portable, isNotNull);
+      expect(portable!.path, p.join(installDir.path, 'QueryaData'));
+      expect(await portable.exists(), isTrue);
+      expect(await AppDataRoot.isPortableMode(), isTrue);
+    });
+
     test('APPIMAGE parent is used as install directory', () async {
       final appImage = p.join(installDir.path, 'Querya.AppImage');
       AppDataRoot.mockInstallDirectory = null;

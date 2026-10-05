@@ -14,6 +14,8 @@ import 'package:path_provider/path_provider.dart';
 abstract final class AppDataRoot {
   static const envPortable = 'QUERYA_PORTABLE';
   static const sidecarDirName = 'QueryaData';
+  static const portableMarkerFile = '.portable';
+  static const portableMarkerAlt = 'portable.txt';
 
   /// Current Linux GTK / XDG application id.
   static const linuxApplicationId = 'com.queryahub.querya_desktop';
@@ -83,8 +85,11 @@ abstract final class AppDataRoot {
 
     final sidecar = Directory(p.join(installDir, sidecarDirName));
     final forced = envRequestsPortable();
+    final hasMarker =
+        await File(p.join(installDir, portableMarkerFile)).exists() ||
+            await File(p.join(installDir, portableMarkerAlt)).exists();
 
-    if (forced) {
+    if (forced || hasMarker) {
       if (!await sidecar.exists()) {
         await sidecar.create(recursive: true);
       }

@@ -83,6 +83,50 @@ class PreferencesAboutSection extends StatelessWidget {
         ).muted().xSmall(),
         const material.SizedBox(height: 12),
 
+        FutureBuilder<bool>(
+          future: AppDataRoot.isPortableMode(),
+          builder: (context, snapshot) {
+            final isPortable = snapshot.data ?? false;
+            if (!isPortable) return const SizedBox.shrink();
+            return material.Container(
+              margin: const material.EdgeInsets.only(bottom: 12),
+              padding: const material.EdgeInsets.all(12),
+              decoration: material.BoxDecoration(
+                color: theme.colorScheme.muted.withValues(alpha: 0.25),
+                borderRadius: material.BorderRadius.circular(6),
+                border: material.Border.all(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                ),
+              ),
+              child: material.Row(
+                crossAxisAlignment: material.CrossAxisAlignment.start,
+                children: [
+                  const QueryaBadge.status(
+                    'PORTABLE',
+                    status: QueryaBadgeStatus.info,
+                  ),
+                  const material.SizedBox(width: 10),
+                  material.Expanded(
+                    child: material.Column(
+                      crossAxisAlignment: material.CrossAxisAlignment.start,
+                      children: [
+                        const Text('Portable Mode Active')
+                            .semiBold()
+                            .small()
+                            .foreground(),
+                        const material.SizedBox(height: 2),
+                        const Text(
+                          'Data, settings, and themes are stored in the local QueryaData folder. Connection passwords remain protected in the host OS keyring.',
+                        ).muted().xSmall(),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+
         material.Wrap(
           spacing: 8,
           runSpacing: 8,
