@@ -758,7 +758,7 @@ class _FolderTile extends material.StatelessWidget {
                     ? material.Icons.folder_open_rounded
                     : material.Icons.folder_rounded,
                 size: 18,
-                color: palette.accent,
+                color: palette.action,
               ),
               const Gap(8),
               material.Text(

@@ -6,7 +6,7 @@ void main() {
   group('RedisKeyTreeEngine', () {
     RedisKeyInfo makeKey(String name, [String type = 'string', int ttl = -1]) {
       return RedisKeyInfo(
-        name: RedisBulkValue.fromString(name),
+        name: RedisBulkValue.utf8(name),
         type: type,
         ttl: ttl,
       );
