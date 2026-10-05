@@ -568,6 +568,21 @@ class RedisConnection {
     return redisReplyInt(result);
   }
 
+  /// DEL key [key ...]. Returns total number of keys removed.
+  Future<int> delMany(Iterable<Object> keys) async {
+    _assertWritable();
+    final list = keys.toList();
+    if (list.isEmpty) return 0;
+    var total = 0;
+    const chunkSize = 200;
+    for (var i = 0; i < list.length; i += chunkSize) {
+      final chunk = list.sublist(i, (i + chunkSize).clamp(0, list.length));
+      final result = await sendCommand(['DEL', ...chunk.map(redisCommandArg)]);
+      total += redisReplyInt(result);
+    }
+    return total;
+  }
+
   /// RENAME old new.
   Future<void> rename(Object oldKey, String newKey) async {
     _assertWritable();
@@ -843,6 +858,8 @@ class RedisConnectionTestFake extends RedisConnection {
           }
         }
         return removed;
+      case 'DEL':
+        return args.length - 1;
       default:
         return null;
     }

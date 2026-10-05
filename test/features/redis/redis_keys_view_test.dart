@@ -276,6 +276,179 @@ void main() {
     expect(fake.scanCallCount, 11);
     await fake.disconnect();
   });
+
+  testWidgets(
+      'RedisKeysView toggles between Flat and Tree view modes and invokes onKeyTap',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const material.Size(900, 700));
+    final fake = RedisConnectionTestFake(
+      firstScanKeys: const [
+        'user:100:profile',
+        'user:100:settings',
+        'standalone',
+      ],
+      dbSizeResult: 3,
+    );
+    await fake.connect();
+
+    String? tappedKey;
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.Scaffold(
+          body: material.SizedBox(
+            width: 900,
+            height: 700,
+            child: RedisKeysView(
+              connection: fake,
+              database: 0,
+              onKeyTap: (key, type) => tappedKey = key.label,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // In flat mode initially
+    expect(find.text('Flat'), findsOneWidget);
+    expect(find.text('Tree'), findsOneWidget);
+    expect(find.text('user:100:profile'), findsOneWidget);
+    expect(find.text('standalone'), findsOneWidget);
+
+    // Switch to Tree view
+    await tester.tap(find.text('Tree'));
+    await tester.pumpAndSettle();
+
+    // Verify folder hierarchy
+    expect(find.text('user'), findsOneWidget);
+    expect(find.text('2 keys'), findsOneWidget);
+    expect(find.text('profile'), findsOneWidget);
+    expect(find.text('settings'), findsOneWidget);
+    expect(find.text('standalone'), findsOneWidget);
+
+    // Tap a leaf key
+    await tester.tap(find.text('profile'));
+    await tester.pumpAndSettle();
+    expect(tappedKey, 'user:100:profile');
+
+    // Switch back to Flat view
+    await tester.tap(find.text('Flat'));
+    await tester.pumpAndSettle();
+    expect(find.text('user:100:profile'), findsOneWidget);
+    await fake.disconnect();
+  });
+
+  testWidgets('RedisKeysView tree view collapse and expand folder',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const material.Size(900, 700));
+    final fake = RedisConnectionTestFake(
+      firstScanKeys: const [
+        'user:100:profile',
+        'user:100:settings',
+      ],
+      dbSizeResult: 2,
+    );
+    await fake.connect();
+
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.Scaffold(
+          body: material.SizedBox(
+            width: 900,
+            height: 700,
+            child: RedisKeysView(
+              connection: fake,
+              database: 0,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Switch to Tree view
+    await tester.tap(find.text('Tree'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('user'), findsOneWidget);
+    expect(find.text('profile'), findsOneWidget);
+
+    // Collapse 'user' folder
+    await tester.tap(find.text('user'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('user'), findsOneWidget);
+    expect(find.text('profile'), findsNothing);
+
+    // Expand 'user' folder again
+    await tester.tap(find.text('user'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('profile'), findsOneWidget);
+    await fake.disconnect();
+  });
+
+  testWidgets(
+      'RedisKeysView tree view folder delete cancels and executes delMany',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const material.Size(900, 700));
+    final fake = _DelTrackingFake(
+      firstScanKeys: const [
+        'user:100:profile',
+        'user:100:settings',
+        'standalone',
+      ],
+      dbSizeResult: 3,
+    );
+    await fake.connect();
+
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.Scaffold(
+          body: material.SizedBox(
+            width: 900,
+            height: 700,
+            child: RedisKeysView(
+              connection: fake,
+              database: 0,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Switch to Tree view
+    await tester.tap(find.text('Tree'));
+    await tester.pumpAndSettle();
+
+    final deleteFolderButton =
+        find.byTooltip('Delete folder (2 keys)');
+    expect(deleteFolderButton, findsOneWidget);
+
+    // Tap delete folder, then Cancel
+    await tester.tap(deleteFolderButton);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('DEL user:100:profile'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(fake.deleted, isEmpty);
+
+    // Tap delete folder, then Confirm execution
+    await tester.tap(deleteFolderButton);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Execute Destructive Statement'));
+    await tester.pumpAndSettle();
+
+    expect(fake.deleted, contains('user:100:profile'));
+    expect(fake.deleted, contains('user:100:settings'));
+    expect(find.text('user'), findsNothing);
+    expect(find.text('standalone'), findsOneWidget);
+    await fake.disconnect();
+  });
 }
 
 class _DelTrackingFake extends RedisConnectionTestFake {
@@ -287,6 +460,14 @@ class _DelTrackingFake extends RedisConnectionTestFake {
   Future<int> del(Object key) async {
     deleted.add(key is RedisBulkValue ? key.label : key.toString());
     return super.del(key);
+  }
+
+  @override
+  Future<int> delMany(Iterable<Object> keys) async {
+    for (final k in keys) {
+      deleted.add(k is RedisBulkValue ? k.label : k.toString());
+    }
+    return super.delMany(keys);
   }
 }
 
