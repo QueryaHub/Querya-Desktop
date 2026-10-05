@@ -4,8 +4,10 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
+import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
+import 'package:querya_desktop/features/connections/ssh_tunnel_section.dart';
 import 'package:querya_desktop/shared/widgets/form_validity_notifier.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -53,6 +55,9 @@ class _PostgresConnectionFormContentState
   final _sslCertController = material.TextEditingController();
   final _sslKeyController = material.TextEditingController();
 
+  SshTunnelConfig _sshConfig = const SshTunnelConfig();
+  final SshTunnelSecrets _sshSecrets = SshTunnelSecrets();
+
   bool _useSSL = false;
   bool _showPassword = false;
   bool _isTesting = false;
@@ -91,6 +96,9 @@ class _PostgresConnectionFormContentState
       _useSSL = initial.useSSL;
       _connectionStringController.text =
           redactUriPassword(initial.connectionString) ?? '';
+      if (initial.sshTunnelConfig != null) {
+        _sshConfig = initial.sshTunnelConfig!;
+      }
       // Password left empty — mergeSecretsForConnectionUpdate keeps existing.
     }
 
@@ -287,6 +295,8 @@ class _PostgresConnectionFormContentState
         sslKey: _sslKeyController.text.trim().isEmpty
             ? null
             : _sslKeyController.text.trim(),
+        sshConfig: _sshConfig.enabled ? _sshConfig : null,
+        sshSecrets: _sshSecrets,
       );
       final result = await conn.testConnection();
       if (mounted) {
@@ -329,7 +339,7 @@ class _PostgresConnectionFormContentState
             ? 'PostgreSQL: $effectiveHost:$effectivePort'
             : 'PostgreSQL $host:$port/$database');
     final initial = widget.initial;
-    final row = ConnectionRow(
+    var row = ConnectionRow(
       id: initial?.id,
       type: initial?.type ?? 'postgresql',
       name: displayName,
@@ -349,7 +359,9 @@ class _PostgresConnectionFormContentState
       folderId: initial?.folderId ?? widget.folderId,
       sortOrder: initial?.sortOrder ?? 0,
       createdAt: initial?.createdAt ?? DateTime.now().toUtc().toIso8601String(),
+      sshSecrets: _sshConfig.enabled ? _sshSecrets : null,
     );
+    row = row.withSshTunnelConfig(_sshConfig.enabled ? _sshConfig : null);
     material.Navigator.of(context).pop(row);
   }
 
@@ -615,7 +627,6 @@ class _PostgresConnectionFormContentState
                           ),
                         ],
                       ),
-                      const Gap(16),
                       // SSL/TLS Toggle
                       material.Row(
                         children: [
@@ -670,6 +681,18 @@ class _PostgresConnectionFormContentState
                           ),
                         ),
                       ],
+                      const Gap(16),
+                      // SSH Tunneling Section
+                      SshTunnelSection(
+                        config: _sshConfig,
+                        secrets: _sshSecrets,
+                        onChanged: (cfg) => setState(() => _sshConfig = cfg),
+                        targetHost: _hostController.text.trim().isNotEmpty
+                            ? _hostController.text.trim()
+                            : 'localhost',
+                        targetPort:
+                            int.tryParse(_portController.text.trim()) ?? 5432,
+                      ),
                     ],
                   ),
                 ),

@@ -78,18 +78,7 @@ class MongoService {
       existing.disconnect(); // fire-and-forget; disconnect is safe
     }
 
-    final connection = MongoConnection(
-      id: id,
-      name: row.name,
-      host: row.host ?? 'localhost',
-      port: row.port ?? 27017,
-      username: row.username,
-      password: row.password,
-      database: row.databaseName,
-      authSource: row.authSource,
-      useSSL: row.useSSL,
-      connectionString: row.connectionString,
-    );
+    final connection = MongoConnection.fromConnectionRow(row);
 
     _connections[connection.id] = connection;
     return connection;

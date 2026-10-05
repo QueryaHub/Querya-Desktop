@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
+import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/storage/app_data_root.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -542,6 +544,15 @@ class LocalDb {
         password: row.password,
         connectionString: row.connectionString,
       );
+      if (row.sshSecrets != null) {
+        await ConnectionSecretsStore.writeSshSecretsForConnection(
+          id,
+          password: row.sshSecrets!.password,
+          privateKey: row.sshSecrets!.privateKey,
+          passphrase: row.sshSecrets!.passphrase,
+          jumpPassword: row.sshSecrets!.jumpPassword,
+        );
+      }
     } catch (e) {
       try {
         await ConnectionSecretsStore.deleteForConnection(id);
@@ -594,6 +605,15 @@ class LocalDb {
         password: row.password,
         connectionString: row.connectionString,
       );
+      if (row.sshSecrets != null) {
+        await ConnectionSecretsStore.writeSshSecretsForConnection(
+          row.id!,
+          password: row.sshSecrets!.password,
+          privateKey: row.sshSecrets!.privateKey,
+          passphrase: row.sshSecrets!.passphrase,
+          jumpPassword: row.sshSecrets!.jumpPassword,
+        );
+      }
     } catch (e) {
       await db.update(
         'connections',
@@ -679,6 +699,7 @@ class ConnectionRow {
     this.folderId,
     this.sortOrder = 0,
     required this.createdAt,
+    this.sshSecrets,
   });
 
   final int? id;
@@ -692,6 +713,7 @@ class ConnectionRow {
   final String? authSource;
   final bool useSSL;
   final String? connectionString;
+  final SshTunnelSecrets? sshSecrets;
 
   /// Package id of an installed extension driver (null for built-ins).
   final String? extensionId;
@@ -706,6 +728,43 @@ class ConnectionRow {
   /// True when this row is backed by an installed extension driver.
   bool get isExtensionDriver =>
       extensionId != null && extensionId!.trim().isNotEmpty;
+
+  /// Returns the SSH tunnel config stored in [driverOptions], if any.
+  SshTunnelConfig? get sshTunnelConfig {
+    if (driverOptions == null || driverOptions!.trim().isEmpty) return null;
+    try {
+      final decoded = jsonDecode(driverOptions!);
+      if (decoded is Map<String, dynamic> && decoded.containsKey('ssh_tunnel')) {
+        final sshMap = decoded['ssh_tunnel'];
+        if (sshMap is Map<String, dynamic>) {
+          return SshTunnelConfig.fromMap(sshMap);
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Returns a copy of this row with the given [sshTunnelConfig] encoded in [driverOptions].
+  ConnectionRow withSshTunnelConfig(SshTunnelConfig? config) {
+    Map<String, dynamic> opts = {};
+    if (driverOptions != null && driverOptions!.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(driverOptions!);
+        if (decoded is Map<String, dynamic>) {
+          opts = Map<String, dynamic>.from(decoded);
+        }
+      } catch (_) {}
+    }
+    if (config == null || !config.enabled) {
+      opts.remove('ssh_tunnel');
+    } else {
+      opts['ssh_tunnel'] = config.toMap();
+    }
+    return copyWith(
+      driverOptions: opts.isEmpty ? null : jsonEncode(opts),
+      clearDriverOptions: opts.isEmpty,
+    );
+  }
 
   Map<String, Object?> toMap() => {
         'type': type,
@@ -780,8 +839,11 @@ class ConnectionRow {
     int? folderId,
     int? sortOrder,
     String? createdAt,
+    SshTunnelSecrets? sshSecrets,
     bool clearPassword = false,
     bool clearConnectionString = false,
+    bool clearSshSecrets = false,
+    bool clearDriverOptions = false,
   }) {
     return ConnectionRow(
       id: id ?? this.id,
@@ -798,10 +860,13 @@ class ConnectionRow {
           ? null
           : (connectionString ?? this.connectionString),
       extensionId: extensionId ?? this.extensionId,
-      driverOptions: driverOptions ?? this.driverOptions,
+      driverOptions: clearDriverOptions
+          ? null
+          : (driverOptions ?? this.driverOptions),
       folderId: folderId ?? this.folderId,
       sortOrder: sortOrder ?? this.sortOrder,
       createdAt: createdAt ?? this.createdAt,
+      sshSecrets: clearSshSecrets ? null : (sshSecrets ?? this.sshSecrets),
     );
   }
 
@@ -813,12 +878,14 @@ class ConnectionRow {
       connectionString != null && connectionString!.isNotEmpty;
 
   /// Whether any in-memory secret credentials are held.
-  bool get hasSecrets => hasPassword || hasConnectionString;
+  bool get hasSecrets =>
+      hasPassword || hasConnectionString || (sshSecrets != null && sshSecrets!.hasAny);
 
   /// Returns a clean copy of this [ConnectionRow] with all secret credentials
-  /// ([password] and [connectionString]) scrubbed to null.
+  /// ([password], [connectionString], and [sshSecrets]) scrubbed to null.
   ConnectionRow withoutSecrets() => copyWith(
         clearPassword: true,
         clearConnectionString: true,
+        clearSshSecrets: true,
       );
 }

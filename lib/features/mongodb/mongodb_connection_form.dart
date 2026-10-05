@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
+import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
+import 'package:querya_desktop/features/connections/ssh_tunnel_section.dart';
 import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
 import 'package:querya_desktop/shared/widgets/form_validity_notifier.dart';
 import 'package:querya_desktop/shared/widgets/ssl_certificate_fields.dart';
@@ -87,6 +89,9 @@ class _MongoConnectionFormContentState
   final _sslCertController = material.TextEditingController();
   final _sslKeyController = material.TextEditingController();
 
+  SshTunnelConfig _sshConfig = const SshTunnelConfig();
+  final SshTunnelSecrets _sshSecrets = SshTunnelSecrets();
+
   bool _useConnectionString = false;
   bool _useSSL = false;
   bool _showPassword = false;
@@ -127,6 +132,9 @@ class _MongoConnectionFormContentState
       _connectionStringController.text = redacted;
       if (redacted.isNotEmpty) {
         _useConnectionString = true;
+      }
+      if (initial.sshTunnelConfig != null) {
+        _sshConfig = initial.sshTunnelConfig!;
       }
     }
 
@@ -285,6 +293,8 @@ class _MongoConnectionFormContentState
         authSource: data.authSource,
         useSSL: data.useSSL,
         connectionString: data.connectionString,
+        sshConfig: _sshConfig.enabled ? _sshConfig : null,
+        sshSecrets: _sshSecrets,
       );
 
       final success = await connection.testConnection();
@@ -305,7 +315,7 @@ class _MongoConnectionFormContentState
         data.name.isNotEmpty ? data.name : 'MongoDB ${data.host}:${data.port}';
 
     final initial = widget.initial;
-    final row = ConnectionRow(
+    var row = ConnectionRow(
       id: initial?.id,
       type: initial?.type ?? 'mongodb',
       name: displayName,
@@ -322,7 +332,9 @@ class _MongoConnectionFormContentState
       folderId: initial?.folderId ?? widget.folderId,
       sortOrder: initial?.sortOrder ?? 0,
       createdAt: initial?.createdAt ?? DateTime.now().toUtc().toIso8601String(),
+      sshSecrets: _sshConfig.enabled ? _sshSecrets : null,
     );
+    row = row.withSshTunnelConfig(_sshConfig.enabled ? _sshConfig : null);
 
     material.Navigator.of(context).pop(row);
   }
@@ -555,7 +567,6 @@ class _MongoConnectionFormContentState
                           ),
                         ],
                       ),
-                      const Gap(16),
                       // SSL
                       material.Row(
                         children: [
@@ -577,6 +588,18 @@ class _MongoConnectionFormContentState
                           onChanged: _syncUriSslParams,
                         ),
                       ],
+                      const Gap(16),
+                      // SSH Tunneling Section
+                      SshTunnelSection(
+                        config: _sshConfig,
+                        secrets: _sshSecrets,
+                        onChanged: (cfg) => setState(() => _sshConfig = cfg),
+                        targetHost: _hostController.text.trim().isNotEmpty
+                            ? _hostController.text.trim()
+                            : 'localhost',
+                        targetPort:
+                            int.tryParse(_portController.text.trim()) ?? 27017,
+                      ),
                     ],
                   ],
                 ),

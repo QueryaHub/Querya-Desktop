@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/mysql_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
+import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
+import 'package:querya_desktop/features/connections/ssh_tunnel_section.dart';
 import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
 import 'package:querya_desktop/shared/widgets/form_validity_notifier.dart';
 import 'package:querya_desktop/shared/widgets/ssl_certificate_fields.dart';
@@ -54,6 +56,9 @@ class _MysqlConnectionFormContentState
   final _sslCertController = material.TextEditingController();
   final _sslKeyController = material.TextEditingController();
 
+  SshTunnelConfig _sshConfig = const SshTunnelConfig();
+  final SshTunnelSecrets _sshSecrets = SshTunnelSecrets();
+
   bool _useSSL = true;
   bool _showPassword = false;
   bool _isTesting = false;
@@ -92,6 +97,9 @@ class _MysqlConnectionFormContentState
       _useSSL = initial.useSSL;
       _connectionStringController.text =
           redactUriPassword(initial.connectionString) ?? '';
+      if (initial.sshTunnelConfig != null) {
+        _sshConfig = initial.sshTunnelConfig!;
+      }
     }
 
     _formValidNotifier.seed();
@@ -215,6 +223,8 @@ class _MysqlConnectionFormContentState
             _passwordController.text.isEmpty ? null : _passwordController.text,
         useSSL: _useSSL || _hasSslCertificateFields(),
         connectionString: uri.isEmpty ? null : uri,
+        sshConfig: _sshConfig.enabled ? _sshConfig : null,
+        sshSecrets: _sshSecrets,
       );
       final ok = await conn.testConnection();
       if (mounted) _showTestResult(ok ? 'success' : 'failed');
@@ -237,7 +247,7 @@ class _MysqlConnectionFormContentState
             ? 'MySQL (URI)'
             : 'MySQL $host:$port${database.isNotEmpty ? '/$database' : ''}');
     final initial = widget.initial;
-    final row = ConnectionRow(
+    var row = ConnectionRow(
       id: initial?.id,
       type: initial?.type ?? 'mysql',
       name: displayName,
@@ -257,7 +267,9 @@ class _MysqlConnectionFormContentState
       folderId: initial?.folderId ?? widget.folderId,
       sortOrder: initial?.sortOrder ?? 0,
       createdAt: initial?.createdAt ?? DateTime.now().toUtc().toIso8601String(),
+      sshSecrets: _sshConfig.enabled ? _sshSecrets : null,
     );
+    row = row.withSshTunnelConfig(_sshConfig.enabled ? _sshConfig : null);
     material.Navigator.of(context).pop(row);
   }
 
@@ -478,15 +490,27 @@ class _MysqlConnectionFormContentState
                         const Text('Use SSL/TLS').small(),
                       ],
                     ),
-                      if (_useSSL) ...[
-                        const Gap(16),
-                        SslCertificateFields(
-                          rootCertController: _sslRootCertController,
-                          clientCertController: _sslCertController,
-                          clientKeyController: _sslKeyController,
-                          onChanged: _syncUriSslParams,
-                        ),
-                      ],
+                    if (_useSSL) ...[
+                      const Gap(16),
+                      SslCertificateFields(
+                        rootCertController: _sslRootCertController,
+                        clientCertController: _sslCertController,
+                        clientKeyController: _sslKeyController,
+                        onChanged: _syncUriSslParams,
+                      ),
+                    ],
+                    const Gap(16),
+                    // SSH Tunneling Section
+                    SshTunnelSection(
+                      config: _sshConfig,
+                      secrets: _sshSecrets,
+                      onChanged: (cfg) => setState(() => _sshConfig = cfg),
+                      targetHost: _hostController.text.trim().isNotEmpty
+                          ? _hostController.text.trim()
+                          : 'localhost',
+                      targetPort:
+                          int.tryParse(_portController.text.trim()) ?? 3306,
+                    ),
                     ],
                   ),
                 ),

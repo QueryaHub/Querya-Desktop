@@ -61,6 +61,14 @@ class ConnectionSecretsStore {
       'querya.v1.profile.${_requireProfileId()}.conn.$connectionId.password';
   static String _connectionStringKey(int connectionId) =>
       'querya.v1.profile.${_requireProfileId()}.conn.$connectionId.connection_string';
+  static String _sshPasswordKey(int connectionId) =>
+      'querya.v1.profile.${_requireProfileId()}.conn.$connectionId.ssh_password';
+  static String _sshPrivateKeyKey(int connectionId) =>
+      'querya.v1.profile.${_requireProfileId()}.conn.$connectionId.ssh_private_key';
+  static String _sshPassphraseKey(int connectionId) =>
+      'querya.v1.profile.${_requireProfileId()}.conn.$connectionId.ssh_passphrase';
+  static String _sshJumpPasswordKey(int connectionId) =>
+      'querya.v1.profile.${_requireProfileId()}.conn.$connectionId.ssh_jump_password';
 
   /// Pre-#986 unnamespaced key format, kept only for [adoptLegacyKeysForConnection].
   static String _legacyPasswordKey(int connectionId) =>
@@ -72,9 +80,63 @@ class ConnectionSecretsStore {
     int connectionId, {
     String? password,
     String? connectionString,
+    String? sshPassword,
+    String? sshPrivateKey,
+    String? sshPassphrase,
+    String? jumpPassword,
   }) async {
     await backend.write(_passwordKey(connectionId), password);
     await backend.write(_connectionStringKey(connectionId), connectionString);
+    if (sshPassword != null || sshPrivateKey != null || sshPassphrase != null || jumpPassword != null) {
+      await writeSshSecretsForConnection(
+        connectionId,
+        password: sshPassword,
+        privateKey: sshPrivateKey,
+        passphrase: sshPassphrase,
+        jumpPassword: jumpPassword,
+      );
+    }
+  }
+
+  static Future<void> writeSshSecretsForConnection(
+    int connectionId, {
+    String? password,
+    String? privateKey,
+    String? passphrase,
+    String? jumpPassword,
+  }) async {
+    await backend.write(_sshPasswordKey(connectionId), password);
+    await backend.write(_sshPrivateKeyKey(connectionId), privateKey);
+    await backend.write(_sshPassphraseKey(connectionId), passphrase);
+    await backend.write(_sshJumpPasswordKey(connectionId), jumpPassword);
+  }
+
+  static Future<({
+    String? password,
+    String? privateKey,
+    String? passphrase,
+    String? jumpPassword,
+  })> readSshSecretsForConnection(int connectionId) async {
+    try {
+      final password = await backend.read(_sshPasswordKey(connectionId));
+      final privateKey = await backend.read(_sshPrivateKeyKey(connectionId));
+      final passphrase = await backend.read(_sshPassphraseKey(connectionId));
+      final jumpPassword =
+          await backend.read(_sshJumpPasswordKey(connectionId));
+      return (
+        password: password,
+        privateKey: privateKey,
+        passphrase: passphrase,
+        jumpPassword: jumpPassword,
+      );
+    } catch (_) {
+      return (
+        password: null,
+        privateKey: null,
+        passphrase: null,
+        jumpPassword: null,
+      );
+    }
   }
 
   static Future<({String? password, String? connectionString})>
@@ -138,6 +200,10 @@ class ConnectionSecretsStore {
   static Future<void> deleteForConnection(int connectionId) async {
     await backend.delete(_passwordKey(connectionId));
     await backend.delete(_connectionStringKey(connectionId));
+    await backend.delete(_sshPasswordKey(connectionId));
+    await backend.delete(_sshPrivateKeyKey(connectionId));
+    await backend.delete(_sshPassphraseKey(connectionId));
+    await backend.delete(_sshJumpPasswordKey(connectionId));
     try {
       await backend.delete(_legacyPasswordKey(connectionId));
       await backend.delete(_legacyConnectionStringKey(connectionId));
