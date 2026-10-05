@@ -189,6 +189,7 @@ void main() {
         const DestructiveSqlOperation(
           type: DestructiveSqlType.redisFlushAll,
           targetName: 'all databases',
+          rawStatement: 'FLUSHALL',
         ).description,
         contains('all Redis databases'),
       );
@@ -199,6 +200,7 @@ void main() {
         const DestructiveSqlOperation(
           type: DestructiveSqlType.redisFlushDb,
           targetName: 'db0',
+          rawStatement: 'FLUSHDB',
         ).description,
         contains('current Redis database'),
       );
@@ -209,6 +211,7 @@ void main() {
         const DestructiveSqlOperation(
           type: DestructiveSqlType.redisShutdown,
           targetName: 'server',
+          rawStatement: 'SHUTDOWN',
         ).description,
         contains('Redis server process'),
       );
@@ -219,6 +222,7 @@ void main() {
         const DestructiveSqlOperation(
           type: DestructiveSqlType.redisKeys,
           targetName: '*',
+          rawStatement: 'KEYS *',
         ).description,
         contains('KEYS'),
       );
