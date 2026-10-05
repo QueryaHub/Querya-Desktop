@@ -213,7 +213,7 @@ void main() {
           targetName: 'server',
           rawStatement: 'SHUTDOWN',
         ).description,
-        contains('Redis server process'),
+        contains('Redis server'),
       );
 
       expect(DestructiveSqlType.redisKeys.label, 'KEYS *');
@@ -264,7 +264,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
 
       expect(find.text('Redis CLI Console'), findsOneWidget);
-      expect(find.textContaining('127.0.0.1:6379 [db0]'), findsOneWidget);
+      expect(find.textContaining('localhost:6379 [db0]'), findsOneWidget);
       expect(find.text('Clear'), findsOneWidget);
       expect(find.text('db0 >'), findsOneWidget);
       expect(find.text('Run'), findsOneWidget);
