@@ -11,6 +11,7 @@ class MainScreenWorkspaceState {
     this.activeConnection,
     this.activeRedisDb,
     this.activeMongoDB,
+    this.selectedMongoCollection,
     this.selectedPostgresObject,
     this.postgresSqlTabRequestToken = 0,
     this.postgresSqlEditorContext,
@@ -25,6 +26,7 @@ class MainScreenWorkspaceState {
     this.lastSelectedSqliteObject,
     this.lastSelectedExtensionObject,
     this.lastSelectedMongoDb,
+    this.lastSelectedMongoCollection,
     this.lastSelectedRedisDb,
     this.isReadOnly = false,
   });
@@ -32,6 +34,7 @@ class MainScreenWorkspaceState {
   final ConnectionRow? activeConnection;
   final int? activeRedisDb;
   final String? activeMongoDB;
+  final String? selectedMongoCollection;
   final ({
     String database,
     String schema,
@@ -95,6 +98,9 @@ class MainScreenWorkspaceState {
   /// Last MongoDB database opened for 1-click return from server stats.
   final String? lastSelectedMongoDb;
 
+  /// Last MongoDB collection opened for 1-click return from server stats.
+  final String? lastSelectedMongoCollection;
+
   /// Last Redis database index opened for 1-click return from server stats.
   final int? lastSelectedRedisDb;
 
@@ -107,6 +113,7 @@ class MainScreenWorkspaceState {
       activeConnection: activeConnection,
       activeRedisDb: activeRedisDb,
       activeMongoDB: activeMongoDB,
+      selectedMongoCollection: selectedMongoCollection,
       selectedPostgresObject: selectedPostgresObject,
       postgresSqlTabRequestToken: postgresSqlTabRequestToken,
       postgresSqlEditorContext: postgresSqlEditorContext,
@@ -121,6 +128,7 @@ class MainScreenWorkspaceState {
       lastSelectedSqliteObject: lastSelectedSqliteObject,
       lastSelectedExtensionObject: lastSelectedExtensionObject,
       lastSelectedMongoDb: lastSelectedMongoDb,
+      lastSelectedMongoCollection: lastSelectedMongoCollection,
       lastSelectedRedisDb: lastSelectedRedisDb,
       isReadOnly: !isReadOnly,
     );
@@ -132,6 +140,7 @@ class MainScreenWorkspaceState {
       activeConnection: connection,
       activeRedisDb: null,
       activeMongoDB: null,
+      selectedMongoCollection: null,
       selectedPostgresObject: null,
       postgresSqlTabRequestToken: postgresSqlTabRequestToken,
       postgresSqlEditorContext: null,
@@ -152,6 +161,8 @@ class MainScreenWorkspaceState {
           : null,
       lastSelectedMongoDb:
           same ? (activeMongoDB ?? lastSelectedMongoDb) : null,
+      lastSelectedMongoCollection:
+          same ? (selectedMongoCollection ?? lastSelectedMongoCollection) : null,
       lastSelectedRedisDb:
           same ? (activeRedisDb ?? lastSelectedRedisDb) : null,
       isReadOnly: false,
@@ -165,6 +176,7 @@ class MainScreenWorkspaceState {
       activeConnection: activeConnection,
       activeRedisDb: null,
       activeMongoDB: null,
+      selectedMongoCollection: null,
       selectedPostgresObject: null,
       postgresSqlTabRequestToken: postgresSqlTabRequestToken,
       postgresSqlEditorContext: postgresSqlEditorContext,
@@ -183,6 +195,8 @@ class MainScreenWorkspaceState {
       lastSelectedExtensionObject:
           selectedExtensionObject ?? lastSelectedExtensionObject,
       lastSelectedMongoDb: activeMongoDB ?? lastSelectedMongoDb,
+      lastSelectedMongoCollection:
+          selectedMongoCollection ?? lastSelectedMongoCollection,
       lastSelectedRedisDb: activeRedisDb ?? lastSelectedRedisDb,
       isReadOnly: isReadOnly,
     );
@@ -230,6 +244,13 @@ class MainScreenWorkspaceState {
         break;
       case 'mongodb':
         if (lastSelectedMongoDb != null) {
+          if (lastSelectedMongoCollection != null) {
+            return selectMongoCollection(
+              conn,
+              lastSelectedMongoDb!,
+              lastSelectedMongoCollection!,
+            );
+          }
           return selectMongoDb(conn, lastSelectedMongoDb!);
         }
         break;
@@ -282,6 +303,7 @@ class MainScreenWorkspaceState {
       lastSelectedSqliteObject: null,
       lastSelectedExtensionObject: null,
       lastSelectedMongoDb: null,
+      lastSelectedMongoCollection: null,
       lastSelectedRedisDb: null,
       isReadOnly: isReadOnly,
     );
@@ -315,6 +337,7 @@ class MainScreenWorkspaceState {
       lastSelectedSqliteObject: null,
       lastSelectedExtensionObject: null,
       lastSelectedMongoDb: null,
+      lastSelectedMongoCollection: null,
       lastSelectedRedisDb: null,
       isReadOnly: isReadOnly,
     );
@@ -346,6 +369,7 @@ class MainScreenWorkspaceState {
       lastSelectedSqliteObject: sq,
       lastSelectedExtensionObject: null,
       lastSelectedMongoDb: null,
+      lastSelectedMongoCollection: null,
       lastSelectedRedisDb: null,
       isReadOnly: isReadOnly,
     );
@@ -378,6 +402,7 @@ class MainScreenWorkspaceState {
       lastSelectedSqliteObject: null,
       lastSelectedExtensionObject: ext,
       lastSelectedMongoDb: null,
+      lastSelectedMongoCollection: null,
       lastSelectedRedisDb: null,
       isReadOnly: isReadOnly,
     );
@@ -401,6 +426,7 @@ class MainScreenWorkspaceState {
       lastSelectedSqliteObject: null,
       lastSelectedExtensionObject: null,
       lastSelectedMongoDb: null,
+      lastSelectedMongoCollection: null,
       lastSelectedRedisDb: db,
       isReadOnly: isReadOnly,
     );
@@ -412,6 +438,7 @@ class MainScreenWorkspaceState {
       activeConnection: connection,
       activeRedisDb: null,
       activeMongoDB: database,
+      selectedMongoCollection: null,
       selectedPostgresObject: null,
       postgresSqlTabRequestToken: postgresSqlTabRequestToken,
       postgresSqlEditorContext: null,
@@ -425,6 +452,36 @@ class MainScreenWorkspaceState {
       lastSelectedSqliteObject: null,
       lastSelectedExtensionObject: null,
       lastSelectedMongoDb: database,
+      lastSelectedMongoCollection: null,
+      lastSelectedRedisDb: null,
+      isReadOnly: isReadOnly,
+    );
+  }
+
+  MainScreenWorkspaceState selectMongoCollection(
+    ConnectionRow connection,
+    String database,
+    String collection,
+  ) {
+    return MainScreenWorkspaceState(
+      activeConnection: connection,
+      activeRedisDb: null,
+      activeMongoDB: database,
+      selectedMongoCollection: collection,
+      selectedPostgresObject: null,
+      postgresSqlTabRequestToken: postgresSqlTabRequestToken,
+      postgresSqlEditorContext: null,
+      postgresSqlEditorContextToken: 0,
+      selectedMysqlObject: null,
+      mysqlSqlTabRequestToken: mysqlSqlTabRequestToken,
+      selectedSqliteObject: null,
+      sqliteSqlTabRequestToken: sqliteSqlTabRequestToken,
+      lastSelectedPostgresObject: null,
+      lastSelectedMysqlObject: null,
+      lastSelectedSqliteObject: null,
+      lastSelectedExtensionObject: null,
+      lastSelectedMongoDb: database,
+      lastSelectedMongoCollection: collection,
       lastSelectedRedisDb: null,
       isReadOnly: isReadOnly,
     );
@@ -490,6 +547,7 @@ class MainScreenWorkspaceState {
       lastSelectedSqliteObject: lastSelectedSqliteObject,
       lastSelectedExtensionObject: lastSelectedExtensionObject,
       lastSelectedMongoDb: lastSelectedMongoDb,
+      lastSelectedMongoCollection: lastSelectedMongoCollection,
       lastSelectedRedisDb: lastSelectedRedisDb,
       isReadOnly: isReadOnly,
     );
@@ -513,6 +571,7 @@ class MainScreenWorkspaceState {
       lastSelectedSqliteObject: lastSelectedSqliteObject,
       lastSelectedExtensionObject: lastSelectedExtensionObject,
       lastSelectedMongoDb: lastSelectedMongoDb,
+      lastSelectedMongoCollection: lastSelectedMongoCollection,
       lastSelectedRedisDb: lastSelectedRedisDb,
       isReadOnly: isReadOnly,
     );
@@ -536,6 +595,7 @@ class MainScreenWorkspaceState {
       lastSelectedSqliteObject: lastSelectedSqliteObject,
       lastSelectedExtensionObject: lastSelectedExtensionObject,
       lastSelectedMongoDb: lastSelectedMongoDb,
+      lastSelectedMongoCollection: lastSelectedMongoCollection,
       lastSelectedRedisDb: lastSelectedRedisDb,
       isReadOnly: isReadOnly,
     );
@@ -548,6 +608,7 @@ class MainScreenWorkspaceState {
         activeConnection?.id == other.activeConnection?.id &&
         activeRedisDb == other.activeRedisDb &&
         activeMongoDB == other.activeMongoDB &&
+        selectedMongoCollection == other.selectedMongoCollection &&
         _pgEquals(selectedPostgresObject, other.selectedPostgresObject) &&
         postgresSqlTabRequestToken == other.postgresSqlTabRequestToken &&
         _pgEquals(postgresSqlEditorContext, other.postgresSqlEditorContext) &&
@@ -564,6 +625,7 @@ class MainScreenWorkspaceState {
         _extensionEquals(
             lastSelectedExtensionObject, other.lastSelectedExtensionObject) &&
         lastSelectedMongoDb == other.lastSelectedMongoDb &&
+        lastSelectedMongoCollection == other.lastSelectedMongoCollection &&
         lastSelectedRedisDb == other.lastSelectedRedisDb &&
         isReadOnly == other.isReadOnly;
   }
@@ -573,6 +635,7 @@ class MainScreenWorkspaceState {
         activeConnection?.id,
         activeRedisDb,
         activeMongoDB,
+        selectedMongoCollection,
         selectedPostgresObject == null
             ? 0
             : Object.hash(
@@ -640,6 +703,7 @@ class MainScreenWorkspaceState {
                 lastSelectedExtensionObject!.name,
               ),
         lastSelectedMongoDb,
+        lastSelectedMongoCollection,
         lastSelectedRedisDb,
         isReadOnly,
       ]);

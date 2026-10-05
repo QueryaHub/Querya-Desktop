@@ -6,6 +6,7 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/main_screen/workspace_panel.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart'
     show SqliteObjectKind;
+import 'package:querya_desktop/features/mongodb/mongo_explorer_view.dart';
 import 'package:querya_desktop/features/redis/redis_explorer_view.dart';
 import 'package:querya_desktop/features/redis/redis_view.dart';
 
@@ -319,5 +320,39 @@ void main() {
       await tester.tap(returnButton);
       expect(restored, isTrue);
     });
+
+    testWidgets(
+        'MongoExplorerView receives selectedMongoCollection from WorkspacePanel',
+        (tester) async {
+      const mongoConn = ConnectionRow(
+        id: 77,
+        type: 'mongodb',
+        name: 'mongo-test',
+        host: '127.0.0.1',
+        port: 27017,
+        createdAt: '0',
+      );
+      await pumpWidgetWithSurfaceSize(
+        tester,
+        const material.Size(800, 600),
+        queryaThemeTestShell(
+          child: const material.SizedBox.expand(
+            child: WorkspacePanel(
+              activeConnection: mongoConn,
+              selectedMongoDb: 'test_db',
+              selectedMongoCollection: 'orders',
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      final explorer =
+          tester.widget<MongoExplorerView>(find.byType(MongoExplorerView));
+      expect(explorer.initialDatabase, 'test_db');
+      expect(explorer.initialCollection, 'orders');
+    });
   });
 }
+

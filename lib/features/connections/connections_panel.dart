@@ -58,7 +58,8 @@ import 'package:flutter/material.dart' as material
         InputBorder,
         TextEditingController,
         FocusNode;
-import 'package:flutter/services.dart' show LogicalKeyboardKey;
+import 'package:flutter/services.dart'
+    show Clipboard, ClipboardData, LogicalKeyboardKey;
 import 'package:querya_desktop/core/actions/querya_schema_object.dart';
 import 'package:querya_desktop/core/actions/querya_schema_object_cache.dart';
 import 'package:querya_desktop/core/actions/querya_schema_object_loader.dart';
@@ -330,6 +331,7 @@ class _ConnectionsTreeSelection {
     this.selectedExtensionObject,
     this.selectedRedisDb,
     this.selectedMongoDb,
+    this.selectedMongoCollection,
   });
 
   static const empty = _ConnectionsTreeSelection();
@@ -350,6 +352,7 @@ class _ConnectionsTreeSelection {
   final ({String database, String name})? selectedExtensionObject;
   final int? selectedRedisDb;
   final String? selectedMongoDb;
+  final String? selectedMongoCollection;
 
   @override
   bool operator ==(Object other) {
@@ -361,7 +364,8 @@ class _ConnectionsTreeSelection {
         selectedSqliteObject == other.selectedSqliteObject &&
         selectedExtensionObject == other.selectedExtensionObject &&
         selectedRedisDb == other.selectedRedisDb &&
-        selectedMongoDb == other.selectedMongoDb;
+        selectedMongoDb == other.selectedMongoDb &&
+        selectedMongoCollection == other.selectedMongoCollection;
   }
 
   @override
@@ -373,6 +377,7 @@ class _ConnectionsTreeSelection {
         selectedExtensionObject,
         selectedRedisDb,
         selectedMongoDb,
+        selectedMongoCollection,
       );
 }
 
@@ -462,9 +467,11 @@ class ConnectionsPanel extends StatefulWidget {
     this.selectedExtensionObject,
     this.selectedRedisDb,
     this.selectedMongoDb,
+    this.selectedMongoCollection,
     this.onConnectionSelected,
     this.onRedisDatabaseSelected,
     this.onMongoDBDatabaseSelected,
+    this.onMongoCollectionSelected,
     this.onPostgresObjectSelected,
     this.onPostgresOpenSqlWorkspace,
     this.onMysqlObjectSelected,
@@ -492,6 +499,7 @@ class ConnectionsPanel extends StatefulWidget {
   final ({String database, String name})? selectedExtensionObject;
   final int? selectedRedisDb;
   final String? selectedMongoDb;
+  final String? selectedMongoCollection;
 
   /// Called when the user taps a connection tile.
   final void Function(ConnectionRow connection)? onConnectionSelected;
@@ -503,6 +511,13 @@ class ConnectionsPanel extends StatefulWidget {
   /// Called when the user taps a MongoDB database node in the tree.
   final void Function(ConnectionRow connection, String database)?
       onMongoDBDatabaseSelected;
+
+  /// Called when the user taps a MongoDB collection node in the tree.
+  final void Function(
+    ConnectionRow connection,
+    String database,
+    String collection,
+  )? onMongoCollectionSelected;
 
   /// Called when the user taps a PostgreSQL table, view, function, or sequence.
   final void Function(
@@ -603,6 +618,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
       selectedExtensionObject: widget.selectedExtensionObject,
       selectedRedisDb: widget.selectedRedisDb,
       selectedMongoDb: widget.selectedMongoDb,
+      selectedMongoCollection: widget.selectedMongoCollection,
     );
   }
 
@@ -840,6 +856,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         onEdit: () => _editConnection(conn),
         onTap: () => widget.onConnectionSelected?.call(conn),
         onDatabaseTap: (db) => widget.onMongoDBDatabaseSelected?.call(conn, db),
+        onCollectionTap: (db, col) =>
+            widget.onMongoCollectionSelected?.call(conn, db, col),
         isExpanded: isExpanded,
         onExpandedChanged: handleExpandedChanged,
       );

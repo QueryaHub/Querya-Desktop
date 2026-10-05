@@ -392,6 +392,33 @@ void main() {
       expect(find.byType(ConnectionsPanel), findsOneWidget);
     });
 
+    testWidgets('ConnectionsPanel propagates Mongo collection selection',
+        (tester) async {
+      await pumpWidgetWithSurfaceSize(
+        tester,
+        const material.Size(400, 600),
+        ShadcnApp(
+          theme: AppTheme.dark,
+          darkTheme: AppTheme.dark,
+          themeMode: ThemeMode.dark,
+          home: material.SizedBox(
+            width: 400,
+            height: 600,
+            child: ConnectionsPanel(
+              skipInitialDbLoadForTest: true,
+              selectedConnectionId: 14,
+              selectedMongoDb: 'app',
+              selectedMongoCollection: 'users',
+              onMongoCollectionSelected: (conn, db, col) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byType(ConnectionsPanel), findsOneWidget);
+    });
+
     testWidgets('SERVERS header uses compact top padding (UI-05)',
         (tester) async {
       await pumpWidgetWithSurfaceSize(
