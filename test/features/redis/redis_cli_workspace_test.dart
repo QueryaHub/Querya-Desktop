@@ -11,16 +11,9 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 import '../../support/querya_theme_test_shell.dart';
 
 class _CliTestRedisConnection extends RedisConnectionTestFake {
-  _CliTestRedisConnection({this.onCommand});
-
-  final Future<dynamic> Function(List<dynamic> args)? onCommand;
-
   @override
   Future<dynamic> sendCommand(List<dynamic> args) async {
     sentCommands.add(args.first.toString().toUpperCase());
-    if (onCommand != null) {
-      return onCommand!(args);
-    }
     final op = args.first.toString().toUpperCase();
     if (op == 'PING') return 'PONG';
     if (op == 'GET') return 'hello-world';
@@ -192,23 +185,43 @@ void main() {
     test('verifies label, riskLevel, and description for Redis types', () {
       expect(DestructiveSqlType.redisFlushAll.label, 'FLUSHALL');
       expect(DestructiveSqlType.redisFlushAll.riskLevel, 'CRITICAL');
-      expect(DestructiveSqlType.redisFlushAll.description,
-          contains('all Redis databases'));
+      expect(
+        const DestructiveSqlOperation(
+          type: DestructiveSqlType.redisFlushAll,
+          targetName: 'all databases',
+        ).description,
+        contains('all Redis databases'),
+      );
 
       expect(DestructiveSqlType.redisFlushDb.label, 'FLUSHDB');
       expect(DestructiveSqlType.redisFlushDb.riskLevel, 'CRITICAL');
-      expect(DestructiveSqlType.redisFlushDb.description,
-          contains('current Redis database'));
+      expect(
+        const DestructiveSqlOperation(
+          type: DestructiveSqlType.redisFlushDb,
+          targetName: 'db0',
+        ).description,
+        contains('current Redis database'),
+      );
 
       expect(DestructiveSqlType.redisShutdown.label, 'SHUTDOWN');
       expect(DestructiveSqlType.redisShutdown.riskLevel, 'CRITICAL');
-      expect(DestructiveSqlType.redisShutdown.description,
-          contains('Redis server process'));
+      expect(
+        const DestructiveSqlOperation(
+          type: DestructiveSqlType.redisShutdown,
+          targetName: 'server',
+        ).description,
+        contains('Redis server process'),
+      );
 
       expect(DestructiveSqlType.redisKeys.label, 'KEYS *');
       expect(DestructiveSqlType.redisKeys.riskLevel, 'HIGH');
-      expect(DestructiveSqlType.redisKeys.description,
-          contains('KEYS'));
+      expect(
+        const DestructiveSqlOperation(
+          type: DestructiveSqlType.redisKeys,
+          targetName: '*',
+        ).description,
+        contains('KEYS'),
+      );
     });
   });
 
@@ -224,6 +237,7 @@ void main() {
         type: 'redis',
         host: '127.0.0.1',
         port: 6379,
+        createdAt: '2026-01-01T00:00:00Z',
       );
 
       await tester.pumpWidget(
@@ -265,6 +279,7 @@ void main() {
         type: 'redis',
         host: '127.0.0.1',
         port: 6379,
+        createdAt: '2026-01-01T00:00:00Z',
       );
 
       await tester.pumpWidget(
@@ -315,6 +330,7 @@ void main() {
         type: 'redis',
         host: '127.0.0.1',
         port: 6379,
+        createdAt: '2026-01-01T00:00:00Z',
       );
 
       await tester.pumpWidget(
@@ -360,6 +376,7 @@ void main() {
         type: 'redis',
         host: '127.0.0.1',
         port: 6379,
+        createdAt: '2026-01-01T00:00:00Z',
       );
 
       await tester.pumpWidget(

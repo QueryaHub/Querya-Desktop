@@ -1,6 +1,5 @@
 import 'dart:async' show unawaited;
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
@@ -197,7 +196,7 @@ String formatRespReply(Object? reply) {
 
 void _formatRespArray(List items, String indent, StringBuffer buf) {
   for (var i = 0; i < items.length; i++) {
-    final numPrefix = '${indent}${i + 1}) ';
+    final numPrefix = '$indent${i + 1}) ';
     final item = items[i];
     if (item is List) {
       if (item.isEmpty) {
@@ -741,7 +740,7 @@ class _RedisCliWorkspaceState extends material.State<RedisCliWorkspace> {
                 material.Expanded(
                   child: Focus(
                     onKeyEvent: (node, event) {
-                      if (event is material.KeyDownEvent) {
+                      if (event is KeyDownEvent) {
                         if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
                           _handleHistoryNavigation(true);
                           return KeyEventResult.handled;
