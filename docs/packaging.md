@@ -5,21 +5,20 @@ Querya Desktop ships (and will ship) two download channels. See epic
 
 | Channel | Typical artifact | Profile data |
 |---------|------------------|--------------|
-| **Portable** | `Querya-Desktop-{ver}-{os}.zip` (Flutter bundle) | OS app-support by default; optional sidecar — see below |
+| **Portable** | `Querya-Desktop-{ver}-{os}.zip` (Flutter bundle) | Portable sidecar (`QueryaData/`) automatically via `.portable` marker |
 | **Installable** | AppImage, Windows setup, `.deb`, `.rpm`, Flatpak | Normal OS locations |
 
 ## Portable profile (`QueryaData`)
 
-By default the zip is a **relocatable binary** only: settings DB, themes, and
-extensions still use OS paths (`getApplicationSupportDirectory`,
-`~/.querya/extensions`, …).
+Official release zip archives include a `.portable` marker file out-of-the-box.
+On launch, Querya detects the marker (or explicit `QueryaData` / `QUERYA_PORTABLE=1`)
+and automatically creates `QueryaData/` next to the binary if it does not exist yet.
 
-To keep profile data next to the app (USB-style):
-
-1. Set environment variable **`QUERYA_PORTABLE=1`** (also `true` / `yes` / `on`),
-   **or**
-2. Create a folder named **`QueryaData`** next to `querya_desktop` /
-   `querya_desktop.exe` / the `.AppImage` file.
+To run in portable mode:
+1. Use the pre-packaged portable zip (contains `.portable` marker file out-of-the-box),
+2. **or** create a `.portable` or `portable.txt` file next to the binary,
+3. **or** create a folder named **`QueryaData`** next to the binary,
+4. **or** set environment variable **`QUERYA_PORTABLE=1`** (also `true` / `yes` / `on`).
 
 Then local data is stored under that folder:
 

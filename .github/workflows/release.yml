@@ -78,7 +78,10 @@ jobs:
         run: |
           $v = "${{ steps.version.outputs.version }}"
           $dir = "build\windows\x64\runner\Release"
+          New-Item -ItemType File -Path "$dir\.portable" -Force | Out-Null
+          New-Item -ItemType File -Path "$dir\portable.txt" -Force | Out-Null
           Compress-Archive -Path "$dir\*" -DestinationPath "Querya-Desktop-$v-windows.zip"
+          Remove-Item -Path "$dir\.portable", "$dir\portable.txt" -Force
 
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y
@@ -143,7 +146,9 @@ jobs:
       - name: Zip Linux artifact (portable)
         run: |
           cd build/linux/x64/release/bundle
+          touch .portable portable.txt
           zip -r "${GITHUB_WORKSPACE}/Querya-Desktop-${{ steps.version.outputs.version }}-linux.zip" .
+          rm -f .portable portable.txt
 
       - name: Build Linux AppImage (installable)
         run: ./scripts/linux/build_appimage.sh
