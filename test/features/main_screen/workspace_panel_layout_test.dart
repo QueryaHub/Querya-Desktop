@@ -350,7 +350,7 @@ void main() {
 
       final explorer =
           tester.widget<MongoExplorerView>(find.byType(MongoExplorerView));
-      expect(explorer.initialDatabase, 'test_db');
+      expect(explorer.database, 'test_db');
       expect(explorer.initialCollection, 'orders');
     });
   });

@@ -2,7 +2,6 @@ import 'dart:async' show Timer;
 
 import 'package:flutter/material.dart' as material
     show
-        AlertDialog,
         TextEditingValue,
         ValueListenableBuilder,
         BuildContext,
@@ -44,7 +43,6 @@ import 'package:flutter/material.dart' as material
         Colors,
         Padding,
         Widget,
-        Navigator,
         ValueKey,
         FontWeight,
         VoidCallback,
