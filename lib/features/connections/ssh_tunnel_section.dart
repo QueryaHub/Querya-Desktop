@@ -200,25 +200,24 @@ class _SshTunnelSectionState extends material.State<SshTunnelSection> {
         children: [
           material.Row(
             children: [
-              Checkbox(
-                state: widget.config.enabled
-                    ? CheckboxState.checked
-                    : CheckboxState.unchecked,
-                onChanged: (state) {
-                  final enabled = state == CheckboxState.checked;
-                  widget.onChanged(widget.config.copyWith(enabled: enabled));
+              material.Checkbox(
+                value: widget.config.enabled,
+                onChanged: (v) {
+                  widget.onChanged(widget.config.copyWith(enabled: v ?? false));
                 },
               ),
-              const Gap(8),
+              const Gap(4),
               material.Icon(
                 material.Icons.security_rounded,
                 size: 16,
                 color: widget.config.enabled ? cs.primary : cs.mutedForeground,
               ),
               const Gap(6),
-              const Text('Connect via SSH Tunnel (Bastion / Jump Host)')
-                  .semiBold()
-                  .small(),
+              material.Expanded(
+                child: const Text(
+                  'Connect via SSH Tunnel (Bastion / Jump Host)',
+                ).semiBold().small(),
+              ),
             ],
           ),
           if (widget.config.enabled) ...[
@@ -279,7 +278,9 @@ class _SshTunnelSectionState extends material.State<SshTunnelSection> {
                     children: [
                       const Text('Authentication Method').small().muted(),
                       const Gap(4),
-                      material.Row(
+                      material.Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
                         children: [
                           _AuthTypeChip(
                             label: 'Password',
@@ -291,7 +292,6 @@ class _SshTunnelSectionState extends material.State<SshTunnelSection> {
                               ));
                             },
                           ),
-                          const Gap(6),
                           _AuthTypeChip(
                             label: 'Private Key',
                             selected: widget.config.authType ==
@@ -302,7 +302,6 @@ class _SshTunnelSectionState extends material.State<SshTunnelSection> {
                               ));
                             },
                           ),
-                          const Gap(6),
                           _AuthTypeChip(
                             label: 'Agent',
                             selected:
@@ -423,7 +422,10 @@ class _SshTunnelSectionState extends material.State<SshTunnelSection> {
             ],
             const Gap(12),
             // Actions: Test SSH Connection and Advanced Options toggle
-            material.Row(
+            material.Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              crossAxisAlignment: material.WrapCrossAlignment.center,
               children: [
                 OutlineButton(
                   size: ButtonSize.small,
@@ -436,7 +438,6 @@ class _SshTunnelSectionState extends material.State<SshTunnelSection> {
                         ),
                   child: const Text('Test SSH Connection'),
                 ),
-                const Gap(10),
                 GhostButton(
                   size: ButtonSize.small,
                   onPressed: () =>

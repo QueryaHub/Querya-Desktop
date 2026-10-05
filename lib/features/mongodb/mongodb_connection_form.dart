@@ -567,19 +567,6 @@ class _MongoConnectionFormContentState
                           ),
                         ],
                       ),
-                      const Gap(16),
-                      // SSH Tunneling Section
-                      SshTunnelSection(
-                        config: _sshConfig,
-                        secrets: _sshSecrets,
-                        onChanged: (cfg) => setState(() => _sshConfig = cfg),
-                        targetHost: _hostController.text.trim().isNotEmpty
-                            ? _hostController.text.trim()
-                            : 'localhost',
-                        targetPort:
-                            int.tryParse(_portController.text.trim()) ?? 27017,
-                      ),
-                      const Gap(16),
                       // SSL
                       material.Row(
                         children: [
@@ -601,6 +588,18 @@ class _MongoConnectionFormContentState
                           onChanged: _syncUriSslParams,
                         ),
                       ],
+                      const Gap(16),
+                      // SSH Tunneling Section
+                      SshTunnelSection(
+                        config: _sshConfig,
+                        secrets: _sshSecrets,
+                        onChanged: (cfg) => setState(() => _sshConfig = cfg),
+                        targetHost: _hostController.text.trim().isNotEmpty
+                            ? _hostController.text.trim()
+                            : 'localhost',
+                        targetPort:
+                            int.tryParse(_portController.text.trim()) ?? 27017,
+                      ),
                     ],
                   ],
                 ),

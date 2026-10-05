@@ -412,19 +412,6 @@ class _RedisConnectionFormContentState
                         ),
                       ],
                     ),
-                    const Gap(16),
-                    // SSH Tunneling Section
-                    SshTunnelSection(
-                      config: _sshConfig,
-                      secrets: _sshSecrets,
-                      onChanged: (cfg) => setState(() => _sshConfig = cfg),
-                      targetHost: _hostController.text.trim().isNotEmpty
-                          ? _hostController.text.trim()
-                          : 'localhost',
-                      targetPort:
-                          int.tryParse(_portController.text.trim()) ?? 6379,
-                    ),
-                    const Gap(16),
                     material.Row(
                       children: [
                         material.Checkbox(
@@ -445,6 +432,18 @@ class _RedisConnectionFormContentState
                         onChanged: _syncUriSslParams,
                       ),
                     ],
+                    const Gap(16),
+                    // SSH Tunneling Section
+                    SshTunnelSection(
+                      config: _sshConfig,
+                      secrets: _sshSecrets,
+                      onChanged: (cfg) => setState(() => _sshConfig = cfg),
+                      targetHost: _hostController.text.trim().isNotEmpty
+                          ? _hostController.text.trim()
+                          : 'localhost',
+                      targetPort:
+                          int.tryParse(_portController.text.trim()) ?? 6379,
+                    ),
                   ],
                 ),
               ),

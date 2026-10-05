@@ -480,6 +480,26 @@ class _MysqlConnectionFormContentState
                       ],
                     ),
                     const Gap(16),
+                    material.Row(
+                      children: [
+                        material.Checkbox(
+                          value: _useSSL,
+                          onChanged: (v) => setState(() => _useSSL = v ?? true),
+                        ),
+                        const Gap(8),
+                        const Text('Use SSL/TLS').small(),
+                      ],
+                    ),
+                    if (_useSSL) ...[
+                      const Gap(16),
+                      SslCertificateFields(
+                        rootCertController: _sslRootCertController,
+                        clientCertController: _sslCertController,
+                        clientKeyController: _sslKeyController,
+                        onChanged: _syncUriSslParams,
+                      ),
+                    ],
+                    const Gap(16),
                     // SSH Tunneling Section
                     SshTunnelSection(
                       config: _sshConfig,
@@ -491,26 +511,6 @@ class _MysqlConnectionFormContentState
                       targetPort:
                           int.tryParse(_portController.text.trim()) ?? 3306,
                     ),
-                    const Gap(16),
-                    material.Row(
-                      children: [
-                        material.Checkbox(
-                          value: _useSSL,
-                          onChanged: (v) => setState(() => _useSSL = v ?? true),
-                        ),
-                        const Gap(8),
-                        const Text('Use SSL/TLS').small(),
-                      ],
-                    ),
-                      if (_useSSL) ...[
-                        const Gap(16),
-                        SslCertificateFields(
-                          rootCertController: _sslRootCertController,
-                          clientCertController: _sslCertController,
-                          clientKeyController: _sslKeyController,
-                          onChanged: _syncUriSslParams,
-                        ),
-                      ],
                     ],
                   ),
                 ),
