@@ -358,7 +358,7 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
     }
   }
 
-  Future<void> _openDdlDialog(material.BuildContext context) async {
+  Future<void> _openDdlDialog() async {
     final navigator = material.Navigator.of(context, rootNavigator: true);
     unawaited(showAppDialog<void>(
       context: context,
@@ -547,7 +547,7 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
               _filterActive = !_filterActive;
             });
           },
-          onOpenDdl: () => unawaited(_openDdlDialog(ctx)),
+          onOpenDdl: () => unawaited(_openDdlDialog()),
           onGoPrevious: state.goToPreviousPage,
           onGoNext: state.goToNextPage,
           onRefresh: () => unawaited(state.refresh()),

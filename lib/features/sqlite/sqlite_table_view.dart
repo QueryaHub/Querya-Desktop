@@ -4,7 +4,6 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
 import 'package:querya_desktop/core/database/sqlite_service.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
-import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/editor/querya_code_editor.dart';
 import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -97,7 +96,7 @@ class SqliteTableDataDelegate extends TableDataMutationDelegate {
     }
 
     final loaded = await loadTableViewSchema(
-      () => conn.getTableSchema(tableName),
+      () => conn.getTableSchema(table: tableName),
     );
     final s = loaded.schema;
     if (s != null) {
@@ -297,7 +296,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
     );
   }
 
-  Future<void> _showDdlDialog(material.BuildContext context) async {
+  Future<void> _showDdlDialog() async {
     final conn = await _delegate.ensureBrowseConnection();
     if (!mounted || conn == null || !conn.isConnected) return;
     final navigator = material.Navigator.of(context, rootNavigator: true);
@@ -470,7 +469,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
                               size: ButtonSize.small,
                               onPressed: state.isLoading
                                   ? null
-                                  : () => unawaited(_showDdlDialog(ctx)),
+                                  : () => unawaited(_showDdlDialog()),
                               child: const Text('DDL'),
                             ),
                             const Gap(4),

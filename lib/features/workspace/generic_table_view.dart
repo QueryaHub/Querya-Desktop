@@ -527,7 +527,7 @@ class GenericTableViewState extends material.State<GenericTableView> {
 
   material.Widget _buildDefaultToolbar() {
     final cs = Theme.of(context).colorScheme;
-    final title = '${effectiveTableTitle}${widget.isMaterializedView ? ' (materialized view)' : widget.isView ? ' (view)' : ''}';
+    final title = '$effectiveTableTitle${widget.isMaterializedView ? ' (materialized view)' : widget.isView ? ' (view)' : ''}';
 
     return material.Container(
       height: 48,

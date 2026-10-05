@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
+import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 
 /// Represents a loaded data page with column names and string rows.
 @immutable
