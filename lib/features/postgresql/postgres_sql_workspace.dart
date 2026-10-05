@@ -1,35 +1,224 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart' as material;
-import 'package:flutter/services.dart' show LogicalKeyboardKey;
-import 'package:file_selector/file_selector.dart';
-import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
-import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
-import 'package:postgres/postgres.dart' as pg;
-import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/postgres_sql.dart';
 import 'package:querya_desktop/core/database/sql_table_target_extractor.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
-import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/core/ui/querya_shell_status.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
 import 'package:querya_desktop/features/postgresql/postgres_result_utils.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_utils.dart';
-import 'package:querya_desktop/features/settings/preferences_dialog.dart';
-import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
-import 'package:querya_desktop/features/workspace/sql_result_grid_schema.dart';
 import 'package:querya_desktop/features/workspace/workspace.dart';
-import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Database used for this SQL workspace session (matches [PostgresService.acquire]).
 String _pgSqlSessionDatabase(ConnectionRow row) {
   final d = row.databaseName?.trim();
   if (d == null || d.isEmpty) return 'postgres';
   return d;
+}
+
+/// Execution delegate for PostgreSQL connections.
+class PostgresSqlExecutionDelegate extends SqlExecutionDelegate {
+  PostgresSqlExecutionDelegate({
+    required this.connectionRow,
+    required this.isReadOnly,
+    required this.effectiveDatabaseProvider,
+    required this.autocommitProvider,
+  });
+
+  final ConnectionRow connectionRow;
+  final bool isReadOnly;
+  final String Function() effectiveDatabaseProvider;
+  final bool Function() autocommitProvider;
+
+  PgLease? _lease;
+  String? _interruptDatabase;
+
+  PgLease? get lease => _lease;
+
+  Future<void> ensureLease() async {
+    if (_lease != null && _lease!.connection.isConnected) return;
+    dropLease();
+    final db = effectiveDatabaseProvider();
+    final lease = await PostgresService.instance.acquire(
+      connectionRow,
+      database: db,
+      mode: isReadOnly ? PgSessionMode.readOnly : PgSessionMode.readWrite,
+    );
+    _lease = lease;
+    _interruptDatabase = db;
+  }
+
+  void dropLease() {
+    _lease?.release();
+    _lease = null;
+    _interruptDatabase = null;
+  }
+
+  @override
+  bool get supportsTransactions => true;
+
+  @override
+  Future<bool?> checkTransactionOpen() async {
+    final conn = _lease?.connection;
+    if (conn == null || !conn.isConnected) {
+      return null;
+    }
+    return conn.inOpenTransaction();
+  }
+
+  @override
+  Future<void> runTransactionCommand(String command, {Duration? timeout}) async {
+    await ensureLease();
+    final conn = _lease?.connection;
+    if (conn == null || !conn.isConnected) {
+      throw StateError('Could not connect to PostgreSQL.');
+    }
+    await conn.execute(command, timeout: timeout);
+  }
+
+  @override
+  Future<SqlExecutionResult> executeQuery(
+    String sql, {
+    int? limit,
+    Duration? timeout,
+  }) async {
+    await ensureLease();
+    final conn = _lease?.connection;
+    if (conn == null || !conn.isConnected) {
+      throw StateError('Could not connect to PostgreSQL.');
+    }
+
+    final cap = limit ?? kDefaultSqlResultMaxRows;
+    final effectiveSql = injectSqlLimit(sql, cap);
+
+    if (!autocommitProvider()) {
+      final inTx = await conn.inOpenTransaction() ?? false;
+      if (!inTx && !shouldSkipImplicitBegin(effectiveSql)) {
+        await conn.execute('BEGIN', timeout: timeout);
+      }
+    }
+
+    final result = await conn.execute(effectiveSql, timeout: timeout);
+
+    final schema = result.schema;
+    final cols = <String>[];
+    for (var i = 0; i < schema.columns.length; i++) {
+      final c = schema.columns[i];
+      cols.add(
+        c.columnName?.isNotEmpty == true ? c.columnName! : '[$i]',
+      );
+    }
+
+    final rawRows = <List<Object?>>[];
+    var n = 0;
+    for (final row in result) {
+      if (n >= cap) break;
+      rawRows.add(row.toList());
+      n++;
+    }
+
+    final outRows = await convertPostgresResultRowsToStringsAdaptive(
+      PostgresResultConvertJob(
+        rowValues: rawRows,
+        columnTypeOids: [
+          for (final c in schema.columns) c.typeOid,
+        ],
+      ),
+    );
+
+    final isTruncated = result.length >= cap;
+    String? statusMsg;
+    if (cols.isEmpty && outRows.isEmpty) {
+      statusMsg = 'Command completed. Rows affected: ${result.affectedRows}.';
+    } else {
+      statusMsg = isTruncated
+          ? 'Showing first $cap row(s) (result capped).'
+          : '${result.length} row(s).';
+    }
+
+    return SqlExecutionResult(
+      columns: cols,
+      rows: outRows,
+      affectedRows: result.affectedRows,
+      statusMessage: statusMsg,
+      isTruncated: isTruncated,
+    );
+  }
+
+  @override
+  Future<String> explainQuery(String sql) async {
+    await ensureLease();
+    final conn = _lease?.connection;
+    if (conn == null || !conn.isConnected) {
+      throw StateError('Could not connect to PostgreSQL.');
+    }
+    final res = await conn.execute('EXPLAIN $sql');
+    return res.map((r) => r.first.toString()).join('\n');
+  }
+
+  @override
+  Future<void> cancelQuery() async {
+    PostgresService.instance.interrupt(
+      connectionRow,
+      database: _interruptDatabase ?? effectiveDatabaseProvider(),
+      mode: isReadOnly ? PgSessionMode.readOnly : PgSessionMode.readWrite,
+    );
+    await _lease?.connection.forceClose();
+    dropLease();
+  }
+
+  @override
+  Future<SqlResultGridSchema> resolveTableSchema(
+    String userSql,
+    List<String> columns,
+  ) async {
+    final conn = _lease?.connection;
+    if (conn == null || !conn.isConnected) {
+      return SqlResultGridSchema.none;
+    }
+    final target = SqlTableTargetExtractor.extract(userSql);
+    if (target != null && columns.isNotEmpty) {
+      return SqlResultGridSchema.fromLoad(
+        await loadTableViewSchema(
+          () => conn.getTableSchema(
+            schema: target.schema ?? 'public',
+            table: target.tableName,
+          ),
+        ),
+      );
+    }
+    return SqlResultGridSchema.none;
+  }
+
+  @override
+  Future<void> applyStagedMutations({
+    required TableMutationPlan plan,
+    Duration? timeout,
+  }) async {
+    await ensureLease();
+    final conn = _lease?.connection;
+    if (conn == null || !conn.isConnected) {
+      throw StateError('Could not connect to PostgreSQL.');
+    }
+
+    await runPostgresStatementsInTransaction(
+      (sql) async {
+        final result = await conn.execute(sql, timeout: timeout);
+        if (sql != 'BEGIN' && sql != 'COMMIT' && sql != 'ROLLBACK') {
+          expectDmlMatchedRows(result.affectedRows);
+        }
+      },
+      plan.statements.map((s) => s.sql),
+    );
+  }
+
+  @override
+  void dispose() {
+    dropLease();
+  }
 }
 
 /// Ad-hoc SQL editor + results for a PostgreSQL connection (pgAdmin-style).
@@ -66,197 +255,12 @@ class PostgresSqlWorkspace extends material.StatefulWidget {
 }
 
 class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
-  final List<SqlQueryTabSession> _sessions = [];
-  int _activeSessionIndex = 0;
-  int _nextSessionId = 1;
-
-  SqlQueryTabSession get _activeSession => _sessions[_activeSessionIndex];
-
-  /// Built session panes, keyed by [SqlQueryTabSession.id].
-  ///
-  /// Switching tabs only changes [_activeSessionIndex]; reusing the same
-  /// widget instance for untouched sessions lets Flutter's element diffing
-  /// (`identical(oldWidget, newWidget)`) skip rebuilding their subtrees, so a
-  /// switch only rebuilds the tab strip and swaps the visible `IndexedStack`
-  /// child instead of rebuilding every tab's editor and results grid.
-  final Map<String, material.Widget> _paneCache = {};
-
-  void _invalidatePane(SqlQueryTabSession session) =>
-      _paneCache.remove(session.id);
-
-  void _invalidateAllPanes() => _paneCache.clear();
-
-  PgLease? _lease;
-
-  /// Database used for the current lease (for [PostgresService.interrupt]).
-  String? _interruptDatabase;
+  late PostgresSqlExecutionDelegate _delegate;
+  final material.GlobalKey<GenericSqlWorkspaceState> _workspaceKey =
+      material.GlobalKey<GenericSqlWorkspaceState>();
 
   int _lastAppliedSqlContextToken = -1;
-
-  /// PostgreSQL default: each statement is its own transaction unless you use
-  /// `BEGIN` / `BEGIN`+implicit when autocommit is off.
   bool _autocommit = true;
-
-  /// `null` = use connection / URI [query_timeout] default from driver.
-  int? _queryTimeoutSeconds;
-
-  int _resultMaxRows = kDefaultSqlResultMaxRows;
-  int _historyMaxEntries = kDefaultSqlHistoryMaxEntries;
-  double _editorFontSize = kDefaultSqlEditorFontSize;
-
-  /// `null` = unknown (older server or error).
-  bool? _txOpen;
-
-  late final VoidCallback _appSettingsListener;
-
-  @override
-  void initState() {
-    super.initState();
-    _sessions.add(
-      SqlQueryTabSession(
-        id: 'pg_tab_1',
-        title: 'Query 1',
-      ),
-    );
-    _appSettingsListener = () {
-      unawaited(_loadWorkspaceSettings());
-    };
-    SqlWorkspaceSettingsRevision.listenable.addListener(_appSettingsListener);
-    material.WidgetsBinding.instance.addPostFrameCallback((_) {
-      _syncPostgresSqlTreeContext();
-      unawaited(_loadWorkspaceSettings());
-      _registerSqlEditorCommands();
-    });
-  }
-
-  void _registerSqlEditorCommands() {
-    if (!mounted) return;
-    SqlEditorCommandBridge.instance.register(
-      connectionId: widget.connectionRow.id,
-      onNew: _addNewTab,
-      onOpen: () => unawaited(_openSqlFile()),
-      onSave: () => unawaited(_saveSqlFile()),
-      onExecute: () {
-        if (!_activeSession.running) unawaited(_execute(_activeSession));
-      },
-      onCloseTab: () {
-        if (_sessions.length > 1) unawaited(_closeTab(_activeSessionIndex));
-      },
-      onNextTab: _nextTab,
-      onPrevTab: _prevTab,
-      onFormat: () {
-        _activeSession.formatSql();
-        _invalidatePane(_activeSession);
-        setState(() {});
-      },
-      onClear: () {
-        _activeSession.clearSql();
-        _invalidatePane(_activeSession);
-        setState(() {});
-      },
-      onOpenWithContent: (sql, filePath, title) {
-        if (!mounted) return;
-        final session = _activeSession;
-        if (session.controller.text.trim().isEmpty && session.rows.isEmpty) {
-          session.controller.value = material.TextEditingValue(
-            text: sql,
-            selection: material.TextSelection.collapsed(offset: sql.length),
-          );
-          session.title = title;
-          session.filePath = filePath;
-          _invalidatePane(session);
-          setState(() {});
-        } else {
-          _addNewTab(initialSql: sql, title: title, filePath: filePath);
-        }
-      },
-    );
-  }
-
-  void _addNewTab({String initialSql = '', String? title, String? filePath}) {
-    setState(() {
-      _nextSessionId++;
-      final session = SqlQueryTabSession(
-        id: 'pg_tab_${DateTime.now().millisecondsSinceEpoch}_$_nextSessionId',
-        title: title ?? 'Query $_nextSessionId',
-        initialSql: initialSql,
-        filePath: filePath,
-        initialFraction:
-            _sessions.isNotEmpty ? _activeSession.topFraction.value : 0.65,
-      );
-      _sessions.add(session);
-      _activeSessionIndex = _sessions.length - 1;
-    });
-  }
-
-  Future<void> _closeTab(int index) async {
-    if (index < 0 || index >= _sessions.length) return;
-    if (_sessions.length <= 1) return;
-    final session = _sessions[index];
-    if (session.isDirty) {
-      final hasDirtyStaging =
-          session.stagingBuffer != null && session.stagingBuffer!.isDirty;
-      final hasUnsavedText = session.isModified ||
-          (session.filePath == null && session.controller.text.trim().isNotEmpty);
-      final String message;
-      if (hasDirtyStaging && hasUnsavedText) {
-        message =
-            'This query tab contains unsaved query text and staged database changes. Closing the tab will discard them.';
-      } else if (hasDirtyStaging) {
-        message =
-            'This query tab contains staged database changes that have not been applied yet. Closing the tab will discard these changes.';
-      } else {
-        message =
-            'This query tab contains unsaved SQL query text. Closing the tab will discard your changes.';
-      }
-      final confirmed = await showUnsavedTabChangesDialog(
-        context: context,
-        tabTitle: session.title,
-        message: message,
-      );
-      if (confirmed != true) return;
-    }
-    if (!mounted) return;
-    setState(() {
-      _sessions.removeAt(index);
-      session.dispose();
-      _paneCache.remove(session.id);
-      if (_activeSessionIndex >= _sessions.length) {
-        _activeSessionIndex = _sessions.length - 1;
-      }
-    });
-  }
-
-  void _nextTab() {
-    if (_sessions.length <= 1) return;
-    setState(() {
-      _activeSessionIndex = (_activeSessionIndex + 1) % _sessions.length;
-    });
-  }
-
-  void _prevTab() {
-    if (_sessions.length <= 1) return;
-    setState(() {
-      _activeSessionIndex =
-          (_activeSessionIndex - 1 + _sessions.length) % _sessions.length;
-    });
-  }
-
-  @override
-  void didUpdateWidget(covariant PostgresSqlWorkspace oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.connectionRow.id != widget.connectionRow.id) {
-      _lastAppliedSqlContextToken = -1;
-    }
-    if (oldWidget.isReadOnly != widget.isReadOnly) {
-      _dropLease();
-      // Cached panes closed over the old widget.isReadOnly in their
-      // onApplyChanges callback (#1007): rebuild every tab so Save reflects
-      // the lock immediately instead of only on that tab's next query run.
-      _invalidateAllPanes();
-    }
-    _syncPostgresSqlTreeContext();
-  }
 
   String _effectiveSessionDatabase() {
     final ctx = widget.postgresSqlEditorContext;
@@ -267,10 +271,38 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     return _pgSqlSessionDatabase(widget.connectionRow);
   }
 
-  void _dropLease() {
-    _lease?.release();
-    _lease = null;
-    _interruptDatabase = null;
+  @override
+  void initState() {
+    super.initState();
+    _delegate = PostgresSqlExecutionDelegate(
+      connectionRow: widget.connectionRow,
+      isReadOnly: widget.isReadOnly,
+      effectiveDatabaseProvider: _effectiveSessionDatabase,
+      autocommitProvider: () => _autocommit,
+    );
+    material.WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncPostgresSqlTreeContext();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant PostgresSqlWorkspace oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.connectionRow.id != widget.connectionRow.id) {
+      _lastAppliedSqlContextToken = -1;
+    }
+    if (oldWidget.isReadOnly != widget.isReadOnly ||
+        oldWidget.connectionRow.id != widget.connectionRow.id) {
+      _delegate.dispose();
+      _delegate = PostgresSqlExecutionDelegate(
+        connectionRow: widget.connectionRow,
+        isReadOnly: widget.isReadOnly,
+        effectiveDatabaseProvider: _effectiveSessionDatabase,
+        autocommitProvider: () => _autocommit,
+      );
+      _workspaceKey.currentState?.invalidateAllPanes();
+    }
+    _syncPostgresSqlTreeContext();
   }
 
   void _syncPostgresSqlTreeContext() {
@@ -282,907 +314,51 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
     }
     if (tok == _lastAppliedSqlContextToken) return;
     _lastAppliedSqlContextToken = tok;
-    _dropLease();
+    _delegate.dropLease();
+
     final sql = postgresBrowseSelectSql(schema: ctx.schema, table: ctx.name);
-    if (_activeSession.controller.text.trim().isEmpty &&
-        _activeSession.rows.isEmpty) {
-      _activeSession.controller.value = material.TextEditingValue(
+    final ws = _workspaceKey.currentState;
+    if (ws == null) return;
+
+    if (ws.activeSession.controller.text.trim().isEmpty &&
+        ws.activeSession.rows.isEmpty) {
+      ws.activeSession.controller.value = material.TextEditingValue(
         text: sql,
         selection: material.TextSelection.collapsed(offset: sql.length),
       );
-      _activeSession.title = ctx.name;
+      ws.activeSession.title = ctx.name;
+      ws.invalidatePane(ws.activeSession);
+      ws.setState(() {});
     } else {
-      _addNewTab(initialSql: sql, title: ctx.name);
-    }
-  }
-
-  Future<void> _loadWorkspaceSettings() async {
-    final t = await AppSettings.instance.getPostgresSqlStmtTimeoutSeconds();
-    final rows = await AppSettings.instance.getSqlResultMaxRows();
-    final hist = await AppSettings.instance.getSqlHistoryMaxEntries();
-    final font = await AppSettings.instance.getSqlEditorFontSize();
-    if (!mounted) return;
-    _invalidateAllPanes();
-    setState(() {
-      _queryTimeoutSeconds = t;
-      _resultMaxRows = rows;
-      _historyMaxEntries = hist;
-      _editorFontSize = font;
-    });
-  }
-
-  void _onStmtTimeoutChanged(int? v) {
-    _invalidateAllPanes();
-    setState(() => _queryTimeoutSeconds = v);
-    unawaited(AppSettings.instance.setPostgresSqlStmtTimeoutSeconds(v));
-  }
-
-  void _notifyTransactionOpen() {
-    widget.transactionOpenNotifier?.value = _txOpen;
-  }
-
-  Future<void> _ensureLease() async {
-    if (_lease != null && _lease!.connection.isConnected) return;
-    _dropLease();
-    final db = _effectiveSessionDatabase();
-    final lease = await PostgresService.instance.acquire(
-      widget.connectionRow,
-      database: db,
-      mode: widget.isReadOnly ? PgSessionMode.readOnly : PgSessionMode.readWrite,
-    );
-    if (!mounted) {
-      lease.release();
-      return;
-    }
-    _lease = lease;
-    _interruptDatabase = db;
-  }
-
-  Duration? _statementTimeout() => _queryTimeoutSeconds == null
-      ? null
-      : Duration(seconds: _queryTimeoutSeconds!);
-
-  Future<void> _refreshTxStatus() async {
-    final conn = _lease?.connection;
-    if (conn == null || !conn.isConnected) {
-      if (mounted) {
-        _invalidateAllPanes();
-        setState(() => _txOpen = null);
-      }
-      _notifyTransactionOpen();
-      return;
-    }
-    final v = await conn.inOpenTransaction();
-    if (mounted) {
-      _invalidateAllPanes();
-      setState(() => _txOpen = v);
-    }
-    _notifyTransactionOpen();
-  }
-
-  Future<void> _runTxCommand(String cmd) async {
-    final session = _activeSession;
-    _invalidatePane(session);
-    setState(() {
-      session.running = true;
-      session.error = null;
-    });
-    try {
-      await _ensureLease();
-      final conn = _lease?.connection;
-      if (conn == null || !conn.isConnected) {
-        if (mounted) {
-          _invalidatePane(session);
-          setState(() {
-            session.error = 'Could not connect to PostgreSQL.';
-            session.running = false;
-          });
-        }
-        return;
-      }
-      final to = _statementTimeout();
-      await conn.execute(cmd, timeout: to);
-      if (!mounted) return;
-      _invalidatePane(session);
-      setState(() {
-        session.columns = [];
-        session.rows = [];
-        session.affectedRows = null;
-        session.statusLine = 'OK: $cmd';
-        session.running = false;
-      });
-    } on TimeoutException catch (e) {
-      unawaited(_lease?.connection.forceClose());
-      if (mounted) {
-        _invalidatePane(session);
-        setState(() {
-          session.error = 'Query timed out: ${e.message ?? e}';
-          session.running = false;
-        });
-      }
-    } on pg.ServerException catch (e) {
-      if (mounted) {
-        _invalidatePane(session);
-        setState(() {
-          session.error = e.message;
-          session.running = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        _invalidatePane(session);
-        setState(() {
-          session.error = e.toString();
-          session.running = false;
-        });
-      }
-    } finally {
-      await _refreshTxStatus();
+      ws.addNewTab(initialSql: sql, title: ctx.name);
     }
   }
 
   @override
   void dispose() {
-    SqlEditorCommandBridge.instance
-        .unregister(connectionId: widget.connectionRow.id);
-    SqlWorkspaceSettingsRevision.listenable
-        .removeListener(_appSettingsListener);
-    final anyRunning = _sessions.any((s) => s.running);
-    if (anyRunning) {
-      PostgresService.instance.interrupt(
-        widget.connectionRow,
-        database: _interruptDatabase ?? _effectiveSessionDatabase(),
-        mode: widget.isReadOnly ? PgSessionMode.readOnly : PgSessionMode.readWrite,
-      );
-    }
-    _dropLease();
-    for (final s in _sessions) {
-      s.dispose();
-    }
-    _paneCache.clear();
+    _delegate.dispose();
     super.dispose();
   }
 
-  Future<void> _execute([SqlQueryTabSession? targetSession]) async {
-    final session = targetSession ?? _activeSession;
-    final selection = session.controller.selection;
-    String userSql;
-    if (selection.isValid && !selection.isCollapsed) {
-      userSql = selection.textInside(session.controller.text).trim();
-    } else {
-      userSql = session.controller.text.trim();
-    }
-    if (userSql.isEmpty) return;
-
-    final safeToProceed = await confirmDiscardTableEditsIfDirty(
-      context: context,
-      buffer: session.stagingBuffer,
-      tableTitle: session.title,
-    );
-    if (!safeToProceed) return;
-    if (session.stagingBuffer != null && session.stagingBuffer!.isDirty) {
-      session.stagingBuffer?.dispose();
-      session.stagingBuffer = null;
-    }
-
-    final confirmDestructive =
-        await AppSettings.instance.getConfirmDestructiveOperations();
-    if (confirmDestructive) {
-      final inspection = DestructiveSqlDetector.inspect(userSql);
-      if (inspection.isDestructive) {
-        if (!mounted) return;
-        final confirmed = await showDestructiveQueryDialog(
-          context: context,
-          result: inspection,
-          sql: userSql,
-          connectionName: widget.connectionRow.name,
-        );
-        if (confirmed != true) return;
-      }
-    }
-
-    var sql = injectSqlLimit(userSql, _resultMaxRows);
-
-    _invalidatePane(session);
-    setState(() {
-      session.running = true;
-      session.error = null;
-      session.columns = [];
-      session.rows = [];
-      session.affectedRows = null;
-      session.statusLine = null;
-      session.resultGridPrimaryKeys = const [];
-      session.resultGridColumnDataTypes = null;
-      session.resultGridColumnMeta = null;
-    });
-    QueryaShellStatus.instance.beginBusy(message: 'Running query…');
-    final sw = Stopwatch()..start();
-
-    try {
-      await _ensureLease();
-      final conn = _lease?.connection;
-      if (conn == null || !conn.isConnected) {
-        if (mounted) {
-          _invalidatePane(session);
-          setState(() {
-            session.error = 'Could not connect to PostgreSQL.';
-            session.running = false;
-          });
-          QueryaShellStatus.instance.endBusy();
-        }
-        return;
-      }
-
-      final to = _statementTimeout();
-      if (!_autocommit) {
-        final inTx = await conn.inOpenTransaction() ?? false;
-        if (!inTx && !shouldSkipImplicitBegin(sql)) {
-          // Separate execute: Parse cannot take `BEGIN;` + the next statement.
-          await conn.execute('BEGIN', timeout: to);
-        }
-      }
-
-      final result = await conn.execute(sql, timeout: to);
-
-      if (!mounted) return;
-
-      final schema = result.schema;
-      final cols = <String>[];
-      for (var i = 0; i < schema.columns.length; i++) {
-        final c = schema.columns[i];
-        cols.add(
-          c.columnName?.isNotEmpty == true ? c.columnName! : '[$i]',
-        );
-      }
-
-      final rawRows = <List<Object?>>[];
-      var n = 0;
-      final cap = _resultMaxRows;
-      for (final row in result) {
-        if (n >= cap) break;
-        rawRows.add(row.toList());
-        n++;
-      }
-
-      final outRows = await convertPostgresResultRowsToStringsAdaptive(
-        PostgresResultConvertJob(
-          rowValues: rawRows,
-          columnTypeOids: [
-            for (final c in schema.columns) c.typeOid,
-          ],
-        ),
-      );
-
-      final target = SqlTableTargetExtractor.extract(userSql);
-      var gridSchema = SqlResultGridSchema.none;
-      if (target != null && cols.isNotEmpty) {
-        gridSchema = SqlResultGridSchema.fromLoad(
-          await loadTableViewSchema(
-            () => conn.getTableSchema(
-              schema: target.schema ?? 'public',
-              table: target.tableName,
-            ),
-          ),
-        );
-      }
-      final pks = gridSchema.primaryKeys;
-      final editHint = gridSchema.editHint(cols);
-      final canSave = sqlResultGridSaveEnabled(
-        sql: userSql,
-        resultColumns: cols,
-        primaryKeys: pks,
-      );
-
-      _invalidatePane(session);
-      setState(() {
-        session.columns = cols;
-        session.rows = outRows;
-        session.affectedRows = result.affectedRows;
-        session.lastExecutedSql = userSql;
-        session.resultGridPrimaryKeys = canSave ? pks : const [];
-        session.resultGridColumnDataTypes = gridSchema.columnDataTypes;
-        session.resultGridColumnMeta = gridSchema.columnMeta;
-        session.stagingBuffer?.dispose();
-        session.stagingBuffer = canSave
-            ? DataGridStagingBuffer(
-                columns: cols,
-                rows: outRows,
-                primaryKeys: pks,
-              )
-            : null;
-        if (cols.isEmpty && outRows.isEmpty) {
-          session.statusLine =
-              'Command completed. Rows affected: ${result.affectedRows}.';
-        } else {
-          final truncated = result.length >= cap;
-          session.statusLine = withEditHint(
-            truncated
-                ? 'Showing first $cap row(s) (result capped).'
-                : '${result.length} row(s).',
-            editHint,
-          );
-        }
-        session.running = false;
-      });
-      sw.stop();
-      QueryaShellStatus.instance.reportQueryResult(
-        duration: sw.elapsed,
-        rowCount: outRows.length,
-        columnCount: cols.length,
-        message: session.statusLine,
-      );
-      final cid = widget.connectionRow.id;
-      if (cid != null) {
-        unawaited(
-          LocalDb.instance.recordSqlQueryHistory(
-            connectionId: cid,
-            databaseName: _effectiveSessionDatabase(),
-            sqlText: userSql,
-            maxEntries: _historyMaxEntries,
-          ),
-        );
-      }
-    } on TimeoutException catch (e) {
-      unawaited(_lease?.connection.forceClose());
-      if (mounted) {
-        _invalidatePane(session);
-        setState(() {
-          session.error = 'Query timed out: ${e.message ?? e}';
-          session.running = false;
-        });
-        QueryaShellStatus.instance.endBusy();
-      }
-    } on pg.ServerException catch (e) {
-      if (mounted) {
-        _invalidatePane(session);
-        setState(() {
-          session.error = e.message;
-          session.running = false;
-        });
-        QueryaShellStatus.instance.endBusy();
-      }
-    } catch (e) {
-      if (mounted) {
-        _invalidatePane(session);
-        setState(() {
-          session.error = e.toString();
-          session.running = false;
-        });
-        QueryaShellStatus.instance.endBusy();
-      }
-    } finally {
-      await _refreshTxStatus();
-    }
-  }
-
-  Future<void> _applyStagedChanges([SqlQueryTabSession? targetSession]) async {
-    final session = targetSession ?? _activeSession;
-    if (widget.isReadOnly ||
-        session.stagingBuffer == null ||
-        !session.stagingBuffer!.isDirty ||
-        session.savingChanges) {
-      return;
-    }
-    final target = session.lastExecutedSql != null
-        ? SqlTableTargetExtractor.extract(session.lastExecutedSql!)
-        : null;
-    if (target == null ||
-        !sqlResultGridSaveEnabled(
-          sql: session.lastExecutedSql,
-          resultColumns: session.columns,
-          primaryKeys: session.resultGridPrimaryKeys,
-        )) {
-      return;
-    }
-
-    _invalidatePane(session);
-    setState(() => session.savingChanges = true);
-    try {
-      final plan = session.stagingBuffer!.generateMutationPlan(
-        dialect: SqlDialect.postgres,
-        tableName: target.tableName,
-        schema: target.schema ?? 'public',
-        primaryKeys: session.resultGridPrimaryKeys,
-        columnDataTypes: session.resultGridColumnDataTypes,
-        columnMeta: session.resultGridColumnMeta,
-      );
-      if (plan.isEmpty) {
-        _invalidatePane(session);
-        setState(() => session.savingChanges = false);
-        return;
-      }
-
-      final confirmed = await showDmlPreviewDialog(
-        context: context,
-        plan: plan,
-      );
-      if (confirmed != true) {
-        _invalidatePane(session);
-        setState(() => session.savingChanges = false);
-        return;
-      }
-
-      await _ensureLease();
-      final conn = _lease?.connection;
-      if (conn == null || !conn.isConnected) {
-        throw StateError('Could not connect to PostgreSQL.');
-      }
-
-      final to = _statementTimeout();
-      await runPostgresStatementsInTransaction(
-        (sql) async {
-          final result = await conn.execute(sql, timeout: to);
-          if (sql != 'BEGIN' && sql != 'COMMIT' && sql != 'ROLLBACK') {
-            expectDmlMatchedRows(result.affectedRows);
-          }
-        },
-        plan.statements.map((s) => s.sql),
-      );
-
-      if (!mounted) return;
-      final newRows = session.stagingBuffer!.committedRows;
-      session.stagingBuffer?.dispose();
-      _invalidatePane(session);
-      setState(() {
-        session.rows = newRows;
-        session.stagingBuffer =
-            DataGridStagingBuffer(
-          columns: session.columns,
-          rows: session.rows,
-          primaryKeys: session.resultGridPrimaryKeys,
-        );
-        session.savingChanges = false;
-      });
-      await _refreshTxStatus();
-    } catch (e) {
-      if (mounted) {
-        _invalidatePane(session);
-        setState(() => session.savingChanges = false);
-        await showTableViewSaveFailedDialog(context: context, error: e);
-      }
-    }
-  }
-
-  Future<void> _openSqlFile() async {
-    try {
-      final file = await openFile(
-        acceptedTypeGroups: const [
-          XTypeGroup(
-            label: 'SQL query',
-            extensions: ['sql'],
-          ),
-        ],
-      );
-      if (file == null) return;
-      final text = await file.readAsString();
-      if (!mounted) return;
-      final session = _activeSession;
-      if (session.controller.text.trim().isEmpty && session.rows.isEmpty) {
-        session.controller.value = material.TextEditingValue(
-          text: text,
-          selection: material.TextSelection.collapsed(offset: text.length),
-        );
-        session.title = file.name;
-        session.markSaved(newFilePath: file.path);
-        _invalidatePane(session);
-        setState(() {});
-      } else {
-        _addNewTab(initialSql: text, title: file.name, filePath: file.path);
-      }
-    } catch (e) {
-      if (!mounted) return;
-      showAppToast(
-        context: context,
-        message: 'Failed to open SQL file: $e',
-        variant: AppToastVariant.error,
-      );
-    }
-  }
-
-  Future<void> _saveSqlFile() async {
-    try {
-      final session = _activeSession;
-      final existingPath = session.filePath;
-      if (existingPath != null && existingPath.isNotEmpty) {
-        await File(existingPath).writeAsString(session.controller.text);
-        session.markSaved();
-        if (!mounted) return;
-        showAppToast(
-          context: context,
-          message: 'Saved ${session.title}',
-          variant: AppToastVariant.success,
-        );
-        return;
-      }
-
-      final suggested = session.title.endsWith('.sql')
-          ? session.title
-          : '${session.title}.sql';
-      final location = await getSaveLocation(
-        acceptedTypeGroups: const [
-          XTypeGroup(label: 'SQL', extensions: ['sql']),
-        ],
-        suggestedName: suggested,
-      );
-      final path = location?.path;
-      if (path == null || path.isEmpty) return;
-      await File(path).writeAsString(session.controller.text);
-      if (!mounted) return;
-      _invalidatePane(session);
-      setState(() {
-        session.title = File(path).uri.pathSegments.last;
-        session.markSaved(newFilePath: path);
-      });
-      showAppToast(
-        context: context,
-        message: 'Saved to ${session.title}',
-        variant: AppToastVariant.success,
-      );
-    } catch (e) {
-      if (!mounted) return;
-      showAppToast(
-        context: context,
-        message: 'Failed to save SQL file: $e',
-        variant: AppToastVariant.error,
-      );
-    }
-  }
-
   @override
   material.Widget build(material.BuildContext context) {
-    return Actions(
-      actions: <Type, Action<Intent>>{
-        NewSqlIntent: CallbackAction<NewSqlIntent>(
-          onInvoke: (intent) {
-            _addNewTab();
-            return null;
-          },
-        ),
-        CloseSqlTabIntent: CallbackAction<CloseSqlTabIntent>(
-          onInvoke: (intent) {
-            if (_sessions.length > 1) {
-              unawaited(_closeTab(_activeSessionIndex));
-            }
-            return null;
-          },
-        ),
-        NextSqlTabIntent: CallbackAction<NextSqlTabIntent>(
-          onInvoke: (intent) {
-            _nextTab();
-            return null;
-          },
-        ),
-        PrevSqlTabIntent: CallbackAction<PrevSqlTabIntent>(
-          onInvoke: (intent) {
-            _prevTab();
-            return null;
-          },
-        ),
-        OpenSqlIntent: CallbackAction<OpenSqlIntent>(
-          onInvoke: (intent) {
-            unawaited(_openSqlFile());
-            return null;
-          },
-        ),
-        SaveSqlIntent: CallbackAction<SaveSqlIntent>(
-          onInvoke: (intent) {
-            unawaited(_saveSqlFile());
-            return null;
-          },
-        ),
-      },
-      child: material.CallbackShortcuts(
-        bindings: {
-          const material.SingleActivator(LogicalKeyboardKey.keyT, control: true): _addNewTab,
-          const material.SingleActivator(LogicalKeyboardKey.keyT, meta: true): _addNewTab,
-          const material.SingleActivator(LogicalKeyboardKey.keyW, control: true): () {
-            if (_sessions.length > 1) unawaited(_closeTab(_activeSessionIndex));
-          },
-          const material.SingleActivator(LogicalKeyboardKey.keyW, meta: true): () {
-            if (_sessions.length > 1) unawaited(_closeTab(_activeSessionIndex));
-          },
-          const material.SingleActivator(LogicalKeyboardKey.tab, control: true): _nextTab,
-          const material.SingleActivator(LogicalKeyboardKey.tab, control: true, shift: true): _prevTab,
-          const material.SingleActivator(LogicalKeyboardKey.f5): () {
-            if (!_activeSession.running) unawaited(_execute(_activeSession));
-          },
-          const material.SingleActivator(
-            LogicalKeyboardKey.enter,
-            control: true,
-          ): () {
-            if (!_activeSession.running) unawaited(_execute(_activeSession));
-          },
-          const material.SingleActivator(
-            LogicalKeyboardKey.enter,
-            meta: true,
-          ): () {
-            if (!_activeSession.running) unawaited(_execute(_activeSession));
-          },
-          const material.SingleActivator(
-            LogicalKeyboardKey.numpadEnter,
-            control: true,
-          ): () {
-            if (!_activeSession.running) unawaited(_execute(_activeSession));
-          },
-          const material.SingleActivator(
-            LogicalKeyboardKey.numpadEnter,
-            meta: true,
-          ): () {
-            if (!_activeSession.running) unawaited(_execute(_activeSession));
-          },
-          const material.SingleActivator(
-            LogicalKeyboardKey.keyR,
-            control: true,
-          ): () {
-            if (!_activeSession.running) unawaited(_execute(_activeSession));
-          },
-          const material.SingleActivator(
-            LogicalKeyboardKey.keyR,
-            meta: true,
-          ): () {
-            if (!_activeSession.running) unawaited(_execute(_activeSession));
-          },
-        },
-        child: material.Focus(
-          autofocus: true,
-          child: material.Column(
-            crossAxisAlignment: material.CrossAxisAlignment.stretch,
-            children: [
-              SqlQueryTabBar(
-                sessions: _sessions,
-                selectedIndex: _activeSessionIndex,
-                onSelect: (index) => setState(() => _activeSessionIndex = index),
-                onAdd: _addNewTab,
-                onClose: _sessions.length > 1
-                    ? (index) => unawaited(_closeTab(index))
-                    : null,
-              ),
-              material.Expanded(
-                child: material.IndexedStack(
-                  index: _activeSessionIndex,
-                  children: [
-                    for (final session in _sessions)
-                      _paneCache.putIfAbsent(
-                        session.id,
-                        () => _buildSessionPane(context, session),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  material.Widget _buildSessionPane(
-    material.BuildContext context,
-    SqlQueryTabSession session,
-  ) {
-    final theme = Theme.of(context);
-    return VerticalSplitPane(
-      key: material.ValueKey(session.id),
-      fraction: session.topFraction,
-      maxFraction: 0.85,
-      top: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _SqlToolbar(
-            sessionDatabase: _effectiveSessionDatabase(),
-            onExecute: session.running ? null : () => _execute(session),
-            running: session.running,
-            autocommit: _autocommit,
-            onAutocommitChanged: (v) {
-              _invalidateAllPanes();
-              setState(() => _autocommit = v);
-            },
-            queryTimeoutSeconds: _queryTimeoutSeconds,
-            onQueryTimeoutChanged: _onStmtTimeoutChanged,
-            onOpenPreferences: () => showPreferencesDialog(context),
-            onOpenHistory: widget.connectionRow.id != null && !session.running
-                ? () {
-                    showSqlQueryHistoryDialog(
-                      context: context,
-                      connectionId: widget.connectionRow.id!,
-                      databaseName: _effectiveSessionDatabase(),
-                      sqlController: session.controller,
-                      onOpenInNewTab: (sql) => _addNewTab(initialSql: sql),
-                    );
-                  }
-                : null,
-            txOpen: _txOpen,
-            onBegin: session.running ? null : () => _runTxCommand('BEGIN'),
-            onCommit: session.running ? null : () => _runTxCommand('COMMIT'),
-            onRollback:
-                session.running ? null : () => _runTxCommand('ROLLBACK'),
-          ),
-          const Divider(height: 1),
-          Expanded(
-            child: QueryEditorTab(
-              controller: session.controller,
-              fontSize: _editorFontSize,
-            ),
-          ),
-        ],
-      ),
-      bottom: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          material.Container(
-            constraints: const material.BoxConstraints(minHeight: 44),
-            padding: const material.EdgeInsets.symmetric(
-              horizontal: 12,
-            ),
-            decoration: material.BoxDecoration(
-              color: theme.colorScheme.muted.withValues(alpha: 0.6),
-            ),
-            alignment: material.Alignment.centerLeft,
-            child: const Text('Data Output').semiBold().small(),
-          ),
-          const Divider(height: 1),
-          Expanded(
-            child: ResultsTab(
-              columns: session.columns,
-              rows: session.rows,
-              errorMessage: session.error,
-              isLoading: session.running,
-              affectedRows: session.affectedRows,
-              statusLine: session.statusLine,
-              stagingBuffer: session.stagingBuffer,
-              columnDataTypes: session.resultGridColumnDataTypes,
-              onApplyChanges: widget.isReadOnly ||
-                      !sqlResultGridSaveEnabled(
-                        sql: session.lastExecutedSql,
-                        resultColumns: session.columns,
-                        primaryKeys: session.resultGridPrimaryKeys,
-                      )
-                  ? null
-                  : () => _applyStagedChanges(session),
-              isSaving: session.savingChanges,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SqlToolbar extends material.StatelessWidget {
-  const _SqlToolbar({
-    required this.sessionDatabase,
-    required this.onExecute,
-    required this.running,
-    required this.autocommit,
-    required this.onAutocommitChanged,
-    required this.queryTimeoutSeconds,
-    required this.onQueryTimeoutChanged,
-    required this.onOpenPreferences,
-    this.onOpenHistory,
-    required this.txOpen,
-    required this.onBegin,
-    required this.onCommit,
-    required this.onRollback,
-  });
-
-  /// Effective PostgreSQL database for queries in this tab (from the connection profile).
-  final String sessionDatabase;
-  final Future<void> Function()? onExecute;
-  final bool running;
-  final bool autocommit;
-  final void Function(bool) onAutocommitChanged;
-  final int? queryTimeoutSeconds;
-  final void Function(int?) onQueryTimeoutChanged;
-  final VoidCallback onOpenPreferences;
-  final VoidCallback? onOpenHistory;
-  final bool? txOpen;
-  final void Function()? onBegin;
-  final void Function()? onCommit;
-  final void Function()? onRollback;
-
-  String _txLabel() {
-    if (txOpen == null) return 'Transaction: —';
-    return txOpen! ? 'Transaction: open' : 'Transaction: none';
-  }
-
-  @override
-  material.Widget build(material.BuildContext context) {
-    final accent = context.workbench.accent;
-    return material.Container(
-      padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: SqlEditorChrome.sqlToolbarDecoration(context),
-      child: material.Column(
-        crossAxisAlignment: material.CrossAxisAlignment.stretch,
-        mainAxisSize: material.MainAxisSize.min,
-        children: [
-          material.Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: material.WrapCrossAlignment.center,
-            children: [
-              const Text('Query').semiBold().small(),
-              Text('DB: $sessionDatabase').muted().small(),
-              Text(_txLabel()).muted().small(),
-              OutlineButton(
-                size: ButtonSize.small,
-                onPressed: onOpenHistory,
-                leading: material.Icon(
-                  material.Icons.history_rounded,
-                  size: 16,
-                  color: accent,
-                ),
-                child: const Text('History'),
-              ),
-              OutlineButton(
-                onPressed: onExecute,
-                leading: running
-                    ? QueryaSpinner(
-                        size: QueryaSpinnerSize.sm,
-                        color: accent,
-                      )
-                    : material.Icon(
-                        material.Icons.play_arrow_rounded,
-                        size: 18,
-                        color: accent,
-                      ),
-                child: const Text('Execute (F5)'),
-              ),
-            ],
-          ),
-          const Gap(8),
-          material.Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: material.WrapCrossAlignment.center,
-            children: [
-              material.Row(
-                mainAxisSize: material.MainAxisSize.min,
-                children: [
-                  const Text('Autocommit').small(),
-                  const Gap(6),
-                  material.Switch(
-                    value: autocommit,
-                    onChanged: running ? null : onAutocommitChanged,
-                  ),
-                ],
-              ),
-              material.Row(
-                mainAxisSize: material.MainAxisSize.min,
-                children: [
-                  const Text('Stmt timeout').small(),
-                  const Gap(6),
-                  SqlStatementTimeoutDropdown(
-                    value: queryTimeoutSeconds,
-                    onChanged: onQueryTimeoutChanged,
-                    enabled: !running,
-                  ),
-                  const Gap(4),
-                  IconButton.ghost(
-                    onPressed: running ? null : onOpenPreferences,
-                    icon: material.Icon(
-                      material.Icons.settings_rounded,
-                      size: 20,
-                      color: accent,
-                    ),
-                  ),
-                ],
-              ),
-              OutlineButton(
-                onPressed: onBegin,
-                child: const Text('Begin'),
-              ),
-              OutlineButton(
-                onPressed: onCommit,
-                child: const Text('Commit'),
-              ),
-              OutlineButton(
-                onPressed: onRollback,
-                child: const Text('Rollback'),
-              ),
-            ],
-          ),
-        ],
-      ),
+    return GenericSqlWorkspace(
+      key: _workspaceKey,
+      connectionRow: widget.connectionRow,
+      delegate: _delegate,
+      dialect: SqlDialect.postgres,
+      sessionPrefix: 'pg',
+      transactionOpenNotifier: widget.transactionOpenNotifier,
+      isReadOnly: widget.isReadOnly,
+      supportsAutocommit: true,
+      initialAutocommit: _autocommit,
+      onAutocommitChanged: (v) => _autocommit = v,
+      supportsStmtTimeout: true,
+      getStoredTimeoutSeconds: () =>
+          AppSettings.instance.getPostgresSqlStmtTimeoutSeconds(),
+      setStoredTimeoutSeconds: (v) =>
+          AppSettings.instance.setPostgresSqlStmtTimeoutSeconds(v),
+      effectiveDatabaseName: _effectiveSessionDatabase,
     );
   }
 }
