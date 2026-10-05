@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
+import 'package:querya_desktop/core/security/ssh_tunnel_manager.dart';
 import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/database/redis_bulk.dart';
@@ -24,6 +26,8 @@ class RedisConnection {
     String? password,
     this.useSSL = false,
     String? connectionString,
+    this.sshConfig,
+    this.sshSecrets,
   })  : _password = password,
         _connectionString = connectionString;
 
@@ -59,6 +63,8 @@ class RedisConnection {
         password: pass ?? row.password,
         useSSL: row.useSSL || parsed.scheme == 'rediss',
         connectionString: uriText,
+        sshConfig: row.sshTunnelConfig,
+        sshSecrets: row.sshSecrets,
       );
     }
     return RedisConnection(
@@ -70,6 +76,8 @@ class RedisConnection {
       password: row.password,
       useSSL: row.useSSL,
       connectionString: row.connectionString,
+      sshConfig: row.sshTunnelConfig,
+      sshSecrets: row.sshSecrets,
     );
   }
 
@@ -81,6 +89,12 @@ class RedisConnection {
   String? _password;
   final bool useSSL;
   String? _connectionString;
+
+  final SshTunnelConfig? sshConfig;
+  final SshTunnelSecrets? sshSecrets;
+  SshTunnelHandle? _sshTunnelHandle;
+
+  SshTunnelHandle? get sshTunnelHandle => _sshTunnelHandle;
 
   String? get password => _password;
   String? get connectionString => _connectionString;
@@ -118,44 +132,79 @@ class RedisConnection {
     final sslPaths =
         extractSslCertificatePathsFromString(effectiveConnectionString);
     final secure = useSSL || sslPaths.hasAny;
-    if (secure) {
-      final context = buildSecurityContext(sslPaths);
-      final socket = await SecureSocket.connect(
-        host,
-        port,
-        context: context,
-      );
-      _command = await _conn!.connectWithSocket(socket);
-    } else {
-      _command = await _conn!.connect(host, port);
-    }
-    _command!.setParser(redis.RedisParserBulkBinary());
-    if (effectivePassword != null && effectivePassword.isNotEmpty) {
-      if (username != null && username!.trim().isNotEmpty) {
-        await _command!
-            .send_object(['AUTH', username!.trim(), effectivePassword]);
-      } else {
-        await _command!.send_object(['AUTH', effectivePassword]);
+
+    try {
+      if (sshConfig != null && sshConfig!.enabled) {
+        var sec = sshSecrets;
+        if (sec == null && id > 0) {
+          final stored =
+              await ConnectionSecretsStore.readSshSecretsForConnection(id);
+          sec = SshTunnelSecrets(
+            password: stored.password,
+            privateKey: stored.privateKey,
+            passphrase: stored.passphrase,
+            jumpPassword: stored.jumpPassword,
+          );
+        }
+        _sshTunnelHandle = await SshTunnelManager.instance.openTunnel(
+          config: sshConfig!,
+          secrets: sec ?? SshTunnelSecrets(),
+          remoteHost: host,
+          remotePort: port,
+        );
       }
-    }
-    final result = await _command!.send_object(['PING']);
-    if (result == null || result.toString().toUpperCase() != 'PONG') {
-      try {
-        await _conn?.close();
-      } catch (_) {}
+
+      final effectiveHost = _sshTunnelHandle?.localHost ?? host;
+      final effectivePort = _sshTunnelHandle?.localPort ?? port;
+
+      if (secure) {
+        final context = buildSecurityContext(sslPaths);
+        final socket = await SecureSocket.connect(
+          effectiveHost,
+          effectivePort,
+          context: context,
+        );
+        _command = await _conn!.connectWithSocket(socket);
+      } else {
+        _command = await _conn!.connect(effectiveHost, effectivePort);
+      }
+      _command!.setParser(redis.RedisParserBulkBinary());
+      if (effectivePassword != null && effectivePassword.isNotEmpty) {
+        if (username != null && username!.trim().isNotEmpty) {
+          await _command!
+              .send_object(['AUTH', username!.trim(), effectivePassword]);
+        } else {
+          await _command!.send_object(['AUTH', effectivePassword]);
+        }
+      }
+      final result = await _command!.send_object(['PING']);
+      if (result == null || result.toString().toUpperCase() != 'PONG') {
+        try {
+          await _conn?.close();
+        } catch (_) {}
+        _conn = null;
+        _command = null;
+        throw RedisConnectionException('PING failed');
+      }
+      _isConnected = true;
+      if (_clientReadOnly) {
+        try {
+          await _command!.send_object(['READONLY']);
+        } catch (_) {
+          // Standalone / older servers: READONLY is cluster-replica only.
+        }
+      }
+      scrubCredentials();
+    } catch (e) {
+      _isConnected = false;
       _conn = null;
       _command = null;
-      throw RedisConnectionException('PING failed');
-    }
-    _isConnected = true;
-    if (_clientReadOnly) {
       try {
-        await _command!.send_object(['READONLY']);
-      } catch (_) {
-        // Standalone / older servers: READONLY is cluster-replica only.
-      }
+        await _sshTunnelHandle?.release();
+      } catch (_) {}
+      _sshTunnelHandle = null;
+      rethrow;
     }
-    scrubCredentials();
   }
 
   Future<void> disconnect() async {
@@ -173,6 +222,10 @@ class RedisConnection {
         }
       }
     }
+    try {
+      await _sshTunnelHandle?.release();
+    } catch (_) {}
+    _sshTunnelHandle = null;
   }
 
   Future<void> forceClose() => disconnect();

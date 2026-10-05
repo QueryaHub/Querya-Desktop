@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
@@ -285,6 +286,59 @@ void main() {
           .singleWhere((c) => c.id == id);
       expect(loaded.password, 'keep-me');
       expect(loaded.name, 'PG Renamed');
+    });
+
+    test(
+        'SSH secrets are saved to secure store and merged during update',
+        () async {
+      final initialRow = ConnectionRow(
+        type: 'postgresql',
+        name: 'PG with SSH',
+        host: 'localhost',
+        port: 5432,
+        username: 'admin',
+        password: 'db-password',
+        createdAt: '2026-01-01T00:00:00Z',
+        sshSecrets: SshTunnelSecrets(
+          password: 'ssh-pass-123',
+          privateKey: 'ssh-key-data',
+          passphrase: 'key-passphrase',
+        ),
+      );
+      final id = await LocalDb.instance.addConnection(initialRow);
+
+      final readSsh =
+          await ConnectionSecretsStore.readSshSecretsForConnection(id);
+      expect(readSsh.password, 'ssh-pass-123');
+      expect(readSsh.privateKey, 'ssh-key-data');
+      expect(readSsh.passphrase, 'key-passphrase');
+
+      // Edit connection without re-entering SSH secrets (empty/blank)
+      final edited = ConnectionRow(
+        id: id,
+        type: 'postgresql',
+        name: 'PG with SSH Renamed',
+        createdAt: '2026-01-01T00:00:00Z',
+        sshSecrets: SshTunnelSecrets(),
+      );
+
+      final merged = await mergeSecretsForConnectionUpdate(edited);
+      expect(merged.sshSecrets?.password, 'ssh-pass-123');
+      expect(merged.sshSecrets?.privateKey, 'ssh-key-data');
+      expect(merged.sshSecrets?.passphrase, 'key-passphrase');
+
+      await LocalDb.instance.updateConnection(merged);
+      final afterUpdate =
+          await ConnectionSecretsStore.readSshSecretsForConnection(id);
+      expect(afterUpdate.password, 'ssh-pass-123');
+      expect(afterUpdate.privateKey, 'ssh-key-data');
+
+      // Deleting connection also deletes SSH secrets
+      await LocalDb.instance.removeConnection(id);
+      final afterDelete =
+          await ConnectionSecretsStore.readSshSecretsForConnection(id);
+      expect(afterDelete.password, isNull);
+      expect(afterDelete.privateKey, isNull);
     });
 
     test('getConnections does not read secure store by default', () async {

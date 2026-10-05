@@ -1,6 +1,34 @@
 import 'package:flutter/foundation.dart';
+import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+
+/// Merges existing SSH secrets from secure store when edit form fields are left blank.
+Future<SshTunnelSecrets> mergeSshSecretsForConnectionUpdate({
+  required int connectionId,
+  required SshTunnelSecrets editedSecrets,
+}) async {
+  final prev =
+      await ConnectionSecretsStore.readSshSecretsForConnection(connectionId);
+  return SshTunnelSecrets(
+    password: (editedSecrets.password != null &&
+            editedSecrets.password!.isNotEmpty)
+        ? editedSecrets.password
+        : prev.password,
+    privateKey: (editedSecrets.privateKey != null &&
+            editedSecrets.privateKey!.isNotEmpty)
+        ? editedSecrets.privateKey
+        : prev.privateKey,
+    passphrase: (editedSecrets.passphrase != null &&
+            editedSecrets.passphrase!.isNotEmpty)
+        ? editedSecrets.passphrase
+        : prev.passphrase,
+    jumpPassword: (editedSecrets.jumpPassword != null &&
+            editedSecrets.jumpPassword!.isNotEmpty)
+        ? editedSecrets.jumpPassword
+        : prev.jumpPassword,
+  );
+}
 
 /// Keeps previous secure-store secrets when edit form fields are left blank.
 ///
@@ -27,9 +55,18 @@ Future<ConnectionRow> mergeSecretsForConnectionUpdate(
     connectionString = injectUriPasswordIfMissing(connectionString, password);
   }
 
+  SshTunnelSecrets? sshSecrets = edited.sshSecrets;
+  if (sshSecrets != null) {
+    sshSecrets = await mergeSshSecretsForConnectionUpdate(
+      connectionId: id,
+      editedSecrets: sshSecrets,
+    );
+  }
+
   return edited.copyWith(
     password: password,
     connectionString: connectionString,
+    sshSecrets: sshSecrets,
     clearPassword: password == null,
     clearConnectionString: connectionString == null,
   );

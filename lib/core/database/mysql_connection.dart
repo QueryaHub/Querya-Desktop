@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:mysql_client/mysql_client.dart';
 import 'package:querya_desktop/core/database/mysql_result_cells.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
+import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
+import 'package:querya_desktop/core/security/ssh_tunnel_manager.dart';
 import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -99,6 +101,8 @@ class MysqlConnection {
     this.database,
     this.useSSL = true,
     String? connectionString,
+    this.sshConfig,
+    this.sshSecrets,
   })  : _password = password,
         _connectionString = connectionString;
 
@@ -116,6 +120,7 @@ class MysqlConnection {
       database: database ?? row.databaseName,
       useSSL: row.useSSL,
       connectionString: row.connectionString,
+      sshConfig: row.sshTunnelConfig,
     );
   }
 
@@ -128,6 +133,12 @@ class MysqlConnection {
   final String? database;
   final bool useSSL;
   String? _connectionString;
+
+  final SshTunnelConfig? sshConfig;
+  final SshTunnelSecrets? sshSecrets;
+  SshTunnelHandle? _sshTunnelHandle;
+
+  SshTunnelHandle? get sshTunnelHandle => _sshTunnelHandle;
 
   String? get password => _password;
   String? get connectionString => _connectionString;
@@ -170,6 +181,26 @@ class MysqlConnection {
     }
 
     try {
+      if (sshConfig != null && sshConfig!.enabled) {
+        var sec = sshSecrets;
+        if (sec == null && id > 0) {
+          final stored =
+              await ConnectionSecretsStore.readSshSecretsForConnection(id);
+          sec = SshTunnelSecrets(
+            password: stored.password,
+            privateKey: stored.privateKey,
+            passphrase: stored.passphrase,
+            jumpPassword: stored.jumpPassword,
+          );
+        }
+        _sshTunnelHandle = await SshTunnelManager.instance.openTunnel(
+          config: sshConfig!,
+          secrets: sec ?? SshTunnelSecrets(),
+          remoteHost: host,
+          remotePort: port,
+        );
+      }
+
       final user = username ?? '';
       final pass = effectivePassword ?? '';
       if (_usesConnectionString(effectiveConnectionString)) {
@@ -188,26 +219,29 @@ class MysqlConnection {
         }
         validateMysqlSslMode(sslMode, sslPaths);
         final securityContext = buildSecurityContext(sslPaths);
-        final host = parsed.host;
+        final effectiveHost = _sshTunnelHandle?.localHost ?? parsed.host;
+        final effectivePort = _sshTunnelHandle?.localPort ?? parsed.port;
         _conn = await MySQLConnection.createConnection(
-          host: host,
-          port: parsed.port,
+          host: effectiveHost,
+          port: effectivePort,
           userName: parsed.userName,
           password: parsed.password,
           secure: sslMode.secure,
           databaseName: parsed.databaseName,
           securityContext: securityContext,
           sslVerifyCertificates: sslMode.verifyCertificates,
-          sslServerName: sslMode.verifyIdentity && host is String ? host : null,
+          sslServerName: sslMode.verifyIdentity && parsed.host is String ? parsed.host : null,
         );
         await _conn!.connect(timeoutMs: connectTimeoutMs);
       } else {
         final sslPaths =
             extractSslCertificatePathsFromString(effectiveConnectionString);
         final securityContext = buildSecurityContext(sslPaths);
+        final effectiveHost = _sshTunnelHandle?.localHost ?? host;
+        final effectivePort = _sshTunnelHandle?.localPort ?? port;
         _conn = await MySQLConnection.createConnection(
-          host: host,
-          port: port,
+          host: effectiveHost,
+          port: effectivePort,
           userName: user,
           password: pass,
           secure: useSSL || sslPaths.hasAny,
@@ -221,6 +255,10 @@ class MysqlConnection {
     } catch (e) {
       _isConnected = false;
       _conn = null;
+      try {
+        await _sshTunnelHandle?.release();
+      } catch (_) {}
+      _sshTunnelHandle = null;
       rethrow;
     }
   }
@@ -315,6 +353,12 @@ class MysqlConnection {
     } catch (e) {
       debugPrint('MysqlConnection.disconnect: $e');
     }
+    try {
+      await _sshTunnelHandle?.release();
+    } catch (e) {
+      debugPrint('MysqlConnection.sshRelease: $e');
+    }
+    _sshTunnelHandle = null;
   }
 
   /// Best-effort close. The `mysql_client` driver may not allow graceful [close]
@@ -332,6 +376,12 @@ class MysqlConnection {
     } catch (e) {
       debugPrint('MysqlConnection.forceClose: $e');
     }
+    try {
+      await _sshTunnelHandle?.release();
+    } catch (e) {
+      debugPrint('MysqlConnection.forceClose ssh: $e');
+    }
+    _sshTunnelHandle = null;
   }
 
   /// Session hint for Table Browser / tree (`MysqlSessionMode.readOnly`).

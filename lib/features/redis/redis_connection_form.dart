@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
+import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
+import 'package:querya_desktop/features/connections/ssh_tunnel_section.dart';
 import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
 import 'package:querya_desktop/shared/widgets/form_validity_notifier.dart';
 import 'package:querya_desktop/shared/widgets/ssl_certificate_fields.dart';
@@ -52,6 +54,9 @@ class _RedisConnectionFormContentState
   final _sslCertController = material.TextEditingController();
   final _sslKeyController = material.TextEditingController();
 
+  SshTunnelConfig _sshConfig = const SshTunnelConfig();
+  final SshTunnelSecrets _sshSecrets = SshTunnelSecrets();
+
   bool _useSSL = false;
   bool _showPassword = false;
   bool _isTesting = false;
@@ -87,6 +92,9 @@ class _RedisConnectionFormContentState
       _useSSL = initial.useSSL;
       _connectionStringController.text =
           redactUriPassword(initial.connectionString) ?? '';
+      if (initial.sshTunnelConfig != null) {
+        _sshConfig = initial.sshTunnelConfig!;
+      }
     }
 
     _formValidNotifier.seed();
@@ -200,7 +208,7 @@ class _RedisConnectionFormContentState
     final uri = _effectiveConnectionUri();
     final displayName = name.isNotEmpty ? name : 'Redis $host:$port';
     final initial = widget.initial;
-    return ConnectionRow(
+    var row = ConnectionRow(
       id: id,
       type: initial?.type ?? 'redis',
       name: displayName.isEmpty ? 'test' : displayName,
@@ -218,7 +226,9 @@ class _RedisConnectionFormContentState
       folderId: initial?.folderId ?? widget.folderId,
       sortOrder: initial?.sortOrder ?? 0,
       createdAt: initial?.createdAt ?? DateTime.now().toUtc().toIso8601String(),
+      sshSecrets: _sshConfig.enabled ? _sshSecrets : null,
     );
+    return row.withSshTunnelConfig(_sshConfig.enabled ? _sshConfig : null);
   }
 
   void _save() {
@@ -401,6 +411,18 @@ class _RedisConnectionFormContentState
                           ),
                         ),
                       ],
+                    ),
+                    const Gap(16),
+                    // SSH Tunneling Section
+                    SshTunnelSection(
+                      config: _sshConfig,
+                      secrets: _sshSecrets,
+                      onChanged: (cfg) => setState(() => _sshConfig = cfg),
+                      targetHost: _hostController.text.trim().isNotEmpty
+                          ? _hostController.text.trim()
+                          : 'localhost',
+                      targetPort:
+                          int.tryParse(_portController.text.trim()) ?? 6379,
                     ),
                     const Gap(16),
                     material.Row(
