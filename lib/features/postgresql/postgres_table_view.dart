@@ -1,7 +1,6 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
-import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:postgres/postgres.dart';
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
@@ -17,17 +16,15 @@ import 'package:querya_desktop/features/postgresql/postgres_table_utils.dart';
 import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
-class PostgresTableView extends material.StatefulWidget {
-  const PostgresTableView({
-    super.key,
+/// PostgreSQL delegate for [GenericTableView].
+class PostgresTableDataDelegate extends TableDataMutationDelegate {
+  PostgresTableDataDelegate({
     required this.connectionRow,
     required this.database,
     required this.schema,
     required this.tableName,
     this.isView = false,
     this.isMaterializedView = false,
-    this.limit = kPostgresBrowseDefaultRowLimit,
-    this.onNavigateHome,
   });
 
   final ConnectionRow connectionRow;
@@ -35,180 +32,30 @@ class PostgresTableView extends material.StatefulWidget {
   final String schema;
   final String tableName;
   final bool isView;
-  final VoidCallback? onNavigateHome;
-
-  /// When true, toolbar offers REFRESH MATERIALIZED VIEW and matview label.
   final bool isMaterializedView;
-  final int limit;
 
-  @override
-  material.State<PostgresTableView> createState() => _PostgresTableViewState();
-}
-
-class _PostgresTableViewState extends material.State<PostgresTableView> {
   PgLease? _lease;
   PostgresConnection? get _connection => _lease?.connection;
 
-  bool _loading = true;
-  String? _error;
-
-  List<String> _columnNames = [];
-  List<List<String>> _rows = [];
-
-  /// Rows on the current page (same as _rows.length when not loading).
-  int _rowsOnPage = 0;
-
-  /// Planner estimate (`reltuples`); `null` when unknown or stale.
-  int? _totalRowCount;
-
-  /// Zero-based offset for LIMIT/OFFSET pagination.
-  int _offset = 0;
-
-  /// When true, [dataSql] comes from [_customSql] (no pagination).
-  bool _customSqlActive = false;
-  String? _customSql;
-
-  DataGridStagingBuffer? _stagingBuffer;
-  List<String> _primaryKeys = [];
   Map<String, String> _columnDataTypes = {};
-  Map<String, TableColumnMeta> _columnMeta = {};
-  bool _schemaLoaded = false;
-  Object? _schemaError;
-  bool _isSaving = false;
+  List<String> _primaryKeys = [];
 
-  String get _tableTitle => '${widget.schema}.${widget.tableName}';
-
-  bool get _isDirty => _stagingBuffer?.isDirty ?? false;
-
-  /// Tables open in view mode; editing is switched on explicitly.
-  bool _editMode = false;
-
-  /// Whether this table could be edited (PK, not a view, writable).
-  bool get _canEdit => tableViewEditingEnabled(
-        isView: widget.isView,
-        isMaterializedView: widget.isMaterializedView,
-        customSqlActive: _customSqlActive,
-        hasPrimaryKey: _primaryKeys.isNotEmpty,
-        schemaError: _schemaError,
-      );
-
-  /// Edit mode is on and the table is editable.
-  bool get _editingEnabled => _canEdit && _editMode;
-
-  @override
-  void initState() {
-    super.initState();
-    _connectAndLoad();
-  }
-
-  @override
-  void didUpdateWidget(covariant PostgresTableView oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.connectionRow.id != widget.connectionRow.id ||
-        oldWidget.database != widget.database ||
-        oldWidget.schema != widget.schema ||
-        oldWidget.tableName != widget.tableName ||
-        oldWidget.isMaterializedView != widget.isMaterializedView) {
-      _customSqlActive = false;
-      _customSql = null;
-      _resetStaging();
-      _disconnectCurrent();
-      _connectAndLoad();
-    }
-  }
-
-  @override
-  void dispose() {
-    _resetStaging();
-    _disconnectCurrent(interruptIfBusy: true);
-    super.dispose();
-  }
-
-  void _resetStaging() {
-    _stagingBuffer?.dispose();
-    _stagingBuffer = null;
-    _primaryKeys = [];
-    _columnDataTypes = {};
-    _columnMeta = {};
-    _schemaLoaded = false;
-    _schemaError = null;
-    _isSaving = false;
-  }
-
-  void _disconnectCurrent({bool interruptIfBusy = false}) {
-    if (interruptIfBusy && _loading) {
-      PostgresService.instance.interrupt(
-        widget.connectionRow,
-        database: widget.database,
-        mode: PgSessionMode.readOnly,
-      );
-    }
-    if (interruptIfBusy && _isSaving) {
-      PostgresService.instance.interrupt(
-        widget.connectionRow,
-        database: widget.database,
-        mode: PgSessionMode.tableWrite,
-      );
-    }
+  Future<void> _ensureReadConnection() async {
+    if (_lease != null && _connection?.isConnected == true) return;
     _lease?.release();
-    _lease = null;
-  }
-
-  Future<void> _connectAndLoad() async {
-    _editMode = false;
-    _disconnectCurrent();
-    if (!mounted) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-      _columnNames = [];
-      _rows = [];
-      _rowsOnPage = 0;
-      _totalRowCount = null;
-      _offset = 0;
-      _customSqlActive = false;
-      _customSql = null;
-      _resetStaging();
-    });
-    try {
-      final lease = await PostgresService.instance.acquire(
-        widget.connectionRow,
-        database: widget.database,
-        mode: PgSessionMode.readOnly,
-      );
-      if (!mounted) {
-        lease.release();
-        return;
-      }
-      _lease = lease;
-      await _fetch(refreshCount: true);
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _loading = false;
-        });
-      }
-    }
-  }
-
-  String _browseDataSql() {
-    final schemaQ = quotePostgresIdentifier(widget.schema);
-    final tableQ = quotePostgresIdentifier(widget.tableName);
-    return postgresBrowseDataSql(
-      qualifiedFrom: '$schemaQ.$tableQ',
-      primaryKeys: _primaryKeys,
-      limit: widget.limit,
-      offset: _offset,
+    _lease = await PostgresService.instance.acquire(
+      connectionRow,
+      database: database,
+      mode: PgSessionMode.readOnly,
     );
   }
 
-  Future<T> _withTableWrite<T>(
+  Future<T> withTableWrite<T>(
     Future<T> Function(PostgresConnection conn) fn,
   ) async {
     final lease = await PostgresService.instance.acquire(
-      widget.connectionRow,
-      database: widget.database,
+      connectionRow,
+      database: database,
       mode: PgSessionMode.tableWrite,
     );
     try {
@@ -218,103 +65,54 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     }
   }
 
-  String? _editDisabledReason() => tableViewEditDisabledReason(
-      isView: widget.isView,
-      isMaterializedView: widget.isMaterializedView,
-      customSqlActive: _customSqlActive,
-      hasPrimaryKey: _primaryKeys.isNotEmpty,
-      schemaLoaded: _schemaLoaded,
-      schemaError: _schemaError,
-    );
-
-  void _enterEditMode() {
-    if (!_canEdit || _editMode) return;
-    setState(() {
-      _editMode = true;
-      _stagingBuffer = replaceTableViewStagingBuffer(
-        previous: _stagingBuffer,
-        columns: _columnNames,
-        rows: _rows,
-        enabled: _editingEnabled,
-        primaryKeys: _primaryKeys,
-      );
-    });
-  }
-
-  Future<void> _exitEditMode() async {
-    if (!_editMode) return;
-    if (!await _confirmDiscardIfNeeded()) return;
-    if (!mounted) return;
-    setState(() {
-      _editMode = false;
-      _stagingBuffer?.dispose();
-      _stagingBuffer = null;
-    });
-  }
-
-  void _toggleEditMode() {
-    if (_editMode) {
-      unawaited(_exitEditMode());
-    } else {
-      _enterEditMode();
-    }
-  }
-
-  material.Widget _editModeButton() => TableEditModeButton(
-        editMode: _editMode,
-        canEdit: _canEdit,
-        busy: _loading || _isSaving,
-        disabledReason: _editDisabledReason(),
-        onEdit: _enterEditMode,
-        onDone: () => unawaited(_exitEditMode()),
-      );
-
-  Future<bool> _confirmDiscardIfNeeded() {
-    return confirmDiscardTableEditsIfDirty(
-      context: context,
-      buffer: _stagingBuffer,
-      tableTitle: _tableTitle,
+  @override
+  String browseDataSql({required int offset, required int limit}) {
+    final schemaQ = quotePostgresIdentifier(schema);
+    final tableQ = quotePostgresIdentifier(tableName);
+    return postgresBrowseDataSql(
+      qualifiedFrom: '$schemaQ.$tableQ',
+      primaryKeys: _primaryKeys,
+      limit: limit,
+      offset: offset,
     );
   }
 
-  Future<void> _ensureSchema(PostgresConnection conn) async {
-    if (_schemaLoaded) return;
-    if (widget.isView || widget.isMaterializedView) {
-      _schemaLoaded = true;
-      _schemaError = null;
+  @override
+  bool isAllowedSelectQuery(String sql) => isAllowedPostgresSelectQuery(sql);
+
+  @override
+  Future<TableDataSchemaInfo> loadSchema() async {
+    if (isView || isMaterializedView) {
       _primaryKeys = [];
       _columnDataTypes = {};
-      _columnMeta = {};
-      return;
+      return const TableDataSchemaInfo();
     }
+    await _ensureReadConnection();
+    final conn = _connection;
+    if (conn == null || !conn.isConnected) {
+      throw StateError('Not connected');
+    }
+
     final loaded = await loadTableViewSchema(
       () => conn.getTableSchema(
-        schema: widget.schema,
-        table: widget.tableName,
+        schema: schema,
+        table: tableName,
       ),
     );
-    final schema = loaded.schema;
-    if (schema != null) {
-      _primaryKeys = List<String>.from(schema.primaryKeys);
-      _columnDataTypes = columnDataTypesFromSchema(schema);
-      _columnMeta = columnMetaFromSchema(schema);
-      _schemaError = null;
-    } else {
-      _primaryKeys = [];
-      _columnDataTypes = {};
-      _columnMeta = {};
-      _schemaError = loaded.error;
+    final s = loaded.schema;
+    if (s != null) {
+      _primaryKeys = List<String>.from(s.primaryKeys);
+      _columnDataTypes = columnDataTypesFromSchema(s);
+      return TableDataSchemaInfo(
+        primaryKeys: _primaryKeys,
+        columnDataTypes: _columnDataTypes,
+        columnMeta: columnMetaFromSchema(s),
+      );
     }
-    _schemaLoaded = true;
-  }
-
-  void _installStagingBuffer(List<String> columns, List<List<String>> rows) {
-    _stagingBuffer = replaceTableViewStagingBuffer(
-      previous: _stagingBuffer,
-      columns: columns,
-      rows: rows,
-      enabled: _editingEnabled,
-      primaryKeys: _primaryKeys,
+    _primaryKeys = [];
+    _columnDataTypes = {};
+    return TableDataSchemaInfo(
+      schemaError: loaded.error,
     );
   }
 
@@ -339,170 +137,190 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     );
   }
 
-  /// [refreshCount] re-reads `reltuples` (e.g. first load or Refresh). Pagination only runs SELECT.
-  Future<void> _fetch({bool refreshCount = false}) async {
+  @override
+  Future<TableDataPage> loadPage({
+    required int offset,
+    required int limit,
+    bool refreshCount = false,
+  }) async {
+    await _ensureReadConnection();
     final conn = _connection;
     if (conn == null || !conn.isConnected) {
-      if (mounted && _loading) {
-        setState(() {
-          _error = 'Not connected';
-          _loading = false;
-        });
-      }
-      return;
+      throw StateError('Not connected');
     }
-    if (_customSqlActive) {
-      await _fetchCustom();
-      return;
-    }
-    if (!mounted) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      await _ensureSchema(conn);
-      if (!mounted) return;
 
-      int? totalRows = _totalRowCount;
-      if (refreshCount || totalRows == null) {
-        try {
-          totalRows = await conn.estimateTableRows(
-            schema: widget.schema,
-            table: widget.tableName,
-          );
-        } catch (_) {
-          totalRows = null;
-        }
-      }
-
-      final dataSql = _browseDataSql();
-      final result = await conn.execute(dataSql);
-      if (!mounted) return;
-
-      final colNames = List<String>.generate(
-        result.schema.columns.length,
-        (i) => result.schema.columns[i].columnName ?? 'col_$i',
-      );
-
-      final stringRows = await _postgresRowsToDisplayStrings(result, colNames);
-
-      if (!mounted) return;
-      final shown = stringRows.length;
-      if (totalRows != null && shown > 0 && totalRows < _offset + shown) {
+    int? totalRows;
+    if (refreshCount) {
+      try {
+        totalRows = await conn.estimateTableRows(
+          schema: schema,
+          table: tableName,
+        );
+      } catch (_) {
         totalRows = null;
       }
-      setState(() {
-        _columnNames = colNames;
-        _rows = stringRows;
-        _rowsOnPage = shown;
-        if (refreshCount || _totalRowCount == null) {
-          _totalRowCount = totalRows;
-        }
-        _loading = false;
-        _installStagingBuffer(colNames, stringRows);
-      });
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _loading = false;
-        });
-      }
     }
+
+    final dataSql = browseDataSql(offset: offset, limit: limit);
+    final result = await conn.execute(dataSql);
+
+    final colNames = List<String>.generate(
+      result.schema.columns.length,
+      (i) => result.schema.columns[i].columnName ?? 'col_$i',
+    );
+
+    final stringRows = await _postgresRowsToDisplayStrings(result, colNames);
+
+    return TableDataPage(
+      columns: colNames,
+      rows: stringRows,
+      totalRowCount: totalRows,
+    );
   }
 
-  Future<void> _fetchCustom() async {
+  @override
+  Future<TableDataPage> loadCustomSql(String sql) async {
+    await _ensureReadConnection();
     final conn = _connection;
     if (conn == null || !conn.isConnected) {
-      if (mounted && _loading) {
-        setState(() {
-          _error = 'Not connected';
-          _loading = false;
-        });
-      }
-      return;
+      throw StateError('Not connected');
     }
-    final sql = _customSql;
-    if (sql == null || sql.isEmpty) return;
-    if (!mounted) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final result = await conn.execute(sql);
-      if (!mounted) return;
 
-      final colNames = List<String>.generate(
-        result.schema.columns.length,
-        (i) => result.schema.columns[i].columnName ?? 'col_$i',
+    final result = await conn.execute(sql);
+    final colNames = List<String>.generate(
+      result.schema.columns.length,
+      (i) => result.schema.columns[i].columnName ?? 'col_$i',
+    );
+
+    final stringRows = await _postgresRowsToDisplayStrings(result, colNames);
+
+    return TableDataPage(
+      columns: colNames,
+      rows: stringRows,
+      totalRowCount: null,
+    );
+  }
+
+  @override
+  Future<void> applyStagedChanges({
+    required TableMutationPlan plan,
+    required DataGridStagingBuffer buffer,
+    Duration? timeout,
+  }) async {
+    await withTableWrite((conn) async {
+      if (!conn.isConnected) {
+        throw StateError('Could not connect to PostgreSQL.');
+      }
+      await runPostgresStatementsInTransaction(
+        (sql) async {
+          final result = await conn.execute(sql, timeout: timeout);
+          if (sql != 'BEGIN' && sql != 'COMMIT' && sql != 'ROLLBACK') {
+            expectDmlMatchedRows(result.affectedRows);
+          }
+        },
+        plan.statements.map((s) => s.sql),
       );
+    });
+  }
 
-      final stringRows = await _postgresRowsToDisplayStrings(result, colNames);
+  Future<void> refreshMaterializedView() async {
+    await withTableWrite((conn) {
+      return conn.refreshMaterializedView(schema, tableName);
+    });
+  }
 
-      if (!mounted) return;
-      setState(() {
-        _columnNames = colNames;
-        _rows = stringRows;
-        _rowsOnPage = stringRows.length;
-        _totalRowCount = null;
-        _loading = false;
-        _installStagingBuffer(colNames, stringRows);
-      });
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _loading = false;
-        });
-      }
+  @override
+  void cancel({bool interruptIfBusy = false}) {
+    if (interruptIfBusy) {
+      PostgresService.instance.interrupt(
+        connectionRow,
+        database: database,
+        mode: PgSessionMode.readOnly,
+      );
+      PostgresService.instance.interrupt(
+        connectionRow,
+        database: database,
+        mode: PgSessionMode.tableWrite,
+      );
     }
   }
 
-  Future<void> _onSqlRun(String sql) async {
-    final trimmed = sql.trim();
-    if (!isAllowedPostgresSelectQuery(trimmed)) return;
-    if (!await _confirmDiscardIfNeeded()) return;
-    if (!mounted) return;
-    final browse = _browseDataSql().trim();
-    if (_browseSqlCompareKey(trimmed) == _browseSqlCompareKey(browse)) {
-      setState(() {
-        _customSqlActive = false;
-        _customSql = null;
-      });
-      await _fetch(refreshCount: true);
-    } else {
-      setState(() {
-        _customSqlActive = true;
-        _customSql = trimmed;
-      });
-      await _fetchCustom();
+  @override
+  void dispose() {
+    _lease?.release();
+    _lease = null;
+  }
+}
+
+/// Paginated data browser for PostgreSQL tables, views, and materialized views.
+class PostgresTableView extends material.StatefulWidget {
+  const PostgresTableView({
+    super.key,
+    required this.connectionRow,
+    required this.database,
+    required this.schema,
+    required this.tableName,
+    this.isView = false,
+    this.isMaterializedView = false,
+    this.limit = kPostgresBrowseDefaultRowLimit,
+    this.onNavigateHome,
+  });
+
+  final ConnectionRow connectionRow;
+  final String database;
+  final String schema;
+  final String tableName;
+  final bool isView;
+  final bool isMaterializedView;
+  final int limit;
+  final material.VoidCallback? onNavigateHome;
+
+  @override
+  material.State<PostgresTableView> createState() => _PostgresTableViewState();
+}
+
+class _PostgresTableViewState extends material.State<PostgresTableView> {
+  late PostgresTableDataDelegate _delegate;
+
+  @override
+  void initState() {
+    super.initState();
+    _delegate = _createDelegate();
+  }
+
+  @override
+  void didUpdateWidget(covariant PostgresTableView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.connectionRow.id != widget.connectionRow.id ||
+        oldWidget.database != widget.database ||
+        oldWidget.schema != widget.schema ||
+        oldWidget.tableName != widget.tableName ||
+        oldWidget.isMaterializedView != widget.isMaterializedView ||
+        oldWidget.isView != widget.isView) {
+      _delegate.dispose();
+      _delegate = _createDelegate();
     }
   }
 
-  Future<void> _refreshMaterializedView() async {
-    if (_loading) return;
-    if (!await _confirmDiscardIfNeeded()) return;
-    if (!mounted) return;
-    try {
-      await _withTableWrite((conn) {
-        return conn.refreshMaterializedView(widget.schema, widget.tableName);
-      });
-      if (!mounted) return;
-      await _fetch(refreshCount: true);
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _loading = false;
-        });
-      }
-    }
+  @override
+  void dispose() {
+    _delegate.dispose();
+    super.dispose();
   }
 
-  void _openPrivileges() {
-    final conn = _connection;
+  PostgresTableDataDelegate _createDelegate() {
+    return PostgresTableDataDelegate(
+      connectionRow: widget.connectionRow,
+      database: widget.database,
+      schema: widget.schema,
+      tableName: widget.tableName,
+      isView: widget.isView,
+      isMaterializedView: widget.isMaterializedView,
+    );
+  }
+
+  void _openPrivileges(material.BuildContext context) {
+    final conn = _delegate._connection;
     if (conn == null || !conn.isConnected) return;
     showPostgresTablePrivilegesDialog(
       context: context,
@@ -512,283 +330,82 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     );
   }
 
-  void _openSqlEditor() {
+  void _openSqlEditor(material.BuildContext context, GenericTableViewState state) {
     showPostgresSqlEditorDialog(
       context: context,
-      initialSql: (_customSqlActive && _customSql != null)
-          ? _customSql!
-          : _browseDataSql(),
-      browseSql: _browseDataSql(),
-      onRun: (sql) => unawaited(_onSqlRun(sql)),
+      initialSql: (state.customSqlActive && state.customSql != null)
+          ? state.customSql!
+          : state.browseDataSql(),
+      browseSql: state.browseDataSql(),
+      onRun: (sql) => unawaited(state.runCustomSql(sql)),
     );
   }
 
-  Future<void> _exitCustomMode() async {
-    if (!await _confirmDiscardIfNeeded()) return;
-    if (!mounted) return;
-    setState(() {
-      _customSqlActive = false;
-      _customSql = null;
-    });
-    await _fetch(refreshCount: true);
-  }
-
-  void _goToPreviousPage() {
-    if (_customSqlActive) return;
-    if (_offset <= 0 || _loading || _isDirty) return;
-    setState(() {
-      final next = _offset - widget.limit;
-      _offset = next < 0 ? 0 : next;
-    });
-    unawaited(_fetch());
-  }
-
-  void _goToNextPage() {
-    if (_customSqlActive) return;
-    if (_loading || _isDirty) return;
-    final total = _totalRowCount;
-    final limit = widget.limit;
-    if (total != null && _offset + _rowsOnPage >= total) return;
-    if (total == null && _rowsOnPage < limit) return;
-    setState(() {
-      _offset += limit;
-    });
-    unawaited(_fetch());
-  }
-
-  bool get _canGoPrevious =>
-      !_customSqlActive && _offset > 0 && !_loading && !_isDirty;
-
-  bool get _canGoNext {
-    if (_customSqlActive || _loading || _isDirty) return false;
-    final total = _totalRowCount;
-    final limit = widget.limit;
-    if (total != null) {
-      return _offset + _rowsOnPage < total;
-    }
-    return _rowsOnPage >= limit;
-  }
-
-  String _paginationLabel() {
-    if (_customSqlActive) {
-      if (_rowsOnPage == 0) return '0 rows (custom SQL)';
-      return '$_rowsOnPage row${_rowsOnPage == 1 ? '' : 's'} (custom SQL)';
-    }
-    if (_rowsOnPage == 0) {
-      final t = _totalRowCount;
-      if (t == null) return '0 rows';
-      return '0 of $t';
-    }
-    final start = _offset + 1;
-    final end = _offset + _rowsOnPage;
-    final total = _totalRowCount;
-    if (total != null) {
-      return '$start–$end of $total';
-    }
-    return '$start–$end';
-  }
-
-  String? _statusLine() {
-    final reason = tableViewEditDisabledReason(
-      isView: widget.isView,
-      isMaterializedView: widget.isMaterializedView,
-      customSqlActive: _customSqlActive,
-      hasPrimaryKey: _primaryKeys.isNotEmpty,
-      schemaLoaded: _schemaLoaded,
-      schemaError: _schemaError,
-    );
-    final pag = _paginationLabel();
-    if (reason != null) return '$pag · $reason';
-    return pag;
-  }
-
-  Future<void> _onRefresh() async {
-    if (!await _confirmDiscardIfNeeded()) return;
-    if (!mounted) return;
-    _schemaLoaded = false;
-    _schemaError = null;
-    if (_customSqlActive) {
-      await _fetchCustom();
-    } else {
-      await _fetch(refreshCount: true);
+  Future<void> _refreshMaterializedView(
+    material.BuildContext context,
+    GenericTableViewState state,
+  ) async {
+    if (state.isLoading) return;
+    if (!await state.confirmDiscardIfNeeded()) return;
+    try {
+      await _delegate.refreshMaterializedView();
+      await state.refresh();
+    } catch (e) {
+      if (!context.mounted) return;
+      showAppToast(
+        context: context,
+        message: 'Refresh materialized view failed: $e',
+        variant: AppToastVariant.error,
+      );
     }
   }
 
-  Future<void> _onNavigateHome() async {
-    final home = widget.onNavigateHome;
-    if (home == null) return;
-    if (!await _confirmDiscardIfNeeded()) return;
-    if (!mounted) return;
-    home();
-  }
+  @override
+  material.Widget build(material.BuildContext context) {
+    final tableTitle = '${widget.schema}.${widget.tableName}';
 
-  Future<void> _applyStagedChanges() async {
-    final buffer = _stagingBuffer;
-    if (buffer == null || !buffer.isDirty || _isSaving) return;
-    setState(() => _isSaving = true);
-    final outcome = await applyTableViewStagedChanges(
-      context: context,
-      buffer: buffer,
+    return GenericTableView(
+      delegate: _delegate,
+      title: tableTitle,
+      tableTitle: tableTitle,
       dialect: SqlDialect.postgres,
       tableName: widget.tableName,
       schema: widget.schema,
-      primaryKeys: _primaryKeys,
-      columnDataTypes: _columnDataTypes.isEmpty ? null : _columnDataTypes,
-      columnMeta: _columnMeta.isEmpty ? null : _columnMeta,
-      execute: (plan) async {
-        await _withTableWrite((conn) async {
-          if (!conn.isConnected) {
-            throw StateError('Could not connect to PostgreSQL.');
-          }
-          await runPostgresStatementsInTransaction(
-            (sql) async {
-              final result = await conn.execute(sql);
-              if (sql != 'BEGIN' && sql != 'COMMIT' && sql != 'ROLLBACK') {
-                expectDmlMatchedRows(result.affectedRows);
-              }
-            },
-            plan.statements.map((s) => s.sql),
-          );
-        });
-      },
-    );
-    if (!mounted) return;
-    if (outcome.isApplied) {
-      if (buffer.insertedRowCount > 0) {
-        // Inserted rows have no database-generated keys / defaults yet, so a
-        // follow-up UPDATE / DELETE on them would match 0 rows. Reload the page.
-        buffer.dispose();
-        setState(() {
-          _stagingBuffer = null;
-          _isSaving = false;
-        });
-        showAppToast(
-          context: context,
-          message: tableViewSavedMessage(outcome.statementCount),
-          variant: AppToastVariant.success,
-        );
-        await _fetch(refreshCount: true);
-        return;
-      }
-      final newRows = buffer.committedRows;
-      buffer.dispose();
-      setState(() {
-        _rows = newRows;
-        _rowsOnPage = newRows.length;
-        _stagingBuffer = replaceTableViewStagingBuffer(
-          previous: null,
-          columns: _columnNames,
-          rows: newRows,
-          enabled: _editingEnabled,
-          primaryKeys: _primaryKeys,
-        );
-        _isSaving = false;
-      });
-      showAppToast(
-        context: context,
-        message: tableViewSavedMessage(outcome.statementCount),
-        variant: AppToastVariant.success,
-      );
-      return;
-    }
-    setState(() => _isSaving = false);
-    if (outcome.isFailed && outcome.error != null) {
-      await showTableViewSaveFailedDialog(
-        context: context,
-        error: outcome.error!,
-      );
-    }
-  }
-
-  material.Widget _buildToolbar() {
-    PostgresTableToolbar toolbar() => PostgresTableToolbar(
-          title:
-              '$_tableTitle${widget.isMaterializedView ? ' (materialized view)' : widget.isView ? ' (view)' : ''}',
-          paginationLabel: _paginationLabel(),
+      isView: widget.isView,
+      isMaterializedView: widget.isMaterializedView,
+      limit: widget.limit,
+      onNavigateHome: widget.onNavigateHome,
+      showExportToolbar: true,
+      customToolbarBuilder: (ctx, state) {
+        return PostgresTableToolbar(
+          title: '$tableTitle${widget.isMaterializedView ? ' (materialized view)' : widget.isView ? ' (view)' : ''}',
+          paginationLabel: state.paginationLabel(),
           tableIcon: widget.isMaterializedView
               ? material.Icons.dynamic_feed_rounded
               : widget.isView
                   ? material.Icons.view_agenda_rounded
                   : material.Icons.table_chart_rounded,
-          customSqlActive: _customSqlActive,
+          customSqlActive: state.customSqlActive,
           isMaterializedView: widget.isMaterializedView,
-          loading: _loading,
-          canGoPrevious: _canGoPrevious,
-          canGoNext: _canGoNext,
+          loading: state.isLoading,
+          canGoPrevious: state.canGoPrevious,
+          canGoNext: state.canGoNext,
           onNavigateHome: widget.onNavigateHome == null
               ? null
-              : () => unawaited(_onNavigateHome()),
-          onOpenSql: _openSqlEditor,
-          onOpenPrivileges: _openPrivileges,
+              : () => unawaited(state.navigateHome()),
+          onOpenSql: () => _openSqlEditor(ctx, state),
+          onOpenPrivileges: () => _openPrivileges(ctx),
           onRefreshMaterializedView: () =>
-              unawaited(_refreshMaterializedView()),
-          onExitCustomMode: () => unawaited(_exitCustomMode()),
-          onGoPrevious: _goToPreviousPage,
-          onGoNext: _goToNextPage,
-          onRefresh: () => unawaited(_onRefresh()),
+              unawaited(_refreshMaterializedView(ctx, state)),
+          onExitCustomMode: () => unawaited(state.exitCustomMode()),
+          onGoPrevious: state.goToPreviousPage,
+          onGoNext: state.goToNextPage,
+          onRefresh: () => unawaited(state.refresh()),
           editAction: widget.isView || widget.isMaterializedView
               ? null
-              : _editModeButton(),
+              : state.buildEditModeButton(),
         );
-    final buffer = _stagingBuffer;
-    if (buffer == null) return toolbar();
-    return ListenableBuilder(
-      listenable: buffer,
-      builder: (context, _) => toolbar(),
-    );
-  }
-
-  @override
-  material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    return material.CallbackShortcuts(
-      bindings: {
-        const material.SingleActivator(LogicalKeyboardKey.keyE, control: true):
-            _toggleEditMode,
-        const material.SingleActivator(LogicalKeyboardKey.keyE, meta: true):
-            _toggleEditMode,
-        const material.SingleActivator(LogicalKeyboardKey.f5): () {
-          if (!_loading) unawaited(_onRefresh());
-        },
       },
-      child: material.Focus(
-        autofocus: true,
-        child: material.Container(
-          color: cs.background,
-          child: material.Column(
-            crossAxisAlignment: material.CrossAxisAlignment.stretch,
-            children: [
-              _buildToolbar(),
-              material.Expanded(
-                child: ResultsTab(
-                  columns: _columnNames,
-                  rows: _rows,
-                  errorMessage: _error,
-                  isLoading: _loading,
-                  statusLine: _statusLine(),
-                  showExportToolbar: true,
-                  stagingBuffer: _stagingBuffer,
-                  columnDataTypes:
-                      _columnDataTypes.isEmpty ? null : _columnDataTypes,
-                  onApplyChanges:
-                      _stagingBuffer != null ? _applyStagedChanges : null,
-                  isSaving: _isSaving,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
-  }
-
-  /// Ignores trailing semicolons and whitespace so Run matches the browse query.
-  static String _browseSqlCompareKey(String sql) {
-    var s = sql.trim();
-    while (s.endsWith(';')) {
-      s = s.substring(0, s.length - 1).trimRight();
-    }
-    return s.replaceAll(RegExp(r'\s+'), ' ');
   }
 }
