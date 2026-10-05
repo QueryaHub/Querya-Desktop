@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mongo_dart/mongo_dart.dart';
+import 'package:mongo_dart/mongo_dart.dart' show ObjectId;
 import 'package:querya_desktop/features/mongodb/mongo_document_tree_view.dart';
 import 'package:querya_desktop/features/mongodb/mongo_documents_json_view.dart';
 import 'package:querya_desktop/features/mongodb/mongo_documents_table_view.dart';

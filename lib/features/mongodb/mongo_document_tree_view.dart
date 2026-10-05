@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
-import 'package:mongo_dart/mongo_dart.dart';
+import 'package:mongo_dart/mongo_dart.dart' show ObjectId;
 import 'package:querya_desktop/features/mongodb/mongo_ejson.dart';
 import 'package:querya_desktop/features/mongodb/mongo_field_codec.dart';
 import 'package:querya_desktop/shared/widgets/app_toast.dart';
