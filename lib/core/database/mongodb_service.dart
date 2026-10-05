@@ -327,6 +327,88 @@ class MongoService {
     });
   }
 
+  /// Returns index information merged with disk sizes from collStats.
+  Future<List<Map<String, dynamic>>> getIndexesWithStats(
+    MongoConnection connection,
+    String database,
+    String collection,
+  ) async {
+    return _withDb(connection, database, (db) async {
+      final coll = db.collection(collection);
+      final indexes = await coll.getIndexes();
+      final list =
+          indexes.map((idx) => Map<String, dynamic>.from(idx)).toList();
+
+      try {
+        final stats =
+            await db.runCommand(<String, Object>{'collStats': collection});
+        final indexSizes = stats['indexSizes'] as Map?;
+        if (indexSizes != null) {
+          for (final idx in list) {
+            final name = idx['name']?.toString();
+            if (name != null && indexSizes.containsKey(name)) {
+              idx['size'] = indexSizes[name];
+            }
+          }
+        }
+      } catch (_) {
+        // collStats may not be supported on some restricted roles/DBs; indexes list still returned
+      }
+
+      return list;
+    });
+  }
+
+  /// Creates a new index on [collection].
+  Future<Map<String, dynamic>> createIndex(
+    MongoConnection connection,
+    String database,
+    String collection, {
+    required Map<String, dynamic> keys,
+    String? name,
+    bool unique = false,
+    bool sparse = false,
+    int? expireAfterSeconds,
+  }) async {
+    if (keys.isEmpty) {
+      throw ArgumentError('Index keys cannot be empty');
+    }
+    return _withDb(connection, database, (db) async {
+      final generatedName = name ??
+          keys.entries.map((e) => '${e.key}_${e.value}').join('_');
+      final indexSpec = <String, Object>{
+        'key': keys,
+        'name': generatedName,
+        if (unique) 'unique': true,
+        if (sparse) 'sparse': true,
+        if (expireAfterSeconds != null)
+          'expireAfterSeconds': expireAfterSeconds,
+      };
+
+      final cmd = <String, Object>{
+        'createIndexes': collection,
+        'indexes': [indexSpec],
+      };
+      return db.runCommand(cmd);
+    });
+  }
+
+  /// Drops an index by [indexName]. Prevents dropping the primary index `_id_`.
+  Future<Map<String, dynamic>> dropIndex(
+    MongoConnection connection,
+    String database,
+    String collection,
+    String indexName,
+  ) async {
+    if (indexName == '_id_' || indexName == '_id') {
+      throw ArgumentError('Cannot drop the primary index _id_');
+    }
+    return _withDb(connection, database, (db) async {
+      final coll = db.collection(collection);
+      return coll.dropIndexes(indexName);
+    });
+  }
+
   /// Creates a new collection.
   Future<void> createCollection(
     MongoConnection connection,

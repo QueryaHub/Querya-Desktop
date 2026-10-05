@@ -14,6 +14,7 @@ import 'mongo_collections_view.dart';
 import 'mongo_databases_view.dart';
 import 'mongo_documents_view.dart';
 import 'mongo_document_editor.dart';
+import 'mongo_indexes_view.dart';
 import 'mongo_stats_view.dart';
 
 // ─── Navigation path model ──────────────────────────────────────────────────
@@ -25,7 +26,15 @@ class _Crumb {
   final _Level level;
 }
 
-enum _Level { databases, collections, documents, document, stats, aggregation }
+enum _Level {
+  databases,
+  collections,
+  documents,
+  document,
+  stats,
+  aggregation,
+  indexes,
+}
 
 // ─── Main explorer widget ───────────────────────────────────────────────────
 
@@ -54,6 +63,7 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
   // View mode
   bool _showStats = false;
   bool _showAggregation = false;
+  bool _showIndexes = false;
 
   /// Bumped when the user taps Refresh in the breadcrumb bar (reload active view).
   int _refreshToken = 0;
@@ -158,6 +168,7 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
       _selectedCollection = null;
       _selectedDocument = null;
       _showAggregation = false;
+      _showIndexes = false;
     });
   }
 
@@ -167,6 +178,7 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
       _lastSelectedCollection = collName;
       _selectedDocument = null;
       _showAggregation = false;
+      _showIndexes = false;
     });
   }
 
@@ -174,6 +186,7 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
     setState(() {
       _selectedDocument = doc;
       _showAggregation = false;
+      _showIndexes = false;
     });
   }
 
@@ -183,6 +196,7 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
       _selectedCollection = null;
       _selectedDocument = null;
       _showAggregation = false;
+      _showIndexes = false;
     });
   }
 
@@ -191,6 +205,7 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
       _selectedCollection = null;
       _selectedDocument = null;
       _showAggregation = false;
+      _showIndexes = false;
     });
   }
 
@@ -198,6 +213,7 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
     setState(() {
       _selectedDocument = null;
       _showAggregation = false;
+      _showIndexes = false;
     });
   }
 
@@ -217,7 +233,9 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
       final id = _selectedDocument!['_id']?.toString() ?? 'Document';
       list.add(_Crumb(id, _Level.document));
     }
-    if (_showAggregation) {
+    if (_showIndexes) {
+      list.add(const _Crumb('Indexes', _Level.indexes));
+    } else if (_showAggregation) {
       list.add(const _Crumb('Aggregation', _Level.aggregation));
     } else if (_showStats) {
       list.add(const _Crumb('Statistics', _Level.stats));
@@ -229,7 +247,8 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
     final leavesDocument = _selectedDocument != null &&
         crumb.level != _Level.document &&
         crumb.level != _Level.stats &&
-        crumb.level != _Level.aggregation;
+        crumb.level != _Level.aggregation &&
+        crumb.level != _Level.indexes;
     if (leavesDocument) {
       if (!await confirmDiscardUnsavedWorkIfNeeded(context)) return;
       if (!mounted) return;
@@ -239,6 +258,9 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
     }
     if (_showAggregation && crumb.level != _Level.aggregation) {
       setState(() => _showAggregation = false);
+    }
+    if (_showIndexes && crumb.level != _Level.indexes) {
+      setState(() => _showIndexes = false);
     }
     switch (crumb.level) {
       case _Level.databases:
@@ -252,6 +274,8 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
       case _Level.stats:
         break;
       case _Level.aggregation:
+        break;
+      case _Level.indexes:
         break;
     }
   }
@@ -390,6 +414,20 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
       );
     }
 
+    // Indexes view
+    if (_showIndexes &&
+        _selectedDatabase != null &&
+        _selectedCollection != null) {
+      return MongoIndexesView(
+        key: ValueKey('idx_${_selectedDatabase}_$_selectedCollection'),
+        connection: conn,
+        database: _selectedDatabase!,
+        collection: _selectedCollection!,
+        refreshToken: _refreshToken,
+        onBack: () => setState(() => _showIndexes = false),
+      );
+    }
+
     // Documents list
     if (_selectedCollection != null && _selectedDatabase != null) {
       return MongoDocumentsView(
@@ -400,6 +438,7 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
         refreshToken: _refreshToken + _documentsListInvalidation,
         onDocumentTap: _navigateToDocument,
         onOpenAggregation: () => setState(() => _showAggregation = true),
+        onOpenIndexes: () => setState(() => _showIndexes = true),
       );
     }
 
