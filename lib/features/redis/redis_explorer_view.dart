@@ -34,11 +34,13 @@ class RedisExplorerView extends material.StatefulWidget {
     super.key,
     required this.connectionRow,
     required this.database,
+    this.initialKey,
     this.isReadOnly = false,
   });
 
   final ConnectionRow connectionRow;
   final int database;
+  final String? initialKey;
   final bool isReadOnly;
 
   @override
@@ -58,6 +60,8 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
   // Navigation state
   RedisBulkValue? _selectedKey;
   String? _selectedKeyType;
+  RedisBulkValue? _lastSelectedKey;
+  String? _lastSelectedKeyType;
 
   // Key used to reach _RedisKeyEditorState.canNavigateAway() from the explorer.
   RedisKeyEditorController? _keyEditorController;
@@ -65,6 +69,13 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialKey != null) {
+      final key = RedisBulkValue.utf8(widget.initialKey!);
+      _selectedKey = key;
+      _lastSelectedKey = key;
+      _selectedKeyType = 'string';
+      _keyEditorController = RedisKeyEditorController();
+    }
     _connect();
   }
 
@@ -75,8 +86,15 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
         oldWidget.database != widget.database) {
       _disconnectCurrent();
       _connect();
-    } else if (oldWidget.isReadOnly != widget.isReadOnly) {
-      unawaited(_connection?.applyClientReadOnly(widget.isReadOnly));
+    } else {
+      if (oldWidget.isReadOnly != widget.isReadOnly) {
+        unawaited(_connection?.applyClientReadOnly(widget.isReadOnly));
+      }
+      if (widget.initialKey != null &&
+          widget.initialKey != _selectedKey?.label) {
+        final key = RedisBulkValue.utf8(widget.initialKey!);
+        _navigateToKey(key, _selectedKeyType ?? 'string');
+      }
     }
   }
 
@@ -104,8 +122,10 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
     setState(() {
       _connecting = true;
       _error = null;
-      _selectedKey = null;
-      _selectedKeyType = null;
+      if (widget.initialKey == null) {
+        _selectedKey = null;
+        _selectedKeyType = null;
+      }
       _showStats = false;
     });
     try {
@@ -141,6 +161,8 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
     setState(() {
       _selectedKey = key;
       _selectedKeyType = type;
+      _lastSelectedKey = key;
+      _lastSelectedKeyType = type;
       _keyEditorController = RedisKeyEditorController();
     });
   }
@@ -161,6 +183,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
   void _onKeyRenamed(RedisBulkValue newKey) {
     setState(() {
       _selectedKey = newKey;
+      _lastSelectedKey = newKey;
       _keyEditorController = RedisKeyEditorController();
       _refreshEpoch++;
     });
@@ -296,6 +319,25 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
                   key: ValueKey('stats_${widget.connectionRow.id}'),
                   connectionRow: widget.connectionRow,
                   connection: conn,
+                  lastSelectedRedisDb: widget.database,
+                  lastSelectedRedisKey:
+                      (_selectedKey ?? _lastSelectedKey)?.label,
+                  onRestoreLastSelectedObject:
+                      (_selectedKey ?? _lastSelectedKey) != null
+                          ? () {
+                              setState(() {
+                                _showStats = false;
+                                _showCli = false;
+                                if (_selectedKey == null &&
+                                    _lastSelectedKey != null) {
+                                  _selectedKey = _lastSelectedKey;
+                                  _selectedKeyType = _lastSelectedKeyType;
+                                  _keyEditorController =
+                                      RedisKeyEditorController();
+                                }
+                              });
+                            }
+                          : () => setState(() => _showStats = false),
                   onBack: () => setState(() => _showStats = false),
                   onCli: () => setState(() {
                     _showStats = false;

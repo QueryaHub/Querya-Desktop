@@ -64,6 +64,7 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
   // Navigation state
   String? _selectedDatabase;
   String? _selectedCollection;
+  String? _lastSelectedCollection;
   Map<String, dynamic>? _selectedDocument;
 
   @override
@@ -75,6 +76,7 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
     }
     if (widget.initialCollection != null) {
       _selectedCollection = widget.initialCollection;
+      _lastSelectedCollection = widget.initialCollection;
     }
   }
 
@@ -159,6 +161,7 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
   void _navigateToCollection(String collName) {
     setState(() {
       _selectedCollection = collName;
+      _lastSelectedCollection = collName;
       _selectedDocument = null;
     });
   }
@@ -310,6 +313,24 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
                   key: ValueKey('stats_${widget.connectionRow.id}'),
                   connectionRow: widget.connectionRow,
                   connection: conn,
+                  lastSelectedMongoDb: _selectedDatabase,
+                  lastSelectedMongoCollection:
+                      _selectedCollection ?? _lastSelectedCollection,
+                  onRestoreLastSelectedObject:
+                      (_selectedCollection ?? _lastSelectedCollection) != null
+                          ? () {
+                              setState(() {
+                                _showStats = false;
+                                if (_selectedCollection == null &&
+                                    _lastSelectedCollection != null) {
+                                  _navigateToCollection(
+                                      _lastSelectedCollection!);
+                                }
+                              });
+                            }
+                          : (_selectedDatabase != null
+                              ? () => setState(() => _showStats = false)
+                              : null),
                   onBack: () => setState(() => _showStats = false),
                 ),
               ],
