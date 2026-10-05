@@ -181,9 +181,22 @@ class MongoService {
       final pipe = pipeline
           .map((stage) => stage.map((k, v) => MapEntry(k, v as Object)))
           .toList();
-      final result = await coll.aggregate(pipe);
-      // aggregate returns a Map, wrap it in a List
-      return [Map<String, dynamic>.from(result)];
+      try {
+        final docs = await coll.aggregateToStream(pipe).toList();
+        return docs.map((d) => Map<String, dynamic>.from(d)).toList();
+      } catch (_) {
+        final result = await coll.aggregate(pipe);
+        if (result['cursor'] is Map &&
+            (result['cursor'] as Map)['firstBatch'] is List) {
+          final batch = (result['cursor'] as Map)['firstBatch'] as List;
+          return batch.map((d) => Map<String, dynamic>.from(d as Map)).toList();
+        }
+        if (result['result'] is List) {
+          final res = result['result'] as List;
+          return res.map((d) => Map<String, dynamic>.from(d as Map)).toList();
+        }
+        return [Map<String, dynamic>.from(result)];
+      }
     });
   }
 
