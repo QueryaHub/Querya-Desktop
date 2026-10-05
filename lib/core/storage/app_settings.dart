@@ -131,6 +131,7 @@ abstract final class AppSettingsKeys {
   static const updateDismissedVersion = 'update_dismissed_version';
   static const hasCompletedWelcomeTour = 'has_completed_welcome_tour';
   static const confirmDestructiveOperations = 'confirm_destructive_operations';
+  static const mongoDocumentsViewMode = 'mongo_documents_view_mode';
 }
 
 /// Bumps [listenable] when any preference is persisted (theme, legacy listeners).
@@ -755,6 +756,23 @@ class AppSettings {
     await LocalDb.instance.setAppSetting(
       AppSettingsKeys.hasCompletedWelcomeTour,
       completed ? 'true' : 'false',
+    );
+    AppSettingsRevision.bump();
+  }
+
+  /// Active view mode for MongoDB documents browser ('table', 'tree', 'json', 'cards').
+  Future<String> getMongoDocumentsViewMode() async {
+    final v = await LocalDb.instance.getAppSetting(
+      AppSettingsKeys.mongoDocumentsViewMode,
+    );
+    if (v == null || v.isEmpty) return 'table';
+    return v;
+  }
+
+  Future<void> setMongoDocumentsViewMode(String mode) async {
+    await LocalDb.instance.setAppSetting(
+      AppSettingsKeys.mongoDocumentsViewMode,
+      mode,
     );
     AppSettingsRevision.bump();
   }

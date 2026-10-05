@@ -4,7 +4,11 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
+import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/features/mongodb/mongo_add_document_dialog.dart';
+import 'package:querya_desktop/features/mongodb/mongo_document_tree_view.dart';
+import 'package:querya_desktop/features/mongodb/mongo_documents_json_view.dart';
+import 'package:querya_desktop/features/mongodb/mongo_documents_table_view.dart';
 import 'package:querya_desktop/features/mongodb/mongo_ejson.dart';
 import 'package:querya_desktop/features/mongodb/mongo_field_codec.dart';
 import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
@@ -13,6 +17,25 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
 const _defaultLimit = 25;
+
+/// View modes for MongoDB documents viewer.
+enum MongoDocumentsViewMode {
+  table('table', 'Table'),
+  tree('tree', 'Tree'),
+  json('json', 'JSON'),
+  cards('cards', 'Cards');
+
+  const MongoDocumentsViewMode(this.id, this.label);
+  final String id;
+  final String label;
+
+  static MongoDocumentsViewMode fromString(String? value) {
+    for (final mode in MongoDocumentsViewMode.values) {
+      if (mode.id == value) return mode;
+    }
+    return MongoDocumentsViewMode.table;
+  }
+}
 
 /// Paginated document browser for a MongoDB collection.
 class MongoDocumentsView extends material.StatefulWidget {
@@ -23,6 +46,7 @@ class MongoDocumentsView extends material.StatefulWidget {
     required this.collection,
     this.onDocumentTap,
     this.refreshToken = 0,
+    this.initialViewMode,
   });
 
   final MongoConnection connection;
@@ -32,6 +56,9 @@ class MongoDocumentsView extends material.StatefulWidget {
 
   /// Incremented by the parent when the user requests a refresh (toolbar).
   final int refreshToken;
+
+  /// Optional initial view mode (overrides persisted setting, e.g. for testing).
+  final MongoDocumentsViewMode? initialViewMode;
 
   @override
   material.State<MongoDocumentsView> createState() =>
@@ -80,11 +107,37 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
   final _filterController = material.TextEditingController();
   Map<String, dynamic>? _activeFilter;
   String? _emptyFilterHint;
+  late MongoDocumentsViewMode _viewMode;
 
   @override
   void initState() {
     super.initState();
+    _viewMode = widget.initialViewMode ?? MongoDocumentsViewMode.table;
+    if (widget.initialViewMode == null) {
+      unawaited(_loadInitialViewMode());
+    }
     _load();
+  }
+
+  Future<void> _loadInitialViewMode() async {
+    try {
+      final saved = await AppSettings.instance.getMongoDocumentsViewMode();
+      if (mounted) {
+        setState(() {
+          _viewMode = MongoDocumentsViewMode.fromString(saved);
+        });
+      }
+    } catch (_) {
+      // Keep current mode
+    }
+  }
+
+  void _setViewMode(MongoDocumentsViewMode mode) {
+    if (_viewMode == mode) return;
+    setState(() {
+      _viewMode = mode;
+    });
+    unawaited(AppSettings.instance.setMongoDocumentsViewMode(mode.id));
   }
 
   @override
@@ -334,7 +387,7 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
         const Divider(height: 1),
         // Error banner
         if (_error != null) _buildErrorBanner(cs),
-        // Document list (virtualized)
+        // Document content (mode-dependent)
         material.Expanded(
           child: _documents.isEmpty
               ? material.Center(
@@ -344,25 +397,48 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
                         .muted(),
                   ),
                 )
-              : material.ListView.separated(
-                  padding: const material.EdgeInsets.all(16),
-                  cacheExtent: 400,
-                  itemCount: _documents.length,
-                  separatorBuilder: (_, __) => const Gap(8),
-                  itemBuilder: (context, i) {
-                    final shadcnCs = shadcn.Theme.of(context).colorScheme;
-                    return _DocumentCard(
-                      document: _documents[i],
-                      index: _skip + i,
-                      colorScheme: cs,
-                      shadcnCs: shadcnCs,
-                      onView: () => widget.onDocumentTap?.call(_documents[i]),
-                      onDelete: () => _deleteDocument(_documents[i]),
-                      onInspectField: (field) =>
-                          unawaited(_inspectField(_documents[i], field)),
-                    );
-                  },
-                ),
+              : switch (_viewMode) {
+                  MongoDocumentsViewMode.table => MongoDocumentsTableView(
+                      documents: _documents,
+                      onDocumentTap: widget.onDocumentTap,
+                      onDeleteDocument: (doc) =>
+                          unawaited(_deleteDocument(doc)),
+                      onInspectField: (doc, field) =>
+                          unawaited(_inspectField(doc, field)),
+                    ),
+                  MongoDocumentsViewMode.tree => MongoDocumentTreeView(
+                      documents: _documents,
+                      startIndex: _skip,
+                      onDocumentTap: widget.onDocumentTap,
+                      onDeleteDocument: (doc) =>
+                          unawaited(_deleteDocument(doc)),
+                      onInspectField: (doc, field) =>
+                          unawaited(_inspectField(doc, field)),
+                    ),
+                  MongoDocumentsViewMode.json => MongoDocumentsJsonView(
+                      documents: _documents,
+                    ),
+                  MongoDocumentsViewMode.cards => material.ListView.separated(
+                      padding: const material.EdgeInsets.all(16),
+                      cacheExtent: 400,
+                      itemCount: _documents.length,
+                      separatorBuilder: (_, __) => const Gap(8),
+                      itemBuilder: (context, i) {
+                        final shadcnCs = shadcn.Theme.of(context).colorScheme;
+                        return _DocumentCard(
+                          document: _documents[i],
+                          index: _skip + i,
+                          colorScheme: cs,
+                          shadcnCs: shadcnCs,
+                          onView: () =>
+                              widget.onDocumentTap?.call(_documents[i]),
+                          onDelete: () => _deleteDocument(_documents[i]),
+                          onInspectField: (field) =>
+                              unawaited(_inspectField(_documents[i], field)),
+                        );
+                      },
+                    ),
+                },
         ),
         // Pagination bar
         _buildPaginationBar(cs),
@@ -403,6 +479,59 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
             onPressed: _clearFilter,
             size: ButtonSize.small,
             child: const Text('Clear'),
+          ),
+          const Gap(12),
+          // View Mode Switcher
+          material.SizedBox(
+            height: 28,
+            child: material.SegmentedButton<MongoDocumentsViewMode>(
+              segments: const [
+                material.ButtonSegment(
+                  value: MongoDocumentsViewMode.table,
+                  label: material.Text('Table'),
+                  icon: material.Icon(
+                    material.Icons.table_chart_rounded,
+                    size: 14,
+                  ),
+                ),
+                material.ButtonSegment(
+                  value: MongoDocumentsViewMode.tree,
+                  label: material.Text('Tree'),
+                  icon: material.Icon(
+                    material.Icons.account_tree_rounded,
+                    size: 14,
+                  ),
+                ),
+                material.ButtonSegment(
+                  value: MongoDocumentsViewMode.json,
+                  label: material.Text('JSON'),
+                  icon: material.Icon(
+                    material.Icons.code_rounded,
+                    size: 14,
+                  ),
+                ),
+                material.ButtonSegment(
+                  value: MongoDocumentsViewMode.cards,
+                  label: material.Text('Cards'),
+                  icon: material.Icon(
+                    material.Icons.view_stream_rounded,
+                    size: 14,
+                  ),
+                ),
+              ],
+              selected: {_viewMode},
+              onSelectionChanged: (selected) {
+                _setViewMode(selected.first);
+              },
+              showSelectedIcon: false,
+              style: material.SegmentedButton.styleFrom(
+                padding: const material.EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 0,
+                ),
+                visualDensity: material.VisualDensity.compact,
+              ),
+            ),
           ),
           const Gap(12),
           PrimaryButton(

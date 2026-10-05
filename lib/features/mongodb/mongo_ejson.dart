@@ -14,6 +14,22 @@ String mongoDocumentToEjson(Map<String, dynamic> doc) {
   return const JsonEncoder.withIndent('  ').convert(ejson);
 }
 
+/// Pretty-prints a list of MongoDB documents as a relaxed Extended JSON array.
+String mongoDocumentsToEjson(List<Map<String, dynamic>> docs) {
+  if (docs.isEmpty) return '[]';
+  final list = docs.map((doc) {
+    try {
+      return EJsonCodec.deserialize(
+        BsonCodec.serialize(Map<String, dynamic>.from(doc)),
+        relaxed: true,
+      );
+    } catch (_) {
+      return doc;
+    }
+  }).toList();
+  return const JsonEncoder.withIndent('  ').convert(list);
+}
+
 /// Parses Extended JSON (canonical or relaxed) back into Dart BSON values.
 Map<String, dynamic> mongoDocumentFromEjson(String text) {
   final decoded = json.decode(text);
