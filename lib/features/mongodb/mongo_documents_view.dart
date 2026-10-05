@@ -47,6 +47,7 @@ class MongoDocumentsView extends material.StatefulWidget {
     this.onDocumentTap,
     this.onOpenAggregation,
     this.onOpenIndexes,
+    this.onOpenQueryConsole,
     this.refreshToken = 0,
     this.initialViewMode,
   });
@@ -57,6 +58,7 @@ class MongoDocumentsView extends material.StatefulWidget {
   final ValueChanged<Map<String, dynamic>>? onDocumentTap;
   final material.VoidCallback? onOpenAggregation;
   final material.VoidCallback? onOpenIndexes;
+  final material.VoidCallback? onOpenQueryConsole;
 
   /// Incremented by the parent when the user requests a refresh (toolbar).
   final int refreshToken;
@@ -550,6 +552,18 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
                 size: 14,
               ),
               child: const Text('Indexes'),
+            ),
+          ],
+          if (widget.onOpenQueryConsole != null) ...[
+            const Gap(8),
+            OutlineButton(
+              onPressed: widget.onOpenQueryConsole,
+              size: ButtonSize.small,
+              leading: const material.Icon(
+                material.Icons.terminal_rounded,
+                size: 14,
+              ),
+              child: const Text('Console'),
             ),
           ],
           const Gap(12),

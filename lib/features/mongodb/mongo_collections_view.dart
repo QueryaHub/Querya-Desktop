@@ -17,12 +17,14 @@ class MongoCollectionsView extends material.StatefulWidget {
     required this.connection,
     required this.database,
     this.onCollectionTap,
+    this.onOpenQueryConsole,
     this.refreshToken = 0,
   });
 
   final MongoConnection connection;
   final String database;
   final ValueChanged<String>? onCollectionTap;
+  final material.VoidCallback? onOpenQueryConsole;
 
   /// Incremented by the parent when the user requests a refresh (toolbar).
   final int refreshToken;
@@ -302,6 +304,18 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
                     ],
                   ),
                 ),
+                if (widget.onOpenQueryConsole != null) ...[
+                  OutlineButton(
+                    onPressed: widget.onOpenQueryConsole,
+                    size: ButtonSize.small,
+                    leading: const material.Icon(
+                      material.Icons.terminal_rounded,
+                      size: 14,
+                    ),
+                    child: const Text('MQL Console'),
+                  ),
+                  const Gap(8),
+                ],
                 material.SizedBox(
                   width: 180,
                   child: TextField(
