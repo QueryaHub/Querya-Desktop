@@ -43,6 +43,7 @@ class RedisView extends material.StatefulWidget {
     required this.connectionRow,
     this.connection,
     this.onBack,
+    this.onCli,
     this.lastSelectedRedisDb,
     this.onRestoreLastSelectedObject,
   });
@@ -55,6 +56,9 @@ class RedisView extends material.StatefulWidget {
 
   /// Called when the user taps the "back to explorer" button.
   final material.VoidCallback? onBack;
+
+  /// Called when the user taps the "CLI Console" button.
+  final material.VoidCallback? onCli;
 
   /// Remembers the last visited database index for 1-click return from stats.
   final int? lastSelectedRedisDb;
@@ -431,6 +435,15 @@ class _RedisViewState extends material.State<RedisView> {
             leading:
                 const material.Icon(material.Icons.grid_view_rounded, size: 18),
             child: const Text('Explorer'),
+          ),
+          const Gap(8),
+        ],
+        if (widget.onCli != null) ...[
+          OutlineButton(
+            onPressed: widget.onCli,
+            leading:
+                const material.Icon(material.Icons.terminal_rounded, size: 18),
+            child: const Text('CLI Console'),
           ),
           const Gap(8),
         ],

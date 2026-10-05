@@ -12,6 +12,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 import 'redis_keys_view.dart';
 import 'redis_key_editor.dart';
 import 'redis_view.dart';
+import 'redis_cli_workspace.dart';
 
 // ─── Navigation path model ──────────────────────────────────────────────────
 
@@ -21,7 +22,7 @@ class _Crumb {
   final _Level level;
 }
 
-enum _Level { keys, key, stats }
+enum _Level { keys, key, stats, cli }
 
 // ─── Main explorer widget ───────────────────────────────────────────────────
 
@@ -51,6 +52,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
 
   // View mode
   bool _showStats = false;
+  bool _showCli = false;
   int _refreshEpoch = 0;
 
   // Navigation state
@@ -176,13 +178,20 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
     }
     if (_showStats) {
       list.add(const _Crumb('Statistics', _Level.stats));
+    } else if (_showCli) {
+      list.add(const _Crumb('CLI Console', _Level.cli));
     }
     return list;
   }
 
   void _onCrumbTap(_Crumb crumb) {
-    if (_showStats && crumb.level != _Level.stats) {
-      setState(() => _showStats = false);
+    if ((_showStats || _showCli) &&
+        crumb.level != _Level.stats &&
+        crumb.level != _Level.cli) {
+      setState(() {
+        _showStats = false;
+        _showCli = false;
+      });
     }
     switch (crumb.level) {
       case _Level.keys:
@@ -190,6 +199,8 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
       case _Level.key:
         break;
       case _Level.stats:
+        break;
+      case _Level.cli:
         break;
     }
   }
@@ -251,6 +262,15 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
     final conn = _connection;
     if (conn == null) return const material.SizedBox.shrink();
 
+    final int bodyIndex;
+    if (_showCli) {
+      bodyIndex = 2;
+    } else if (_showStats) {
+      bodyIndex = 1;
+    } else {
+      bodyIndex = 0;
+    }
+
     return material.Container(
       color: cs.background,
       child: material.Column(
@@ -260,15 +280,24 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
             crumbs: _crumbs,
             onCrumbTap: _onCrumbTap,
             onRefresh: () => setState(() => _refreshEpoch++),
-            onStats: () => setState(() => _showStats = !_showStats),
+            onStats: () => setState(() {
+              _showStats = !_showStats;
+              if (_showStats) _showCli = false;
+            }),
+            onCli: () => setState(() {
+              _showCli = !_showCli;
+              if (_showCli) _showStats = false;
+            }),
+            isCliActive: _showCli,
+            isStatsActive: _showStats,
             isReadOnly: widget.isReadOnly,
           ),
           const Divider(height: 1),
-          // Content with fluid cross-fade morph between keys and stats
+          // Content with fluid cross-fade morph between keys, stats and CLI
           material.Expanded(
             child: QueryaSwitchingBody(
               slide: material.Offset.zero,
-              index: _showStats ? 1 : 0,
+              index: bodyIndex,
               children: [
                 _buildContent(conn),
                 RedisView(
@@ -276,6 +305,18 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
                   connectionRow: widget.connectionRow,
                   connection: conn,
                   onBack: () => setState(() => _showStats = false),
+                  onCli: () => setState(() {
+                    _showStats = false;
+                    _showCli = true;
+                  }),
+                ),
+                RedisCliWorkspace(
+                  key: ValueKey(
+                      'cli_${widget.connectionRow.id}_${widget.database}'),
+                  connectionRow: widget.connectionRow,
+                  connection: conn,
+                  database: widget.database,
+                  onBack: () => setState(() => _showCli = false),
                 ),
               ],
             ),
@@ -324,6 +365,9 @@ class _BreadcrumbBar extends StatelessWidget {
     required this.onCrumbTap,
     required this.onRefresh,
     required this.onStats,
+    required this.onCli,
+    this.isCliActive = false,
+    this.isStatsActive = false,
     this.isReadOnly = false,
   });
 
@@ -331,6 +375,9 @@ class _BreadcrumbBar extends StatelessWidget {
   final void Function(_Crumb) onCrumbTap;
   final VoidCallback onRefresh;
   final VoidCallback onStats;
+  final VoidCallback onCli;
+  final bool isCliActive;
+  final bool isStatsActive;
   final bool isReadOnly;
 
   @override
@@ -386,14 +433,41 @@ class _BreadcrumbBar extends StatelessWidget {
           ),
           const Gap(8),
           material.Tooltip(
+            message: 'Redis CLI Console',
+            child: material.InkWell(
+              onTap: onCli,
+              borderRadius: material.BorderRadius.circular(6),
+              child: material.Container(
+                decoration: isCliActive
+                    ? material.BoxDecoration(
+                        color: cs.primary.withValues(alpha: 0.15),
+                        borderRadius: material.BorderRadius.circular(6),
+                      )
+                    : null,
+                padding: const material.EdgeInsets.all(6),
+                child: material.Icon(material.Icons.terminal_rounded,
+                    size: 18,
+                    color: isCliActive ? cs.primary : cs.mutedForeground),
+              ),
+            ),
+          ),
+          const Gap(4),
+          material.Tooltip(
             message: 'Statistics',
             child: material.InkWell(
               onTap: onStats,
               borderRadius: material.BorderRadius.circular(6),
-              child: material.Padding(
+              child: material.Container(
+                decoration: isStatsActive
+                    ? material.BoxDecoration(
+                        color: cs.primary.withValues(alpha: 0.15),
+                        borderRadius: material.BorderRadius.circular(6),
+                      )
+                    : null,
                 padding: const material.EdgeInsets.all(6),
                 child: material.Icon(material.Icons.bar_chart_rounded,
-                    size: 18, color: cs.mutedForeground),
+                    size: 18,
+                    color: isStatsActive ? cs.primary : cs.mutedForeground),
               ),
             ),
           ),

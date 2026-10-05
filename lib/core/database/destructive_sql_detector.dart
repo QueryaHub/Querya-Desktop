@@ -16,7 +16,11 @@ enum DestructiveSqlType {
   redisSrem,
   redisZrem,
   redisRename,
-  redisLrem;
+  redisLrem,
+  redisFlushAll,
+  redisFlushDb,
+  redisShutdown,
+  redisKeys;
 
   String get label => switch (this) {
         DestructiveSqlType.dropDatabase => 'DROP DATABASE',
@@ -35,6 +39,10 @@ enum DestructiveSqlType {
         DestructiveSqlType.redisZrem => 'ZREM',
         DestructiveSqlType.redisRename => 'RENAME',
         DestructiveSqlType.redisLrem => 'LREM',
+        DestructiveSqlType.redisFlushAll => 'FLUSHALL',
+        DestructiveSqlType.redisFlushDb => 'FLUSHDB',
+        DestructiveSqlType.redisShutdown => 'SHUTDOWN',
+        DestructiveSqlType.redisKeys => 'KEYS *',
       };
 
   String get riskLevel => switch (this) {
@@ -52,6 +60,10 @@ enum DestructiveSqlType {
         DestructiveSqlType.redisZrem => 'HIGH',
         DestructiveSqlType.redisRename => 'HIGH',
         DestructiveSqlType.redisLrem => 'HIGH',
+        DestructiveSqlType.redisFlushAll => 'CRITICAL',
+        DestructiveSqlType.redisFlushDb => 'CRITICAL',
+        DestructiveSqlType.redisShutdown => 'CRITICAL',
+        DestructiveSqlType.redisKeys => 'HIGH',
         DestructiveSqlType.dropMaterializedView => 'MEDIUM',
         DestructiveSqlType.dropView => 'MEDIUM',
       };
@@ -101,6 +113,14 @@ class DestructiveSqlOperation {
           'Renaming will overwrite existing key "$targetName". The existing value will be permanently lost.',
         DestructiveSqlType.redisLrem =>
           'Permanently removes list element "$targetName".',
+        DestructiveSqlType.redisFlushAll =>
+          'Permanently deletes all keys across all Redis databases! This cannot be undone.',
+        DestructiveSqlType.redisFlushDb =>
+          'Permanently deletes all keys in the current Redis database ($targetName).',
+        DestructiveSqlType.redisShutdown =>
+          'Shuts down the Redis server instance. All clients will be disconnected.',
+        DestructiveSqlType.redisKeys =>
+          'Scanning all keys with "KEYS $targetName" can block Redis on large production instances. Consider SCAN instead.',
       };
 }
 
