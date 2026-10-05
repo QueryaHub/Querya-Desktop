@@ -439,6 +439,9 @@ void main() {
     await tester.tap(deleteFolderButton);
     await tester.pumpAndSettle();
 
+    await tester.tap(find.byType(material.Checkbox));
+    await tester.pumpAndSettle();
+
     await tester.tap(find.text('Execute Destructive Statement'));
     await tester.pumpAndSettle();
 
