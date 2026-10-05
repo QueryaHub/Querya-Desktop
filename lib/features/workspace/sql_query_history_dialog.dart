@@ -281,7 +281,7 @@ class _SqlQueryHistoryDialogContentState
                     return const material.Center(
                       child: material.Padding(
                         padding: material.EdgeInsets.all(24),
-                        child: material.CircularProgressIndicator(),
+                        child: QueryaSpinner(size: QueryaSpinnerSize.lg),
                       ),
                     );
                   }

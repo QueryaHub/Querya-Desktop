@@ -295,12 +295,7 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
                 onPressed: _saving ? null : _save,
                 size: ButtonSize.small,
                 leading: _saving
-                    ? const material.SizedBox(
-                        width: 14,
-                        height: 14,
-                        child:
-                            material.CircularProgressIndicator(strokeWidth: 2),
-                      )
+                    ? const QueryaSpinner(size: QueryaSpinnerSize.sm)
                     : const material.Icon(material.Icons.save_rounded,
                         size: 14),
                 child: Text(_saving ? 'Saving...' : 'Save'),

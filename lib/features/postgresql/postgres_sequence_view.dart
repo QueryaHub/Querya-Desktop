@@ -120,18 +120,10 @@ class _PostgresSequenceViewState extends material.State<PostgresSequenceView> {
     if (_loading) {
       return material.Container(
         color: cs.background,
-        child: material.Center(
-          child: material.Column(
-            mainAxisSize: material.MainAxisSize.min,
-            children: [
-              const material.SizedBox(
-                width: 28,
-                height: 28,
-                child: material.CircularProgressIndicator(strokeWidth: 2),
-              ),
-              const Gap(12),
-              const Text('Loading sequence…').muted().small(),
-            ],
+        child: const material.Center(
+          child: QueryaSpinner(
+            size: QueryaSpinnerSize.md,
+            label: 'Loading sequence…',
           ),
         ),
       );

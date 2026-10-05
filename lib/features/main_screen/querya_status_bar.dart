@@ -168,13 +168,10 @@ class QueryaStatusBar extends material.StatelessWidget {
 
                 if (isBusy) ...[
                   const Gap(10),
-                  material.SizedBox(
-                    width: 10,
-                    height: 10,
-                    child: material.CircularProgressIndicator(
-                      strokeWidth: 1.5,
-                      color: wb.accent,
-                    ),
+                  QueryaSpinner(
+                    customDimension: 10,
+                    strokeWidth: 1.5,
+                    color: wb.accent,
                   ),
                 ],
                 if (statusMessage != null && statusMessage!.isNotEmpty) ...[

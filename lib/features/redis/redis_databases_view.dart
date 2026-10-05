@@ -97,18 +97,10 @@ class _RedisDatabasesViewState extends material.State<RedisDatabasesView> {
     final shadcnCs = shadcn.Theme.of(context).colorScheme;
 
     if (_loading) {
-      return material.Center(
-        child: material.Column(
-          mainAxisSize: material.MainAxisSize.min,
-          children: [
-            const material.SizedBox(
-              width: 32,
-              height: 32,
-              child: material.CircularProgressIndicator(strokeWidth: 2),
-            ),
-            const Gap(16),
-            const Text('Loading databases...').muted().small(),
-          ],
+      return const material.Center(
+        child: QueryaSpinner(
+          size: QueryaSpinnerSize.lg,
+          label: 'Loading databases...',
         ),
       );
     }

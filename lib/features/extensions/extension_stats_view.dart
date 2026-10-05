@@ -127,18 +127,10 @@ class _ExtensionStatsViewState extends material.State<ExtensionStatsView> {
     final cs = Theme.of(context).colorScheme;
 
     if (_loading) {
-      return material.Center(
-        child: material.Column(
-          mainAxisSize: material.MainAxisSize.min,
-          children: [
-            const material.SizedBox(
-              width: 32,
-              height: 32,
-              child: material.CircularProgressIndicator(strokeWidth: 2),
-            ),
-            const Gap(16),
-            const Text('Loading server statistics...').muted().small(),
-          ],
+      return const material.Center(
+        child: QueryaSpinner(
+          size: QueryaSpinnerSize.lg,
+          label: 'Loading server statistics...',
         ),
       );
     }

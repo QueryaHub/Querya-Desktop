@@ -168,7 +168,7 @@ class _MysqlRoutineViewState extends material.State<MysqlRoutineView> {
         if (_loading)
           const material.Expanded(
             child: material.Center(
-              child: material.CircularProgressIndicator(),
+              child: QueryaSpinner(size: QueryaSpinnerSize.lg),
             ),
           )
         else if (_error != null)

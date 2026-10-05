@@ -60,7 +60,7 @@ class _ExtensionSideloadDialogState
     final cs = Theme.of(context).colorScheme;
     final fileName = p.basename(widget.archivePath);
 
-    return material.AlertDialog(
+    return QueryaModalDialog(
       title: const material.Text('Install local extension'),
       content: material.SizedBox(
         width: 440,

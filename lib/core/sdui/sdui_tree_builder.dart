@@ -263,12 +263,9 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
                 expandable: node.expandable,
               ),
         iconWidget: isLoading
-            ? const material.SizedBox(
-                width: QueryaTreeTokens.spinnerNested,
-                height: QueryaTreeTokens.spinnerNested,
-                child: material.CircularProgressIndicator(
-                  strokeWidth: QueryaTreeTokens.spinnerStroke,
-                ),
+            ? const QueryaSpinner(
+                customDimension: QueryaTreeTokens.spinnerNested,
+                strokeWidth: QueryaTreeTokens.spinnerStroke,
               )
             : null,
         iconSize: iconSize,

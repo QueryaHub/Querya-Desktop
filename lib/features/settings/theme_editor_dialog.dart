@@ -147,51 +147,18 @@ class _ThemeEditorDialogState extends material.State<ThemeEditorDialog> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    return material.AlertDialog(
-      backgroundColor: cs.popover,
-      shape: material.RoundedRectangleBorder(
-        borderRadius: material.BorderRadius.circular(12),
-        side: material.BorderSide(color: cs.border.withValues(alpha: 0.35)),
-      ),
-      titlePadding: const material.EdgeInsets.fromLTRB(20, 16, 16, 12),
-      contentPadding: const material.EdgeInsets.symmetric(horizontal: 20),
-      actionsPadding: const material.EdgeInsets.fromLTRB(20, 12, 20, 16),
-      title: material.Row(
-        children: [
-          material.Icon(
-            material.Icons.palette_outlined,
-            size: 20,
-            color: cs.primary,
-          ),
-          const material.SizedBox(width: 10),
-          material.Expanded(
-            child: material.Column(
-              crossAxisAlignment: material.CrossAxisAlignment.start,
-              children: [
-                const Text('Theme Studio')
-                    .semiBold()
-                    .medium()
-                    .foreground(),
-                const material.SizedBox(height: 2),
-                const Text(
-                  'Customize color tokens with real-time UI preview',
-                ).muted().xSmall(),
-              ],
-            ),
-          ),
-          IconButton.ghost(
-            icon: const material.Icon(material.Icons.close, size: 16),
-            onPressed: () => material.Navigator.of(context).pop(),
-            density: ButtonDensity.compact,
-          ),
-        ],
-      ),
+    return QueryaModalDialog(
+      constraints: const material.BoxConstraints(maxWidth: 580),
+      title: const Text('Theme Studio'),
+      description: const Text('Customize color tokens with real-time UI preview'),
+      icon: const material.Icon(material.Icons.palette_outlined),
+      showCloseButton: true,
       content: material.SizedBox(
         width: 540,
         height: 480,
         child: _loading
             ? const material.Center(
-                child: material.CircularProgressIndicator(),
+                child: QueryaSpinner(size: QueryaSpinnerSize.lg),
               )
             : material.SingleChildScrollView(
                 child: material.Column(

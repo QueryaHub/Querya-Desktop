@@ -363,18 +363,10 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
     final cs = Theme.of(context).colorScheme;
 
     if (_loading && _documents.isEmpty) {
-      return material.Center(
-        child: material.Column(
-          mainAxisSize: material.MainAxisSize.min,
-          children: [
-            const material.SizedBox(
-              width: 32,
-              height: 32,
-              child: material.CircularProgressIndicator(strokeWidth: 2),
-            ),
-            const Gap(16),
-            const Text('Loading documents...').muted().small(),
-          ],
+      return const material.Center(
+        child: QueryaSpinner(
+          size: QueryaSpinnerSize.lg,
+          label: 'Loading documents...',
         ),
       );
     }
@@ -456,16 +448,15 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
       ),
       child: Row(
         children: [
-          material.Icon(material.Icons.filter_list_rounded,
-              size: 18, color: shadcnCs.mutedForeground),
-          const Gap(10),
           material.Expanded(
-            child: TextField(
+            child: QueryaSearchField(
               controller: _filterController,
-              placeholder: const Text(
-                r'Filter (JSON / EJSON) e.g. {"_id": {"$oid": "…"}}',
-              ),
+              placeholder:
+                  r'Filter (JSON / EJSON) e.g. {"_id": {"$oid": "…"}}',
               onSubmitted: (_) => _applyFilter(),
+              onChanged: (val) {
+                if (val.isEmpty) _clearFilter();
+              },
             ),
           ),
           const Gap(8),

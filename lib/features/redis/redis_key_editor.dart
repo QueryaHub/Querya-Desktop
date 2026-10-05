@@ -141,25 +141,14 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   Future<bool> _confirmDiscardStringEdits() async {
     if (!_isStringDirty) return true;
     if (!mounted) return false;
-    final confirmed = await showAppDialog<bool>(
+    final confirmed = await QueryaConfirmDialog.show(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Unsaved changes'),
-        content: const Text(
-          'You have unsaved edits to this string value. '
+      title: 'Unsaved changes',
+      message: 'You have unsaved edits to this string value. '
           'Do you want to discard them?',
-        ),
-        actions: [
-          OutlineButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-          DestructiveButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Discard'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Discard',
+      cancelLabel: 'Cancel',
+      isDestructive: true,
     );
     return confirmed == true;
   }
@@ -649,18 +638,10 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     final palette = context.semanticPalette;
 
     if (_loading) {
-      return material.Center(
-        child: material.Column(
-          mainAxisSize: material.MainAxisSize.min,
-          children: [
-            const material.SizedBox(
-              width: 32,
-              height: 32,
-              child: material.CircularProgressIndicator(strokeWidth: 2),
-            ),
-            const Gap(16),
-            const Text('Loading key...').muted().small(),
-          ],
+      return const material.Center(
+        child: QueryaSpinner(
+          size: QueryaSpinnerSize.lg,
+          label: 'Loading key...',
         ),
       );
     }
@@ -1325,7 +1306,7 @@ class _RedisTtlDialogContentState
 
   @override
   material.Widget build(material.BuildContext context) {
-    return AlertDialog(
+    return QueryaModalDialog(
       title: const Text('Set TTL'),
       content: material.Column(
         mainAxisSize: material.MainAxisSize.min,
@@ -1389,7 +1370,7 @@ class _RedisRenameDialogContentState
 
   @override
   material.Widget build(material.BuildContext context) {
-    return AlertDialog(
+    return QueryaModalDialog(
       title: const Text('Rename Key'),
       content: material.Column(
         mainAxisSize: material.MainAxisSize.min,
@@ -1454,7 +1435,7 @@ class _RedisEditListDialogContentState
 
   @override
   material.Widget build(material.BuildContext context) {
-    return AlertDialog(
+    return QueryaModalDialog(
       title: Text('Edit Item [${widget.index}]'),
       content: material.Column(
         mainAxisSize: material.MainAxisSize.min,

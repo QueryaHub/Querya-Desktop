@@ -149,14 +149,15 @@ class QueryaModalDialog extends material.StatelessWidget {
             // Actions
             if (actions != null && actions!.isNotEmpty) ...[
               const Gap(20),
-              material.Row(
-                mainAxisAlignment: material.MainAxisAlignment.end,
-                children: [
-                  for (var i = 0; i < actions!.length; i++) ...[
-                    if (i > 0) const Gap(8),
-                    actions![i],
-                  ],
-                ],
+              material.Align(
+                alignment: material.Alignment.centerRight,
+                child: material.Wrap(
+                  alignment: material.WrapAlignment.end,
+                  crossAxisAlignment: material.WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: actions!,
+                ),
               ),
             ],
           ],

@@ -512,7 +512,7 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => const material.Center(
-        child: material.CircularProgressIndicator(),
+        child: QueryaSpinner(size: QueryaSpinnerSize.lg),
       ),
     ));
 

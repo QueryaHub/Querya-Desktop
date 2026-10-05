@@ -707,13 +707,9 @@ class _ExtensionSqlToolbar extends material.StatelessWidget {
             IconButton.ghost(
               onPressed: running || isRestarting ? null : onRestartDriver,
               icon: isRestarting
-                  ? material.SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: material.CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: accent,
-                      ),
+                  ? QueryaSpinner(
+                      size: QueryaSpinnerSize.sm,
+                      color: accent,
                     )
                   : material.Icon(
                       material.Icons.restart_alt_rounded,
@@ -755,13 +751,9 @@ class _ExtensionSqlToolbar extends material.StatelessWidget {
           OutlineButton(
             onPressed: onExecute,
             leading: running
-                ? material.SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: material.CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: accent,
-                    ),
+                ? QueryaSpinner(
+                    size: QueryaSpinnerSize.sm,
+                    color: accent,
                   )
                 : material.Icon(
                     material.Icons.play_arrow_rounded,

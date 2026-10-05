@@ -74,7 +74,7 @@ class _ThemeRemoteInstallDialogState
     final cs = Theme.of(context).colorScheme;
     final host = Uri.tryParse(_urlController.text.trim())?.host;
 
-    return material.AlertDialog(
+    return QueryaModalDialog(
       title: const material.Text('Install theme from URL'),
       content: material.SizedBox(
         width: 420,

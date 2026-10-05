@@ -1030,13 +1030,9 @@ class _MysqlSqlToolbar extends material.StatelessWidget {
               OutlineButton(
                 onPressed: onExecute,
                 leading: running
-                    ? material.SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: material.CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: accent,
-                        ),
+                    ? QueryaSpinner(
+                        size: QueryaSpinnerSize.sm,
+                        color: accent,
                       )
                     : material.Icon(
                         material.Icons.play_arrow_rounded,

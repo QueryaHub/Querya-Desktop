@@ -238,7 +238,7 @@ class _ExtensionConnectionFormContentState
                         const material.Padding(
                           padding: material.EdgeInsets.all(24),
                           child: material.Center(
-                            child: material.CircularProgressIndicator(),
+                            child: QueryaSpinner(size: QueryaSpinnerSize.md),
                           ),
                         )
                       else if (_loadError != null)
@@ -287,12 +287,8 @@ class _ExtensionConnectionFormContentState
                       onPressed:
                           _schema == null || _testing ? null : _testConnection,
                       leading: _testing
-                          ? const material.SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: material.CircularProgressIndicator(
-                                strokeWidth: 2,
-                              ),
+                          ? const QueryaSpinner(
+                              size: QueryaSpinnerSize.sm,
                             )
                           : const material.Icon(
                               material.Icons.bolt_rounded,

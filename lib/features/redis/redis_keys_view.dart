@@ -295,18 +295,10 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
     final cs = Theme.of(context).colorScheme;
 
     if (_loading && _keys.isEmpty) {
-      return material.Center(
-        child: material.Column(
-          mainAxisSize: material.MainAxisSize.min,
-          children: [
-            const material.SizedBox(
-              width: 32,
-              height: 32,
-              child: material.CircularProgressIndicator(strokeWidth: 2),
-            ),
-            const Gap(16),
-            const Text('Scanning keys...').muted().small(),
-          ],
+      return const material.Center(
+        child: QueryaSpinner(
+          size: QueryaSpinnerSize.lg,
+          label: 'Scanning keys...',
         ),
       );
     }
@@ -467,14 +459,14 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
       ),
       child: Row(
         children: [
-          material.Icon(material.Icons.search_rounded,
-              size: 18, color: shadcnCs.mutedForeground),
-          const Gap(10),
           material.Expanded(
-            child: TextField(
+            child: QueryaSearchField(
               controller: _filterController,
-              placeholder: const Text('Pattern e.g. user:* or session:*'),
+              placeholder: 'Pattern e.g. user:* or session:*',
               onSubmitted: (_) => _applyFilter(),
+              onChanged: (val) {
+                if (val.isEmpty) _clearFilter();
+              },
             ),
           ),
           const Gap(8),

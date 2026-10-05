@@ -273,7 +273,7 @@ class _ExtensionManagerContentState
   material.Widget _buildInstalledTab() {
     if (_loading) {
       return const material.Center(
-        child: material.CircularProgressIndicator(),
+        child: QueryaSpinner(size: QueryaSpinnerSize.lg),
       );
     }
     return material.Column(
@@ -342,7 +342,7 @@ class _ExtensionManagerContentState
   material.Widget _buildMarketplaceTab() {
     if (_loading) {
       return const material.Center(
-        child: material.CircularProgressIndicator(),
+        child: QueryaSpinner(size: QueryaSpinnerSize.lg),
       );
     }
     final theme = Theme.of(context).colorScheme;
@@ -431,7 +431,7 @@ class _ExtensionManagerContentState
   material.Widget _buildUpdatesTab() {
     if (_loading) {
       return const material.Center(
-        child: material.CircularProgressIndicator(),
+        child: QueryaSpinner(size: QueryaSpinnerSize.lg),
       );
     }
     final theme = Theme.of(context).colorScheme;
