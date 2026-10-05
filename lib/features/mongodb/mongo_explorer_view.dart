@@ -9,6 +9,7 @@ import 'package:querya_desktop/core/unsaved_work_guard.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
+import 'mongo_aggregation_workspace.dart';
 import 'mongo_collections_view.dart';
 import 'mongo_databases_view.dart';
 import 'mongo_documents_view.dart';
@@ -24,7 +25,7 @@ class _Crumb {
   final _Level level;
 }
 
-enum _Level { databases, collections, documents, document, stats }
+enum _Level { databases, collections, documents, document, stats, aggregation }
 
 // ─── Main explorer widget ───────────────────────────────────────────────────
 
@@ -52,6 +53,7 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
 
   // View mode
   bool _showStats = false;
+  bool _showAggregation = false;
 
   /// Bumped when the user taps Refresh in the breadcrumb bar (reload active view).
   int _refreshToken = 0;
@@ -155,6 +157,7 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
       _selectedDatabase = dbName;
       _selectedCollection = null;
       _selectedDocument = null;
+      _showAggregation = false;
     });
   }
 
@@ -163,12 +166,14 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
       _selectedCollection = collName;
       _lastSelectedCollection = collName;
       _selectedDocument = null;
+      _showAggregation = false;
     });
   }
 
   void _navigateToDocument(Map<String, dynamic> doc) {
     setState(() {
       _selectedDocument = doc;
+      _showAggregation = false;
     });
   }
 
@@ -177,6 +182,7 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
       _selectedDatabase = null;
       _selectedCollection = null;
       _selectedDocument = null;
+      _showAggregation = false;
     });
   }
 
@@ -184,12 +190,14 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
     setState(() {
       _selectedCollection = null;
       _selectedDocument = null;
+      _showAggregation = false;
     });
   }
 
   void _navigateToDocuments() {
     setState(() {
       _selectedDocument = null;
+      _showAggregation = false;
     });
   }
 
@@ -209,7 +217,9 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
       final id = _selectedDocument!['_id']?.toString() ?? 'Document';
       list.add(_Crumb(id, _Level.document));
     }
-    if (_showStats) {
+    if (_showAggregation) {
+      list.add(const _Crumb('Aggregation', _Level.aggregation));
+    } else if (_showStats) {
       list.add(const _Crumb('Statistics', _Level.stats));
     }
     return list;
@@ -218,13 +228,17 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
   Future<void> _onCrumbTap(_Crumb crumb) async {
     final leavesDocument = _selectedDocument != null &&
         crumb.level != _Level.document &&
-        crumb.level != _Level.stats;
+        crumb.level != _Level.stats &&
+        crumb.level != _Level.aggregation;
     if (leavesDocument) {
       if (!await confirmDiscardUnsavedWorkIfNeeded(context)) return;
       if (!mounted) return;
     }
     if (_showStats && crumb.level != _Level.stats) {
       setState(() => _showStats = false);
+    }
+    if (_showAggregation && crumb.level != _Level.aggregation) {
+      setState(() => _showAggregation = false);
     }
     switch (crumb.level) {
       case _Level.databases:
@@ -236,6 +250,8 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
       case _Level.document:
         break; // Already on the document
       case _Level.stats:
+        break;
+      case _Level.aggregation:
         break;
     }
   }
@@ -342,6 +358,19 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
   }
 
   material.Widget _buildContent(MongoConnection conn) {
+    // Aggregation workspace
+    if (_showAggregation &&
+        _selectedDatabase != null &&
+        _selectedCollection != null) {
+      return MongoAggregationWorkspace(
+        key: ValueKey('agg_${_selectedDatabase}_$_selectedCollection'),
+        connection: conn,
+        database: _selectedDatabase!,
+        collection: _selectedCollection!,
+        onBack: () => setState(() => _showAggregation = false),
+      );
+    }
+
     // Document editor
     if (_selectedDocument != null &&
         _selectedDatabase != null &&
@@ -370,6 +399,7 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
         collection: _selectedCollection!,
         refreshToken: _refreshToken + _documentsListInvalidation,
         onDocumentTap: _navigateToDocument,
+        onOpenAggregation: () => setState(() => _showAggregation = true),
       );
     }
 
