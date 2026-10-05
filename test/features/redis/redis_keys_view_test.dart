@@ -283,8 +283,8 @@ void main() {
     await tester.binding.setSurfaceSize(const material.Size(900, 700));
     final fake = RedisConnectionTestFake(
       firstScanKeys: const [
-        'user:100:profile',
-        'user:100:settings',
+        'user:profile',
+        'user:settings',
         'standalone',
       ],
       dbSizeResult: 3,
@@ -312,7 +312,7 @@ void main() {
     // In flat mode initially
     expect(find.text('Flat'), findsOneWidget);
     expect(find.text('Tree'), findsOneWidget);
-    expect(find.text('user:100:profile'), findsOneWidget);
+    expect(find.text('user:profile'), findsOneWidget);
     expect(find.text('standalone'), findsOneWidget);
 
     // Switch to Tree view
@@ -329,12 +329,12 @@ void main() {
     // Tap a leaf key
     await tester.tap(find.text('profile'));
     await tester.pumpAndSettle();
-    expect(tappedKey, 'user:100:profile');
+    expect(tappedKey, 'user:profile');
 
     // Switch back to Flat view
     await tester.tap(find.text('Flat'));
     await tester.pumpAndSettle();
-    expect(find.text('user:100:profile'), findsOneWidget);
+    expect(find.text('user:profile'), findsOneWidget);
     await fake.disconnect();
   });
 
@@ -343,8 +343,8 @@ void main() {
     await tester.binding.setSurfaceSize(const material.Size(900, 700));
     final fake = RedisConnectionTestFake(
       firstScanKeys: const [
-        'user:100:profile',
-        'user:100:settings',
+        'user:profile',
+        'user:settings',
       ],
       dbSizeResult: 2,
     );
@@ -394,8 +394,8 @@ void main() {
     await tester.binding.setSurfaceSize(const material.Size(900, 700));
     final fake = _DelTrackingFake(
       firstScanKeys: const [
-        'user:100:profile',
-        'user:100:settings',
+        'user:profile',
+        'user:settings',
         'standalone',
       ],
       dbSizeResult: 3,
@@ -422,15 +422,14 @@ void main() {
     await tester.tap(find.text('Tree'));
     await tester.pumpAndSettle();
 
-    final deleteFolderButton =
-        find.byTooltip('Delete folder (2 keys)');
+    final deleteFolderButton = find.byTooltip('Delete folder (2 keys)');
     expect(deleteFolderButton, findsOneWidget);
 
     // Tap delete folder, then Cancel
     await tester.tap(deleteFolderButton);
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('DEL user:100:profile'), findsOneWidget);
+    expect(find.textContaining('DEL user:profile'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
 
@@ -443,8 +442,8 @@ void main() {
     await tester.tap(find.text('Execute Destructive Statement'));
     await tester.pumpAndSettle();
 
-    expect(fake.deleted, contains('user:100:profile'));
-    expect(fake.deleted, contains('user:100:settings'));
+    expect(fake.deleted, contains('user:profile'));
+    expect(fake.deleted, contains('user:settings'));
     expect(find.text('user'), findsNothing);
     expect(find.text('standalone'), findsOneWidget);
     await fake.disconnect();

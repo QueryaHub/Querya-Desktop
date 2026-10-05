@@ -82,7 +82,7 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
         _loading = false;
         if (_viewMode == RedisKeyViewMode.tree && _expandedFolders.isEmpty) {
           final tree = _buildTree();
-          _expandedFolders.addAll(tree.rootFolders.map((f) => f.fullPrefix));
+          _expandedFolders.addAll(_collectAllFolderPrefixes(tree.rootFolders));
         }
       });
     } catch (e) {
@@ -520,7 +520,7 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
                       _expandedFolders.isEmpty) {
                     final tree = _buildTree();
                     _expandedFolders
-                        .addAll(tree.rootFolders.map((f) => f.fullPrefix));
+                        .addAll(_collectAllFolderPrefixes(tree.rootFolders));
                   }
                 });
               },
