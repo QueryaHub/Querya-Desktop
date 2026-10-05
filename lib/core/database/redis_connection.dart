@@ -859,7 +859,15 @@ class RedisConnectionTestFake extends RedisConnection {
         }
         return removed;
       case 'DEL':
-        return args.length - 1;
+        final allKeys = [...firstScanKeys, ...secondScanKeys];
+        var count = 0;
+        for (var i = 1; i < args.length; i++) {
+          final target = args[i].toString();
+          if (allKeys.contains(target)) {
+            count++;
+          }
+        }
+        return count;
       default:
         return null;
     }
