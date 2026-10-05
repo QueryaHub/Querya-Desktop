@@ -8,6 +8,8 @@ import 'package:querya_desktop/features/mongodb/mongo_documents_view.dart';
 import 'package:querya_desktop/features/mongodb/mongo_ejson.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
+import '../../support/querya_theme_test_shell.dart';
+
 void main() {
   group('MongoDocumentsViewMode', () {
     test('fromString parses correctly and defaults to table', () {
@@ -123,13 +125,9 @@ void main() {
       ];
 
       await tester.pumpWidget(
-        material.MaterialApp(
-          home: material.Scaffold(
-            body: ShadcnApp(
-              home: MongoDocumentsTableView(
-                documents: docs,
-              ),
-            ),
+        queryaThemeTestShell(
+          child: MongoDocumentsTableView(
+            documents: docs,
           ),
         ),
       );
@@ -157,13 +155,9 @@ void main() {
       ];
 
       await tester.pumpWidget(
-        material.MaterialApp(
-          home: material.Scaffold(
-            body: ShadcnApp(
-              home: MongoDocumentTreeView(
-                documents: docs,
-              ),
-            ),
+        queryaThemeTestShell(
+          child: MongoDocumentTreeView(
+            documents: docs,
           ),
         ),
       );
@@ -198,13 +192,9 @@ void main() {
       ];
 
       await tester.pumpWidget(
-        material.MaterialApp(
-          home: material.Scaffold(
-            body: ShadcnApp(
-              home: MongoDocumentsJsonView(
-                documents: docs,
-              ),
-            ),
+        queryaThemeTestShell(
+          child: MongoDocumentsJsonView(
+            documents: docs,
           ),
         ),
       );
