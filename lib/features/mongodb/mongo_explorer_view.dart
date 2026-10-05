@@ -84,6 +84,18 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
     if (oldWidget.connectionRow.id != widget.connectionRow.id) {
       _clearLocalConnectionRef();
       _connect();
+    } else {
+      if (oldWidget.database != widget.database && widget.database != null) {
+        _selectedDatabase = widget.database;
+      }
+      if (widget.initialCollection != null &&
+          widget.initialCollection != _selectedCollection) {
+        _navigateToCollection(widget.initialCollection!);
+      } else if (widget.initialCollection == null &&
+          oldWidget.initialCollection != null &&
+          _selectedCollection != null) {
+        _navigateToCollections();
+      }
     }
   }
 

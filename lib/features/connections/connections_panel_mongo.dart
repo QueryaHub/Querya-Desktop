@@ -12,6 +12,7 @@ class _MongoConnectionTile extends StatefulWidget {
     required this.onEdit,
     this.onTap,
     this.onDatabaseTap,
+    this.onCollectionTap,
     this.isExpanded = false,
     this.onExpandedChanged,
   });
@@ -24,6 +25,7 @@ class _MongoConnectionTile extends StatefulWidget {
   final VoidCallback onEdit;
   final VoidCallback? onTap;
   final void Function(String database)? onDatabaseTap;
+  final void Function(String database, String collection)? onCollectionTap;
   final bool isExpanded;
   final ValueChanged<bool>? onExpandedChanged;
 
@@ -99,25 +101,13 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
 
   Future<void> _deleteDatabase(String dbName) async {
     if (!mounted) return;
-    final ok = await showAppDialog<bool>(
+    final ok = await QueryaConfirmDialog.show(
       context: context,
-      barrierDismissible: true,
-      builder: (ctx) => material.AlertDialog(
-        title: const Text('Drop database?'),
-        content: Text(
+      title: 'Drop database?',
+      message:
           'Permanently delete database "$dbName"? This cannot be undone.',
-        ),
-        actions: [
-          OutlineButton(
-            onPressed: () => material.Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-          DestructiveButton(
-            onPressed: () => material.Navigator.of(ctx).pop(true),
-            child: const Text('Drop database'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Drop database',
+      isDestructive: true,
     );
     if (ok != true || !mounted) return;
     try {
@@ -295,6 +285,7 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
                       connection: widget.connection,
                       databases: _databases,
                       onDatabaseTap: widget.onDatabaseTap,
+                      onCollectionTap: widget.onCollectionTap,
                       onDeleteDatabase: _deleteDatabase,
                       onRefreshDatabases: () {
                         setState(() => _databases = []);
@@ -318,6 +309,7 @@ class _MongoDatabasesNode extends StatelessWidget {
     required this.onRefreshDatabases,
     required this.onDeleteDatabase,
     this.onDatabaseTap,
+    this.onCollectionTap,
   });
 
   final ConnectionRow connection;
@@ -325,6 +317,7 @@ class _MongoDatabasesNode extends StatelessWidget {
   final VoidCallback onRefreshDatabases;
   final Future<void> Function(String name) onDeleteDatabase;
   final void Function(String database)? onDatabaseTap;
+  final void Function(String database, String collection)? onCollectionTap;
 
   @override
   Widget build(BuildContext context) {
@@ -338,9 +331,11 @@ class _MongoDatabasesNode extends StatelessWidget {
         itemBuilder: (context, index) {
           final db = databases[index];
           return _MongoDatabaseNode(
+            key: material.ValueKey('mongo-db-${connection.id ?? 0}-$db'),
             connection: connection,
             name: db,
             onTap: () => onDatabaseTap?.call(db),
+            onCollectionTap: onCollectionTap,
             onDelete: () => onDeleteDatabase(db),
             onRefreshDatabases: onRefreshDatabases,
           );
@@ -350,13 +345,15 @@ class _MongoDatabasesNode extends StatelessWidget {
   }
 }
 
-class _MongoDatabaseNode extends StatelessWidget {
+class _MongoDatabaseNode extends StatefulWidget {
   const _MongoDatabaseNode({
+    super.key,
     required this.connection,
     required this.name,
     required this.onTap,
     required this.onDelete,
     required this.onRefreshDatabases,
+    this.onCollectionTap,
   });
 
   final ConnectionRow connection;
@@ -364,6 +361,275 @@ class _MongoDatabaseNode extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final VoidCallback onRefreshDatabases;
+  final void Function(String database, String collection)? onCollectionTap;
+
+  @override
+  State<_MongoDatabaseNode> createState() => _MongoDatabaseNodeState();
+}
+
+class _MongoDatabaseNodeState extends State<_MongoDatabaseNode> {
+  bool _expanded = false;
+  bool _loading = false;
+  String? _error;
+  List<String> _collections = [];
+  final _filterController = material.TextEditingController();
+  final _filterDebouncer = FilterDebouncer();
+  String _filter = '';
+
+  @override
+  void dispose() {
+    _filterDebouncer.cancel();
+    _filterController.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    setState(() => _expanded = !_expanded);
+    if (_expanded && _collections.isEmpty && !_loading) {
+      _loadCollections();
+    }
+  }
+
+  Future<void> _loadCollections() async {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final conn =
+          await MongoService.instance.ensureConnected(widget.connection);
+      final colls = await conn.listCollections(widget.name);
+      colls.sort();
+      if (!mounted) return;
+      setState(() {
+        _collections = colls;
+        _loading = false;
+        _error = null;
+      });
+      final cacheId = widget.connection.id;
+      if (cacheId != null) {
+        QueryaSchemaObjectCache.instance.merge(
+          cacheId,
+          QueryaSchemaObjectCache.scopeMongo(widget.name),
+          [
+            for (final name in colls)
+              QueryaSchemaObject.mongo(
+                database: widget.name,
+                name: name,
+              ),
+          ],
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _dropCollection(String collName) async {
+    if (!mounted) return;
+    final ok = await QueryaConfirmDialog.show(
+      context: context,
+      title: 'Drop collection?',
+      message:
+          'Permanently delete collection "$collName" from database "${widget.name}"? This cannot be undone.',
+      confirmLabel: 'Drop collection',
+      isDestructive: true,
+    );
+    if (ok != true || !mounted) return;
+    try {
+      final conn =
+          await MongoService.instance.ensureConnected(widget.connection);
+      await MongoService.instance.dropCollection(conn, widget.name, collName);
+      if (mounted) {
+        await _loadCollections();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final query = _filter.trim().toLowerCase();
+    final matching = query.isEmpty
+        ? _collections
+        : _collections.where((it) => it.toLowerCase().contains(query)).toList();
+
+    final showFilter = _collections.length >= 8 || _filter.isNotEmpty;
+
+    return QueryaTreeIndentGuide(
+      depth: 1,
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.start,
+        mainAxisSize: material.MainAxisSize.min,
+        children: [
+          _ConnectionsTreeSelectionBuilder<bool>(
+            select: (sel) =>
+                sel.selectedConnectionId == widget.connection.id &&
+                sel.selectedMongoDb == widget.name &&
+                sel.selectedMongoCollection == null,
+            builder: (context, isSelected) {
+              return QueryaConnectionTreeRow(
+                label: widget.name,
+                isSelected: isSelected,
+                leading: material.MouseRegion(
+                  cursor: material.SystemMouseCursors.click,
+                  child: material.InkWell(
+                    onTap: _toggle,
+                    borderRadius: material.BorderRadius.circular(4),
+                    child: material.AnimatedRotation(
+                      turns: _expanded ? 0.25 : 0,
+                      duration: context.motionDuration(QueryaMotion.treeExpand),
+                      curve: context.motionCurve(QueryaMotion.treeExpandCurve),
+                      child: material.Icon(
+                        QueryaIcons.expandClosed,
+                        size: QueryaIconSizes.treeExpand,
+                        color: theme.colorScheme.mutedForeground,
+                      ),
+                    ),
+                  ),
+                ),
+                icon: QueryaIcons.database,
+                iconSize: QueryaIconSizes.treeConnection,
+                iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
+                textStyle: material.TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.foreground,
+                ),
+                verticalPadding: 3,
+                expanded: _expanded,
+                onTap: () {
+                  widget.onTap();
+                  if (!_expanded) {
+                    _toggle();
+                  }
+                },
+                connection: widget.connection,
+                onContextRefresh: () {
+                  widget.onRefreshDatabases();
+                  if (_expanded) {
+                    _loadCollections();
+                  }
+                },
+                onOpenSqlWorkspace: null,
+                onContextDelete: widget.onDelete,
+                contextDeleteLabel: 'Delete database',
+              );
+            },
+          ),
+          QueryaAnimatedExpand(
+            expanded: _expanded,
+            estimatedChildCount: _collections.length,
+            child: material.Column(
+              mainAxisSize: material.MainAxisSize.min,
+              crossAxisAlignment: material.CrossAxisAlignment.stretch,
+              children: [
+                if (_loading)
+                  const ConnectionTreeLoadingRow.nested()
+                else if (_error != null)
+                  TreeLoadError(
+                    title: 'Could not load collections',
+                    message: _error!,
+                    onRetry: _loadCollections,
+                  )
+                else ...[
+                  if (showFilter)
+                    TreeObjectFilterBar(
+                      controller: _filterController,
+                      hintText: 'Filter collections...',
+                      onChanged: (val) => _filterDebouncer.run(() {
+                        if (mounted) setState(() => _filter = val);
+                      }),
+                      onClear: () {
+                        _filterDebouncer.cancel();
+                        setState(() {
+                          _filter = '';
+                          _filterController.clear();
+                        });
+                      },
+                      filteredCount: matching.length,
+                      totalCount: _collections.length,
+                    ),
+                  if (matching.isEmpty && _collections.isNotEmpty)
+                    material.Padding(
+                      padding: QueryaTreeTokens.emptyFilterPadding,
+                      child: const Text('No matching collections')
+                          .muted()
+                          .xSmall(),
+                    )
+                  else if (_collections.isEmpty && !_loading)
+                    material.Padding(
+                      padding: const material.EdgeInsets.only(
+                        left: 28,
+                        top: 4,
+                        bottom: 4,
+                      ),
+                      child: const Text('No collections')
+                          .muted()
+                          .xSmall(),
+                    )
+                  else
+                    QueryaTreeIndentGuide(
+                      depth: 1,
+                      child: lazyConnectionTreeList(
+                        context: context,
+                        itemCount: matching.length,
+                        itemExtent: kConnectionTreeRowExtent,
+                        itemBuilder: (context, index) {
+                          final collName = matching[index];
+                          return _MongoCollectionNode(
+                            key: material.ValueKey(
+                              'mongo-col-${widget.connection.id}-${widget.name}-$collName',
+                            ),
+                            connection: widget.connection,
+                            database: widget.name,
+                            name: collName,
+                            onTap: () {
+                              widget.onCollectionTap?.call(widget.name, collName);
+                            },
+                            onRefreshCollections: _loadCollections,
+                            onDropCollection: _dropCollection,
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MongoCollectionNode extends StatelessWidget {
+  const _MongoCollectionNode({
+    super.key,
+    required this.connection,
+    required this.database,
+    required this.name,
+    required this.onTap,
+    required this.onRefreshCollections,
+    required this.onDropCollection,
+  });
+
+  final ConnectionRow connection;
+  final String database;
+  final String name;
+  final VoidCallback onTap;
+  final VoidCallback onRefreshCollections;
+  final Future<void> Function(String name) onDropCollection;
 
   @override
   Widget build(BuildContext context) {
@@ -371,28 +637,64 @@ class _MongoDatabaseNode extends StatelessWidget {
     return _ConnectionsTreeSelectionBuilder<bool>(
       select: (sel) =>
           sel.selectedConnectionId == connection.id &&
-          sel.selectedMongoDb == name,
+          sel.selectedMongoDb == database &&
+          sel.selectedMongoCollection == name,
       builder: (context, isSelected) {
-        return QueryaTreeIndentGuide(
-          depth: 1,
-          padding: const material.EdgeInsets.only(top: 2, bottom: 2),
+        return ContextMenu(
+          items: [
+            MenuButton(
+              leading: material.Icon(
+                material.Icons.description_outlined,
+                size: 18,
+                color: theme.colorScheme.primary,
+              ),
+              onPressed: (_) => onTap(),
+              child: const Text('Open collection'),
+            ),
+            MenuButton(
+              leading: material.Icon(
+                material.Icons.copy_rounded,
+                size: 18,
+                color: theme.colorScheme.mutedForeground,
+              ),
+              onPressed: (_) {
+                Clipboard.setData(ClipboardData(text: name));
+              },
+              child: const Text('Copy name'),
+            ),
+            const MenuDivider(),
+            MenuButton(
+              leading: material.Icon(
+                material.Icons.refresh_rounded,
+                size: 18,
+                color: theme.colorScheme.mutedForeground,
+              ),
+              onPressed: (_) => onRefreshCollections(),
+              child: const Text('Refresh'),
+            ),
+            MenuButton(
+              leading: material.Icon(
+                material.Icons.delete_outline_rounded,
+                size: 18,
+                color: theme.colorScheme.destructive,
+              ),
+              onPressed: (_) => onDropCollection(name),
+              child: const Text('Drop collection'),
+            ),
+          ],
           child: QueryaConnectionTreeRow(
             label: name,
             isSelected: isSelected,
-            icon: QueryaIcons.database,
-            iconSize: QueryaIconSizes.treeConnection,
-            iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
+            icon: material.Icons.table_chart_outlined,
+            iconSize: QueryaIconSizes.treeLeaf,
+            iconColor: QueryaTreeTokens.leafIconColor(theme.colorScheme.primary),
             textStyle: material.TextStyle(
-              fontSize: 12,
+              fontSize: 11,
               color: theme.colorScheme.foreground,
             ),
-            verticalPadding: 3,
+            verticalPadding: 2,
             onTap: onTap,
-            connection: connection,
-            onContextRefresh: onRefreshDatabases,
-            onOpenSqlWorkspace: null,
-            onContextDelete: onDelete,
-            contextDeleteLabel: 'Delete database',
+            connection: null,
           ),
         );
       },

@@ -411,12 +411,40 @@ class _MainScreenState extends State<MainScreen> {
   ) async {
     final ws = _workspace.value;
     if (ws.activeConnection?.id == connection.id &&
-        ws.activeMongoDB == database) {
+        ws.activeMongoDB == database &&
+        ws.selectedMongoCollection == null) {
       return;
     }
     if (!await _allowUnsavedNavigation()) return;
     if (!mounted) return;
+    setState(() => _pendingMongoCollection = null);
     _workspace.value = _workspace.value.selectMongoDb(connection, database);
+  }
+
+  void _onMongoCollectionSelected(
+    ConnectionRow connection,
+    String database,
+    String collection,
+  ) {
+    unawaited(_selectMongoCollection(connection, database, collection));
+  }
+
+  Future<void> _selectMongoCollection(
+    ConnectionRow connection,
+    String database,
+    String collection,
+  ) async {
+    final ws = _workspace.value;
+    if (ws.activeConnection?.id == connection.id &&
+        ws.activeMongoDB == database &&
+        ws.selectedMongoCollection == collection) {
+      return;
+    }
+    if (!await _allowUnsavedNavigation()) return;
+    if (!mounted) return;
+    setState(() => _pendingMongoCollection = collection);
+    _workspace.value =
+        _workspace.value.selectMongoCollection(connection, database, collection);
   }
 
   void _onPostgresOpenSqlWorkspace(
@@ -609,10 +637,10 @@ class _MainScreenState extends State<MainScreen> {
           );
         }
       case QueryaSchemaObjectKind.collection:
-        setState(() => _pendingMongoCollection = object.name);
-        _onMongoDBDatabaseSelected(
+        _onMongoCollectionSelected(
           conn,
           object.database ?? conn.databaseName ?? '',
+          object.name,
         );
     }
   }
@@ -1047,6 +1075,7 @@ class _MainScreenState extends State<MainScreen> {
                         onExtensionObjectSelected: _onExtensionObjectSelected,
                         onRedisDatabaseSelected: _onRedisDatabaseSelected,
                         onMongoDBDatabaseSelected: _onMongoDBDatabaseSelected,
+                        onMongoCollectionSelected: _onMongoCollectionSelected,
                         onPostgresOpenSqlWorkspace: _onPostgresOpenSqlWorkspace,
                         onMysqlOpenSqlWorkspace: _onMysqlOpenSqlWorkspace,
                         onSqliteOpenSqlWorkspace: _onSqliteOpenSqlWorkspace,
@@ -1112,6 +1141,7 @@ class _MainContentSplit extends StatefulWidget {
     required this.onExtensionObjectSelected,
     required this.onRedisDatabaseSelected,
     required this.onMongoDBDatabaseSelected,
+    required this.onMongoCollectionSelected,
     required this.onPostgresOpenSqlWorkspace,
     required this.onMysqlOpenSqlWorkspace,
     required this.onSqliteOpenSqlWorkspace,
@@ -1154,6 +1184,7 @@ class _MainContentSplit extends StatefulWidget {
   ) onExtensionObjectSelected;
   final void Function(ConnectionRow, int) onRedisDatabaseSelected;
   final void Function(ConnectionRow, String) onMongoDBDatabaseSelected;
+  final void Function(ConnectionRow, String, String) onMongoCollectionSelected;
   final OnPostgresOpenSqlWorkspace onPostgresOpenSqlWorkspace;
   final void Function(ConnectionRow) onMysqlOpenSqlWorkspace;
   final void Function(ConnectionRow) onSqliteOpenSqlWorkspace;
@@ -1357,6 +1388,8 @@ class _MainContentSplitState extends State<_MainContentSplit>
                 widget.onRedisDatabaseSelected,
             onMongoDBDatabaseSelected:
                 widget.onMongoDBDatabaseSelected,
+            onMongoCollectionSelected:
+                widget.onMongoCollectionSelected,
             onPostgresObjectSelected:
                 widget.onPostgresObjectSelected,
             onPostgresOpenSqlWorkspace:
@@ -1546,6 +1579,7 @@ class _MainContentSplitState extends State<_MainContentSplit>
                           onRequestOpenTour: widget.onRequestOpenTour,
                           onOpenConnection: widget.onOpenConnection,
                           initialMongoCollection: widget.initialMongoCollection,
+                          selectedMongoCollection: ws.selectedMongoCollection,
                         );
                       },
                     ),
@@ -1571,6 +1605,7 @@ class _ConnectionsPanelSlot extends StatefulWidget {
     required this.onSqliteObjectSelected,
     required this.onRedisDatabaseSelected,
     required this.onMongoDBDatabaseSelected,
+    required this.onMongoCollectionSelected,
     required this.onPostgresOpenSqlWorkspace,
     required this.onMysqlOpenSqlWorkspace,
     required this.onSqliteOpenSqlWorkspace,
@@ -1600,6 +1635,7 @@ class _ConnectionsPanelSlot extends StatefulWidget {
   ) onSqliteObjectSelected;
   final void Function(ConnectionRow, int) onRedisDatabaseSelected;
   final void Function(ConnectionRow, String) onMongoDBDatabaseSelected;
+  final void Function(ConnectionRow, String, String) onMongoCollectionSelected;
   final OnPostgresOpenSqlWorkspace onPostgresOpenSqlWorkspace;
   final void Function(ConnectionRow) onMysqlOpenSqlWorkspace;
   final void Function(ConnectionRow) onSqliteOpenSqlWorkspace;
@@ -1642,9 +1678,11 @@ class _ConnectionsPanelSlotState extends State<_ConnectionsPanelSlot> {
       selectedExtensionObject: ws.selectedExtensionObject,
       selectedRedisDb: ws.activeRedisDb,
       selectedMongoDb: ws.activeMongoDB,
+      selectedMongoCollection: ws.selectedMongoCollection,
       onConnectionSelected: widget.onConnectionSelected,
       onRedisDatabaseSelected: widget.onRedisDatabaseSelected,
       onMongoDBDatabaseSelected: widget.onMongoDBDatabaseSelected,
+      onMongoCollectionSelected: widget.onMongoCollectionSelected,
       onPostgresObjectSelected: widget.onPostgresObjectSelected,
       onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
       onMysqlObjectSelected: widget.onMysqlObjectSelected,

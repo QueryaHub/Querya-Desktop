@@ -70,6 +70,7 @@ class WorkspacePanel extends StatefulWidget {
     this.onRequestOpenTour,
     this.onOpenConnection,
     this.initialMongoCollection,
+    this.selectedMongoCollection,
   });
 
   final VoidCallback? onRequestLaunchDemo;
@@ -86,6 +87,9 @@ class WorkspacePanel extends StatefulWidget {
   /// When set, the user selected a specific MongoDB database in the sidebar tree.
   /// null = show stats, non-null = show data explorer for that db.
   final String? selectedMongoDb;
+
+  /// When set, the user selected a specific MongoDB collection in the sidebar tree.
+  final String? selectedMongoCollection;
 
   /// When set, the user selected a PostgreSQL object in the sidebar tree.
   /// null = show stats, non-null = show table/grid or definition view.
@@ -324,7 +328,8 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
                   key: ValueKey('mongo_${activeConn.id}_db_$mongoDb'),
                   connectionRow: activeConn,
                   database: mongoDb,
-                  initialCollection: widget.initialMongoCollection,
+                  initialCollection: widget.selectedMongoCollection ??
+                      widget.initialMongoCollection,
                 ),
         );
         break;
