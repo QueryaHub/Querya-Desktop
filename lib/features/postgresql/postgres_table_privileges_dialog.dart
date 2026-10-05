@@ -164,7 +164,7 @@ class _PrivilegesDialogBodyState extends material.State<_PrivilegesDialogBody> {
   material.Widget _buildListArea(ColorScheme theme) {
     if (_loading) {
       return const material.Center(
-        child: material.CircularProgressIndicator(strokeWidth: 2),
+        child: QueryaSpinner(size: QueryaSpinnerSize.md),
       );
     }
     if (_error != null) {

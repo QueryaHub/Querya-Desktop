@@ -11,7 +11,7 @@ Future<Color?> showThemeColorPickerDialog({
   return showAppDialog<Color>(
     context: context,
     builder: (dialogContext) {
-      return material.AlertDialog(
+      return QueryaModalDialog(
         title: const material.Text('Pick color'),
         content: material.SizedBox(
           width: 320,
@@ -22,11 +22,11 @@ Future<Color?> showThemeColorPickerDialog({
           ),
         ),
         actions: [
-          material.TextButton(
+          OutlineButton(
             onPressed: () => material.Navigator.pop(dialogContext),
             child: const material.Text('Cancel'),
           ),
-          material.TextButton(
+          PrimaryButton(
             onPressed: () =>
                 material.Navigator.pop(dialogContext, picked.toColor()),
             child: const material.Text('Apply'),

@@ -136,18 +136,10 @@ class _SqliteOverviewTabState extends material.State<SqliteOverviewTab> {
     final cs = Theme.of(context).colorScheme;
 
     if (_loading && _overview == null) {
-      return material.Center(
-        child: material.Row(
-          mainAxisSize: material.MainAxisSize.min,
-          children: [
-            const material.SizedBox(
-              width: 16,
-              height: 16,
-              child: material.CircularProgressIndicator(strokeWidth: 2),
-            ),
-            const Gap(12),
-            const Text('Loading database overview...').muted().small(),
-          ],
+      return const material.Center(
+        child: QueryaSpinner(
+          size: QueryaSpinnerSize.sm,
+          label: 'Loading database overview...',
         ),
       );
     }

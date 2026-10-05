@@ -99,7 +99,7 @@ class _PostgresIndexListViewState
       return material.Container(
         color: cs.background,
         child: const material.Center(
-          child: material.CircularProgressIndicator(strokeWidth: 2),
+          child: QueryaSpinner(size: QueryaSpinnerSize.md),
         ),
       );
     }
@@ -279,7 +279,7 @@ class _PostgresTriggerListViewState
       return material.Container(
         color: cs.background,
         child: const material.Center(
-          child: material.CircularProgressIndicator(strokeWidth: 2),
+          child: QueryaSpinner(size: QueryaSpinnerSize.md),
         ),
       );
     }
@@ -449,7 +449,7 @@ class _PostgresTypeListViewState extends material.State<PostgresTypeListView> {
     final cs = Theme.of(context).colorScheme;
     if (_loading) {
       return const material.Center(
-        child: material.CircularProgressIndicator(strokeWidth: 2),
+        child: QueryaSpinner(size: QueryaSpinnerSize.md),
       );
     }
     if (_error != null) {
@@ -601,7 +601,7 @@ class _PostgresExtensionListViewState
     final cs = Theme.of(context).colorScheme;
     if (_loading) {
       return const material.Center(
-        child: material.CircularProgressIndicator(strokeWidth: 2),
+        child: QueryaSpinner(size: QueryaSpinnerSize.md),
       );
     }
     if (_error != null) {
@@ -750,7 +750,7 @@ class _PostgresFdwListViewState extends material.State<PostgresFdwListView> {
     final cs = Theme.of(context).colorScheme;
     if (_loading) {
       return const material.Center(
-        child: material.CircularProgressIndicator(strokeWidth: 2),
+        child: QueryaSpinner(size: QueryaSpinnerSize.md),
       );
     }
     if (_error != null) {

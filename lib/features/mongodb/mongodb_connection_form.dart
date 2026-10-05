@@ -664,13 +664,10 @@ class _MongoConnectionFormContentState
                           onPressed:
                               formValid && !_isTesting ? _testConnection : null,
                           leading: _isTesting
-                              ? material.SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: material.CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: theme.primary,
-                                  ),
+                              ? QueryaSpinner(
+                                  customDimension: 18,
+                                  strokeWidth: 2,
+                                  color: theme.primary,
                                 )
                               : material.Icon(
                                   material.Icons.link_rounded,

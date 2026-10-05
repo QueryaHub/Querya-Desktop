@@ -18,25 +18,14 @@ String mysqlSqlToolbarTxLabel(bool? txOpen) {
 Future<bool> confirmLeaveOpenMysqlTransaction(
   material.BuildContext context,
 ) async {
-  final ok = await showAppDialog<bool>(
+  final ok = await QueryaConfirmDialog.show(
     context: context,
-    builder: (ctx) => material.AlertDialog(
-      title: const material.Text('Open transaction'),
-      content: const material.Text(
-        'The SQL tab has an open transaction. Leave anyway? '
+    title: 'Open transaction',
+    message: 'The SQL tab has an open transaction. Leave anyway? '
         'Uncommitted work may be lost if the session ends.',
-      ),
-      actions: [
-        material.TextButton(
-          onPressed: () => material.Navigator.of(ctx).pop(false),
-          child: const material.Text('Stay'),
-        ),
-        material.TextButton(
-          onPressed: () => material.Navigator.of(ctx).pop(true),
-          child: const material.Text('Leave'),
-        ),
-      ],
-    ),
+    confirmLabel: 'Leave',
+    cancelLabel: 'Stay',
+    isDestructive: true,
   );
   return ok == true;
 }

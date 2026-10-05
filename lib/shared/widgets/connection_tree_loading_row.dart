@@ -2,6 +2,8 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/ui/querya_tree_tokens.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
+import 'querya_spinner.dart';
+
 /// Compact inline spinner row used while connection trees lazy-load children.
 class ConnectionTreeLoadingRow extends material.StatelessWidget {
   const ConnectionTreeLoadingRow.connection({
@@ -32,10 +34,9 @@ class ConnectionTreeLoadingRow extends material.StatelessWidget {
       padding: padding,
       child: material.Row(
         children: [
-          material.SizedBox(
-            width: spinnerSize,
-            height: spinnerSize,
-            child: material.CircularProgressIndicator(strokeWidth: strokeWidth),
+          QueryaSpinner(
+            customDimension: spinnerSize,
+            strokeWidth: strokeWidth,
           ),
           Gap(gap),
           Text(label).muted().xSmall(),

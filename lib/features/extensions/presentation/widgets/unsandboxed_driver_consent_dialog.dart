@@ -8,7 +8,7 @@ Future<bool> showUnsandboxedDriverConsentDialog(
 ) async {
   final approved = await showAppDialog<bool>(
     context: context,
-    builder: (dialogContext) => material.AlertDialog(
+    builder: (dialogContext) => QueryaModalDialog(
       title: const material.Text('Run driver without OS sandbox?'),
       content: material.SizedBox(
         width: 440,

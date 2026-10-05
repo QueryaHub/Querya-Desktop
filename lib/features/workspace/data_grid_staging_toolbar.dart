@@ -148,13 +148,9 @@ class DataGridStagingToolbar extends StatelessWidget {
                       size: ButtonSize.small,
                       onPressed: isDirty && !isSaving ? onApplyChanges : null,
                       leading: isSaving
-                          ? material.SizedBox(
-                              width: 12,
-                              height: 12,
-                              child: material.CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: cs.primaryForeground,
-                              ),
+                          ? QueryaSpinner(
+                              size: QueryaSpinnerSize.sm,
+                              color: cs.primaryForeground,
                             )
                           : const material.Icon(
                               material.Icons.save_rounded,

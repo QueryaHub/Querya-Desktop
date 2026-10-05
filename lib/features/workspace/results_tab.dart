@@ -255,19 +255,11 @@ class _ResultsTabState extends material.State<ResultsTab> {
   @override
   material.Widget build(material.BuildContext context) {
     if (widget.isLoading) {
-      return material.Center(
-        key: const material.ValueKey('results_mode_loading'),
-        child: material.Row(
-          mainAxisSize: material.MainAxisSize.min,
-          children: [
-            const material.SizedBox(
-              width: 16,
-              height: 16,
-              child: material.CircularProgressIndicator(strokeWidth: 2),
-            ),
-            const Gap(12),
-            const Text('Executing query...').muted().small(),
-          ],
+      return const material.Center(
+        key: material.ValueKey('results_mode_loading'),
+        child: QueryaSpinner(
+          size: QueryaSpinnerSize.sm,
+          label: 'Executing query...',
         ),
       );
     }

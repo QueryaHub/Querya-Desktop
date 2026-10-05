@@ -210,13 +210,7 @@ class ExtensionTableToolbar extends material.StatelessWidget {
                             size: ButtonSize.small,
                             onPressed: loading || isRestarting ? null : onRestartDriver,
                             leading: isRestarting
-                                ? const material.SizedBox(
-                                    width: 14,
-                                    height: 14,
-                                    child: material.CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
+                                ? const QueryaSpinner(size: QueryaSpinnerSize.sm)
                                 : const material.Icon(
                                     material.Icons.restart_alt_rounded,
                                     size: 15,

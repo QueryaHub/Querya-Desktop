@@ -487,13 +487,9 @@ class _GridCellInspectorDialogState
                           density: ButtonDensity.compact,
                           onPressed: _savingToDb ? null : _saveToDatabase,
                           leading: _savingToDb
-                              ? material.SizedBox(
-                                  width: 12,
-                                  height: 12,
-                                  child: material.CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: cs.primaryForeground,
-                                  ),
+                              ? QueryaSpinner(
+                                  size: QueryaSpinnerSize.sm,
+                                  color: cs.primaryForeground,
                                 )
                               : const material.Icon(
                                   material.Icons.save_rounded,

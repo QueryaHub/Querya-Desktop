@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
-import 'package:querya_desktop/shared/widgets/querya_dropdown_tokens.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Result of an async theme preview load for [ThemePreviewCard].
 sealed class ThemePreviewResult {
@@ -55,13 +54,10 @@ class ThemePreviewCard extends material.StatelessWidget {
         borderColor: appScheme.border,
         child: material.Row(
           children: [
-            material.SizedBox(
-              width: context.scaled(14),
-              height: context.scaled(14),
-              child: material.CircularProgressIndicator(
-                strokeWidth: 2,
-                color: appScheme.mutedForeground,
-              ),
+            QueryaSpinner(
+              customDimension: context.scaled(14),
+              strokeWidth: 2,
+              color: appScheme.mutedForeground,
             ),
             material.SizedBox(width: context.scaled(8)),
             material.Text(

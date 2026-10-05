@@ -447,7 +447,7 @@ class UpdateDialogContentState extends material.State<UpdateDialogContent> {
       UpdateDialogPhase.checking => const material.Center(
           child: material.Padding(
             padding: material.EdgeInsets.all(32),
-            child: material.CircularProgressIndicator(),
+            child: QueryaSpinner(size: QueryaSpinnerSize.lg),
           ),
         ),
       UpdateDialogPhase.upToDate => material.Padding(

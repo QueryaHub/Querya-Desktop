@@ -8,8 +8,7 @@ import 'package:querya_desktop/core/database/redis_bulk.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
-import 'package:querya_desktop/shared/widgets/app_toast.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Known Redis commands for auto-completion.
 const List<String> kRedisCommands = [
@@ -770,11 +769,7 @@ class _RedisCliWorkspaceState extends material.State<RedisCliWorkspace> {
                   onPressed: _executing ? null : _submitCommand,
                   size: ButtonSize.small,
                   leading: _executing
-                      ? const material.SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: material.CircularProgressIndicator(strokeWidth: 2),
-                        )
+                      ? const QueryaSpinner(size: QueryaSpinnerSize.sm)
                       : const material.Icon(
                           material.Icons.play_arrow_rounded,
                           size: 16,

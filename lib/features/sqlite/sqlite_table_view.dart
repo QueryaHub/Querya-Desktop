@@ -537,7 +537,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
       context: context,
       barrierDismissible: false,
       builder: (_) => const material.Center(
-        child: material.CircularProgressIndicator(),
+        child: QueryaSpinner(size: QueryaSpinnerSize.lg),
       ),
     ));
     try {
