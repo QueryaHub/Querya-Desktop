@@ -59,7 +59,10 @@ class WorkspacePanel extends StatefulWidget {
     this.lastSelectedSqliteObject,
     this.lastSelectedExtensionObject,
     this.lastSelectedMongoDb,
+    this.lastSelectedMongoCollection,
     this.lastSelectedRedisDb,
+    this.selectedRedisKey,
+    this.lastSelectedRedisKey,
     this.onNavigateHome,
     this.onRestoreLastSelectedObject,
     this.isReadOnly = false,
@@ -164,8 +167,17 @@ class WorkspacePanel extends StatefulWidget {
   /// Last MongoDB database for 1-click return from stats.
   final String? lastSelectedMongoDb;
 
+  /// Last MongoDB collection for 1-click return from stats.
+  final String? lastSelectedMongoCollection;
+
   /// Last Redis database index for 1-click return from stats.
   final int? lastSelectedRedisDb;
+
+  /// Currently selected Redis key, if any.
+  final String? selectedRedisKey;
+
+  /// Last Redis key for 1-click return from stats.
+  final String? lastSelectedRedisKey;
 
   /// Collection to open in [MongoExplorerView] after Quick Switcher jump.
   final String? initialMongoCollection;
@@ -320,6 +332,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
             key: ValueKey('mongo_stats_${activeConn.id}'),
             connectionRow: activeConn,
             lastSelectedMongoDb: widget.lastSelectedMongoDb,
+            lastSelectedMongoCollection: widget.lastSelectedMongoCollection,
             onRestoreLastSelectedObject: widget.onRestoreLastSelectedObject,
           ),
           object: mongoDb == null
@@ -341,6 +354,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
             key: ValueKey('redis_stats_${activeConn.id}'),
             connectionRow: activeConn,
             lastSelectedRedisDb: widget.lastSelectedRedisDb,
+            lastSelectedRedisKey: widget.lastSelectedRedisKey,
             onRestoreLastSelectedObject: widget.onRestoreLastSelectedObject,
           ),
           object: redisDb == null
@@ -349,6 +363,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
                   key: ValueKey('redis_${activeConn.id}_db_$redisDb'),
                   connectionRow: activeConn,
                   database: redisDb,
+                  initialKey: widget.selectedRedisKey,
                   isReadOnly: widget.isReadOnly,
                 ),
         );

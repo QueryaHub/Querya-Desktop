@@ -21,6 +21,7 @@ class MongoStatsView extends material.StatefulWidget {
     this.connection,
     this.onBack,
     this.lastSelectedMongoDb,
+    this.lastSelectedMongoCollection,
     this.onRestoreLastSelectedObject,
   });
 
@@ -35,6 +36,9 @@ class MongoStatsView extends material.StatefulWidget {
 
   /// Remembers the last visited database for 1-click return from stats.
   final String? lastSelectedMongoDb;
+
+  /// Remembers the last visited collection for 1-click return from stats.
+  final String? lastSelectedMongoCollection;
   final material.VoidCallback? onRestoreLastSelectedObject;
 
   @override
@@ -208,6 +212,26 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
 
     final cs = Theme.of(context).colorScheme;
 
+    return material.Container(
+      color: cs.background,
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
+          material.Padding(
+            padding: const material.EdgeInsets.fromLTRB(24, 20, 24, 16),
+            child: _header(context),
+          ),
+          const Divider(height: 1),
+          material.Expanded(
+            child: _buildBody(context, cs),
+          ),
+        ],
+      ),
+    );
+  }
+
+  material.Widget _buildBody(
+      material.BuildContext context, shadcn.ColorScheme cs) {
     if (_loading) {
       return const material.Center(
         child: QueryaSpinner(
@@ -273,25 +297,21 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
       );
     }
 
-    return material.Container(
-      color: cs.background,
-      child: material.RefreshIndicator(
-        onRefresh: _refreshNow,
-        child: material.LayoutBuilder(
-          builder: (context, constraints) {
-            final contentWidth = math.max(0.0, constraints.maxWidth - 48);
-            return material.SingleChildScrollView(
-              physics: const material.AlwaysScrollableScrollPhysics(),
-              padding: const material.EdgeInsets.all(24),
-              child: material.SizedBox(
-                width: contentWidth,
-                child: material.Column(
-                  mainAxisSize: material.MainAxisSize.min,
-                  crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                  children: [
-                    _header(context),
-                    const Gap(24),
-                    _summaryChips(context, status),
+    return material.RefreshIndicator(
+      onRefresh: _refreshNow,
+      child: material.LayoutBuilder(
+        builder: (context, constraints) {
+          final contentWidth = math.max(0.0, constraints.maxWidth - 48);
+          return material.SingleChildScrollView(
+            physics: const material.AlwaysScrollableScrollPhysics(),
+            padding: const material.EdgeInsets.all(24),
+            child: material.SizedBox(
+              width: contentWidth,
+              child: material.Column(
+                mainAxisSize: material.MainAxisSize.min,
+                crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                children: [
+                  _summaryChips(context, status),
                     const Gap(24),
                     _gridRow(
                       _memoryCard(context, status),
@@ -345,8 +365,7 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
             );
           },
         ),
-      ),
-    );
+      );
   }
 
   material.Widget _header(material.BuildContext context) {
@@ -394,7 +413,17 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
           alignment: material.WrapAlignment.end,
           crossAxisAlignment: material.WrapCrossAlignment.center,
           children: [
-            if (widget.lastSelectedMongoDb != null &&
+            if (widget.lastSelectedMongoCollection != null &&
+                widget.onRestoreLastSelectedObject != null)
+              OutlineButton(
+                onPressed: widget.onRestoreLastSelectedObject,
+                leading: const material.Icon(
+                  material.Icons.table_chart_outlined,
+                  size: 18,
+                ),
+                child: Text('Return to ${widget.lastSelectedMongoCollection}'),
+              )
+            else if (widget.lastSelectedMongoDb != null &&
                 widget.onRestoreLastSelectedObject != null)
               OutlineButton(
                 onPressed: widget.onRestoreLastSelectedObject,

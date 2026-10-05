@@ -1562,7 +1562,11 @@ class _MainContentSplitState extends State<_MainContentSplit>
                           lastSelectedExtensionObject:
                               ws.lastSelectedExtensionObject,
                           lastSelectedMongoDb: ws.lastSelectedMongoDb,
+                          lastSelectedMongoCollection:
+                              ws.lastSelectedMongoCollection,
                           lastSelectedRedisDb: ws.lastSelectedRedisDb,
+                          selectedRedisKey: ws.selectedRedisKey,
+                          lastSelectedRedisKey: ws.lastSelectedRedisKey,
                           onNavigateHome: () {
                             widget.workspace.value =
                                 widget.workspace.value.unselectActiveObject();

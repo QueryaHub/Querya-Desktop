@@ -45,6 +45,7 @@ class RedisView extends material.StatefulWidget {
     this.onBack,
     this.onCli,
     this.lastSelectedRedisDb,
+    this.lastSelectedRedisKey,
     this.onRestoreLastSelectedObject,
   });
 
@@ -62,6 +63,9 @@ class RedisView extends material.StatefulWidget {
 
   /// Remembers the last visited database index for 1-click return from stats.
   final int? lastSelectedRedisDb;
+
+  /// Remembers the last visited key for 1-click return from stats.
+  final String? lastSelectedRedisKey;
   final material.VoidCallback? onRestoreLastSelectedObject;
 
   @override
@@ -217,6 +221,26 @@ class _RedisViewState extends material.State<RedisView> {
 
     final cs = Theme.of(context).colorScheme;
 
+    return material.Container(
+      color: cs.background,
+      child: material.Column(
+        crossAxisAlignment: material.CrossAxisAlignment.stretch,
+        children: [
+          material.Padding(
+            padding: const material.EdgeInsets.fromLTRB(24, 20, 24, 16),
+            child: _header(context),
+          ),
+          const Divider(height: 1),
+          material.Expanded(
+            child: _buildBody(context, cs),
+          ),
+        ],
+      ),
+    );
+  }
+
+  material.Widget _buildBody(
+      material.BuildContext context, shadcn.ColorScheme cs) {
     if (_loading) {
       return const material.Center(
         child: QueryaSpinner(
@@ -228,28 +252,30 @@ class _RedisViewState extends material.State<RedisView> {
 
     final err = _error;
     if (err != null) {
-      return material.Center(
-        child: material.Padding(
-          padding: const material.EdgeInsets.all(32),
-          child: material.Column(
-            mainAxisSize: material.MainAxisSize.min,
-            children: [
-              material.Icon(material.Icons.error_outline_rounded,
-                  size: 48, color: cs.destructive),
-              const Gap(16),
-              const Text('Connection Error').large().semiBold(),
-              const Gap(8),
-              material.SelectableText(err,
-                  style: material.TextStyle(
-                      color: cs.mutedForeground, fontSize: 13)),
-              const Gap(24),
-              OutlineButton(
-                onPressed: () => unawaited(_load(reconnect: true)),
-                leading: const material.Icon(material.Icons.refresh_rounded,
-                    size: 18),
-                child: const Text('Retry'),
-              ),
-            ],
+      return material.SingleChildScrollView(
+        child: material.Center(
+          child: material.Padding(
+            padding: const material.EdgeInsets.all(32),
+            child: material.Column(
+              mainAxisSize: material.MainAxisSize.min,
+              children: [
+                material.Icon(material.Icons.error_outline_rounded,
+                    size: 48, color: cs.destructive),
+                const Gap(16),
+                const Text('Connection Error').large().semiBold(),
+                const Gap(8),
+                material.SelectableText(err,
+                    style: material.TextStyle(
+                        color: cs.mutedForeground, fontSize: 13)),
+                const Gap(24),
+                OutlineButton(
+                  onPressed: () => unawaited(_load(reconnect: true)),
+                  leading: const material.Icon(material.Icons.refresh_rounded,
+                      size: 18),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -257,8 +283,9 @@ class _RedisViewState extends material.State<RedisView> {
 
     final info = _info;
     if (info == null) {
-      return material.Center(
-        child: material.Padding(
+      return material.SingleChildScrollView(
+        child: material.Center(
+          child: material.Padding(
           padding: const material.EdgeInsets.all(32),
           child: material.Column(
             mainAxisSize: material.MainAxisSize.min,
@@ -279,29 +306,26 @@ class _RedisViewState extends material.State<RedisView> {
             ],
           ),
         ),
-      );
+      ),
+    );
     }
 
-    return material.Container(
-      color: cs.background,
-      child: material.RefreshIndicator(
-        onRefresh: _fetch,
-        child: material.LayoutBuilder(
-          builder: (context, constraints) {
-            final contentWidth = math.max(0.0, constraints.maxWidth - 48);
-            final isNarrow = contentWidth < 560;
-            return material.SingleChildScrollView(
-              physics: const material.AlwaysScrollableScrollPhysics(),
-              padding: const material.EdgeInsets.all(24),
-              child: material.SizedBox(
-                width: contentWidth,
-                child: material.Column(
-                  mainAxisSize: material.MainAxisSize.min,
-                  crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                  children: [
-                    _header(context),
-                    const Gap(24),
-                    _summaryChips(context, info),
+    return material.RefreshIndicator(
+      onRefresh: _fetch,
+      child: material.LayoutBuilder(
+        builder: (context, constraints) {
+          final contentWidth = math.max(0.0, constraints.maxWidth - 48);
+          final isNarrow = contentWidth < 560;
+          return material.SingleChildScrollView(
+            physics: const material.AlwaysScrollableScrollPhysics(),
+            padding: const material.EdgeInsets.all(24),
+            child: material.SizedBox(
+              width: contentWidth,
+              child: material.Column(
+                mainAxisSize: material.MainAxisSize.min,
+                crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                children: [
+                  _summaryChips(context, info),
                     const Gap(24),
                     _gridRow(
                       _memoryCard(context, info),
@@ -378,72 +402,90 @@ class _RedisViewState extends material.State<RedisView> {
         );
       },
     ),
-  ),
-);
+  );
   }
 
   material.Widget _header(material.BuildContext context) {
     final cs = shadcn.Theme.of(context).colorScheme;
-    return material.Row(
+    return material.Column(
+      crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
-        material.Container(
-          padding: const material.EdgeInsets.all(10),
-          decoration: material.BoxDecoration(
-            color: cs.primary.withValues(alpha: 0.12),
-            borderRadius: material.BorderRadius.circular(12),
-          ),
-          child: material.Icon(material.Icons.memory_rounded,
-              size: 28, color: cs.primary),
-        ),
-        const Gap(16),
-        material.Expanded(
-          child: material.Column(
-            crossAxisAlignment: material.CrossAxisAlignment.start,
-            mainAxisSize: material.MainAxisSize.min,
-            children: [
-              Text(widget.connectionRow.name).large().semiBold(),
-              const Gap(4),
-              Text('${widget.connectionRow.host ?? 'localhost'}:${widget.connectionRow.port ?? 6379}')
-                  .muted()
-                  .small(),
-            ],
-          ),
-        ),
-        if (widget.lastSelectedRedisDb != null &&
-            widget.onRestoreLastSelectedObject != null) ...[
-          OutlineButton(
-            onPressed: widget.onRestoreLastSelectedObject,
-            leading: const material.Icon(
-              material.Icons.memory_outlined,
-              size: 18,
+        material.Row(
+          crossAxisAlignment: material.CrossAxisAlignment.start,
+          children: [
+            material.Container(
+              padding: const material.EdgeInsets.all(10),
+              decoration: material.BoxDecoration(
+                color: cs.primary.withValues(alpha: 0.12),
+                borderRadius: material.BorderRadius.circular(12),
+              ),
+              child: material.Icon(material.Icons.memory_rounded,
+                  size: 28, color: cs.primary),
             ),
-            child: Text('Return to db${widget.lastSelectedRedisDb}'),
-          ),
-          const Gap(8),
-        ],
-        if (widget.onBack != null) ...[
-          OutlineButton(
-            onPressed: widget.onBack,
-            leading:
-                const material.Icon(material.Icons.grid_view_rounded, size: 18),
-            child: const Text('Explorer'),
-          ),
-          const Gap(8),
-        ],
-        if (widget.onCli != null) ...[
-          OutlineButton(
-            onPressed: widget.onCli,
-            leading:
-                const material.Icon(material.Icons.terminal_rounded, size: 18),
-            child: const Text('CLI Console'),
-          ),
-          const Gap(8),
-        ],
-        OutlineButton(
-          onPressed: () => unawaited(_refresh()),
-          leading:
-              const material.Icon(material.Icons.refresh_rounded, size: 18),
-          child: const Text('Refresh'),
+            const Gap(16),
+            material.Expanded(
+              child: material.Column(
+                crossAxisAlignment: material.CrossAxisAlignment.start,
+                mainAxisSize: material.MainAxisSize.min,
+                children: [
+                  Text(widget.connectionRow.name).large().semiBold(),
+                  const Gap(4),
+                  Text('${widget.connectionRow.host ?? 'localhost'}:${widget.connectionRow.port ?? 6379}')
+                      .muted()
+                      .small(),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const Gap(12),
+        material.Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          alignment: material.WrapAlignment.end,
+          crossAxisAlignment: material.WrapCrossAlignment.center,
+          children: [
+            if (widget.lastSelectedRedisKey != null &&
+                widget.onRestoreLastSelectedObject != null)
+              OutlineButton(
+                onPressed: widget.onRestoreLastSelectedObject,
+                leading: const material.Icon(
+                  material.Icons.vpn_key_outlined,
+                  size: 18,
+                ),
+                child: Text('Return to ${widget.lastSelectedRedisKey}'),
+              )
+            else if (widget.lastSelectedRedisDb != null &&
+                widget.onRestoreLastSelectedObject != null)
+              OutlineButton(
+                onPressed: widget.onRestoreLastSelectedObject,
+                leading: const material.Icon(
+                  material.Icons.memory_outlined,
+                  size: 18,
+                ),
+                child: Text('Return to db${widget.lastSelectedRedisDb}'),
+              ),
+            if (widget.onBack != null)
+              OutlineButton(
+                onPressed: widget.onBack,
+                leading: const material.Icon(material.Icons.grid_view_rounded,
+                    size: 18),
+                child: const Text('Explorer'),
+              ),
+            if (widget.onCli != null)
+              OutlineButton(
+                onPressed: widget.onCli,
+                leading: const material.Icon(material.Icons.terminal_rounded,
+                    size: 18),
+                child: const Text('CLI Console'),
+              ),
+            OutlineButton(
+              onPressed: () => unawaited(_refresh()),
+              leading:
+                  const material.Icon(material.Icons.refresh_rounded, size: 18),
+              child: const Text('Refresh'),
+            ),
+          ],
         ),
       ],
     );

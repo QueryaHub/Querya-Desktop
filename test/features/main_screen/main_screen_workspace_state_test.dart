@@ -283,21 +283,27 @@ void main() {
 
       // 4. MongoDB
       final mongoState = MainScreenWorkspaceState.empty
-          .selectMongoDb(mongoConn, 'analytics')
+          .selectMongoCollection(mongoConn, 'analytics', 'events')
           .unselectActiveObject();
       expect(mongoState.activeMongoDB, isNull);
+      expect(mongoState.selectedMongoCollection, isNull);
       expect(mongoState.lastSelectedMongoDb, 'analytics');
+      expect(mongoState.lastSelectedMongoCollection, 'events');
       final restoredMongo = mongoState.restoreLastSelectedObject();
       expect(restoredMongo.activeMongoDB, 'analytics');
+      expect(restoredMongo.selectedMongoCollection, 'events');
 
       // 5. Redis
       final redisState = MainScreenWorkspaceState.empty
-          .selectRedisDb(redisConn, 7)
+          .selectRedisDb(redisConn, 7, key: 'token:abc')
           .selectConnection(redisConn);
       expect(redisState.activeRedisDb, isNull);
+      expect(redisState.selectedRedisKey, isNull);
       expect(redisState.lastSelectedRedisDb, 7);
+      expect(redisState.lastSelectedRedisKey, 'token:abc');
       final restoredRedis = redisState.restoreLastSelectedObject();
       expect(restoredRedis.activeRedisDb, 7);
+      expect(restoredRedis.selectedRedisKey, 'token:abc');
     });
 
     test('restoreLastSelectedObject ignores cached references from other drivers', () {
