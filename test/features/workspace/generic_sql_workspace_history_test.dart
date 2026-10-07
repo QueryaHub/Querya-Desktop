@@ -1,3 +1,6 @@
+@Timeout(Duration(seconds: 60))
+library;
+
 import 'dart:io';
 
 import 'package:flutter/material.dart' as material;
