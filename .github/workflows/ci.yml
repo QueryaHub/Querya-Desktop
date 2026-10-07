@@ -15,7 +15,10 @@ jobs:
   # in the `rest` section.
   test-sections:
     name: Tests (${{ matrix.section }})
-    runs-on: ubuntu-latest
+    # Self-hosted when the repository variable CI_RUNS_ON is set (see
+    # docs/ci-runners.md); pull requests from forks always run on GitHub-hosted
+    # runners, never on our own machines.
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && fromJSON('"ubuntu-latest"') || fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') }}
     strategy:
       fail-fast: false
       matrix:
@@ -39,6 +42,7 @@ jobs:
           cache: true
 
       - name: Install Linux dependencies (plugins)
+        if: runner.environment == 'github-hosted'
         run: |
           sudo apt-get update
           sudo apt-get install -y libsecret-1-dev
@@ -54,7 +58,11 @@ jobs:
             echo "No tests in section ${{ matrix.section }}"
             exit 0
           fi
-          flutter test --exclude-tags=golden "${paths[@]}"
+          # Several runners share one machine, so cap the test processes each
+          # job starts.
+          flutter test --exclude-tags=golden \
+            --concurrency="${{ runner.environment == 'self-hosted' && '2' || '4' }}" \
+            "${paths[@]}"
 
   # Single required check for the whole suite: passes only when every section did.
   test:
@@ -79,7 +87,7 @@ jobs:
 
   analyze:
     name: Code Analysis
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && fromJSON('"ubuntu-latest"') || fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') }}
     steps:
       - uses: actions/checkout@v4
       
