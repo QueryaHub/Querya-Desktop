@@ -5,6 +5,14 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 import '../../support/querya_theme_test_shell.dart';
 
+/// The sized box that wraps the progress indicator.
+Finder _spinnerBox() => find
+    .ancestor(
+      of: find.byType(material.CircularProgressIndicator),
+      matching: find.byType(material.SizedBox),
+    )
+    .first;
+
 void main() {
   group('QueryaSearchField', () {
     testWidgets('Escape clears the text and reports an empty query',
@@ -166,8 +174,7 @@ void main() {
     testWidgets('medium is the default size', (tester) async {
       await pump(tester, const QueryaSpinner());
 
-      final box = tester.getSize(find.byType(material.SizedBox).first);
-      expect(box, const material.Size(20, 20));
+      expect(tester.getSize(_spinnerBox()), const material.Size(20, 20));
     });
 
     testWidgets('custom dimension, stroke and color override the preset',
@@ -184,8 +191,7 @@ void main() {
 
       expect(indicator.strokeWidth, 5);
       expect(indicator.valueColor!.value, const material.Color(0xFF123456));
-      expect(tester.getSize(find.byType(material.SizedBox).first),
-          const material.Size(40, 40));
+      expect(tester.getSize(_spinnerBox()), const material.Size(40, 40));
     });
   });
 
