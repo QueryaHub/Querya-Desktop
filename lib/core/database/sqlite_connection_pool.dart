@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:querya_desktop/core/database/connection_pool_lock.dart';
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -106,7 +107,8 @@ class SqliteConnectionPool {
     } catch (e, st) {
       Error.throwWithStackTrace(
         SqliteConnectionException(
-          'Failed to acquire SQLite connection: $e',
+          'Failed to acquire SQLite connection: '
+          '${describeDatabaseError(e, driver: DatabaseDriver.sqlite)}',
           cause: e,
           stackTrace: st,
         ),

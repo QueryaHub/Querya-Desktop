@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/database/redis_bulk.dart';
@@ -98,6 +99,16 @@ class RedisConnection {
   }
 
   Future<void> connect() async {
+    try {
+      await _openConnection();
+    } on RedisConnectionException {
+      rethrow;
+    } catch (e, st) {
+      rethrowMappedDatabaseError(e, st, driver: DatabaseDriver.redis);
+    }
+  }
+
+  Future<void> _openConnection() async {
     if (_isConnected && _command != null) return;
 
     var effectivePassword = _password;
