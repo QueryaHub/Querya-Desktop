@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:querya_desktop/core/database/connection_pool_lock.dart';
 import 'package:querya_desktop/core/database/mysql_connection.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -98,7 +99,8 @@ class MysqlConnectionPool {
     } catch (e, st) {
       Error.throwWithStackTrace(
         MysqlConnectionException(
-          'Failed to acquire MySQL connection for database "$database": $e',
+          'Failed to acquire MySQL connection for database "$database": '
+          '${describeDatabaseError(e, driver: DatabaseDriver.mysql)}',
           cause: e,
           stackTrace: st,
         ),

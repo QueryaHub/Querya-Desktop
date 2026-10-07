@@ -3,6 +3,7 @@ import 'dart:io' show SecurityContext;
 
 import 'package:flutter/foundation.dart';
 import 'package:postgres/postgres.dart';
+import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_manager.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
@@ -299,7 +300,8 @@ class PostgresConnection {
       _sshTunnelHandle = null;
       Error.throwWithStackTrace(
         PostgresConnectionException(
-          'Failed to connect to PostgreSQL${name.isNotEmpty ? ' ($name)' : ''}: $e',
+          'Failed to connect to PostgreSQL${name.isNotEmpty ? ' ($name)' : ''}: '
+          '${describeDatabaseError(e, driver: DatabaseDriver.postgres)}',
           cause: e,
           stackTrace: st,
         ),
