@@ -1,6 +1,3 @@
-@Timeout(Duration(seconds: 60))
-library;
-
 import 'dart:async';
 import 'dart:io';
 
@@ -19,6 +16,9 @@ import '../../support/local_db_test_support.dart';
 import '../../support/querya_theme_test_shell.dart';
 
 const _connectionId = 7002;
+
+/// A hung test must fail in a minute instead of blocking CI for ten.
+const _timeout = Timeout(Duration(seconds: 60));
 
 const _connection = ConnectionRow(
   id: _connectionId,
@@ -65,17 +65,20 @@ void main() {
     );
   }
 
-  /// Runs [action] outside the fake-async zone (query execution reads its
-  /// settings from the real SQLite file) and lets the work finish.
-  Future<void> real(WidgetTester tester, Future<void> Function() action) async {
-    await tester.runAsync(() async {
-      await action();
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-    });
-    await tester.pump();
+  /// Lets the real async work behind `execute` (SQLite settings reads) finish.
+  /// The action itself runs in the test zone; each round gives real time to
+  /// the pending I/O and then pumps so the continuation (a fake-async
+  /// microtask) runs and can start the next step.
+  Future<void> settle(WidgetTester tester) async {
+    for (var i = 0; i < 4; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 150)),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+    }
   }
 
-  testWidgets('the Execute button runs the active tab and shows the result',
+  testWidgets('the Execute button runs the active tab and shows the result', timeout: _timeout,
       (tester) async {
     final delegate = FakeSqlExecutionDelegate();
     final state = await pumpWorkspace(
@@ -84,9 +87,8 @@ void main() {
       initialSql: 'SELECT n FROM t',
     );
 
-    await real(tester, () async {
-      await tester.tap(find.widgetWithText(OutlineButton, 'Execute (F5)'));
-    });
+    await tester.tap(find.widgetWithText(OutlineButton, 'Execute (F5)'));
+    await settle(tester);
 
     expect(delegate.executed, ['SELECT n FROM t']);
     expect(state.activeSession.columns, ['n']);
@@ -97,29 +99,29 @@ void main() {
     expect(state.activeSession.running, isFalse);
   });
 
-  testWidgets('F5 executes the active tab', (tester) async {
+  testWidgets('F5 executes the active tab', timeout: _timeout, (tester) async {
     final delegate = FakeSqlExecutionDelegate();
     await pumpWorkspace(tester, delegate, initialSql: 'SELECT 1');
 
-    await real(tester, () => tester.sendKeyEvent(LogicalKeyboardKey.f5));
+    await tester.sendKeyEvent(LogicalKeyboardKey.f5);
+    await settle(tester);
 
     expect(delegate.executed, ['SELECT 1']);
   });
 
-  testWidgets('Ctrl+Enter executes the active tab', (tester) async {
+  testWidgets('Ctrl+Enter executes the active tab', timeout: _timeout, (tester) async {
     final delegate = FakeSqlExecutionDelegate();
     await pumpWorkspace(tester, delegate, initialSql: 'SELECT 2');
 
-    await real(tester, () async {
-      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
-      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
-    });
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await settle(tester);
 
     expect(delegate.executed, ['SELECT 2']);
   });
 
-  testWidgets('Ctrl+T opens a tab and Ctrl+W closes it', (tester) async {
+  testWidgets('Ctrl+T opens a tab and Ctrl+W closes it', timeout: _timeout, (tester) async {
     final state = await pumpWorkspace(tester, FakeSqlExecutionDelegate());
 
     await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
@@ -136,7 +138,7 @@ void main() {
     expect(state.activeSession.title, 'Query 1');
   });
 
-  testWidgets('Ctrl+Tab and Ctrl+Shift+Tab cycle through the tabs',
+  testWidgets('Ctrl+Tab and Ctrl+Shift+Tab cycle through the tabs', timeout: _timeout,
       (tester) async {
     final state = await pumpWorkspace(tester, FakeSqlExecutionDelegate());
     state.addNewTab();
@@ -156,11 +158,12 @@ void main() {
     expect(state.activeSession.title, 'Query 2');
   });
 
-  testWidgets('blank SQL is not sent to the database', (tester) async {
+  testWidgets('blank SQL is not sent to the database', timeout: _timeout, (tester) async {
     final delegate = FakeSqlExecutionDelegate();
     final state = await pumpWorkspace(tester, delegate, initialSql: '   ');
 
-    await real(tester, () => state.execute());
+    unawaited(state.execute());
+    await settle(tester);
 
     expect(delegate.executed, isEmpty);
   });
@@ -169,7 +172,7 @@ void main() {
   // text by assigning the controller value does not mimic a user selection in
   // the editor. Re-enable once the selection is made through the mounted
   // editor (EditableTextState.userUpdateTextEditingValue).
-  testWidgets('only the selected text runs when there is a selection',
+  testWidgets('only the selected text runs when there is a selection', timeout: _timeout,
       skip: true,
       (tester) async {
     final delegate = FakeSqlExecutionDelegate();
@@ -180,29 +183,32 @@ void main() {
       selection: TextSelection(baseOffset: 10, extentOffset: 18),
     );
 
-    await real(tester, () => state.execute());
+    unawaited(state.execute());
+    await settle(tester);
 
     expect(delegate.executed, ['SELECT 2']);
   });
 
-  testWidgets('a second execute is ignored while a query is running',
+  testWidgets('a second execute is ignored while a query is running', timeout: _timeout,
       (tester) async {
     final delegate = FakeSqlExecutionDelegate()..gate = Completer<void>();
     final state = await pumpWorkspace(tester, delegate, initialSql: 'SELECT 1');
 
-    await real(tester, () async {
-      unawaited(state.execute());
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      await state.execute();
-    });
+    unawaited(state.execute());
+    await settle(tester);
     expect(state.activeSession.running, isTrue);
+
+    unawaited(state.execute());
+    await tester.pump();
     expect(delegate.executed, ['SELECT 1']);
 
-    await real(tester, () async => delegate.gate!.complete());
+    delegate.gate!.complete();
+    await settle(tester);
     expect(state.activeSession.running, isFalse);
+    expect(delegate.executed, ['SELECT 1']);
   });
 
-  testWidgets('a failing query shows its error and clears the running state',
+  testWidgets('a failing query shows its error and clears the running state', timeout: _timeout,
       (tester) async {
     final delegate = FakeSqlExecutionDelegate(
       onExecute: (_) => throw Exception('syntax error near FORM'),
@@ -213,13 +219,14 @@ void main() {
       initialSql: 'SELECT * FORM t',
     );
 
-    await real(tester, () => state.execute());
+    unawaited(state.execute());
+    await settle(tester);
 
     expect(state.activeSession.error, contains('syntax error near FORM'));
     expect(state.activeSession.running, isFalse);
   });
 
-  testWidgets('a statement that returns no rows reports the affected count',
+  testWidgets('a statement that returns no rows reports the affected count', timeout: _timeout,
       (tester) async {
     final delegate = FakeSqlExecutionDelegate(
       onExecute: (_) => const SqlExecutionResult(affectedRows: 3),
@@ -230,13 +237,14 @@ void main() {
       initialSql: 'UPDATE t SET a = 1 WHERE b = 2',
     );
 
-    await real(tester, () => state.execute());
+    unawaited(state.execute());
+    await settle(tester);
 
     expect(state.activeSession.statusLine, 'OK. Rows affected: 3.');
     expect(state.activeSession.affectedRows, 3);
   });
 
-  testWidgets('the format command upper-cases SQL keywords', (tester) async {
+  testWidgets('the format command upper-cases SQL keywords', timeout: _timeout, (tester) async {
     await pumpWorkspace(
       tester,
       FakeSqlExecutionDelegate(),
@@ -252,7 +260,7 @@ void main() {
     expect(state.activeSession.controller.text, 'SELECT id FROM users');
   });
 
-  testWidgets('the clear command empties the editor', (tester) async {
+  testWidgets('the clear command empties the editor', timeout: _timeout, (tester) async {
     final state = await pumpWorkspace(
       tester,
       FakeSqlExecutionDelegate(),

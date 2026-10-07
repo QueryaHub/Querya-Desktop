@@ -1,6 +1,3 @@
-@Timeout(Duration(seconds: 60))
-library;
-
 import 'dart:async';
 import 'dart:io';
 
@@ -16,6 +13,9 @@ import '../../support/local_db_test_support.dart';
 import '../../support/querya_theme_test_shell.dart';
 
 const _connectionId = 7001;
+
+/// A hung test must fail in a minute instead of blocking CI for ten.
+const _timeout = Timeout(Duration(seconds: 60));
 
 const _connection = ConnectionRow(
   id: _connectionId,
@@ -62,7 +62,7 @@ void main() {
     );
   }
 
-  testWidgets('starts with one tab holding the initial SQL', (tester) async {
+  testWidgets('starts with one tab holding the initial SQL', timeout: _timeout, (tester) async {
     final state = await pumpWorkspace(
       tester,
       FakeSqlExecutionDelegate(),
@@ -74,7 +74,7 @@ void main() {
     expect(state.activeSession.controller.text, 'SELECT 1');
   });
 
-  testWidgets('addNewTab appends a tab and activates it', (tester) async {
+  testWidgets('addNewTab appends a tab and activates it', timeout: _timeout, (tester) async {
     final state = await pumpWorkspace(tester, FakeSqlExecutionDelegate());
 
     state.addNewTab();
@@ -85,7 +85,7 @@ void main() {
     expect(state.activeSession.title, 'Query 2');
   });
 
-  testWidgets('new tabs can carry SQL and a title', (tester) async {
+  testWidgets('new tabs can carry SQL and a title', timeout: _timeout, (tester) async {
     final state = await pumpWorkspace(tester, FakeSqlExecutionDelegate());
 
     state.addNewTab(initialSql: 'SELECT 2', title: 'Report');
@@ -95,7 +95,7 @@ void main() {
     expect(state.activeSession.controller.text, 'SELECT 2');
   });
 
-  testWidgets('nextTab and prevTab wrap around the tab list', (tester) async {
+  testWidgets('nextTab and prevTab wrap around the tab list', timeout: _timeout, (tester) async {
     final state = await pumpWorkspace(tester, FakeSqlExecutionDelegate());
     state.addNewTab();
     state.addNewTab();
@@ -115,7 +115,7 @@ void main() {
     expect(state.activeSession.title, 'Query 2');
   });
 
-  testWidgets('selecting a tab in the tab bar switches the active session',
+  testWidgets('selecting a tab in the tab bar switches the active session', timeout: _timeout,
       (tester) async {
     final state = await pumpWorkspace(tester, FakeSqlExecutionDelegate());
     state.addNewTab();
@@ -127,7 +127,7 @@ void main() {
     expect(state.activeSession.title, 'Query 1');
   });
 
-  testWidgets('the last remaining tab cannot be closed', (tester) async {
+  testWidgets('the last remaining tab cannot be closed', timeout: _timeout, (tester) async {
     final state = await pumpWorkspace(tester, FakeSqlExecutionDelegate());
 
     await state.closeTab(0);
@@ -137,7 +137,7 @@ void main() {
     expect(state.activeSession.title, 'Query 1');
   });
 
-  testWidgets('closing a clean tab removes it and keeps a valid active tab',
+  testWidgets('closing a clean tab removes it and keeps a valid active tab', timeout: _timeout,
       (tester) async {
     final state = await pumpWorkspace(tester, FakeSqlExecutionDelegate());
     state.addNewTab();
@@ -151,7 +151,7 @@ void main() {
     expect(state.activeSession.title, 'Query 1');
   });
 
-  testWidgets('closing a dirty tab asks first; Cancel keeps it',
+  testWidgets('closing a dirty tab asks first; Cancel keeps it', timeout: _timeout,
       (tester) async {
     final state = await pumpWorkspace(tester, FakeSqlExecutionDelegate());
     state.addNewTab();
@@ -171,7 +171,7 @@ void main() {
     expect(state.activeSession.controller.text, 'SELECT 42');
   });
 
-  testWidgets('closing a dirty tab with Discard & Close removes it',
+  testWidgets('closing a dirty tab with Discard & Close removes it', timeout: _timeout,
       (tester) async {
     final state = await pumpWorkspace(tester, FakeSqlExecutionDelegate());
     state.addNewTab();
@@ -188,7 +188,7 @@ void main() {
     expect(state.activeSession.title, 'Query 1');
   });
 
-  testWidgets('tabs keep their own SQL text when switching', (tester) async {
+  testWidgets('tabs keep their own SQL text when switching', timeout: _timeout, (tester) async {
     final state = await pumpWorkspace(
       tester,
       FakeSqlExecutionDelegate(),
@@ -206,7 +206,7 @@ void main() {
     expect(state.activeSession.controller.text, 'SELECT second');
   });
 
-  testWidgets('disposing the workspace disposes the delegate', (tester) async {
+  testWidgets('disposing the workspace disposes the delegate', timeout: _timeout, (tester) async {
     final delegate = FakeSqlExecutionDelegate();
     await pumpWorkspace(tester, delegate);
 
@@ -218,7 +218,7 @@ void main() {
     expect(delegate.disposeCount, 1);
   });
 
-  testWidgets('disposing while a query runs cancels it', (tester) async {
+  testWidgets('disposing while a query runs cancels it', timeout: _timeout, (tester) async {
     final delegate = FakeSqlExecutionDelegate()..gate = Completer<void>();
     final state = await pumpWorkspace(
       tester,
@@ -226,12 +226,15 @@ void main() {
       initialSql: 'SELECT slow',
     );
 
-    // Settings are read from the real SQLite file, so the query is started
-    // (and left waiting on the gate) outside the fake-async zone.
-    await tester.runAsync(() async {
-      unawaited(state.execute());
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-    });
+    // Settings are read from the real SQLite file: start the query in the test
+    // zone, then let real time pass so it reaches the (blocked) delegate.
+    unawaited(state.execute());
+    for (var i = 0; i < 4; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 150)),
+      );
+      await tester.pump();
+    }
     expect(state.activeSession.running, isTrue);
     expect(delegate.executed, ['SELECT slow']);
 
@@ -241,9 +244,9 @@ void main() {
     await tester.pump();
     expect(delegate.cancelCount, 1);
 
-    await tester.runAsync(() async {
-      delegate.gate!.complete();
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    });
+    delegate.gate!.complete();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 100)),
+    );
   });
 }
