@@ -128,6 +128,7 @@ void main() {
         await tester.tap(find.text('Apply Changes'));
         await pumpFrames(tester);
         await applying;
+        await tester.pump(const Duration(seconds: 6)); // toast timer
 
         expect(delegate.appliedPlans, hasLength(1));
         final plan = delegate.appliedPlans.single;
@@ -154,6 +155,7 @@ void main() {
       await tester.tap(find.text('Cancel'));
       await pumpFrames(tester);
       await applying;
+      await tester.pump(const Duration(seconds: 6)); // toast timer
 
       expect(delegate.appliedPlans, isEmpty);
       expect(state.isDirty, isTrue);
@@ -180,6 +182,7 @@ void main() {
       await tester.tap(find.text('OK'));
       await pumpFrames(tester);
       await applying;
+      await tester.pump(const Duration(seconds: 6)); // toast timer
 
       expect(state.isDirty, isTrue);
       expect(state.isSaving, isFalse);
