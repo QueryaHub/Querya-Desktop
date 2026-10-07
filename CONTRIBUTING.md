@@ -53,6 +53,19 @@ flutter analyze
 flutter test
 ```
 
+CI runs the suite as parallel sections (`core-data`, `core-extensions`,
+`core-theme`, `core-ui`, `features-workspace`, `features-nosql`,
+`features-app`, `rest`) defined in `scripts/ci/test_sections.sh`. To run just
+the one you touched:
+
+```bash
+flutter test $(scripts/ci/test_sections.sh paths features-workspace)
+scripts/ci/test_sections.sh check   # every test file is in exactly one section
+```
+
+A test in a directory no section lists runs in `rest`, so new directories need
+no CI change; add the directory to a section if it belongs with one.
+
 For release or large UI PRs, optionally smoke-test a build:
 
 ```bash
