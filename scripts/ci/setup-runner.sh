@@ -33,9 +33,11 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 # The native dependencies the hosted Ubuntu test job installs for the plugins,
 # plus what the Flutter SDK itself needs (git, curl, unzip, xz, zip, GLU).
+# libsqlite3-dev provides the unversioned libsqlite3.so that sqflite_common_ffi
+# loads (the hosted Ubuntu image has it; a minimal container does not).
 apt-get install -y -qq \
   ca-certificates curl git jq unzip xz-utils zip libglu1-mesa \
-  libsecret-1-dev
+  libsecret-1-dev libsqlite3-dev
 
 echo "==> User ${RUNNER_USER} (no sudo)"
 if ! id "$RUNNER_USER" >/dev/null 2>&1; then
