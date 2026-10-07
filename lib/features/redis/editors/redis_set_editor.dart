@@ -95,6 +95,7 @@ class _RedisSetEditorState extends material.State<RedisSetEditor> {
 
 class RedisMemberRow extends StatelessWidget {
   const RedisMemberRow({
+    super.key,
     required this.member,
     this.onDelete,
     required this.colorScheme,

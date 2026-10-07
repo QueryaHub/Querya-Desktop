@@ -122,6 +122,7 @@ class _RedisListEditorState extends material.State<RedisListEditor> {
 
 class RedisEditListDialogContent extends material.StatefulWidget {
   const RedisEditListDialogContent({
+    super.key,
     required this.index,
     required this.initialValue,
   });
@@ -184,6 +185,7 @@ class RedisEditListDialogContentState
 
 class RedisIndexedValueRow extends StatelessWidget {
   const RedisIndexedValueRow({
+    super.key,
     required this.index,
     required this.value,
     this.isBinary = false,

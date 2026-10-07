@@ -110,6 +110,7 @@ class _RedisHashEditorState extends material.State<RedisHashEditor> {
 
 class RedisFieldRow extends StatelessWidget {
   const RedisFieldRow({
+    super.key,
     required this.field,
     required this.value,
     this.onDelete,

@@ -111,6 +111,7 @@ class _RedisZsetEditorState extends material.State<RedisZsetEditor> {
 
 class RedisScoredMemberRow extends StatelessWidget {
   const RedisScoredMemberRow({
+    super.key,
     required this.member,
     required this.score,
     this.onDelete,
