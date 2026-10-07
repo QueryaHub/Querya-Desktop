@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:file_selector/file_selector.dart';
+import 'package:querya_desktop/core/storage/mutation_audit_recorder.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
@@ -484,6 +485,14 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
         message: session.statusLine,
       );
 
+      auditSqlExecution(
+        connection: widget.connectionRow,
+        databaseName: effectiveDatabase,
+        sql: userSql,
+        rowsAffected: result.affectedRows,
+        source: MutationAuditSource.sqlEditor,
+      );
+
       final cid = widget.connectionRow.id;
       if (cid != null) {
         unawaited(
@@ -576,6 +585,12 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
         timeout: statementTimeout,
       );
       await refreshTxStatus();
+      auditMutationPlan(
+        connection: widget.connectionRow,
+        databaseName: effectiveDatabase,
+        plan: plan,
+        source: MutationAuditSource.sqlEditor,
+      );
 
       if (!mounted) return;
       final newRows = session.stagingBuffer!.committedRows;

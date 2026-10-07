@@ -11,7 +11,7 @@ import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const _dbName = 'querya.db';
-const _dbVersion = 9;
+const _dbVersion = 10;
 
 /// `app_settings` key under which each profile database's random id is
 /// stored (see [LocalDb._ensureProfileId] and issue #986).
@@ -179,7 +179,31 @@ class LocalDb {
       CREATE INDEX idx_sql_query_history_lookup
       ON sql_query_history (connection_id, database_name, recorded_at DESC, id DESC)
     ''');
+    await _createMutationAuditTable(db);
     ConnectionSecretsStore.profileId = await _ensureProfileId(db);
+  }
+
+  /// Local audit trail of executed data / schema changes (#1062). Not linked
+  /// to `connections` so entries outlive a deleted connection; the connection
+  /// name is stored as a snapshot.
+  Future<void> _createMutationAuditTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS mutation_audit (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        connection_id INTEGER,
+        connection_name TEXT NOT NULL,
+        environment TEXT,
+        database_name TEXT,
+        sql_text TEXT NOT NULL,
+        rows_affected INTEGER,
+        source TEXT NOT NULL,
+        recorded_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_mutation_audit_recorded
+      ON mutation_audit (id DESC)
+    ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -289,6 +313,9 @@ class LocalDb {
         if (id == null) continue;
         await ConnectionSecretsStore.adoptLegacyKeysForConnection(id);
       }
+    }
+    if (oldVersion < 10) {
+      await _createMutationAuditTable(db);
     }
   }
 
@@ -448,6 +475,69 @@ class LocalDb {
       ''',
       [connectionId, dbKey],
     );
+  }
+
+  /// Appends one executed mutation to the audit trail and trims the table to
+  /// [kMutationAuditCap] rows. Never throws: auditing must not break a query.
+  Future<void> recordMutationAudit({
+    int? connectionId,
+    required String connectionName,
+    String? environment,
+    String? databaseName,
+    required String sqlText,
+    int? rowsAffected,
+    required MutationAuditSource source,
+  }) async {
+    final sql = sqlText.trim();
+    if (sql.isEmpty) return;
+    try {
+      final db = await _open();
+      await db.insert('mutation_audit', {
+        'connection_id': connectionId,
+        'connection_name': connectionName,
+        'environment': environment,
+        'database_name': _normalizeHistoryDatabaseName(databaseName),
+        'sql_text': sql,
+        'rows_affected': rowsAffected,
+        'source': source.storageValue,
+        'recorded_at': DateTime.now().toUtc().toIso8601String(),
+      });
+      _mutationAuditInsertCount++;
+      if (_mutationAuditInsertCount >= 50) {
+        _mutationAuditInsertCount = 0;
+        await db.rawDelete(
+          'DELETE FROM mutation_audit WHERE id <= ('
+          'SELECT id FROM mutation_audit ORDER BY id DESC LIMIT 1 OFFSET ?)',
+          [kMutationAuditCap],
+        );
+      }
+    } catch (_) {
+      // Best effort.
+    }
+  }
+
+  var _mutationAuditInsertCount = 0;
+
+  /// Newest-first audit entries, optionally for one connection.
+  Future<List<MutationAuditEntry>> listMutationAudit({
+    int? connectionId,
+    int limit = 200,
+  }) async {
+    final db = await _open();
+    final rows = await db.query(
+      'mutation_audit',
+      where: connectionId == null ? null : 'connection_id = ?',
+      whereArgs: connectionId == null ? null : [connectionId],
+      orderBy: 'id DESC',
+      limit: limit,
+    );
+    return rows.map(MutationAuditEntry.fromMap).toList();
+  }
+
+  Future<void> clearMutationAudit() async {
+    final db = await _open();
+    await db.delete('mutation_audit');
+    _mutationAuditInsertCount = 0;
   }
 
   Future<List<String>> getFolders() async {
@@ -654,6 +744,65 @@ class LocalDb {
     _db = null;
     _cachedDbPath = null;
   }
+}
+
+/// Maximum rows kept in the mutation audit trail.
+const int kMutationAuditCap = 10000;
+
+/// Where an audited mutation was started.
+enum MutationAuditSource {
+  sqlEditor('sql_editor'),
+  tableEditor('table_editor');
+
+  const MutationAuditSource(this.storageValue);
+
+  final String storageValue;
+
+  static MutationAuditSource fromStorageValue(String? value) =>
+      values.firstWhere(
+        (s) => s.storageValue == value,
+        orElse: () => MutationAuditSource.sqlEditor,
+      );
+}
+
+/// One row of the local mutation audit trail.
+class MutationAuditEntry {
+  const MutationAuditEntry({
+    required this.id,
+    this.connectionId,
+    required this.connectionName,
+    this.environment,
+    this.databaseName,
+    required this.sqlText,
+    this.rowsAffected,
+    required this.source,
+    required this.recordedAt,
+  });
+
+  final int id;
+  final int? connectionId;
+  final String connectionName;
+
+  /// `development` / `staging` / `production` when the connection was tagged.
+  final String? environment;
+  final String? databaseName;
+  final String sqlText;
+  final int? rowsAffected;
+  final MutationAuditSource source;
+  final String recordedAt;
+
+  static MutationAuditEntry fromMap(Map<String, Object?> m) =>
+      MutationAuditEntry(
+        id: _sqliteInt(m['id'])!,
+        connectionId: _sqliteInt(m['connection_id']),
+        connectionName: m['connection_name'] as String,
+        environment: m['environment'] as String?,
+        databaseName: m['database_name'] as String?,
+        sqlText: m['sql_text'] as String,
+        rowsAffected: _sqliteInt(m['rows_affected']),
+        source: MutationAuditSource.fromStorageValue(m['source'] as String?),
+        recordedAt: m['recorded_at'] as String,
+      );
 }
 
 /// One row from [LocalDb.sql_query_history] (recent SQL, no secrets).

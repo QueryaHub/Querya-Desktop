@@ -65,6 +65,12 @@ class PostgresTableDataDelegate extends TableDataMutationDelegate {
   }
 
   @override
+  ConnectionRow? get auditConnection => connectionRow;
+
+  @override
+  String? get auditDatabaseName => database;
+
+  @override
   String browseDataSql({required int offset, required int limit}) {
     final schemaQ = quotePostgresIdentifier(schema);
     final tableQ = quotePostgresIdentifier(tableName);
