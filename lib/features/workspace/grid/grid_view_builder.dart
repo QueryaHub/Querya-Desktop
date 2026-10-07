@@ -11,6 +11,7 @@ extension _GridViewBuilder on _VirtualResultGridState {
       _widthsNeedUpdate = false;
     }
     final cs = Theme.of(context).colorScheme;
+    final piiKinds = _activePiiKinds;
 
     return material.CallbackShortcuts(
       bindings: {
@@ -425,6 +426,7 @@ extension _GridViewBuilder on _VirtualResultGridState {
                                       onToggleDeleteRow: _toggleDeleteRowCb,
                                       onRevertRow: _revertRowCb,
                                       columnDataTypes: widget.columnDataTypes,
+                                      piiKinds: piiKinds,
                                     );
                                     final previous = _rowWidgets[rowIndex];
                                     if (previous != null &&

@@ -31,6 +31,7 @@ class _DataRow extends material.StatefulWidget {
     this.onToggleDeleteRow,
     this.onRevertRow,
     this.columnDataTypes,
+    this.piiKinds,
   });
 
   final int rowIndex;
@@ -80,6 +81,9 @@ class _DataRow extends material.StatefulWidget {
   final void Function(int row)? onRevertRow;
   final Map<String, String>? columnDataTypes;
 
+  /// Per-column PII kind while "Mask sensitive data" is on (null when off).
+  final List<PiiKind?>? piiKinds;
+
   /// True when [other] would draw exactly the same row. The grid hands the
   /// framework the *previous* widget instance in that case, so
   /// [Element.updateChild] skips it and an edit, a selection change or a scroll
@@ -114,7 +118,8 @@ class _DataRow extends material.StatefulWidget {
           onDuplicateRow == other.onDuplicateRow &&
           onToggleDeleteRow == other.onToggleDeleteRow &&
           onRevertRow == other.onRevertRow &&
-          identical(columnDataTypes, other.columnDataTypes);
+          identical(columnDataTypes, other.columnDataTypes) &&
+          identical(piiKinds, other.piiKinds);
 
   @override
   material.State<_DataRow> createState() => _DataRowState();
@@ -165,7 +170,9 @@ class _DataRow extends material.StatefulWidget {
                     row: rowIndex,
                     column: c,
                     columnName: c < columns.length ? columns[c] : '',
-                    text: c < row.length ? row[c] : '',
+                    text: c < row.length
+                        ? _maskCellText(piiKinds, c, row[c])
+                        : '',
                     width: columnWidths[c],
                     colorScheme: colorScheme,
                     striped: striped,
@@ -240,4 +247,11 @@ class _DataRowState extends material.State<_DataRow> {
     _cells.removeWhere((c, _) => c < w.first || c > w.last);
     return widget._buildRow(_cells);
   }
+}
+
+/// [value] hidden according to [kinds] (the per-column PII guesses).
+String _maskCellText(List<PiiKind?>? kinds, int column, String value) {
+  if (kinds == null || column >= kinds.length) return value;
+  final kind = kinds[column];
+  return kind == null ? value : maskPiiValue(kind, value);
 }

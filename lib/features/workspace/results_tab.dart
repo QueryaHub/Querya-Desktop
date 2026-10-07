@@ -2,6 +2,7 @@ import 'dart:async' show Timer, unawaited;
 
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
+import 'package:querya_desktop/core/security/pii_masking_controller.dart';
 import 'package:querya_desktop/core/actions/data_grid_command_bridge.dart';
 import 'package:querya_desktop/core/widgets/virtual_selectable_text_view.dart';
 import 'package:querya_desktop/features/workspace/data_grid_calc_bar.dart';
@@ -447,6 +448,35 @@ class _ResultsTabState extends material.State<ResultsTab> {
                           : Theme.of(context).colorScheme.mutedForeground,
                       onPressed: () {
                         setState(() => _showFilterBar = !_showFilterBar);
+                      },
+                    ),
+                    const Gap(4),
+
+                    // Mask sensitive data (passwords, tokens, emails, phones, cards)
+                    material.ListenableBuilder(
+                      listenable: PiiMaskingController.instance,
+                      builder: (context, _) {
+                        final masked = PiiMaskingController.instance.enabled;
+                        return material.IconButton(
+                          key: const material.Key(
+                              'results_mask_sensitive_toggle'),
+                          icon: material.Icon(
+                            masked
+                                ? material.Icons.visibility_off_rounded
+                                : material.Icons.visibility_outlined,
+                            size: 15,
+                          ),
+                          tooltip: masked
+                              ? 'Sensitive data is masked — click to show'
+                              : 'Mask sensitive data',
+                          padding: material.EdgeInsets.zero,
+                          constraints: const material.BoxConstraints(
+                              minWidth: 28, minHeight: 28),
+                          color: masked
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).colorScheme.mutedForeground,
+                          onPressed: PiiMaskingController.instance.toggle,
+                        );
                       },
                     ),
                     const Gap(4),

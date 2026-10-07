@@ -6,6 +6,7 @@ part of '../result_grid_view.dart';
 extension _GridCellActions on _VirtualResultGridState {
   void _handleFilterByValue(int row, int col, {required bool invert}) {
     if (widget.onFilterRequested == null) return;
+    if (_isPiiMasked(col)) return;
     if (col >= widget.columns.length || row >= _sortedRows.length) return;
     final colName = widget.columns[col];
     final rowData = _sortedRows[row];
@@ -25,6 +26,7 @@ extension _GridCellActions on _VirtualResultGridState {
 
   void _handleFilterComparison(int row, int col, String operator) {
     if (widget.onFilterRequested == null) return;
+    if (_isPiiMasked(col)) return;
     if (col >= widget.columns.length || row >= _sortedRows.length) return;
     final colName = widget.columns[col];
     final rowData = _sortedRows[row];

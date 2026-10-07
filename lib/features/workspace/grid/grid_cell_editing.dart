@@ -6,6 +6,7 @@ part of '../result_grid_view.dart';
 extension _GridCellEditing on _VirtualResultGridState {
   void _startEditing(int row, int column) {
     if (widget.stagingBuffer == null) return;
+    if (_isPiiMasked(column)) return;
     if (row < 0 ||
         row >= _sortedRows.length ||
         column < 0 ||
@@ -141,6 +142,7 @@ extension _GridCellEditing on _VirtualResultGridState {
   }
 
   Future<void> _openInspector(int row, int column) async {
+    if (_isPiiMasked(column)) return;
     if (row < 0 ||
         row >= _sortedRows.length ||
         column < 0 ||

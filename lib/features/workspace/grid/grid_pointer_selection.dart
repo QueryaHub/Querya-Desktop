@@ -17,7 +17,7 @@ extension _GridPointerSelection on _VirtualResultGridState {
                 c <= _selection!.endColumn;
                 c++) {
               if (c >= 0 && c < rows[r].length) {
-                values.add(rows[r][c]);
+                values.add(_maskedValue(c, rows[r][c]));
               }
             }
           }
@@ -32,7 +32,7 @@ extension _GridPointerSelection on _VirtualResultGridState {
       final rows = _sortedRows;
       if (r >= 0 && r < rows.length && c >= 0 && c < widget.columns.length) {
         final colName = widget.columns[c];
-        final val = c < rows[r].length ? rows[r][c] : '';
+        final val = c < rows[r].length ? _maskedValue(c, rows[r][c]) : '';
         final modelRow = _toModelRowIndex(r);
         widget.onCellFocused!(colName, val, modelRow);
       }

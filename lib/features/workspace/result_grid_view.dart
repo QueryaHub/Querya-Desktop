@@ -10,6 +10,8 @@ import 'package:flutter/services.dart'
 import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
+import 'package:querya_desktop/core/security/pii_masker.dart';
+import 'package:querya_desktop/core/security/pii_masking_controller.dart';
 import 'package:querya_desktop/core/ui/querya_tooltip.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/features/workspace/grid_cell_editor.dart';
@@ -30,6 +32,7 @@ part 'grid/grid_clipboard_service.dart';
 part 'grid/grid_cell_actions.dart';
 part 'grid/grid_keyboard_navigation.dart';
 part 'grid/grid_view_builder.dart';
+part 'grid/grid_pii_masking.dart';
 part 'grid/grid_header_renderer.dart';
 part 'grid/grid_row_renderer.dart';
 part 'grid/grid_cell_renderer.dart';
@@ -98,6 +101,10 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   /// same row (see [_DataRow.sameAs]).
   final Map<int, _DataRow> _rowWidgets = {};
 
+  /// Cache for [_activePiiKinds]: column-name based PII guesses.
+  List<String>? _piiKindsSource;
+  List<PiiKind?>? _piiKinds;
+
   // Row callbacks live in extension methods, whose tear-offs are not equal
   // across evaluations. They are captured once so [_DataRow.sameAs] can keep
   // reusing unchanged rows.
@@ -156,6 +163,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   void initState() {
     super.initState();
     _horizontalController.addListener(_onHorizontalScroll);
+    PiiMaskingController.instance.addListener(_onPiiMaskingChanged);
     widget.stagingBuffer?.addListener(_onStagingBufferChanged);
     _lastKnownStagedRowCount = _baseRows.length;
     _updateSortedRows();
@@ -252,6 +260,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
 
   @override
   void dispose() {
+    PiiMaskingController.instance.removeListener(_onPiiMaskingChanged);
     _stopAutoScroll();
     _rowWidgets.clear();
     widget.stagingBuffer?.removeListener(_onStagingBufferChanged);
