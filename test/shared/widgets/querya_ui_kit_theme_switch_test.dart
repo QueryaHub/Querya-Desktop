@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/security/connection_environment.dart';
 import 'package:querya_desktop/core/theme/querya_semantic_palette.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
-import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/theme/querya_workbench_theme.dart';
 import 'package:querya_desktop/shared/widgets/connection_environment_badge.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
