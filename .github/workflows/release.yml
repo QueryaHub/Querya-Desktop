@@ -275,9 +275,93 @@ jobs:
           path: Querya-Desktop-${{ steps.version.outputs.version }}-macos.zip
           if-no-files-found: error
 
+  build-ext-tester:
+    name: Build querya-ext-tester (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x64
+            archive: tar.gz
+          - os: macos-latest
+            target: macos-arm64
+            archive: tar.gz
+          - os: macos-15-intel
+            target: macos-x64
+            archive: tar.gz
+          - os: windows-latest
+            target: windows-x64
+            archive: zip
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version from pubspec.yaml
+        id: version
+        shell: bash
+        run: |
+          FULL_VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: //')
+          VERSION=$(echo "$FULL_VERSION" | sed 's/+.*//')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.6'
+          channel: stable
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Compile standalone executable (AOT)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/ext-tester
+          EXE=querya-ext-tester
+          if [ "${{ runner.os }}" = "Windows" ]; then EXE=querya-ext-tester.exe; fi
+          dart compile exe bin/querya_ext_tester.dart -o "build/ext-tester/$EXE"
+
+      - name: Smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXE=build/ext-tester/querya-ext-tester
+          if [ "${{ runner.os }}" = "Windows" ]; then EXE=build/ext-tester/querya-ext-tester.exe; fi
+          "$EXE" --help | grep -q "Usage: querya-ext-tester"
+          # An empty directory has no manifest.json: the run must fail with exit code 1.
+          mkdir -p build/ext-tester-empty
+          set +e
+          "$EXE" build/ext-tester-empty --no-color > smoke.log
+          code=$?
+          set -e
+          cat smoke.log
+          test "$code" -eq 1
+          grep -q "manifest.json not found" smoke.log
+
+      - name: Package
+        shell: bash
+        run: |
+          set -euo pipefail
+          NAME="querya-ext-tester-v${{ steps.version.outputs.version }}-${{ matrix.target }}"
+          cd build/ext-tester
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            7z a -tzip "../../$NAME.zip" querya-ext-tester.exe
+          else
+            tar -czf "../../$NAME.tar.gz" querya-ext-tester
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tester-${{ matrix.target }}
+          path: querya-ext-tester-v${{ steps.version.outputs.version }}-${{ matrix.target }}.${{ matrix.archive }}
+          if-no-files-found: error
+
   publish:
     name: Publish GitHub Release
-    needs: [build-windows, build-linux, build-macos]
+    needs: [build-windows, build-linux, build-macos, build-ext-tester]
     runs-on: ubuntu-latest
     outputs:
       version: ${{ needs.build-windows.outputs.version }}
@@ -293,6 +377,12 @@ jobs:
           pattern: bundle-*
           merge-multiple: true
 
+      - uses: actions/download-artifact@v4
+        with:
+          path: tester-artifacts
+          pattern: tester-*
+          merge-multiple: true
+
       - name: Layout distribution files
         run: |
           set -euo pipefail
@@ -305,6 +395,9 @@ jobs:
           test "$(find dist -name '*.rpm' | wc -l)" -eq 1
           test "$(find dist -name '*.flatpak' | wc -l)" -eq 1
           test "$(find dist -name '*-windows-setup.exe' | wc -l)" -eq 1
+          find tester-artifacts -type f \( -name 'querya-ext-tester-*.tar.gz' -o -name 'querya-ext-tester-*.zip' \) \
+            -exec mv -t dist/ {} +
+          test "$(find dist -name 'querya-ext-tester-*' | wc -l)" -eq 4
           cd dist
           sha256sum *.* | tee SHA256SUMS.txt
 
@@ -335,6 +428,9 @@ jobs:
             echo ""
             echo "**Arch (AUR):** \`querya-desktop\` — \`yay -S querya-desktop\` (auto-published when \`AUR_SSH_PRIVATE_KEY\` is configured)."
             echo ""
+            echo "#### Extension developers"
+            echo "- **querya-ext-tester** (headless extension test runner, no Flutter needed): \`querya-ext-tester-v${VERSION}-linux-x64.tar.gz\`, \`-macos-arm64.tar.gz\`, \`-macos-x64.tar.gz\`, \`-windows-x64.zip\` — see docs/extension-testing.md"
+            echo ""
             echo "Verify checksums: \`SHA256SUMS.txt\`"
             echo ""
             echo "### Build info"
@@ -359,7 +455,8 @@ jobs:
           body_path: release-notes.md
           fail_on_unmatched_files: false
           files: |
-            dist/*.zip
+            dist/Querya-Desktop-*.zip
+            dist/querya-ext-tester-*
             dist/*.deb
             dist/*.rpm
             dist/*.flatpak
