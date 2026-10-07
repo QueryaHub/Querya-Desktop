@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:mongo_dart/mongo_dart.dart';
+import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_manager.dart';
 import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
@@ -275,7 +276,7 @@ class MongoConnection {
         _openedDbs[defaultName] = _db!;
       }
       scrubCredentials();
-    } catch (e) {
+    } catch (e, st) {
       _isConnected = false;
       _db = null;
       await _cleanupTempTlsKey();
@@ -283,7 +284,7 @@ class MongoConnection {
         await _sshTunnelHandle?.release();
       } catch (_) {}
       _sshTunnelHandle = null;
-      rethrow;
+      rethrowMappedDatabaseError(e, st, driver: DatabaseDriver.mongodb);
     }
   }
 

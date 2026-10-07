@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:mysql_client/mysql_client.dart';
+import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:querya_desktop/core/database/mysql_result_cells.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
@@ -252,14 +253,14 @@ class MysqlConnection {
       }
       _isConnected = true;
       scrubCredentials();
-    } catch (e) {
+    } catch (e, st) {
       _isConnected = false;
       _conn = null;
       try {
         await _sshTunnelHandle?.release();
       } catch (_) {}
       _sshTunnelHandle = null;
-      rethrow;
+      rethrowMappedDatabaseError(e, st, driver: DatabaseDriver.mysql);
     }
   }
 

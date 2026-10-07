@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:querya_desktop/core/database/connection_pool_lock.dart';
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -110,7 +111,8 @@ class PostgresConnectionPool {
     } catch (e, st) {
       Error.throwWithStackTrace(
         PostgresConnectionException(
-          'Failed to acquire PostgreSQL connection for database "$database": $e',
+          'Failed to acquire PostgreSQL connection for database "$database": '
+          '${describeDatabaseError(e, driver: DatabaseDriver.postgres)}',
           cause: e,
           stackTrace: st,
         ),
