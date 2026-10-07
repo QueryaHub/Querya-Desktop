@@ -10,6 +10,7 @@ import 'package:querya_desktop/core/actions/querya_command_host.dart';
 import 'package:querya_desktop/features/command_palette/command_palette_dialog.dart';
 import 'package:querya_desktop/features/command_palette/quick_switcher_dialog.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
+import 'package:querya_desktop/shared/widgets/connection_environment_badge.dart';
 import 'package:querya_desktop/features/extensions/presentation/pages/extension_manager_dialog.dart';
 import 'package:querya_desktop/features/help/about_dialog.dart';
 import 'package:querya_desktop/features/updater/update_available_badge.dart';
@@ -102,6 +103,7 @@ class QueryaWindowTitleBar extends StatelessWidget {
   @override
   material.Widget build(material.BuildContext context) {
     final wb = context.workbench;
+    final environment = activeConnection?.environment;
     final buttonColors = windowButtonColors(context);
     final closeButtonColors = QueryaWindowTitleBar.closeButtonColors(context);
 
@@ -429,6 +431,10 @@ class QueryaWindowTitleBar extends StatelessWidget {
               ? MoveWindow()
               : const SizedBox(),
         ),
+        if (environment != null) ...[
+          ConnectionEnvironmentBadge(environment: environment),
+          const Gap(8),
+        ],
         Row(
           mainAxisSize: material.MainAxisSize.min,
           children: [
@@ -448,7 +454,7 @@ class QueryaWindowTitleBar extends StatelessWidget {
 
     return material.Container(
       height: context.scaled(40),
-      color: titleBarBackground(context),
+      color: environmentChromeColor(wb, environment, titleBarBackground(context)),
       child: useNativeWindowChrome ? WindowTitleBarBox(child: inner) : inner,
     );
   }

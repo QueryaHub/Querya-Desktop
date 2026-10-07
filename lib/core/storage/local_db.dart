@@ -4,6 +4,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
+import 'package:querya_desktop/core/security/connection_environment.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/storage/app_data_root.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
@@ -742,6 +743,20 @@ class ConnectionRow {
       }
     } catch (_) {}
     return null;
+  }
+
+  /// Environment tag stored in [driverOptions] (null when untagged).
+  ConnectionEnvironment? get environment =>
+      ConnectionEnvironment.fromDriverOptions(driverOptions);
+
+  /// Returns a copy of this row tagged with [environment] (null removes the tag).
+  ConnectionRow withEnvironment(ConnectionEnvironment? environment) {
+    final options =
+        ConnectionEnvironment.applyToDriverOptions(driverOptions, environment);
+    return copyWith(
+      driverOptions: options,
+      clearDriverOptions: options == null,
+    );
   }
 
   /// Returns a copy of this row with the given [sshTunnelConfig] encoded in [driverOptions].

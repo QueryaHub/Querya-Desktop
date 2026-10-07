@@ -176,8 +176,17 @@ class MainScreenWorkspaceState {
           same ? (activeRedisDb ?? lastSelectedRedisDb) : null,
       lastSelectedRedisKey:
           same ? (selectedRedisKey ?? lastSelectedRedisKey) : null,
-      isReadOnly: false,
+      isReadOnly: _readOnlyAfterSelecting(connection, same: same),
     );
+  }
+
+  /// Safe Mode: Production connections open read-only. Re-selecting the same
+  /// Production connection keeps the current lock state, so a temporary unlock
+  /// is not undone by browsing the tree.
+  bool _readOnlyAfterSelecting(ConnectionRow connection, {required bool same}) {
+    final locksByDefault = connection.environment?.defaultsToReadOnly ?? false;
+    if (!locksByDefault) return false;
+    return same ? isReadOnly : true;
   }
 
   /// Clears the active table/view/db selection to show server stats/home, but retains

@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/security/connection_environment.dart';
+import 'package:querya_desktop/features/connections/environment_section.dart';
 import 'package:querya_desktop/core/database/mysql_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
@@ -57,6 +59,7 @@ class _MysqlConnectionFormContentState
   final _sslKeyController = material.TextEditingController();
 
   SshTunnelConfig _sshConfig = const SshTunnelConfig();
+  ConnectionEnvironment? _environment;
   final SshTunnelSecrets _sshSecrets = SshTunnelSecrets();
 
   bool _useSSL = true;
@@ -90,6 +93,7 @@ class _MysqlConnectionFormContentState
     final initial = widget.initial;
     if (initial != null) {
       _nameController.text = initial.name;
+      _environment = initial.environment;
       _hostController.text = initial.host ?? '';
       _portController.text = (initial.port ?? 3306).toString();
       _usernameController.text = initial.username ?? '';
@@ -270,6 +274,7 @@ class _MysqlConnectionFormContentState
       sshSecrets: _sshConfig.enabled ? _sshSecrets : null,
     );
     row = row.withSshTunnelConfig(_sshConfig.enabled ? _sshConfig : null);
+    row = row.withEnvironment(_environment);
     material.Navigator.of(context).pop(row);
   }
 
@@ -499,6 +504,11 @@ class _MysqlConnectionFormContentState
                         onChanged: _syncUriSslParams,
                       ),
                     ],
+                    const Gap(16),
+                    EnvironmentSection(
+                      value: _environment,
+                      onChanged: (e) => setState(() => _environment = e),
+                    ),
                     const Gap(16),
                     // SSH Tunneling Section
                     SshTunnelSection(

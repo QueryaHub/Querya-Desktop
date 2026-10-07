@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart' as material;
 import 'package:path/path.dart' as p;
+import 'package:querya_desktop/core/security/connection_environment.dart';
+import 'package:querya_desktop/features/connections/environment_section.dart';
 import 'package:querya_desktop/core/extensions/extension_driver_session.dart';
 import 'package:querya_desktop/core/extensions/models/extension_contributions.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
@@ -58,6 +60,7 @@ class _ExtensionConnectionFormContentState
     extends material.State<_ExtensionConnectionFormContent> {
   final _nameController = material.TextEditingController();
   final _formKey = material.GlobalKey<SduiFormBuilderState>();
+  ConnectionEnvironment? _environment;
   SduiFormSchema? _schema;
   String? _loadError;
   var _loading = true;
@@ -74,6 +77,7 @@ class _ExtensionConnectionFormContentState
     final initial = widget.initial;
     if (initial != null) {
       _nameController.text = initial.name;
+      _environment = initial.environment;
       _initialValues = _sduiInitialValuesFromConnection(initial);
     } else {
       _nameController.text = widget.driver.displayName;
@@ -127,7 +131,7 @@ class _ExtensionConnectionFormContentState
       values: values,
       folderId: widget.folderId,
       initial: widget.initial,
-    );
+    ).withEnvironment(_environment);
     material.Navigator.of(context).pop(row);
   }
 
@@ -232,6 +236,11 @@ class _ExtensionConnectionFormContentState
                       TextField(
                         controller: _nameController,
                         placeholder: const Text('My ClickHouse'),
+                      ),
+                      const material.SizedBox(height: 16),
+                      EnvironmentSection(
+                        value: _environment,
+                        onChanged: (e) => setState(() => _environment = e),
                       ),
                       const material.SizedBox(height: 16),
                       if (_loading)

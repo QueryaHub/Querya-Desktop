@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:path/path.dart' as p;
+import 'package:querya_desktop/core/security/connection_environment.dart';
+import 'package:querya_desktop/features/connections/environment_section.dart';
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -41,6 +43,7 @@ class _SqliteConnectionFormContent extends material.StatefulWidget {
 
 class _SqliteConnectionFormContentState
     extends material.State<_SqliteConnectionFormContent> {
+  ConnectionEnvironment? _environment;
   final _nameController = material.TextEditingController();
   final _pathController = material.TextEditingController();
 
@@ -66,6 +69,7 @@ class _SqliteConnectionFormContentState
       _nameController.text = initial.name;
       _pathController.text = initial.host ?? '';
       _readOnly = initial.useSSL;
+      _environment = initial.environment;
     }
 
     _nameController.addListener(() {
@@ -190,7 +194,7 @@ class _SqliteConnectionFormContentState
       folderId: initial?.folderId ?? widget.folderId,
       sortOrder: initial?.sortOrder ?? 0,
     );
-    material.Navigator.of(context).pop(row);
+    material.Navigator.of(context).pop(row.withEnvironment(_environment));
   }
 
   @override
@@ -259,6 +263,11 @@ class _SqliteConnectionFormContentState
                             ),
                           ),
                         ],
+                        const Gap(16),
+                        EnvironmentSection(
+                          value: _environment,
+                          onChanged: (e) => setState(() => _environment = e),
+                        ),
                         const Gap(16),
                         // Database File Path
                         const Text('Database file path').small().semiBold(),
