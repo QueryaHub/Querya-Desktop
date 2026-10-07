@@ -98,6 +98,23 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   /// same row (see [_DataRow.sameAs]).
   final Map<int, _DataRow> _rowWidgets = {};
 
+  // Row callbacks live in extension methods, whose tear-offs are not equal
+  // across evaluations. They are captured once so [_DataRow.sameAs] can keep
+  // reusing unchanged rows.
+  late final _cellSecondaryTapCb = _onCellSecondaryTap;
+  late final _commitEditCb = _commitEdit;
+  late final _cancelEditCb = _cancelEdit;
+  late final _openInspectorCb = _openInspector;
+  late final _copyCellCb = _handleCopyCell;
+  late final _filterByValueCb = _handleFilterByValue;
+  late final _filterComparisonCb = _handleFilterComparison;
+  late final _setNullCb = _handleSetNull;
+  late final _setEmptyCb = _handleSetEmpty;
+  late final _revertCellCb = _handleRevertCell;
+  late final _duplicateRowCb = _handleDuplicateRow;
+  late final _toggleDeleteRowCb = _handleToggleDeleteRow;
+  late final _revertRowCb = _handleRevertRow;
+
   @material.visibleForTesting
   int get rowWidgetsCacheCount => _rowWidgets.length;
 
