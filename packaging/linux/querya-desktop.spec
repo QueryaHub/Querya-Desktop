@@ -35,6 +35,17 @@ mkdir -p %{buildroot}/usr/share/icons/hicolor/512x512/apps
 install -m 644 %{querya_desktop_file} %{buildroot}/usr/share/applications/querya_desktop.desktop
 install -m 644 %{querya_icon} %{buildroot}/usr/share/icons/hicolor/512x512/apps/querya_desktop.png
 
+%post
+# Refresh desktop-menu and icon caches so the launcher and icon appear at once.
+/usr/bin/update-desktop-database -q /usr/share/applications &>/dev/null || :
+/usr/bin/gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor &>/dev/null || :
+
+%postun
+# Drop the removed launcher and icon from the caches (also runs on upgrade,
+# where it simply refreshes them again).
+/usr/bin/update-desktop-database -q /usr/share/applications &>/dev/null || :
+/usr/bin/gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor &>/dev/null || :
+
 %files
 /opt/querya-desktop
 /usr/bin/querya_desktop

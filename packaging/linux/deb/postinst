@@ -1,0 +1,17 @@
+#!/bin/sh
+# Refresh the desktop-menu and icon caches so the Querya Desktop launcher and
+# icon show up right after installation, without restarting the session.
+set -e
+
+case "$1" in
+  configure|triggered)
+    if command -v update-desktop-database >/dev/null 2>&1; then
+      update-desktop-database -q /usr/share/applications || true
+    fi
+    if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+      gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor || true
+    fi
+    ;;
+esac
+
+exit 0
