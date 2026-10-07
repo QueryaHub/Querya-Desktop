@@ -1,13 +1,11 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/security/connection_environment.dart';
 import 'package:querya_desktop/core/storage/mutation_audit_recorder.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../../memory_secrets_backend.dart';
 
@@ -190,7 +188,7 @@ void main() {
   group('audit recorders', () {
     setUp(() => LocalDb.instance.clearMutationAudit());
 
-    final connection = ConnectionRow(
+    final connection = const ConnectionRow(
       id: 5,
       type: 'postgres',
       name: 'orders-prod',
