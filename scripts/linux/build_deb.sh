@@ -52,6 +52,10 @@ fi
 cp "$ROOT/packaging/linux/querya_desktop.desktop" \
   "$PKG/usr/share/applications/${BINARY_NAME}.desktop"
 
+# Maintainer scripts: refresh desktop-menu and icon caches (#1057).
+install -m 0755 "$ROOT/packaging/linux/deb/postinst" "$PKG/DEBIAN/postinst"
+install -m 0755 "$ROOT/packaging/linux/deb/postrm" "$PKG/DEBIAN/postrm"
+
 # Rough installed size in KiB for the control file.
 INSTALLED_SIZE="$(du -sk "$PKG" | awk '{print $1}')"
 
