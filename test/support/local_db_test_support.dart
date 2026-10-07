@@ -35,6 +35,9 @@ Future<Directory> initTestLocalDb(String prefix) async {
   final dir = await Directory.systemTemp.createTemp(prefix);
   PathProviderPlatform.instance = _FakePathProvider(dir.path);
   await LocalDb.initFfi();
+  // Open (and migrate) the database now, in the real zone. Opening it lazily
+  // inside a widget test takes many real-async hops that each need a pump.
+  await LocalDb.instance.getAppSetting('test_warmup');
   return dir;
 }
 
