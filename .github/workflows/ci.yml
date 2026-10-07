@@ -10,19 +10,34 @@ on:
     branches: [ main, dev ]
 
 jobs:
-  test:
-    name: Run Tests
+  # The suite is split into independent sections (scripts/ci/test_sections.sh)
+  # that run as parallel jobs. A test in a directory no section lists still runs
+  # in the `rest` section.
+  test-sections:
+    name: Tests (${{ matrix.section }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        section:
+          - core-data
+          - core-extensions
+          - core-theme
+          - core-ui
+          - features-workspace
+          - features-nosql
+          - features-app
+          - rest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.41.6'
           channel: 'stable'
           cache: true
-      
+
       - name: Install Linux dependencies (plugins)
         run: |
           sudo apt-get update
@@ -30,9 +45,37 @@ jobs:
 
       - name: Get dependencies
         run: flutter pub get
-      
-      - name: Run tests
-        run: flutter test --exclude-tags=golden
+
+      - name: Run tests (${{ matrix.section }})
+        run: |
+          set -euo pipefail
+          mapfile -t paths < <(./scripts/ci/test_sections.sh paths "${{ matrix.section }}")
+          if [ "${#paths[@]}" -eq 0 ]; then
+            echo "No tests in section ${{ matrix.section }}"
+            exit 0
+          fi
+          flutter test --exclude-tags=golden "${paths[@]}"
+
+  # Single required check for the whole suite: passes only when every section did.
+  test:
+    name: Run Tests
+    if: always()
+    needs: [test-sections, test-coverage]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All test sections passed
+        run: |
+          echo "sections: ${{ needs.test-sections.result }}"
+          echo "coverage: ${{ needs.test-coverage.result }}"
+          [ "${{ needs.test-sections.result }}" = "success" ] && [ "${{ needs.test-coverage.result }}" = "success" ]
+
+  # Every test file must belong to exactly one section.
+  test-coverage:
+    name: Test sections cover all tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/ci/test_sections.sh check
 
   analyze:
     name: Code Analysis
