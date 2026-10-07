@@ -431,10 +431,12 @@ class QueryaExtensionHarness {
       abort = false;
       await method('system.shutdown', () async {
         await call('system.shutdown');
-        await process!.exitCode.timeout(shutdownTimeout, onTimeout: () {
-          throw StateError('plugin did not exit within $shutdownTimeout '
-              'after system.shutdown');
-        });
+        await process!.exitCode.timeout(
+          shutdownTimeout,
+          onTimeout: () => throw StateError(
+            'plugin did not exit within $shutdownTimeout after system.shutdown',
+          ),
+        );
       });
     }
 
