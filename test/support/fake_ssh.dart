@@ -167,7 +167,9 @@ class FakeSshClient implements SSHClient {
   bool get isClosed => _closed;
 
   @override
-  void close() => _closed = true;
+  Future<void> close() async {
+    _closed = true;
+  }
 
   @override
   Future<void> ping() async => pingCount++;
