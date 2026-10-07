@@ -456,4 +456,5 @@ extension _GridViewBuilder on _VirtualResultGridState {
         ),
       ),
     );
+  }
 }
