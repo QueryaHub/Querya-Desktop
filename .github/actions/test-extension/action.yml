@@ -1,0 +1,128 @@
+name: Test Querya extension
+description: >-
+  Downloads a released querya-ext-tester and checks a Querya database-driver
+  extension (manifest and JSON-RPC lifecycle) headlessly, with no Flutter
+  install. Publish a copy of this directory as QueryaHub/action-test-extension
+  to use it as `uses: QueryaHub/action-test-extension@v1`.
+
+inputs:
+  querya-version:
+    description: Querya Desktop release to take the tester from (e.g. 0.4.18) or "latest".
+    required: false
+    default: latest
+  target-version:
+    description: Host version to emulate (--target-version). Defaults to querya-version.
+    required: false
+    default: ''
+  extension-dir:
+    description: Directory containing manifest.json and the driver entry point.
+    required: false
+    default: .
+  connect:
+    description: db.connect parameters as inline JSON or a path to a JSON file.
+    required: false
+    default: ''
+  query:
+    description: Statement for the db.query check.
+    required: false
+    default: SELECT 1
+  table:
+    description: Table name for the db.getTableSchema check (skipped when empty).
+    required: false
+    default: ''
+  sandbox:
+    description: Run the plugin inside the OS sandbox when available ("true" / "false").
+    required: false
+    default: 'false'
+  junit-path:
+    description: Where to write the JUnit XML report.
+    required: false
+    default: querya-ext-test-junit.xml
+  tap-path:
+    description: Where to write the TAP report (skipped when empty).
+    required: false
+    default: ''
+
+outputs:
+  tester-version:
+    description: Querya Desktop release the tester binary came from.
+    value: ${{ steps.fetch.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Download querya-ext-tester
+      id: fetch
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REQUESTED: ${{ inputs.querya-version }}
+        REPO: QueryaHub/Querya-Desktop
+      run: |
+        set -euo pipefail
+        case "${RUNNER_OS}-${RUNNER_ARCH}" in
+          Linux-X64)    TARGET=linux-x64;   EXT=tar.gz ;;
+          macOS-ARM64)  TARGET=macos-arm64; EXT=tar.gz ;;
+          macOS-X64)    TARGET=macos-x64;   EXT=tar.gz ;;
+          Windows-X64)  TARGET=windows-x64; EXT=zip ;;
+          *) echo "::error::Unsupported runner ${RUNNER_OS}-${RUNNER_ARCH}"; exit 1 ;;
+        esac
+
+        if [ "$REQUESTED" = "latest" ]; then
+          TAG=$(gh api "repos/${REPO}/releases/latest" --jq .tag_name)
+        else
+          TAG="$REQUESTED"
+        fi
+        VERSION="${TAG#v}"
+        ASSET="querya-ext-tester-v${VERSION}-${TARGET}.${EXT}"
+
+        DEST="${RUNNER_TEMP}/querya-ext-tester"
+        rm -rf "$DEST" && mkdir -p "$DEST"
+        gh release download "$TAG" --repo "$REPO" --dir "$DEST" \
+          --pattern "$ASSET" --pattern SHA256SUMS.txt
+
+        cd "$DEST"
+        EXPECTED=$(grep " ${ASSET}\$" SHA256SUMS.txt | cut -d' ' -f1)
+        if [ -z "$EXPECTED" ]; then
+          echo "::error::${ASSET} is not listed in SHA256SUMS.txt of release ${TAG}"
+          exit 1
+        fi
+        if command -v sha256sum >/dev/null; then
+          ACTUAL=$(sha256sum "$ASSET" | cut -d' ' -f1)
+        else
+          ACTUAL=$(shasum -a 256 "$ASSET" | cut -d' ' -f1)
+        fi
+        if [ "$EXPECTED" != "$ACTUAL" ]; then
+          echo "::error::Checksum mismatch for ${ASSET}"
+          exit 1
+        fi
+
+        if [ "$EXT" = "zip" ]; then 7z x -y "$ASSET" >/dev/null; else tar -xzf "$ASSET"; fi
+        echo "dir=${DEST}" >> "$GITHUB_OUTPUT"
+        echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+    - name: Run querya-ext-tester
+      shell: bash
+      env:
+        TESTER_DIR: ${{ steps.fetch.outputs.dir }}
+        TARGET_VERSION: ${{ inputs.target-version != '' && inputs.target-version || steps.fetch.outputs.version }}
+        EXTENSION_DIR: ${{ inputs.extension-dir }}
+        CONNECT: ${{ inputs.connect }}
+        QUERY: ${{ inputs.query }}
+        TABLE: ${{ inputs.table }}
+        SANDBOX: ${{ inputs.sandbox }}
+        JUNIT_PATH: ${{ inputs.junit-path }}
+        TAP_PATH: ${{ inputs.tap-path }}
+      run: |
+        set -euo pipefail
+        EXE="${TESTER_DIR}/querya-ext-tester"
+        if [ "${RUNNER_OS}" = "Windows" ]; then EXE="${EXE}.exe"; fi
+
+        ARGS=("$EXTENSION_DIR" --target-version "$TARGET_VERSION" --query "$QUERY" --no-color)
+        if [ -n "$CONNECT" ]; then ARGS+=(--connect "$CONNECT"); fi
+        if [ -n "$TABLE" ]; then ARGS+=(--table "$TABLE"); fi
+        if [ "$SANDBOX" = "true" ]; then ARGS+=(--sandbox); fi
+        if [ -n "$JUNIT_PATH" ]; then ARGS+=(--junit "$JUNIT_PATH"); fi
+        if [ -n "$TAP_PATH" ]; then ARGS+=(--tap "$TAP_PATH"); fi
+
+        "$EXE" "${ARGS[@]}"

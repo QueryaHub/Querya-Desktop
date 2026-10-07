@@ -1,6 +1,8 @@
-// Headless test runner for Querya extensions (database drivers).
+// querya-ext-tester: headless test runner for Querya extensions (database
+// drivers). Released as a standalone executable built with
+// `dart compile exe bin/querya_ext_tester.dart`.
 //
-//   dart run tool/extension_harness.dart <extension-dir> [options]
+//   dart run bin/querya_ext_tester.dart <extension-dir> [options]
 //
 // Exit codes: 0 all checks passed, 1 a check failed, 2 bad usage.
 import 'dart:convert';
@@ -10,7 +12,7 @@ import 'package:querya_desktop/core/extensions/harness/extension_harness.dart';
 import 'package:querya_desktop/core/extensions/harness/extension_protocol_profile.dart';
 
 const _usage = '''
-Usage: dart run tool/extension_harness.dart <extension-dir> [options]
+Usage: querya-ext-tester <extension-dir> [options]
 
 Starts the extension like Querya Desktop does and checks its JSON-RPC
 lifecycle without a GUI.
