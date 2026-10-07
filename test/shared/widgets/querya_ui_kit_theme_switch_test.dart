@@ -42,7 +42,10 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    // `pumpAndSettle` never returns here: the spinner animates forever. A
+    // second of frames is enough for the theme transition.
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
   }
 
   material.Color? textColor(WidgetTester tester, String text) =>
