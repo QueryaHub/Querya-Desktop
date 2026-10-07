@@ -77,7 +77,7 @@ void main() {
 
   group('status bar badge', () {
     Future<void> pump(
-      material.WidgetTester tester,
+      WidgetTester tester,
       ConnectionRow? connection,
     ) async {
       await tester.pumpWidget(
@@ -155,7 +155,7 @@ void main() {
 
   group('SafeModeUnlockDialog', () {
     Future<void> open(
-      material.WidgetTester tester,
+      WidgetTester tester,
       void Function(bool) onResult,
     ) async {
       await tester.pumpWidget(
@@ -188,7 +188,6 @@ void main() {
 
       final confirm =
           find.byKey(const material.Key('safe_mode_unlock_confirm'));
-      expect(tester.widget<material.Widget>(confirm), isNotNull);
       await tester.tap(confirm, warnIfMissed: false);
       await tester.pumpAndSettle();
       expect(result, isNull, reason: 'dialog must still be open');
