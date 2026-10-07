@@ -41,6 +41,7 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 100));
     }
+    await tester.pump(const Duration(seconds: 6)); // toast timer
   }
 
   Future<void> filterBy(WidgetTester tester, String text) async {

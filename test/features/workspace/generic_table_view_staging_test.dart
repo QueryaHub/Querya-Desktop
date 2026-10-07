@@ -102,7 +102,8 @@ void main() {
   group('applying changes', () {
     const quoting = {
       SqlDialect.postgres: ('"public"."users"', '"name"'),
-      SqlDialect.sqlite: ('"public"."users"', '"name"'),
+      // SQLite has no schemas: the schema name is dropped.
+      SqlDialect.sqlite: ('"users"', '"name"'),
       SqlDialect.mysql: ('`public`.`users`', '`name`'),
     };
 
