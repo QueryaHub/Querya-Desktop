@@ -2,6 +2,11 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/redis_bulk.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
+import 'package:querya_desktop/features/redis/editors/redis_hash_editor.dart';
+import 'package:querya_desktop/features/redis/editors/redis_list_editor.dart';
+import 'package:querya_desktop/features/redis/editors/redis_set_editor.dart';
+import 'package:querya_desktop/features/redis/editors/redis_string_editor.dart';
+import 'package:querya_desktop/features/redis/editors/redis_zset_editor.dart';
 import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
@@ -89,10 +94,6 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   late String _currentKeyName;
   Object? _currentKeyArg;
 
-  // For adding new items
-  final _newFieldController = material.TextEditingController();
-  final _newValueController = material.TextEditingController();
-
   @override
   void initState() {
     super.initState();
@@ -117,8 +118,6 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   void dispose() {
     widget.controller?._detach(this);
     _stringController.dispose();
-    _newFieldController.dispose();
-    _newValueController.dispose();
     super.dispose();
   }
 
@@ -870,7 +869,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   Widget _buildContent(ColorScheme cs, shadcn.ColorScheme scs) {
     switch (_effectiveType) {
       case 'string':
-        return _buildStringEditor(cs, scs);
+        return _buildStringEditor(cs);
       case 'hash':
         return _buildHashEditor(cs, scs);
       case 'list':
@@ -902,340 +901,68 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     );
   }
 
-  // ─── String ─────────────────────────────────────────────────────────────
+  // ─── Type editors ───────────────────────────────────────────────────────
 
-  Widget _buildStringEditor(ColorScheme cs, shadcn.ColorScheme scs) {
-    if (_stringIsBinary) {
-      final bulk = _stringValue!;
-      return material.Column(
-        crossAxisAlignment: material.CrossAxisAlignment.stretch,
-        children: [
-          Text('Binary value (${bulk.bytes.length} bytes)').semiBold(),
-          const Gap(8),
-          const Text(
-            'Not valid UTF-8. Save as text is disabled so the original bytes are not overwritten.',
-          ).muted().small(),
-          const Gap(12),
-          const Text('Hex').semiBold().small(),
-          const Gap(4),
-          material.SelectableText(
-            bulk.toHex(),
-            style: const material.TextStyle(
-              fontSize: 13,
-              fontFamily: 'monospace',
-            ),
-          ),
-          const Gap(12),
-          const Text('Base64').semiBold().small(),
-          const Gap(4),
-          material.SelectableText(
-            bulk.toBase64(),
-            style: const material.TextStyle(
-              fontSize: 13,
-              fontFamily: 'monospace',
-            ),
-          ),
-        ],
-      );
-    }
-    return material.Column(
-      crossAxisAlignment: material.CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            const Text('Value').semiBold(),
-            if (!widget.isReadOnly) ...[
-              const Spacer(),
-              PrimaryButton(
-                onPressed: _saveString,
-                size: ButtonSize.small,
-                leading:
-                    const material.Icon(material.Icons.save_rounded, size: 14),
-                child: const Text('Save'),
-              ),
-            ],
-          ],
-        ),
-        const Gap(8),
-        material.Container(
-          constraints: const material.BoxConstraints(minHeight: 200),
-          decoration: material.BoxDecoration(
-            border:
-                material.Border.all(color: cs.border.withValues(alpha: 0.3)),
-            borderRadius: material.BorderRadius.circular(8),
-          ),
-          child: material.TextField(
-            controller: _stringController,
-            readOnly: widget.isReadOnly,
-            maxLines: null,
-            style: const material.TextStyle(
-              fontSize: 13,
-              fontFamily: 'monospace',
-            ),
-            decoration: const material.InputDecoration(
-              border: material.InputBorder.none,
-              contentPadding: material.EdgeInsets.all(12),
-            ),
-          ),
-        ),
-      ],
+  Widget _buildStringEditor(ColorScheme cs) {
+    return RedisStringEditor(
+      value: _stringValue,
+      controller: _stringController,
+      isReadOnly: widget.isReadOnly,
+      onSave: _saveString,
+      colorScheme: cs,
     );
   }
-
-  // ─── Hash ───────────────────────────────────────────────────────────────
 
   Widget _buildHashEditor(ColorScheme cs, shadcn.ColorScheme scs) {
-    final entries = _hashValue.entries.toList();
-    return material.Column(
-      crossAxisAlignment: material.CrossAxisAlignment.stretch,
-      children: [
-        Text(_collectionHeading('Hash fields')).semiBold(),
-        if (!widget.isReadOnly) ...[
-          const Gap(8),
-          material.Row(
-            children: [
-              material.Expanded(
-                child: TextField(
-                  controller: _newFieldController,
-                  placeholder: const Text('Field'),
-                ),
-              ),
-              const Gap(8),
-              material.Expanded(
-                child: TextField(
-                  controller: _newValueController,
-                  placeholder: const Text('Value'),
-                ),
-              ),
-              const Gap(8),
-              PrimaryButton(
-                onPressed: () {
-                  final f = _newFieldController.text.trim();
-                  final v = _newValueController.text;
-                  if (f.isEmpty) return;
-                  _hashSet(f, v);
-                  _newFieldController.clear();
-                  _newValueController.clear();
-                },
-                size: ButtonSize.small,
-                child: const Text('HSET'),
-              ),
-            ],
-          ),
-        ],
-        const Gap(12),
-        material.Expanded(
-          child: entries.isEmpty
-              ? material.Center(child: const Text('No fields').muted())
-              : material.ListView.separated(
-                  itemCount: entries.length,
-                  separatorBuilder: (_, __) => const Gap(4),
-                  itemBuilder: (context, index) {
-                    final entry = entries[index];
-                    return _FieldRow(
-                      field: entry.key.label,
-                      value: entry.value.label,
-                      onDelete:
-                          widget.isReadOnly ? null : () => _hashDel(entry.key),
-                      colorScheme: cs,
-                      shadcnCs: scs,
-                    );
-                  },
-                ),
-        ),
-        if (_hasMore) _loadMoreTile(),
-      ],
+    return RedisHashEditor(
+      heading: _collectionHeading('Hash fields'),
+      entries: _hashValue.entries.toList(),
+      isReadOnly: widget.isReadOnly,
+      onSet: _hashSet,
+      onDelete: _hashDel,
+      colorScheme: cs,
+      shadcnCs: scs,
+      footer: _hasMore ? _loadMoreTile() : null,
     );
   }
-
-  // ─── List ───────────────────────────────────────────────────────────────
 
   Widget _buildListEditor(ColorScheme cs, shadcn.ColorScheme scs) {
-    return material.Column(
-      crossAxisAlignment: material.CrossAxisAlignment.stretch,
-      children: [
-        Text(_collectionHeading('List items')).semiBold(),
-        if (!widget.isReadOnly) ...[
-          const Gap(8),
-          material.Row(
-            children: [
-              material.Expanded(
-                child: TextField(
-                  controller: _newValueController,
-                  placeholder: const Text('New item'),
-                ),
-              ),
-              const Gap(8),
-              PrimaryButton(
-                onPressed: () {
-                  final v = _newValueController.text;
-                  if (v.isEmpty) return;
-                  _listPush(v);
-                  _newValueController.clear();
-                },
-                size: ButtonSize.small,
-                child: const Text('RPUSH'),
-              ),
-            ],
-          ),
-        ],
-        const Gap(12),
-        material.Expanded(
-          child: _listValue.isEmpty
-              ? material.Center(child: const Text('No items').muted())
-              : material.ListView.separated(
-                  itemCount: _listValue.length,
-                  separatorBuilder: (_, __) => const Gap(4),
-                  itemBuilder: (context, i) => _IndexedValueRow(
-                    index: i,
-                    value: _listValue[i].label,
-                    isBinary: !_listValue[i].isUtf8,
-                    onEdit: widget.isReadOnly || !_listValue[i].isUtf8
-                        ? null
-                        : () async {
-                            final initialText =
-                                _listValue[i].text ?? _listValue[i].label;
-                            final edited = await showAppDialog<String>(
-                              context: context,
-                              builder: (ctx) => _RedisEditListDialogContent(
-                                index: i,
-                                initialValue: initialText,
-                              ),
-                            );
-                            if (edited != null && edited != initialText) {
-                              await _listSet(i, edited,
-                                  expectedCurrent: _listValue[i]);
-                            }
-                          },
-                    onDelete: widget.isReadOnly
-                        ? null
-                        : () => _listRemove(i, _listValue[i]),
-                    colorScheme: cs,
-                    shadcnCs: scs,
-                  ),
-                ),
-        ),
-        if (_hasMore) _loadMoreTile(),
-      ],
+    return RedisListEditor(
+      heading: _collectionHeading('List items'),
+      items: _listValue,
+      isReadOnly: widget.isReadOnly,
+      onPush: _listPush,
+      onSet: _listSet,
+      onRemove: _listRemove,
+      colorScheme: cs,
+      shadcnCs: scs,
+      footer: _hasMore ? _loadMoreTile() : null,
     );
   }
-
-  // ─── Set ────────────────────────────────────────────────────────────────
 
   Widget _buildSetEditor(ColorScheme cs, shadcn.ColorScheme scs) {
-    return material.Column(
-      crossAxisAlignment: material.CrossAxisAlignment.stretch,
-      children: [
-        Text(_collectionHeading('Set members')).semiBold(),
-        if (!widget.isReadOnly) ...[
-          const Gap(8),
-          material.Row(
-            children: [
-              material.Expanded(
-                child: TextField(
-                  controller: _newValueController,
-                  placeholder: const Text('New member'),
-                ),
-              ),
-              const Gap(8),
-              PrimaryButton(
-                onPressed: () {
-                  final v = _newValueController.text.trim();
-                  if (v.isEmpty) return;
-                  _setAdd(v);
-                  _newValueController.clear();
-                },
-                size: ButtonSize.small,
-                child: const Text('SADD'),
-              ),
-            ],
-          ),
-        ],
-        const Gap(12),
-        material.Expanded(
-          child: _setValue.isEmpty
-              ? material.Center(child: const Text('No members').muted())
-              : material.ListView.separated(
-                  itemCount: _setValue.length,
-                  separatorBuilder: (_, __) => const Gap(4),
-                  itemBuilder: (context, index) => _MemberRow(
-                    member: _setValue[index].label,
-                    onDelete: widget.isReadOnly
-                        ? null
-                        : () => _setRemove(_setValue[index]),
-                    colorScheme: cs,
-                    shadcnCs: scs,
-                  ),
-                ),
-        ),
-        if (_hasMore) _loadMoreTile(),
-      ],
+    return RedisSetEditor(
+      heading: _collectionHeading('Set members'),
+      members: _setValue,
+      isReadOnly: widget.isReadOnly,
+      onAdd: _setAdd,
+      onRemove: _setRemove,
+      colorScheme: cs,
+      shadcnCs: scs,
+      footer: _hasMore ? _loadMoreTile() : null,
     );
   }
 
-  // ─── Sorted Set ─────────────────────────────────────────────────────────
-
   Widget _buildZsetEditor(ColorScheme cs, shadcn.ColorScheme scs) {
-    return material.Column(
-      crossAxisAlignment: material.CrossAxisAlignment.stretch,
-      children: [
-        Text(_collectionHeading('Sorted set')).semiBold(),
-        if (!widget.isReadOnly) ...[
-          const Gap(8),
-          material.Row(
-            children: [
-              material.Expanded(
-                flex: 2,
-                child: TextField(
-                  controller: _newValueController,
-                  placeholder: const Text('Member'),
-                ),
-              ),
-              const Gap(8),
-              material.Expanded(
-                child: TextField(
-                  controller: _newFieldController,
-                  placeholder: const Text('Score'),
-                ),
-              ),
-              const Gap(8),
-              PrimaryButton(
-                onPressed: () {
-                  final m = _newValueController.text.trim();
-                  final s = double.tryParse(_newFieldController.text.trim());
-                  if (m.isEmpty || s == null) return;
-                  _zsetAdd(m, s);
-                  _newValueController.clear();
-                  _newFieldController.clear();
-                },
-                size: ButtonSize.small,
-                child: const Text('ZADD'),
-              ),
-            ],
-          ),
-        ],
-        const Gap(12),
-        material.Expanded(
-          child: _zsetValue.isEmpty
-              ? material.Center(child: const Text('No members').muted())
-              : material.ListView.separated(
-                  itemCount: _zsetValue.length,
-                  separatorBuilder: (_, __) => const Gap(4),
-                  itemBuilder: (context, index) {
-                    final (member, score) = _zsetValue[index];
-                    return _ScoredMemberRow(
-                      member: member.label,
-                      score: score,
-                      onDelete:
-                          widget.isReadOnly ? null : () => _zsetRemove(member),
-                      colorScheme: cs,
-                      shadcnCs: scs,
-                    );
-                  },
-                ),
-        ),
-        if (_hasMore) _loadMoreTile(),
-      ],
+    return RedisZsetEditor(
+      heading: _collectionHeading('Sorted set'),
+      members: _zsetValue,
+      isReadOnly: widget.isReadOnly,
+      onAdd: _zsetAdd,
+      onRemove: _zsetRemove,
+      colorScheme: cs,
+      shadcnCs: scs,
+      footer: _hasMore ? _loadMoreTile() : null,
     );
   }
 
@@ -1418,369 +1145,6 @@ class _RedisRenameDialogContentState
           child: const Text('Rename'),
         ),
       ],
-    );
-  }
-}
-
-class _RedisEditListDialogContent extends material.StatefulWidget {
-  const _RedisEditListDialogContent({
-    required this.index,
-    required this.initialValue,
-  });
-
-  final int index;
-  final String initialValue;
-
-  @override
-  material.State<_RedisEditListDialogContent> createState() =>
-      _RedisEditListDialogContentState();
-}
-
-class _RedisEditListDialogContentState
-    extends material.State<_RedisEditListDialogContent> {
-  late final material.TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = material.TextEditingController(text: widget.initialValue);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  material.Widget build(material.BuildContext context) {
-    return AlertDialog(
-      title: Text('Edit Item [${widget.index}]'),
-      content: material.Column(
-        mainAxisSize: material.MainAxisSize.min,
-        crossAxisAlignment: material.CrossAxisAlignment.stretch,
-        children: [
-          const Text('Enter new value').muted().small(),
-          const Gap(8),
-          TextField(
-            controller: _controller,
-            placeholder: const Text('Value'),
-          ),
-        ],
-      ),
-      actions: [
-        GhostButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        PrimaryButton(
-          onPressed: () {
-            Navigator.of(context).pop(_controller.text);
-          },
-          child: const Text('Save'),
-        ),
-      ],
-    );
-  }
-}
-
-// ─── Shared row widgets ─────────────────────────────────────────────────────
-
-class _FieldRow extends StatelessWidget {
-  const _FieldRow({
-    required this.field,
-    required this.value,
-    this.onDelete,
-    required this.colorScheme,
-    required this.shadcnCs,
-  });
-
-  final String field;
-  final String value;
-  final VoidCallback? onDelete;
-  final ColorScheme colorScheme;
-  final shadcn.ColorScheme shadcnCs;
-
-  @override
-  material.Widget build(material.BuildContext context) {
-    return material.Container(
-      padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: material.BoxDecoration(
-        color: colorScheme.card,
-        borderRadius: material.BorderRadius.circular(6),
-        border: material.Border.all(
-            color: colorScheme.border.withValues(alpha: 0.3)),
-      ),
-      child: material.Row(
-        children: [
-          material.SizedBox(
-            width: 160,
-            child: material.Text(
-              field,
-              overflow: material.TextOverflow.ellipsis,
-              style: material.TextStyle(
-                fontSize: 12,
-                fontFamily: 'monospace',
-                fontWeight: material.FontWeight.w600,
-                color: shadcnCs.primary,
-              ),
-            ),
-          ),
-          const Gap(12),
-          material.Expanded(
-            child: material.SelectableText(
-              value,
-              style: material.TextStyle(
-                fontSize: 12,
-                fontFamily: 'monospace',
-                color: colorScheme.foreground,
-              ),
-            ),
-          ),
-          const Gap(8),
-          if (onDelete != null)
-            material.InkWell(
-              onTap: onDelete,
-              borderRadius: material.BorderRadius.circular(4),
-              child: material.Padding(
-                padding: const material.EdgeInsets.all(4),
-                child: material.Icon(material.Icons.close_rounded,
-                    size: 14, color: context.semanticPalette.destructive),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _IndexedValueRow extends StatelessWidget {
-  const _IndexedValueRow({
-    required this.index,
-    required this.value,
-    this.isBinary = false,
-    this.onEdit,
-    this.onDelete,
-    required this.colorScheme,
-    required this.shadcnCs,
-  });
-
-  final int index;
-  final String value;
-  final bool isBinary;
-  final VoidCallback? onEdit;
-  final VoidCallback? onDelete;
-  final ColorScheme colorScheme;
-  final shadcn.ColorScheme shadcnCs;
-
-  @override
-  material.Widget build(material.BuildContext context) {
-    return material.Container(
-      padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: material.BoxDecoration(
-        color: colorScheme.card,
-        borderRadius: material.BorderRadius.circular(6),
-        border: material.Border.all(
-            color: colorScheme.border.withValues(alpha: 0.3)),
-      ),
-      child: material.Row(
-        children: [
-          material.SizedBox(
-            width: 40,
-            child: Text(
-              '$index',
-              style: material.TextStyle(
-                fontSize: 12,
-                fontWeight: material.FontWeight.w600,
-                color: shadcnCs.mutedForeground,
-              ),
-            ),
-          ),
-          const Gap(12),
-          material.Expanded(
-            child: material.SelectableText(
-              value,
-              style: material.TextStyle(
-                fontSize: 12,
-                fontFamily: 'monospace',
-                color: colorScheme.foreground,
-              ),
-            ),
-          ),
-          if (isBinary) ...[
-            const Gap(8),
-            material.Container(
-              padding: const material.EdgeInsets.symmetric(
-                  horizontal: 5, vertical: 1.5),
-              decoration: material.BoxDecoration(
-                color: shadcnCs.muted,
-                borderRadius: material.BorderRadius.circular(3),
-              ),
-              child: Text(
-                'binary',
-                style: material.TextStyle(
-                  fontSize: 10,
-                  fontFamily: 'monospace',
-                  color: shadcnCs.mutedForeground,
-                ),
-              ),
-            ),
-          ],
-          if (onEdit != null) ...[
-            const Gap(8),
-            material.Tooltip(
-              message: 'Edit item',
-              child: material.InkWell(
-                onTap: onEdit,
-                borderRadius: material.BorderRadius.circular(4),
-                child: material.Padding(
-                  padding: const material.EdgeInsets.all(4),
-                  child: material.Icon(material.Icons.edit_outlined,
-                      size: 14, color: shadcnCs.mutedForeground),
-                ),
-              ),
-            ),
-          ],
-          if (onDelete != null) ...[
-            const Gap(8),
-            material.Tooltip(
-              message: 'Delete item',
-              child: material.InkWell(
-                onTap: onDelete,
-                borderRadius: material.BorderRadius.circular(4),
-                child: material.Padding(
-                  padding: const material.EdgeInsets.all(4),
-                  child: material.Icon(material.Icons.close_rounded,
-                      size: 14, color: context.semanticPalette.destructive),
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _MemberRow extends StatelessWidget {
-  const _MemberRow({
-    required this.member,
-    this.onDelete,
-    required this.colorScheme,
-    required this.shadcnCs,
-  });
-
-  final String member;
-  final VoidCallback? onDelete;
-  final ColorScheme colorScheme;
-  final shadcn.ColorScheme shadcnCs;
-
-  @override
-  material.Widget build(material.BuildContext context) {
-    return material.Container(
-      padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: material.BoxDecoration(
-        color: colorScheme.card,
-        borderRadius: material.BorderRadius.circular(6),
-        border: material.Border.all(
-            color: colorScheme.border.withValues(alpha: 0.3)),
-      ),
-      child: material.Row(
-        children: [
-          material.Expanded(
-            child: material.SelectableText(
-              member,
-              style: material.TextStyle(
-                fontSize: 12,
-                fontFamily: 'monospace',
-                color: colorScheme.foreground,
-              ),
-            ),
-          ),
-          const Gap(8),
-          if (onDelete != null)
-            material.InkWell(
-              onTap: onDelete,
-              borderRadius: material.BorderRadius.circular(4),
-              child: material.Padding(
-                padding: const material.EdgeInsets.all(4),
-                child: material.Icon(material.Icons.close_rounded,
-                    size: 14, color: context.semanticPalette.destructive),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ScoredMemberRow extends StatelessWidget {
-  const _ScoredMemberRow({
-    required this.member,
-    required this.score,
-    this.onDelete,
-    required this.colorScheme,
-    required this.shadcnCs,
-  });
-
-  final String member;
-  final double score;
-  final VoidCallback? onDelete;
-  final ColorScheme colorScheme;
-  final shadcn.ColorScheme shadcnCs;
-
-  @override
-  material.Widget build(material.BuildContext context) {
-    return material.Container(
-      padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: material.BoxDecoration(
-        color: colorScheme.card,
-        borderRadius: material.BorderRadius.circular(6),
-        border: material.Border.all(
-            color: colorScheme.border.withValues(alpha: 0.3)),
-      ),
-      child: material.Row(
-        children: [
-          material.Container(
-            padding:
-                const material.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: material.BoxDecoration(
-              color: shadcnCs.muted.withValues(alpha: 0.3),
-              borderRadius: material.BorderRadius.circular(4),
-            ),
-            child: Text(
-              score.toStringAsFixed(score == score.roundToDouble() ? 0 : 2),
-              style: material.TextStyle(
-                fontSize: 11,
-                fontWeight: material.FontWeight.w600,
-                color: shadcnCs.primary,
-              ),
-            ),
-          ),
-          const Gap(12),
-          material.Expanded(
-            child: material.SelectableText(
-              member,
-              style: material.TextStyle(
-                fontSize: 12,
-                fontFamily: 'monospace',
-                color: colorScheme.foreground,
-              ),
-            ),
-          ),
-          const Gap(8),
-          if (onDelete != null)
-            material.InkWell(
-              onTap: onDelete,
-              borderRadius: material.BorderRadius.circular(4),
-              child: material.Padding(
-                padding: const material.EdgeInsets.all(4),
-                child: material.Icon(material.Icons.close_rounded,
-                    size: 14, color: context.semanticPalette.destructive),
-              ),
-            ),
-        ],
-      ),
     );
   }
 }
