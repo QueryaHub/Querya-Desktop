@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/security/connection_environment.dart';
 import 'package:querya_desktop/core/security/safe_mode.dart';
-import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
+import 'package:querya_desktop/shared/widgets/connection_environment_badge.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Asks the user to type the connection name before a Production connection
@@ -54,7 +55,10 @@ class _SafeModeUnlockDialogState extends material.State<SafeModeUnlockDialog> {
         'it locks again.',
       ),
       icon: const material.Icon(material.Icons.lock_open_rounded),
-      iconColor: context.workbench.destructive,
+      iconColor: environmentAccentColorOf(
+        context,
+        ConnectionEnvironment.production,
+      ),
       content: material.Column(
         mainAxisSize: material.MainAxisSize.min,
         crossAxisAlignment: material.CrossAxisAlignment.stretch,

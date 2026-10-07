@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/security/connection_environment.dart';
-import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/shared/widgets/connection_environment_badge.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -18,7 +17,7 @@ class EnvironmentSection extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final wb = context.workbench;
+    final muted = Theme.of(context).colorScheme.mutedForeground;
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
@@ -31,7 +30,7 @@ class EnvironmentSection extends material.StatelessWidget {
             _Option(
               optionKey: 'none',
               label: 'None',
-              color: wb.mutedForeground,
+              color: muted,
               selected: value == null,
               onTap: () => onChanged(null),
             ),
@@ -39,7 +38,7 @@ class EnvironmentSection extends material.StatelessWidget {
               _Option(
                 optionKey: env.storageValue,
                 label: env.label,
-                color: environmentAccentColor(wb, env),
+                color: environmentAccentColorOf(context, env),
                 selected: value == env,
                 onTap: () => onChanged(env),
               ),
@@ -50,7 +49,7 @@ class EnvironmentSection extends material.StatelessWidget {
           Text(
             'Opens read-only. Writing requires typing the connection name to '
             'unlock, and locks again after 5 minutes.',
-            style: material.TextStyle(color: wb.mutedForeground, fontSize: 11),
+            style: material.TextStyle(color: muted, fontSize: 11),
           ),
         ],
       ],
