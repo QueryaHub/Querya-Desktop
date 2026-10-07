@@ -104,10 +104,20 @@ class FakeSshClient implements SSHClient {
   }
 
   final FakeSshServer server;
+
+  @override
   final SSHSocket socket;
+
+  @override
   final String username;
+
+  @override
   final SSHPasswordRequestHandler? onPasswordRequest;
+
+  @override
   final List<SSHKeyPair>? identities;
+
+  @override
   final SSHHostkeyVerifyHandler? onVerifyHostKey;
 
   final _authenticated = Completer<void>();
@@ -175,7 +185,8 @@ class FakeSshClient implements SSHClient {
   }
 
   @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError('${invocation.memberName} is not faked');
 }
 
 /// Forwarded channel that answers every chunk with its uppercase form.
@@ -216,5 +227,6 @@ class _EchoForwardChannel implements SSHForwardChannel {
   Future<void> flush() async {}
 
   @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError('${invocation.memberName} is not faked');
 }
