@@ -84,7 +84,8 @@ environment. Use a throwaway database in CI.
 
 This repository contains a composite action in
 `.github/actions/test-extension`. Until it is published as
-`QueryaHub/action-test-extension`, reference it by path:
+`QueryaHub/action-test-extension`, reference it by path (pin a release tag once one
+ships the action; `dev` is shown here):
 
 ```yaml
 jobs:
@@ -97,7 +98,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build the driver
         run: ./build.sh
-      - uses: QueryaHub/Querya-Desktop/.github/actions/test-extension@0.4.18
+      - uses: QueryaHub/Querya-Desktop/.github/actions/test-extension@dev
         with:
           querya-version: ${{ matrix.querya-version }}
           extension-dir: ./dist/my-extension
