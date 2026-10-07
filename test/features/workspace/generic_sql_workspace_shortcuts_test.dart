@@ -170,7 +170,7 @@ void main() {
   // the editor. Re-enable once the selection is made through the mounted
   // editor (EditableTextState.userUpdateTextEditingValue).
   testWidgets('only the selected text runs when there is a selection',
-      skip: 'hangs in CI; drive the selection through the mounted editor',
+      skip: true,
       (tester) async {
     final delegate = FakeSqlExecutionDelegate();
     final state = await pumpWorkspace(tester, delegate);
