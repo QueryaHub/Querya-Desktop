@@ -2,6 +2,8 @@ import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
+import 'package:querya_desktop/core/storage/local_db.dart' show MutationAuditSource;
+import 'package:querya_desktop/core/storage/mutation_audit_recorder.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
@@ -475,6 +477,12 @@ class GenericTableViewState extends material.State<GenericTableView> {
         await widget.delegate.applyStagedChanges(
           plan: plan,
           buffer: buffer,
+        );
+        auditMutationPlan(
+          connection: widget.delegate.auditConnection,
+          databaseName: widget.delegate.auditDatabaseName,
+          plan: plan,
+          source: MutationAuditSource.tableEditor,
         );
       },
     );

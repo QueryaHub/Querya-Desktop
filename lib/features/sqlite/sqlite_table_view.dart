@@ -70,6 +70,12 @@ class SqliteTableDataDelegate extends TableDataMutationDelegate {
   }
 
   @override
+  ConnectionRow? get auditConnection => connectionRow;
+
+  @override
+  String? get auditDatabaseName => connectionRow.host;
+
+  @override
   String browseDataSql({required int offset, required int limit}) {
     return sqliteBrowseDataSql(
       qualifiedFrom: _qualifiedFrom(),

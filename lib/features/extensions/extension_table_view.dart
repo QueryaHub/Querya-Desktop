@@ -45,6 +45,12 @@ class ExtensionTableDataDelegate extends TableDataMutationDelegate {
   }
 
   @override
+  ConnectionRow? get auditConnection => connectionRow;
+
+  @override
+  String? get auditDatabaseName => database;
+
+  @override
   String browseDataSql({required int offset, required int limit}) {
     return 'SELECT * FROM $qualifiedName$_whereClause LIMIT $limit OFFSET $offset';
   }

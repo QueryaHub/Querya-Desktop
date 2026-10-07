@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
+import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 
 /// Represents a loaded data page with column names and string rows.
@@ -67,6 +68,12 @@ abstract class TableDataMutationDelegate {
 
   /// Checks if [sql] is an allowed select query for custom SQL execution.
   bool isAllowedSelectQuery(String sql);
+
+  /// Connection this delegate writes through (audit trail of applied edits).
+  ConnectionRow? get auditConnection => null;
+
+  /// Database the edits are applied in, for the audit trail.
+  String? get auditDatabaseName => null;
 
   /// Cancels an in-flight operation if supported.
   void cancel({bool interruptIfBusy = false}) {}
