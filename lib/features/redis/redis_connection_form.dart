@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/security/connection_environment.dart';
+import 'package:querya_desktop/features/connections/environment_section.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
@@ -55,6 +57,7 @@ class _RedisConnectionFormContentState
   final _sslKeyController = material.TextEditingController();
 
   SshTunnelConfig _sshConfig = const SshTunnelConfig();
+  ConnectionEnvironment? _environment;
   final SshTunnelSecrets _sshSecrets = SshTunnelSecrets();
 
   bool _useSSL = false;
@@ -86,6 +89,7 @@ class _RedisConnectionFormContentState
     final initial = widget.initial;
     if (initial != null) {
       _nameController.text = initial.name;
+      _environment = initial.environment;
       _hostController.text = initial.host ?? '';
       _portController.text = (initial.port ?? 6379).toString();
       _usernameController.text = initial.username ?? '';
@@ -228,7 +232,9 @@ class _RedisConnectionFormContentState
       createdAt: initial?.createdAt ?? DateTime.now().toUtc().toIso8601String(),
       sshSecrets: _sshConfig.enabled ? _sshSecrets : null,
     );
-    return row.withSshTunnelConfig(_sshConfig.enabled ? _sshConfig : null);
+    return row
+        .withSshTunnelConfig(_sshConfig.enabled ? _sshConfig : null)
+        .withEnvironment(_environment);
   }
 
   void _save() {
@@ -432,6 +438,11 @@ class _RedisConnectionFormContentState
                         onChanged: _syncUriSslParams,
                       ),
                     ],
+                    const Gap(16),
+                    EnvironmentSection(
+                      value: _environment,
+                      onChanged: (e) => setState(() => _environment = e),
+                    ),
                     const Gap(16),
                     // SSH Tunneling Section
                     SshTunnelSection(

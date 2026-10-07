@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/security/connection_environment.dart';
+import 'package:querya_desktop/features/connections/environment_section.dart';
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
@@ -56,6 +58,7 @@ class _PostgresConnectionFormContentState
   final _sslKeyController = material.TextEditingController();
 
   SshTunnelConfig _sshConfig = const SshTunnelConfig();
+  ConnectionEnvironment? _environment;
   final SshTunnelSecrets _sshSecrets = SshTunnelSecrets();
 
   bool _useSSL = false;
@@ -89,6 +92,7 @@ class _PostgresConnectionFormContentState
     final initial = widget.initial;
     if (initial != null) {
       _nameController.text = initial.name;
+      _environment = initial.environment;
       _hostController.text = initial.host ?? '';
       _portController.text = (initial.port ?? 5432).toString();
       _usernameController.text = initial.username ?? '';
@@ -362,6 +366,7 @@ class _PostgresConnectionFormContentState
       sshSecrets: _sshConfig.enabled ? _sshSecrets : null,
     );
     row = row.withSshTunnelConfig(_sshConfig.enabled ? _sshConfig : null);
+    row = row.withEnvironment(_environment);
     material.Navigator.of(context).pop(row);
   }
 
@@ -681,6 +686,11 @@ class _PostgresConnectionFormContentState
                           ),
                         ),
                       ],
+                      const Gap(16),
+                      EnvironmentSection(
+                        value: _environment,
+                        onChanged: (e) => setState(() => _environment = e),
+                      ),
                       const Gap(16),
                       // SSH Tunneling Section
                       SshTunnelSection(

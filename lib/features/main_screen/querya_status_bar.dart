@@ -5,6 +5,7 @@ import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/core/ui/querya_icons.dart';
+import 'package:querya_desktop/shared/widgets/connection_environment_badge.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Obsidian/IDE standard bottom status bar.
@@ -42,11 +43,12 @@ class QueryaStatusBar extends material.StatelessWidget {
     final wb = context.workbench;
     final theme = Theme.of(context);
     final isMac = Platform.isMacOS;
+    final environment = activeConnection?.environment;
 
     return material.Container(
       height: context.scaled(26),
       decoration: material.BoxDecoration(
-        color: wb.surface,
+        color: environmentChromeColor(wb, environment, wb.surface),
         border: material.Border(
           top: material.BorderSide(
             color: wb.borderSubtle.withValues(alpha: 0.22),
@@ -116,6 +118,13 @@ class QueryaStatusBar extends material.StatelessWidget {
                       ),
                     ),
                   ),
+                  if (environment != null) ...[
+                    const Gap(6),
+                    ConnectionEnvironmentBadge(
+                      environment: environment,
+                      compact: true,
+                    ),
+                  ],
                   if (activeConnection!.host != null) ...[
                     const Gap(4),
                     material.Flexible(

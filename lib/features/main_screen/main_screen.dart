@@ -19,6 +19,7 @@ import 'package:querya_desktop/core/layout/querya_split_handle.dart';
 import 'package:querya_desktop/core/motion/querya_spring.dart';
 import 'package:querya_desktop/core/motion/querya_spring_controller.dart';
 import 'package:querya_desktop/core/platform/file_launch_service.dart';
+import 'package:querya_desktop/core/security/safe_mode.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/extensions/sandbox/unsandboxed_launch_consent_gate.dart';
@@ -31,6 +32,7 @@ import 'package:querya_desktop/core/ui/querya_shell_status.dart';
 import 'package:querya_desktop/core/unsaved_work_guard.dart';
 import 'package:querya_desktop/features/main_screen/connections_panel_width_persist.dart';
 import 'package:querya_desktop/features/main_screen/querya_status_bar.dart';
+import 'package:querya_desktop/features/main_screen/safe_mode_unlock_dialog.dart';
 import 'package:querya_desktop/features/main_screen/querya_window_title_bar.dart';
 import 'package:querya_desktop/features/macos/querya_platform_menu_bar.dart';
 import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
@@ -92,9 +94,52 @@ class _MainScreenState extends State<MainScreen> {
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_handleGlobalKeyEvent);
     UnsandboxedLaunchConsentGate.instance.handler = null;
+    _safeModeRelockTimer?.cancel();
     _workspace.dispose();
     _isSidebarVisible.dispose();
     super.dispose();
+  }
+
+  Timer? _safeModeRelockTimer;
+
+  /// Toggles the read-only lock. Turning it off for a Production connection
+  /// (Safe Mode) needs a typed confirmation and re-locks after
+  /// [kSafeModeUnlockDuration].
+  Future<void> _toggleReadOnly() async {
+    final ws = _workspace.value;
+    final connection = ws.activeConnection;
+    if (connection == null) return;
+
+    if (ws.isReadOnly &&
+        safeModeRequiresConfirmation(connection.environment)) {
+      final confirmed = await showSafeModeUnlockDialog(
+        context: context,
+        connectionName: connection.name,
+      );
+      if (!confirmed || !mounted) return;
+      final current = _workspace.value;
+      if (current.activeConnection?.id != connection.id || !current.isReadOnly) {
+        return;
+      }
+      _workspace.value = current.toggleReadOnly();
+      _safeModeRelockTimer?.cancel();
+      _safeModeRelockTimer = Timer(kSafeModeUnlockDuration, () {
+        if (!mounted) return;
+        final latest = _workspace.value;
+        if (latest.activeConnection?.id == connection.id &&
+            !latest.isReadOnly) {
+          _workspace.value = latest.toggleReadOnly();
+          showAppToast(
+            context: context,
+            message: '${connection.name} is read-only again',
+          );
+        }
+      });
+      return;
+    }
+
+    _safeModeRelockTimer?.cancel();
+    _workspace.value = ws.toggleReadOnly();
   }
 
   bool _handleGlobalKeyEvent(KeyEvent event) {
@@ -841,9 +886,7 @@ class _MainScreenState extends State<MainScreen> {
                   )
               : null,
           onToggleReadOnly: workspace.activeConnection != null
-              ? () {
-                  _workspace.value = _workspace.value.toggleReadOnly();
-                }
+              ? () => unawaited(_toggleReadOnly())
               : null,
           onOpenWelcomeTour: _onOpenWelcomeTour,
           selectedConnectionId: workspace.activeConnection?.id,
@@ -1020,10 +1063,7 @@ class _MainScreenState extends State<MainScreen> {
                               _splitKey.currentState?.toggleSidebar(),
                           onOpenWelcomeTour: _onOpenWelcomeTour,
                           onGoHome: _onGoHome,
-                          onReadOnlyChanged: () {
-                            _workspace.value =
-                                _workspace.value.toggleReadOnly();
-                          },
+                          onReadOnlyChanged: () => unawaited(_toggleReadOnly()),
                           onConnect: () {
                             final active = workspace.activeConnection;
                             if (active != null && active.id != null) {
