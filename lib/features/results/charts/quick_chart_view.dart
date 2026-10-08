@@ -149,7 +149,7 @@ class _QuickChartViewState extends material.State<QuickChartView> {
                     QueryaDropdownItem(value: i, label: widget.columns[i]),
                 ],
                 onSelected: (v) =>
-                    setState(() => _labelCol = v < 0 ? null : v),
+                    setState(() => _labelCol = (v == null || v < 0) ? null : v),
               ),
               const material.SizedBox(width: 12),
               const Text('Y'),
@@ -162,7 +162,7 @@ class _QuickChartViewState extends material.State<QuickChartView> {
                   for (final i in _numeric)
                     QueryaDropdownItem(value: i, label: widget.columns[i]),
                 ],
-                onSelected: (v) => setState(() => _valueCol = v),
+                onSelected: (v) => setState(() => _valueCol = v ?? _valueCol),
               ),
               const material.Spacer(),
               material.IconButton(
