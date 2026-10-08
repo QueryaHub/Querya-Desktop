@@ -16,8 +16,15 @@ abstract class SqlExecutionDelegate {
   /// Explains the SQL query plan if supported by the DBMS.
   Future<String> explainQuery(String sql);
 
+  /// Whether [explainQuery] works for this driver (shows the Explain button).
+  bool get supportsExplain => true;
+
   /// Interrupts or cancels active query execution.
   Future<void> cancelQuery();
+
+  /// Whether [cancelQuery] really interrupts a running statement (shows the
+  /// Cancel button while a query runs).
+  bool get supportsCancel => true;
 
   /// Whether the database supports explicit multi-statement transactions.
   bool get supportsTransactions;

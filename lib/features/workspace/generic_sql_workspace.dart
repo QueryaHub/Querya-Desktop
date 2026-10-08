@@ -558,6 +558,73 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
     }
   }
 
+  /// Shows the query plan of the selection (or the whole editor text) in the
+  /// result grid, one plan line per row.
+  Future<void> explain([SqlQueryTabSession? targetSession]) async {
+    final session = targetSession ?? _activeSession;
+    if (session.running || !widget.delegate.supportsExplain) return;
+
+    final selection = session.controller.selection;
+    final sql = (selection.isValid && !selection.isCollapsed
+            ? selection.textInside(session.controller.text)
+            : session.controller.text)
+        .trim();
+    if (sql.isEmpty) return;
+
+    invalidatePane(session);
+    setState(() {
+      session.running = true;
+      session.error = null;
+      session.columns = [];
+      session.rows = [];
+      session.affectedRows = null;
+      session.statusLine = null;
+      session.resultGridPrimaryKeys = const [];
+      session.resultGridColumnDataTypes = null;
+      session.resultGridColumnMeta = null;
+      session.stagingBuffer?.dispose();
+      session.stagingBuffer = null;
+    });
+    QueryaShellStatus.instance.beginBusy(message: 'Explaining query…');
+    try {
+      final plan = await widget.delegate.explainQuery(sql);
+      if (!mounted) return;
+      final lines = plan.split('\n').where((l) => l.trim().isNotEmpty).toList();
+      invalidatePane(session);
+      setState(() {
+        session.columns = const ['QUERY PLAN'];
+        session.rows = [for (final l in lines) [l]];
+        session.statusLine = 'Query plan: ${lines.length} line(s).';
+        session.running = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        invalidatePane(session);
+        setState(() {
+          session.error = e.toString();
+          session.running = false;
+        });
+      }
+    } finally {
+      QueryaShellStatus.instance.endBusy();
+    }
+  }
+
+  /// Interrupts the statement that is running in [targetSession]. The pending
+  /// `execute` / `explain` then finishes with the driver's cancellation error.
+  Future<void> cancelRunning([SqlQueryTabSession? targetSession]) async {
+    final session = targetSession ?? _activeSession;
+    if (!session.running || !widget.delegate.supportsCancel) return;
+    try {
+      await widget.delegate.cancelQuery();
+    } catch (e) {
+      if (mounted) {
+        invalidatePane(session);
+        setState(() => session.error = 'Cancel failed: $e');
+      }
+    }
+  }
+
   Future<void> applyStagedChanges([SqlQueryTabSession? targetSession]) async {
     final session = targetSession ?? _activeSession;
     if (widget.isReadOnly ||
@@ -883,7 +950,9 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
                       Text('DB: $effectiveDatabase').muted().small(),
                     if (widget.delegate.supportsTransactions)
                       Text(_txLabel()).muted().small(),
-                    OutlineButton(
+                    QueryaActionButton(
+                      label: 'History',
+                      icon: material.Icons.history_rounded,
                       size: ButtonSize.small,
                       onPressed: widget.connectionRow.id != null && !session.running
                           ? () {
@@ -896,31 +965,34 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
                               );
                             }
                           : null,
-                      leading: material.Icon(
-                        material.Icons.history_rounded,
-                        size: 16,
-                        color: accent,
+                    ),
+                    QueryaActionButton(
+                      label: 'Execute (F5)',
+                      icon: material.Icons.play_arrow_rounded,
+                      loading: session.running,
+                      onPressed: () => execute(session),
+                    ),
+                    if (widget.delegate.supportsExplain)
+                      QueryaActionButton(
+                        key: const material.ValueKey('explain_query'),
+                        label: 'Explain',
+                        icon: material.Icons.account_tree_outlined,
+                        tooltip: 'Show the query plan',
+                        onPressed: session.running ? null : () => explain(session),
                       ),
-                      child: const Text('History'),
-                    ),
-                    OutlineButton(
-                      onPressed: session.running ? null : () => execute(session),
-                      leading: session.running
-                          ? QueryaSpinner(
-                              size: QueryaSpinnerSize.sm,
-                              color: accent,
-                            )
-                          : material.Icon(
-                              material.Icons.play_arrow_rounded,
-                              size: 18,
-                              color: accent,
-                            ),
-                      child: const Text('Execute (F5)'),
-                    ),
-                    OutlineButton(
+                    if (session.running && widget.delegate.supportsCancel)
+                      QueryaActionButton(
+                        key: const material.ValueKey('cancel_query'),
+                        label: 'Cancel',
+                        icon: material.Icons.stop_rounded,
+                        isDestructive: true,
+                        tooltip: 'Interrupt the running query',
+                        onPressed: () => cancelRunning(session),
+                      ),
+                    QueryaActionButton(
                       key: const material.ValueKey('open_diagram_tab'),
+                      label: 'Diagram',
                       onPressed: openDiagramTab,
-                      child: const Text('Diagram'),
                     ),
                     if (widget.extraToolbarTrailing?.call(context, session) case final extra?)
                       extra,
@@ -976,17 +1048,17 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
                         ),
                       ],
                       if (widget.delegate.supportsTransactions) ...[
-                        OutlineButton(
+                        QueryaActionButton(
+                          label: 'Begin',
                           onPressed: session.running ? null : () => runTxCommand('BEGIN'),
-                          child: const Text('Begin'),
                         ),
-                        OutlineButton(
+                        QueryaActionButton(
+                          label: 'Commit',
                           onPressed: session.running ? null : () => runTxCommand('COMMIT'),
-                          child: const Text('Commit'),
                         ),
-                        OutlineButton(
+                        QueryaActionButton(
+                          label: 'Rollback',
                           onPressed: session.running ? null : () => runTxCommand('ROLLBACK'),
-                          child: const Text('Rollback'),
                         ),
                       ],
                     ],
