@@ -16,7 +16,15 @@ On upgrade from older databases, existing plaintext secrets in SQLite are **migr
 
 - Anyone with **full access to your user session** can usually read app data and may extract secrets depending on OS protections.
 - The app does **not** implement team features, audit logging, or network zero-trust controls.
-- **SSH tunnels / jump hosts** are not built into the client today; use OS-level VPN or SSH forwarding if required.
+- **SSH tunnels / jump hosts** are built in (see below); the tunnel does not protect against an attacker who already controls your user session.
+
+## SSH tunnels (bastion hosts)
+
+- **Loopback only:** the forwarded port is bound to `127.0.0.1` on an ephemeral port, never to a public interface.
+- **Secrets:** SSH password, private key, passphrase and jump-host password are stored in the platform secure store next to the database password, not in SQLite. The tunnel configuration kept in the connection row (host, port, user, auth type, key *path*, fingerprint) is non-secret.
+- **Credential hygiene:** secrets are read on demand when connecting, not when the sidebar loads, and database drivers clear their in-memory credentials once the handshake completes.
+- **Host key verification:** with no pinned fingerprint the first key is accepted (trust on first use). Pin the server's SHA-256 fingerprint in the connection to reject a changed key; a mismatch fails the connection and reports the observed fingerprint.
+- **Team sharing:** *Export Team Profile* writes connections without passwords or SSH secrets; importing re-scrubs the file.
 
 ## Tests
 

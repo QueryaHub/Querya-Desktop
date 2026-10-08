@@ -45,11 +45,14 @@ Living document for planned work. Not a commitment order; adjust as priorities c
 - **Done:** CSV, JSON, Markdown, and SQL dump from ResultsTab / table toolbars (0.4.11 candidate, #326) — [`ResultsTab`](lib/features/main_screen/results_tab.dart), [`lib/shared/services/data_export_service.dart`](lib/shared/services/data_export_service.dart).
 - **Later:** alignment with `AppSettings` max rows for very large grids (warn or truncate before export).
 
+## NoSQL evolution (stages 1 and 2)
+
+- **Done:** nested collection subtree in the connections panel (#1023), one-click return to the active Mongo collection / Redis key (#1024), Redis key folder tree by delimiter (#1025), Mongo document viewer in Table / Tree / JSON modes (#1026), Aggregation Pipeline Builder (#1027), visual Index Manager (#1028), interactive Redis CLI console (#1029) and MQL query / shell console (#1030). See the [user guide](user-guide.md#mongodb-and-redis).
+
 ## SSH and advanced networking
 
-- **Today:** the app does not embed SSH tunnels or jump hosts (see [security.md](security.md)).
-- **Near term:** expand user-facing docs with recipes: `ssh -L`, cloud provider consoles, VPN.
-- **Later (if demand):** optional “local proxy command” or documented integration with external tools; avoid shipping full SSH client scope unless clearly justified.
+- **Done:** SSH tunnels through a bastion / jump host (password, private key or agent auth, optional second hop, host key fingerprint pinning, keep-alive) with a loopback-only forwarded port and a *Test SSH Connection* button. Security model: [security.md](security.md#ssh-tunnels-bastion-hosts). Setup guide: [user-guide.md](user-guide.md#connecting-through-a-bastion-host).
+- **Later (if demand):** optional "local proxy command" or documented integration with external tools; avoid growing into a full SSH client.
 
 ## Connections tree maintainability
 
