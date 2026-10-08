@@ -11,7 +11,7 @@ import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const _dbName = 'querya.db';
-const _dbVersion = 10;
+const _dbVersion = 11;
 
 /// `app_settings` key under which each profile database's random id is
 /// stored (see [LocalDb._ensureProfileId] and issue #986).
@@ -180,6 +180,7 @@ class LocalDb {
       ON sql_query_history (connection_id, database_name, recorded_at DESC, id DESC)
     ''');
     await _createMutationAuditTable(db);
+    await _createMcpActivityTable(db);
     ConnectionSecretsStore.profileId = await _ensureProfileId(db);
   }
 
@@ -203,6 +204,25 @@ class LocalDb {
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_mutation_audit_recorded
       ON mutation_audit (id DESC)
+    ''');
+  }
+
+  /// Calls made by MCP clients (#1136), newest kept, capped at
+  /// [kMcpActivityCap]. Connection name is a snapshot, like the audit.
+  Future<void> _createMcpActivityTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS mcp_activity (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        recorded_at TEXT NOT NULL,
+        client TEXT NOT NULL,
+        tool TEXT NOT NULL,
+        connection_id INTEGER,
+        connection_name TEXT,
+        sql_text TEXT,
+        row_count INTEGER,
+        duration_ms INTEGER NOT NULL,
+        error TEXT
+      )
     ''');
   }
 
@@ -316,6 +336,9 @@ class LocalDb {
     }
     if (oldVersion < 10) {
       await _createMutationAuditTable(db);
+    }
+    if (oldVersion < 11) {
+      await _createMcpActivityTable(db);
     }
   }
 
@@ -538,6 +561,36 @@ class LocalDb {
     final db = await _open();
     await db.delete('mutation_audit');
     _mutationAuditInsertCount = 0;
+  }
+
+  /// Appends one MCP tool call and keeps the newest [kMcpActivityCap].
+  /// Never throws: logging must not break a tool call.
+  Future<void> recordMcpActivity(McpActivityEntry entry) async {
+    try {
+      final db = await _open();
+      final map = entry.toMap()..remove('id');
+      await db.insert('mcp_activity', map);
+      await db.rawDelete(
+        'DELETE FROM mcp_activity WHERE id <= ('
+        'SELECT id FROM mcp_activity ORDER BY id DESC LIMIT 1 OFFSET ?)',
+        [kMcpActivityCap],
+      );
+    } catch (_) {
+      // Best effort.
+    }
+  }
+
+  /// Newest-first MCP tool calls.
+  Future<List<McpActivityEntry>> listMcpActivity({int limit = 200}) async {
+    final db = await _open();
+    final rows =
+        await db.query('mcp_activity', orderBy: 'id DESC', limit: limit);
+    return rows.map(McpActivityEntry.fromMap).toList();
+  }
+
+  Future<void> clearMcpActivity() async {
+    final db = await _open();
+    await db.delete('mcp_activity');
   }
 
   Future<List<String>> getFolders() async {
@@ -766,6 +819,64 @@ enum MutationAuditSource {
 }
 
 /// One row of the local mutation audit trail.
+/// Rows kept in `mcp_activity`.
+const kMcpActivityCap = 200;
+
+/// One tool call made by an MCP client.
+class McpActivityEntry {
+  const McpActivityEntry({
+    this.id,
+    required this.recordedAt,
+    required this.client,
+    required this.tool,
+    this.connectionId,
+    this.connectionName,
+    this.sqlText,
+    this.rowCount,
+    required this.durationMs,
+    this.error,
+  });
+
+  final int? id;
+
+  /// UTC ISO-8601.
+  final String recordedAt;
+  final String client;
+  final String tool;
+  final int? connectionId;
+  final String? connectionName;
+  final String? sqlText;
+  final int? rowCount;
+  final int durationMs;
+  final String? error;
+
+  Map<String, Object?> toMap() => {
+        'id': id,
+        'recorded_at': recordedAt,
+        'client': client,
+        'tool': tool,
+        'connection_id': connectionId,
+        'connection_name': connectionName,
+        'sql_text': sqlText,
+        'row_count': rowCount,
+        'duration_ms': durationMs,
+        'error': error,
+      };
+
+  static McpActivityEntry fromMap(Map<String, Object?> m) => McpActivityEntry(
+        id: _sqliteInt(m['id']),
+        recordedAt: m['recorded_at'] as String,
+        client: m['client'] as String,
+        tool: m['tool'] as String,
+        connectionId: _sqliteInt(m['connection_id']),
+        connectionName: m['connection_name'] as String?,
+        sqlText: m['sql_text'] as String?,
+        rowCount: _sqliteInt(m['row_count']),
+        durationMs: _sqliteInt(m['duration_ms']) ?? 0,
+        error: m['error'] as String?,
+      );
+}
+
 class MutationAuditEntry {
   const MutationAuditEntry({
     required this.id,

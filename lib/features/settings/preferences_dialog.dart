@@ -10,6 +10,7 @@ import 'package:querya_desktop/features/settings/preferences_appearance_section.
 import 'package:querya_desktop/features/settings/preferences_category.dart';
 import 'package:querya_desktop/features/settings/preferences_controls.dart';
 import 'package:querya_desktop/features/settings/preferences_extensions_section.dart';
+import 'package:querya_desktop/features/settings/preferences_mcp_section.dart';
 import 'package:querya_desktop/features/settings/preferences_shortcuts_section.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -524,6 +525,8 @@ class PreferencesDialogContentState
         return _buildDataGridSection(theme);
       case PreferencesCategory.extensions:
         return const PreferencesExtensionsSection();
+      case PreferencesCategory.mcp:
+        return const PreferencesMcpSection();
       case PreferencesCategory.shortcuts:
         return PreferencesShortcutsSection(searchQuery: _searchQuery);
       case PreferencesCategory.about:

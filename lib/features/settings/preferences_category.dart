@@ -32,6 +32,12 @@ enum PreferencesCategory {
     description: 'Sideloading .qext/.zip packages, extension folder',
     icon: material.Icons.extension_outlined,
   ),
+  mcp(
+    id: 'mcp',
+    label: 'MCP Server',
+    description: 'Let AI clients read shared connections',
+    icon: material.Icons.hub_outlined,
+  ),
   shortcuts(
     id: 'shortcuts',
     label: 'Shortcuts',
