@@ -63,4 +63,33 @@ void main() {
     expect(FoldersStorage.instance.folders, isNot(contains('Team A')));
     await app.close(tester);
   });
+
+  testWidgets('a connection is moved into a folder and the sidebar shows it',
+      (tester) async {
+    await app.launch(tester);
+    await tester.runAsync(() => FoldersStorage.instance.add('Team B'));
+    final folderId = await tester
+        .runAsync(() => LocalDb.instance.getFolderIdByName('Team B'));
+    expect(folderId, isNotNull);
+
+    final id = await E2eConnections.add(
+        tester, E2eConnections.postgres('E2E Moved'));
+    final stored =
+        await tester.runAsync(() => LocalDb.instance.getConnectionById(id));
+    expect(stored!.folderId, isNull);
+
+    await tester.runAsync(() => LocalDb.instance
+        .updateConnection(stored.copyWith(folderId: folderId)));
+    await tester.runAsync(FoldersStorage.instance.reload);
+    await E2eConnections.reloadSidebar(tester);
+
+    final moved =
+        await tester.runAsync(() => LocalDb.instance.getConnectionById(id));
+    expect(moved!.folderId, folderId);
+    expect(inSidebar('Team B'), findsOneWidget);
+
+    await E2eConnections.remove(tester, id);
+    await tester.runAsync(() => FoldersStorage.instance.remove('Team B'));
+    await app.close(tester);
+  });
 }
