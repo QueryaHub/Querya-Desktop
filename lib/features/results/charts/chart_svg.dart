@@ -81,8 +81,8 @@ class ChartSvg {
     ChartSvgColors colors, {
     required bool bars,
   }) {
-    final plotW = width - _left - _right;
-    final plotH = height - _top - _bottom;
+    const plotW = width - _left - _right;
+    const plotH = height - _top - _bottom;
     var lo = math.min(0.0, points.map((p) => p.value).reduce(math.min));
     var hi = math.max(0.0, points.map((p) => p.value).reduce(math.max));
     if (hi == lo) hi = lo + 1;
