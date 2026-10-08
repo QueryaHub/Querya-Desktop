@@ -90,6 +90,9 @@ void main() {
     await tester.tap(find.text('Cancel'));
     await tester.pump(const Duration(milliseconds: 400));
 
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 300));
+    }
     expect(closed, isTrue);
     expect(result, isNull);
     expect(find.text('New connection from URL'), findsNothing);
