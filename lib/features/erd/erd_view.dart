@@ -66,10 +66,13 @@ class _ErdViewState extends material.State<ErdView> {
   String? _hovered;
   String? _dragging;
 
-  /// Pointer travel since the press; a card moves only after a few pixels so
-  /// taps and double taps stay taps.
-  double _dragTravel = 0;
-  static const _dragSlop = 4.0;
+  final _transform = material.TransformationController();
+
+  @override
+  void dispose() {
+    _transform.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -111,18 +114,14 @@ class _ErdViewState extends material.State<ErdView> {
     setState(() => _setLayout(ErdLayout.compute(schema)));
   }
 
-  void _dragStart(String table) {
-    setState(() {
-      _dragging = table;
-      _dragTravel = 0;
-    });
-  }
+  void _dragStart(String table) => setState(() => _dragging = table);
 
-  void _dragMove(String table, material.Offset delta) {
+  /// [screenDelta] is in screen pixels; the canvas may be zoomed.
+  void _dragMove(String table, material.Offset screenDelta) {
     final layout = _layout;
     if (_dragging != table || layout == null) return;
-    _dragTravel += delta.distance;
-    if (_dragTravel < _dragSlop) return;
+    final scale = _transform.value.getMaxScaleOnAxis();
+    final delta = screenDelta / (scale == 0 ? 1 : scale);
     setState(() =>
         _setLayout(layout.withPosition(table, layout.positions[table]! + delta)));
   }
@@ -173,6 +172,7 @@ class _ErdViewState extends material.State<ErdView> {
     } else {
       body = material.InteractiveViewer(
         constrained: false,
+        transformationController: _transform,
         // A card drag must not pan the canvas.
         panEnabled: _dragging == null,
         minScale: 0.2,
@@ -226,7 +226,9 @@ class _ErdViewState extends material.State<ErdView> {
       children: [
         material.Padding(
           padding: const material.EdgeInsets.all(8),
-          child: material.Row(
+          child: material.Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
               QueryaActionButton(
                 key: const material.ValueKey('erd_refresh'),
@@ -234,7 +236,6 @@ class _ErdViewState extends material.State<ErdView> {
                 icon: material.Icons.refresh_rounded,
                 onPressed: _loading ? null : _load,
               ),
-              const material.SizedBox(width: 8),
               QueryaActionButton(
                 key: const material.ValueKey('erd_auto_layout'),
                 label: 'Auto layout',
@@ -242,7 +243,6 @@ class _ErdViewState extends material.State<ErdView> {
                 tooltip: 'Arrange the tables again (undoes manual moves)',
                 onPressed: ready ? _autoLayout : null,
               ),
-              const material.Spacer(),
               QueryaActionButton(
                 key: const material.ValueKey('erd_mermaid'),
                 label: 'Mermaid',
@@ -254,7 +254,6 @@ class _ErdViewState extends material.State<ErdView> {
                               utf8.encode(ErdExport.toMermaid(schema))),
                         ),
               ),
-              const material.SizedBox(width: 8),
               QueryaActionButton(
                 key: const material.ValueKey('erd_svg'),
                 label: 'SVG',
@@ -266,7 +265,6 @@ class _ErdViewState extends material.State<ErdView> {
                               ErdExport.toSvg(schema, layout, routes: _routes))),
                         ),
               ),
-              const material.SizedBox(width: 8),
               QueryaActionButton(
                 key: const material.ValueKey('erd_png'),
                 label: 'PNG',
@@ -307,22 +305,23 @@ class _TableCard extends material.StatelessWidget {
     final wb = context.workbench;
     final palette = context.semanticPalette;
     final radius = material.BorderRadius.circular(8);
-    // Raw pointer events: they reach the card whatever the gesture arena
-    // decides, and localDelta is already in canvas coordinates (zoom-aware).
-    return material.Listener(
-      onPointerDown: (_) => onDragStart(),
-      onPointerMove: (e) => onDragMove(e.localDelta),
-      onPointerUp: (_) => onDragEnd(),
-      onPointerCancel: (_) => onDragEnd(),
-      child: material.MouseRegion(
+    return material.MouseRegion(
         cursor: dragging
             ? material.SystemMouseCursors.grabbing
             : material.SystemMouseCursors.grab,
         onEnter: (_) => onHover(true),
         onExit: (_) => onHover(false),
+        // The card's pan recognizer joins the arena before the canvas's one
+        // and wins it, so dragging a card never pans the canvas. `down`
+        // reports the movement from the press, slop included.
         child: material.GestureDetector(
           key: material.ValueKey('erd_table_${table.name}'),
+          dragStartBehavior: material.DragStartBehavior.down,
           onDoubleTap: onOpen,
+          onPanStart: (_) => onDragStart(),
+          onPanUpdate: (d) => onDragMove(d.delta),
+          onPanEnd: (_) => onDragEnd(),
+          onPanCancel: onDragEnd,
           child: material.Container(
             width: ErdLayout.cardWidth,
             height: ErdLayout.cardHeight(table),
@@ -414,7 +413,6 @@ class _TableCard extends material.StatelessWidget {
               ),
             ),
           ),
-        ),
       ),
     );
   }
