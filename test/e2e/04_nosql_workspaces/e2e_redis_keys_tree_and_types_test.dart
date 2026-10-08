@@ -56,7 +56,7 @@ class _ExplorerState extends material.State<_Explorer> {
       body: material.Row(
         children: [
           material.SizedBox(
-            width: 640,
+            width: 900,
             child: RedisKeysView(
               connection: widget.connection,
               database: 0,
@@ -88,7 +88,7 @@ void main() {
   Future<void> open(WidgetTester tester, RedisConnection redis) async {
     await redis.connect();
     addTearDown(redis.disconnect);
-    await tester.binding.setSurfaceSize(const material.Size(1400, 760));
+    await tester.binding.setSurfaceSize(const material.Size(1700, 760));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       queryaThemeTestShell(child: _Explorer(connection: redis)),
