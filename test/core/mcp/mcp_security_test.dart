@@ -258,7 +258,7 @@ void main() {
     });
 
     test('in driver errors that quote the connection', () async {
-      final leak = 'connection to postgresql://admin:$_pw@db.internal:5432/shop '
+      const leak = 'connection to postgresql://admin:$_pw@db.internal:5432/shop '
           'failed: password=$_pw sslkey passphrase=$_phrase ssh pw $_sshPw\n$_pem';
       db.onExecute = (_) => throw StateError(leak);
       db.explainError = StateError(leak);
