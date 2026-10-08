@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'app/app.dart';
 import 'core/editor/syntax_highlight_service.dart';
 import 'core/layout/ui_scale_controller.dart';
+import 'core/mcp/mcp_server_controller.dart';
 import 'core/motion/display_refresh_service.dart';
 import 'core/motion/querya_motion_controller.dart';
 import 'core/platform/file_launch_service.dart';
@@ -33,6 +34,7 @@ void main([List<String> args = const []]) async {
     await QueryaMotionController.instance.load();
     unawaited(UpdateController.instance.initialize());
     unawaited(cleanupStaleMongoTlsTempFiles());
+    unawaited(McpServerController.instance.startIfEnabled());
     runApp(const QueryaApp());
     doWhenWindowReady(() {
       final win = appWindow;

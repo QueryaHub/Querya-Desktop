@@ -34,6 +34,8 @@ dependencies:
   package_info_plus: ^9.0.1
   flutter_svg: ^2.3.0
   dartssh2: ^4.1.0
+  dart_mcp: ^0.5.2
+  stream_channel: ^2.1.4
 
 dev_dependencies:
   flutter_test:

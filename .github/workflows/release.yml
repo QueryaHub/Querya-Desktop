@@ -74,6 +74,9 @@ jobs:
       - name: Build Windows (release)
         run: flutter build windows --release
 
+      - name: Bundle querya-mcp (MCP stdio bridge)
+        run: dart compile exe bin/querya_mcp.dart -o build\windows\x64\runner\Release\querya-mcp.exe
+
       - name: Zip Windows artifact (portable)
         run: |
           $v = "${{ steps.version.outputs.version }}"
@@ -142,6 +145,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./scripts/linux/apply_patched_engine.sh
+
+      - name: Bundle querya-mcp (MCP stdio bridge)
+        run: dart compile exe bin/querya_mcp.dart -o build/linux/x64/release/bundle/querya-mcp
 
       - name: Zip Linux artifact (portable)
         run: |
@@ -363,6 +369,10 @@ jobs:
           EXE=querya-ext-tester
           if [ "${{ runner.os }}" = "Windows" ]; then EXE=querya-ext-tester.exe; fi
           dart compile exe bin/querya_ext_tester.dart -o "build/ext-tester/$EXE"
+          MCP=querya-mcp
+          if [ "${{ runner.os }}" = "Windows" ]; then MCP=querya-mcp.exe; fi
+          mkdir -p build/mcp
+          dart compile exe bin/querya_mcp.dart -o "build/mcp/$MCP"
 
       - name: Smoke test
         shell: bash
@@ -380,23 +390,40 @@ jobs:
           cat smoke.log
           test "$code" -eq 1
           grep -q "manifest.json not found" smoke.log
+          MCP=build/mcp/querya-mcp
+          if [ "${{ runner.os }}" = "Windows" ]; then MCP=build/mcp/querya-mcp.exe; fi
+          "$MCP" --help | grep -q "Usage: querya-mcp"
+          # No endpoint file: initialize must be answered with a clear error.
+          set +e
+          echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' \
+            | QUERYA_MCP_ENDPOINT="$PWD/build/no-such-endpoint.json" "$MCP" > mcp-smoke.log
+          code=$?
+          set -e
+          cat mcp-smoke.log
+          test "$code" -eq 1
+          grep -q "Querya Desktop is not running" mcp-smoke.log
 
       - name: Package
         shell: bash
         run: |
           set -euo pipefail
           NAME="querya-ext-tester-v${{ steps.version.outputs.version }}-${{ matrix.target }}"
+          MCP_NAME="querya-mcp-v${{ steps.version.outputs.version }}-${{ matrix.target }}"
           cd build/ext-tester
           if [ "${{ matrix.archive }}" = "zip" ]; then
             7z a -tzip "../../$NAME.zip" querya-ext-tester.exe
+            cd ../mcp && 7z a -tzip "../../$MCP_NAME.zip" querya-mcp.exe
           else
             tar -czf "../../$NAME.tar.gz" querya-ext-tester
+            cd ../mcp && tar -czf "../../$MCP_NAME.tar.gz" querya-mcp
           fi
 
       - uses: actions/upload-artifact@v4
         with:
           name: tester-${{ matrix.target }}
-          path: querya-ext-tester-v${{ steps.version.outputs.version }}-${{ matrix.target }}.${{ matrix.archive }}
+          path: |
+            querya-ext-tester-v${{ steps.version.outputs.version }}-${{ matrix.target }}.${{ matrix.archive }}
+            querya-mcp-v${{ steps.version.outputs.version }}-${{ matrix.target }}.${{ matrix.archive }}
           if-no-files-found: error
 
   publish:
@@ -439,6 +466,9 @@ jobs:
           find tester-artifacts -type f \( -name 'querya-ext-tester-*.tar.gz' -o -name 'querya-ext-tester-*.zip' \) \
             -exec mv -t dist/ {} +
           test "$(find dist -name 'querya-ext-tester-*' | wc -l)" -eq 4
+          find tester-artifacts -type f \( -name 'querya-mcp-*.tar.gz' -o -name 'querya-mcp-*.zip' \) \
+            -exec mv -t dist/ {} +
+          test "$(find dist -name 'querya-mcp-*' | wc -l)" -eq 4
           cd dist
           sha256sum *.* | tee SHA256SUMS.txt
 
@@ -473,6 +503,9 @@ jobs:
             echo "#### Extension developers"
             echo "- **querya-ext-tester** (headless extension test runner, no Flutter needed): \`querya-ext-tester-v${VERSION}-linux-x64.tar.gz\`, \`-macos-arm64.tar.gz\`, \`-macos-x64.tar.gz\`, \`-windows-x64.zip\` — see docs/extension-testing.md"
             echo ""
+            echo "#### MCP (AI clients)"
+            echo "- **querya-mcp** (stdio bridge for Claude Desktop, Cursor, VS Code and other MCP clients; also bundled with the Linux and Windows builds): \`querya-mcp-v${VERSION}-linux-x64.tar.gz\`, \`-macos-arm64.tar.gz\`, \`-macos-x64.tar.gz\`, \`-windows-x64.zip\`"
+            echo ""
             echo "Verify checksums: \`SHA256SUMS.txt\`"
             echo ""
             echo "### Build info"
@@ -500,6 +533,7 @@ jobs:
             dist/Querya-Desktop-*.zip
             dist/*.dmg
             dist/querya-ext-tester-*
+            dist/querya-mcp-*
             dist/*.deb
             dist/*.rpm
             dist/*.flatpak
