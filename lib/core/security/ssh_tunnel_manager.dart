@@ -88,15 +88,64 @@ class _PooledTunnelSession {
   }
 }
 
+/// Opens the raw TCP transport to an SSH server (replaceable in tests).
+typedef SshSocketConnector = Future<SSHSocket> Function(
+  String host,
+  int port, {
+  Duration? timeout,
+});
+
+/// Builds the SSH client over an open transport (replaceable in tests).
+typedef SshClientBuilder = SSHClient Function(
+  SSHSocket socket, {
+  required String username,
+  SSHPasswordRequestHandler? onPasswordRequest,
+  List<SSHKeyPair>? identities,
+  SSHHostkeyVerifyHandler? onVerifyHostKey,
+});
+
+SSHClient _defaultClientBuilder(
+  SSHSocket socket, {
+  required String username,
+  SSHPasswordRequestHandler? onPasswordRequest,
+  List<SSHKeyPair>? identities,
+  SSHHostkeyVerifyHandler? onVerifyHostKey,
+}) =>
+    SSHClient(
+      socket,
+      username: username,
+      onPasswordRequest: onPasswordRequest,
+      identities: identities,
+      onVerifyHostKey: onVerifyHostKey,
+    );
+
 /// Singleton manager for production SSH tunnels (Bastion / Jump Hosts).
 /// Supports ephemeral local port forwarding, TLS over SSH, ref-counting,
 /// host key fingerprint verification, and zero-leak credential hygiene.
 class SshTunnelManager {
-  SshTunnelManager._();
+  SshTunnelManager._()
+      : _connect = SSHSocket.connect,
+        _buildClient = _defaultClientBuilder;
+
+  /// A manager whose network transport and SSH client are supplied by the
+  /// caller, so the tunnel logic can be exercised without an SSH server.
+  @visibleForTesting
+  SshTunnelManager.forTesting({
+    required SshSocketConnector connector,
+    required SshClientBuilder clientBuilder,
+  })  : _connect = connector,
+        _buildClient = clientBuilder;
 
   static SshTunnelManager instance = SshTunnelManager._();
 
+  final SshSocketConnector _connect;
+  final SshClientBuilder _buildClient;
+
   final Map<String, _PooledTunnelSession> _sessions = {};
+
+  /// Number of pooled tunnel sessions currently open.
+  @visibleForTesting
+  int get activeSessionCount => _sessions.length;
 
   /// Formats SHA-256 fingerprint as standard hex string (`aa:bb:cc...` or raw hex).
   static String formatFingerprint(Uint8List bytes) {
@@ -116,14 +165,21 @@ class SshTunnelManager {
 
     // 1. Check if an active session can be reused (ref-counting)
     final existing = _sessions[poolKey];
-    if (existing != null && !existing.client.isClosed) {
+    if (existing != null && existing.client.isClosed) {
+      // The SSH connection dropped (network error, server restart): drop the
+      // stale session, including its local listener, and dial again below.
+      _sessions.remove(poolKey);
+      unawaited(existing.close());
+    } else if (existing != null) {
       existing.refCount++;
+      // The caller's credentials are not needed for a reused session.
+      secrets.zero();
       return SshTunnelHandle(
         localHost: '127.0.0.1',
         localPort: existing.localPort,
         remoteHost: remoteHost,
         remotePort: remotePort,
-        onRelease: () => _releaseSession(poolKey),
+        onRelease: () => _releaseSession(existing),
       );
     }
 
@@ -136,13 +192,13 @@ class SshTunnelManager {
       final jumpPort = config.jumpPort ?? 22;
       final jumpUser = config.jumpUsername ?? config.username;
 
-      final rawJumpSocket = await SSHSocket.connect(
+      final rawJumpSocket = await _connect(
         jumpHost,
         jumpPort,
         timeout: Duration(seconds: config.connectTimeoutSeconds),
       );
 
-      jumpClient = SSHClient(
+      jumpClient = _buildClient(
         rawJumpSocket,
         username: jumpUser,
         onPasswordRequest: () =>
@@ -153,7 +209,7 @@ class SshTunnelManager {
       // Forward through jump host to target bastion (returns SSHForwardChannel which implements SSHSocket)
       bastionSocket = await jumpClient.forwardLocal(config.host.trim(), config.port);
     } else {
-      bastionSocket = await SSHSocket.connect(
+      bastionSocket = await _connect(
         config.host.trim(),
         config.port,
         timeout: Duration(seconds: config.connectTimeoutSeconds),
@@ -207,7 +263,7 @@ class SshTunnelManager {
       return true;
     }
 
-    final client = SSHClient(
+    final client = _buildClient(
       bastionSocket,
       username: config.username.trim(),
       onPasswordRequest: () => secrets.password ?? '',
@@ -284,18 +340,20 @@ class SshTunnelManager {
       localPort: localPort,
       remoteHost: remoteHost,
       remotePort: remotePort,
-      onRelease: () => _releaseSession(poolKey),
+      onRelease: () => _releaseSession(session),
     );
   }
 
-  Future<void> _releaseSession(String poolKey) async {
-    final session = _sessions[poolKey];
-    if (session == null) return;
+  /// Drops one reference to [session]; the last one closes it. Handles keep a
+  /// reference to their own session, so a handle from a replaced (dropped)
+  /// session cannot release the session that took its place.
+  Future<void> _releaseSession(_PooledTunnelSession session) async {
     session.refCount--;
-    if (session.refCount <= 0) {
-      _sessions.remove(poolKey);
-      await session.close();
+    if (session.refCount > 0) return;
+    if (identical(_sessions[session.poolKey], session)) {
+      _sessions.remove(session.poolKey);
     }
+    await session.close();
   }
 
   /// Closes all active tunnels and cleans up all sockets.
@@ -336,12 +394,12 @@ class SshTunnelManager {
 
     try {
       if (config.jumpHost != null && config.jumpHost!.trim().isNotEmpty) {
-        final jumpSocket = await SSHSocket.connect(
+        final jumpSocket = await _connect(
           config.jumpHost!.trim(),
           config.jumpPort ?? 22,
           timeout: Duration(seconds: config.connectTimeoutSeconds),
         );
-        jumpClient = SSHClient(
+        jumpClient = _buildClient(
           jumpSocket,
           username: config.jumpUsername ?? config.username,
           onPasswordRequest: () =>
@@ -353,7 +411,7 @@ class SshTunnelManager {
           config.port,
         );
       } else {
-        bastionSocket = await SSHSocket.connect(
+        bastionSocket = await _connect(
           config.host.trim(),
           config.port,
           timeout: Duration(seconds: config.connectTimeoutSeconds),
@@ -380,7 +438,7 @@ class SshTunnelManager {
       }
 
       String? observedFingerprint;
-      client = SSHClient(
+      client = _buildClient(
         bastionSocket,
         username: config.username.trim(),
         onPasswordRequest: () => secrets.password ?? '',
