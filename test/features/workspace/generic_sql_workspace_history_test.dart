@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart' as material;
@@ -13,6 +14,9 @@ import '../../memory_secrets_backend.dart';
 import '../../support/fake_sql_execution_delegate.dart';
 import '../../support/local_db_test_support.dart';
 import '../../support/querya_theme_test_shell.dart';
+
+/// A hung test must fail in a minute instead of blocking CI for ten.
+const _timeout = Timeout(Duration(seconds: 60));
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -82,12 +86,15 @@ void main() {
   }
 
   Future<void> run(WidgetTester tester, GenericSqlWorkspaceState state) async {
-    await tester.runAsync(() async {
-      await state.execute();
-      // History and audit rows are written without being awaited.
-      await Future<void>.delayed(const Duration(milliseconds: 400));
-    });
-    await tester.pump();
+    unawaited(state.execute());
+    // Settings are read, then history and audit rows are written without being
+    // awaited: every hop needs real time and a pump so its continuation runs.
+    for (var i = 0; i < 8; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 150)),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+    }
   }
 
   Future<List<SqlQueryHistoryEntry>> history(
@@ -104,7 +111,7 @@ void main() {
   Future<List<MutationAuditEntry>> audit(WidgetTester tester) async =>
       (await tester.runAsync(LocalDb.instance.listMutationAudit))!;
 
-  testWidgets('an executed query is written to the SQL history',
+  testWidgets('an executed query is written to the SQL history', timeout: _timeout,
       (tester) async {
     final state = await pumpWorkspace(
       tester,
@@ -118,7 +125,7 @@ void main() {
     expect(entries.map((e) => e.sqlText), ['SELECT n FROM t']);
   });
 
-  testWidgets('history is bucketed by the effective database name',
+  testWidgets('history is bucketed by the effective database name', timeout: _timeout,
       (tester) async {
     final state = await pumpWorkspace(
       tester,
@@ -134,7 +141,7 @@ void main() {
     expect(await history(tester), isEmpty);
   });
 
-  testWidgets('repeated runs are recorded newest first', (tester) async {
+  testWidgets('repeated runs are recorded newest first', timeout: _timeout, (tester) async {
     final state = await pumpWorkspace(
       tester,
       FakeSqlExecutionDelegate(),
@@ -148,7 +155,7 @@ void main() {
     expect(entries.map((e) => e.sqlText), ['SELECT 2', 'SELECT 1']);
   });
 
-  testWidgets('a failed query is not written to the history', (tester) async {
+  testWidgets('a failed query is not written to the history', timeout: _timeout, (tester) async {
     final state = await pumpWorkspace(
       tester,
       FakeSqlExecutionDelegate(onExecute: (_) => throw Exception('boom')),
@@ -161,7 +168,7 @@ void main() {
     expect(await history(tester), isEmpty);
   });
 
-  testWidgets('a SELECT is not written to the mutation audit trail',
+  testWidgets('a SELECT is not written to the mutation audit trail', timeout: _timeout,
       (tester) async {
     final state = await pumpWorkspace(
       tester,
@@ -174,7 +181,7 @@ void main() {
     expect(await audit(tester), isEmpty);
   });
 
-  testWidgets('an UPDATE is audited with rows affected and the environment',
+  testWidgets('an UPDATE is audited with rows affected and the environment', timeout: _timeout,
       (tester) async {
     final prod = connection.withEnvironment(ConnectionEnvironment.production);
     final state = await pumpWorkspace(
