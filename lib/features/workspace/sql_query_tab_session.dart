@@ -15,6 +15,7 @@ class SqlQueryTabSession {
     String? initialSql,
     this.filePath,
     double initialFraction = 0.65,
+    this.isDiagram = false,
   })  : controller = material.TextEditingController(text: initialSql ?? ''),
         _savedSql = initialSql ?? '',
         topFraction = material.ValueNotifier<double>(initialFraction) {
@@ -26,6 +27,9 @@ class SqlQueryTabSession {
   }
 
   final String id;
+
+  /// True for the ER diagram tab (no editor / result grid).
+  final bool isDiagram;
   String title;
   String? filePath;
   final material.TextEditingController controller;

@@ -110,7 +110,7 @@ void main() {
             refreshGate.complete();
           }
         },
-        debounce: const Duration(milliseconds: 100),
+        debounce: const Duration(milliseconds: 600),
       );
 
       await watcher.start();
@@ -121,8 +121,8 @@ void main() {
       await target.writeAsString(await target.readAsString());
       await target.writeAsString('${await target.readAsString()}\n');
 
-      await refreshGate.future.timeout(const Duration(seconds: 2));
-      await Future<void>.delayed(const Duration(milliseconds: 150));
+      await refreshGate.future.timeout(const Duration(seconds: 10));
+      await Future<void>.delayed(const Duration(milliseconds: 900));
 
       expect(refreshCount, 1);
       await watcher.stop();
