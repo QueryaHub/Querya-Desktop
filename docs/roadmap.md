@@ -49,6 +49,11 @@ Living document for planned work. Not a commitment order; adjust as priorities c
 
 - **Done:** nested collection subtree in the connections panel (#1023), one-click return to the active Mongo collection / Redis key (#1024), Redis key folder tree by delimiter (#1025), Mongo document viewer in Table / Tree / JSON modes (#1026), Aggregation Pipeline Builder (#1027), visual Index Manager (#1028), interactive Redis CLI console (#1029) and MQL query / shell console (#1030). See the [user guide](user-guide.md#mongodb-and-redis).
 
+## MCP server (AI clients)
+
+- **Done (epic [#1133](https://github.com/QueryaHub/Querya-Desktop/issues/1133)):** read-only MCP server inside the app for PostgreSQL, MySQL and SQLite — tools `list_connections`, `list_tables`, `describe_table`, `sample_rows`, `run_query`, `explain_query` and a `schema://` resource; `querya-mcp` stdio bridge (bundled on Linux / Windows, release asset for all platforms); per-connection opt-in, activity log, three read-only layers — [mcp-server.md](mcp-server.md), [security.md](security.md#mcp-server).
+- **Later:** writes through a `propose_write` tool confirmed in the Querya window; Streamable HTTP transport; MongoDB / Redis tools; extension drivers; views in `list_tables`; bundling `querya-mcp` in the macOS app and Flatpak.
+
 ## SSH and advanced networking
 
 - **Done:** SSH tunnels through a bastion / jump host (password, private key or agent auth, optional second hop, host key fingerprint pinning, keep-alive) with a loopback-only forwarded port and a *Test SSH Connection* button. Security model: [security.md](security.md#ssh-tunnels-bastion-hosts). Setup guide: [user-guide.md](user-guide.md#connecting-through-a-bastion-host).
