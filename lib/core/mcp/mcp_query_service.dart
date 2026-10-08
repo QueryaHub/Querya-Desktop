@@ -85,6 +85,15 @@ class McpQueryService {
     ];
   }
 
+  /// All tables with columns and keys in one catalog pass (no indexes); backs
+  /// the `schema://` resource.
+  Future<List<McpTableDescription>> schemaOverview(int connectionId) {
+    return _withDelegate(connectionId, (delegate, dialect) async {
+      final schema = await _loadSchema(delegate, dialect);
+      return [for (final t in schema.tables) _describe(schema, t, const [])];
+    });
+  }
+
   Future<McpTableDescription> describeTable(
     int connectionId,
     String table,
@@ -100,7 +109,19 @@ class McpQueryService {
         ),
         dialect,
       );
-      return McpTableDescription(
+      return _describe(schema, t, [
+        for (final r in indexes.rows)
+          if (r.length >= 2) McpIndexInfo(name: r[0], definition: r[1]),
+      ]);
+    });
+  }
+
+  static McpTableDescription _describe(
+    ErdSchema schema,
+    ErdTable t,
+    List<McpIndexInfo> indexes,
+  ) =>
+      McpTableDescription(
         name: t.name,
         columns: [
           for (final c in t.columns)
@@ -115,13 +136,8 @@ class McpQueryService {
               ].firstOrNull,
             ),
         ],
-        indexes: [
-          for (final r in indexes.rows)
-            if (r.length >= 2) McpIndexInfo(name: r[0], definition: r[1]),
-        ],
+        indexes: indexes,
       );
-    });
-  }
 
   Future<McpQueryResult> sampleRows(
     int connectionId,

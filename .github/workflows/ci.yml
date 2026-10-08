@@ -109,6 +109,16 @@ jobs:
       - name: Analyze code
         run: flutter analyze
 
+      # packages/ is excluded above: the bridge is its own dependency-free
+      # package and must keep compiling to a single static binary.
+      - name: Analyze and build querya-mcp
+        run: |
+          cd packages/querya_mcp_bridge
+          dart pub get
+          dart analyze --fatal-infos
+          dart compile exe bin/querya_mcp.dart -o "$RUNNER_TEMP/querya-mcp"
+          "$RUNNER_TEMP/querya-mcp" --help | grep -q "Usage: querya-mcp"
+
   # Release smoke build: runs after tests + analyze only when the workflow was
   # triggered by a version tag (semver X.Y.Z or legacy v*), not on branch/PR pushes.
   build-linux-release:
