@@ -123,16 +123,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('address'), findsOneWidget);
-    expect(find.text('"Berlin"'), findsOneWidget);
+    expect(find.text('"Querya"'), findsOneWidget);
 
     await tester.tap(find.text('Collapse All'));
     await tester.pumpAndSettle();
     expect(find.text('"Querya"'), findsNothing);
-    expect(find.text('"Berlin"'), findsNothing);
+    expect(find.text('address'), findsNothing);
 
     await tester.tap(find.text('Expand All'));
     await tester.pumpAndSettle();
     expect(find.text('"Querya"'), findsOneWidget);
-    expect(find.text('"Berlin"'), findsOneWidget);
+    expect(find.text('address'), findsOneWidget);
   });
 }

@@ -4,7 +4,6 @@ import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/features/mongodb/mongo_index_info.dart';
 import 'package:querya_desktop/features/mongodb/mongo_indexes_view.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import '../../support/querya_theme_test_shell.dart';
 

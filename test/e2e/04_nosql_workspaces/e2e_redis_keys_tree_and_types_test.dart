@@ -5,7 +5,6 @@ import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/features/redis/redis_key_editor.dart';
 import 'package:querya_desktop/features/redis/redis_keys_view.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import '../../support/querya_theme_test_shell.dart';
 
@@ -57,7 +56,7 @@ class _ExplorerState extends material.State<_Explorer> {
       body: material.Row(
         children: [
           material.SizedBox(
-            width: 360,
+            width: 640,
             child: RedisKeysView(
               connection: widget.connection,
               database: 0,
@@ -89,7 +88,7 @@ void main() {
   Future<void> open(WidgetTester tester, RedisConnection redis) async {
     await redis.connect();
     addTearDown(redis.disconnect);
-    await tester.binding.setSurfaceSize(const material.Size(1200, 760));
+    await tester.binding.setSurfaceSize(const material.Size(1400, 760));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       queryaThemeTestShell(child: _Explorer(connection: redis)),
