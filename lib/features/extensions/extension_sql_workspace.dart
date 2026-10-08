@@ -63,7 +63,13 @@ class ExtensionSqlExecutionDelegate extends SqlExecutionDelegate {
       throw UnsupportedError('EXPLAIN is not supported for generic extension drivers');
 
   @override
+  bool get supportsExplain => false;
+
+  @override
   Future<void> cancelQuery() async {}
+
+  @override
+  bool get supportsCancel => false;
 
   @override
   Future<SqlResultGridSchema> resolveTableSchema(

@@ -15,7 +15,18 @@ class FakeSqlExecutionDelegate extends SqlExecutionDelegate {
   /// "running").
   Completer<void>? gate;
 
+  /// Plan returned by `explainQuery`; throws it when it is an [Exception].
+  String explainPlan = 'plan';
+  Object? explainError;
+
+  /// When true, `cancelQuery` aborts a query held by [gate] like a driver would.
+  bool cancelAbortsGate = false;
+
+  bool explainSupported = true;
+  bool cancelSupported = true;
+
   final executed = <String>[];
+  final explained = <String>[];
   final appliedPlans = <TableMutationPlan>[];
   var cancelCount = 0;
   var disposeCount = 0;
@@ -40,10 +51,27 @@ class FakeSqlExecutionDelegate extends SqlExecutionDelegate {
   }
 
   @override
-  Future<String> explainQuery(String sql) async => 'plan';
+  Future<String> explainQuery(String sql) async {
+    explained.add(sql);
+    final error = explainError;
+    if (error != null) throw error;
+    return explainPlan;
+  }
 
   @override
-  Future<void> cancelQuery() async => cancelCount++;
+  bool get supportsExplain => explainSupported;
+
+  @override
+  Future<void> cancelQuery() async {
+    cancelCount++;
+    final pending = gate;
+    if (cancelAbortsGate && pending != null && !pending.isCompleted) {
+      pending.completeError(StateError('canceling statement due to user request'));
+    }
+  }
+
+  @override
+  bool get supportsCancel => cancelSupported;
 
   @override
   bool get supportsTransactions => false;

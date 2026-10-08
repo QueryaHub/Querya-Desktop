@@ -53,6 +53,22 @@ QueryaIconButton(
 
 Anti-pattern: `IconButton` without a tooltip, hard-coded `Color(0xFF…)` icons.
 
+### `QueryaActionButton`
+
+Labelled outline button for toolbars (SQL editor: Execute, Explain, Cancel,
+Begin / Commit / Rollback). Optional `icon`, `loading` (spinner instead of the
+icon, button disabled), `isDestructive`, `tooltip`; `onPressed: null` disables it.
+
+```dart
+QueryaActionButton(
+  label: 'Explain',
+  icon: Icons.account_tree_outlined,
+  onPressed: session.running ? null : () => explain(session),
+)
+```
+
+Anti-pattern: a hand-built `OutlineButton` with its own spinner / icon coloring.
+
 ### `QueryaSpinner`
 
 Progress indicator with `QueryaSpinnerSize.sm | md | lg` and an optional
