@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/rendering.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
@@ -316,7 +317,7 @@ class _TableCard extends material.StatelessWidget {
         // reports the movement from the press, slop included.
         child: material.GestureDetector(
           key: material.ValueKey('erd_table_${table.name}'),
-          dragStartBehavior: material.DragStartBehavior.down,
+          dragStartBehavior: DragStartBehavior.down,
           onDoubleTap: onOpen,
           onPanStart: (_) => onDragStart(),
           onPanUpdate: (d) => onDragMove(d.delta),
