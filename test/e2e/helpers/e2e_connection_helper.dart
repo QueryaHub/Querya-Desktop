@@ -50,6 +50,10 @@ class E2eConnections {
   static Future<void> remove(WidgetTester tester, int id) async {
     await tester.runAsync(() => LocalDb.instance.removeConnection(id));
     await reloadSidebar(tester);
+    // Let the tile's exit animation finish.
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
   }
 
   /// Re-reads connections from the database into the mounted sidebar.
