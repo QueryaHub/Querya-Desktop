@@ -8,6 +8,7 @@ import 'package:querya_desktop/features/erd/erd_catalog.dart';
 import 'package:querya_desktop/features/erd/erd_export.dart';
 import 'package:querya_desktop/features/erd/erd_layout.dart';
 import 'package:querya_desktop/features/erd/erd_model.dart';
+import 'package:querya_desktop/features/erd/erd_router.dart';
 import 'package:querya_desktop/features/erd/erd_view.dart';
 import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
 
@@ -77,6 +78,184 @@ void main() {
         expect(l.size.width, greaterThanOrEqualTo(rects[i].right));
         expect(l.size.height, greaterThanOrEqualTo(rects[i].bottom));
       }
+    });
+  });
+
+  group('ErdLayout (layered)', () {
+    // users <- orders <- order_items -> products, users <- sessions, lonely.
+    ErdSchema shop() => ErdSchema.fromCatalog(
+          columnRows: [
+            ['users', 'id', 'int', '1'],
+            ['users', 'email', 'text', '0'],
+            ['orders', 'id', 'int', '1'],
+            ['orders', 'user_id', 'int', '0'],
+            ['order_items', 'id', 'int', '1'],
+            ['order_items', 'order_id', 'int', '0'],
+            ['order_items', 'product_id', 'int', '0'],
+            ['products', 'id', 'int', '1'],
+            ['sessions', 'id', 'int', '1'],
+            ['sessions', 'user_id', 'int', '0'],
+            ['lonely', 'id', 'int', '1'],
+          ],
+          fkRows: [
+            ['orders', 'user_id', 'users', 'id'],
+            ['order_items', 'order_id', 'orders', 'id'],
+            ['order_items', 'product_id', 'products', 'id'],
+            ['sessions', 'user_id', 'users', 'id'],
+          ],
+        );
+
+    test('referenced tables sit left of the tables that reference them', () {
+      final s = shop();
+      final l = ErdLayout.compute(s);
+      double x(String t) => l.positions[t]!.dx;
+      expect(x('users'), lessThan(x('orders')));
+      expect(x('orders'), lessThan(x('order_items')));
+      expect(x('products'), lessThan(x('order_items')));
+      expect(x('users'), lessThan(x('sessions')));
+    });
+
+    test('tables without relations go below the diagram', () {
+      final s = shop();
+      final l = ErdLayout.compute(s);
+      final lonely = l.rectOf(s.tables.firstWhere((t) => t.name == 'lonely'));
+      for (final t in s.tables.where((t) => t.name != 'lonely')) {
+        expect(lonely.top, greaterThan(l.rectOf(t).bottom), reason: t.name);
+      }
+    });
+
+    test('cards never overlap, also with a cycle and a self reference', () {
+      final s = ErdSchema.fromCatalog(
+        columnRows: [
+          for (final t in ['a', 'b', 'c', 'd']) ...[
+            [t, 'id', 'int', '1'],
+            [t, 'ref', 'int', '0'],
+          ],
+        ],
+        fkRows: [
+          ['a', 'ref', 'b', 'id'],
+          ['b', 'ref', 'c', 'id'],
+          ['c', 'ref', 'a', 'id'],
+          ['d', 'ref', 'd', 'id'],
+        ],
+      );
+      final l = ErdLayout.compute(s);
+      final rects = [for (final t in s.tables) l.rectOf(t)];
+      for (var i = 0; i < rects.length; i++) {
+        for (var j = i + 1; j < rects.length; j++) {
+          expect(rects[i].overlaps(rects[j]), isFalse);
+        }
+      }
+    });
+
+    test('withPosition moves one card and grows the canvas', () {
+      final s = shop();
+      final l = ErdLayout.compute(s);
+      final moved = l.withPosition('users', const material.Offset(2000, 1500));
+      expect(moved.positions['users'], const material.Offset(2000, 1500));
+      expect(moved.positions['orders'], l.positions['orders']);
+      expect(moved.size.width, greaterThan(2000 + ErdLayout.cardWidth));
+      expect(moved.size.height, greaterThan(1500));
+      expect(l.withPosition('users', const material.Offset(-50, -9)).positions['users'],
+          const material.Offset(8, 8));
+    });
+
+    group('ErdRouter', () {
+      void expectClean(ErdSchema s, ErdLayout l, List<ErdRoute> routes) {
+        final byName = {for (final t in s.tables) t.name: t};
+        final cards = [for (final t in s.tables) l.rectOf(t)];
+        for (final r in routes) {
+          final from = byName[r.relation.fromTable]!, to = byName[r.relation.toTable]!;
+          final pts = r.points;
+          final fr = l.rectOf(from), tr = l.rectOf(to);
+          // Ends sit on the card sides at the column rows.
+          expect(pts.first.dy, l.columnY(from, r.relation.fromColumn));
+          expect([fr.left, fr.right], contains(pts.first.dx));
+          expect(pts.last.dy, l.columnY(to, r.relation.toColumn));
+          expect([tr.left, tr.right], contains(pts.last.dx));
+          for (var i = 0; i + 1 < pts.length; i++) {
+            final a = pts[i], b = pts[i + 1];
+            expect(a.dx == b.dx || a.dy == b.dy, isTrue,
+                reason: 'orthogonal segment $a -> $b');
+            for (var k = 1; k < 10; k++) {
+              final p = material.Offset.lerp(a, b, k / 10)!;
+              for (final c in cards) {
+                final inside = p.dx > c.left + 0.5 &&
+                    p.dx < c.right - 0.5 &&
+                    p.dy > c.top + 0.5 &&
+                    p.dy < c.bottom - 0.5;
+                expect(inside, isFalse,
+                    reason: '${r.relation.fromTable}->${r.relation.toTable} crosses $c');
+              }
+            }
+          }
+        }
+      }
+
+      test('every relation is routed around the cards', () {
+        final s = shop();
+        final l = ErdLayout.compute(s);
+        final routes = ErdRouter.route(s, l);
+        expect(routes, hasLength(4));
+        expectClean(s, l, routes);
+      });
+
+      test('a card placed in the way is avoided', () {
+        final s = ErdSchema.fromCatalog(
+          columnRows: [
+            ['users', 'id', 'int', '1'],
+            ['orders', 'user_id', 'int', '0'],
+            ['blocker', 'id', 'int', '1'],
+            ['blocker', 'a', 'int', '0'],
+            ['blocker', 'b', 'int', '0'],
+          ],
+          fkRows: [
+            ['orders', 'user_id', 'users', 'id'],
+          ],
+        );
+        final l = ErdLayout.compute(s)
+            .withPosition('users', const material.Offset(40, 100))
+            .withPosition('blocker', const material.Offset(400, 80))
+            .withPosition('orders', const material.Offset(760, 100));
+        final routes = ErdRouter.route(s, l);
+        expectClean(s, l, routes);
+        expect(routes.single.points.length, greaterThan(2),
+            reason: 'must bend around the blocker');
+      });
+
+      test('parallel segments of different edges do not overlap', () {
+        final s = shop();
+        final routes = ErdRouter.route(s, ErdLayout.compute(s));
+        final segs = <(int, material.Offset, material.Offset)>[];
+        for (var r = 0; r < routes.length; r++) {
+          final p = routes[r].points;
+          for (var i = 1; i + 2 < p.length; i++) {
+            segs.add((r, p[i], p[i + 1]));
+          }
+        }
+        for (var i = 0; i < segs.length; i++) {
+          for (var j = i + 1; j < segs.length; j++) {
+            final (ra, a1, a2) = segs[i];
+            final (rb, b1, b2) = segs[j];
+            if (ra == rb) continue;
+            if (a1.dx == a2.dx && b1.dx == b2.dx && a1.dx == b1.dx) {
+              final lo = [a1.dy, a2.dy].reduce((x, y) => x < y ? x : y);
+              final hi = [a1.dy, a2.dy].reduce((x, y) => x > y ? x : y);
+              final lo2 = [b1.dy, b2.dy].reduce((x, y) => x < y ? x : y);
+              final hi2 = [b1.dy, b2.dy].reduce((x, y) => x > y ? x : y);
+              expect(lo < hi2 - 0.5 && lo2 < hi - 0.5, isFalse,
+                  reason: 'vertical overlap at x=${a1.dx}');
+            }
+          }
+        }
+      });
+
+      test('no relations means no routes', () {
+        final s = ErdSchema.fromCatalog(columnRows: [
+          ['a', 'id', 'int', '1'],
+        ], fkRows: const []);
+        expect(ErdRouter.route(s, ErdLayout.compute(s)), isEmpty);
+      });
     });
   });
 
@@ -157,6 +336,34 @@ void main() {
       await t.tap(card);
       await t.pump();
       expect(opened, 'users');
+      await t.pump(const Duration(seconds: 1));
+    });
+
+    testWidgets('a card can be dragged and Auto layout puts it back',
+        (t) async {
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
+      addTearDown(() => t.binding.setSurfaceSize(null));
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(delegate: delegate(), dialect: SqlDialect.sqlite),
+      ));
+      await t.pump();
+      await t.pump();
+      final card = find.byKey(const material.ValueKey('erd_table_orders'));
+      final users = find.byKey(const material.ValueKey('erd_table_users'));
+      final before = t.getTopLeft(card);
+      final usersBefore = t.getTopLeft(users);
+
+      await t.drag(card, const material.Offset(120, 60));
+      await t.pump();
+      final after = t.getTopLeft(card);
+      expect(after.dx - before.dx, greaterThan(100));
+      expect(after.dy - before.dy, greaterThan(40));
+      // The other card stayed: the drag moved the card, not the canvas.
+      expect(t.getTopLeft(users), usersBefore);
+
+      await t.tap(find.byKey(const material.ValueKey('erd_auto_layout')));
+      await t.pump();
+      expect(t.getTopLeft(card), before);
       await t.pump(const Duration(seconds: 1));
     });
 
