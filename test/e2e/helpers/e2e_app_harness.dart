@@ -72,6 +72,15 @@ class E2eAppHarness {
     }
   }
 
+  /// Unmounts the app and lets pending timers fire, so the test can finish
+  /// without "Timer is still pending" failures. Call at the end of a scenario.
+  Future<void> close(WidgetTester tester) async {
+    await tester.pumpWidget(const material.SizedBox.shrink());
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(seconds: 10));
+    }
+  }
+
   /// Removes every connection so tests do not leak into each other.
   Future<void> resetData(WidgetTester tester) async {
     await tester.runAsync(() async {

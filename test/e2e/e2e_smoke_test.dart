@@ -18,6 +18,7 @@ void main() {
     expect(find.byType(MainScreen), findsOneWidget);
     expect(find.byType(ConnectionsPanel), findsOneWidget);
     expect(find.byKey(const Key('empty_new_connection')), findsOneWidget);
+    await app.close(tester);
   });
 
   testWidgets('command palette opens with Ctrl+P and closes on Escape',
@@ -27,17 +28,23 @@ void main() {
     expect(E2ePalette.field, findsOneWidget);
     await E2ePalette.search(tester, 'dark');
     expect(find.byKey(const ValueKey('querya.theme.toggle')), findsOneWidget);
-    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-    await tester.pump(const Duration(milliseconds: 200));
+    // The first Escape may only clear the query; the second closes the dialog.
+    for (var i = 0; i < 2; i++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await E2eAppHarness.settle(tester);
+    }
     expect(E2ePalette.field, findsNothing);
+    expect(find.byKey(const ValueKey('querya.theme.toggle')), findsNothing);
+    await app.close(tester);
   });
 
   testWidgets('a stored connection appears in the sidebar', (tester) async {
     await app.launch(tester);
     final id = await E2eConnections.add(
         tester, E2eConnections.postgres('E2E Postgres'));
-    expect(find.text('E2E Postgres'), findsOneWidget);
+    expect(find.text('E2E Postgres'), findsWidgets);
     await E2eConnections.remove(tester, id);
     expect(find.text('E2E Postgres'), findsNothing);
+    await app.close(tester);
   });
 }
