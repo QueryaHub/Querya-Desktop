@@ -22,6 +22,7 @@ Index of Querya Desktop documentation, grouped by audience.
 
 - [Tags and releases](tags-and-releases.md) — tag/release policy.
 - [Release checklist](release-checklist.md) — step-by-step release flow.
+- [Self-hosted CI runners](ci-runners.md) — where tests and analysis run, the fork rule, the `CI_RUNS_ON` switch.
 - [macOS signing](macos-signing.md) — signing and notarization track.
 
 ## Planning
