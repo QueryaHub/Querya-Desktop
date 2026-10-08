@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/security/pii_masking_controller.dart';
 import 'package:querya_desktop/core/actions/data_grid_command_bridge.dart';
 import 'package:querya_desktop/core/widgets/virtual_selectable_text_view.dart';
+import 'package:querya_desktop/features/results/charts/quick_chart_view.dart';
 import 'package:querya_desktop/features/workspace/data_grid_calc_bar.dart';
 import 'package:querya_desktop/features/workspace/data_grid_filter_bar.dart';
 import 'package:querya_desktop/features/workspace/data_grid_groupings_view.dart';
@@ -20,6 +21,7 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 enum ResultViewMode {
   grid,
   groupings,
+  charts,
 }
 
 /// Query output: grid, loading, error, or placeholder.
@@ -412,6 +414,11 @@ class _ResultsTabState extends material.State<ResultsTab> {
                             label: Text('Groupings'),
                             icon: material.Icon(material.Icons.grid_view_rounded, size: 14),
                           ),
+                          material.ButtonSegment(
+                            value: ResultViewMode.charts,
+                            label: Text('Charts'),
+                            icon: material.Icon(material.Icons.bar_chart_rounded, size: 14),
+                          ),
                         ],
                         selected: {_viewMode},
                         onSelectionChanged: (selected) {
@@ -558,7 +565,12 @@ class _ResultsTabState extends material.State<ResultsTab> {
         material.Expanded(
           child: QueryaFadeSlide(
             key: material.ValueKey(_viewMode),
-            child: _viewMode == ResultViewMode.groupings
+            child: _viewMode == ResultViewMode.charts
+                ? QuickChartView(
+                    columns: widget.columns,
+                    rows: filteredRows,
+                  )
+                : _viewMode == ResultViewMode.groupings
                 ? DataGridGroupingsView(
                     columns: widget.columns,
                     rows: filteredRows,
