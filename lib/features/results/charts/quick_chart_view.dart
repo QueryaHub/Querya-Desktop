@@ -1,3 +1,4 @@
+import 'dart:convert' show utf8;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -7,6 +8,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/rendering.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/results/charts/chart_data.dart';
+import 'package:querya_desktop/features/results/charts/chart_svg.dart';
 import 'package:querya_desktop/shared/widgets/querya_dropdown.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
@@ -25,6 +27,22 @@ Future<void> _defaultPngSaver(Uint8List png) async {
       .saveTo(location.path);
 }
 
+/// Saves rendered chart SVG text; replaceable in tests.
+typedef ChartSvgSaver = Future<void> Function(String svg);
+
+Future<void> _defaultSvgSaver(String svg) async {
+  final location = await getSaveLocation(
+    acceptedTypeGroups: const [
+      XTypeGroup(label: 'SVG', extensions: ['svg']),
+    ],
+    suggestedName: 'chart.svg',
+  );
+  if (location == null) return;
+  await XFile.fromData(Uint8List.fromList(utf8.encode(svg)),
+          mimeType: 'image/svg+xml', name: 'chart.svg')
+      .saveTo(location.path);
+}
+
 /// 1-click chart tab: pick X / Y columns and a chart type, export as PNG.
 class QuickChartView extends material.StatefulWidget {
   const QuickChartView({
@@ -32,11 +50,13 @@ class QuickChartView extends material.StatefulWidget {
     required this.columns,
     required this.rows,
     this.onSavePng,
+    this.onSaveSvg,
   });
 
   final List<String> columns;
   final List<List<String>> rows;
   final ChartPngSaver? onSavePng;
+  final ChartSvgSaver? onSaveSvg;
 
   @override
   material.State<QuickChartView> createState() => _QuickChartViewState();
@@ -97,6 +117,39 @@ class _QuickChartViewState extends material.State<QuickChartView> {
     final data = await image.toByteData(format: ui.ImageByteFormat.png);
     if (data == null) return;
     await (widget.onSavePng ?? _defaultPngSaver)(data.buffer.asUint8List());
+  }
+
+  Future<void> _exportSvg() async {
+    final valueCol = _valueCol;
+    if (valueCol == null) return;
+    final palette = context.semanticPalette;
+    final wb = context.workbench;
+    final svg = ChartSvg.build(
+      points: ChartData.build(
+        rows: widget.rows,
+        labelColumn: _labelCol,
+        valueColumn: valueCol,
+        type: _type,
+      ),
+      type: _type,
+      title: widget.columns[valueCol],
+      colors: ChartSvgColors(
+        background: ChartSvgColors.hex(wb.surface.toARGB32()),
+        text: ChartSvgColors.hex(wb.mutedForeground.toARGB32()),
+        grid: ChartSvgColors.hex(wb.borderSubtle.toARGB32()),
+        series: [
+          for (final c in [
+            palette.type1,
+            palette.type2,
+            palette.type3,
+            palette.type4,
+            palette.type5,
+          ])
+            ChartSvgColors.hex(c.toARGB32()),
+        ],
+      ),
+    );
+    await (widget.onSaveSvg ?? _defaultSvgSaver)(svg);
   }
 
   @override
@@ -170,6 +223,12 @@ class _QuickChartViewState extends material.State<QuickChartView> {
                 tooltip: 'Export PNG',
                 icon: const material.Icon(material.Icons.image_outlined),
                 onPressed: _export,
+              ),
+              material.IconButton(
+                key: const material.ValueKey('chart_export_svg'),
+                tooltip: 'Export SVG',
+                icon: const material.Icon(material.Icons.polyline_outlined),
+                onPressed: _exportSvg,
               ),
             ],
           ),
