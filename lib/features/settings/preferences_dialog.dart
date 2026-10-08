@@ -195,6 +195,11 @@ class PreferencesDialogContentState
             .contains(q)) {
           count++;
         }
+      case PreferencesCategory.mcp:
+        if ('mcp ai model claude cursor vscode copilot llm server share token'
+            .contains(q)) {
+          count++;
+        }
       case PreferencesCategory.shortcuts:
         final matching = PreferencesShortcutsSection.allShortcuts.where(
           (s) =>
