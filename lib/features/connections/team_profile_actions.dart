@@ -15,7 +15,7 @@ Future<void> exportTeamProfile(BuildContext context) async {
   final connections = await LocalDb.instance.getConnections();
   if (!context.mounted) return;
   if (connections.isEmpty) {
-    showAppToast(context, message: 'No connections to export');
+    showAppToast(context: context, message: 'No connections to export');
     return;
   }
   final location = await getSaveLocation(
@@ -26,7 +26,7 @@ Future<void> exportTeamProfile(BuildContext context) async {
   await File(location.path).writeAsString(TeamProfileCodec.encode(connections));
   if (!context.mounted) return;
   showAppToast(
-    context,
+    context: context,
     message:
         'Exported ${connections.length} connection(s). Passwords are not included.',
     variant: AppToastVariant.success,
@@ -43,7 +43,7 @@ Future<void> importTeamProfile(BuildContext context) async {
     if (!context.mounted) return;
     QueryaCommandHost.maybeOf(context)?.onReloadConnections?.call();
     showAppToast(
-      context,
+      context: context,
       message: added == 0
           ? 'Nothing new to import'
           : 'Imported $added connection(s). Enter passwords when connecting.',
@@ -51,6 +51,6 @@ Future<void> importTeamProfile(BuildContext context) async {
     );
   } on TeamProfileFormatException catch (e) {
     if (!context.mounted) return;
-    showAppToast(context, message: e.message, variant: AppToastVariant.error);
+    showAppToast(context: context, message: e.message, variant: AppToastVariant.error);
   }
 }
