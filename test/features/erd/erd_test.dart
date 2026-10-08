@@ -157,6 +157,7 @@ void main() {
       await t.tap(card);
       await t.pump();
       expect(opened, 'users');
+      await t.pump(const Duration(seconds: 1));
     });
 
     testWidgets('shows empty state', (t) async {
