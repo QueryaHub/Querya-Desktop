@@ -860,6 +860,9 @@ class _MainScreenState extends State<MainScreen> {
         return QueryaCommandHost(
           onToggleSidebar: () => _splitKey.currentState?.toggleSidebar(),
           onNewConnection: () => unawaited(_onNewDatabaseConnectionFromMenu()),
+          onReloadConnections: () => unawaited(
+              _connectionsPanelKey.currentState?.reloadConnectionsFromDb() ??
+                  Future<void>.value()),
           onShowQuickSwitcher: _openQuickSwitcher,
           onOpenSchemaObject: _onOpenSchemaObject,
           onGoHome:

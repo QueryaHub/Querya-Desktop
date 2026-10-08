@@ -179,6 +179,8 @@ void main() {
       'querya.workspace.close',
       'querya.workspace.home',
       'querya.connection.new',
+      'querya.connection.exportTeamProfile',
+      'querya.connection.importTeamProfile',
       'querya.connection.connect',
       'querya.connection.disconnect',
       'querya.connection.reconnect',

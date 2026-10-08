@@ -7,6 +7,7 @@ class QueryaCommandHost extends InheritedWidget {
     super.key,
     this.onToggleSidebar,
     this.onNewConnection,
+    this.onReloadConnections,
     this.onShowQuickSwitcher,
     this.onOpenSchemaObject,
     this.onGoHome,
@@ -22,6 +23,9 @@ class QueryaCommandHost extends InheritedWidget {
 
   final VoidCallback? onToggleSidebar;
   final VoidCallback? onNewConnection;
+
+  /// Reloads the sidebar connection list after connections changed in the DB.
+  final VoidCallback? onReloadConnections;
 
   /// Opens Quick Switcher; [query] is a prefilled filter (`#users` remainder).
   final void Function(String query)? onShowQuickSwitcher;
@@ -48,6 +52,7 @@ class QueryaCommandHost extends InheritedWidget {
   bool updateShouldNotify(QueryaCommandHost oldWidget) {
     return onToggleSidebar != oldWidget.onToggleSidebar ||
         onNewConnection != oldWidget.onNewConnection ||
+        onReloadConnections != oldWidget.onReloadConnections ||
         onShowQuickSwitcher != oldWidget.onShowQuickSwitcher ||
         onOpenSchemaObject != oldWidget.onOpenSchemaObject ||
         onGoHome != oldWidget.onGoHome ||

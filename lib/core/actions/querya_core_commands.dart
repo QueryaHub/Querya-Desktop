@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart' show Icons;
 import 'package:shadcn_flutter/shadcn_flutter.dart' show ThemeMode;
 import 'package:querya_desktop/core/actions/data_grid_command_bridge.dart';
@@ -6,6 +8,7 @@ import 'package:querya_desktop/core/actions/querya_command_host.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
+import 'package:querya_desktop/features/connections/team_profile_actions.dart';
 import 'package:querya_desktop/features/extensions/presentation/pages/extension_manager_dialog.dart';
 import 'package:querya_desktop/features/help/about_dialog.dart';
 import 'package:querya_desktop/features/onboarding/welcome_tour_dialog.dart';
@@ -90,6 +93,26 @@ List<QueryaCommand> queryaCoreCommands() {
           return;
         }
         promptCreateConnection(context);
+      },
+    ),
+    QueryaCommand(
+      id: 'querya.connection.exportTeamProfile',
+      title: 'Export Team Profile…',
+      category: 'Connection',
+      icon: Icons.upload_file_rounded,
+      aliases: const ['share', 'team', 'export connections'],
+      execute: (context) {
+        unawaited(exportTeamProfile(context));
+      },
+    ),
+    QueryaCommand(
+      id: 'querya.connection.importTeamProfile',
+      title: 'Import Team Profile…',
+      category: 'Connection',
+      icon: Icons.download_rounded,
+      aliases: const ['share', 'team', 'import connections', 'onboarding'],
+      execute: (context) {
+        unawaited(importTeamProfile(context));
       },
     ),
     QueryaCommand(
