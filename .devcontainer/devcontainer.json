@@ -1,0 +1,23 @@
+{
+  "name": "Querya Desktop",
+  "build": { "dockerfile": "Dockerfile" },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+  },
+  "postCreateCommand": "flutter config --enable-linux-desktop && flutter pub get",
+  "postStartCommand": "docker compose -f docker/docker-compose.yml up -d || echo 'Docker stack not started (run it manually: cd docker && docker compose up -d)'",
+  "forwardPorts": [5432, 3306, 6379, 27017, 8123, 9000],
+  "portsAttributes": {
+    "5432": { "label": "PostgreSQL" },
+    "3306": { "label": "MySQL" },
+    "6379": { "label": "Redis" },
+    "27017": { "label": "MongoDB" },
+    "8123": { "label": "ClickHouse HTTP" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["Dart-Code.dart-code", "Dart-Code.flutter"]
+    }
+  },
+  "hostRequirements": { "cpus": 4, "memory": "8gb" }
+}

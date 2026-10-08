@@ -1,0 +1,86 @@
+name: Benchmark
+
+# Informational: compares frame timings of benchmark/grid_perf_bench.dart on the
+# PR against its base branch and comments when the PR is >5% slower. Never
+# blocks a merge.
+
+on:
+  pull_request:
+    branches: [ dev, main ]
+    paths:
+      - 'lib/features/workspace/**'
+      - 'lib/core/database/**'
+      - 'lib/core/csv/**'
+      - 'benchmark/**'
+      - 'scripts/ci/bench_compare.py'
+      - '.github/workflows/benchmark.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: benchmark-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  grid-bench:
+    name: Grid performance
+    # Forks get no write token and must never reach any self-hosted runner.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Linux dependencies
+        timeout-minutes: 8
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev libsqlite3-dev xvfb libgl1-mesa-dri
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.6'
+          channel: 'stable'
+          cache: true
+
+      - name: Run benchmark on PR head
+        timeout-minutes: 15
+        run: |
+          flutter pub get
+          xvfb-run -a -s '-screen 0 1920x1080x24' flutter run --profile -d linux \
+            -t benchmark/grid_perf_bench.dart --dart-define=MODE=scroll \
+            2>&1 | tee "$RUNNER_TEMP/head.log" || true
+
+      - name: Run benchmark on base
+        if: github.event_name == 'pull_request'
+        timeout-minutes: 15
+        run: |
+          git worktree add "$RUNNER_TEMP/base" "origin/${{ github.base_ref }}"
+          rm -rf "$RUNNER_TEMP/base/benchmark"
+          cp -r benchmark "$RUNNER_TEMP/base/benchmark"
+          cd "$RUNNER_TEMP/base"
+          flutter pub get
+          xvfb-run -a -s '-screen 0 1920x1080x24' flutter run --profile -d linux \
+            -t benchmark/grid_perf_bench.dart --dart-define=MODE=scroll \
+            2>&1 | tee "$RUNNER_TEMP/base.log" || true
+
+      - name: Compare
+        id: compare
+        run: |
+          python3 scripts/ci/bench_compare.py "$RUNNER_TEMP/base.log" "$RUNNER_TEMP/head.log" 5 > "$RUNNER_TEMP/report.txt"
+          cat "$RUNNER_TEMP/report.txt"
+          echo "regression=$(head -1 "$RUNNER_TEMP/report.txt" | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+          tail -n +2 "$RUNNER_TEMP/report.txt" > "$RUNNER_TEMP/report.md"
+          cat "$RUNNER_TEMP/report.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment on regression
+        if: github.event_name == 'pull_request' && steps.compare.outputs.regression == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr comment "${{ github.event.pull_request.number }}" --body-file "$RUNNER_TEMP/report.md"
