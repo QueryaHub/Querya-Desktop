@@ -1,5 +1,6 @@
 import 'package:querya_desktop/features/erd/erd_layout.dart';
 import 'package:querya_desktop/features/erd/erd_model.dart';
+import 'package:querya_desktop/features/erd/erd_router.dart';
 
 /// Text exports of an [ErdSchema].
 class ErdExport {
@@ -38,25 +39,27 @@ class ErdExport {
       .replaceAll('>', '&gt;')
       .replaceAll('"', '&quot;');
 
-  /// Standalone SVG rendering of the diagram.
-  static String toSvg(ErdSchema schema, ErdLayout layout) {
-    final byName = {for (final t in schema.tables) t.name: t};
-    final w = layout.size.width, h = layout.size.height;
+  static String _n(double v) => v.toStringAsFixed(1);
+
+  /// Standalone SVG rendering of the diagram, with the same positions and
+  /// edge routes as the screen ([routes] defaults to a fresh routing).
+  static String toSvg(ErdSchema schema, ErdLayout layout, {List<ErdRoute>? routes}) {
+    final size = layout.size;
+    final w = _n(size.width), h = _n(size.height);
     final b = StringBuffer()
       ..writeln('<svg xmlns="http://www.w3.org/2000/svg" width="$w" height="$h" '
           'viewBox="0 0 $w $h" font-family="sans-serif" font-size="12">')
       ..writeln('<rect width="100%" height="100%" fill="#ffffff"/>');
-    for (final r in schema.relations) {
-      final from = byName[r.fromTable], to = byName[r.toTable];
-      if (from == null || to == null) continue;
-      final fr = layout.rectOf(from), tr = layout.rectOf(to);
-      final fromRight = fr.center.dx < tr.center.dx;
-      final x1 = fromRight ? fr.right : fr.left;
-      final x2 = fromRight ? tr.left : tr.right;
-      final y1 = layout.columnY(from, r.fromColumn);
-      final y2 = layout.columnY(to, r.toColumn);
-      b.writeln('<line x1="$x1" y1="$y1" x2="$x2" y2="$y2" '
-          'stroke="#64748b" stroke-width="1.5"/>');
+    for (final r in routes ?? ErdRouter.route(schema, layout)) {
+      if (r.points.length < 2) continue;
+      final d = StringBuffer('M ${_n(r.points.first.dx)} ${_n(r.points.first.dy)}');
+      for (final p in r.points.skip(1)) {
+        d.write(' L ${_n(p.dx)} ${_n(p.dy)}');
+      }
+      b.writeln('<path d="$d" fill="none" stroke="#64748b" stroke-width="1.5" '
+          'stroke-linejoin="round"><title>${_esc(r.relation.fromTable)}.'
+          '${_esc(r.relation.fromColumn)} → ${_esc(r.relation.toTable)}.'
+          '${_esc(r.relation.toColumn)}</title></path>');
     }
     for (final t in schema.tables) {
       final rect = layout.rectOf(t);
