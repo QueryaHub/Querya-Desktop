@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart' show EditableText;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 

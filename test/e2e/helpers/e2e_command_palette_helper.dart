@@ -1,5 +1,5 @@
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Drives the Command Palette (`Ctrl+P`) the way a user does.
