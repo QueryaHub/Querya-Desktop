@@ -75,7 +75,10 @@ jobs:
         run: flutter build windows --release
 
       - name: Bundle querya-mcp (MCP stdio bridge)
-        run: dart compile exe bin/querya_mcp.dart -o build\windows\x64\runner\Release\querya-mcp.exe
+        run: |
+          cd packages\querya_mcp_bridge
+          dart pub get
+          dart compile exe bin\querya_mcp.dart -o ..\..\build\windows\x64\runner\Release\querya-mcp.exe
 
       - name: Zip Windows artifact (portable)
         run: |
@@ -147,7 +150,10 @@ jobs:
         run: ./scripts/linux/apply_patched_engine.sh
 
       - name: Bundle querya-mcp (MCP stdio bridge)
-        run: dart compile exe bin/querya_mcp.dart -o build/linux/x64/release/bundle/querya-mcp
+        run: |
+          cd packages/querya_mcp_bridge
+          dart pub get
+          dart compile exe bin/querya_mcp.dart -o ../../build/linux/x64/release/bundle/querya-mcp
 
       - name: Zip Linux artifact (portable)
         run: |
@@ -372,7 +378,9 @@ jobs:
           MCP=querya-mcp
           if [ "${{ runner.os }}" = "Windows" ]; then MCP=querya-mcp.exe; fi
           mkdir -p build/mcp
-          dart compile exe bin/querya_mcp.dart -o "build/mcp/$MCP"
+          # Own dependency-free package: one static binary, no build hooks.
+          (cd packages/querya_mcp_bridge && dart pub get && \
+            dart compile exe bin/querya_mcp.dart -o "../../build/mcp/$MCP")
 
       - name: Smoke test
         shell: bash

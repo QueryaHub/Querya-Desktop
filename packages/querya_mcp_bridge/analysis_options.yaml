@@ -1,0 +1,4 @@
+# Analyzed on its own (no Flutter lints here): the package has no dependencies.
+analyzer:
+  language:
+    strict-casts: true

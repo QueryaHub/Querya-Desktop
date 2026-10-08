@@ -1,12 +1,15 @@
 // querya-mcp: stdio bridge between an MCP client (Claude Desktop, Cursor,
-// VS Code, ...) and a running Querya Desktop. Released as a standalone
-// executable built with `dart compile exe bin/querya_mcp.dart`.
+// VS Code, ...) and a running Querya Desktop. Released as a single static
+// executable:
+//
+//   cd packages/querya_mcp_bridge && dart pub get
+//   dart compile exe bin/querya_mcp.dart -o querya-mcp
 //
 // Client configuration:
 //   { "mcpServers": { "querya": { "command": "/path/to/querya-mcp" } } }
 import 'dart:io';
 
-import 'package:querya_desktop/core/mcp/mcp_shim.dart';
+import 'package:querya_mcp_bridge/querya_mcp_bridge.dart';
 
 Future<void> main(List<String> args) async {
   if (args.contains('--help') || args.contains('-h')) {

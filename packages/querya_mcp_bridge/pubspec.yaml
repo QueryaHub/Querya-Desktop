@@ -1,0 +1,10 @@
+name: querya_mcp_bridge
+description: >-
+  querya-mcp, the stdio bridge between MCP clients and a running Querya
+  Desktop, and the endpoint file both sides share. Pure dart:io, no
+  dependencies, so it compiles to a single static executable.
+publish_to: none
+version: 1.0.0
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'

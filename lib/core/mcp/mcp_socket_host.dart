@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:querya_desktop/core/mcp/mcp_endpoint.dart';
+import 'package:querya_mcp_bridge/querya_mcp_bridge.dart';
 import 'package:stream_channel/stream_channel.dart';
 
 /// Accepts `querya-mcp` connections on `127.0.0.1` and hands each

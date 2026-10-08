@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:querya_desktop/core/mcp/mcp_endpoint.dart';
+import 'mcp_endpoint.dart';
 
 /// Message for clients when the app is not reachable.
 const kMcpAppNotRunning =

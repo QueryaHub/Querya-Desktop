@@ -3,6 +3,8 @@ include: package:flutter_lints/flutter.yaml
 analyzer:
   exclude:
     - "third_party/**"
+    # Own package with its own analysis_options (no Flutter lints).
+    - "packages/**"
     - "build/**"
     - android/**
     - ios/**

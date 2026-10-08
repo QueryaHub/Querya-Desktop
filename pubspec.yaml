@@ -35,6 +35,8 @@ dependencies:
   flutter_svg: ^2.3.0
   dartssh2: ^4.1.0
   dart_mcp: ^0.5.2
+  querya_mcp_bridge:
+    path: packages/querya_mcp_bridge
   stream_channel: ^2.1.4
 
 dev_dependencies:

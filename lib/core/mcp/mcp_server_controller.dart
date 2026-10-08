@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:querya_desktop/core/mcp/mcp_endpoint.dart';
+import 'package:querya_mcp_bridge/querya_mcp_bridge.dart';
 import 'package:querya_desktop/core/mcp/mcp_query_service.dart';
 import 'package:querya_desktop/core/mcp/mcp_socket_host.dart';
 import 'package:querya_desktop/core/mcp/mcp_sql_delegates.dart';
