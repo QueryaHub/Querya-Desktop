@@ -15,6 +15,7 @@ ICON_SRC="$ROOT/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png
 APP_ID="com.queryahub.querya_desktop"
 MANIFEST_SRC="$ROOT/packaging/linux/flatpak/${APP_ID}.yml"
 DESKTOP_SRC="$ROOT/packaging/linux/flatpak/${APP_ID}.desktop"
+METAINFO_SRC="$ROOT/packaging/linux/flatpak/${APP_ID}.metainfo.xml"
 
 if [[ ! -d "$BUNDLE" ]]; then
   echo "error: Flutter linux bundle not found: $BUNDLE" >&2
@@ -45,6 +46,7 @@ mkdir -p "$STAGING/bundle"
 cp -a "$BUNDLE"/. "$STAGING/bundle/"
 cp "$MANIFEST_SRC" "$STAGING/${APP_ID}.yml"
 cp "$DESKTOP_SRC" "$STAGING/bundle/${APP_ID}.desktop"
+cp "$METAINFO_SRC" "$STAGING/bundle/${APP_ID}.metainfo.xml"
 cp "$ICON_SRC" "$STAGING/bundle/${APP_ID}.png"
 
 flatpak-builder \

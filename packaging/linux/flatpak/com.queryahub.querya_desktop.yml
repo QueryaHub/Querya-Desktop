@@ -24,6 +24,7 @@ modules:
       - cp -a data /app/
       - install -Dm644 com.queryahub.querya_desktop.desktop /app/share/applications/com.queryahub.querya_desktop.desktop
       - install -Dm644 com.queryahub.querya_desktop.png /app/share/icons/hicolor/512x512/apps/com.queryahub.querya_desktop.png
+      - install -Dm644 com.queryahub.querya_desktop.metainfo.xml /app/share/metainfo/com.queryahub.querya_desktop.metainfo.xml
     sources:
       - type: dir
         path: bundle
