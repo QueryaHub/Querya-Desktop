@@ -184,6 +184,7 @@ Manual QA (with animation enabled):
 
 ## Related docs
 
+- [ui-kit.md](ui-kit.md) — shared widgets, tokens and guard tests
 - [theme-import.md](theme-import.md) — supported `colors` keys and merge behavior
 - [archive/research_theme.md](archive/research_theme.md) — background research (RU)
 - [archive/editor-spike-report.md](archive/editor-spike-report.md) — code editor package evaluation (#48)
