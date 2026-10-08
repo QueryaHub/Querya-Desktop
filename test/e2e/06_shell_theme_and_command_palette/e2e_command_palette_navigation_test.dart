@@ -7,6 +7,8 @@ import '../helpers/e2e_app_harness.dart';
 import '../helpers/e2e_command_palette_helper.dart';
 import '../helpers/e2e_grid_interactions.dart';
 
+const _timeout = Timeout(Duration(seconds: 60));
+
 void main() {
   final app = E2eAppHarness(prefix: 'querya_e2e_palette_');
   setUpAll(app.setUpAll);
@@ -19,17 +21,23 @@ void main() {
     }
   }
 
-  testWidgets('palette command toggles the theme mode', (tester) async {
+  testWidgets('palette command toggles the theme mode', timeout: _timeout,
+      (tester) async {
     final controller = ThemeController.instance;
-    await controller.setThemeMode(ThemeMode.dark);
+    // Settings I/O is real async work: run it outside the fake-async zone.
+    await tester.runAsync(() => controller.setThemeMode(ThemeMode.dark));
     await app.launch(tester);
 
     await E2ePalette.run(tester, 'dark', 'querya.theme.toggle');
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 300)));
     await E2eAppHarness.settle(tester);
     expect(controller.themeMode, ThemeMode.light);
     expect(E2ePalette.field, findsNothing, reason: 'palette closes after run');
 
     await E2ePalette.run(tester, 'dark', 'querya.theme.toggle');
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 300)));
     await E2eAppHarness.settle(tester);
     expect(controller.themeMode, ThemeMode.dark);
     await app.close(tester);
