@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_manager.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
@@ -151,5 +152,59 @@ void main() {
       throwsA(isA<SshHostKeyMismatchException>()),
     );
     expect(manager.activeSessionCount, 0);
+  });
+
+  test('a passphrase-protected key is stored in the secure store and opens '
+      'the tunnel', () async {
+    const passphrase = 'Key-Passphrase-3d8f';
+    final keyDir = await Directory.systemTemp.createTemp('e2e_ssh_key_');
+    addTearDown(() => keyDir.deleteSync(recursive: true));
+    final keyPath = p.join(keyDir.path, 'id_ed25519');
+    try {
+      final r = await Process.run('ssh-keygen',
+          ['-q', '-t', 'ed25519', '-N', passphrase, '-f', keyPath]);
+      if (r.exitCode != 0) {
+        markTestSkipped('ssh-keygen failed');
+        return;
+      }
+    } on ProcessException {
+      markTestSkipped('ssh-keygen is not available');
+      return;
+    }
+    final pem = File(keyPath).readAsStringSync();
+
+    final cfg = config().copyWith(authType: SshAuthType.privateKey);
+    final id = await LocalDb.instance.addConnection(ConnectionRow(
+      type: 'postgresql',
+      name: 'Key bastion',
+      host: 'db.internal',
+      port: 5432,
+      createdAt: DateTime.utc(2026).toIso8601String(),
+      sshSecrets: SshTunnelSecrets(privateKey: pem, passphrase: passphrase),
+    ).withSshTunnelConfig(cfg));
+    final row = (await LocalDb.instance.getConnectionById(id))!;
+
+    expect(row.sshTunnelConfig!.authType, SshAuthType.privateKey);
+    expect(row.driverOptions, isNot(contains(passphrase)));
+    expect(row.driverOptions, isNot(contains('PRIVATE KEY')));
+
+    final stored =
+        await ConnectionSecretsStore.readSshSecretsForConnection(id);
+    expect(stored.passphrase, passphrase);
+    expect(stored.privateKey, pem);
+
+    final secrets = SshTunnelSecrets(
+        privateKey: stored.privateKey, passphrase: stored.passphrase);
+    final handle = await manager.openTunnel(
+      config: row.sshTunnelConfig!,
+      secrets: secrets,
+      remoteHost: row.host!,
+      remotePort: row.port!,
+    );
+    expect(handle.localPort, greaterThan(0));
+    expect(server.clients.last.passwordRequested, isFalse,
+        reason: 'key auth must not fall back to a password');
+    expect(secrets.isEmpty, isTrue);
+    await handle.release();
   });
 }
