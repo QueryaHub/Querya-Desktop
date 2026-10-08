@@ -128,6 +128,111 @@ tar -xzf querya-ext-tester-v0.4.18-linux-x64.tar.gz
 
 GitLab CI, Jenkins and Bitbucket read the JUnit XML file as a test report.
 
+## Recipes by language
+
+The tester only needs a directory with `manifest.json` and the built entry
+point named by `main`. Build first, then point it at the output directory.
+Use a throwaway database service in CI and pass credentials through `--connect`.
+
+### Go
+
+```yaml
+jobs:
+  test-extension:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        querya-version: ['0.4.18', '0.5.0']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: stable }
+      - name: Build
+        run: |
+          mkdir -p dist
+          CGO_ENABLED=0 go build -o dist/driver ./cmd/driver
+          cp manifest.json dist/
+      - uses: QueryaHub/Querya-Desktop/.github/actions/test-extension@dev
+        with:
+          querya-version: ${{ matrix.querya-version }}
+          extension-dir: dist
+          connect: '{"host":"localhost","port":5432}'
+```
+
+### Rust
+
+```yaml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build
+        run: |
+          cargo build --release
+          mkdir -p dist
+          cp target/release/my-driver dist/driver
+          cp manifest.json dist/
+      - uses: QueryaHub/Querya-Desktop/.github/actions/test-extension@dev
+        with:
+          extension-dir: dist
+```
+
+### TypeScript / Node
+
+```yaml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Build
+        run: |
+          npm ci
+          npm run build            # emits dist/index.js
+          cp manifest.json dist/   # manifest "main" must point at the entry that is run
+      - uses: QueryaHub/Querya-Desktop/.github/actions/test-extension@dev
+        with:
+          extension-dir: dist
+```
+
+For interpreted entry points make sure the file is executable (or has a
+shebang) in the same way Querya Desktop would launch it.
+
+### GitLab CI
+
+There is no dedicated Docker image; download the release binary in any image
+that has `curl`:
+
+```yaml
+test-extension:
+  image: debian:stable-slim
+  parallel:
+    matrix:
+      - QUERYA_VERSION: ['0.4.18', '0.5.0']
+  before_script:
+    - apt-get update && apt-get install -y curl ca-certificates tar
+    - curl -fsSLO "https://github.com/QueryaHub/Querya-Desktop/releases/download/${QUERYA_VERSION}/querya-ext-tester-v${QUERYA_VERSION}-linux-x64.tar.gz"
+    - tar -xzf "querya-ext-tester-v${QUERYA_VERSION}-linux-x64.tar.gz"
+  script:
+    - ./querya-ext-tester ./dist --target-version "$QUERYA_VERSION" --junit junit.xml --no-color
+  artifacts:
+    when: always
+    reports:
+      junit: junit.xml
+```
+
+## Debugging locally
+
+1. Run the tester against your build output with the same flags as CI. Failed
+   checks print the JSON path of a manifest problem or the RPC method and error.
+2. Raise the timeout while attaching a debugger: `--timeout-ms 60000`.
+3. Test a single older host with `--target-version`; methods the emulated host
+   does not send are reported as skipped.
+4. Reproduce what a user sees in Querya Desktop with `--sandbox`, which starts
+   the plugin in the same OS sandbox.
+5. Capture machine-readable results with `--junit report.xml` or `--tap report.tap`.
+
+There is no `--strict` mode: recommended methods only warn, and exit code `1`
+means a required check failed.
+
 ## Running from source
 
 Inside a Querya Desktop checkout (needs the Flutter SDK for `pub get`):

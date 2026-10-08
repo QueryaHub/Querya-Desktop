@@ -1,5 +1,7 @@
 # ТЗ: Архитектура системы расширений и Маркетплейса (Querya Desktop)
 
+> Тестирование расширений в CI (жизненный цикл RPC, флаги `querya-ext-tester`, примеры для Go/Rust/TypeScript и GitLab): [extension-testing.md](extension-testing.md).
+
 ## 1. Концепция и Ограничения
 **Цель:** Превратить Querya Desktop из монолитного клиента баз данных в расширяемую платформу (подобно VS Code или DBeaver), позволяющую сторонним разработчикам добавлять поддержку новых СУБД (ClickHouse, Cassandra, Redis), форматировщиков и UI-тем.
 
