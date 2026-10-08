@@ -1,0 +1,114 @@
+import 'package:flutter/foundation.dart';
+
+@immutable
+class ErdColumn {
+  const ErdColumn({
+    required this.name,
+    required this.type,
+    this.isPrimaryKey = false,
+    this.isForeignKey = false,
+  });
+
+  final String name;
+  final String type;
+  final bool isPrimaryKey;
+  final bool isForeignKey;
+
+  ErdColumn copyWith({bool? isForeignKey}) => ErdColumn(
+        name: name,
+        type: type,
+        isPrimaryKey: isPrimaryKey,
+        isForeignKey: isForeignKey ?? this.isForeignKey,
+      );
+}
+
+@immutable
+class ErdTable {
+  const ErdTable({required this.name, required this.columns});
+
+  final String name;
+  final List<ErdColumn> columns;
+}
+
+/// A foreign key: [fromTable].[fromColumn] references [toTable].[toColumn].
+@immutable
+class ErdRelation {
+  const ErdRelation({
+    required this.fromTable,
+    required this.fromColumn,
+    required this.toTable,
+    required this.toColumn,
+  });
+
+  final String fromTable;
+  final String fromColumn;
+  final String toTable;
+  final String toColumn;
+}
+
+@immutable
+class ErdSchema {
+  const ErdSchema({required this.tables, required this.relations});
+
+  final List<ErdTable> tables;
+  final List<ErdRelation> relations;
+
+  bool get isEmpty => tables.isEmpty;
+
+  /// Builds a schema from flat catalog rows.
+  ///
+  /// [columnRows]: `table, column, type, isPk`. [fkRows]: `table, column,
+  /// refTable, refColumn`. Relations to unknown tables are dropped.
+  factory ErdSchema.fromCatalog({
+    required List<List<String>> columnRows,
+    required List<List<String>> fkRows,
+  }) {
+    final order = <String>[];
+    final cols = <String, List<ErdColumn>>{};
+    for (final r in columnRows) {
+      if (r.length < 4) continue;
+      final list = cols.putIfAbsent(r[0], () {
+        order.add(r[0]);
+        return [];
+      });
+      list.add(ErdColumn(
+        name: r[1],
+        type: r[2],
+        isPrimaryKey: _truthy(r[3]),
+      ));
+    }
+    final relations = <ErdRelation>[];
+    final fkCols = <String>{};
+    for (final r in fkRows) {
+      if (r.length < 4) continue;
+      if (!cols.containsKey(r[0]) || !cols.containsKey(r[2])) continue;
+      relations.add(ErdRelation(
+        fromTable: r[0],
+        fromColumn: r[1],
+        toTable: r[2],
+        toColumn: r[3],
+      ));
+      fkCols.add('${r[0]}\u0000${r[1]}');
+    }
+    return ErdSchema(
+      tables: [
+        for (final t in order)
+          ErdTable(
+            name: t,
+            columns: [
+              for (final c in cols[t]!)
+                fkCols.contains('$t\u0000${c.name}')
+                    ? c.copyWith(isForeignKey: true)
+                    : c,
+            ],
+          ),
+      ],
+      relations: relations,
+    );
+  }
+
+  static bool _truthy(String v) {
+    final s = v.trim().toLowerCase();
+    return s == '1' || s == 't' || s == 'true' || s == 'yes';
+  }
+}

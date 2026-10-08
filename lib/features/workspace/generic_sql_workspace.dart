@@ -22,6 +22,7 @@ import 'package:querya_desktop/features/workspace/dml_preview_dialog.dart';
 import 'package:querya_desktop/features/workspace/query_editor_tab.dart';
 import 'package:querya_desktop/features/workspace/results_tab.dart';
 import 'package:querya_desktop/features/workspace/sql_editor_chrome.dart';
+import 'package:querya_desktop/features/erd/erd_view.dart';
 import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
 import 'package:querya_desktop/features/workspace/sql_query_history_dialog.dart';
 import 'package:querya_desktop/features/workspace/sql_query_tab_bar.dart';
@@ -224,6 +225,36 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       );
       _sessions.add(session);
       _activeSessionIndex = _sessions.length - 1;
+    });
+  }
+
+  /// Opens the ER diagram tab (or focuses the existing one).
+  void openDiagramTab() {
+    final existing = _sessions.indexWhere((s) => s.isDiagram);
+    if (existing >= 0) {
+      setState(() => _activeSessionIndex = existing);
+      return;
+    }
+    setState(() {
+      _nextSessionId++;
+      _sessions.add(SqlQueryTabSession(
+        id: '${widget.sessionPrefix}_diagram_$_nextSessionId',
+        title: 'Diagram',
+        isDiagram: true,
+      ));
+      _activeSessionIndex = _sessions.length - 1;
+    });
+  }
+
+  void _openTableFromDiagram(String table) {
+    final q = switch (widget.dialect) {
+      SqlDialect.mysql => '`$table`',
+      _ => '"$table"',
+    };
+    addNewTab(initialSql: 'SELECT * FROM $q LIMIT 100;', title: table);
+    final session = _activeSession;
+    material.WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(execute(session));
     });
   }
 
@@ -814,6 +845,14 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
     SqlQueryTabSession session,
   ) {
     paneBuildCount++;
+    if (session.isDiagram) {
+      return ErdView(
+        key: material.ValueKey(session.id),
+        delegate: widget.delegate,
+        dialect: widget.dialect,
+        onOpenTable: _openTableFromDiagram,
+      );
+    }
     final theme = Theme.of(context);
     final accent = context.workbench.accent;
 
@@ -877,6 +916,11 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
                               color: accent,
                             ),
                       child: const Text('Execute (F5)'),
+                    ),
+                    OutlineButton(
+                      key: const material.ValueKey('open_diagram_tab'),
+                      onPressed: openDiagramTab,
+                      child: const Text('Diagram'),
                     ),
                     if (widget.extraToolbarTrailing?.call(context, session) case final extra?)
                       extra,
