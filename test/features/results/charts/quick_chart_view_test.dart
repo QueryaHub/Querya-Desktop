@@ -58,4 +58,29 @@ void main() {
     expect(saved, isNotNull);
     expect(saved!.isNotEmpty, isTrue);
   });
+
+  testWidgets('export SVG button saves an SVG for the current chart type',
+      (t) async {
+    String? saved;
+    await t.binding.setSurfaceSize(const Size(1000, 700));
+    await t.pumpWidget(queryaThemeTestShell(child: QuickChartView(
+      columns: columns,
+      rows: rows,
+      onSaveSvg: (svg) async => saved = svg,
+    )));
+    await t.pump();
+
+    await t.tap(find.byKey(const material.ValueKey('chart_export_svg')));
+    await t.pump();
+    expect(saved, isNotNull);
+    expect(saved, contains('<svg'));
+    expect(saved, contains('<title>amount</title>'));
+    expect('<rect '.allMatches(saved!).length, 1 + rows.length);
+
+    await t.tap(find.text('Pie'));
+    await t.pump();
+    await t.tap(find.byKey(const material.ValueKey('chart_export_svg')));
+    await t.pump();
+    expect('<path '.allMatches(saved!).length, rows.length);
+  });
 }
