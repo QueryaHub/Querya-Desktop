@@ -42,9 +42,14 @@ void main() {
     await app.launch(tester);
     final id = await E2eConnections.add(
         tester, E2eConnections.postgres('E2E Postgres'));
-    expect(find.text('E2E Postgres'), findsWidgets);
+    // Other screens (e.g. the welcome hero) may list it too; assert on the sidebar.
+    final inSidebar = find.descendant(
+      of: find.byType(ConnectionsPanel),
+      matching: find.text('E2E Postgres'),
+    );
+    expect(inSidebar, findsOneWidget);
     await E2eConnections.remove(tester, id);
-    expect(find.text('E2E Postgres'), findsNothing);
+    expect(inSidebar, findsNothing);
     await app.close(tester);
   });
 }
