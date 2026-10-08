@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **MCP server (#1133)** — Querya can serve shared PostgreSQL / MySQL / SQLite connections to AI clients (Claude Desktop, Cursor, VS Code, Gemini CLI, ...) over MCP: `list_connections`, `list_tables`, `describe_table`, `sample_rows`, `run_query`, `explain_query` and a `schema://` resource. Read-only in three layers (SQL guard, read-only database session, per-connection opt-in), credentials never sent to the model, `querya-mcp` stdio bridge, Preferences → MCP Server with copy-config buttons and an activity log — see docs/mcp-server.md.
+
+### Fixed
+
+- **ERD for SQLite (#1134)** — the diagram was always empty for SQLite connections (catalog columns collapsed in the driver's row maps).
+
 ### Planned
 
 - Planned 0.5.0 — live Marketplace download and install

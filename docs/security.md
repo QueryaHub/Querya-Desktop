@@ -15,7 +15,7 @@ On upgrade from older databases, existing plaintext secrets in SQLite are **migr
 ## Threat model (practical)
 
 - Anyone with **full access to your user session** can usually read app data and may extract secrets depending on OS protections.
-- The app does **not** implement team features, audit logging, or network zero-trust controls.
+- The app does **not** implement network zero-trust controls. Local audit trails exist for executed data changes and for MCP calls.
 - **SSH tunnels / jump hosts** are built in (see below); the tunnel does not protect against an attacker who already controls your user session.
 
 ## SSH tunnels (bastion hosts)
@@ -25,6 +25,22 @@ On upgrade from older databases, existing plaintext secrets in SQLite are **migr
 - **Credential hygiene:** secrets are read on demand when connecting, not when the sidebar loads, and database drivers clear their in-memory credentials once the handshake completes.
 - **Host key verification:** with no pinned fingerprint the first key is accepted (trust on first use). Pin the server's SHA-256 fingerprint in the connection to reject a changed key; a mismatch fails the connection and reports the observed fingerprint.
 - **Team sharing:** *Export Team Profile* writes connections without passwords or SSH secrets; importing re-scrubs the file.
+
+## MCP server
+
+Querya can serve the connections you share to AI clients over MCP ([mcp-server.md](mcp-server.md)). SQL written by a model is untrusted, so access is limited in three independent layers:
+
+1. **Guard** (`McpSqlGuard`): one statement per call, only `SELECT` / `WITH` without data-modifying parts / `EXPLAIN` without `ANALYZE` / `SHOW` / `DESCRIBE` / `VALUES` and SQLite schema pragmas. Refused even inside a read: `SELECT ... INTO`, `INTO OUTFILE`, row locks, server functions with side effects (`pg_terminate_backend`, `pg_read_file`, `dblink`, `set_config`, `LOAD_FILE`, `load_extension`, ...) and MySQL executable comments (`/*! ... */`).
+2. **Read-only database session:** PostgreSQL `default_transaction_read_only`, MySQL `SET SESSION TRANSACTION READ ONLY`, SQLite opened with `SQLITE_OPEN_READONLY`. A write that slipped past the guard is refused by the database. For defense in depth, also give MCP-shared connections a database user with read-only grants.
+3. **Policy:** the server is off by default; each connection is shared individually (off by default); 15 s statement timeout, 1000-row and 4 KB-per-cell limits.
+
+Credentials never reach the model: tools return only connection id, name, type, environment and database name, and error messages are scrubbed (`McpRedaction`) of the connection's secrets, URI user info, `password=`-style values and private keys.
+
+**Transport:** the server listens on `127.0.0.1` only, on a random port. Clients connect through `querya-mcp`, which must present a random 256-bit token from an endpoint file readable only by your user (directory `0700`, file `0600`); a wrong token closes the connection. Any process running as your user can read that file, so the MCP server does not protect against an attacker who already controls your session.
+
+**Prompt injection:** query results are data. Text stored in your tables can contain instructions aimed at the model; the server tells clients not to follow them, but the read-only limits above are what actually bound the damage.
+
+**Audit:** every call is logged (Preferences → MCP Server → Recent calls).
 
 ## Tests
 

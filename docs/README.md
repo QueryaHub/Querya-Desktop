@@ -7,6 +7,7 @@ Index of Querya Desktop documentation, grouped by audience.
 - [Getting started](getting-started.md) — prerequisites, install, first run.
 - [User guide](user-guide.md) — connections, preferences, driver manager.
 - [Security / local data](security.md) — where metadata and secrets are stored.
+- [MCP server](mcp-server.md) — let Claude Desktop, Cursor, VS Code and other AI clients read shared connections (read-only).
 - [Testing extensions in CI](extension-testing.md) — `querya-ext-tester`, release binaries and the GitHub Action.
 
 ## For contributors
