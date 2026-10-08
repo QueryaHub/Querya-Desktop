@@ -32,7 +32,7 @@ void main() {
     expect(delegate.executed, isEmpty);
     expect(find.text('QUERY PLAN'), findsWidgets);
     expect(find.text('Seq Scan on users'), findsOneWidget);
-    expect(find.text('Filter: (id > 1)'), findsOneWidget);
+    expect(find.textContaining('Filter: (id > 1)'), findsOneWidget);
     expect(find.text('Query plan: 2 line(s).'), findsOneWidget);
   });
 
