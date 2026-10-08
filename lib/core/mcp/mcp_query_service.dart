@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/mcp/mcp_access_store.dart';
+import 'package:querya_desktop/core/mcp/mcp_redaction.dart';
 import 'package:querya_desktop/core/mcp/mcp_sql_guard.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/erd/erd_catalog.dart';
@@ -293,9 +294,17 @@ class McpQueryService {
   ) async {
     final row = await _readableConnection(connectionId);
     final dialect = dialectOf(row.type)!;
-    final delegate = _createDelegate(row, dialect);
+    final SqlExecutionDelegate delegate;
+    try {
+      delegate = _createDelegate(row, dialect);
+    } catch (e) {
+      throw McpToolException(McpRedaction.redact('$e', row: row));
+    }
     try {
       return await body(delegate, dialect);
+    } on McpToolException catch (e) {
+      // Driver errors may quote connection strings or options.
+      throw McpToolException(McpRedaction.redact(e.message, row: row));
     } finally {
       delegate.dispose();
     }

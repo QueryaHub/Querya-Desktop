@@ -67,6 +67,12 @@ abstract final class McpSqlGuard {
       return 'Only one statement per call is allowed; send them separately.';
     }
     final statement = statements.single;
+    // MySQL / MariaDB execute the body of `/*! ... */` and `/*M! ... */`
+    // comments, which the comment stripper below would hide from the checks.
+    if (dialect == SqlDialect.mysql &&
+        RegExp(r'/\*M?!').hasMatch(statement)) {
+      return 'MySQL executable comments (/*! ... */) are not allowed.';
+    }
     final upper = DestructiveSqlDetector.stripCommentsAndStrings(statement)
         .trim()
         .replaceAll(RegExp(r';\s*$'), '')
