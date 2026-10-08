@@ -17,17 +17,23 @@ class McpServerController {
     McpQueryService? service,
     File? endpointFile,
     String? version,
-  })  : _service = service ??
+    bool logActivity = false,
+  })  : _logActivity = logActivity,
+        _service = service ??
             McpQueryService(createDelegate: createReadOnlyMcpDelegate),
         _endpointFile = endpointFile ?? McpEndpoint.defaultFile(),
         _versionOverride = version;
 
-  static final McpServerController instance = McpServerController();
+  static final McpServerController instance =
+      McpServerController(logActivity: true);
 
   /// `app_settings` key; the server is off unless the user enables it.
   static const enabledKey = 'mcp_server_enabled';
 
   final McpQueryService _service;
+
+  /// Persist every call to the `mcp_activity` table (the app instance only).
+  final bool _logActivity;
   final File _endpointFile;
   final String? _versionOverride;
 
@@ -84,7 +90,7 @@ class McpServerController {
           channel,
           service: _service,
           version: version,
-          onCall: _calls.add,
+          onCall: _onCall,
         );
         _servers.add(server);
         await server.done;
@@ -107,6 +113,41 @@ class McpServerController {
     _servers.clear();
     await host?.stop();
     status.value = McpServerStatus.stopped;
+  }
+
+  void _onCall(McpCallRecord r) {
+    if (_logActivity) unawaited(_persist(r));
+    _calls.add(r);
+  }
+
+  Future<void> _persist(McpCallRecord r) async {
+    String? name;
+    if (r.connectionId != null) {
+      try {
+        name = (await LocalDb.instance.getConnectionById(r.connectionId!))
+            ?.name;
+      } catch (_) {}
+    }
+    final sql = r.sql;
+    await LocalDb.instance.recordMcpActivity(McpActivityEntry(
+      recordedAt: r.at.toUtc().toIso8601String(),
+      client: r.client,
+      tool: r.tool,
+      connectionId: r.connectionId,
+      connectionName: name,
+      sqlText: sql == null || sql.length <= 2000 ? sql : sql.substring(0, 2000),
+      rowCount: r.rowCount,
+      durationMs: r.duration.inMilliseconds,
+      error: r.error,
+    ));
+  }
+
+  /// Stops and starts again with a new token; connected clients must
+  /// reconnect (their `querya-mcp` reads the new endpoint file).
+  Future<void> regenerateToken() async {
+    if (_host == null) return;
+    await stop();
+    await start();
   }
 
   void _publish(McpSocketHost host) {
