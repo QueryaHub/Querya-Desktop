@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:dart_mcp/server.dart';
 import 'package:querya_desktop/core/mcp/mcp_query_service.dart';
+import 'package:querya_desktop/core/mcp/mcp_redaction.dart';
 
 /// One finished tool call, for the activity log.
 class McpCallRecord {
@@ -217,7 +218,7 @@ base class QueryaMcpServer extends MCPServer with ToolsSupport, ResourcesSupport
         return CallToolResult(
             isError: true, content: [TextContent(text: e.message)]);
       } catch (e) {
-        final message = 'Internal error: $e';
+        final message = McpRedaction.redact('Internal error: $e');
         _report(tool, started, sw.elapsed, connectionId, rawSql, null, message);
         return CallToolResult(
             isError: true, content: [TextContent(text: message)]);
