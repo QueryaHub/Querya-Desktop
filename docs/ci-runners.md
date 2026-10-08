@@ -67,3 +67,14 @@ pinned in one place (`ci.yml`).
 - Keep the machine updated (`apt upgrade`) and clean old workspaces under
   `/home/runner/actions-runner-*/_work` if the disk fills.
 - The runners hold no secrets of ours; do not add any to the container.
+
+## Dev Container and benchmarks
+
+`.devcontainer/` provides a ready environment (Flutter 3.41.6, Linux desktop
+toolchain, Docker CLI) for GitHub Codespaces or VS Code Dev Containers. On start
+it runs `docker/docker-compose.yml` (PostgreSQL, MySQL, Redis, MongoDB,
+ClickHouse) and forwards their ports.
+
+`.github/workflows/benchmark.yml` runs `benchmark/grid_perf_bench.dart` under
+Xvfb on the PR and on its base branch and comments when frame times are more
+than 5% worse. It is informational and never blocks a merge.
