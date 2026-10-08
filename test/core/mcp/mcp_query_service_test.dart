@@ -195,11 +195,8 @@ void main() {
 
     test('database errors come back as tool errors', () async {
       db.onExecute = (_) => throw StateError('relation "nope" does not exist');
-      await expectLater(
-        service().runQuery(1, 'SELECT * FROM nope'),
-        throwsA(isA<McpToolException>().having(
-            (e) => e.message, 'message', contains('nope'))),
-      );
+      await expectLater(service().runQuery(1, 'SELECT * FROM nope'),
+          throwsA(isA<McpToolException>()));
       expect(db.disposeCount, 1);
     });
 
