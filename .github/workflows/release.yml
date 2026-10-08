@@ -269,10 +269,50 @@ jobs:
           test -d "$APP"
           ditto -c -k --keepParent "$APP" "Querya-Desktop-${{ steps.version.outputs.version }}-macos.zip"
 
+      - name: Build macOS .dmg
+        env:
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          APP="build/macos/Build/Products/Release/querya_desktop.app"
+          DMG="Querya-Desktop-${{ steps.version.outputs.version }}-macos.dmg"
+          test -d "$APP"
+
+          # Drag-to-Applications layout: the app next to an /Applications link.
+          STAGE="$RUNNER_TEMP/dmg-stage"
+          rm -rf "$STAGE" && mkdir -p "$STAGE"
+          ditto "$APP" "$STAGE/Querya Desktop.app"
+          ln -s /Applications "$STAGE/Applications"
+          hdiutil create -volname "Querya Desktop" -srcfolder "$STAGE" \
+            -fs HFS+ -format UDZO -ov "$DMG"
+
+          if [ -z "${MACOS_SIGN_IDENTITY:-}" ] || [ -z "${MACOS_NOTARY_KEY:-}" ]; then
+            echo "Skipping .dmg signing/notarization — secrets not configured."
+            exit 0
+          fi
+
+          # The signing keychain was created by the previous signing step.
+          codesign --force --timestamp --sign "$MACOS_SIGN_IDENTITY" "$DMG"
+          NOTARY_KEY="$RUNNER_TEMP/notary_key_dmg.p8"
+          echo -n "$MACOS_NOTARY_KEY" | base64 --decode -o "$NOTARY_KEY"
+          xcrun notarytool submit "$DMG" \
+            --key "$NOTARY_KEY" \
+            --key-id "$MACOS_NOTARY_KEY_ID" \
+            --issuer "$MACOS_NOTARY_ISSUER_ID" \
+            --wait
+          xcrun stapler staple "$DMG"
+          xcrun stapler validate "$DMG"
+          rm "$NOTARY_KEY"
+
       - uses: actions/upload-artifact@v4
         with:
           name: bundle-macos
-          path: Querya-Desktop-${{ steps.version.outputs.version }}-macos.zip
+          path: |
+            Querya-Desktop-${{ steps.version.outputs.version }}-macos.zip
+            Querya-Desktop-${{ steps.version.outputs.version }}-macos.dmg
           if-no-files-found: error
 
   build-ext-tester:
@@ -387,9 +427,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          find artifacts \( -name '*.zip' -o -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' -o -name '*.flatpak' -o -name '*-windows-setup.exe' \) \
+          find artifacts \( -name '*.zip' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' -o -name '*.flatpak' -o -name '*-windows-setup.exe' \) \
             -exec mv -t dist/ {} +
           test "$(find dist -name '*.zip' | wc -l)" -eq 3
+          test "$(find dist -name '*.dmg' | wc -l)" -eq 1
           test "$(find dist -name '*.AppImage' | wc -l)" -eq 1
           test "$(find dist -name '*.deb' | wc -l)" -eq 1
           test "$(find dist -name '*.rpm' | wc -l)" -eq 1
@@ -416,6 +457,7 @@ jobs:
             echo "- **Linux**: \`Querya-Desktop-${VERSION}-linux.zip\`"
             echo "- **Windows**: \`Querya-Desktop-${VERSION}-windows.zip\`"
             echo "- **macOS**: \`Querya-Desktop-${VERSION}-macos.zip\` (signed, notarized and stapled \`.app\` when Apple Developer secrets are configured; otherwise unsigned)"
+            echo "- **macOS disk image**: \`Querya-Desktop-${VERSION}-macos.dmg\` (drag to Applications; notarized and stapled when Apple Developer secrets are configured)"
             echo ""
             echo "Optional USB-style profile: set \`QUERYA_PORTABLE=1\` or create a \`QueryaData/\` folder next to the binary (see docs/packaging.md)."
             echo ""
@@ -456,6 +498,7 @@ jobs:
           fail_on_unmatched_files: false
           files: |
             dist/Querya-Desktop-*.zip
+            dist/*.dmg
             dist/querya-ext-tester-*
             dist/*.deb
             dist/*.rpm

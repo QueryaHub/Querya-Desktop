@@ -4,6 +4,12 @@ CI now builds a **macOS zip** with an **unsigned** `.app` by default. When Apple
 
 > This is a one-time setup. After the secrets are in place, every future tag release (`0.4.10`, `0.4.11`, …) will produce a signed macOS build automatically.
 
+The release also attaches `Querya-Desktop-<version>-macos.dmg`, a disk image with
+the app and an `Applications` link (drag to install). With the same secrets the
+image is signed, notarized and stapled too. Installing from `/Applications`
+avoids Gatekeeper App Translocation, which happens when the app is launched
+straight from `~/Downloads`.
+
 ---
 
 ## What the user sees
