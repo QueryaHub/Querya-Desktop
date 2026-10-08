@@ -48,7 +48,8 @@ void main() {
     final delegate = _TxDelegate();
     await ws.pump(tester, delegate);
     await E2eSqlWorkspace.settle(tester);
-    expect(find.text('Transaction: none'), findsOneWidget);
+    // Unknown until the first command refreshes the state.
+    expect(find.text('Transaction: —'), findsOneWidget);
 
     await tapAndSettle(tester, 'Begin');
     expect(find.text('Transaction: open'), findsOneWidget);
@@ -89,6 +90,13 @@ void main() {
 
     await E2eSqlWorkspace.ctrl(tester, LogicalKeyboardKey.enter);
     await E2eSqlWorkspace.settle(tester);
+    // The button stays disabled until the warning is acknowledged.
+    await tester.tap(find.text('Execute Destructive Statement'),
+        warnIfMissed: false);
+    await E2eSqlWorkspace.settle(tester);
+    expect(delegate.executed, isEmpty);
+    await tester.tap(find.byType(material.Checkbox));
+    await tester.pump();
     await tester.tap(find.text('Execute Destructive Statement'));
     await E2eSqlWorkspace.settle(tester);
     expect(delegate.executed, ['DELETE FROM users']);
