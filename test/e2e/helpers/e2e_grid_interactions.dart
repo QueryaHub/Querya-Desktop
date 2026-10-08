@@ -24,9 +24,9 @@ class E2eGrid {
     await tester.pump(const Duration(milliseconds: 50));
   }
 
-  static Future<void> find_(WidgetTester tester) =>
+  static Future<void> openFind(WidgetTester tester) =>
       shortcut(tester, LogicalKeyboardKey.keyF, ctrl: true);
-  static Future<void> groupings(WidgetTester tester) =>
+  static Future<void> toggleGroupings(WidgetTester tester) =>
       shortcut(tester, LogicalKeyboardKey.keyG, ctrl: true);
   static Future<void> enter(WidgetTester tester) =>
       shortcut(tester, LogicalKeyboardKey.enter);
