@@ -78,6 +78,8 @@ class McpSocketHost {
 
   void _accept(Socket socket) {
     _sockets.add(socket);
+    // A client that disappears mid-write must not surface as an uncaught error.
+    unawaited(socket.done.then((_) {}, onError: (Object _) {}));
     final incoming = StreamController<String>();
     final outgoing = StreamController<String>();
     var authed = false;

@@ -44,32 +44,46 @@ Future<int> runMcpShim({
     return 1;
   }
 
-  socket.setOption(SocketOption.tcpNoDelay, true);
-  socket.write('${endpoint.token}\n');
-
+  final conn = socket;
   final done = Completer<int>();
+  void finish(int code, [Object? error]) {
+    if (done.isCompleted) return;
+    if (error != null) {
+      errors.writeln('querya-mcp: connection to Querya Desktop lost: $error');
+    }
+    done.complete(code);
+  }
+
+  // The app may drop the connection at any time (server stopped, app quit):
+  // a reset must end the shim cleanly, not crash it with an uncaught error.
+  unawaited(conn.done.then((_) {}, onError: (Object e) => finish(1, e)));
+  conn.setOption(SocketOption.tcpNoDelay, true);
+  conn.write('${endpoint.token}\n');
+
   final toApp = input.listen(
-    socket.add,
+    (bytes) {
+      if (!done.isCompleted) conn.add(bytes);
+    },
     onDone: () async {
-      await socket!.flush();
-      await socket.close();
+      try {
+        await conn.flush();
+        await conn.close();
+      } catch (_) {
+        // Reported through conn.done.
+      }
     },
     cancelOnError: true,
   );
-  socket.listen(
+  conn.listen(
     output.add,
-    onDone: () {
-      if (!done.isCompleted) done.complete(0);
-    },
-    onError: (Object e) {
-      errors.writeln('querya-mcp: connection to Querya Desktop lost: $e');
-      if (!done.isCompleted) done.complete(1);
-    },
+    onDone: () => finish(0),
+    onError: (Object e) => finish(1, e),
+    cancelOnError: true,
   );
   final code = await done.future;
   await toApp.cancel();
   await output.flush();
-  socket.destroy();
+  conn.destroy();
   return code;
 }
 
