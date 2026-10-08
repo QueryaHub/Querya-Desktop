@@ -50,15 +50,16 @@ void main() {
     expect(find.text('david'), findsOneWidget);
   });
 
-  testWidgets('a comparison on a missing column matches nothing harmful',
+  testWidgets('a plain word filters by any cell',
       timeout: _timeout, (tester) async {
     await pumpGenericTableView(tester, _accounts());
     await tester.tap(find.byTooltip('Toggle Quick Filter'));
     await tester.pumpAndSettle();
 
     await _filter(tester, 'bob');
-    expect(find.text('bob'), findsOneWidget);
     expect(find.text('alice'), findsNothing);
+    expect(find.text('charlie'), findsNothing);
+    expect(find.text('1 / 4'), findsOneWidget);
   });
 
   testWidgets('selecting a numeric cell shows its Quick Calc statistics',
