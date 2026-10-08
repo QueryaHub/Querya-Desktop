@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/features/workspace/generic_sql_workspace.dart';
+import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
 
 import '../../support/fake_sql_execution_delegate.dart';
 import '../helpers/e2e_app_harness.dart';
