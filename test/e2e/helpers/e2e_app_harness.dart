@@ -30,6 +30,9 @@ class E2eAppHarness {
   final String prefix;
   Directory? _dir;
 
+  /// Isolated data directory of this run (valid after [setUpAll]).
+  Directory get dataDir => _dir!;
+
   /// Creates the isolated data directory and opens the database.
   Future<void> setUpAll() async {
     _dir = await initTestLocalDb(prefix);
