@@ -5,6 +5,13 @@ import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart'
 import '../../support/fake_table_data_delegate.dart';
 import '../../support/generic_table_view_harness.dart';
 
+/// Pumps a few frames. `pumpAndSettle` never returns while a save is running:
+/// the progress spinner animates forever.
+Future<void> pumpFrames(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 500));
+}
+
 void main() {
   group('edit mode', () {
     testWidgets('a table with a primary key can be edited after toggling',
@@ -95,7 +102,8 @@ void main() {
   group('applying changes', () {
     const quoting = {
       SqlDialect.postgres: ('"public"."users"', '"name"'),
-      SqlDialect.sqlite: ('"public"."users"', '"name"'),
+      // SQLite has no schemas: the schema name is dropped.
+      SqlDialect.sqlite: ('"users"', '"name"'),
       SqlDialect.mysql: ('`public`.`users`', '`name`'),
     };
 
@@ -112,15 +120,16 @@ void main() {
           dialect: dialect,
         );
         state.toggleEditMode();
-        await tester.pumpAndSettle();
+        await pumpFrames(tester);
         state.stagingBuffer!.setCell(0, 1, 'Alicia');
 
         final applying = state.applyStagedChanges();
-        await tester.pumpAndSettle();
+        await pumpFrames(tester);
         expect(find.text('Confirm Data Changes'), findsOneWidget);
         await tester.tap(find.text('Apply Changes'));
-        await tester.pumpAndSettle();
+        await pumpFrames(tester);
         await applying;
+        await tester.pump(const Duration(seconds: 6)); // toast timer
 
         expect(delegate.appliedPlans, hasLength(1));
         final plan = delegate.appliedPlans.single;
@@ -139,14 +148,15 @@ void main() {
       final delegate = FakeTableDataDelegate();
       final state = await pumpGenericTableView(tester, delegate);
       state.toggleEditMode();
-      await tester.pumpAndSettle();
+      await pumpFrames(tester);
       state.stagingBuffer!.setCell(0, 1, 'Alicia');
 
       final applying = state.applyStagedChanges();
-      await tester.pumpAndSettle();
+      await pumpFrames(tester);
       await tester.tap(find.text('Cancel'));
-      await tester.pumpAndSettle();
+      await pumpFrames(tester);
       await applying;
+      await tester.pump(const Duration(seconds: 6)); // toast timer
 
       expect(delegate.appliedPlans, isEmpty);
       expect(state.isDirty, isTrue);
@@ -158,21 +168,22 @@ void main() {
       final delegate = _FailingDelegate();
       final state = await pumpGenericTableView(tester, delegate);
       state.toggleEditMode();
-      await tester.pumpAndSettle();
+      await pumpFrames(tester);
       state.stagingBuffer!.setCell(0, 1, 'Alicia');
 
       final applying = state.applyStagedChanges();
-      await tester.pumpAndSettle();
+      await pumpFrames(tester);
       await tester.tap(find.text('Apply Changes'));
-      await tester.pumpAndSettle();
+      await pumpFrames(tester);
 
       expect(
         find.text('No changes were applied. Your edits are still pending.'),
         findsOneWidget,
       );
       await tester.tap(find.text('OK'));
-      await tester.pumpAndSettle();
+      await pumpFrames(tester);
       await applying;
+      await tester.pump(const Duration(seconds: 6)); // toast timer
 
       expect(state.isDirty, isTrue);
       expect(state.isSaving, isFalse);

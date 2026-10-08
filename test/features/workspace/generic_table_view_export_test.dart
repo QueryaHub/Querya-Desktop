@@ -30,13 +30,18 @@ void main() {
 
   Future<void> copyAs(WidgetTester tester, String menuLabel) async {
     await tester.tap(find.text('Export ▾'));
-    await tester.pumpAndSettle();
-    // Formatting runs on a background isolate, which needs real async.
-    await tester.runAsync(() async {
-      await tester.tap(find.text(menuLabel));
-      await Future<void>.delayed(const Duration(milliseconds: 500));
-    });
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.text(menuLabel));
+    // The menu closes over a few frames, then formatting runs on a background
+    // isolate: alternate real time and pumps so each continuation can run.
+    for (var i = 0; i < 8; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 200)),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    await tester.pump(const Duration(seconds: 6)); // toast timer
   }
 
   Future<void> filterBy(WidgetTester tester, String text) async {

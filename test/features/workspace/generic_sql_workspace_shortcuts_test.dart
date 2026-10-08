@@ -15,29 +15,34 @@ import '../../support/fake_sql_execution_delegate.dart';
 import '../../support/local_db_test_support.dart';
 import '../../support/querya_theme_test_shell.dart';
 
-const _connectionId = 7002;
 
 /// A hung test must fail in a minute instead of blocking CI for ten.
 const _timeout = Timeout(Duration(seconds: 60));
 
-const _connection = ConnectionRow(
-  id: _connectionId,
-  type: 'sqlite',
-  name: 'Synthetic',
-  host: '/tmp/synthetic.db',
-  createdAt: '2026-01-01T00:00:00Z',
-);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Directory tempDir;
+  late ConnectionRow connection;
 
-  setUpAll(() async => tempDir = await initTestLocalDb('generic_ws_keys_'));
+  setUpAll(() async {
+    tempDir = await initTestLocalDb('generic_ws_keys_');
+    // History is written with a foreign key to `connections`, so the workspace
+    // needs a connection that really exists.
+    const row = ConnectionRow(
+      type: 'sqlite',
+      name: 'Synthetic',
+      host: '/tmp/synthetic.db',
+      createdAt: '2026-01-01T00:00:00Z',
+    );
+    final id = await LocalDb.instance.addConnection(row);
+    connection = row.copyWith(id: id);
+  });
   tearDownAll(() => disposeTestLocalDb(tempDir));
 
   tearDown(() {
-    SqlEditorCommandBridge.instance.unregister(connectionId: _connectionId);
+    SqlEditorCommandBridge.instance.unregister(connectionId: connection.id);
   });
 
   Future<GenericSqlWorkspaceState> pumpWorkspace(
@@ -51,7 +56,7 @@ void main() {
       queryaThemeTestShell(
         child: material.SizedBox.expand(
           child: GenericSqlWorkspace(
-            connectionRow: _connection,
+            connectionRow: connection,
             delegate: delegate,
             dialect: SqlDialect.sqlite,
             initialSql: initialSql,
