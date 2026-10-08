@@ -125,7 +125,7 @@ void main() {
         });
 
     testWidgets('renders cards, opens table and exports', (t) async {
-      await t.binding.setSurfaceSize(const Size(1200, 800));
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
       String? opened;
       final saved = <String, Uint8List>{};
       await t.pumpWidget(queryaThemeTestShell(

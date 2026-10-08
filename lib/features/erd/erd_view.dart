@@ -12,6 +12,7 @@ import 'package:querya_desktop/features/erd/erd_export.dart';
 import 'package:querya_desktop/features/erd/erd_layout.dart';
 import 'package:querya_desktop/features/erd/erd_model.dart';
 import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
+import 'package:querya_desktop/shared/widgets/querya_spinner.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// Saves an exported diagram file; replaceable in tests.
@@ -105,7 +106,7 @@ class _ErdViewState extends material.State<ErdView> {
     final layout = _layout;
     material.Widget body;
     if (_loading) {
-      body = const material.Center(child: material.CircularProgressIndicator());
+      body = const material.Center(child: QueryaSpinner());
     } else if (_error != null) {
       body = material.Center(child: Text(_error!));
     } else if (schema == null || layout == null || schema.isEmpty) {
