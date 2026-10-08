@@ -88,3 +88,28 @@ flatpak override --user com.queryahub.querya_desktop --filesystem=/var/run/postg
 ```
 
 Flathub submission can reuse [`packaging/linux/flatpak/com.queryahub.querya_desktop.yml`](../packaging/linux/flatpak/com.queryahub.querya_desktop.yml).
+
+## APT and DNF repository (`repo.querya.app`)
+
+The Release workflow job `publish-linux-repo` runs
+[`scripts/linux/publish_package_repo.sh`](../scripts/linux/publish_package_repo.sh)
+after the GitHub Release is created. It adds the new `.deb` / `.rpm` to the
+`gh-pages` branch of `QueryaHub/repo`, regenerates the APT indexes
+(`apt-ftparchive`, signed `InRelease` / `Release.gpg`) and the DNF metadata
+(`createrepo_c`, signed packages and `repomd.xml.asc`). Older versions stay in
+the pool, so users can pin them.
+
+The job is skipped while its secrets are not set, like the AUR job.
+
+One-time setup:
+
+1. Create a signing key without a passphrase: `gpg --quick-generate-key "Querya Packages <packages@querya.app>" rsa4096 sign never`.
+2. Add repository secrets in `QueryaHub/Querya-Desktop`:
+   `PACKAGE_REPO_GPG_PRIVATE_KEY` (`gpg --armor --export-secret-keys <fpr>`) and
+   `PACKAGE_REPO_TOKEN` (a token with write access to `QueryaHub/repo`).
+3. In `QueryaHub/repo`, serve the `gh-pages` branch with GitHub Pages and set the
+   custom domain `repo.querya.app` (DNS `CNAME` to `queryahub.github.io`).
+4. Run a release (or re-run `publish-linux-repo`) and check
+   `https://repo.querya.app/gpg.key` and `https://repo.querya.app/apt/dists/stable/InRelease`.
+
+Rotating the key means re-running the job and asking users to refresh `gpg.key`.

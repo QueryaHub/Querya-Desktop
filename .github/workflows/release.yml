@@ -546,3 +546,58 @@ jobs:
           TAG="${{ needs.publish.outputs.release_tag }}"
           chmod +x ./scripts/linux/aur_publish.sh
           ./scripts/linux/aur_publish.sh "$VER" "$TAG"
+
+  publish-linux-repo:
+    name: Publish APT + DNF repository
+    needs: [publish]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check repository secrets
+        id: repo
+        env:
+          GPG_KEY: ${{ secrets.PACKAGE_REPO_GPG_PRIVATE_KEY }}
+          TOKEN: ${{ secrets.PACKAGE_REPO_TOKEN }}
+        run: |
+          if [ -n "${GPG_KEY}" ] && [ -n "${TOKEN}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "PACKAGE_REPO_GPG_PRIVATE_KEY / PACKAGE_REPO_TOKEN not set; skipping."
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.repo.outputs.enabled == 'true'
+
+      - uses: actions/download-artifact@v4
+        if: steps.repo.outputs.enabled == 'true'
+        with:
+          name: bundle-linux
+          path: artifacts/linux
+
+      - name: Install repository tooling
+        if: steps.repo.outputs.enabled == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apt-utils createrepo-c rpm
+
+      - name: Import signing key
+        if: steps.repo.outputs.enabled == 'true'
+        id: gpg
+        env:
+          GPG_KEY: ${{ secrets.PACKAGE_REPO_GPG_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          echo "$GPG_KEY" | gpg --batch --import
+          fpr="$(gpg --batch --list-secret-keys --with-colons | awk -F: '/^fpr:/ {print $10; exit}')"
+          echo "fpr=$fpr" >> "$GITHUB_OUTPUT"
+
+      - name: Publish
+        if: steps.repo.outputs.enabled == 'true'
+        env:
+          PACKAGE_REPO_URL: https://x-access-token:${{ secrets.PACKAGE_REPO_TOKEN }}@github.com/QueryaHub/repo.git
+          GPG_KEY_ID: ${{ steps.gpg.outputs.fpr }}
+        run: |
+          set -euo pipefail
+          deb="$(find artifacts/linux -name '*.deb' | head -n1)"
+          rpm="$(find artifacts/linux -name '*.rpm' | head -n1)"
+          ./scripts/linux/publish_package_repo.sh "$deb" "$rpm"

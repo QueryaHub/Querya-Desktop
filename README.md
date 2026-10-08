@@ -122,7 +122,22 @@ Whether you are navigating multi-million row datasets, authoring complex analyti
 ## Installation
 
 ### Linux
-Download the latest `.deb`, `.AppImage`, or `.tar.gz` from [Releases](https://github.com/QueryaHub/Querya-Desktop/releases):
+**Debian / Ubuntu (APT repository, updates with `apt upgrade`):**
+
+```bash
+curl -fsSL https://repo.querya.app/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/querya.gpg
+echo "deb [signed-by=/etc/apt/keyrings/querya.gpg] https://repo.querya.app/apt stable main" | sudo tee /etc/apt/sources.list.d/querya.list
+sudo apt update && sudo apt install querya-desktop
+```
+
+**Fedora / RHEL (DNF repository):**
+
+```bash
+sudo dnf config-manager --add-repo https://repo.querya.app/rpm/querya.repo
+sudo dnf install querya-desktop
+```
+
+Or download the latest `.deb`, `.AppImage`, or `.tar.gz` from [Releases](https://github.com/QueryaHub/Querya-Desktop/releases):
 
 ```bash
 # Debian / Ubuntu (.deb)
