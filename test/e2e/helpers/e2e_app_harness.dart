@@ -79,6 +79,13 @@ class E2eAppHarness {
   /// without "Timer is still pending" failures. Call at the end of a scenario.
   Future<void> close(WidgetTester tester) async {
     await tester.pumpWidget(const material.SizedBox.shrink());
+    // Let the database requests still in flight finish in real time first.
+    // Advancing the fake clock in 10 s steps while one is pending fires
+    // sqflite's "database has been locked" warning, which is noise here: the
+    // app holds no lock.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 500)),
+    );
     for (var i = 0; i < 6; i++) {
       await tester.pump(const Duration(seconds: 10));
     }
