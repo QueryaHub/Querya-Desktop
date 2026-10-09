@@ -1211,6 +1211,12 @@ class _RelationPainter extends material.CustomPainter {
     }
   }
 
+  /// Edges take no pointer: a CustomPaint is hit everywhere by default, which
+  /// hid the pointer from the hover layer below and so the edge label never
+  /// showed.
+  @override
+  bool? hitTest(material.Offset position) => false;
+
   @override
   bool shouldRepaint(_RelationPainter old) =>
       old.routes != routes ||
