@@ -49,18 +49,18 @@ void main() {
     await ws.pump(tester, delegate);
     await E2eSqlWorkspace.settle(tester);
     // Unknown until the first command refreshes the state.
-    expect(find.text('Transaction: —'), findsOneWidget);
+    expect(find.text('Transaction —'), findsOneWidget);
 
     await tapAndSettle(tester, 'Begin');
-    expect(find.text('Transaction: open'), findsOneWidget);
+    expect(find.text('Transaction open'), findsOneWidget);
     expect(find.text('OK: BEGIN'), findsWidgets);
 
     await tapAndSettle(tester, 'Rollback');
-    expect(find.text('Transaction: none'), findsOneWidget);
+    expect(find.text('Auto-commit'), findsOneWidget);
 
     await tapAndSettle(tester, 'Begin');
     await tapAndSettle(tester, 'Commit');
-    expect(find.text('Transaction: none'), findsOneWidget);
+    expect(find.text('Auto-commit'), findsOneWidget);
 
     expect(delegate.commands, ['BEGIN', 'ROLLBACK', 'BEGIN', 'COMMIT']);
   });
