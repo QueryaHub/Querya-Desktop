@@ -146,6 +146,27 @@ class MysqlConnection {
 
   MySQLConnection? _conn;
   Future<void>? _connecting;
+
+  /// Statements on this session run one at a time, here. The client would
+  /// otherwise poll for the previous statement and give up after 10 s, which
+  /// closed the session for every caller.
+  Future<void> _statementQueue = Future<void>.value();
+
+  /// Test seam: replaces the driver call of [execute].
+  @visibleForTesting
+  Future<IResultSet> Function(
+    String sql,
+    Map<String, dynamic>? params,
+    bool iterable,
+    Duration? timeout,
+  )? runStatementForTest;
+
+  Future<T> _serialized<T>(Future<T> Function() run) {
+    final previous = _statementQueue;
+    final turn = Completer<void>();
+    _statementQueue = turn.future;
+    return previous.then((_) => run()).whenComplete(() => turn.complete());
+  }
   bool _isConnected = false;
   bool _inTransaction = false;
 
@@ -441,18 +462,36 @@ class MysqlConnection {
     String sql, [
     Map<String, dynamic>? params,
     bool iterable = false,
-  ]) async {
-    if (!isConnected || _conn == null) {
-      throw StateError('Not connected to MySQL');
-    }
-    try {
-      final rs = await _conn!.execute(sql, params, iterable);
-      _noteTransactionSql(sql);
-      return rs;
-    } on TimeoutException {
-      unawaited(forceClose());
-      rethrow;
-    }
+  ]) =>
+      _run(sql, params, iterable, null);
+
+  Future<IResultSet> _run(
+    String sql,
+    Map<String, dynamic>? params,
+    bool iterable,
+    Duration? timeout,
+  ) {
+    return _serialized(() async {
+      final seam = runStatementForTest;
+      final c = _conn;
+      if (seam == null && (!isConnected || c == null)) {
+        throw StateError('Not connected to MySQL');
+      }
+      try {
+        final pending = seam != null
+            ? seam(sql, params, iterable, timeout)
+            : c!.execute(sql, params, iterable);
+        final rs = timeout == null ? await pending : await pending.timeout(timeout);
+        _noteTransactionSql(sql);
+        return rs;
+      } on TimeoutException {
+        // The client cannot cancel a running statement, so the session is out of
+        // step after a timeout and is closed. Statements queued behind this one
+        // wait in the queue and are not affected.
+        unawaited(forceClose());
+        rethrow;
+      }
+    });
   }
 
   /// Whether this session has an open `START TRANSACTION` / `BEGIN`.
@@ -498,22 +537,15 @@ class MysqlConnection {
     }
   }
 
-  /// Runs [execute] with an application-level [timeout] (driver limits still apply).
+  /// [execute] with [timeout] as the statement's own limit; it starts when the
+  /// statement starts, not while the statement waits behind another one.
   Future<IResultSet> executeWithTimeout(
     String sql, {
     Duration? timeout,
     Map<String, dynamic>? params,
     bool iterable = false,
-  }) async {
-    final f = execute(sql, params, iterable);
-    if (timeout == null) return f;
-    try {
-      return await f.timeout(timeout);
-    } on TimeoutException {
-      unawaited(forceClose());
-      rethrow;
-    }
-  }
+  }) =>
+      _run(sql, params, iterable, timeout);
 
   /// Lists user-visible databases (excludes typical system schemas).
   Future<List<String>> listDatabases() async {
