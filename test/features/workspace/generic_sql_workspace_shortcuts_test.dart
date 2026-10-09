@@ -350,7 +350,7 @@ void main() {
     final session = find.byKey(const material.ValueKey('session_menu'));
     expect(run, findsOneWidget);
     expect(session, findsOneWidget);
-    expect(tester.getTopLeft(session).dy, closeTo(tester.getTopLeft(run).dy, 1));
+    expect(tester.getCenter(session).dy, closeTo(tester.getCenter(run).dy, 1));
   });
 
   testWidgets('no Query caption and no Data Output bar above the results',
