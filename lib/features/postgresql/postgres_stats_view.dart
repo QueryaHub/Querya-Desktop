@@ -60,18 +60,13 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
   @override
   void dispose() {
     _timer?.cancel();
-    _disconnectCurrent(interruptIfBusy: _loading);
+    _disconnectCurrent();
     super.dispose();
   }
 
-  void _disconnectCurrent({bool interruptIfBusy = false}) {
-    if (interruptIfBusy && _loading) {
-      PostgresService.instance.interrupt(
-        widget.connectionRow,
-        database: widget.connectionRow.databaseName ?? 'postgres',
-        mode: PgSessionMode.readOnly,
-      );
-    }
+  /// Releases the lease. The session is shared with the object tree, other
+  /// views and MCP, so closing this view never interrupts it.
+  void _disconnectCurrent() {
     _lease?.release();
     _lease = null;
   }
