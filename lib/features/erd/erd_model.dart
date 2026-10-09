@@ -54,10 +54,17 @@ class ErdRelation {
 
 @immutable
 class ErdSchema {
-  const ErdSchema({required this.tables, required this.relations});
+  const ErdSchema({
+    required this.tables,
+    required this.relations,
+    this.truncated = false,
+  });
 
   final List<ErdTable> tables;
   final List<ErdRelation> relations;
+
+  /// The catalog was cut at its row limit: some tables or columns are missing.
+  final bool truncated;
 
   bool get isEmpty => tables.isEmpty;
 
@@ -69,6 +76,7 @@ class ErdSchema {
   factory ErdSchema.fromCatalog({
     required List<List<String>> columnRows,
     required List<List<String>> fkRows,
+    bool truncated = false,
   }) {
     final order = <String>[];
     final cols = <String, List<ErdColumn>>{};
@@ -118,6 +126,7 @@ class ErdSchema {
           ),
       ],
       relations: relations,
+      truncated: truncated,
     );
   }
 

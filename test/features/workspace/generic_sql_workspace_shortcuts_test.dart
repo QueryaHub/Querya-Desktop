@@ -419,4 +419,40 @@ void main() {
     expect(delegate.executed.where((q) => q.startsWith('SELECT * FROM')),
         isEmpty);
   });
+
+  testWidgets('the Diagram reads the catalog through its own delegate, not the editor',
+      timeout: _timeout, (tester) async {
+    final editor = FakeSqlExecutionDelegate();
+    final catalog = FakeSqlExecutionDelegate(onExecute: (sql) {
+      if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+        return const SqlExecutionResult(rows: [
+          ['users', 'id', 'INTEGER', '1'],
+        ]);
+      }
+      return const SqlExecutionResult();
+    });
+    await tester.binding.setSurfaceSize(const material.Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.SizedBox.expand(
+          child: GenericSqlWorkspace(
+            connectionRow: connection,
+            delegate: editor,
+            dialect: SqlDialect.sqlite,
+            catalogDelegateFactory: () => catalog,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const material.ValueKey('open_diagram_tab')));
+    await settle(tester);
+
+    expect(find.byKey(const material.ValueKey('erd_table_users')), findsOneWidget);
+    expect(catalog.executed, contains(ErdCatalog.columnsSql(SqlDialect.sqlite)));
+    expect(editor.executed, isEmpty,
+        reason: 'the editor session must not carry the catalog reads');
+  });
 }

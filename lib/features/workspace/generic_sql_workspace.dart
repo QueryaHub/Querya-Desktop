@@ -66,6 +66,7 @@ class GenericSqlWorkspace extends material.StatefulWidget {
     super.key,
     required this.connectionRow,
     required this.delegate,
+    this.catalogDelegateFactory,
     required this.dialect,
     this.sessionPrefix = 'query',
     this.initialSql,
@@ -87,6 +88,11 @@ class GenericSqlWorkspace extends material.StatefulWidget {
 
   final ConnectionRow connectionRow;
   final SqlExecutionDelegate delegate;
+
+  /// Makes the session the schema diagram reads the catalog through. Without
+  /// one, the diagram uses [delegate] (no workspace does that today). The
+  /// editor's own session keeps its transaction and its running query.
+  final SqlExecutionDelegate Function()? catalogDelegateFactory;
   final SqlDialect dialect;
   final String sessionPrefix;
   final String? initialSql;
@@ -182,8 +188,17 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
     }
   }
 
+  SqlExecutionDelegate? _catalogDelegate;
+
+  SqlExecutionDelegate get _diagramDelegate {
+    final factory = widget.catalogDelegateFactory;
+    if (factory == null) return widget.delegate;
+    return _catalogDelegate ??= factory();
+  }
+
   @override
   void dispose() {
+    _catalogDelegate?.dispose();
     SqlEditorCommandBridge.instance
         .unregister(connectionId: widget.connectionRow.id);
     SqlWorkspaceSettingsRevision.listenable
@@ -1209,7 +1224,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
     if (session.isDiagram) {
       return ErdView(
         key: material.ValueKey(session.id),
-        source: SqlErdSource(delegate: widget.delegate, dialect: widget.dialect),
+        source: SqlErdSource(delegate: _diagramDelegate, dialect: widget.dialect),
         databaseName: effectiveDatabase,
         onOpenTable: _openTableFromDiagram,
         onOpenInSql: _openTableInSql,

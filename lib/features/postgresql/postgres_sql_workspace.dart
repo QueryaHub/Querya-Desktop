@@ -354,6 +354,14 @@ class _PostgresSqlWorkspaceState extends material.State<PostgresSqlWorkspace> {
       key: _workspaceKey,
       connectionRow: widget.connectionRow,
       delegate: _delegate,
+      catalogDelegateFactory: () => PostgresSqlExecutionDelegate(
+        connectionRow: widget.connectionRow,
+        isReadOnly: true,
+        effectiveDatabaseProvider: _effectiveSessionDatabase,
+        // The catalog runs without the editor's implicit BEGIN, so opening the
+        // diagram never opens a transaction in the editor.
+        autocommitProvider: () => true,
+      ),
       dialect: SqlDialect.postgres,
       sessionPrefix: 'pg',
       transactionOpenNotifier: widget.transactionOpenNotifier,

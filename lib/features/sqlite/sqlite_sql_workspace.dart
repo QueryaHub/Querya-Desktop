@@ -277,6 +277,10 @@ class _SqliteSqlWorkspaceState extends material.State<SqliteSqlWorkspace> {
       key: _workspaceKey,
       connectionRow: widget.connectionRow,
       delegate: _delegate,
+      catalogDelegateFactory: () => SqliteSqlExecutionDelegate(
+        connectionRow: widget.connectionRow,
+        isReadOnly: true,
+      ),
       dialect: SqlDialect.sqlite,
       sessionPrefix: 'sqlite',
       transactionOpenNotifier: widget.transactionOpenNotifier,
