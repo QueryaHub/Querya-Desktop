@@ -55,6 +55,30 @@ jobs:
           # up uid map: Permission denied"). This relaxes it on the CI VM only.
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
+      # The live MySQL test in core-data reads 127.0.0.1:3306 with the querya
+      # user from the environment defaults; without a server it skips. The
+      # client has no TLS here, so the server uses mysql_native_password: MySQL
+      # 8's default caching_sha2_password needs a secure connection.
+      - name: Start MySQL for the live database test
+        if: matrix.section == 'core-data' && runner.environment == 'github-hosted'
+        timeout-minutes: 5
+        run: |
+          docker run -d --name mysql-live -p 3306:3306 \
+            -e MYSQL_ROOT_PASSWORD=root \
+            -e MYSQL_DATABASE=querya \
+            -e MYSQL_USER=querya \
+            -e MYSQL_PASSWORD=querya \
+            mysql:8.0 --default-authentication-plugin=mysql_native_password
+          for _ in $(seq 1 60); do
+            if docker exec mysql-live mysqladmin -uquerya -pquerya --silent ping 2>/dev/null; then
+              echo "MySQL is up"
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs mysql-live
+          exit 1
+
       - name: Get dependencies
         run: flutter pub get
 
