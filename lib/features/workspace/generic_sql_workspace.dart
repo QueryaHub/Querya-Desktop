@@ -506,8 +506,15 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
 
   final Map<String, SqlResultGridSchema> _gridSchemaCache = {};
 
-  static String _schemaCacheKey(String sql, List<String> cols) =>
-      '${cols.join('\u0001')}\u0000$sql';
+  /// Table schemas are cached per (database, schema, table), so any query on a
+  /// table reuses the lookup, not only the same text. A query with no single
+  /// target table is not cached.
+  String? _schemaCacheKey(String sql) {
+    final target = SqlTableTargetExtractor.extract(sql);
+    if (target == null) return null;
+    return '$effectiveDatabase\u0001${target.schema ?? ''}\u0001'
+        '${target.tableName}';
+  }
 
   static final _readQueryRegex = RegExp(
     r'^\s*(select|with|values|show|explain|pragma|describe)\b',
@@ -725,8 +732,8 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
 
       // Rows show now. The table schema (keys, types, edit hint) follows: from
       // the cache, or from the delegate in the background.
-      final cacheKey = _schemaCacheKey(shownSql, cols);
-      final cached = _gridSchemaCache[cacheKey];
+      final cacheKey = _schemaCacheKey(shownSql);
+      final cached = cacheKey == null ? null : _gridSchemaCache[cacheKey];
       invalidatePane(session);
       setState(() {
         session.columns = cols;
@@ -753,7 +760,11 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
           widget.delegate.resolveTableSchema(shownSql, cols).then(
             (gridSchema) {
               if (!mounted) return;
-              _gridSchemaCache[cacheKey] = gridSchema;
+              // A result with no columns gets no schema from the delegate, so
+              // it is not worth keeping for the table.
+              if (cacheKey != null && cols.isNotEmpty) {
+                _gridSchemaCache[cacheKey] = gridSchema;
+              }
               _applyGridSchema(session, shownSql, cols, outRows, gridSchema,
                   result, scriptStatus);
             },
