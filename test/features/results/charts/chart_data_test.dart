@@ -205,6 +205,30 @@ void main() {
     });
   });
 
+  group('ChartData.downsample', () {
+    test('short series come back unchanged', () {
+      final pts = [for (var i = 0; i < 5; i++) ChartPoint('$i', i.toDouble())];
+      expect(ChartData.downsample(pts, 10), same(pts));
+    });
+
+    test('keeps the first and last points and the target count', () {
+      final pts = [for (var i = 0; i < 1000; i++) ChartPoint('$i', i * 0.5)];
+      final out = ChartData.downsample(pts, 50);
+      expect(out.length, 50);
+      expect(out.first.label, '0');
+      expect(out.last.label, '999');
+    });
+
+    test('a spike survives the reduction', () {
+      final pts = [
+        for (var i = 0; i < 200; i++)
+          ChartPoint('$i', i == 137 ? 100.0 : 0.0),
+      ];
+      final out = ChartData.downsample(pts, 20);
+      expect(out.any((p) => p.value == 100), isTrue);
+    });
+  });
+
   group('ChartData line cap', () {
     final many = [
       for (var i = 0; i < 80; i++) ['k$i', '${i + 1}'],

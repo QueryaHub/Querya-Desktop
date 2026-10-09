@@ -74,6 +74,17 @@ class _QuickChartViewState extends material.State<QuickChartView> {
   ChartAggregation _aggregation = ChartAggregation.none;
   int? _topN = ChartData.defaultTopN;
   int? _hoveredSlice;
+  ({
+    List<List<String>> rows,
+    ({
+      int? label,
+      int value,
+      QuickChartType type,
+      ChartAggregation aggregation,
+      int? topN,
+    }) key,
+    ChartSeries series,
+  })? _seriesMemo;
 
   @override
   void initState() {
@@ -143,14 +154,30 @@ class _QuickChartViewState extends material.State<QuickChartView> {
   /// categories; they report the rows beyond the cap instead.
   ChartSeries _series(int valueCol) {
     final isLine = _type == QuickChartType.line;
-    return ChartData.build(
+    final aggregation = isLine ? ChartAggregation.none : _aggregation;
+    final topN = isLine ? null : _topN;
+    final key = (
+      label: _labelCol,
+      value: valueCol,
+      type: _type,
+      aggregation: aggregation,
+      topN: topN,
+    );
+    // Rebuilds (hover, export) reuse the points while rows and settings stay.
+    final memo = _seriesMemo;
+    if (memo != null && identical(memo.rows, widget.rows) && memo.key == key) {
+      return memo.series;
+    }
+    final series = ChartData.build(
       rows: widget.rows,
       labelColumn: _labelCol,
       valueColumn: valueCol,
       type: _type,
-      aggregation: isLine ? ChartAggregation.none : _aggregation,
-      topN: isLine ? null : _topN,
+      aggregation: aggregation,
+      topN: topN,
     );
+    _seriesMemo = (rows: widget.rows, key: key, series: series);
+    return series;
   }
 
   int? _defaultLabel() {
