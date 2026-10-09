@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/rendering.dart';
@@ -49,6 +50,15 @@ Future<void> defaultErdFileSaver(String name, Uint8List bytes) async {
 /// Interactive entity-relationship diagram of the connected database.
 /// Entries of the diagram's Export menu.
 enum _ExportAction { mermaid, svg, png, copyMermaid, toggleTheme }
+
+/// A card's focus: related to the focused table, and faded while another
+/// table is picked and this one is not related to it.
+typedef _CardFocus = ({bool highlighted, bool faded});
+
+/// Card builds so far. A test seam: hovering one card must not rebuild the
+/// others.
+@visibleForTesting
+int erdCardBuilds = 0;
 
 class ErdView extends material.StatefulWidget {
   const ErdView({
@@ -109,6 +119,13 @@ class _ErdViewState extends material.State<ErdView> {
   String? _selected;
   bool _routeScheduled = false;
 
+  /// The focus the edges draw. Every card has its own notifier in
+  /// [_cardStates]; [_syncFocus] moves only the ones whose focus changed, so a
+  /// hover rebuilds the cards it touches and not the whole canvas.
+  final _focus = material.ValueNotifier<String?>(null);
+  final _cardStates = <String, material.ValueNotifier<_CardFocus>>{};
+  Map<String, Set<String>> _neighbours = const {};
+
   /// Density: only PK and FK columns, cards collapsed to their header, and
   /// tables hidden from the diagram. Layout and routing follow the visible
   /// schema from [_visibleOf].
@@ -141,6 +158,10 @@ class _ErdViewState extends material.State<ErdView> {
   void dispose() {
     _transform.dispose();
     _hovered.dispose();
+    _focus.dispose();
+    for (final card in _cardStates.values) {
+      card.dispose();
+    }
     _edgeTipNotifier.dispose();
     _searchController.dispose();
     _searchFocus.dispose();
@@ -152,6 +173,7 @@ class _ErdViewState extends material.State<ErdView> {
   void initState() {
     super.initState();
     _searchFocus.addListener(_onSearchFocus);
+    _hovered.addListener(_syncFocus);
     _load();
   }
 
@@ -187,6 +209,7 @@ class _ErdViewState extends material.State<ErdView> {
       if (!mounted) return;
       setState(() {
         _schema = schema;
+        _neighbours = _neighbourMap(schema);
         _setLayout(ErdLayout.compute(_visibleOf(schema)));
         _loading = false;
       });
@@ -281,6 +304,7 @@ class _ErdViewState extends material.State<ErdView> {
       // A pick on a hidden table would leave every card faded.
       if (_selected == table) _selected = null;
     });
+    _syncFocus();
     _reflow();
   }
 
@@ -289,7 +313,10 @@ class _ErdViewState extends material.State<ErdView> {
     _reflow();
   }
 
-  void _dragStart(String table) => setState(() => _dragging = table);
+  void _dragStart(String table) {
+    setState(() => _dragging = table);
+    _syncFocus();
+  }
 
   /// [screenDelta] is in screen pixels; the canvas may be zoomed.
   void _dragMove(String table, material.Offset screenDelta) {
@@ -320,6 +347,7 @@ class _ErdViewState extends material.State<ErdView> {
   void _dragEnd() {
     if (_dragging == null) return;
     setState(() => _dragging = null);
+    _syncFocus();
   }
 
   Future<void> _save(String name, Uint8List bytes) =>
@@ -390,6 +418,7 @@ class _ErdViewState extends material.State<ErdView> {
       _transform.value = Matrix4.identity()..translate(t.dx, t.dy)..scale(s);
     }
     setState(() => _selected = name);
+    _syncFocus();
   }
 
   /// A click on the empty canvas: clears the pick and takes the keyboard, so
@@ -398,12 +427,14 @@ class _ErdViewState extends material.State<ErdView> {
     _canvasFocus.requestFocus();
     if (_selected == null) return;
     setState(() => _selected = null);
+    _syncFocus();
   }
 
   /// A click on a card picks it.
   void _pick(String name) {
     _canvasFocus.requestFocus();
     setState(() => _selected = name);
+    _syncFocus();
   }
 
   void _openSearch() {
@@ -424,7 +455,10 @@ class _ErdViewState extends material.State<ErdView> {
       _canvasFocus.requestFocus();
       return;
     }
-    if (_selected != null) setState(() => _selected = null);
+    if (_selected != null) {
+      setState(() => _selected = null);
+      _syncFocus();
+    }
   }
 
   List<ErdTable> _matches(ErdSchema schema) {
@@ -478,6 +512,33 @@ class _ErdViewState extends material.State<ErdView> {
     return focus == table || (neighbours[focus]?.contains(table) ?? false);
   }
 
+  /// The table the diagram focuses: the dragged one, then the picked one, then
+  /// the one under the mouse.
+  String? _currentFocus() => _dragging ?? _selected ?? _hovered.value;
+
+  _CardFocus _cardFocusFor(String table, String? focus) {
+    final highlighted = _isFocusedIn(_neighbours, focus, table);
+    return (highlighted: highlighted, faded: _selected != null && !highlighted);
+  }
+
+  /// The notifier of card [table], made on first use with its current focus.
+  material.ValueNotifier<_CardFocus> _cardState(String table) =>
+      _cardStates.putIfAbsent(
+        table,
+        () => material.ValueNotifier(_cardFocusFor(table, _currentFocus())),
+      );
+
+  /// Pushes the focus to the edges and to each card. A notifier only fires
+  /// when its own highlight or fade changed, so the rest are not rebuilt.
+  /// Call after any change to [_selected], [_dragging] or [_hovered].
+  void _syncFocus() {
+    final focus = _currentFocus();
+    _focus.value = focus;
+    for (final entry in _cardStates.entries) {
+      entry.value.value = _cardFocusFor(entry.key, focus);
+    }
+  }
+
   /// PNG of the diagram. With the light palette it is drawn from the same SVG
   /// the SVG export saves, so the two match. With the current theme it is a
   /// screenshot of the canvas: a picked table, the hover highlight and the edge
@@ -500,7 +561,10 @@ class _ErdViewState extends material.State<ErdView> {
         _edgeTipNotifier.value != null;
     _hovered.value = null;
     _edgeTipNotifier.value = null;
-    if (picked != null) setState(() => _selected = null);
+    if (picked != null) {
+      setState(() => _selected = null);
+      _syncFocus();
+    }
     try {
       if (needsFrame) await material.WidgetsBinding.instance.endOfFrame;
       if (!mounted) return;
@@ -530,6 +594,7 @@ class _ErdViewState extends material.State<ErdView> {
     } finally {
       if (mounted && picked != null && _selected == null) {
         setState(() => _selected = picked);
+        _syncFocus();
       }
     }
   }
@@ -789,12 +854,7 @@ class _ErdViewState extends material.State<ErdView> {
                       // Empty canvas: a tap clears the selection.
                       behavior: material.HitTestBehavior.translucent,
                       onTap: _clearSelection,
-                      child: material.ValueListenableBuilder<String?>(
-                        valueListenable: _hovered,
-                        builder: (context, hovered, _) {
-                          final focus = _dragging ?? _selected ?? hovered;
-                          final neighbours = _neighbourMap(schema);
-                          return material.Stack(
+                      child: material.Stack(
                         children: [
                           // Lowest layer: sees the pointer wherever no card is,
                           // so edges can name themselves on hover.
@@ -807,12 +867,16 @@ class _ErdViewState extends material.State<ErdView> {
                             ),
                           ),
                           material.Positioned.fill(
-                            child: material.CustomPaint(
-                              painter: _RelationPainter(
-                                routes: _routes,
-                                color: wb.mutedForeground,
-                                highlight: wb.accent,
-                                focus: focus,
+                            child: material.ValueListenableBuilder<String?>(
+                              valueListenable: _focus,
+                              builder: (context, focus, _) =>
+                                  material.CustomPaint(
+                                painter: _RelationPainter(
+                                  routes: _routes,
+                                  color: wb.mutedForeground,
+                                  highlight: wb.accent,
+                                  focus: focus,
+                                ),
                               ),
                             ),
                           ),
@@ -820,13 +884,14 @@ class _ErdViewState extends material.State<ErdView> {
                             material.Positioned(
                               left: layout.positions[t.name]!.dx,
                               top: layout.positions[t.name]!.dy,
-                              child: material.Opacity(
-                                // Unrelated cards fade while a table is picked.
-                                opacity: _selected != null &&
-                                        !_isFocusedIn(neighbours, focus, t.name)
-                                    ? 0.35
-                                    : 1,
-                                child: ContextMenu(
+                              // Each card listens to its own focus, so a hover
+                              // rebuilds only the cards it changes.
+                              child: material.ValueListenableBuilder<_CardFocus>(
+                                valueListenable: _cardState(t.name),
+                                builder: (context, focus, _) => material.Opacity(
+                                  // Unrelated cards fade while a table is picked.
+                                  opacity: focus.faded ? 0.35 : 1,
+                                  child: ContextMenu(
                                   items: [
                                     if (widget.onOpenTable case final open?)
                                       MenuButton(
@@ -870,8 +935,7 @@ class _ErdViewState extends material.State<ErdView> {
                                   ],
                                   child: _TableCard(
                                   table: t,
-                                  highlighted:
-                                      _isFocusedIn(neighbours, focus, t.name),
+                                  highlighted: focus.highlighted,
                                   dragging: _dragging == t.name,
                                   onOpen: widget.onOpenTable == null
                                       ? null
@@ -887,11 +951,10 @@ class _ErdViewState extends material.State<ErdView> {
                                   onDragEnd: _dragEnd,
                                 ),
                                 ),
+                                ),
                               ),
                             ),
                         ],
-                          );
-                        },
                       ),
                     ),
                   ),
@@ -1088,6 +1151,7 @@ class _TableCard extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
+    erdCardBuilds++;
     final wb = context.workbench;
     final palette = context.semanticPalette;
     final radius = material.BorderRadius.circular(8);
