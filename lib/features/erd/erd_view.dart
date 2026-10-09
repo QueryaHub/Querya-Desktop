@@ -561,10 +561,12 @@ class _ErdViewState extends material.State<ErdView> {
     }
   }
 
-  /// Pointer over the canvas: names the relation within 6 px of it, if any.
+  /// Pointer over the canvas ([p] in canvas space): names the relation within
+  /// 6 screen px of it, if any, whatever the zoom.
   void _hoverCanvas(material.Offset p) {
     ErdRelation? hit;
-    var best = 6.0;
+    final scale = _scale;
+    var best = 6.0 / (scale <= 0 ? 1 : scale);
     for (final r in _routes) {
       final d = ErdGeometry.distanceToRoute(r.points, p);
       if (d <= best) {
@@ -826,31 +828,37 @@ class _ErdViewState extends material.State<ErdView> {
                                 ),
                               ),
                             ),
-                          material.Positioned.fill(
-                            child: material.IgnorePointer(
-                              child: material.ValueListenableBuilder<
-                                  (ErdRelation, material.Offset)?>(
-                                valueListenable: _edgeTipNotifier,
-                                builder: (context, tip, _) => tip == null
-                                    ? const material.SizedBox.shrink()
-                                    : material.Stack(
-                                        children: [
-                                          material.Positioned(
-                                            left: tip.$2.dx + 12,
-                                            top: tip.$2.dy + 12,
-                                            child: _edgeTipLabel(
-                                                context, tip.$1),
-                                          ),
-                                        ],
-                                      ),
-                              ),
-                            ),
-                          ),
                         ],
                           );
                         },
                       ),
                     ),
+                  ),
+                ),
+              ),
+              // The edge label sits above the zoomed canvas, in screen space,
+              // so it stays readable at any zoom and is never in a PNG.
+              material.Positioned.fill(
+                child: material.IgnorePointer(
+                  child: material.ListenableBuilder(
+                    listenable: material.Listenable.merge(
+                        [_edgeTipNotifier, _transform]),
+                    builder: (context, _) {
+                      final tip = _edgeTipNotifier.value;
+                      if (tip == null) return const material.SizedBox.shrink();
+                      final at = material.MatrixUtils.transformPoint(
+                          _transform.value, tip.$2);
+                      return material.Stack(
+                        children: [
+                          material.Positioned(
+                            key: const material.ValueKey('erd_edge_tip'),
+                            left: at.dx + 12,
+                            top: at.dy + 12,
+                            child: _edgeTipLabel(context, tip.$1),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),

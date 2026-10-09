@@ -1,6 +1,7 @@
 import 'dart:convert';
 
-import 'package:flutter/gestures.dart' show kSecondaryButton;
+import 'package:flutter/gestures.dart'
+    show PointerDeviceKind, kSecondaryButton;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -387,7 +388,18 @@ void main() {
       expect(m, contains('users {'));
       expect(m, contains('integer id PK'));
       expect(m, contains('integer user_id FK'));
-      expect(m, contains('users ||--o{ orders : "user_id"'));
+      // user_id is NOT NULL here: one or many.
+      expect(m, contains('users ||--|{ orders : "user_id"'));
+    });
+
+    test('mermaid marks a nullable foreign key as zero or many', () {
+      final s = ErdSchema.fromCatalog(columnRows: [
+        ['users', 'id', 'int', '1', '0'],
+        ['orders', 'user_id', 'int', '0', '1'],
+      ], fkRows: [
+        ['orders', 'user_id', 'users', 'id'],
+      ]);
+      expect(ErdExport.toMermaid(s), contains('users ||--o{ orders'));
     });
 
     test('mermaid sanitizes odd identifiers', () {
@@ -672,6 +684,69 @@ void main() {
       expect(find.text('Copy name'), findsOneWidget);
       expect(find.text('Open in SQL'), findsNothing);
       expect(find.text('Show relations'), findsNothing);
+    });
+
+    testWidgets('hovering an edge names its columns at any zoom', (t) async {
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(
+            source: SqlErdSource(delegate: delegate(), dialect: SqlDialect.sqlite)),
+      ));
+      await t.pump();
+      await t.pump();
+
+      // The same schema, layout and routes as the view draws.
+      final schema = ErdSchema.fromCatalog(columnRows: [
+        ['users', 'id', 'INTEGER', '1'],
+        ['orders', 'user_id', 'INTEGER', '0'],
+      ], fkRows: [
+        ['orders', 'user_id', 'users', 'id'],
+      ]);
+      final layout = ErdLayout.compute(schema);
+      final route = ErdRouter.route(schema, layout).single.points;
+      // Middle of the longest segment: on the edge, away from the cards.
+      var a = route[0], b = route[1];
+      for (var i = 1; i < route.length; i++) {
+        if ((route[i] - route[i - 1]).distance > (b - a).distance) {
+          a = route[i - 1];
+          b = route[i];
+        }
+      }
+      final onEdge = (a + b) / 2;
+
+      material.Offset toScreen(material.Offset canvas, double scale) {
+        final card = t.getTopLeft(
+            find.byKey(const material.ValueKey('erd_table_users')));
+        return card + (canvas - layout.positions['users']!) * scale;
+      }
+
+      double scale() => int.parse(t
+              .widget<material.Text>(
+                  find.byKey(const material.ValueKey('erd_zoom_label')))
+              .data!
+              .replaceAll('%', '')) /
+          100;
+
+      final mouse = await t.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      await mouse.addPointer(location: material.Offset.zero);
+      await mouse.moveTo(toScreen(onEdge, scale()));
+      await t.pump();
+      const label = 'orders.user_id → users.id';
+      expect(find.text(label), findsOneWidget);
+      final height = t.getSize(find.byKey(const material.ValueKey('erd_edge_tip'))).height;
+
+      // Zoomed out, the label keeps its screen size.
+      await mouse.moveTo(material.Offset.zero);
+      await t.pump();
+      await t.tap(find.byKey(const material.ValueKey('erd_zoom_out')));
+      await t.pump();
+      await mouse.moveTo(toScreen(onEdge, scale()));
+      await t.pump();
+      expect(find.text(label), findsOneWidget);
+      expect(
+          t.getSize(find.byKey(const material.ValueKey('erd_edge_tip'))).height,
+          closeTo(height, 0.5));
     });
 
     testWidgets('a card can be dragged and Auto layout puts it back',

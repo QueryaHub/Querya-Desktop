@@ -79,9 +79,12 @@ class ErdExport {
       }
       b.writeln('  }');
     }
+    // The FK end as on screen: zero or many when the column may be NULL,
+    // one or many otherwise.
     for (final r in schema.relations) {
+      final many = r.optional ? 'o{' : '|{';
       b.writeln(
-          '  ${_id(r.toTable)} ||--o{ ${_id(r.fromTable)} : "${r.fromColumn.replaceAll('"', '')}"');
+          '  ${_id(r.toTable)} ||--$many ${_id(r.fromTable)} : "${r.fromColumn.replaceAll('"', '')}"');
     }
     return b.toString();
   }
