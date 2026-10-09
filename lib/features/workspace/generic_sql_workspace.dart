@@ -510,6 +510,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
     List<List<String>> outRows,
     SqlResultGridSchema gridSchema,
     SqlExecutionResult result,
+    String? scriptStatus,
   ) {
     if (!mounted ||
         !identical(session.rows, outRows) ||
@@ -535,10 +536,16 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
               primaryKeys: pks,
             )
           : null;
-      session.statusLine = _resultStatus(result, cols, outRows, editHint);
+      session.statusLine = scriptStatus != null
+          ? withEditHint(scriptStatus, editHint)
+          : _resultStatus(result, cols, outRows, editHint);
     });
   }
 
+  /// Runs the statement at the caret ([statementAtCursor]: the selection, or
+  /// the one statement under the caret), or else the script: the selection, or
+  /// the whole text. A script runs one statement at a time and stops at the
+  /// first error.
   Future<void> execute([
     SqlQueryTabSession? targetSession,
     bool statementAtCursor = false,
@@ -548,19 +555,21 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
 
     final selection = session.controller.selection;
     final text = session.controller.text;
-    String userSql;
-    if (selection.isValid && !selection.isCollapsed) {
-      userSql = selection.textInside(text).trim();
-    } else if (statementAtCursor) {
-      final span = SqlStatementSplitter.at(
-        SqlStatementSplitter.spans(text),
-        selection.isValid ? selection.baseOffset : text.length,
-      );
-      userSql = span == null ? '' : span.textIn(text);
-    } else {
-      userSql = text.trim();
-    }
-    if (userSql.isEmpty) return;
+    final selected = selection.isValid && !selection.isCollapsed;
+    final scope = selected ? selection.textInside(text) : text;
+    final spans = _runSpans(
+      scope,
+      statementAtCursor: statementAtCursor,
+      selected: selected,
+      caret: selection.isValid ? selection.baseOffset : scope.length,
+    );
+    if (spans.isEmpty) return;
+    final scopeStart = selected ? selection.start : 0;
+    final texts = [for (final s in spans) s.textIn(scope)];
+    final runSql = statementAtCursor ? texts.single : scope.trim();
+    // One statement goes to the driver as the run text, with its ';' when the
+    // whole script is one statement.
+    final sent = texts.length == 1 ? [runSql] : texts;
 
     final safeToProceed = await confirmDiscardTableEditsIfDirty(
       context: context,
@@ -573,16 +582,17 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       session.stagingBuffer = null;
     }
 
+    // Checked once, over the text that will run.
     final confirmDestructive =
         await AppSettings.instance.getConfirmDestructiveOperations();
     if (confirmDestructive) {
-      final inspection = DestructiveSqlDetector.inspect(userSql);
+      final inspection = DestructiveSqlDetector.inspect(runSql);
       if (inspection.isDestructive) {
         if (!mounted) return;
         final confirmed = await showDestructiveQueryDialog(
           context: context,
           result: inspection,
-          sql: userSql,
+          sql: runSql,
           connectionName: widget.connectionRow.name,
         );
         if (confirmed != true) return;
@@ -604,49 +614,109 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
     QueryaShellStatus.instance.beginBusy(message: 'Running query…');
     final sw = Stopwatch()..start();
 
+    // The grid shows the last statement that returned columns, or else the
+    // last statement.
+    SqlExecutionResult? shown;
+    var shownIndex = 0;
+    var affectedTotal = 0;
+    var affectedKnown = false;
+    String? failure;
+    var failedAt = 0;
     try {
-      final result = await widget.delegate.executeQuery(
-        userSql,
-        limit: _resultMaxRows,
-        timeout: statementTimeout,
-      );
-
+      for (var i = 0; i < texts.length; i++) {
+        final SqlExecutionResult result;
+        try {
+          result = await widget.delegate.executeQuery(
+            sent[i],
+            limit: _resultMaxRows,
+            timeout: statementTimeout,
+          );
+        } catch (e) {
+          // A single statement reports its error as before.
+          if (texts.length == 1) rethrow;
+          failure = _runErrorText(e);
+          failedAt = i;
+          break;
+        }
+        if (!mounted) return;
+        if (result.affectedRows != null) {
+          affectedTotal += result.affectedRows!;
+          affectedKnown = true;
+        }
+        if (shown == null ||
+            result.columns.isNotEmpty ||
+            shown.columns.isEmpty) {
+          shown = result;
+          shownIndex = i;
+        }
+        auditSqlExecution(
+          connection: widget.connectionRow,
+          databaseName: effectiveDatabase,
+          sql: sent[i],
+          rowsAffected: result.affectedRows,
+          source: MutationAuditSource.sqlEditor,
+        );
+      }
       if (!mounted) return;
 
+      if (failure != null) {
+        final at = scopeStart + spans[failedAt].start;
+        final line = 1 + '\n'.allMatches(text.substring(0, at)).length;
+        session.controller.selection =
+            material.TextSelection.collapsed(offset: at);
+        invalidatePane(session);
+        setState(() {
+          session.error =
+              'Statement ${failedAt + 1} of ${texts.length} failed (line $line): $failure';
+          session.running = false;
+        });
+        QueryaShellStatus.instance.endBusy();
+        return;
+      }
+
+      final result = shown!;
       final cols = result.columns;
       final outRows = result.rows;
+      final shownSql = sent[shownIndex];
+      final multi = texts.length > 1;
+      final scriptStatus = multi
+          ? '${texts.length} statements'
+              '${affectedKnown ? ' · $affectedTotal rows affected' : ''}'
+          : null;
 
       // Rows show now. The table schema (keys, types, edit hint) follows: from
       // the cache, or from the delegate in the background.
-      final cacheKey = _schemaCacheKey(userSql, cols);
+      final cacheKey = _schemaCacheKey(shownSql, cols);
       final cached = _gridSchemaCache[cacheKey];
       invalidatePane(session);
       setState(() {
         session.columns = cols;
         session.rows = outRows;
-        session.affectedRows = result.affectedRows;
-        session.lastExecutedSql = userSql;
+        session.affectedRows = affectedKnown ? affectedTotal : null;
+        session.lastExecutedSql = shownSql;
         session.resultGridPrimaryKeys = const [];
         session.resultGridColumnDataTypes = null;
         session.resultGridColumnMeta = null;
         session.stagingBuffer?.dispose();
         session.stagingBuffer = null;
-        session.statusLine = _resultStatus(result, cols, outRows, null);
+        session.statusLine = scriptStatus ??
+            _resultStatus(result, cols, outRows, null);
         session.running = false;
       });
       // Anything that is not a read may change table shapes: forget the cache.
-      if (!_isReadQuery(userSql)) _gridSchemaCache.clear();
+      if (!sent.every(_isReadQuery)) _gridSchemaCache.clear();
 
       if (cached != null) {
-        _applyGridSchema(session, userSql, cols, outRows, cached, result);
+        _applyGridSchema(
+            session, shownSql, cols, outRows, cached, result, scriptStatus);
       } else {
         unawaited(
-          widget.delegate.resolveTableSchema(userSql, cols).then(
+          widget.delegate.resolveTableSchema(shownSql, cols).then(
             (gridSchema) {
               if (!mounted) return;
               _gridSchemaCache[cacheKey] = gridSchema;
-              _applyGridSchema(
-                  session, userSql, cols, outRows, gridSchema, result);
+              _applyGridSchema(session, shownSql, cols, outRows, gridSchema,
+                  result, scriptStatus);
             },
             onError: (_) {}, // The rows stay without save.
           ),
@@ -654,7 +724,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       }
 
       sw.stop();
-      final duration = result.elapsed ?? sw.elapsed;
+      final duration = multi ? sw.elapsed : result.elapsed ?? sw.elapsed;
       QueryaShellStatus.instance.reportQueryResult(
         duration: duration,
         rowCount: outRows.length,
@@ -662,21 +732,14 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
         message: session.statusLine,
       );
 
-      auditSqlExecution(
-        connection: widget.connectionRow,
-        databaseName: effectiveDatabase,
-        sql: userSql,
-        rowsAffected: result.affectedRows,
-        source: MutationAuditSource.sqlEditor,
-      );
-
+      // One history entry per run, with the text that ran.
       final cid = widget.connectionRow.id;
       if (cid != null) {
         unawaited(
           LocalDb.instance.recordSqlQueryHistory(
             connectionId: cid,
             databaseName: effectiveDatabase,
-            sqlText: userSql,
+            sqlText: runSql,
             maxEntries: _historyMaxEntries,
           ),
         );
@@ -705,10 +768,51 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       final afterPlainRead = _autocommit &&
           session.error == null &&
           _txOpen == false &&
-          _isReadQuery(userSql);
+          sent.every(_isReadQuery);
       if (!afterPlainRead) await refreshTxStatus();
     }
   }
+
+  /// Shortcut prefix shown in the run menu: ⌘ on macOS, Ctrl elsewhere.
+  static String get _modLabel => Platform.isMacOS ? '⌘' : 'Ctrl+';
+
+  void _openHistory(SqlQueryTabSession session) {
+    final cid = widget.connectionRow.id;
+    if (cid == null || session.running) return;
+    showSqlQueryHistoryDialog(
+      context: context,
+      connectionId: cid,
+      databaseName: effectiveDatabase,
+      sqlController: session.controller,
+      onOpenInNewTab: (sql) => addNewTab(initialSql: sql),
+    );
+  }
+
+  /// The ranges of [scope] a run covers. A caret run takes the statement at
+  /// [caret]; a selected caret run is the selection as one statement; a script
+  /// is every statement.
+  static List<SqlStatementSpan> _runSpans(
+    String scope, {
+    required bool statementAtCursor,
+    required bool selected,
+    required int caret,
+  }) {
+    if (statementAtCursor && selected) {
+      final start = scope.length - scope.trimLeft().length;
+      final end = scope.trimRight().length;
+      return end > start
+          ? [SqlStatementSpan(start: start, end: end, line: 1)]
+          : const [];
+    }
+    final all = SqlStatementSplitter.spans(scope);
+    if (!statementAtCursor) return all;
+    final at = SqlStatementSplitter.at(all, caret);
+    return at == null ? const [] : [at];
+  }
+
+  static String _runErrorText(Object e) => e is TimeoutException
+      ? 'Query timed out: ${e.message ?? e}'
+      : e.toString();
 
   /// Shows the query plan of the selection (or the whole editor text) in the
   /// result grid, one plan line per row.
@@ -1025,6 +1129,8 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
           const material.SingleActivator(LogicalKeyboardKey.numpadEnter, meta: true): () {
             if (!_activeSession.running) unawaited(execute(_activeSession, true));
           },
+          const material.SingleActivator(LogicalKeyboardKey.keyH, control: true): () => _openHistory(_activeSession),
+          const material.SingleActivator(LogicalKeyboardKey.keyH, meta: true): () => _openHistory(_activeSession),
           const material.SingleActivator(LogicalKeyboardKey.keyR, control: true): () {
             if (!_activeSession.running) unawaited(execute(_activeSession, true));
           },
@@ -1113,22 +1219,45 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
                       icon: material.Icons.history_rounded,
                       size: ButtonSize.small,
                       onPressed: widget.connectionRow.id != null && !session.running
-                          ? () {
-                              showSqlQueryHistoryDialog(
-                                context: context,
-                                connectionId: widget.connectionRow.id!,
-                                databaseName: effectiveDatabase,
-                                sqlController: session.controller,
-                                onOpenInNewTab: (sql) => addNewTab(initialSql: sql),
-                              );
-                            }
+                          ? () => _openHistory(session)
                           : null,
                     ),
-                    QueryaActionButton(
-                      label: 'Execute (F5)',
-                      icon: material.Icons.play_arrow_rounded,
-                      loading: session.running,
-                      onPressed: () => execute(session),
+                    material.Row(
+                      mainAxisSize: material.MainAxisSize.min,
+                      children: [
+                        QueryaActionButton(
+                          key: const material.ValueKey('run_script'),
+                          label: 'Execute (F5)',
+                          icon: material.Icons.play_arrow_rounded,
+                          loading: session.running,
+                          onPressed: () => execute(session),
+                        ),
+                        const material.SizedBox(width: 4),
+                        QueryaActionMenu<bool>(
+                          key: const material.ValueKey('run_menu'),
+                          items: [
+                            QueryaActionMenuItem(
+                              value: true,
+                              label: 'Run statement (${_modLabel}Enter)',
+                              icon: material.Icons.short_text_rounded,
+                            ),
+                            const QueryaActionMenuItem(
+                              value: false,
+                              label: 'Run script (F5)',
+                              icon: material.Icons.list_alt_rounded,
+                            ),
+                          ],
+                          onSelected: (atCursor) {
+                            if (!session.running) {
+                              unawaited(execute(session, atCursor));
+                            }
+                          },
+                          child: const material.Icon(
+                            material.Icons.expand_more_rounded,
+                            size: 16,
+                          ),
+                        ),
+                      ],
                     ),
                     if (widget.delegate.supportsExplain)
                       QueryaActionButton(
