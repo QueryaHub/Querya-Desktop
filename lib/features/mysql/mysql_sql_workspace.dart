@@ -17,10 +17,18 @@ class MysqlSqlExecutionDelegate extends SqlExecutionDelegate {
   MysqlSqlExecutionDelegate({
     required this.connectionRow,
     required this.isReadOnly,
+    this.isMcp = false,
   });
 
   final ConnectionRow connectionRow;
   final bool isReadOnly;
+
+  /// MCP delegates run on the MCP session of their own, not the user's.
+  final bool isMcp;
+
+  MysqlSessionMode get _sessionMode => isMcp
+      ? MysqlSessionMode.mcp
+      : (isReadOnly ? MysqlSessionMode.readOnly : MysqlSessionMode.readWrite);
 
   MysqlLease? _lease;
 
@@ -35,7 +43,7 @@ class MysqlSqlExecutionDelegate extends SqlExecutionDelegate {
     final lease = await MysqlService.instance.acquire(
       connectionRow,
       database: poolDatabaseKey,
-      mode: isReadOnly ? MysqlSessionMode.readOnly : MysqlSessionMode.readWrite,
+      mode: _sessionMode,
     );
     _lease = lease;
   }
@@ -165,7 +173,7 @@ class MysqlSqlExecutionDelegate extends SqlExecutionDelegate {
     MysqlService.instance.interrupt(
       connectionRow,
       database: poolDatabaseKey,
-      mode: isReadOnly ? MysqlSessionMode.readOnly : MysqlSessionMode.readWrite,
+      mode: _sessionMode,
     );
     await _lease?.connection.forceClose();
     dropLease();

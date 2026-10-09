@@ -19,7 +19,10 @@ Future<MysqlConnection> _defaultCreateAndConnect(
     database: database.isEmpty ? null : database,
   );
   await conn.connect();
-  await conn.setSessionReadOnly(mode.isReadOnlySession);
+  await conn.configureSession(
+        readOnly: mode.isReadOnlySession,
+        statementTimeout: mode.statementTimeout,
+      );
   return conn;
 }
 

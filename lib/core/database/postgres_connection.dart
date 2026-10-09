@@ -389,6 +389,20 @@ class PostgresConnection {
     );
   }
 
+  /// Session settings of a pool slot: the read-only default and, when the slot
+  /// has one, a server-side statement timeout.
+  Future<void> configureSession({
+    required bool readOnly,
+    Duration? statementTimeout,
+  }) async {
+    await setSessionReadOnly(readOnly);
+    if (statementTimeout != null) {
+      await execute(
+        'SET statement_timeout = ${statementTimeout.inMilliseconds}',
+      );
+    }
+  }
+
   /// Tests connectivity and returns a result with an optional error message.
   Future<({bool ok, String? error})> testConnection() async {
     try {

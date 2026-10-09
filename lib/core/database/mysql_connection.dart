@@ -436,6 +436,20 @@ class MysqlConnection {
     await execute(sessionTransactionAccessModeSql(readOnly));
   }
 
+  /// Session settings of a pool slot: the read-only default and, when the slot
+  /// has one, a server-side limit on SELECT execution time.
+  Future<void> configureSession({
+    required bool readOnly,
+    Duration? statementTimeout,
+  }) async {
+    await setSessionReadOnly(readOnly);
+    if (statementTimeout != null) {
+      await execute(
+        'SET SESSION max_execution_time = ${statementTimeout.inMilliseconds}',
+      );
+    }
+  }
+
   /// `SET SESSION TRANSACTION READ ONLY` / `READ WRITE`.
   @visibleForTesting
   static String sessionTransactionAccessModeSql(bool readOnly) => readOnly

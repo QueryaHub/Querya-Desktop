@@ -627,4 +627,41 @@ void main() {
       }
     });
   });
+
+  group('MCP session (#1217)', () {
+    test('MCP has its own slot, read-only, with a server-side statement timeout',
+        () async {
+      expect(PgSessionMode.mcp.isReadOnlySession, isTrue);
+      expect(PgSessionMode.readOnly.statementTimeout, isNull);
+      expect(PgSessionMode.mcp.statementTimeout, mcpStatementTimeout);
+      final pool = PostgresConnectionPool(
+        createAndConnect: (row, {required database, required mode}) async =>
+            FakePostgresConnection(),
+      );
+      expect(pool.keyFor(1, 'app', PgSessionMode.mcp),
+          isNot(pool.keyFor(1, 'app', PgSessionMode.readOnly)));
+    });
+
+    test('an MCP lease never shares the connection of the read-only slot',
+        () async {
+      final created = <FakePostgresConnection>[];
+      final pool = PostgresConnectionPool(
+        createAndConnect: (row, {required database, required mode}) async {
+          final c = FakePostgresConnection();
+          await c.connect();
+          created.add(c);
+          return c;
+        },
+      );
+      final r = _row();
+      final ui = await pool.acquire(r,
+          database: 'app', mode: PgSessionMode.readOnly);
+      final mcp = await pool.acquire(r,
+          database: 'app', mode: PgSessionMode.mcp);
+      expect(identical(ui.connection, mcp.connection), isFalse);
+      expect(created.length, 2);
+      ui.release();
+      mcp.release();
+    });
+  });
 }
