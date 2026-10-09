@@ -4,7 +4,10 @@ import 'dart:io';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/actions/querya_command_host.dart';
+import 'package:querya_desktop/core/actions/querya_schema_object.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
+import 'package:querya_desktop/features/erd/erd_catalog.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/workspace/generic_sql_workspace.dart';
@@ -360,5 +363,52 @@ void main() {
     expect(find.text('Query'), findsNothing);
     expect(find.text('Data Output'), findsNothing);
     expect(find.byKey(const material.ValueKey('open_diagram_tab')), findsOneWidget);
+  });
+
+  testWidgets('a double click on a diagram card opens the table browser',
+      timeout: _timeout, (tester) async {
+    final opened = <QueryaSchemaObject>[];
+    final delegate = FakeSqlExecutionDelegate(onExecute: (sql) {
+      if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+        return const SqlExecutionResult(rows: [
+          ['users', 'id', 'INTEGER', '1'],
+        ]);
+      }
+      return const SqlExecutionResult();
+    });
+    await tester.binding.setSurfaceSize(const material.Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: QueryaCommandHost(
+          onOpenSchemaObject: opened.add,
+          child: material.SizedBox.expand(
+            child: GenericSqlWorkspace(
+              connectionRow: connection,
+              delegate: delegate,
+              dialect: SqlDialect.sqlite,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const material.ValueKey('open_diagram_tab')));
+    await settle(tester);
+    final card = find.byKey(const material.ValueKey('erd_table_users'));
+    expect(card, findsOneWidget);
+
+    await tester.tap(card);
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(card);
+    await settle(tester);
+
+    expect(opened, hasLength(1));
+    expect(opened.single.name, 'users');
+    expect(opened.single.kind, QueryaSchemaObjectKind.table);
+    // No SQL tab: the browser opens instead.
+    expect(delegate.executed.where((q) => q.startsWith('SELECT * FROM')),
+        isEmpty);
   });
 }

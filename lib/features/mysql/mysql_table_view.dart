@@ -341,6 +341,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       dialect: SqlDialect.mysql,
       tableName: widget.tableName,
       schema: widget.database,
+      database: widget.database,
       isView: widget.isView,
       isReadOnly: widget.isReadOnly,
       limit: widget.limit,

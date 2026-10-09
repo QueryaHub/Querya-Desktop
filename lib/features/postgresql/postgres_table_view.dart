@@ -376,6 +376,7 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
       dialect: SqlDialect.postgres,
       tableName: widget.tableName,
       schema: widget.schema,
+      database: widget.database,
       isView: widget.isView,
       isMaterializedView: widget.isMaterializedView,
       limit: widget.limit,
