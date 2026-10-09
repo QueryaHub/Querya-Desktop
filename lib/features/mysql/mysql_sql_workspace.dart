@@ -11,6 +11,7 @@ import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/workspace/workspace.dart';
+import 'package:querya_desktop/features/workspace/query_plan.dart';
 
 /// Execution delegate for MySQL / MariaDB connections.
 class MysqlSqlExecutionDelegate extends SqlExecutionDelegate {
@@ -151,6 +152,16 @@ class MysqlSqlExecutionDelegate extends SqlExecutionDelegate {
   static int? _affectedInt(BigInt v) {
     if (v == BigInt.zero) return null;
     return v.toInt();
+  }
+
+  @override
+  Future<PlanNode?> explainTree(String sql) async {
+    await ensureLease();
+    final conn = _lease?.connection;
+    if (conn == null || !conn.isConnected) return null;
+    final rs = await conn.executeWithTimeout('EXPLAIN FORMAT=JSON $sql');
+    if (rs.rows.isEmpty) return null;
+    return QueryPlanParser.fromMysqlJson(rs.rows.first.assoc().values.first);
   }
 
   @override

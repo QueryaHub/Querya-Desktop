@@ -28,6 +28,8 @@ import 'package:querya_desktop/features/workspace/query_editor_tab.dart';
 import 'package:querya_desktop/features/workspace/results_tab.dart';
 import 'package:querya_desktop/features/workspace/sql_editor_chrome.dart';
 import 'package:querya_desktop/features/erd/erd_view.dart';
+import 'package:querya_desktop/features/workspace/plan_tree_view.dart';
+import 'package:querya_desktop/features/workspace/query_plan.dart';
 import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
 import 'package:querya_desktop/features/workspace/sql_query_history_dialog.dart';
 import 'package:querya_desktop/features/workspace/sql_query_tab_bar.dart';
@@ -643,6 +645,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       session.rows = [];
       session.affectedRows = null;
       session.statusLine = null;
+      session.planRoot = null;
       session.resultGridPrimaryKeys = const [];
       session.resultGridColumnDataTypes = null;
       session.resultGridColumnMeta = null;
@@ -852,6 +855,16 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
 
   /// Shows the query plan of the selection (or the whole editor text) in the
   /// result grid, one plan line per row.
+  /// The plan as a tree; null when the driver has none or it cannot be read.
+  /// The text plan is already shown, so a failure here is not an error.
+  Future<PlanNode?> _explainTreeOrNull(String sql) async {
+    try {
+      return await widget.delegate.explainTree(sql);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> explain([SqlQueryTabSession? targetSession]) async {
     final session = targetSession ?? _activeSession;
     if (session.running || !widget.delegate.supportsExplain) return;
@@ -871,6 +884,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       session.rows = [];
       session.affectedRows = null;
       session.statusLine = null;
+      session.planRoot = null;
       session.resultGridPrimaryKeys = const [];
       session.resultGridColumnDataTypes = null;
       session.resultGridColumnMeta = null;
@@ -889,6 +903,9 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
         session.statusLine = 'Query plan: ${lines.length} line(s).';
         session.running = false;
       });
+      final tree = await _explainTreeOrNull(sql);
+      if (!mounted) return;
+      setState(() => session.planRoot = tree);
     } catch (e) {
       if (mounted) {
         invalidatePane(session);
@@ -1259,8 +1276,25 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       bottom: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (session.planRoot != null)
+            material.Padding(
+              padding: const material.EdgeInsets.fromLTRB(8, 6, 8, 6),
+              child: material.Align(
+                alignment: material.Alignment.centerLeft,
+                child: material.SizedBox(
+                  width: 200,
+                  child: QueryaTabStrip(
+                    labels: const ['Plan', 'Text'],
+                    selectedIndex: session.planAsTree ? 0 : 1,
+                    onSelected: (i) => setState(() => session.planAsTree = i == 0),
+                  ),
+                ),
+              ),
+            ),
           Expanded(
-            child: ResultsTab(
+            child: session.planRoot != null && session.planAsTree
+                ? PlanTreeView(root: session.planRoot!)
+                : ResultsTab(
               columns: session.columns,
               rows: session.rows,
               errorMessage: session.error,

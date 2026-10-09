@@ -1,4 +1,6 @@
 import 'dart:async';
+
+import 'package:querya_desktop/features/workspace/query_plan.dart';
 import 'package:flutter/foundation.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/features/workspace/sql_result_grid_schema.dart';
@@ -15,6 +17,10 @@ abstract class SqlExecutionDelegate {
 
   /// Explains the SQL query plan if supported by the DBMS.
   Future<String> explainQuery(String sql);
+
+  /// The plan as a tree, when the driver can give one. [explainQuery] remains
+  /// the text fallback.
+  Future<PlanNode?> explainTree(String sql) async => null;
 
   /// Whether [explainQuery] works for this driver (shows the Explain button).
   bool get supportsExplain => true;
