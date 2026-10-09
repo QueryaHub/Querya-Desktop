@@ -40,6 +40,36 @@ jobs:
             echo "Tag $RAW matches pubspec semver $VER."
           fi
 
+  # End-to-end scenarios (test/e2e) must pass before a release is published.
+  e2e:
+    name: E2E tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.1'
+          channel: 'stable'
+          cache: true
+
+      - name: Install Linux dependencies
+        timeout-minutes: 8
+        run: |
+          APT="-o Acquire::Retries=3 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20"
+          sudo apt-get $APT update
+          # bubblewrap runs the extension sandbox scenario; without it it skips.
+          sudo apt-get $APT install -y libsecret-1-dev bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Run E2E tests
+        run: flutter test test/e2e
+
   build-windows:
     name: Build Windows
     runs-on: windows-latest
@@ -436,7 +466,7 @@ jobs:
 
   publish:
     name: Publish GitHub Release
-    needs: [build-windows, build-linux, build-macos, build-ext-tester]
+    needs: [e2e, build-windows, build-linux, build-macos, build-ext-tester]
     runs-on: ubuntu-latest
     outputs:
       version: ${{ needs.build-windows.outputs.version }}

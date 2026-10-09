@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:mongo_dart/mongo_dart.dart';
 
 import '../storage/local_db.dart';
@@ -31,7 +32,20 @@ void _throwIfMongoWriteFailed(
 /// Service for managing MongoDB connections.
 class MongoService {
   MongoService._();
-  static final MongoService instance = MongoService._();
+
+  /// A service a test subclasses to answer without a server.
+  @visibleForTesting
+  MongoService.forTest();
+
+  static final MongoService _real = MongoService._();
+  static MongoService _instance = _real;
+
+  static MongoService get instance => _instance;
+
+  /// Replaces [instance] in tests; null puts the real service back.
+  @visibleForTesting
+  static set instanceForTest(MongoService? service) =>
+      _instance = service ?? _real;
 
   final Map<int, MongoConnection> _connections = {};
 
