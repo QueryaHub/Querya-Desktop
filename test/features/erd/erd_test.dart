@@ -58,7 +58,8 @@ void main() {
         ErdCatalog.foreignKeysSql(SqlDialect.postgres),
       ]) {
         expect(sql, contains('pg_catalog.'));
-        expect(sql, isNot(contains('information_schema')));
+        // Schema names may still mention information_schema to exclude it.
+        expect(sql, isNot(contains('information_schema.')));
       }
       expect(ErdCatalog.foreignKeysSql(SqlDialect.postgres),
           contains('unnest(con.conkey, con.confkey)'));
