@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import '../motion/querya_motion_scope.dart';
@@ -320,7 +321,13 @@ class AppSettings {
 
   /// Chart and diagram exports. False (default): a light palette for documents.
   /// True: the colours of the current theme.
+  /// Test seam: answers [getExportCurrentTheme] without the local database.
+  @visibleForTesting
+  static Future<bool> Function()? exportCurrentThemeOverride;
+
   Future<bool> getExportCurrentTheme() async {
+    final override = exportCurrentThemeOverride;
+    if (override != null) return override();
     try {
       final value = await LocalDb.instance.getAppSetting(
         AppSettingsKeys.exportCurrentTheme,

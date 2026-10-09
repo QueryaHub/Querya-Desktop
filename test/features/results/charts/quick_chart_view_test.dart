@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/features/results/charts/chart_data.dart';
 import 'package:querya_desktop/features/results/charts/quick_chart_view.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -10,6 +11,11 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 import '../../../support/querya_theme_test_shell.dart';
 
 void main() {
+  // The export reads its theme setting; the tests answer it without the
+  // local database, which is shared by test processes in CI.
+  setUp(() => AppSettings.exportCurrentThemeOverride = () async => false);
+  tearDown(() => AppSettings.exportCurrentThemeOverride = null);
+
   const columns = ['name', 'amount'];
   final rows = [
     ['a', '1'],
@@ -113,7 +119,7 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.text('SVG'));
     // The export reads its setting first, which is real I/O.
-    for (var i = 0; i < 40 && saved == null; i++) {
+    for (var i = 0; i < 200 && saved == null; i++) {
       await t.runAsync(
           () => Future<void>.delayed(const Duration(milliseconds: 50)));
       await t.pump();
@@ -129,7 +135,7 @@ void main() {
     await t.pumpAndSettle();
     saved = null;
     await t.tap(find.text('SVG'));
-    for (var i = 0; i < 40 && saved == null; i++) {
+    for (var i = 0; i < 200 && saved == null; i++) {
       await t.runAsync(
           () => Future<void>.delayed(const Duration(milliseconds: 50)));
       await t.pump();
