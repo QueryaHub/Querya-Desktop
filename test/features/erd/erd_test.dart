@@ -345,7 +345,7 @@ void main() {
     });
 
     test('svg fits long types inside the card with an ellipsis', () {
-      final longType = "enum('pending','paid','shipped','cancelled','refunded')";
+      const longType = "enum('pending','paid','shipped','cancelled','refunded')";
       final s = ErdSchema.fromCatalog(columnRows: [
         ['orders', 'status', longType, '0'],
       ], fkRows: const []);
