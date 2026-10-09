@@ -24,10 +24,10 @@ void main() {
 
   testWidgets('Relations shows the neighbourhood and Data keeps its place',
       (t) async {
-    await pumpGenericTableView(t, FakeTableDataDelegate());
+    final state = await pumpGenericTableView(t, FakeTableDataDelegate());
     expect(find.byType(ErdView), findsNothing);
 
-    await t.tap(find.text('Relations'));
+    state.selectView(1);
     await t.pump();
     await t.pump();
     expect(find.byType(ErdView), findsOneWidget);

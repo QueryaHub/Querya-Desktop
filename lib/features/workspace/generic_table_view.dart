@@ -116,11 +116,16 @@ class GenericTableViewState extends material.State<GenericTableView> {
     return QueryaTabStrip(
       labels: const ['Data', 'Relations'],
       selectedIndex: _relationsMode ? 1 : 0,
-      onSelected: (i) => setState(() {
-        _relationsMode = i == 1;
-        if (_relationsMode) _relationsVisited = true;
-      }),
+      onSelected: selectView,
     );
+  }
+
+  /// 0 shows the grid (Data), 1 the neighbourhood (Relations).
+  void selectView(int index) {
+    setState(() {
+      _relationsMode = index == 1;
+      if (_relationsMode) _relationsVisited = true;
+    });
   }
 
   /// Neighbourhood of this table. Built on the first switch and kept, so
