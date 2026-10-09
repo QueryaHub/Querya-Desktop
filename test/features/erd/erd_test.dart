@@ -439,6 +439,16 @@ void main() {
       expect(svgFor('0'), isNot(contains('<circle')));
     });
 
+    test('fit goes below the usual minimum zoom for a large diagram', () {
+      final big = ErdLayout.fitScale(
+          const material.Size(20000, 9000), const material.Size(1200, 700));
+      expect(big, lessThan(0.2));
+      expect(big, greaterThan(0));
+      expect(20000 * big, lessThanOrEqualTo(1200));
+      expect(ErdLayout.fitScale(
+          const material.Size(400, 300), const material.Size(1200, 700)), 1);
+    });
+
     test('png ratio keeps the longest side within 8192 px', () {
       final ratio = ErdExport.pngPixelRatio(const material.Size(20000, 9000));
       expect((20000 * ratio).round(), lessThanOrEqualTo(8192));
@@ -759,6 +769,117 @@ void main() {
       await t.pump(const Duration(milliseconds: 400));
       expect(opacityOf(t, 'lonely'), contains(0.35));
       expect(opacityOf(t, 'orders'), isNot(contains(0.35)));
+    });
+
+    String zoomLabel(WidgetTester t) => t
+        .widget<material.Text>(
+            find.byKey(const material.ValueKey('erd_zoom_label')))
+        .data!;
+
+    testWidgets('a large diagram fits the viewport on first load', (t) async {
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
+      final tall = FakeSqlExecutionDelegate(onExecute: (sql) {
+        if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+          return SqlExecutionResult(rows: [
+            for (final table in ['a', 'b', 'c'])
+              for (var i = 0; i < 400; i++) [table, 'col$i', 'INTEGER', '0'],
+          ]);
+        }
+        return const SqlExecutionResult();
+      });
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(
+            source: SqlErdSource(delegate: tall, dialect: SqlDialect.sqlite)),
+      ));
+      await t.pump();
+      await t.pump();
+      await t.pump();
+      final percent = int.parse(zoomLabel(t).replaceAll('%', ''));
+      // A card of 400 rows is about 8 800 px tall: below the usual 20 % floor.
+      expect(percent, lessThan(20));
+      expect(percent, greaterThan(0));
+    });
+
+    testWidgets('Ctrl+Shift+= ("+") zooms in', (t) async {
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(
+            source: SqlErdSource(delegate: delegate(), dialect: SqlDialect.sqlite)),
+      ));
+      await t.pump();
+      await t.pump();
+      expect(zoomLabel(t), '100%');
+
+      await t.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await t.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await t.sendKeyEvent(LogicalKeyboardKey.equal);
+      await t.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await t.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await t.pump();
+      expect(zoomLabel(t), '125%');
+    });
+
+    testWidgets('Enter in the search picks the table and closes the search',
+        (t) async {
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(
+            source: SqlErdSource(delegate: threeTables(), dialect: SqlDialect.sqlite)),
+      ));
+      await t.pump();
+      await t.pump();
+
+      await t.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await t.sendKeyEvent(LogicalKeyboardKey.keyF);
+      await t.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await t.pump();
+      await t.pump();
+      await t.enterText(find.byType(material.EditableText), 'ord');
+      await t.pump();
+      await t.testTextInput.receiveAction(TextInputAction.done);
+      await t.pump();
+      await t.pump();
+
+      expect(find.byType(material.EditableText), findsNothing);
+      expect(opacityOf(t, 'lonely'), contains(0.35));
+
+      // The canvas has the keyboard again: Esc clears the pick.
+      await t.sendKeyEvent(LogicalKeyboardKey.escape);
+      await t.pump();
+      expect(opacityOf(t, 'lonely'), isNot(contains(0.35)));
+    });
+
+    testWidgets('Esc closes an open search and keeps the picked table',
+        (t) async {
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(
+            source: SqlErdSource(delegate: threeTables(), dialect: SqlDialect.sqlite)),
+      ));
+      await t.pump();
+      await t.pump();
+
+      await t.tap(find.byKey(const material.ValueKey('erd_table_orders')));
+      await t.pump(const Duration(milliseconds: 400));
+      expect(opacityOf(t, 'lonely'), contains(0.35));
+
+      await t.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await t.sendKeyEvent(LogicalKeyboardKey.keyF);
+      await t.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await t.pump();
+      await t.pump();
+      expect(find.byType(material.EditableText), findsOneWidget);
+
+      // The empty field drops the focus on Esc; the search closes.
+      await t.sendKeyEvent(LogicalKeyboardKey.escape);
+      await t.pump();
+      await t.pump();
+      expect(find.byType(material.EditableText), findsNothing);
+      expect(opacityOf(t, 'lonely'), contains(0.35));
+
+      await t.sendKeyEvent(LogicalKeyboardKey.escape);
+      await t.pump();
+      expect(opacityOf(t, 'lonely'), isNot(contains(0.35)));
     });
 
     testWidgets('keys only hides plain columns and the toggle brings them back',

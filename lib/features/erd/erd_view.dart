@@ -122,6 +122,10 @@ class _ErdViewState extends material.State<ErdView> {
   static const double _maxScale = 3;
   static const double _zoomStep = 1.25;
 
+  /// Lowest zoom: [_minScale], or lower when the whole diagram needs it to
+  /// fit the viewport (a schema of a few hundred tables).
+  double _zoomFloor = _minScale;
+
   @override
   void dispose() {
     _transform.dispose();
@@ -136,7 +140,26 @@ class _ErdViewState extends material.State<ErdView> {
   @override
   void initState() {
     super.initState();
+    _searchFocus.addListener(_onSearchFocus);
     _load();
+  }
+
+  /// The search field handles Esc itself: the first clears the text, the
+  /// next drops the focus, so the view's own Esc never sees it. An empty
+  /// search that loses the focus closes, and the canvas gets the keyboard
+  /// back for the next Esc and the zoom shortcuts.
+  void _onSearchFocus() {
+    if (!mounted ||
+        _searchFocus.hasFocus ||
+        !_searchOpen ||
+        _searchController.text.isNotEmpty) {
+      return;
+    }
+    setState(() {
+      _searchOpen = false;
+      _query = '';
+    });
+    _canvasFocus.requestFocus();
   }
 
   Future<void> _load() async {
@@ -234,7 +257,11 @@ class _ErdViewState extends material.State<ErdView> {
   }
 
   void _hide(String table) {
-    setState(() => _hidden.add(table));
+    setState(() {
+      _hidden.add(table);
+      // A pick on a hidden table would leave every card faded.
+      if (_selected == table) _selected = null;
+    });
     _reflow();
   }
 
@@ -292,7 +319,7 @@ class _ErdViewState extends material.State<ErdView> {
 
   /// Sets the zoom to [target], keeping the scene point under [focal] still.
   void _setScale(double target, material.Offset focal) {
-    final s = target.clamp(_minScale, _maxScale).toDouble();
+    final s = target.clamp(_zoomFloor, _maxScale).toDouble();
     final t = _transform.value.getTranslation();
     final current = material.Offset(t.x, t.y);
     final next = focal - (focal - current) * (s / _scale);
@@ -310,14 +337,24 @@ class _ErdViewState extends material.State<ErdView> {
     final layout = _layout;
     final vs = _viewportSize();
     if (layout == null || vs == null) return;
-    const pad = 24.0;
-    final s = min((vs.width - 2 * pad) / layout.size.width,
-            (vs.height - 2 * pad) / layout.size.height)
-        .clamp(_minScale, 1.0)
-        .toDouble();
+    final s = ErdLayout.fitScale(layout.size, vs);
+    final floor = min(_minScale, s);
+    if (floor != _zoomFloor) setState(() => _zoomFloor = floor);
     final tx = (vs.width - layout.size.width * s) / 2;
     final ty = (vs.height - layout.size.height * s) / 2;
     _transform.value = Matrix4.identity()..translate(tx, ty)..scale(s);
+  }
+
+  /// Picks a table from the search: centres it, closes the search and gives
+  /// the keyboard back to the canvas, so Esc then clears the pick.
+  void _pickFromSearch(ErdSchema schema, String name) {
+    _selectTable(schema, name);
+    _searchController.clear();
+    setState(() {
+      _searchOpen = false;
+      _query = '';
+    });
+    _canvasFocus.requestFocus();
   }
 
   /// Picks a table and centres the view on it, keeping the zoom.
@@ -336,9 +373,18 @@ class _ErdViewState extends material.State<ErdView> {
     setState(() => _selected = name);
   }
 
+  /// A click on the empty canvas: clears the pick and takes the keyboard, so
+  /// the zoom and search shortcuts work after a click anywhere on it.
   void _clearSelection() {
+    _canvasFocus.requestFocus();
     if (_selected == null) return;
     setState(() => _selected = null);
+  }
+
+  /// A click on a card picks it.
+  void _pick(String name) {
+    _canvasFocus.requestFocus();
+    setState(() => _selected = name);
   }
 
   void _openSearch() {
@@ -347,14 +393,19 @@ class _ErdViewState extends material.State<ErdView> {
         .addPostFrameCallback((_) => _searchFocus.requestFocus());
   }
 
-  /// Escape: closes the search and clears the selection.
+  /// Escape: closes the search when it is open, else clears the pick. One
+  /// Esc never does both, so closing the search keeps the table found.
   void _escape() {
-    _searchController.clear();
-    setState(() {
-      _searchOpen = false;
-      _query = '';
-      _selected = null;
-    });
+    if (_searchOpen) {
+      _searchController.clear();
+      setState(() {
+        _searchOpen = false;
+        _query = '';
+      });
+      _canvasFocus.requestFocus();
+      return;
+    }
+    if (_selected != null) setState(() => _selected = null);
   }
 
   List<ErdTable> _matches(ErdSchema schema) {
@@ -368,12 +419,16 @@ class _ErdViewState extends material.State<ErdView> {
   /// Keyboard shortcuts for both Ctrl (Linux, Windows) and Cmd (macOS).
   Map<material.ShortcutActivator, material.VoidCallback> _bindings() {
     final out = <material.ShortcutActivator, material.VoidCallback>{};
-    void both(LogicalKeyboardKey key, material.VoidCallback action) {
-      out[material.SingleActivator(key, control: true)] = action;
-      out[material.SingleActivator(key, meta: true)] = action;
+    void both(LogicalKeyboardKey key, material.VoidCallback action,
+        {bool shift = false}) {
+      out[material.SingleActivator(key, control: true, shift: shift)] = action;
+      out[material.SingleActivator(key, meta: true, shift: shift)] = action;
     }
 
     both(LogicalKeyboardKey.equal, () => _zoomBy(_zoomStep));
+    // "+" is Shift+= on most layouts.
+    both(LogicalKeyboardKey.equal, () => _zoomBy(_zoomStep), shift: true);
+    both(LogicalKeyboardKey.add, () => _zoomBy(_zoomStep));
     both(LogicalKeyboardKey.numpadAdd, () => _zoomBy(_zoomStep));
     both(LogicalKeyboardKey.minus, () => _zoomBy(1 / _zoomStep));
     both(LogicalKeyboardKey.numpadSubtract, () => _zoomBy(1 / _zoomStep));
@@ -552,7 +607,7 @@ class _ErdViewState extends material.State<ErdView> {
           debounceDuration: Duration.zero,
           onChanged: (v) => setState(() => _query = v.trim()),
           onSubmitted: (_) {
-            if (matches.isNotEmpty) _selectTable(schema, matches.first.name);
+            if (matches.isNotEmpty) _pickFromSearch(schema, matches.first.name);
           },
         ),
         if (_query.isNotEmpty)
@@ -577,7 +632,7 @@ class _ErdViewState extends material.State<ErdView> {
                   material.GestureDetector(
                     key: material.ValueKey('erd_search_result_${t.name}'),
                     behavior: material.HitTestBehavior.opaque,
-                    onTap: () => _selectTable(schema, t.name),
+                    onTap: () => _pickFromSearch(schema, t.name),
                     child: material.Padding(
                       padding: const material.EdgeInsets.symmetric(
                           horizontal: 10, vertical: 6),
@@ -650,7 +705,7 @@ class _ErdViewState extends material.State<ErdView> {
                 transformationController: _transform,
                 // A card drag must not pan the canvas.
                 panEnabled: _dragging == null,
-                minScale: _minScale,
+                minScale: _zoomFloor,
                 maxScale: _maxScale,
                 boundaryMargin: const material.EdgeInsets.all(400),
                 child: material.RepaintBoundary(
@@ -733,8 +788,7 @@ class _ErdViewState extends material.State<ErdView> {
                                   onOpen: widget.onOpenTable == null
                                       ? null
                                       : () => widget.onOpenTable!(t.name),
-                                  onSelect: () =>
-                                      setState(() => _selected = t.name),
+                                  onSelect: () => _pick(t.name),
                                   onHover: (inside) => _hovered.value = inside
                                       ? t.name
                                       : (_hovered.value == t.name
