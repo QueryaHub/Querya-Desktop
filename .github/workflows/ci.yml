@@ -137,6 +137,9 @@ jobs:
       - name: Analyze code
         run: flutter analyze
 
+      - name: Test the benchmark comparison script
+        run: python3 scripts/ci/test_bench_compare.py
+
       # packages/ is excluded above: the bridge is its own dependency-free
       # package and must keep compiling to a single static binary.
       - name: Analyze and build querya-mcp

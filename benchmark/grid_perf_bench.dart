@@ -248,15 +248,17 @@ void _report() {
   stdout.writeln('BENCH ${row('raster', raster)}');
   stdout.writeln('BENCH ${row('total ', total)}');
   // Real smoothness: gap between consecutive presented frames. At 120 Hz a gap
-  // above ~12.5 ms means at least one vsync was missed (a visible stutter).
+  // above ~12.5 ms means at least one vsync was missed (a visible stutter); at
+  // 60 Hz (xvfb in CI) the same holds above 25 ms.
   final starts = [for (final t in timings) t.timestampInMicroseconds(FramePhase.vsyncStart)]..sort();
   final gaps = [for (var i = 1; i < starts.length; i++) (starts[i] - starts[i - 1]) / 1000.0];
   if (gaps.isNotEmpty) {
     final missed = gaps.where((g) => g > 12.5).length;
+    final missed60 = gaps.where((g) => g > 25).length;
     final secs = (starts.last - starts.first) / 1e6;
     stdout.writeln('BENCH frames: ${timings.length} in ${secs.toStringAsFixed(1)} s = ${(timings.length / secs).toStringAsFixed(0)} fps, '
         'gap p50=${pct(gaps, .5).toStringAsFixed(2)} p99=${pct(gaps, .99).toStringAsFixed(2)} max=${pct(gaps, 1).toStringAsFixed(1)} ms, '
-        'stutters(>12.5ms)=$missed');
+        'stutters(>12.5ms)=$missed stutters(>25ms)=$missed60');
   }
 }
 
