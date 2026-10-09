@@ -20,7 +20,10 @@ import 'package:querya_desktop/features/erd/erd_layout.dart';
 import 'package:querya_desktop/features/erd/erd_model.dart';
 import 'package:querya_desktop/features/erd/erd_router.dart';
 import 'package:querya_desktop/shared/widgets/app_toast.dart';
+import 'package:querya_desktop/shared/widgets/querya_action_menu.dart';
+import 'package:querya_desktop/shared/widgets/querya_empty_state.dart';
 import 'package:querya_desktop/shared/widgets/querya_search_field.dart';
+import 'package:querya_desktop/features/workspace/sql_editor_chrome.dart';
 import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
 import 'package:querya_desktop/shared/widgets/querya_action_button.dart';
 import 'package:querya_desktop/shared/widgets/querya_spinner.dart';
@@ -42,17 +45,24 @@ Future<void> defaultErdFileSaver(String name, Uint8List bytes) async {
 }
 
 /// Interactive entity-relationship diagram of the connected database.
+/// Entries of the diagram's Export menu.
+enum _ExportAction { mermaid, svg, png, copyMermaid }
+
 class ErdView extends material.StatefulWidget {
   const ErdView({
     super.key,
     required this.delegate,
     required this.dialect,
+    this.databaseName = '',
     this.onOpenTable,
     this.onSaveFile,
   });
 
   final SqlExecutionDelegate delegate;
   final SqlDialect dialect;
+
+  /// Names the exported files: `<databaseName>-erd.svg`.
+  final String databaseName;
 
   /// Called on double tap of a table card.
   final void Function(String table)? onOpenTable;
@@ -351,7 +361,33 @@ class _ErdViewState extends material.State<ErdView> {
     final image = await boundary.toImage(pixelRatio: ratio);
     final data = await image.toByteData(format: ui.ImageByteFormat.png);
     if (data == null) return;
-    await _save('diagram.png', data.buffer.asUint8List());
+    await _save('$_fileStem.png', data.buffer.asUint8List());
+  }
+
+  /// `<database>-erd`, or `erd` when the database name is unknown.
+  String get _fileStem =>
+      widget.databaseName.isEmpty ? 'erd' : '${widget.databaseName}-erd';
+
+  void _export(_ExportAction action, ErdSchema schema, ErdLayout layout) {
+    switch (action) {
+      case _ExportAction.mermaid:
+        _save(
+            '$_fileStem.mmd',
+            Uint8List.fromList(utf8.encode(ErdExport.toMermaid(schema))));
+      case _ExportAction.svg:
+        _save(
+            '$_fileStem.svg',
+            Uint8List.fromList(utf8.encode(
+                ErdExport.toSvg(schema, layout, routes: _routes))));
+      case _ExportAction.png:
+        _exportPng();
+      case _ExportAction.copyMermaid:
+        Clipboard.setData(ClipboardData(text: ErdExport.toMermaid(schema)));
+        showAppToast(
+          context: context,
+          message: 'Mermaid copied to the clipboard',
+        );
+    }
   }
 
   /// Pointer over the canvas: names the relation within 6 px of it, if any.
@@ -462,13 +498,28 @@ class _ErdViewState extends material.State<ErdView> {
     final layout = _layout;
     material.Widget body;
     if (_loading) {
-      body = const material.Center(child: QueryaSpinner());
+      body = const material.Center(
+          child: QueryaSpinner(label: 'Loading schema…'));
     } else if (_error != null) {
-      body = material.Center(child: Text(_error!));
+      body = material.Center(
+        child: QueryaEmptyState(
+          icon: material.Icon(material.Icons.error_outline_rounded,
+              color: wb.destructive),
+          title: 'Could not load the schema',
+          description: _error,
+          actionLabel: 'Retry',
+          onAction: _load,
+        ),
+      );
     } else if (schema == null || layout == null || schema.isEmpty) {
       body = material.Center(
-        child: Text('No tables found',
-            style: material.TextStyle(color: wb.mutedForeground)),
+        child: QueryaEmptyState(
+          icon: material.Icon(material.Icons.table_chart_outlined,
+              color: wb.mutedForeground),
+          title: 'No tables found',
+          description:
+              'This schema has no tables, or this role cannot see them.',
+        ),
       );
     } else {
       body = material.CallbackShortcuts(
@@ -618,11 +669,13 @@ class _ErdViewState extends material.State<ErdView> {
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
-        material.Padding(
+        material.Container(
+          decoration: SqlEditorChrome.sqlToolbarDecoration(context),
           padding: const material.EdgeInsets.all(8),
           child: material.Wrap(
             spacing: 8,
             runSpacing: 8,
+            crossAxisAlignment: material.WrapCrossAlignment.center,
             children: [
               QueryaActionButton(
                 key: const material.ValueKey('erd_refresh'),
@@ -656,32 +709,57 @@ class _ErdViewState extends material.State<ErdView> {
                 tooltip: 'Arrange the tables again (undoes manual moves)',
                 onPressed: ready ? _autoLayout : null,
               ),
-              QueryaActionButton(
-                key: const material.ValueKey('erd_mermaid'),
-                label: 'Mermaid',
-                onPressed: !ready
-                    ? null
-                    : () => _save(
-                          'diagram.mmd',
-                          Uint8List.fromList(
-                              utf8.encode(ErdExport.toMermaid(schema))),
-                        ),
-              ),
-              QueryaActionButton(
-                key: const material.ValueKey('erd_svg'),
-                label: 'SVG',
-                onPressed: !ready
-                    ? null
-                    : () => _save(
-                          'diagram.svg',
-                          Uint8List.fromList(utf8.encode(
-                              ErdExport.toSvg(schema, layout, routes: _routes))),
-                        ),
-              ),
-              QueryaActionButton(
-                key: const material.ValueKey('erd_png'),
-                label: 'PNG',
-                onPressed: ready ? _exportPng : null,
+              material.IgnorePointer(
+                ignoring: !ready,
+                child: material.Opacity(
+                  opacity: ready ? 1 : 0.5,
+                  child: QueryaActionMenu<_ExportAction>(
+                    items: const [
+                      QueryaActionMenuItem(
+                        value: _ExportAction.mermaid,
+                        label: 'Mermaid (.mmd)',
+                        icon: material.Icons.account_tree_outlined,
+                      ),
+                      QueryaActionMenuItem(
+                        value: _ExportAction.svg,
+                        label: 'SVG',
+                        icon: material.Icons.polyline_outlined,
+                      ),
+                      QueryaActionMenuItem(
+                        value: _ExportAction.png,
+                        label: 'PNG',
+                        icon: material.Icons.image_outlined,
+                      ),
+                      QueryaActionMenuItem(
+                        value: _ExportAction.copyMermaid,
+                        label: 'Copy Mermaid',
+                        icon: material.Icons.content_copy_rounded,
+                      ),
+                    ],
+                    onSelected: (action) {
+                      if (schema != null && layout != null) {
+                        _export(action, schema, layout);
+                      }
+                    },
+                    child: material.Padding(
+                      key: const material.ValueKey('erd_export'),
+                      padding: const material.EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      child: material.Row(
+                        mainAxisSize: material.MainAxisSize.min,
+                        children: [
+                          material.Icon(material.Icons.file_download_outlined,
+                              size: 16, color: wb.mutedForeground),
+                          const material.SizedBox(width: 6),
+                          const Text('Export'),
+                          const material.SizedBox(width: 4),
+                          material.Icon(material.Icons.expand_more_rounded,
+                              size: 16, color: wb.mutedForeground),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
