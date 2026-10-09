@@ -339,4 +339,26 @@ void main() {
     expect(state.activeSession.statusLine, '3 statements · 6 rows affected');
     expect(state.activeSession.affectedRows, 6);
   });
+
+  testWidgets('the toolbar stays on one row on a narrow window', timeout: _timeout,
+      (tester) async {
+    await pumpWorkspace(tester, FakeSqlExecutionDelegate());
+    await tester.binding.setSurfaceSize(const material.Size(800, 700));
+    await tester.pumpAndSettle();
+
+    final run = find.byKey(const material.ValueKey('run_script'));
+    final session = find.byKey(const material.ValueKey('session_menu'));
+    expect(run, findsOneWidget);
+    expect(session, findsOneWidget);
+    expect(tester.getCenter(session).dy, closeTo(tester.getCenter(run).dy, 1));
+  });
+
+  testWidgets('no Query caption and no Data Output bar above the results',
+      timeout: _timeout, (tester) async {
+    await pumpWorkspace(tester, FakeSqlExecutionDelegate());
+
+    expect(find.text('Query'), findsNothing);
+    expect(find.text('Data Output'), findsNothing);
+    expect(find.byKey(const material.ValueKey('open_diagram_tab')), findsOneWidget);
+  });
 }
