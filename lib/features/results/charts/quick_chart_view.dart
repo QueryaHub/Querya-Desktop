@@ -9,6 +9,7 @@ import 'package:flutter/rendering.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/results/charts/chart_data.dart';
 import 'package:querya_desktop/features/results/charts/chart_svg.dart';
+import 'package:querya_desktop/shared/widgets/querya_badge.dart';
 import 'package:querya_desktop/shared/widgets/querya_dropdown.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
@@ -68,6 +69,8 @@ class _QuickChartViewState extends material.State<QuickChartView> {
   int? _labelCol;
   int? _valueCol;
   List<int> _numeric = const [];
+  ChartAggregation _aggregation = ChartAggregation.none;
+  int? _topN = ChartData.defaultTopN;
 
   @override
   void initState() {
@@ -97,6 +100,37 @@ class _QuickChartViewState extends material.State<QuickChartView> {
       _labelCol = null;
     }
     _labelCol ??= _defaultLabel();
+    _aggregation = _defaultAggregation(_valueCol!);
+  }
+
+  ChartAggregation _defaultAggregation(int valueCol) =>
+      ChartData.defaultAggregation(
+        rows: widget.rows,
+        labelColumn: _labelCol,
+        valueColumn: valueCol,
+      );
+
+  static String _aggregationLabel(ChartAggregation a) => switch (a) {
+        ChartAggregation.none => 'None',
+        ChartAggregation.sum => 'Sum',
+        ChartAggregation.count => 'Count',
+        ChartAggregation.avg => 'Avg',
+        ChartAggregation.min => 'Min',
+        ChartAggregation.max => 'Max',
+      };
+
+  /// Points for the current X / Y / type. Line charts never aggregate or cut
+  /// categories; they report the rows beyond the cap instead.
+  ChartSeries _series(int valueCol) {
+    final isLine = _type == QuickChartType.line;
+    return ChartData.build(
+      rows: widget.rows,
+      labelColumn: _labelCol,
+      valueColumn: valueCol,
+      type: _type,
+      aggregation: isLine ? ChartAggregation.none : _aggregation,
+      topN: isLine ? null : _topN,
+    );
   }
 
   int? _defaultLabel() {
@@ -125,12 +159,7 @@ class _QuickChartViewState extends material.State<QuickChartView> {
     final palette = context.semanticPalette;
     final wb = context.workbench;
     final svg = ChartSvg.build(
-      points: ChartData.build(
-        rows: widget.rows,
-        labelColumn: _labelCol,
-        valueColumn: valueCol,
-        type: _type,
-      ),
+      points: _series(valueCol).points,
       type: _type,
       title: widget.columns[valueCol],
       colors: ChartSvgColors(
@@ -163,12 +192,8 @@ class _QuickChartViewState extends material.State<QuickChartView> {
         ),
       );
     }
-    final points = ChartData.build(
-      rows: widget.rows,
-      labelColumn: _labelCol,
-      valueColumn: _valueCol!,
-      type: _type,
-    );
+    final series = _series(_valueCol!);
+    final points = series.points;
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
@@ -201,8 +226,10 @@ class _QuickChartViewState extends material.State<QuickChartView> {
                   for (var i = 0; i < widget.columns.length; i++)
                     QueryaDropdownItem(value: i, label: widget.columns[i]),
                 ],
-                onSelected: (v) =>
-                    setState(() => _labelCol = (v == null || v < 0) ? null : v),
+                onSelected: (v) => setState(() {
+                  _labelCol = (v == null || v < 0) ? null : v;
+                  _aggregation = _defaultAggregation(_valueCol!);
+                }),
               ),
               const material.SizedBox(width: 12),
               const Text('Y'),
@@ -215,9 +242,51 @@ class _QuickChartViewState extends material.State<QuickChartView> {
                   for (final i in _numeric)
                     QueryaDropdownItem(value: i, label: widget.columns[i]),
                 ],
-                onSelected: (v) => setState(() => _valueCol = v ?? _valueCol),
+                onSelected: (v) => setState(() {
+                  _valueCol = v ?? _valueCol;
+                  _aggregation = _defaultAggregation(_valueCol!);
+                }),
               ),
+              if (_type != QuickChartType.line) ...[
+                const material.SizedBox(width: 12),
+                const Text('Agg'),
+                const material.SizedBox(width: 6),
+                QueryaDropdown<ChartAggregation>(
+                  key: const material.ValueKey('chart_aggregation'),
+                  value: _aggregation,
+                  width: 110,
+                  items: [
+                    for (final a in ChartAggregation.values)
+                      QueryaDropdownItem(
+                          value: a, label: _aggregationLabel(a)),
+                  ],
+                  onSelected: (v) =>
+                      setState(() => _aggregation = v ?? _aggregation),
+                ),
+                const material.SizedBox(width: 12),
+                const Text('Top'),
+                const material.SizedBox(width: 6),
+                QueryaDropdown<int>(
+                  key: const material.ValueKey('chart_top_n'),
+                  value: _topN ?? 0,
+                  width: 90,
+                  items: [
+                    for (final n in ChartData.topNChoices)
+                      QueryaDropdownItem(
+                          value: n ?? 0, label: n == null ? 'All' : '$n'),
+                  ],
+                  onSelected: (v) =>
+                      setState(() => _topN = (v == null || v == 0) ? null : v),
+                ),
+              ],
               const material.Spacer(),
+              if (series.droppedRows > 0) ...[
+                QueryaBadge.status(
+                  '${points.length} of ${points.length + series.droppedRows} rows',
+                  status: QueryaBadgeStatus.warning,
+                ),
+                const material.SizedBox(width: 8),
+              ],
               material.IconButton(
                 key: const material.ValueKey('chart_export'),
                 tooltip: 'Export PNG',
