@@ -86,8 +86,10 @@ class SqliteSqlExecutionDelegate extends SqlExecutionDelegate {
     }
 
     final cap = limit ?? kDefaultSqlResultMaxRows;
+    // Wrapped first, so the LIMIT lands on the outer query and the columns
+    // keep unique names (#1144).
     final effectiveSql = sqliteSqlIsReadOnlyQuery(sql)
-        ? injectSqlLimit(sql, cap)
+        ? injectSqlLimit(sqliteUniqueColumnsSql(sql), cap)
         : sql;
 
     final results = await conn.executeWithTimeout(effectiveSql, timeout: timeout);

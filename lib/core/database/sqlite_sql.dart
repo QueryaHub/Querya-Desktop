@@ -268,6 +268,25 @@ class _SqliteSqlScan {
   }
 }
 
+/// [sql] as a `SELECT * FROM (...)` wrapper, so SQLite names every output
+/// column uniquely: `SELECT o.id, u.id` gives `id` and `id:1` instead of two
+/// `id` columns. `rawQuery` returns rows as maps keyed by name, so repeated
+/// names would collapse into one (#1144).
+///
+/// Only a single `SELECT` or `WITH` statement is wrapped. Anything else, and
+/// several statements at once, come back unchanged.
+String sqliteUniqueColumnsSql(String sql) {
+  final stmt = sqliteStripSqlComments(sql).trim().toLowerCase();
+  if (!RegExp(r'^(select|with)\b').hasMatch(stmt)) return sql;
+  if (sqliteHasMultipleStatements(sql)) return sql;
+  var body = sql.trim();
+  while (body.endsWith(';')) {
+    body = body.substring(0, body.length - 1).trimRight();
+  }
+  // The newlines keep a trailing `-- comment` from swallowing the `)`.
+  return 'SELECT * FROM (\n$body\n)';
+}
+
 bool _isIdentStart(int c) => (c >= 0x61 && c <= 0x7a) || c == 0x5f;
 
 bool _isIdentPart(int c) => _isIdentStart(c) || (c >= 0x30 && c <= 0x39);
