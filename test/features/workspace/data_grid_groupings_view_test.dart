@@ -26,7 +26,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('No data available for grouping.'), findsOneWidget);
+      expect(find.text('No data to group'), findsOneWidget);
     });
 
     testWidgets('renders grouping categories and allows aggregation switching', (tester) async {
