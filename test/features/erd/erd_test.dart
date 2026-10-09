@@ -403,6 +403,43 @@ void main() {
       await t.pump(const Duration(seconds: 1));
     });
 
+    testWidgets('long types do not overflow and PK+FK shows both markers',
+        (t) async {
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
+      final junction = FakeSqlExecutionDelegate(onExecute: (sql) {
+        if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+          return const SqlExecutionResult(rows: [
+            ['orders', 'id', 'INTEGER', '1'],
+            ['order_items', 'order_id', 'INTEGER', '1'],
+            ['order_items', 'status', "enum('pending','paid','shipped','cancelled')", '0'],
+            ['order_items', 'created_at', 'timestamp with time zone', '0'],
+          ]);
+        }
+        return const SqlExecutionResult(rows: [
+          ['order_items', 'order_id', 'orders', 'id'],
+        ]);
+      });
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(delegate: junction, dialect: SqlDialect.sqlite),
+      ));
+      await t.pump();
+      await t.pump();
+
+      final card = find.byKey(const material.ValueKey('erd_table_order_items'));
+      expect(card, findsOneWidget);
+      expect(t.takeException(), isNull);
+      expect(
+        find.descendant(
+            of: card, matching: find.byIcon(material.Icons.key_rounded)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+            of: card, matching: find.byIcon(material.Icons.link_rounded)),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('shows empty state', (t) async {
       await t.pumpWidget(queryaThemeTestShell(
         child: ErdView(
