@@ -87,7 +87,10 @@ void main() {
     await t.pumpAndSettle();
     await t.runAsync(() async {
       await t.tap(find.text('PNG'));
-      await Future<void>.delayed(const Duration(milliseconds: 500));
+      final deadline = DateTime.now().add(const Duration(seconds: 10));
+      while (saved == null && DateTime.now().isBefore(deadline)) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
     });
     await t.pump();
     expect(saved, isNotNull);
