@@ -234,21 +234,11 @@ class PostgresTableDataDelegate extends TableDataMutationDelegate {
     });
   }
 
+  /// Pooled sessions are shared with every other view of this database, so
+  /// cancelling never closes them: a statement that is still running finishes
+  /// or times out on its own, and the lease is released by [dispose].
   @override
-  void cancel({bool interruptIfBusy = false}) {
-    if (interruptIfBusy) {
-      PostgresService.instance.interrupt(
-        connectionRow,
-        database: database,
-        mode: PgSessionMode.readOnly,
-      );
-      PostgresService.instance.interrupt(
-        connectionRow,
-        database: database,
-        mode: PgSessionMode.tableWrite,
-      );
-    }
-  }
+  void cancel({bool interruptIfBusy = false}) {}
 
   @override
   void dispose() {
