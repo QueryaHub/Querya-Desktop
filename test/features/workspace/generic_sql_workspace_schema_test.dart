@@ -42,6 +42,30 @@ class _SchemaDelegate extends FakeSqlExecutionDelegate {
   }
 }
 
+/// Counts the transaction probes the workspace sends to the server.
+class _TxDelegate extends FakeSqlExecutionDelegate {
+  _TxDelegate()
+      : super(
+          onExecute: (sql) => const SqlExecutionResult(
+            columns: ['id'],
+            rows: [
+              ['1'],
+            ],
+          ),
+        );
+
+  var probes = 0;
+
+  @override
+  bool get supportsTransactions => true;
+
+  @override
+  Future<bool?> checkTransactionOpen() async {
+    probes++;
+    return false;
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -80,7 +104,7 @@ void main() {
 
   Future<GenericSqlWorkspaceState> pumpWorkspace(
     WidgetTester tester,
-    _SchemaDelegate delegate,
+    FakeSqlExecutionDelegate delegate,
     String initialSql,
   ) async {
     await tester.binding.setSurfaceSize(const material.Size(1200, 800));
@@ -132,5 +156,15 @@ void main() {
     await runAndWait(tester, state);
     await runAndWait(tester, state);
     expect(delegate.lookups.length, 1);
+  });
+
+  testWidgets('a plain read in autocommit does not probe the transaction again',
+      (tester) async {
+    final delegate = _TxDelegate();
+    final state = await pumpWorkspace(tester, delegate, 'select 1');
+    await runAndWait(tester, state);
+    expect(delegate.probes, 1);
+    await runAndWait(tester, state);
+    expect(delegate.probes, 1);
   });
 }

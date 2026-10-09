@@ -350,7 +350,9 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
   Future<void> refreshTxStatus() async {
     if (!widget.delegate.supportsTransactions) return;
     final v = await widget.delegate.checkTransactionOpen();
-    if (mounted) {
+    // The transaction label lives in each pane: rebuild the cached panes only
+    // when the state really changed, not after every statement.
+    if (mounted && v != _txOpen) {
       invalidateAllPanes();
       setState(() => _txOpen = v);
     }
@@ -396,7 +398,13 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
         });
       }
     } finally {
-      await refreshTxStatus();
+      // Autocommit: after a read that succeeded while no transaction is known
+      // to be open, none can have been opened, so the server is not asked.
+      final afterPlainRead = _autocommit &&
+          session.error == null &&
+          _txOpen == false &&
+          _isReadQuery(userSql);
+      if (!afterPlainRead) await refreshTxStatus();
     }
   }
 
