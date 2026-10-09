@@ -757,6 +757,50 @@ void main() {
           closeTo(height, 0.5));
     });
 
+    testWidgets('hovering a card rebuilds only the cards it changes',
+        (t) async {
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
+      final wide = FakeSqlExecutionDelegate(onExecute: (sql) {
+        if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+          return SqlExecutionResult(rows: [
+            for (var i = 0; i < 20; i++) ['t$i', 'id', 'INTEGER', '1'],
+            ['child', 'id', 'INTEGER', '1'],
+            ['child', 't0_id', 'INTEGER', '0'],
+          ]);
+        }
+        return const SqlExecutionResult(rows: [
+          ['child', 't0_id', 't0', 'id'],
+        ]);
+      });
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(
+            source: SqlErdSource(delegate: wide, dialect: SqlDialect.sqlite)),
+      ));
+      await t.pump();
+      await t.pump();
+      await t.pump();
+
+      final mouse = await t.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      await mouse.addPointer(location: material.Offset.zero);
+
+      // The first hover changes one card's focus: only that card rebuilds.
+      erdCardBuilds = 0;
+      await mouse.moveTo(
+          t.getCenter(find.byKey(const material.ValueKey('erd_table_t5'))));
+      await t.pump();
+      expect(erdCardBuilds, 1);
+
+      // Moving to child: t5 loses the highlight, child and t0 gain it. The
+      // other twenty cards stay as they are.
+      erdCardBuilds = 0;
+      await mouse.moveTo(
+          t.getCenter(find.byKey(const material.ValueKey('erd_table_child'))));
+      await t.pump();
+      expect(erdCardBuilds, greaterThan(0));
+      expect(erdCardBuilds, lessThanOrEqualTo(3));
+    });
+
     testWidgets('Copy Mermaid puts the diagram on the clipboard', (t) async {
       await t.binding.setSurfaceSize(const material.Size(1200, 800));
       String? copied;
