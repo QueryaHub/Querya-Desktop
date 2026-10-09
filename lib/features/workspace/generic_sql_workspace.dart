@@ -30,10 +30,33 @@ import 'package:querya_desktop/features/workspace/sql_query_tab_bar.dart';
 import 'package:querya_desktop/features/workspace/sql_query_tab_session.dart';
 import 'package:querya_desktop/features/workspace/sql_result_grid_schema.dart';
 import 'package:querya_desktop/features/workspace/table_view_staging.dart';
+import 'package:querya_desktop/shared/widgets/querya_action_menu.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Reusable base SQL workspace supporting multi-tab editing, statement execution,
 /// destructive query confirmations, unsaved changes guards, DML staging and result grids.
+/// Entries of the Session menu in the SQL toolbar.
+sealed class _SessionChoice {
+  const _SessionChoice();
+}
+
+class _ToggleAutocommit extends _SessionChoice {
+  const _ToggleAutocommit();
+}
+
+class _SetTimeout extends _SessionChoice {
+  const _SetTimeout(this.seconds);
+  final int? seconds;
+}
+
+class _BeginTransaction extends _SessionChoice {
+  const _BeginTransaction();
+}
+
+class _OpenPreferences extends _SessionChoice {
+  const _OpenPreferences();
+}
+
 class GenericSqlWorkspace extends material.StatefulWidget {
   const GenericSqlWorkspace({
     super.key,
@@ -404,6 +427,45 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
 
   /// Runs the selection, else the whole text. With [statementAtCursor] (run
   /// statement) only the statement under the caret, see [SqlStatementSplitter].
+  List<QueryaActionMenuItem<_SessionChoice>> _sessionMenuItems() => [
+        if (widget.supportsAutocommit)
+          QueryaActionMenuItem(
+            value: const _ToggleAutocommit(),
+            label: _autocommit ? 'Autocommit: on' : 'Autocommit: off',
+          ),
+        if (widget.supportsStmtTimeout)
+          for (final option in kSqlStatementTimeoutMenuItems)
+            QueryaActionMenuItem(
+              value: _SetTimeout(option.value),
+              label: 'Timeout: ${option.label}'
+                  '${option.value == _queryTimeoutSeconds ? '  ✓' : ''}',
+            ),
+        if (widget.delegate.supportsTransactions && _txOpen != true)
+          const QueryaActionMenuItem(
+            value: _BeginTransaction(),
+            label: 'Begin transaction',
+          ),
+        const QueryaActionMenuItem(
+          value: _OpenPreferences(),
+          label: 'Preferences…',
+        ),
+      ];
+
+  void _onSessionChoice(_SessionChoice choice) {
+    switch (choice) {
+      case _ToggleAutocommit():
+        invalidateAllPanes();
+        setState(() => _autocommit = !_autocommit);
+        widget.onAutocommitChanged?.call(_autocommit);
+      case _SetTimeout(:final seconds):
+        _onStmtTimeoutChanged(seconds);
+      case _BeginTransaction():
+        unawaited(runTxCommand('BEGIN'));
+      case _OpenPreferences():
+        unawaited(showPreferencesDialog(context));
+    }
+  }
+
   final Map<String, SqlResultGridSchema> _gridSchemaCache = {};
 
   static String _schemaCacheKey(String sql, List<String> cols) =>
@@ -1102,48 +1164,39 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
                     runSpacing: 8,
                     crossAxisAlignment: material.WrapCrossAlignment.center,
                     children: [
-                      if (widget.supportsAutocommit) ...[
-                        material.Row(
-                          mainAxisSize: material.MainAxisSize.min,
-                          children: [
-                            const Text('Autocommit').small(),
-                            const Gap(6),
-                            material.Switch(
-                              value: _autocommit,
-                              onChanged: session.running
-                                  ? null
-                                  : (v) {
-                                      invalidateAllPanes();
-                                      setState(() => _autocommit = v);
-                                      widget.onAutocommitChanged?.call(v);
-                                    },
-                            ),
-                          ],
-                        ),
-                      ],
-                      if (widget.supportsStmtTimeout) ...[
-                        material.Row(
-                          mainAxisSize: material.MainAxisSize.min,
-                          children: [
-                            const Text('Stmt timeout').small(),
-                            const Gap(6),
-                            SqlStatementTimeoutDropdown(
-                              value: _queryTimeoutSeconds,
-                              onChanged: _onStmtTimeoutChanged,
-                              enabled: !session.running,
-                            ),
-                            const Gap(4),
-                            IconButton.ghost(
-                              onPressed: session.running ? null : () => showPreferencesDialog(context),
-                              icon: material.Icon(
-                                material.Icons.settings_rounded,
-                                size: 20,
-                                color: accent,
+                      // Autocommit, statement timeout, Begin and Preferences live
+                      // in one Session menu.
+                      material.IgnorePointer(
+                        ignoring: session.running,
+                        child: material.Opacity(
+                          opacity: session.running ? 0.5 : 1,
+                          child: QueryaActionMenu<_SessionChoice>(
+                            key: const material.ValueKey('session_menu'),
+                            items: _sessionMenuItems(),
+                            onSelected: (choice) => _onSessionChoice(choice),
+                            child: material.Padding(
+                              padding: const material.EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
+                              child: material.Row(
+                                mainAxisSize: material.MainAxisSize.min,
+                                children: [
+                                  material.Icon(material.Icons.tune_rounded,
+                                      size: 16, color: accent),
+                                  const material.SizedBox(width: 6),
+                                  Text(_autocommit
+                                      ? 'Session · auto-commit'
+                                      : 'Session · manual'),
+                                  const material.SizedBox(width: 4),
+                                  material.Icon(
+                                      material.Icons.expand_more_rounded,
+                                      size: 16,
+                                      color: accent),
+                                ],
                               ),
                             ),
-                          ],
+                          ),
                         ),
-                      ],
+                      ),
                       // Commit and Rollback only while a transaction is open; Begin
                       // otherwise.
                       if (widget.delegate.supportsTransactions)
