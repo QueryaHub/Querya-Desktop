@@ -135,6 +135,48 @@ class ChartData {
     return ChartSeries(points: [...head, ChartPoint(otherLabel, rest)]);
   }
 
+  /// Largest-triangle-three-buckets: reduces [points] to [target] points that
+  /// keep the shape of the series, so peaks survive. The first and last points
+  /// are always kept; shorter series come back unchanged.
+  static List<ChartPoint> downsample(List<ChartPoint> points, int target) {
+    final n = points.length;
+    if (target < 3 || n <= target) return points;
+    final out = <ChartPoint>[points.first];
+    final every = (n - 2) / (target - 2);
+    var a = 0;
+    for (var i = 0; i < target - 2; i++) {
+      // Average of the next bucket: the third corner of each triangle.
+      final nextStart = ((i + 1) * every).floor() + 1;
+      final nextEnd = (((i + 2) * every).floor() + 1).clamp(0, n).toInt();
+      var avgX = 0.0, avgY = 0.0;
+      for (var k = nextStart; k < nextEnd; k++) {
+        avgX += k;
+        avgY += points[k].value;
+      }
+      final count = nextEnd - nextStart;
+      avgX /= count;
+      avgY /= count;
+
+      final rangeStart = (i * every).floor() + 1;
+      final rangeEnd = (((i + 1) * every).floor() + 1).clamp(0, n).toInt();
+      final ax = a.toDouble(), ay = points[a].value;
+      var best = -1.0, pick = rangeStart;
+      for (var k = rangeStart; k < rangeEnd; k++) {
+        final area = ((ax - avgX) * (points[k].value - ay) -
+                (ax - k) * (avgY - ay))
+            .abs();
+        if (area > best) {
+          best = area;
+          pick = k;
+        }
+      }
+      out.add(points[pick]);
+      a = pick;
+    }
+    out.add(points.last);
+    return out;
+  }
+
   static List<ChartPoint> _parse(
     List<List<String>> rows,
     int? labelColumn,
