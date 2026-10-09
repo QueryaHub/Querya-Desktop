@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/motion/ticker_gated_polling.dart';
 import 'package:querya_desktop/core/stats/metric_history.dart';
