@@ -38,7 +38,7 @@ class SqlErdSource implements ErdSource {
 /// [TableDataMutationDelegate.loadCustomSql]. The table delegate keeps its own
 /// connection, so the diagram never borrows the SQL editor's session.
 class TableDataSqlAdapter extends SqlExecutionDelegate {
-  const TableDataSqlAdapter(this.table);
+  TableDataSqlAdapter(this.table);
 
   final TableDataMutationDelegate table;
 
