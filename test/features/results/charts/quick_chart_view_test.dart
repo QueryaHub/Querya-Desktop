@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/features/results/charts/chart_data.dart';
 import 'package:querya_desktop/features/results/charts/quick_chart_view.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
@@ -22,6 +23,24 @@ void main() {
     await t.pumpWidget(queryaThemeTestShell(child: QuickChartView(columns: cols, rows: r)));
     await t.pump();
   }
+
+  testWidgets('pie shows Top 8 with Other, distinct colours and a legend',
+      (t) async {
+    final many = [
+      for (var i = 1; i <= 30; i++) ['cat$i', '$i'],
+    ];
+    await pumpView(t, columns, many);
+    await t.tap(find.text('Pie'));
+    await t.pump();
+
+    final pie = t.widget<PieChart>(find.byType(PieChart));
+    final sections = pie.data.sections;
+    expect(sections.length, ChartData.pieTopN + 1);
+    expect(sections.map((s) => s.color).toSet().length, sections.length);
+    // The legend names every slice, the tail as Other.
+    expect(find.text(ChartData.otherLabel), findsOneWidget);
+    expect(find.text('cat30'), findsOneWidget);
+  });
 
   testWidgets('shows empty state without numeric column', (t) async {
     await pumpView(t, ['name'], [

@@ -31,9 +31,13 @@ class ChartData {
   static const int maxPoints = 50;
 
   /// Top N choices offered for bar and pie; `null` means every category.
-  static const List<int?> topNChoices = [10, 20, 50, null];
+  static const List<int?> topNChoices = [8, 10, 20, 50, null];
 
+  /// Default for bar charts.
   static const int defaultTopN = 20;
+
+  /// Default for pie: eight slices and "Other" stay readable in a legend.
+  static const int pieTopN = 8;
 
   /// Name of the slice that collects the categories beyond Top N.
   static const String otherLabel = 'Other';

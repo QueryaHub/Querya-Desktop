@@ -1,4 +1,5 @@
 import 'dart:convert' show utf8;
+import 'dart:math' show min;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -71,6 +72,7 @@ class _QuickChartViewState extends material.State<QuickChartView> {
   List<int> _numeric = const [];
   ChartAggregation _aggregation = ChartAggregation.none;
   int? _topN = ChartData.defaultTopN;
+  int? _hoveredSlice;
 
   @override
   void initState() {
@@ -217,7 +219,13 @@ class _QuickChartViewState extends material.State<QuickChartView> {
                 ],
                 selected: {_type},
                 showSelectedIcon: false,
-                onSelectionChanged: (s) => setState(() => _type = s.first),
+                onSelectionChanged: (s) => setState(() {
+                  _type = s.first;
+                  _topN = _type == QuickChartType.pie
+                      ? ChartData.pieTopN
+                      : ChartData.defaultTopN;
+                  _hoveredSlice = null;
+                }),
               ),
               const material.SizedBox(width: 12),
               const Text('X'),
@@ -327,18 +335,139 @@ class _QuickChartViewState extends material.State<QuickChartView> {
     );
   }
 
-  material.Widget _buildChart(
+  /// Donut sized to the pane, with a legend beside it (wide) or below it.
+  /// Hovering a slice or its legend row highlights both.
+  material.Widget _buildPie(
       material.BuildContext context, List<ChartPoint> points) {
     final palette = context.semanticPalette;
     final wb = context.workbench;
-    final label = material.TextStyle(color: wb.mutedForeground, fontSize: 10);
-    final colors = [
+    final base = [
       palette.type1,
       palette.type2,
       palette.type3,
       palette.type4,
       palette.type5,
     ];
+    final total = points.fold<double>(0, (s, p) => s + p.value);
+
+    // Five palette colours; each further round is tinted towards the muted
+    // text colour, so slices stay distinct up to 25 of them.
+    material.Color colorOf(int i) {
+      final round = i ~/ base.length;
+      final c = base[i % base.length];
+      return round == 0
+          ? c
+          : material.Color.lerp(c, wb.mutedForeground, 0.35 * round)!;
+    }
+
+    material.Color contrastOn(material.Color c) =>
+        c.computeLuminance() > 0.5 ? material.Colors.black : material.Colors.white;
+
+    material.Widget legendRow(int i) {
+      final p = points[i];
+      final share = total > 0 ? p.value / total * 100 : 0.0;
+      final hovered = _hoveredSlice == i;
+      final valueText = p.value == p.value.roundToDouble()
+          ? p.value.toInt().toString()
+          : p.value.toStringAsFixed(2);
+      return material.MouseRegion(
+        onEnter: (_) => setState(() => _hoveredSlice = i),
+        onExit: (_) => setState(() => _hoveredSlice = null),
+        child: material.Container(
+          color: hovered ? wb.accent.withValues(alpha: 0.12) : null,
+          padding: const material.EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+          child: material.Row(
+            children: [
+              material.Container(
+                  width: 10, height: 10, color: colorOf(i)),
+              const material.SizedBox(width: 6),
+              material.Expanded(
+                child: material.Text(p.label,
+                    maxLines: 1,
+                    overflow: material.TextOverflow.ellipsis,
+                    style: const material.TextStyle(fontSize: 12)),
+              ),
+              const material.SizedBox(width: 8),
+              material.Text(valueText,
+                  style: material.TextStyle(
+                      fontSize: 11, color: wb.mutedForeground)),
+              const material.SizedBox(width: 8),
+              material.SizedBox(
+                width: 48,
+                child: material.Text('${share.toStringAsFixed(1)}%',
+                    textAlign: material.TextAlign.right,
+                    style: const material.TextStyle(fontSize: 11)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final legend = material.ListView(
+      padding: material.EdgeInsets.zero,
+      children: [for (var i = 0; i < points.length; i++) legendRow(i)],
+    );
+
+    return material.LayoutBuilder(builder: (context, box) {
+      final wide = box.maxWidth >= 520;
+      final chart = material.Expanded(
+        child: material.LayoutBuilder(builder: (context, c) {
+          final side = min(c.maxWidth, c.maxHeight);
+          // Leaves room for the touched slice to grow.
+          final outer = side / 2 * 0.88;
+          final hole = outer * 0.45;
+          return material.Center(
+            child: material.SizedBox(
+              width: side,
+              height: side,
+              child: PieChart(PieChartData(
+                sectionsSpace: 1,
+                centerSpaceRadius: hole,
+                pieTouchData: PieTouchData(
+                  touchCallback: (event, response) {
+                    final i = response?.touchedSection?.touchedSectionIndex;
+                    if (_hoveredSlice != i) setState(() => _hoveredSlice = i);
+                  },
+                ),
+                sections: [
+                  for (var i = 0; i < points.length; i++)
+                    PieChartSectionData(
+                      value: points[i].value,
+                      color: colorOf(i),
+                      radius: outer - hole + (_hoveredSlice == i ? 8 : 0),
+                      title: total > 0 && points[i].value / total >= 0.05
+                          ? '${(points[i].value / total * 100).round()}%'
+                          : '',
+                      titleStyle: TextStyle(
+                          fontSize: 11, color: contrastOn(colorOf(i))),
+                    ),
+                ],
+              )),
+            ),
+          );
+        }),
+      );
+
+      if (wide) {
+        return material.Row(children: [
+          chart,
+          const material.SizedBox(width: 12),
+          material.SizedBox(width: 240, child: legend),
+        ]);
+      }
+      return material.Column(children: [
+        chart,
+        material.SizedBox(height: 150, child: legend),
+      ]);
+    });
+  }
+
+  material.Widget _buildChart(
+      material.BuildContext context, List<ChartPoint> points) {
+    final palette = context.semanticPalette;
+    final wb = context.workbench;
+    final label = material.TextStyle(color: wb.mutedForeground, fontSize: 10);
     final step = (points.length / 8).ceil().clamp(1, 1000);
 
     material.Widget bottom(double v, TitleMeta meta) {
@@ -420,19 +549,7 @@ class _QuickChartViewState extends material.State<QuickChartView> {
           ],
         ));
       case QuickChartType.pie:
-        return PieChart(PieChartData(
-          sectionsSpace: 1,
-          sections: [
-            for (var i = 0; i < points.length; i++)
-              PieChartSectionData(
-                value: points[i].value,
-                color: colors[i % colors.length],
-                radius: 100,
-                title: points.length <= 8 ? points[i].label : '',
-                titleStyle: const TextStyle(fontSize: 11),
-              ),
-          ],
-        ));
+        return _buildPie(context, points);
     }
   }
 }
