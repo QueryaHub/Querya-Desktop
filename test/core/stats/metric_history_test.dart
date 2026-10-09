@@ -35,7 +35,7 @@ void main() {
       final h = MetricHistory();
       expect(h.series('nothing'), isEmpty);
       h.record('a', 1, DateTime.utc(2026));
-      expect(() => h.series('a').add(const MetricSample(DateTime.utc(2026), 2)),
+      expect(() => h.series('a').add(MetricSample(DateTime.utc(2026), 2)),
           throwsUnsupportedError);
     });
   });
