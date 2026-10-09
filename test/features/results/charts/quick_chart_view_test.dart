@@ -30,7 +30,7 @@ void main() {
       for (var i = 1; i <= 30; i++) ['cat$i', '$i'],
     ];
     await pumpView(t, columns, many);
-    await t.tap(find.text('Pie'));
+    await t.tap(find.bySemanticsLabel('Pie'));
     await t.pump();
 
     final pie = t.widget<PieChart>(find.byType(PieChart));
@@ -66,10 +66,10 @@ void main() {
   testWidgets('renders bar, line and pie', (t) async {
     await pumpView(t, columns, rows);
     expect(find.byType(BarChart), findsOneWidget);
-    await t.tap(find.text('Line'));
+    await t.tap(find.bySemanticsLabel('Line'));
     await t.pump();
     expect(find.byType(LineChart), findsOneWidget);
-    await t.tap(find.text('Pie'));
+    await t.tap(find.bySemanticsLabel('Pie'));
     await t.pump();
     expect(find.byType(PieChart), findsOneWidget);
   });
@@ -84,7 +84,7 @@ void main() {
     )));
     await t.pump();
     await t.tap(find.byKey(const material.ValueKey('chart_export')));
-    await t.pump();
+    await t.pumpAndSettle();
     await t.runAsync(() async {
       await t.tap(find.text('PNG'));
       await Future<void>.delayed(const Duration(milliseconds: 500));
@@ -106,7 +106,7 @@ void main() {
     await t.pump();
 
     await t.tap(find.byKey(const material.ValueKey('chart_export')));
-    await t.pump();
+    await t.pumpAndSettle();
     await t.tap(find.text('SVG'));
     await t.pump();
     expect(saved, isNotNull);
@@ -114,10 +114,10 @@ void main() {
     expect(saved, contains('<title>amount by name</title>'));
     expect('<rect '.allMatches(saved!).length, 1 + rows.length);
 
-    await t.tap(find.text('Pie'));
+    await t.tap(find.bySemanticsLabel('Pie'));
     await t.pump();
     await t.tap(find.byKey(const material.ValueKey('chart_export')));
-    await t.pump();
+    await t.pumpAndSettle();
     await t.tap(find.text('SVG'));
     await t.pump();
     expect('<path '.allMatches(saved!).length, rows.length);
