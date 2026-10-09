@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/features/erd/erd_catalog.dart';
@@ -468,6 +469,94 @@ void main() {
             of: card, matching: find.byIcon(material.Icons.link_rounded)),
         findsOneWidget,
       );
+    });
+
+    /// users <- orders; lonely has no relation.
+    FakeSqlExecutionDelegate threeTables() =>
+        FakeSqlExecutionDelegate(onExecute: (sql) {
+          if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+            return const SqlExecutionResult(rows: [
+              ['users', 'id', 'INTEGER', '1'],
+              ['orders', 'id', 'INTEGER', '1'],
+              ['orders', 'user_id', 'INTEGER', '0'],
+              ['lonely', 'id', 'INTEGER', '1'],
+            ]);
+          }
+          return const SqlExecutionResult(rows: [
+            ['orders', 'user_id', 'users', 'id'],
+          ]);
+        });
+
+    Iterable<double> opacityOf(WidgetTester t, String table) =>
+        t.widgetList<material.Opacity>(find.ancestor(
+          of: find.byKey(material.ValueKey('erd_table_$table')),
+          matching: find.byType(material.Opacity),
+        )).map((o) => o.opacity);
+
+    testWidgets('zoom buttons change the zoom label', (t) async {
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(delegate: delegate(), dialect: SqlDialect.sqlite),
+      ));
+      await t.pump();
+      await t.pump();
+      expect(find.text('100%'), findsOneWidget);
+
+      await t.tap(find.byKey(const material.ValueKey('erd_zoom_out')));
+      await t.pump();
+      expect(find.text('80%'), findsOneWidget);
+
+      await t.tap(find.byKey(const material.ValueKey('erd_zoom_in')));
+      await t.pump();
+      expect(find.text('100%'), findsOneWidget);
+    });
+
+    testWidgets('a click picks a table and fades the unrelated ones',
+        (t) async {
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(delegate: threeTables(), dialect: SqlDialect.sqlite),
+      ));
+      await t.pump();
+      await t.pump();
+
+      await t.tap(find.byKey(const material.ValueKey('erd_table_lonely')));
+      // A tap waits out the double-tap window.
+      await t.pump(const Duration(milliseconds: 400));
+      expect(opacityOf(t, 'users'), contains(0.35));
+      expect(opacityOf(t, 'lonely'), isNot(contains(0.35)));
+
+      await t.sendKeyEvent(LogicalKeyboardKey.escape);
+      await t.pump();
+      expect(opacityOf(t, 'users'), isNot(contains(0.35)));
+    });
+
+    testWidgets('search lists matches and a tap picks the table',
+        (t) async {
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(delegate: threeTables(), dialect: SqlDialect.sqlite),
+      ));
+      await t.pump();
+      await t.pump();
+
+      await t.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await t.sendKeyEvent(LogicalKeyboardKey.keyF);
+      await t.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await t.pump();
+      await t.pump();
+
+      await t.enterText(find.byType(material.EditableText), 'ord');
+      await t.pump();
+      expect(find.byKey(const material.ValueKey('erd_search_result_orders')),
+          findsOneWidget);
+      expect(find.byKey(const material.ValueKey('erd_search_result_lonely')),
+          findsNothing);
+
+      await t.tap(find.byKey(const material.ValueKey('erd_search_result_orders')));
+      await t.pump(const Duration(milliseconds: 400));
+      expect(opacityOf(t, 'lonely'), contains(0.35));
+      expect(opacityOf(t, 'orders'), isNot(contains(0.35)));
     });
 
     testWidgets('shows empty state', (t) async {
