@@ -153,7 +153,9 @@ void main() {
     await tester.tap(find.text('orders'));
     await settle(tester);
     expect(find.byType(MongoDocumentsView), findsOneWidget);
-    expect(find.textContaining('ann'), findsWidgets);
+    // One card per document.
+    final cards = find.byIcon(material.Icons.description_rounded);
+    expect(cards, findsNWidgets(2));
 
     // Add a document through the dialog.
     await tester.tap(find.text('Add Document'));
@@ -170,7 +172,7 @@ void main() {
     await settle(tester);
     expect(mongo.inserted, hasLength(1));
     expect(mongo.inserted.single['name'], 'cid');
-    expect(find.textContaining('cid'), findsWidgets);
+    expect(cards, findsNWidgets(3), reason: 'the list reloads with the new one');
 
     // Edit a field of the first document from its expanded card.
     await tester.tap(find.byIcon(material.Icons.expand_more_rounded).first);
@@ -198,7 +200,8 @@ void main() {
     expect(mongo.deletes, [
       {'_id': 1},
     ]);
-    expect(find.textContaining('annie'), findsNothing);
+    expect(cards, findsNWidgets(2), reason: 'the list reloads without it');
+    expect(mongo.docs.map((d) => d['name']), ['bob', 'cid']);
   });
 
   testWidgets('cancelling the delete keeps the document (#1052)',

@@ -45,8 +45,19 @@ void main() {
     return null;
   }
 
+  /// Pumps with real time in between until [finder] shows: dialogs read the
+  /// extension registry and secrets from disk before they open.
+  Future<void> waitFor(WidgetTester t, Finder finder) async {
+    for (var i = 0; i < 60 && finder.evaluate().isEmpty; i++) {
+      await t.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 25)));
+      await t.pump(const Duration(milliseconds: 100));
+    }
+  }
+
   /// Picks [label] in the database type dialog and goes on to its form.
   Future<void> pickType(WidgetTester t, String label) async {
+    await waitFor(t, find.text('Select your database'));
     expect(find.text('Select your database'), findsOneWidget);
     await t.tap(find.text('Select database…'));
     await step(t);
@@ -118,6 +129,7 @@ void main() {
       await openNewConnection(tester);
       await pickType(tester, label);
 
+      await waitFor(tester, byPlaceholder(fields.keys.first));
       for (final e in fields.entries) {
         await tester.enterText(byPlaceholder(e.key), e.value);
         await tester.pump();
@@ -143,6 +155,7 @@ void main() {
     await pickType(tester, 'SQLite');
 
     final path = '${app.dataDir.path}/e2e_form.db';
+    await waitFor(tester, byPlaceholder('e.g. Local Cache'));
     await tester.enterText(byPlaceholder('e.g. Local Cache'), 'E2E Form SQLite');
     await tester.pump();
     await tester.enterText(byPlaceholder('/path/to/database.db'), path);
@@ -164,7 +177,6 @@ void main() {
   });
 
   testWidgets('New connection on a folder saves the connection into it',
-      variant: TargetPlatformVariant.only(material.TargetPlatform.linux),
       (tester) async {
     await app.launch(tester);
     addTearDown(() => app.resetData(tester));
@@ -184,6 +196,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 150));
     await step(tester);
     await pickType(tester, 'PostgreSQL');
+    await waitFor(tester,
+        byPlaceholder('postgresql://user:pass@host:5432/dbname?sslmode=require'));
     await tester.enterText(
         byPlaceholder('postgresql://user:pass@host:5432/dbname?sslmode=require'),
         'postgresql://u:p@folder.example.com:5432/app');
