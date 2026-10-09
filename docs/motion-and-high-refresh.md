@@ -1,7 +1,7 @@
 # Motion system and high-refresh-rate support (0.4.4 research)
 
 **Status:** research / design for **0.4.4**.
-**Scope:** Querya Desktop is **desktop-only** (Linux, Windows, macOS — see [`linux/`](../linux), [`windows/`](../windows), [`macos/`](../macos)). Toolchain at time of writing: **Flutter 3.41.6 stable**, Impeller engine.
+**Scope:** Querya Desktop is **desktop-only** (Linux, Windows, macOS — see [`linux/`](../linux), [`windows/`](../windows), [`macos/`](../macos)). Toolchain at time of writing: **Flutter 3.47.1 stable**, Impeller engine.
 
 Goal of 0.4.4: make every animation **smooth and pleasant**, driven by a single motion system, and make the app actually render at the display's **native refresh rate (90/120/144 Hz)** on each OS instead of being capped at 60.
 
