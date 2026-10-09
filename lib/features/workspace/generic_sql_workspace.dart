@@ -462,7 +462,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       case _BeginTransaction():
         unawaited(runTxCommand('BEGIN'));
       case _OpenPreferences():
-        unawaited(showPreferencesDialog(context));
+        showPreferencesDialog(context);
     }
   }
 
