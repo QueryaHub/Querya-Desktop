@@ -58,6 +58,18 @@ class ChartData {
     if (!_isoTime.hasMatch(text)) return null;
     final parsed = DateTime.tryParse(text.replaceFirst(' ', 'T'));
     if (parsed == null) return null;
+    // DateTime rolls an impossible date over (2026-13-45 becomes 2027-02-14);
+    // the fields must read back as typed.
+    if (parsed.year != int.parse(text.substring(0, 4)) ||
+        parsed.month != int.parse(text.substring(5, 7)) ||
+        parsed.day != int.parse(text.substring(8, 10))) {
+      return null;
+    }
+    if (text.length >= 16 &&
+        (parsed.hour != int.parse(text.substring(11, 13)) ||
+            parsed.minute != int.parse(text.substring(14, 16)))) {
+      return null;
+    }
     if (_hasZone.hasMatch(text)) return parsed.toUtc();
     return DateTime.utc(parsed.year, parsed.month, parsed.day, parsed.hour,
         parsed.minute, parsed.second, parsed.millisecond, parsed.microsecond);

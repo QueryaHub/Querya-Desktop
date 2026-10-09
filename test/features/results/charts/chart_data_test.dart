@@ -279,7 +279,8 @@ void main() {
         type: QuickChartType.line,
       );
       final offsets = ChartData.timeOffsets(series.points)!;
-      expect(offsets, [0, 1, 58]);
+      // 1 January to 1 March is 59 days; 2 January to 1 March is 58.
+      expect(offsets, [0, 1, 59]);
       // The gap before the third point is 58 times the first gap.
       expect((offsets[2] - offsets[1]) / (offsets[1] - offsets[0]), 58);
     });
