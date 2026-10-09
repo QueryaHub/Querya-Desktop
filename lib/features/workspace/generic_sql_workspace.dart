@@ -567,6 +567,9 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
     final scopeStart = selected ? selection.start : 0;
     final texts = [for (final s in spans) s.textIn(scope)];
     final runSql = statementAtCursor ? texts.single : scope.trim();
+    // One statement goes to the driver as the run text, with its ';' when the
+    // whole script is one statement.
+    final sent = texts.length == 1 ? [runSql] : texts;
 
     final safeToProceed = await confirmDiscardTableEditsIfDirty(
       context: context,
@@ -624,7 +627,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
         final SqlExecutionResult result;
         try {
           result = await widget.delegate.executeQuery(
-            texts[i],
+            sent[i],
             limit: _resultMaxRows,
             timeout: statementTimeout,
           );
@@ -649,7 +652,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
         auditSqlExecution(
           connection: widget.connectionRow,
           databaseName: effectiveDatabase,
-          sql: texts[i],
+          sql: sent[i],
           rowsAffected: result.affectedRows,
           source: MutationAuditSource.sqlEditor,
         );
@@ -674,7 +677,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       final result = shown!;
       final cols = result.columns;
       final outRows = result.rows;
-      final shownSql = texts[shownIndex];
+      final shownSql = sent[shownIndex];
       final multi = texts.length > 1;
       final scriptStatus = multi
           ? '${texts.length} statements'
@@ -701,7 +704,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
         session.running = false;
       });
       // Anything that is not a read may change table shapes: forget the cache.
-      if (!texts.every(_isReadQuery)) _gridSchemaCache.clear();
+      if (!sent.every(_isReadQuery)) _gridSchemaCache.clear();
 
       if (cached != null) {
         _applyGridSchema(
@@ -765,7 +768,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       final afterPlainRead = _autocommit &&
           session.error == null &&
           _txOpen == false &&
-          texts.every(_isReadQuery);
+          sent.every(_isReadQuery);
       if (!afterPlainRead) await refreshTxStatus();
     }
   }
@@ -1238,7 +1241,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
                               label: 'Run statement (${_modLabel}Enter)',
                               icon: material.Icons.short_text_rounded,
                             ),
-                            QueryaActionMenuItem(
+                            const QueryaActionMenuItem(
                               value: false,
                               label: 'Run script (F5)',
                               icon: material.Icons.list_alt_rounded,
