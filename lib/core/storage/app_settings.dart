@@ -321,10 +321,15 @@ class AppSettings {
   /// Chart and diagram exports. False (default): a light palette for documents.
   /// True: the colours of the current theme.
   Future<bool> getExportCurrentTheme() async {
-    final value = await LocalDb.instance.getAppSetting(
-      AppSettingsKeys.exportCurrentTheme,
-    );
-    return value == '1' || value?.toLowerCase() == 'true';
+    try {
+      final value = await LocalDb.instance.getAppSetting(
+        AppSettingsKeys.exportCurrentTheme,
+      );
+      return value == '1' || value?.toLowerCase() == 'true';
+    } catch (_) {
+      // No readable store (tests, a damaged database): export the default.
+      return false;
+    }
   }
 
   Future<void> setExportCurrentTheme(bool value) async {

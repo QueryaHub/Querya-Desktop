@@ -12,7 +12,6 @@ import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/features/results/charts/chart_data.dart';
 import 'package:querya_desktop/features/results/charts/chart_format.dart';
 import 'package:querya_desktop/features/results/charts/chart_svg.dart';
-import 'package:querya_desktop/shared/widgets/app_toast.dart';
 import 'package:querya_desktop/shared/widgets/querya_action_menu.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
