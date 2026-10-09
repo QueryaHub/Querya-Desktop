@@ -100,8 +100,11 @@ class _DataGridGroupingsViewState
   @override
   material.Widget build(material.BuildContext context) {
     if (widget.columns.isEmpty || widget.rows.isEmpty) {
-      return material.Center(
-        child: const Text('No data available for grouping.').muted(),
+      return const material.Center(
+        child: QueryaEmptyState(
+          title: 'No data to group',
+          description: 'Run a query that returns rows, then group them here.',
+        ),
       );
     }
 
