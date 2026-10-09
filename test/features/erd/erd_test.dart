@@ -50,6 +50,42 @@ void main() {
       }
     });
 
+    test('postgres reads the catalog from pg_catalog, not information_schema',
+        () {
+      for (final sql in [
+        ErdCatalog.columnsSql(SqlDialect.postgres),
+        ErdCatalog.foreignKeysSql(SqlDialect.postgres),
+      ]) {
+        expect(sql, contains('pg_catalog.'));
+        expect(sql, isNot(contains('information_schema')));
+      }
+      expect(ErdCatalog.foreignKeysSql(SqlDialect.postgres),
+          contains('unnest(con.conkey, con.confkey)'));
+    });
+
+    test('composite foreign keys give one edge per column pair', () {
+      // Recorded rows as returned for FK (a, b) -> (x, y) on PostgreSQL and
+      // MySQL: one row per column pair, paired by position.
+      final schema = ErdSchema.fromCatalog(
+        columnRows: [
+          ['parent', 'x', 'integer', '1'],
+          ['parent', 'y', 'integer', '1'],
+          ['child', 'id', 'integer', '1'],
+          ['child', 'a', 'integer', '0'],
+          ['child', 'b', 'integer', '0'],
+        ],
+        fkRows: [
+          ['child', 'a', 'parent', 'x'],
+          ['child', 'b', 'parent', 'y'],
+        ],
+      );
+      expect(schema.relations.length, 2);
+      expect(
+        schema.relations.map((r) => '${r.fromColumn}->${r.toColumn}'),
+        ['a->x', 'b->y'],
+      );
+    });
+
     test('load runs both queries through the delegate', () async {
       final delegate = FakeSqlExecutionDelegate(onExecute: (sql) {
         if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
