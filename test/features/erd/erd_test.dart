@@ -482,6 +482,28 @@ void main() {
       expect(svg, contains('clip-path="url(#card0)"'));
     });
 
+    test('no SVG text is wider than its card, long names are cut (#1153)', () {
+      const longTable = 'a_table_with_a_very_long_name_for_the_card';
+      const longColumn = 'an_extremely_long_column_name_that_wont_fit';
+      final s = ErdSchema.fromCatalog(columnRows: [
+        [longTable, 'id', 'INTEGER', '1'],
+        [longTable, longColumn, 'timestamp with time zone', '0'],
+      ], fkRows: const []);
+      final svg = ErdExport.toSvg(s, ErdLayout.compute(s));
+
+      expect(svg, contains('…'));
+      expect(svg, isNot(contains(longColumn)));
+      final texts = RegExp(r'<text[^>]*>([^<]*)</text>')
+          .allMatches(svg)
+          .map((m) => m.group(1)!);
+      expect(texts, isNotEmpty);
+      for (final text in texts) {
+        // The same per-glyph estimate the export cuts with: 7.5 px a glyph.
+        expect(text.length * 7.5, lessThanOrEqualTo(ErdLayout.cardWidth - 20),
+            reason: text);
+      }
+    });
+
     test('svg draws an edge and its end markers for every relation', () {
       final s = ErdSchema.fromCatalog(columnRows: [
         ['users', 'id', 'int', '1'],
@@ -1077,6 +1099,54 @@ void main() {
       await t.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
       await t.pump();
       expect(zoomLabel(t), '125%');
+    });
+
+    testWidgets('a search that matches nothing says so (#1157)', (t) async {
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(source: SqlErdSource(delegate: threeTables(), dialect: SqlDialect.sqlite)),
+      ));
+      await t.pump();
+      await t.pump();
+
+      await t.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await t.sendKeyEvent(LogicalKeyboardKey.keyF);
+      await t.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await t.pump();
+      await t.pump();
+
+      await t.enterText(find.byType(material.EditableText), 'zzz');
+      await t.pump();
+      expect(find.text('No tables match'), findsOneWidget);
+    });
+
+    testWidgets('double click opens a table of another schema by its name (#1155)',
+        (t) async {
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
+      String? opened;
+      final sales = FakeSqlExecutionDelegate(onExecute: (sql) {
+        if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+          return const SqlExecutionResult(rows: [
+            ['sales.orders', 'id', 'INTEGER', '1'],
+          ]);
+        }
+        return const SqlExecutionResult();
+      });
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(
+          source: SqlErdSource(delegate: sales, dialect: SqlDialect.sqlite),
+          onOpenTable: (n) => opened = n,
+        ),
+      ));
+      await t.pump();
+      await t.pump();
+
+      final card = find.byKey(const material.ValueKey('erd_table_sales.orders'));
+      await t.tap(card);
+      await t.pump(const Duration(milliseconds: 50));
+      await t.tap(card);
+      await t.pump(const Duration(milliseconds: 400));
+      expect(opened, 'sales.orders');
     });
 
     testWidgets('Enter in the search picks the table and closes the search',
