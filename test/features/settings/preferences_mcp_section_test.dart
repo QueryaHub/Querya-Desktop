@@ -184,6 +184,7 @@ void main() {
         sqlText: 'DELETE FROM orders',
         durationMs: 1,
         error: 'Data-modifying statements are not allowed over MCP.',
+        refusalRule: 'data_modifying',
       ),
     ];
     await pump(tester);
@@ -192,6 +193,7 @@ void main() {
     expect(find.text('1 row(s) · 12 ms'), findsOneWidget);
     expect(find.text('Data-modifying statements are not allowed over MCP.'),
         findsOneWidget);
+    expect(find.text('refused by data_modifying'), findsOneWidget);
 
     await tester.tap(find.byKey(const material.ValueKey('mcp_clear_log')));
     await tester.pump();
