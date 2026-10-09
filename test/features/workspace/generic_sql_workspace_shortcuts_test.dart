@@ -176,22 +176,30 @@ void main() {
     expect(delegate.executed, isEmpty);
   });
 
-  // Disabled: this test hung CI for the full 10-minute timeout. Selecting
-  // text by assigning the controller value does not mimic a user selection in
-  // the editor. Re-enable once the selection is made through the mounted
-  // editor (EditableTextState.userUpdateTextEditingValue).
   testWidgets('only the selected text runs when there is a selection', timeout: _timeout,
-      skip: true,
       (tester) async {
     final delegate = FakeSqlExecutionDelegate();
-    final state = await pumpWorkspace(tester, delegate);
-    const sql = 'SELECT 1; SELECT 2';
-    state.activeSession.controller.value = const TextEditingValue(
-      text: sql,
-      selection: TextSelection(baseOffset: 10, extentOffset: 18),
-    );
+    final state = await pumpWorkspace(tester, delegate, initialSql: 'SELECT 1; SELECT 2');
 
-    unawaited(state.execute());
+    // The selection is made through the mounted editor, as a user does; setting
+    // the controller value directly is what made the test hang before.
+    final editor = tester.state<material.EditableTextState>(
+      find.byType(material.EditableText).first,
+    );
+    editor.userUpdateTextEditingValue(
+      const TextEditingValue(
+        text: 'SELECT 1; SELECT 2',
+        selection: TextSelection(baseOffset: 10, extentOffset: 18),
+      ),
+      null,
+    );
+    await tester.pump();
+    expect(state.activeSession.controller.selection.textInside(
+        state.activeSession.controller.text), 'SELECT 2');
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
     await settle(tester);
 
     expect(delegate.executed, ['SELECT 2']);
