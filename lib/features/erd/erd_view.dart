@@ -20,6 +20,7 @@ import 'package:querya_desktop/features/erd/erd_geometry.dart';
 import 'package:querya_desktop/features/erd/erd_layout.dart';
 import 'package:querya_desktop/features/erd/erd_model.dart';
 import 'package:querya_desktop/features/erd/erd_router.dart';
+import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/shared/widgets/app_toast.dart';
 import 'package:querya_desktop/shared/widgets/querya_action_menu.dart';
 import 'package:querya_desktop/shared/widgets/querya_empty_state.dart';
@@ -46,7 +47,7 @@ Future<void> defaultErdFileSaver(String name, Uint8List bytes) async {
 
 /// Interactive entity-relationship diagram of the connected database.
 /// Entries of the diagram's Export menu.
-enum _ExportAction { mermaid, svg, png, copyMermaid }
+enum _ExportAction { mermaid, svg, png, copyMermaid, toggleTheme }
 
 class ErdView extends material.StatefulWidget {
   const ErdView({
@@ -523,6 +524,31 @@ class _ErdViewState extends material.State<ErdView> {
     }
   }
 
+  /// The SVG export: the light palette for documents, unless the setting asks
+  /// for the current theme.
+  Future<void> _exportSvg(ErdSchema schema, ErdLayout layout) async {
+    final currentTheme = await AppSettings.instance.getExportCurrentTheme();
+    if (!mounted) return;
+    final colors = currentTheme ? _svgColors() : const ErdSvgColors();
+    await _save(
+        '$_fileStem.svg',
+        Uint8List.fromList(utf8.encode(ErdExport.toSvg(schema, layout,
+            routes: _routes, colors: colors))));
+  }
+
+  /// Flips between the light export palette and the current theme.
+  Future<void> _toggleExportTheme() async {
+    final now = !await AppSettings.instance.getExportCurrentTheme();
+    await AppSettings.instance.setExportCurrentTheme(now);
+    if (!mounted) return;
+    showAppToast(
+      context: context,
+      message: now
+          ? 'Exports use the current theme'
+          : 'Exports use the light palette for documents',
+    );
+  }
+
   /// Colours of the current theme for the SVG export, as the screen draws the
   /// cards and edges.
   ErdSvgColors _svgColors() {
@@ -554,13 +580,11 @@ class _ErdViewState extends material.State<ErdView> {
             '$_fileStem.mmd',
             Uint8List.fromList(utf8.encode(ErdExport.toMermaid(schema))));
       case _ExportAction.svg:
-        _save(
-            '$_fileStem.svg',
-            Uint8List.fromList(utf8.encode(
-                ErdExport.toSvg(schema, layout,
-                    routes: _routes, colors: _svgColors()))));
+        unawaited(_exportSvg(schema, layout));
       case _ExportAction.png:
         unawaited(_exportPng());
+      case _ExportAction.toggleTheme:
+        unawaited(_toggleExportTheme());
       case _ExportAction.copyMermaid:
         Clipboard.setData(ClipboardData(text: ErdExport.toMermaid(schema)));
         showAppToast(
@@ -963,6 +987,11 @@ class _ErdViewState extends material.State<ErdView> {
                   opacity: ready ? 1 : 0.5,
                   child: QueryaActionMenu<_ExportAction>(
                     items: const [
+                      QueryaActionMenuItem(
+                        value: _ExportAction.toggleTheme,
+                        label: 'Toggle export theme (light / current)',
+                        icon: material.Icons.palette_outlined,
+                      ),
                       QueryaActionMenuItem(
                         value: _ExportAction.mermaid,
                         label: 'Mermaid (.mmd)',

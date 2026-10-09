@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:convert' show utf8;
 import 'dart:math' show min, pi;
 import 'dart:typed_data';
@@ -7,6 +8,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/rendering.dart';
+import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/features/results/charts/chart_data.dart';
 import 'package:querya_desktop/features/results/charts/chart_format.dart';
 import 'package:querya_desktop/features/results/charts/chart_svg.dart';
@@ -14,7 +16,7 @@ import 'package:querya_desktop/shared/widgets/querya_action_menu.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Formats of the chart export menu.
-enum _ChartExport { png, svg }
+enum _ChartExport { png, svg, toggleTheme }
 
 /// Saves rendered chart PNG bytes; replaceable in tests.
 typedef ChartPngSaver = Future<void> Function(Uint8List png);
@@ -204,29 +206,47 @@ class _QuickChartViewState extends material.State<QuickChartView> {
   Future<void> _exportSvg() async {
     final valueCol = _valueCol;
     if (valueCol == null) return;
+    final currentTheme = await AppSettings.instance.getExportCurrentTheme();
+    if (!mounted) return;
     final palette = context.semanticPalette;
     final wb = context.workbench;
     final svg = ChartSvg.build(
       points: _series(valueCol).points,
       type: _type,
       title: _chartTitle(),
-      colors: ChartSvgColors(
-        background: ChartSvgColors.hex(wb.surface.toARGB32()),
-        text: ChartSvgColors.hex(wb.mutedForeground.toARGB32()),
-        grid: ChartSvgColors.hex(wb.borderSubtle.toARGB32()),
-        series: [
-          for (final c in [
-            palette.type1,
-            palette.type2,
-            palette.type3,
-            palette.type4,
-            palette.type5,
-          ])
-            ChartSvgColors.hex(c.toARGB32()),
-        ],
-      ),
+      colors: currentTheme
+          ? ChartSvgColors(
+              background: ChartSvgColors.hex(wb.surface.toARGB32()),
+              text: ChartSvgColors.hex(wb.mutedForeground.toARGB32()),
+              grid: ChartSvgColors.hex(wb.borderSubtle.toARGB32()),
+              series: [
+                for (final c in [
+                  palette.type1,
+                  palette.type2,
+                  palette.type3,
+                  palette.type4,
+                  palette.type5,
+                ])
+                  ChartSvgColors.hex(c.toARGB32()),
+              ],
+            )
+          : ChartSvg.light,
     );
     await (widget.onSaveSvg ?? _defaultSvgSaver)(svg);
+  }
+
+  /// Flips between the light export palette and the current theme, and says
+  /// which one is in use.
+  Future<void> _toggleExportTheme() async {
+    final now = !await AppSettings.instance.getExportCurrentTheme();
+    await AppSettings.instance.setExportCurrentTheme(now);
+    if (!mounted) return;
+    showAppToast(
+      context: context,
+      message: now
+          ? 'Exports use the current theme'
+          : 'Exports use the light palette for documents',
+    );
   }
 
   @override
@@ -356,9 +376,16 @@ class _QuickChartViewState extends material.State<QuickChartView> {
                     label: 'SVG',
                     icon: material.Icons.polyline_outlined,
                   ),
+                  QueryaActionMenuItem(
+                    value: _ChartExport.toggleTheme,
+                    label: 'Toggle export theme (light / current)',
+                    icon: material.Icons.palette_outlined,
+                  ),
                 ],
                 onSelected: (format) {
-                  if (format == _ChartExport.png) {
+                  if (format == _ChartExport.toggleTheme) {
+                    unawaited(_toggleExportTheme());
+                  } else if (format == _ChartExport.png) {
                     _export();
                   } else {
                     _exportSvg();
