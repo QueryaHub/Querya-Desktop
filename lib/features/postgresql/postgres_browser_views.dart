@@ -47,13 +47,6 @@ class _PostgresIndexListViewState
   @override
   void dispose() {
     _scroll.dispose();
-    if (_loading) {
-      PostgresService.instance.interrupt(
-        widget.connectionRow,
-        database: widget.database,
-        mode: PgSessionMode.readOnly,
-      );
-    }
     _lease?.release();
     super.dispose();
   }
@@ -227,13 +220,6 @@ class _PostgresTriggerListViewState
   @override
   void dispose() {
     _scroll.dispose();
-    if (_loading) {
-      PostgresService.instance.interrupt(
-        widget.connectionRow,
-        database: widget.database,
-        mode: PgSessionMode.readOnly,
-      );
-    }
     _lease?.release();
     super.dispose();
   }
@@ -399,13 +385,6 @@ class _PostgresTypeListViewState extends material.State<PostgresTypeListView> {
   @override
   void dispose() {
     _scroll.dispose();
-    if (_loading) {
-      PostgresService.instance.interrupt(
-        widget.connectionRow,
-        database: widget.database,
-        mode: PgSessionMode.readOnly,
-      );
-    }
     _lease?.release();
     super.dispose();
   }
@@ -551,13 +530,6 @@ class _PostgresExtensionListViewState
   @override
   void dispose() {
     _scroll.dispose();
-    if (_loading) {
-      PostgresService.instance.interrupt(
-        widget.connectionRow,
-        database: widget.database,
-        mode: PgSessionMode.readOnly,
-      );
-    }
     _lease?.release();
     super.dispose();
   }
@@ -697,13 +669,6 @@ class _PostgresFdwListViewState extends material.State<PostgresFdwListView> {
   @override
   void dispose() {
     _scroll.dispose();
-    if (_loading) {
-      PostgresService.instance.interrupt(
-        widget.connectionRow,
-        database: widget.database,
-        mode: PgSessionMode.readOnly,
-      );
-    }
     _lease?.release();
     super.dispose();
   }
