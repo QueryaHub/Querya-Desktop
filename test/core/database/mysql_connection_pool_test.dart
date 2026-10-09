@@ -200,4 +200,38 @@ void main() {
       grid.release();
     });
   });
+
+  group('lease after interrupt (#1213)', () {
+    test('releasing a lease from before an interrupt keeps the replacement',
+        () async {
+      final created = <FakeMysqlConnection>[];
+      final pool = MysqlConnectionPool(
+        idleDisposeDelay: const Duration(milliseconds: 20),
+        createAndConnect: (row, {required database, required mode}) async {
+          final c = FakeMysqlConnection();
+          await c.connect();
+          created.add(c);
+          return c;
+        },
+      );
+      final r = _row();
+      final before = await pool.acquire(r,
+          database: 'app', mode: MysqlSessionMode.readOnly);
+      pool.interrupt(r, database: 'app', mode: MysqlSessionMode.readOnly);
+      final after = await pool.acquire(r,
+          database: 'app', mode: MysqlSessionMode.readOnly);
+
+      before.release();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      final replacement = created.last;
+      expect(identical(after.connection, replacement), isTrue);
+      expect(replacement.isConnected, isTrue);
+      expect(replacement.disconnectCount, 0);
+
+      after.release();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(replacement.disconnectCount, 1);
+    });
+  });
 }

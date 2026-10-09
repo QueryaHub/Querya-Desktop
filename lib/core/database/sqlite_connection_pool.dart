@@ -29,10 +29,10 @@ typedef SqlitePoolConnectionFactory = Future<SqliteConnection> Function(
 
 /// Lease for a pooled [SqliteConnection]. Call [release] when the UI is done.
 class SqliteLease {
-  SqliteLease._(this._pool, this._key, this.connection);
+  SqliteLease._(this._pool, this._entry, this.connection);
 
   final SqliteConnectionPool _pool;
-  final String _key;
+  final _PoolEntry _entry;
   final SqliteConnection connection;
 
   bool _released = false;
@@ -40,13 +40,14 @@ class SqliteLease {
   void release() {
     if (_released) return;
     _released = true;
-    _pool._release(_key);
+    _pool._release(_entry);
   }
 }
 
 class _PoolEntry {
-  _PoolEntry(this.connection);
+  _PoolEntry(this.connection, this.key);
   final SqliteConnection connection;
+  final String key;
   int refs = 0;
   DateTime lastUsed = DateTime.now();
   Timer? idleTimer;
@@ -90,14 +91,14 @@ class SqliteConnectionPool {
       if (!entry.connection.isConnected) {
         await entry.connection.connect();
       }
-      return SqliteLease._(this, k, entry.connection);
+      return SqliteLease._(this, entry, entry.connection);
     }
 
     try {
       await _creationLock.createIfAbsent(k, () async {
         _evictIfNeededBeforeNewSlot();
         final conn = await createAndConnect(row, mode: mode);
-        _pool[k] = _PoolEntry(conn);
+        _pool[k] = _PoolEntry(conn, k);
         return conn;
       });
     } on StateError {
@@ -124,7 +125,7 @@ class SqliteConnectionPool {
     if (!entry.connection.isConnected) {
       await entry.connection.connect();
     }
-    return SqliteLease._(this, k, entry.connection);
+    return SqliteLease._(this, entry, entry.connection);
   }
 
   void _evictIfNeededBeforeNewSlot() {
@@ -147,19 +148,24 @@ class SqliteConnectionPool {
     unawaited(entry.connection.forceClose());
   }
 
-  void _release(String key) {
-    final entry = _pool[key];
-    if (entry == null) return;
+  /// Releases one lease on [entry]. A lease taken before an [interrupt] points
+  /// at an entry that is no longer in the pool: it must not touch the entry
+  /// that replaced it under the same key, so it does nothing.
+  void _release(_PoolEntry entry) {
+    if (!identical(_pool[entry.key], entry)) return;
     entry.refs--;
+    assert(
+      entry.refs >= 0,
+      'pool entry ${entry.key} released more often than leased',
+    );
     if (entry.refs <= 0) {
       entry.refs = 0;
       entry.idleTimer?.cancel();
       entry.idleTimer = Timer(idleDisposeDelay, () {
-        final e = _pool[key];
-        if (e == null || e.refs > 0) return;
-        e.idleTimer = null;
-        unawaited(e.connection.disconnect());
-        _pool.remove(key);
+        if (!identical(_pool[entry.key], entry) || entry.refs > 0) return;
+        entry.idleTimer = null;
+        unawaited(entry.connection.disconnect());
+        _pool.remove(entry.key);
       });
     }
   }
