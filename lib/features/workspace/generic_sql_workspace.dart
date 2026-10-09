@@ -398,13 +398,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
         });
       }
     } finally {
-      // Autocommit: after a read that succeeded while no transaction is known
-      // to be open, none can have been opened, so the server is not asked.
-      final afterPlainRead = _autocommit &&
-          session.error == null &&
-          _txOpen == false &&
-          _isReadQuery(userSql);
-      if (!afterPlainRead) await refreshTxStatus();
+      await refreshTxStatus();
     }
   }
 
@@ -644,7 +638,13 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
         QueryaShellStatus.instance.endBusy();
       }
     } finally {
-      await refreshTxStatus();
+      // Autocommit: after a read that succeeded while no transaction is known
+      // to be open, none can have been opened, so the server is not asked.
+      final afterPlainRead = _autocommit &&
+          session.error == null &&
+          _txOpen == false &&
+          _isReadQuery(userSql);
+      if (!afterPlainRead) await refreshTxStatus();
     }
   }
 
