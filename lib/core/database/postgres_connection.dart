@@ -144,6 +144,22 @@ class PostgresConnection {
 
   Connection? _conn;
   Future<void>? _connecting;
+
+  /// Statements on this session run one at a time, here and not in the driver.
+  /// The driver starts a statement's timeout before the statement gets its turn,
+  /// so a statement that waited behind another one could cancel the other one.
+  Future<void> _statementQueue = Future<void>.value();
+
+  /// Test seam: replaces the driver call of [execute].
+  @visibleForTesting
+  Future<Result> Function(String sql, Duration? timeout)? runStatementForTest;
+
+  Future<T> _serialized<T>(Future<T> Function() run) {
+    final previous = _statementQueue;
+    final turn = Completer<void>();
+    _statementQueue = turn.future;
+    return previous.then((_) => run()).whenComplete(() => turn.complete());
+  }
   bool _isConnected = false;
   bool _inTransaction = false;
 
@@ -391,37 +407,41 @@ class PostgresConnection {
     }
   }
 
-  /// Runs SQL on the underlying session. [timeout] overrides
-  /// [ConnectionSettings.queryTimeout] for this statement (see `postgres`
-  /// package).
-  Future<Result> execute(String sql, {Duration? timeout}) async {
-    if (!isConnected || _conn == null) {
-      throw StateError('Not connected to PostgreSQL');
-    }
-    try {
-      final result = await _conn!.execute(sql, timeout: timeout);
-      _inTransaction = applyPostgresTransactionSql(_inTransaction, sql);
-      return result;
-    } on TimeoutException {
-      unawaited(forceClose());
-      rethrow;
-    }
+  /// Runs SQL on the underlying session, one statement at a time. [timeout]
+  /// overrides [ConnectionSettings.queryTimeout] for this statement and starts
+  /// when the statement does.
+  ///
+  /// A server-side cancel (SQLSTATE 57014) arrives as a [PgException], and the
+  /// session stays usable. Only a bare [TimeoutException] closes it: then the
+  /// protocol may be out of step.
+  Future<Result> execute(String sql, {Duration? timeout}) {
+    return _serialized(() async {
+      final seam = runStatementForTest;
+      final c = _conn;
+      if (seam == null && (!isConnected || c == null)) {
+        throw StateError('Not connected to PostgreSQL');
+      }
+      try {
+        final result = seam != null
+            ? await seam(sql, timeout)
+            : await c!.execute(sql, timeout: timeout);
+        _inTransaction = applyPostgresTransactionSql(_inTransaction, sql);
+        return result;
+      } on TimeoutException catch (e) {
+        if (e is! PgException) unawaited(forceClose());
+        rethrow;
+      }
+    });
   }
 
-  /// Runs [execute] with an application-level [timeout] (in addition to driver timeout).
+  /// [execute] with [timeout] as the statement's own limit. The limit starts
+  /// when the statement starts: time spent waiting behind another statement on
+  /// this session does not count against it.
   Future<Result> executeWithTimeout(
     String sql, {
     Duration? timeout,
-  }) async {
-    final f = execute(sql, timeout: timeout);
-    if (timeout == null) return f;
-    try {
-      return await f.timeout(timeout);
-    } on TimeoutException {
-      unawaited(forceClose());
-      rethrow;
-    }
-  }
+  }) =>
+      execute(sql, timeout: timeout);
 
   /// Whether the session has an open transaction.
   ///

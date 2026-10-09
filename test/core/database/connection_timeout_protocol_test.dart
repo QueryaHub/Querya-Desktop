@@ -4,7 +4,6 @@ import 'package:mysql_client/mysql_client.dart';
 import 'package:querya_desktop/core/database/mysql_connection.dart';
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
-import 'package:postgres/postgres.dart' as pg;
 
 class FakeSlowMysqlConnection extends MysqlConnection {
   FakeSlowMysqlConnection({super.id = 1})
@@ -52,12 +51,6 @@ class FakeSlowPostgresConnection extends PostgresConnection {
 
   @override
   bool get isConnected => _connected;
-
-  @override
-  Future<pg.Result> execute(String sql, {Duration? timeout}) async {
-    await Future.delayed(const Duration(seconds: 10));
-    throw Exception('should not reach here');
-  }
 
   @override
   Future<void> forceClose() async {
@@ -116,9 +109,12 @@ void main() {
       expect(conn.isConnected, isFalse);
     });
 
-    test('PostgresConnection.executeWithTimeout force-closes on TimeoutException', () async {
+    test('PostgresConnection.executeWithTimeout force-closes on a bare TimeoutException', () async {
       final conn = FakeSlowPostgresConnection();
       expect(conn.isConnected, isTrue);
+      // The driver's own timer fires as a bare TimeoutException.
+      conn.runStatementForTest = (sql, timeout) =>
+          Future.error(TimeoutException('driver timer', timeout));
 
       try {
         await conn.executeWithTimeout(
