@@ -44,6 +44,7 @@ class GenericSqlWorkspace extends material.StatefulWidget {
     this.initialTabTitle,
     this.transactionOpenNotifier,
     this.isReadOnly = false,
+    this.showDiagram = true,
     this.supportsAutocommit = false,
     this.initialAutocommit = true,
     this.onAutocommitChanged,
@@ -64,6 +65,10 @@ class GenericSqlWorkspace extends material.StatefulWidget {
   final String? initialTabTitle;
   final material.ValueNotifier<bool?>? transactionOpenNotifier;
   final bool isReadOnly;
+
+  /// Whether the Diagram tab is offered. Extension drivers have no diagram
+  /// source yet, so their workspace turns it off.
+  final bool showDiagram;
 
   final bool supportsAutocommit;
   final bool initialAutocommit;
@@ -990,7 +995,8 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
                         tooltip: 'Interrupt the running query',
                         onPressed: () => cancelRunning(session),
                       ),
-                    QueryaActionButton(
+                    if (widget.showDiagram)
+                      QueryaActionButton(
                       key: const material.ValueKey('open_diagram_tab'),
                       label: 'Diagram',
                       onPressed: openDiagramTab,

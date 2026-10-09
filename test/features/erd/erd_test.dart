@@ -58,7 +58,8 @@ void main() {
         ErdCatalog.foreignKeysSql(SqlDialect.postgres),
       ]) {
         expect(sql, contains('pg_catalog.'));
-        expect(sql, isNot(contains('information_schema')));
+        // Schema names may still mention information_schema to exclude it.
+        expect(sql, isNot(contains('information_schema.')));
       }
       expect(ErdCatalog.foreignKeysSql(SqlDialect.postgres),
           contains('unnest(con.conkey, con.confkey)'));
@@ -108,6 +109,64 @@ void main() {
       };
       expect(optional, {'customer_id': true, 'user_id': false});
       expect(s.tables[1].columns[1].isNullable, isTrue);
+    });
+
+    test('postgres names tables of other schemas schema.table', () {
+      expect(ErdCatalog.foreignKeysSql(SqlDialect.postgres),
+          contains("|| '.' ||"));
+      expect(ErdCatalog.columnsSql(SqlDialect.postgres, schema: 'sales'),
+          contains("nspname = 'sales'"));
+    });
+
+    test('neighbourhood follows foreign keys up to the requested depth', () {
+      final fks = [
+        ['b', 'a_id', 'a', 'id'],
+        ['c', 'b_id', 'b', 'id'],
+        ['d', 'x', 'z', 'id'],
+      ];
+      expect(ErdCatalog.neighbourhood(fks, 'a', 1), {'a', 'b'});
+      expect(ErdCatalog.neighbourhood(fks, 'a', 2), {'a', 'b', 'c'});
+      expect(ErdCatalog.neighbourhood(fks, 'z', 5), {'z', 'd'});
+    });
+
+    test('cycles and self references end the walk', () {
+      final fks = [
+        ['a', 'b_id', 'b', 'id'],
+        ['b', 'a_id', 'a', 'id'],
+        ['a', 'parent', 'a', 'id'],
+      ];
+      expect(ErdCatalog.neighbourhood(fks, 'a', 9), {'a', 'b'});
+    });
+
+    test('a table without relations is its own neighbourhood', () {
+      expect(ErdCatalog.neighbourhood(const [], 'lonely', 2), {'lonely'});
+    });
+
+    test('loadNeighbourhood loads only the tables around the one asked for',
+        () async {
+      final delegate = FakeSqlExecutionDelegate(onExecute: (sql) {
+        if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+          return const SqlExecutionResult(rows: [
+            ['a', 'id', 'INTEGER', '1'],
+            ['b', 'id', 'INTEGER', '1'],
+            ['b', 'a_id', 'INTEGER', '0'],
+            ['c', 'id', 'INTEGER', '1'],
+          ]);
+        }
+        if (sql == ErdCatalog.foreignKeysSql(SqlDialect.sqlite)) {
+          return const SqlExecutionResult(rows: [
+            ['b', 'a_id', 'a', 'id'],
+          ]);
+        }
+        return const SqlExecutionResult();
+      });
+      final s = await ErdCatalog.loadNeighbourhood(
+        delegate,
+        SqlDialect.sqlite,
+        table: 'a',
+      );
+      expect(s.tables.map((t) => t.name), ['a', 'b']);
+      expect(s.relations.length, 1);
     });
 
     test('load runs both queries through the delegate', () async {
