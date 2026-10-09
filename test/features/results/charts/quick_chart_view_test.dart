@@ -126,4 +126,20 @@ void main() {
     await t.pump();
     expect('<path '.allMatches(saved!).length, rows.length);
   });
+
+  for (final width in [600.0, 1600.0]) {
+    testWidgets('the pie lays out without clipping at ${width.toInt()} px',
+        (t) async {
+      await t.binding.setSurfaceSize(material.Size(width, 700));
+      await t.pumpWidget(queryaThemeTestShell(child: QuickChartView(
+        columns: columns,
+        rows: rows,
+      )));
+      await t.pump();
+      await t.tap(find.bySemanticsLabel('Pie'));
+      await t.pump();
+      expect(find.byType(PieChart), findsOneWidget);
+      expect(t.takeException(), isNull);
+    });
+  }
 }
