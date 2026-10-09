@@ -120,7 +120,7 @@ class _QuickChartViewState extends material.State<QuickChartView> {
 
   String get _yName => widget.columns[_valueCol!];
 
-  /// "<Y> by <X>", plus the aggregation when one is applied. Used on screen,
+  /// "`Y` by `X`", plus the aggregation when one is applied. Used on screen,
   /// in the PNG and in the SVG.
   String _chartTitle() {
     final agg = _type == QuickChartType.line ? ChartAggregation.none : _aggregation;
