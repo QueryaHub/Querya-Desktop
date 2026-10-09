@@ -13,6 +13,7 @@ import 'package:flutter/services.dart'
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/erd/erd_canvas_controls.dart';
+import 'package:querya_desktop/features/erd/erd_catalog.dart';
 import 'package:querya_desktop/features/erd/erd_source.dart';
 import 'package:querya_desktop/features/erd/erd_export.dart';
 import 'package:querya_desktop/features/erd/erd_geometry.dart';
@@ -187,6 +188,14 @@ class _ErdViewState extends material.State<ErdView> {
         _setLayout(ErdLayout.compute(_visibleOf(schema)));
         _loading = false;
       });
+      if (schema.truncated) {
+        showAppToast(
+          context: context,
+          message: 'The catalog has more than '
+              '${ErdCatalog.catalogRowLimit} rows: some tables or columns '
+              'are not in the diagram.',
+        );
+      }
       // The viewport is measured after this frame: fit the diagram, then pick
       // and centre the focused table.
       material.WidgetsBinding.instance.addPostFrameCallback((_) {

@@ -287,6 +287,10 @@ class _MysqlSqlWorkspaceState extends material.State<MysqlSqlWorkspace> {
       key: _workspaceKey,
       connectionRow: widget.connectionRow,
       delegate: _delegate,
+      catalogDelegateFactory: () => MysqlSqlExecutionDelegate(
+        connectionRow: widget.connectionRow,
+        isReadOnly: true,
+      ),
       dialect: SqlDialect.mysql,
       sessionPrefix: 'mysql',
       transactionOpenNotifier: widget.transactionOpenNotifier,

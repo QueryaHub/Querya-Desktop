@@ -1148,4 +1148,73 @@ void main() {
       expect(find.text('No tables found'), findsOneWidget);
     });
   });
+
+  group('catalog limit (#1218)', () {
+    test('a catalog read asks for the explicit row limit', () async {
+      final limits = <int?>[];
+      final delegate = FakeSqlExecutionDelegate(onExecute: (sql) {
+        return const SqlExecutionResult();
+      });
+      final recording = _LimitRecordingDelegate(delegate, limits);
+      await ErdCatalog.load(recording, SqlDialect.sqlite);
+      expect(limits, [ErdCatalog.catalogRowLimit, ErdCatalog.catalogRowLimit]);
+    });
+
+    test('a cut catalog is reported as truncated', () async {
+      final delegate = FakeSqlExecutionDelegate(onExecute: (sql) {
+        if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+          return const SqlExecutionResult(
+            rows: [
+              ['users', 'id', 'INTEGER', '1'],
+            ],
+            isTruncated: true,
+          );
+        }
+        return const SqlExecutionResult();
+      });
+      final schema = await ErdCatalog.load(delegate, SqlDialect.sqlite);
+      expect(schema.truncated, isTrue);
+      expect(schema.tables.map((t) => t.name), ['users']);
+    });
+
+    test('a complete catalog is not truncated', () async {
+      final delegate = FakeSqlExecutionDelegate(onExecute: (_) {
+        return const SqlExecutionResult(rows: [
+          ['users', 'id', 'INTEGER', '1'],
+        ]);
+      });
+      final schema = await ErdCatalog.load(delegate, SqlDialect.sqlite);
+      expect(schema.truncated, isFalse);
+    });
+  });
+}
+
+/// Passes every call on and records the row limit it was given.
+class _LimitRecordingDelegate extends SqlExecutionDelegate {
+  _LimitRecordingDelegate(this._inner, this._limits);
+
+  final SqlExecutionDelegate _inner;
+  final List<int?> _limits;
+
+  @override
+  Future<SqlExecutionResult> executeQuery(
+    String sql, {
+    int? limit,
+    Duration? timeout,
+  }) {
+    _limits.add(limit);
+    return _inner.executeQuery(sql, limit: limit, timeout: timeout);
+  }
+
+  @override
+  Future<String> explainQuery(String sql) => _inner.explainQuery(sql);
+
+  @override
+  bool get supportsExplain => false;
+
+  @override
+  Future<void> cancelQuery() async {}
+
+  @override
+  bool get supportsTransactions => false;
 }

@@ -13,6 +13,10 @@ import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
 class ErdCatalog {
   ErdCatalog._();
 
+  /// Most catalog rows read for a diagram or MCP. Larger catalogs are cut and
+  /// reported as truncated, rather than dropped silently.
+  static const int catalogRowLimit = 200000;
+
   /// PostgreSQL name of relation alias [rel] in namespace alias [ns]:
   /// `table` for the current schema, `schema.table` otherwise.
   static String _pgQualified(String rel, String ns) =>
@@ -105,9 +109,19 @@ WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
     SqlExecutionDelegate delegate,
     SqlDialect dialect,
   ) async {
-    final cols = await delegate.executeQuery(columnsSql(dialect));
-    final fks = await delegate.executeQuery(foreignKeysSql(dialect));
-    return ErdSchema.fromCatalog(columnRows: cols.rows, fkRows: fks.rows);
+    final cols = await delegate.executeQuery(
+      columnsSql(dialect),
+      limit: catalogRowLimit,
+    );
+    final fks = await delegate.executeQuery(
+      foreignKeysSql(dialect),
+      limit: catalogRowLimit,
+    );
+    return ErdSchema.fromCatalog(
+      columnRows: cols.rows,
+      fkRows: fks.rows,
+      truncated: cols.isTruncated || fks.isTruncated,
+    );
   }
 
   /// Tables within [depth] foreign keys of [table] in either direction, with
@@ -118,7 +132,12 @@ WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
     required String table,
     int depth = 1,
   }) async {
-    final fks = (await delegate.executeQuery(foreignKeysSql(dialect))).rows;
+    final fksResult = await delegate.executeQuery(
+      foreignKeysSql(dialect),
+      limit: catalogRowLimit,
+    );
+    final fks = fksResult.rows;
+    var truncated = fksResult.isTruncated;
     final names = neighbourhood(fks, table, depth);
 
     final cols = <List<String>>[];
@@ -126,13 +145,19 @@ WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
     for (final s in schemas) {
       final rows = await delegate.executeQuery(
         columnsSql(dialect, schema: dialect == SqlDialect.postgres ? s : null),
+        limit: catalogRowLimit,
       );
+      truncated = truncated || rows.isTruncated;
       cols.addAll(rows.rows.where((r) => r.isNotEmpty && names.contains(r[0])));
     }
-    return ErdSchema.fromCatalog(columnRows: cols, fkRows: [
-      for (final r in fks)
-        if (r.length >= 4 && names.contains(r[0]) && names.contains(r[2])) r,
-    ]);
+    return ErdSchema.fromCatalog(
+      columnRows: cols,
+      fkRows: [
+        for (final r in fks)
+          if (r.length >= 4 && names.contains(r[0]) && names.contains(r[2])) r,
+      ],
+      truncated: truncated,
+    );
   }
 
   /// Names of the tables within [depth] foreign keys of [table], including
