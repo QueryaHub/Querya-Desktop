@@ -5,7 +5,6 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:file_selector/file_selector.dart';
-import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/rendering.dart';
