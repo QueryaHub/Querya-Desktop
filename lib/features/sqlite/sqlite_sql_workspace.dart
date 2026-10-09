@@ -11,6 +11,7 @@ import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/sqlite/sqlite_result_utils.dart';
 import 'package:querya_desktop/features/workspace/workspace.dart';
+import 'package:querya_desktop/features/workspace/query_plan.dart';
 
 /// Execution delegate for SQLite connections.
 class SqliteSqlExecutionDelegate extends SqlExecutionDelegate {
@@ -125,6 +126,22 @@ class SqliteSqlExecutionDelegate extends SqlExecutionDelegate {
       statusMessage: statusMsg,
       isTruncated: truncated || (injectedLimit && results.length >= cap),
     );
+  }
+
+  @override
+  Future<PlanNode?> explainTree(String sql) async {
+    await ensureLease();
+    final conn = _lease?.connection;
+    if (conn == null || !conn.isConnected) return null;
+    final res = await conn.executeWithTimeout('EXPLAIN QUERY PLAN $sql');
+    return QueryPlanParser.fromSqliteRows([
+      for (final r in res)
+        (
+          id: int.parse('${r.values.elementAt(0)}'),
+          parent: int.parse('${r.values.elementAt(1)}'),
+          detail: '${r.values.elementAt(3)}',
+        ),
+    ]);
   }
 
   @override

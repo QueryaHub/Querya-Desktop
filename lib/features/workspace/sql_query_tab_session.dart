@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/actions/sql_script_format.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
+import 'package:querya_desktop/features/workspace/query_plan.dart';
 import 'package:querya_desktop/core/unsaved_work_registry.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 
@@ -42,6 +43,10 @@ class SqlQueryTabSession {
   List<List<String>> rows = const [];
   int? affectedRows;
   String? statusLine;
+
+  /// The EXPLAIN plan as a tree, and whether the result area shows it (or text).
+  PlanNode? planRoot;
+  bool planAsTree = true;
   DataGridStagingBuffer? stagingBuffer;
   String? lastExecutedSql;
   bool savingChanges = false;

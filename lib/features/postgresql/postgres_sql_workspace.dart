@@ -11,6 +11,7 @@ import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
 import 'package:querya_desktop/features/postgresql/postgres_result_utils.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_utils.dart';
 import 'package:querya_desktop/features/workspace/workspace.dart';
+import 'package:querya_desktop/features/workspace/query_plan.dart';
 
 /// Database used for this SQL workspace session (matches [PostgresService.acquire]).
 String _pgSqlSessionDatabase(ConnectionRow row) {
@@ -154,6 +155,16 @@ class PostgresSqlExecutionDelegate extends SqlExecutionDelegate {
       statusMessage: statusMsg,
       isTruncated: isTruncated,
     );
+  }
+
+  @override
+  Future<PlanNode?> explainTree(String sql) async {
+    await ensureLease();
+    final conn = _lease?.connection;
+    if (conn == null || !conn.isConnected) return null;
+    final res = await conn.execute('EXPLAIN (FORMAT JSON) $sql');
+    if (res.isEmpty) return null;
+    return QueryPlanParser.fromPostgresJson(res.first.first);
   }
 
   @override
