@@ -1225,4 +1225,29 @@ class _LimitRecordingDelegate extends SqlExecutionDelegate {
 
   @override
   bool get supportsTransactions => false;
+
+  group('router on a larger schema (#1168)', () {
+    test('a 100-table schema routes every relation with a real path', () {
+      final columns = <List<String>>[];
+      final fks = <List<String>>[];
+      for (var i = 0; i < 100; i++) {
+        columns.add(['t$i', 'id', 'int', '1', '0']);
+        columns.add(['t$i', 'parent_id', 'int', '0', '1']);
+        if (i > 0) {
+          fks.add(['t$i', 'parent_id', 't${i ~/ 2}', 'id']);
+        }
+        if (i > 10 && i % 7 == 0) {
+          fks.add(['t$i', 'parent_id', 't${i - 9}', 'id']);
+        }
+      }
+      final schema = ErdSchema.fromCatalog(columnRows: columns, fkRows: fks);
+      final layout = ErdLayout.compute(schema);
+      final routes = ErdRouter.route(schema, layout);
+
+      expect(routes.length, schema.relations.length);
+      for (final r in routes) {
+        expect(r.points.length, greaterThanOrEqualTo(2));
+      }
+    });
+  });
 }

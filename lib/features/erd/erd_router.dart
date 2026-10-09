@@ -231,6 +231,15 @@ class _Grid {
   final List<double> xs, ys;
   final List<Rect> rects;
   late final Uint8List _node;
+
+  // Search state, one entry per (cell, direction). Sized lazily on first search.
+  late final int _states = xs.length * ys.length * 4;
+  late final Float64List _cost = Float64List(_states);
+  late final Int32List _prev = Int32List(_states);
+  late final Int32List _startOf = Int32List(_states);
+  late final Int32List _stamp = Int32List(_states);
+  late final Int32List _closed = Int32List(_states);
+  int _generation = 0;
   late final Uint8List _hSeg;
   late final Uint8List _vSeg;
 
@@ -322,16 +331,24 @@ class _Grid {
       return best;
     }
 
-    final cost = <int, double>{};
-    final prev = <int, int>{};
-    final startOf = <int, int>{};
+    // Per-state data lives in flat arrays shared by every search of this grid.
+    // An entry is valid only when its stamp is the current search's generation,
+    // so nothing is cleared between searches.
+    final gen = ++_generation;
+    double costOf(int k) => _stamp[k] == gen ? _cost[k] : double.infinity;
+    void setCost(int k, double c) {
+      _stamp[k] = gen;
+      _cost[k] = c;
+    }
+
     final heap = _Heap();
     for (var s = 0; s < starts.length; s++) {
       final i = _ix(starts[s].$1.dx), j = _iy(starts[s].$1.dy);
       if (i < 0 || j < 0 || _blockedNode(i, j)) continue;
       final k = key(i, j, starts[s].$2);
-      cost[k] = 0;
-      startOf[k] = s;
+      setCost(k, 0);
+      _prev[k] = -1;
+      _startOf[k] = s;
       heap.push(k, heuristic(i, j));
     }
 
@@ -340,14 +357,14 @@ class _Grid {
     int? bestKey;
     var bestGoal = -1;
     var expanded = 0;
-    final closed = <int>{};
     while (heap.isNotEmpty) {
       if (heap.peekPriority >= bestCost) break;
       final k = heap.pop();
-      if (!closed.add(k)) continue;
+      if (_closed[k] == gen) continue;
+      _closed[k] = gen;
       if (++expanded > w * h * 4) break;
       final d = k % 4, cell = k ~/ 4, i = cell ~/ h, j = cell % h;
-      final c = cost[k]!;
+      final c = _cost[k];
       final goal = goalAt[cell];
       if (goal != null) {
         final want = goal.$2;
@@ -374,9 +391,9 @@ class _Grid {
         if (_blockedSegment(i, j, nd)) continue;
         final nc = c + (a - b).distance + (nd == d ? 0 : bendCost);
         final nk = key(ni, nj, nd);
-        if (nc < (cost[nk] ?? double.infinity)) {
-          cost[nk] = nc;
-          prev[nk] = k;
+        if (nc < costOf(nk)) {
+          setCost(nk, nc);
+          _prev[nk] = k;
           heap.push(nk, nc + heuristic(ni, nj));
         }
       }
@@ -388,11 +405,11 @@ class _Grid {
     while (true) {
       final cc = cur ~/ 4;
       pts.add(Offset(xs[cc ~/ h], ys[cc % h]));
-      final p = prev[cur];
-      if (p == null) break;
+      final p = _prev[cur];
+      if (p < 0) break;
       cur = p;
     }
-    return (pts.reversed.toList(), startOf[cur]!, bestGoal);
+    return (pts.reversed.toList(), _startOf[cur], bestGoal);
   }
 }
 
