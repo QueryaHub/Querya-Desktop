@@ -55,6 +55,8 @@ class ErdView extends material.StatefulWidget {
     this.focusTable,
     this.neighbourhoodDepth,
     this.onOpenTable,
+    this.onOpenInSql,
+    this.onShowRelations,
     this.onOpenFullDiagram,
     this.onSaveFile,
   });
@@ -76,6 +78,12 @@ class ErdView extends material.StatefulWidget {
 
   /// Called on double tap of a table card.
   final void Function(String table)? onOpenTable;
+
+  /// "Open in SQL" in a card's menu: the table's rows in the SQL editor.
+  final void Function(String table)? onOpenInSql;
+
+  /// "Show relations" in a card's menu: the table browser's Relations view.
+  final void Function(String table)? onShowRelations;
   final ErdFileSaver? onSaveFile;
 
   @override
@@ -757,11 +765,28 @@ class _ErdViewState extends material.State<ErdView> {
                                     : 1,
                                 child: ContextMenu(
                                   items: [
-                                    MenuButton(
-                                      onPressed: (_) =>
-                                          widget.onOpenTable?.call(t.name),
-                                      child: const Text('Open data'),
-                                    ),
+                                    if (widget.onOpenTable case final open?)
+                                      MenuButton(
+                                        key: material.ValueKey(
+                                            'erd_menu_open_${t.name}'),
+                                        onPressed: (_) => open(t.name),
+                                        child: const Text('Open data'),
+                                      ),
+                                    if (widget.onOpenInSql case final inSql?)
+                                      MenuButton(
+                                        key: material.ValueKey(
+                                            'erd_menu_sql_${t.name}'),
+                                        onPressed: (_) => inSql(t.name),
+                                        child: const Text('Open in SQL'),
+                                      ),
+                                    if (widget.onShowRelations
+                                        case final relations?)
+                                      MenuButton(
+                                        key: material.ValueKey(
+                                            'erd_menu_relations_${t.name}'),
+                                        onPressed: (_) => relations(t.name),
+                                        child: const Text('Show relations'),
+                                      ),
                                     MenuButton(
                                       onPressed: (_) {
                                         Clipboard.setData(

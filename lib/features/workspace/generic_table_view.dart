@@ -4,7 +4,9 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:querya_desktop/core/storage/local_db.dart' show MutationAuditSource;
 import 'package:querya_desktop/core/storage/mutation_audit_recorder.dart';
+import 'package:querya_desktop/core/actions/querya_command_host.dart';
 import 'package:querya_desktop/core/actions/table_view_command_bridge.dart';
+import 'package:querya_desktop/features/erd/erd_table_names.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/features/erd/erd_source.dart';
@@ -30,6 +32,7 @@ class GenericTableView extends material.StatefulWidget {
     required this.dialect,
     this.tableName = '',
     this.schema,
+    this.database,
     this.isView = false,
     this.isMaterializedView = false,
     this.isReadOnly = false,
@@ -50,6 +53,9 @@ class GenericTableView extends material.StatefulWidget {
   final SqlDialect dialect;
   final String tableName;
   final String? schema;
+
+  /// Database of the table, for opening a neighbour from the Relations view.
+  final String? database;
   final bool isView;
   final bool isMaterializedView;
   final bool isReadOnly;
@@ -64,7 +70,9 @@ class GenericTableView extends material.StatefulWidget {
   /// Offers the Data | Relations switch. Extension tables have no diagram.
   final bool showRelations;
 
-  /// Double click on a neighbour in the Relations view.
+  /// Double click on a neighbour in the Relations view. When null, the
+  /// neighbour opens in the table browser like a Quick Switcher pick, in the
+  /// Relations view, so the graph can be walked.
   final void Function(String table)? onOpenNeighbour;
 
   /// Opens the full diagram focused on this table.
@@ -165,7 +173,7 @@ class GenericTableViewState extends material.State<GenericTableView> {
             source: _erdSource,
             focusTable: focus,
             neighbourhoodDepth: _relationsDepth,
-            onOpenTable: widget.onOpenNeighbour,
+            onOpenTable: _openNeighbour,
             onOpenFullDiagram:
                 widget.onOpenFullDiagram == null ? null : openFull,
           ),
@@ -217,7 +225,29 @@ class GenericTableViewState extends material.State<GenericTableView> {
   void initState() {
     super.initState();
     _loadPage(refreshCount: true);
+    _takePendingView();
     _syncRelationsCommand();
+  }
+
+  /// Starts in the view a "Show relations" or a neighbour open asked for.
+  void _takePendingView() {
+    final view = TableViewCommandBridge.instance.takePendingView();
+    if (view == null || !showsRelations) return;
+    _relationsMode = view == 1;
+    if (_relationsMode) _relationsVisited = true;
+  }
+
+  void _openNeighbour(String name) {
+    final custom = widget.onOpenNeighbour;
+    if (custom != null) {
+      custom(name);
+      return;
+    }
+    final open = QueryaCommandHost.maybeOf(context)?.onOpenSchemaObject;
+    if (open == null) return;
+    TableViewCommandBridge.instance.requestViewForNextTable(1);
+    open(ErdTableNames.schemaObject(name, widget.dialect,
+        database: widget.database ?? ''));
   }
 
   /// The Command Palette can switch Data / Relations only while this table
@@ -244,6 +274,8 @@ class GenericTableViewState extends material.State<GenericTableView> {
       _resetStaging();
       _offset = 0;
       _loadPage(refreshCount: true);
+      // The browser is reused for the next table: it may ask for a view too.
+      _takePendingView();
     } else if (oldWidget.isReadOnly != widget.isReadOnly) {
       _syncStagingToReadOnly();
     }

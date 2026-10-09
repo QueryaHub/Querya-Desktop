@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/gestures.dart' show kSecondaryButton;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -616,6 +617,61 @@ void main() {
       expect(saved['erd.png']!.isNotEmpty, isTrue);
       expect(t.takeException(), isNull);
       await t.pump(const Duration(seconds: 1));
+    });
+
+    // The card menu is a desktop popover; on a phone platform shadcn opens it
+    // as a sheet, which needs the app's drawer overlay.
+    final desktop = TargetPlatformVariant.only(material.TargetPlatform.linux);
+
+    testWidgets('a card menu opens the table in SQL and shows its relations',
+        variant: desktop, (t) async {
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
+      String? inSql, relations;
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(
+          source: SqlErdSource(delegate: delegate(), dialect: SqlDialect.sqlite),
+          onOpenTable: (_) {},
+          onOpenInSql: (n) => inSql = n,
+          onShowRelations: (n) => relations = n,
+        ),
+      ));
+      await t.pump();
+      await t.pump();
+      final card = find.byKey(const material.ValueKey('erd_table_users'));
+
+      await t.tap(card, buttons: kSecondaryButton);
+      await t.pump();
+      await t.pump(const Duration(milliseconds: 300));
+      expect(find.text('Open data'), findsOneWidget);
+      await t.tap(find.byKey(const material.ValueKey('erd_menu_sql_users')));
+      await t.pump(const Duration(milliseconds: 300));
+      expect(inSql, 'users');
+
+      await t.tap(card, buttons: kSecondaryButton);
+      await t.pump();
+      await t.pump(const Duration(milliseconds: 300));
+      await t.tap(
+          find.byKey(const material.ValueKey('erd_menu_relations_users')));
+      await t.pump(const Duration(milliseconds: 300));
+      expect(relations, 'users');
+    });
+
+    testWidgets('a card menu leaves out actions nobody handles',
+        variant: desktop, (t) async {
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(
+            source: SqlErdSource(delegate: delegate(), dialect: SqlDialect.sqlite)),
+      ));
+      await t.pump();
+      await t.pump();
+      await t.tap(find.byKey(const material.ValueKey('erd_table_users')),
+          buttons: kSecondaryButton);
+      await t.pump();
+      await t.pump(const Duration(milliseconds: 300));
+      expect(find.text('Copy name'), findsOneWidget);
+      expect(find.text('Open in SQL'), findsNothing);
+      expect(find.text('Show relations'), findsNothing);
     });
 
     testWidgets('a card can be dragged and Auto layout puts it back',

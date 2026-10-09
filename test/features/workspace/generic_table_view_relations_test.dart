@@ -70,4 +70,20 @@ void main() {
     await pumpGenericTableView(t, FakeTableDataDelegate(), isView: true);
     expect(TableViewCommandBridge.instance.isActive, isFalse);
   });
+
+  testWidgets('a table asked to open in Relations starts there', (t) async {
+    TableViewCommandBridge.instance.requestViewForNextTable(1);
+    await pumpGenericTableView(t, FakeTableDataDelegate());
+    await t.pump();
+    expect(find.byType(ErdView), findsOneWidget);
+    // The request is used once.
+    expect(TableViewCommandBridge.instance.takePendingView(), isNull);
+  });
+
+  testWidgets('a view ignores a Relations request', (t) async {
+    TableViewCommandBridge.instance.requestViewForNextTable(1);
+    await pumpGenericTableView(t, FakeTableDataDelegate(), isView: true);
+    await t.pump();
+    expect(find.byType(ErdView), findsNothing);
+  });
 }

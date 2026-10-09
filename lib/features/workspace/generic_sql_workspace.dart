@@ -9,7 +9,10 @@ import 'package:querya_desktop/core/storage/mutation_audit_recorder.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
+import 'package:querya_desktop/core/actions/querya_command_host.dart';
+import 'package:querya_desktop/core/actions/table_view_command_bridge.dart';
 import 'package:querya_desktop/features/erd/erd_source.dart';
+import 'package:querya_desktop/features/erd/erd_table_names.dart';
 import 'package:querya_desktop/core/database/sql_table_target_extractor.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
@@ -276,12 +279,29 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
     });
   }
 
-  void _openTableFromDiagram(String table) {
-    final q = switch (widget.dialect) {
-      SqlDialect.mysql => '`$table`',
-      _ => '"$table"',
-    };
-    addNewTab(initialSql: 'SELECT * FROM $q LIMIT 100;', title: table);
+  /// Double click or "Open data" on a diagram card: the table browser, as the
+  /// Quick Switcher opens it. With [relations] it starts in the Relations
+  /// view. Without the app shell (tests, embedded use) the rows open in a
+  /// new SQL tab instead.
+  void _openTableFromDiagram(String table, {bool relations = false}) {
+    final open = QueryaCommandHost.maybeOf(context)?.onOpenSchemaObject;
+    if (open == null) {
+      _openTableInSql(table);
+      return;
+    }
+    if (relations) TableViewCommandBridge.instance.requestViewForNextTable(1);
+    open(ErdTableNames.schemaObject(table, widget.dialect,
+        database: effectiveDatabase));
+  }
+
+  /// "Open in SQL" on a diagram card: `SELECT * … LIMIT 100` in a new tab,
+  /// with the name qualified and quoted for the dialect.
+  void _openTableInSql(String table) {
+    final (_, bare) = ErdTableNames.split(table, widget.dialect);
+    addNewTab(
+      initialSql: ErdTableNames.selectSql(table, widget.dialect),
+      title: bare,
+    );
     final session = _activeSession;
     material.WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(execute(session));
@@ -1192,6 +1212,11 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
         source: SqlErdSource(delegate: widget.delegate, dialect: widget.dialect),
         databaseName: effectiveDatabase,
         onOpenTable: _openTableFromDiagram,
+        onOpenInSql: _openTableInSql,
+        onShowRelations:
+            QueryaCommandHost.maybeOf(context)?.onOpenSchemaObject == null
+                ? null
+                : (table) => _openTableFromDiagram(table, relations: true),
       );
     }
 
