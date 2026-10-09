@@ -634,14 +634,12 @@ void main() {
       expect(PgSessionMode.mcp.isReadOnlySession, isTrue);
       expect(PgSessionMode.readOnly.statementTimeout, isNull);
       expect(PgSessionMode.mcp.statementTimeout, mcpStatementTimeout);
-      expect(
-        PostgresConnectionPool(createAndConnect: (r, {required database, required mode}) =>
-                throw StateError('unused'))
-            .keyFor(1, 'app', PgSessionMode.mcp),
-        isNot(PostgresConnectionPool(createAndConnect: (r, {required database, required mode}) =>
-                throw StateError('unused'))
-            .keyFor(1, 'app', PgSessionMode.readOnly)),
+      final pool = PostgresConnectionPool(
+        createAndConnect: (row, {required database, required mode}) async =>
+            FakePostgresConnection(),
       );
+      expect(pool.keyFor(1, 'app', PgSessionMode.mcp),
+          isNot(pool.keyFor(1, 'app', PgSessionMode.readOnly)));
     });
 
     test('an MCP lease never shares the connection of the read-only slot',
