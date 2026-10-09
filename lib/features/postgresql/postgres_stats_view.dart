@@ -3,10 +3,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/motion/ticker_gated_polling.dart';
+import 'package:querya_desktop/core/stats/metric_history.dart';
 import 'package:querya_desktop/core/util/deep_collection_equals.dart';
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/shared/widgets/querya_sparkline.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
@@ -32,6 +34,9 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
   PostgresConnection? get _connection => _lease?.connection;
 
   Map<String, dynamic>? _stats;
+
+  /// Samples of the last poll results: connections and transactions per second.
+  final _history = MetricHistory();
   bool _loading = true;
   String? _error;
   Timer? _timer;
@@ -103,6 +108,21 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
     }
   }
 
+  /// Records the poll's numbers. No query is added: the poll already fetched them.
+  void _recordHistory(Map<String, dynamic> stats) {
+    final now = DateTime.now();
+    _history
+      ..record('connections_active',
+          ((stats['connections_active'] ?? 0) as num).toDouble(), now)
+      ..record('connections_total',
+          ((stats['connections_total'] ?? 0) as num).toDouble(), now);
+    var commits = 0;
+    for (final db in stats['databases'] as List? ?? const []) {
+      commits += ((db as Map)['xact_commit'] as num? ?? 0).toInt();
+    }
+    _history.recordCounter('transactions_per_second', commits.toDouble(), now);
+  }
+
   Future<void> _fetch() async {
     final c = _connection;
     if (c == null || !c.isConnected) {
@@ -116,6 +136,7 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
     try {
       final stats = await c.serverStats();
       if (!mounted) return;
+      _recordHistory(stats);
       if (!replaceIfChanged(_stats, stats, (v) => _stats = v)) {
         if (_loading) {
           setState(() {
@@ -143,8 +164,10 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
     try {
       final stats = await c.serverStats();
       if (!mounted) return;
-      if (!replaceIfChanged(_stats, stats, (v) => _stats = v)) return;
-      setState(() => _stats = stats);
+      _recordHistory(stats);
+      // The sparklines move with every sample, so rebuild even when the numbers
+      // did not change.
+      setState(() => replaceIfChanged(_stats, stats, (v) => _stats = v));
     } catch (_) {}
   }
 
@@ -452,6 +475,15 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
           _row(context, 'Active', '$active'),
           _row(context, 'Idle', '$idle'),
           _row(context, 'Max connections', maxConn),
+          const Gap(8),
+          QueryaSparkline(
+            samples: _history.series('connections_active'),
+            color: context.workbench.accent,
+          ),
+          QueryaSparkline(
+            samples: _history.series('transactions_per_second'),
+            color: context.workbench.accent,
+          ),
         ],
       ),
       minHeight: _gridCardMinHeight,
