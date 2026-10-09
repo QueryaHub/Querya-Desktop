@@ -29,10 +29,10 @@ typedef MysqlPoolConnectionFactory = Future<MysqlConnection> Function(
 
 /// Lease for a pooled [MysqlConnection]. Call [release] when the UI is done.
 class MysqlLease {
-  MysqlLease._(this._pool, this._key, this.connection);
+  MysqlLease._(this._pool, this._entry, this.connection);
 
   final MysqlConnectionPool _pool;
-  final String _key;
+  final _PoolEntry _entry;
   final MysqlConnection connection;
 
   bool _released = false;
@@ -40,7 +40,7 @@ class MysqlLease {
   void release() {
     if (_released) return;
     _released = true;
-    _pool._release(_key);
+    _pool._release(_entry);
   }
 }
 
@@ -81,7 +81,7 @@ class MysqlConnectionPool {
         await entry.connection.connect();
         await entry.connection.setSessionReadOnly(mode.isReadOnlySession);
       }
-      return MysqlLease._(this, k, entry.connection);
+      return MysqlLease._(this, entry, entry.connection);
     }
 
     try {
@@ -89,7 +89,7 @@ class MysqlConnectionPool {
         _evictIfNeededBeforeNewSlot();
         final conn =
             await createAndConnect(row, database: database, mode: mode);
-        _pool[k] = _PoolEntry(conn);
+        _pool[k] = _PoolEntry(conn, k);
         return conn;
       });
     } on StateError {
@@ -117,7 +117,7 @@ class MysqlConnectionPool {
       await entry.connection.connect();
       await entry.connection.setSessionReadOnly(mode.isReadOnlySession);
     }
-    return MysqlLease._(this, k, entry.connection);
+    return MysqlLease._(this, entry, entry.connection);
   }
 
   void _evictIfNeededBeforeNewSlot() {
@@ -140,18 +140,23 @@ class MysqlConnectionPool {
     unawaited(entry.connection.forceClose());
   }
 
-  void _release(String k) {
-    final entry = _pool[k];
-    if (entry == null) return;
+  /// Releases one lease on [entry]. A lease taken before an [interrupt] points
+  /// at an entry that is no longer in the pool: it must not touch the entry
+  /// that replaced it under the same key, so it does nothing.
+  void _release(_PoolEntry entry) {
+    if (!identical(_pool[entry.key], entry)) return;
     entry.refs--;
+    assert(
+      entry.refs >= 0,
+      'pool entry ${entry.key} released more often than leased',
+    );
     if (entry.refs > 0) return;
     entry.idleTimer?.cancel();
     entry.idleTimer = Timer(idleDisposeDelay, () {
-      final e = _pool[k];
-      if (e == null || e.refs > 0) return;
-      e.idleTimer = null;
-      unawaited(e.connection.disconnect());
-      _pool.remove(k);
+      if (!identical(_pool[entry.key], entry) || entry.refs > 0) return;
+      entry.idleTimer = null;
+      unawaited(entry.connection.disconnect());
+      _pool.remove(entry.key);
     });
   }
 
@@ -194,9 +199,10 @@ class MysqlConnectionPool {
 }
 
 class _PoolEntry {
-  _PoolEntry(this.connection) : lastUsed = DateTime.now();
+  _PoolEntry(this.connection, this.key) : lastUsed = DateTime.now();
 
   final MysqlConnection connection;
+  final String key;
   int refs = 0;
   Timer? idleTimer;
   DateTime lastUsed;

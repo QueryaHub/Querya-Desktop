@@ -33,10 +33,10 @@ typedef PostgresPoolConnectionFactory = Future<PostgresConnection> Function(
 /// Lease for a pooled [PostgresConnection]. Call [release] when the UI is done
 /// (typically in [State.dispose]).
 class PgLease {
-  PgLease._(this._pool, this._key, this.connection);
+  PgLease._(this._pool, this._entry, this.connection);
 
   final PostgresConnectionPool _pool;
-  final String _key;
+  final _PoolEntry _entry;
   final PostgresConnection connection;
 
   bool _released = false;
@@ -45,7 +45,7 @@ class PgLease {
   void release() {
     if (_released) return;
     _released = true;
-    _pool._release(_key);
+    _pool._release(_entry);
   }
 }
 
@@ -93,7 +93,7 @@ class PostgresConnectionPool {
         await entry.connection.connect();
         await entry.connection.setSessionReadOnly(mode.isReadOnlySession);
       }
-      return PgLease._(this, k, entry.connection);
+      return PgLease._(this, entry, entry.connection);
     }
 
     try {
@@ -101,7 +101,7 @@ class PostgresConnectionPool {
         _evictIfNeededBeforeNewSlot();
         final conn =
             await createAndConnect(row, database: database, mode: mode);
-        _pool[k] = _PoolEntry(conn);
+        _pool[k] = _PoolEntry(conn, k);
         return conn;
       });
     } on StateError {
@@ -129,7 +129,7 @@ class PostgresConnectionPool {
       await entry.connection.connect();
       await entry.connection.setSessionReadOnly(mode.isReadOnlySession);
     }
-    return PgLease._(this, k, entry.connection);
+    return PgLease._(this, entry, entry.connection);
   }
 
   /// Drops idle LRU slots until there is room for one more key.
@@ -153,18 +153,23 @@ class PostgresConnectionPool {
     unawaited(entry.connection.forceClose());
   }
 
-  void _release(String k) {
-    final entry = _pool[k];
-    if (entry == null) return;
+  /// Releases one lease on [entry]. A lease taken before an [interrupt] points
+  /// at an entry that is no longer in the pool: it must not touch the entry
+  /// that replaced it under the same key, so it does nothing.
+  void _release(_PoolEntry entry) {
+    if (!identical(_pool[entry.key], entry)) return;
     entry.refs--;
+    assert(
+      entry.refs >= 0,
+      'pool entry ${entry.key} released more often than leased',
+    );
     if (entry.refs > 0) return;
     entry.idleTimer?.cancel();
     entry.idleTimer = Timer(idleDisposeDelay, () {
-      final e = _pool[k];
-      if (e == null || e.refs > 0) return;
-      e.idleTimer = null;
-      unawaited(e.connection.disconnect());
-      _pool.remove(k);
+      if (!identical(_pool[entry.key], entry) || entry.refs > 0) return;
+      entry.idleTimer = null;
+      unawaited(entry.connection.disconnect());
+      _pool.remove(entry.key);
     });
   }
 
@@ -213,9 +218,10 @@ class PostgresConnectionPool {
 }
 
 class _PoolEntry {
-  _PoolEntry(this.connection) : lastUsed = DateTime.now();
+  _PoolEntry(this.connection, this.key) : lastUsed = DateTime.now();
 
   final PostgresConnection connection;
+  final String key;
   int refs = 0;
   Timer? idleTimer;
   DateTime lastUsed;
