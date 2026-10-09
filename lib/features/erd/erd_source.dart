@@ -37,7 +37,7 @@ class SqlErdSource implements ErdSource {
 /// Runs catalog queries on a table browser's own read-only session, through
 /// [TableDataMutationDelegate.loadCustomSql]. The table delegate keeps its own
 /// connection, so the diagram never borrows the SQL editor's session.
-class TableDataSqlAdapter implements SqlExecutionDelegate {
+class TableDataSqlAdapter extends SqlExecutionDelegate {
   const TableDataSqlAdapter(this.table);
 
   final TableDataMutationDelegate table;

@@ -12,8 +12,6 @@ import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart'
 import 'package:querya_desktop/features/workspace/results_tab.dart';
 import 'package:querya_desktop/features/workspace/table_data_delegate.dart';
 import 'package:querya_desktop/features/workspace/table_view_staging.dart';
-import 'package:querya_desktop/shared/widgets/querya_action_button.dart';
-import 'package:querya_desktop/shared/widgets/querya_tab_strip.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Reusable database table browser supporting:
