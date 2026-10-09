@@ -172,6 +172,87 @@ void main() {
       expect(s.relations.length, 1);
     });
 
+    test('a PostgreSQL table of the current schema is found by its bare name',
+        () async {
+      final delegate = FakeSqlExecutionDelegate(onExecute: (sql) {
+        if (sql == ErdCatalog.foreignKeysSql(SqlDialect.postgres)) {
+          return const SqlExecutionResult(rows: [
+            ['orders', 'user_id', 'users', 'id'],
+            ['users', 'org_id', 'orgs', 'id'],
+          ]);
+        }
+        if (sql == ErdCatalog.columnsSql(SqlDialect.postgres)) {
+          return const SqlExecutionResult(rows: [
+            ['users', 'id', 'integer', '1'],
+            ['users', 'org_id', 'integer', '0'],
+            ['orders', 'id', 'integer', '1'],
+            ['orders', 'user_id', 'integer', '0'],
+            ['orgs', 'id', 'integer', '1'],
+            ['unrelated', 'id', 'integer', '1'],
+          ]);
+        }
+        return const SqlExecutionResult();
+      });
+      // The table browser names it `public.users`; the catalog says `users`.
+      final s = await ErdCatalog.loadNeighbourhood(
+        delegate,
+        SqlDialect.postgres,
+        table: 'public.users',
+      );
+      expect(s.tables.map((t) => t.name).toSet(), {'users', 'orders', 'orgs'});
+      expect(s.relations, hasLength(2));
+    });
+
+    test('a PostgreSQL table with no keys is found by its columns', () async {
+      final delegate = FakeSqlExecutionDelegate(onExecute: (sql) {
+        if (sql == ErdCatalog.columnsSql(SqlDialect.postgres, schema: 'public')) {
+          return const SqlExecutionResult(rows: [
+            ['lonely', 'id', 'integer', '1'],
+            ['other', 'id', 'integer', '1'],
+          ]);
+        }
+        return const SqlExecutionResult();
+      });
+      final s = await ErdCatalog.loadNeighbourhood(
+        delegate,
+        SqlDialect.postgres,
+        table: 'public.lonely',
+      );
+      expect(s.tables.map((t) => t.name), ['lonely']);
+      expect(s.relations, isEmpty);
+    });
+
+    test('a PostgreSQL table of another schema keeps its qualified name',
+        () async {
+      final delegate = FakeSqlExecutionDelegate(onExecute: (sql) {
+        if (sql == ErdCatalog.foreignKeysSql(SqlDialect.postgres)) {
+          return const SqlExecutionResult(rows: [
+            ['sales.orders', 'customer_id', 'customers', 'id'],
+          ]);
+        }
+        if (sql == ErdCatalog.columnsSql(SqlDialect.postgres, schema: 'sales')) {
+          return const SqlExecutionResult(rows: [
+            ['sales.orders', 'id', 'integer', '1'],
+            ['sales.orders', 'customer_id', 'integer', '0'],
+          ]);
+        }
+        if (sql == ErdCatalog.columnsSql(SqlDialect.postgres)) {
+          return const SqlExecutionResult(rows: [
+            ['customers', 'id', 'integer', '1'],
+            ['users', 'id', 'integer', '1'],
+          ]);
+        }
+        return const SqlExecutionResult();
+      });
+      final s = await ErdCatalog.loadNeighbourhood(
+        delegate,
+        SqlDialect.postgres,
+        table: 'sales.orders',
+      );
+      expect(s.tables.map((t) => t.name).toSet(), {'sales.orders', 'customers'});
+      expect(s.relations, hasLength(1));
+    });
+
     test('load runs both queries through the delegate', () async {
       final delegate = FakeSqlExecutionDelegate(onExecute: (sql) {
         if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {

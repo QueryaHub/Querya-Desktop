@@ -1,5 +1,6 @@
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/features/erd/erd_model.dart';
+import 'package:querya_desktop/features/erd/erd_table_names.dart';
 import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
 
 /// Catalog queries per dialect. Column query yields `table, column, type,
@@ -138,9 +139,16 @@ WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
     );
     final fks = fksResult.rows;
     var truncated = fksResult.isTruncated;
-    final names = neighbourhood(fks, table, depth);
+    // The table browser names a PostgreSQL table `schema.table`, while the
+    // catalog names one of the current schema `table`. Use the catalog's name.
+    final (_, bare) = ErdTableNames.split(table, dialect);
+    var focus = table;
+    if (bare != table && !_mentions(fks, table) && _mentions(fks, bare)) {
+      focus = bare;
+    }
+    var names = neighbourhood(fks, focus, depth);
 
-    final cols = <List<String>>[];
+    final fetched = <List<String>>[];
     final schemas = {for (final n in names) schemaOf(n)};
     for (final s in schemas) {
       final rows = await delegate.executeQuery(
@@ -148,7 +156,17 @@ WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
         limit: catalogRowLimit,
       );
       truncated = truncated || rows.isTruncated;
-      cols.addAll(rows.rows.where((r) => r.isNotEmpty && names.contains(r[0])));
+      fetched.addAll(rows.rows.where((r) => r.isNotEmpty));
+    }
+    var cols = [for (final r in fetched) if (names.contains(r[0])) r];
+    // A table with no keys either way: only its columns show which name the
+    // catalog uses.
+    if (bare != focus &&
+        !cols.any((r) => r[0] == focus) &&
+        fetched.any((r) => r[0] == bare)) {
+      focus = bare;
+      names = neighbourhood(fks, focus, depth);
+      cols = [for (final r in fetched) if (names.contains(r[0])) r];
     }
     return ErdSchema.fromCatalog(
       columnRows: cols,
@@ -159,6 +177,10 @@ WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
       truncated: truncated,
     );
   }
+
+  /// Whether a foreign key row names [table] on either side.
+  static bool _mentions(List<List<String>> fkRows, String table) => fkRows
+      .any((r) => r.length >= 4 && (r[0] == table || r[2] == table));
 
   /// Names of the tables within [depth] foreign keys of [table], including
   /// [table] itself. Pure, for tests.

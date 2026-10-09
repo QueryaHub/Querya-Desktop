@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/gestures.dart' show kSecondaryButton;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -419,6 +420,87 @@ void main() {
     expect(delegate.executed.where((q) => q.startsWith('SELECT * FROM')),
         isEmpty);
   });
+
+  Future<FakeSqlExecutionDelegate> pumpDiagram(
+    WidgetTester tester,
+    SqlDialect dialect,
+    String table, {
+    void Function(QueryaSchemaObject)? onOpen,
+  }) async {
+    final delegate = FakeSqlExecutionDelegate(onExecute: (sql) {
+      if (sql == ErdCatalog.columnsSql(dialect)) {
+        return SqlExecutionResult(rows: [
+          [table, 'id', 'integer', '1'],
+        ]);
+      }
+      return const SqlExecutionResult();
+    });
+    await tester.binding.setSurfaceSize(const material.Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: QueryaCommandHost(
+          onOpenSchemaObject: onOpen ?? (_) {},
+          child: material.SizedBox.expand(
+            child: GenericSqlWorkspace(
+              connectionRow: connection,
+              delegate: delegate,
+              dialect: dialect,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const material.ValueKey('open_diagram_tab')));
+    await settle(tester);
+    return delegate;
+  }
+
+  testWidgets('a double click opens a table of another schema in the browser (#1155)',
+      timeout: _timeout, (tester) async {
+    final opened = <QueryaSchemaObject>[];
+    await pumpDiagram(tester, SqlDialect.postgres, 'sales.orders',
+        onOpen: opened.add);
+    final card = find.byKey(const material.ValueKey('erd_table_sales.orders'));
+    expect(card, findsOneWidget);
+
+    await tester.tap(card);
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(card);
+    await settle(tester);
+
+    expect(opened, hasLength(1));
+    expect(opened.single.schema, 'sales');
+    expect(opened.single.name, 'orders');
+    expect(opened.single.kind, QueryaSchemaObjectKind.table);
+  });
+
+  for (final (dialect, table, quoted) in [
+    (SqlDialect.postgres, 'sales.orders', '"sales"."orders"'),
+    // A dot in a MySQL name is part of the name.
+    (SqlDialect.mysql, 'order.items', '`order.items`'),
+  ]) {
+    testWidgets(
+        '${dialect.name}: Open in SQL quotes $table for the dialect (#1155)',
+        timeout: _timeout,
+        variant: TargetPlatformVariant.only(material.TargetPlatform.linux),
+        (tester) async {
+      final delegate = await pumpDiagram(tester, dialect, table);
+      final card = find.byKey(material.ValueKey('erd_table_$table'));
+      await tester.tap(card, buttons: kSecondaryButton);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.byKey(material.ValueKey('erd_menu_sql_$table')));
+      await settle(tester);
+
+      expect(
+        delegate.executed.where((q) => q.contains('SELECT * FROM $quoted')),
+        isNotEmpty,
+        reason: 'executed: ${delegate.executed}',
+      );
+    });
+  }
 
   testWidgets('the Diagram reads the catalog through its own delegate, not the editor',
       timeout: _timeout, (tester) async {

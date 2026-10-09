@@ -141,7 +141,11 @@ class GenericTableViewState extends material.State<GenericTableView> {
   /// the grid's state (staged edits, page, filter) is never disturbed.
   material.Widget _buildRelations() {
     final schema = widget.schema;
-    final focus = schema == null || schema.isEmpty
+    // Only PostgreSQL names a table by its schema in the diagram. MySQL passes
+    // the database as the schema, and its catalog never qualifies a name.
+    final focus = widget.dialect != SqlDialect.postgres ||
+            schema == null ||
+            schema.isEmpty
         ? widget.tableName
         : '$schema.${widget.tableName}';
     void openFull() => widget.onOpenFullDiagram?.call(focus);

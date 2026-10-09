@@ -230,6 +230,33 @@ void main() {
       // Row locks hidden at the end of a read.
       ('SELECT 1 FROM t WHERE id = 1 FOR UPDATE', SqlDialect.postgres,
           'select_into_or_lock'),
+      ('SELECT 1 FOR NO KEY UPDATE', SqlDialect.postgres,
+          'select_into_or_lock'),
+      // A server function with effects, inside an ordinary read.
+      ('SELECT pg_terminate_backend(42)', SqlDialect.postgres,
+          'function_not_allowed'),
+      ('EXPLAIN ANALYZE SELECT 1', SqlDialect.postgres,
+          'explain_analyze_or_write'),
+      // MySQL: the MariaDB form of the executable comment, a file read, a
+      // file write and a share lock at the end of a read.
+      ('SELECT 1 /*M! ; DROP TABLE t */', SqlDialect.mysql,
+          'mysql_executable_comment'),
+      ("SELECT LOAD_FILE('/etc/passwd')", SqlDialect.mysql,
+          'function_not_allowed'),
+      ("SELECT * FROM t INTO OUTFILE '/tmp/x'", SqlDialect.mysql,
+          'select_into_or_lock'),
+      ('SELECT 1 FROM t LOCK IN SHARE MODE', SqlDialect.mysql,
+          'select_into_or_lock'),
+      ('SELECT 1 /* ; */; DROP TABLE t', SqlDialect.mysql, 'single_statement'),
+      // SQLite: a separator behind a comment, a write behind WITH, an
+      // extension load in a read and a pragma that writes.
+      ('SELECT 1 /* ; */; DELETE FROM t', SqlDialect.sqlite,
+          'single_statement'),
+      ('WITH x AS (SELECT 1) INSERT INTO t SELECT * FROM x', SqlDialect.sqlite,
+          'data_modifying'),
+      ("SELECT load_extension('/tmp/evil.so')", SqlDialect.sqlite,
+          'function_not_allowed'),
+      ('PRAGMA writable_schema = 1', SqlDialect.sqlite, 'sqlite_pragma'),
     ];
 
     for (final (sql, dialect, rule) in placements) {
@@ -237,6 +264,32 @@ void main() {
         expect(McpSqlGuard.refusal(sql, dialect)?.rule, rule);
       });
     }
+
+    test('run_query refuses each case with the same rule, before the driver',
+        () async {
+      final types = {
+        SqlDialect.postgres: 'postgresql',
+        SqlDialect.mysql: 'mysql',
+        SqlDialect.sqlite: 'sqlite',
+      };
+      final db = FakeSqlExecutionDelegate()..onExecute = _catalog;
+      final service = McpQueryService(
+        createDelegate: (row, dialect) => db,
+        access: _Access({1, 2, 3}),
+        loadConnections: () async => [
+          for (final e in types.entries) _row(e.key.index + 1, e.value),
+        ],
+      );
+      for (final (sql, dialect, rule) in placements) {
+        await expectLater(
+          service.runQuery(dialect.index + 1, sql),
+          throwsA(isA<McpToolException>()
+              .having((e) => e.rule, 'rule', rule)),
+          reason: sql,
+        );
+      }
+      expect(db.executed, isEmpty);
+    });
 
     test('a write keyword inside a string literal is a value, not a write', () {
       expect(

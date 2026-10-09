@@ -16,6 +16,8 @@ Future<GenericTableViewState> pumpGenericTableView(
   bool isView = false,
   bool showRelations = true,
   int limit = 200,
+  String? schema = 'public',
+  void Function(String table)? onOpenNeighbour,
 }) async {
   await tester.binding.setSurfaceSize(const material.Size(1300, 800));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -28,7 +30,8 @@ Future<GenericTableViewState> pumpGenericTableView(
             title: 'users',
             dialect: dialect,
             tableName: 'users',
-            schema: 'public',
+            schema: schema,
+            onOpenNeighbour: onOpenNeighbour,
             isReadOnly: isReadOnly,
             isView: isView,
             showRelations: showRelations,
