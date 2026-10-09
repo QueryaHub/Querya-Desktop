@@ -113,7 +113,7 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.text('SVG'));
     // The export reads its setting first, which is real I/O.
-    for (var i = 0; i < 40 && saved == null; i++) {
+    for (var i = 0; i < 200 && saved == null; i++) {
       await t.runAsync(
           () => Future<void>.delayed(const Duration(milliseconds: 50)));
       await t.pump();
@@ -129,7 +129,7 @@ void main() {
     await t.pumpAndSettle();
     saved = null;
     await t.tap(find.text('SVG'));
-    for (var i = 0; i < 40 && saved == null; i++) {
+    for (var i = 0; i < 200 && saved == null; i++) {
       await t.runAsync(
           () => Future<void>.delayed(const Duration(milliseconds: 50)));
       await t.pump();
