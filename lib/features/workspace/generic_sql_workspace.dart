@@ -1045,8 +1045,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
                       const Text('Query').semiBold().small(),
                     if (effectiveDatabase.isNotEmpty)
                       Text('DB: $effectiveDatabase').muted().small(),
-                    if (widget.delegate.supportsTransactions)
-                      Text(_txLabel()).muted().small(),
+                    if (widget.delegate.supportsTransactions) _txBadge(),
                     QueryaActionButton(
                       label: 'History',
                       icon: material.Icons.history_rounded,
@@ -1145,20 +1144,23 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
                           ],
                         ),
                       ],
-                      if (widget.delegate.supportsTransactions) ...[
-                        QueryaActionButton(
-                          label: 'Begin',
-                          onPressed: session.running ? null : () => runTxCommand('BEGIN'),
-                        ),
-                        QueryaActionButton(
-                          label: 'Commit',
-                          onPressed: session.running ? null : () => runTxCommand('COMMIT'),
-                        ),
-                        QueryaActionButton(
-                          label: 'Rollback',
-                          onPressed: session.running ? null : () => runTxCommand('ROLLBACK'),
-                        ),
-                      ],
+                      // Commit and Rollback only while a transaction is open; Begin
+                      // otherwise.
+                      if (widget.delegate.supportsTransactions)
+                        if (_txOpen == true) ...[
+                          QueryaActionButton(
+                            label: 'Commit',
+                            onPressed: session.running ? null : () => runTxCommand('COMMIT'),
+                          ),
+                          QueryaActionButton(
+                            label: 'Rollback',
+                            onPressed: session.running ? null : () => runTxCommand('ROLLBACK'),
+                          ),
+                        ] else
+                          QueryaActionButton(
+                            label: 'Begin',
+                            onPressed: session.running ? null : () => runTxCommand('BEGIN'),
+                          ),
                     ],
                   ),
                 ],
@@ -1214,8 +1216,19 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
     );
   }
 
-  String _txLabel() {
-    if (_txOpen == null) return 'Transaction: —';
-    return _txOpen! ? 'Transaction: open' : 'Transaction: none';
+  /// Transaction state as a badge: an open transaction is a warning, because
+  /// work can be lost, and looks different from no transaction.
+  material.Widget _txBadge() {
+    final open = _txOpen;
+    if (open == null) {
+      return const QueryaBadge.status('Transaction —', status: QueryaBadgeStatus.neutral);
+    }
+    if (open) {
+      return const QueryaBadge.status('Transaction open', status: QueryaBadgeStatus.warning);
+    }
+    return QueryaBadge.status(
+      _autocommit ? 'Auto-commit' : 'Manual commit',
+      status: _autocommit ? QueryaBadgeStatus.neutral : QueryaBadgeStatus.info,
+    );
   }
 }
