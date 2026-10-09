@@ -61,9 +61,10 @@ void main() {
     expect(find.text('Select your database'), findsOneWidget);
     await t.tap(find.text('Select database…'));
     await step(t);
-    await t.tap(find.text(label).last);
+    // Only the visible item: the picker's own label is in the tree too.
+    await t.tap(find.text(label).hitTestable().last);
     await step(t);
-    await t.tap(find.text('Next'));
+    await t.tap(find.text('Next').hitTestable());
     await step(t);
     await step(t);
   }
