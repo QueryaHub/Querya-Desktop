@@ -89,10 +89,7 @@ class PostgresConnectionPool {
       entry.idleTimer?.cancel();
       entry.idleTimer = null;
       entry.refs++;
-      if (!entry.connection.isConnected) {
-        await entry.connection.connect();
-        await entry.connection.setSessionReadOnly(mode.isReadOnlySession);
-      }
+      if (!entry.connection.isConnected) await _reconnect(entry, mode);
       return PgLease._(this, entry, entry.connection);
     }
 
@@ -125,11 +122,23 @@ class PostgresConnectionPool {
     entry.idleTimer?.cancel();
     entry.idleTimer = null;
     entry.refs++;
-    if (!entry.connection.isConnected) {
+    if (!entry.connection.isConnected) await _reconnect(entry, mode);
+    return PgLease._(this, entry, entry.connection);
+  }
+
+  /// Brings a dropped entry back with one reconnect and one session setting,
+  /// even when several callers ask at once; they all wait for the same attempt.
+  Future<void> _reconnect(_PoolEntry entry, PgSessionMode mode) {
+    final inFlight = entry.reconnecting;
+    if (inFlight != null) return inFlight;
+    final attempt = () async {
       await entry.connection.connect();
       await entry.connection.setSessionReadOnly(mode.isReadOnlySession);
-    }
-    return PgLease._(this, entry, entry.connection);
+    }();
+    entry.reconnecting = attempt;
+    return attempt.whenComplete(() {
+      if (identical(entry.reconnecting, attempt)) entry.reconnecting = null;
+    });
   }
 
   /// Drops idle LRU slots until there is room for one more key.
@@ -222,6 +231,7 @@ class _PoolEntry {
 
   final PostgresConnection connection;
   final String key;
+  Future<void>? reconnecting;
   int refs = 0;
   Timer? idleTimer;
   DateTime lastUsed;
