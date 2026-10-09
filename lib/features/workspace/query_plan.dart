@@ -49,7 +49,7 @@ abstract final class QueryPlanParser {
   /// PostgreSQL `EXPLAIN (FORMAT JSON)`: a list with one object holding `Plan`.
   /// Accepts the JSON text or the already decoded value.
   static PlanNode? fromPostgresJson(Object? value) {
-    final decoded = value is String ? jsonDecode(value) : value;
+    final decoded = _decode(value);
     if (decoded is! List || decoded.isEmpty) return null;
     final first = decoded.first;
     if (first is! Map || first['Plan'] is! Map) return null;
@@ -79,19 +79,29 @@ abstract final class QueryPlanParser {
   /// MySQL `EXPLAIN FORMAT=JSON`: `query_block` with a `nested_loop` of tables
   /// (joins), or a single `table`.
   static PlanNode? fromMysqlJson(Object? value) {
-    final decoded = value is String ? jsonDecode(value) : value;
+    final decoded = _decode(value);
     if (decoded is! Map || decoded['query_block'] is! Map) return null;
     final block = _asMap(decoded['query_block']!);
     final rootCost = _num(_asMap(block['cost_info'] ?? const {})['query_cost']);
     final tables = <PlanNode>[];
     final loop = block['nested_loop'];
+    // prefix_cost is cumulative along the loop; each table keeps its own part,
+    // so the query block's cost is the sum of its tables'.
+    var previous = 0.0;
+    void addTable(Map<String, Object?> table) {
+      final prefix = _num(_asMap(table['cost_info'] ?? const {})['prefix_cost']);
+      final node = _mysqlTable(table, ownCost: prefix == null ? null : prefix - previous);
+      if (prefix != null) previous = prefix;
+      tables.add(node);
+    }
+
     if (loop is List) {
       for (final item in loop) {
         final table = _asMap(item)['table'];
-        if (table is Map) tables.add(_mysqlTable(_asMap(table)));
+        if (table is Map) addTable(_asMap(table));
       }
     } else if (block['table'] is Map) {
-      tables.add(_mysqlTable(_asMap(block['table']!)));
+      addTable(_asMap(block['table']!));
     }
     return PlanNode(
       operation: 'Query block',
@@ -100,13 +110,12 @@ abstract final class QueryPlanParser {
     );
   }
 
-  static PlanNode _mysqlTable(Map<String, Object?> t) {
-    final cost = _asMap(t['cost_info'] ?? const {});
+  static PlanNode _mysqlTable(Map<String, Object?> t, {double? ownCost}) {
     return PlanNode(
       operation: '${t['access_type'] ?? 'table'}',
       relation: t['table_name'] as String?,
       estimatedRows: _num(t['rows_examined_per_scan'] ?? t['rows_produced_per_join']),
-      cost: _num(cost['prefix_cost']),
+      cost: ownCost,
       details: {
         for (final e in t.entries)
           if (e.value is! Map && e.value is! List) e.key: '${e.value}',
@@ -161,6 +170,16 @@ abstract final class QueryPlanParser {
 
     visit(root);
     return best;
+  }
+
+  /// The JSON text decoded, or the value itself; null when the text is not JSON.
+  static Object? _decode(Object? value) {
+    if (value is! String) return value;
+    try {
+      return jsonDecode(value);
+    } on FormatException {
+      return null;
+    }
   }
 
   static Map<String, Object?> _asMap(Object? v) =>

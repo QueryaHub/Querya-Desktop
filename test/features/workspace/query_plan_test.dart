@@ -58,6 +58,8 @@ void main() {
   ]}}''';
       final root = QueryPlanParser.fromMysqlJson(plan)!;
       expect(root.cost, 42);
+      // Each table keeps its own part of the 42: 30 for orders, 12 for customers.
+      expect(root.children.map((c) => c.ownCost), [30, 12]);
       expect(root.children.map((c) => c.relation), ['orders', 'customers']);
       expect(root.children.first.operation, 'ALL');
       expect(QueryPlanParser.hottest(root)!.relation, 'orders');
