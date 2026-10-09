@@ -32,14 +32,15 @@ void main() {
     expect(find.text('Seq Scan'), findsOneWidget);
     expect(find.text('Filter'), findsNothing);
 
-    await t.tap(find.text('Seq Scan'));
+    // The name shows again in the panel, so tap the tree row (the first one).
+    await t.tap(find.text('Seq Scan').first);
     await t.pump();
     expect(find.text('Filter'), findsOneWidget);
     expect(find.text('paid'), findsOneWidget);
     expect(find.text('Startup Cost'), findsOneWidget);
 
     // A second click closes the details again.
-    await t.tap(find.text('Seq Scan'));
+    await t.tap(find.text('Seq Scan').first);
     await t.pump();
     expect(find.text('Filter'), findsNothing);
   });
