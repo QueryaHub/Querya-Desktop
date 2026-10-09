@@ -24,7 +24,6 @@ import 'package:querya_desktop/shared/widgets/querya_action_menu.dart';
 import 'package:querya_desktop/shared/widgets/querya_empty_state.dart';
 import 'package:querya_desktop/shared/widgets/querya_search_field.dart';
 import 'package:querya_desktop/features/workspace/sql_editor_chrome.dart';
-import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
 import 'package:querya_desktop/shared/widgets/querya_action_button.dart';
 import 'package:querya_desktop/shared/widgets/querya_spinner.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -51,20 +50,14 @@ enum _ExportAction { mermaid, svg, png, copyMermaid }
 class ErdView extends material.StatefulWidget {
   const ErdView({
     super.key,
-    this.delegate,
-    this.dialect,
+    required this.source,
     this.databaseName = '',
-    this.source,
     this.focusTable,
     this.neighbourhoodDepth,
     this.onOpenTable,
     this.onOpenFullDiagram,
     this.onSaveFile,
-  }) : assert(source != null || (delegate != null && dialect != null));
-
-  /// Query runner and dialect, used when [source] is not given.
-  final SqlExecutionDelegate? delegate;
-  final SqlDialect? dialect;
+  });
 
   /// Draw only [focusTable] and the tables within this many foreign keys.
   final int? neighbourhoodDepth;
@@ -72,8 +65,8 @@ class ErdView extends material.StatefulWidget {
   /// Opens the diagram's full schema, from a neighbourhood's empty state.
   final material.VoidCallback? onOpenFullDiagram;
 
-  /// Where the tables come from; the delegate and dialect when omitted.
-  final ErdSource? source;
+  /// Where the tables come from.
+  final ErdSource source;
 
   /// Table to pick and centre once the schema is drawn.
   final String? focusTable;
@@ -155,8 +148,8 @@ class _ErdViewState extends material.State<ErdView> {
       final depth = widget.neighbourhoodDepth;
       final focus = widget.focusTable;
       final schema = depth != null && focus != null
-          ? await _source.loadNeighbourhood(focus, depth: depth)
-          : await _source.loadSchema();
+          ? await widget.source.loadNeighbourhood(focus, depth: depth)
+          : await widget.source.loadSchema();
       if (!mounted) return;
       setState(() {
         _schema = schema;
@@ -187,10 +180,6 @@ class _ErdViewState extends material.State<ErdView> {
         ? const []
         : ErdRouter.route(_visibleOf(schema), layout);
   }
-
-  ErdSource get _source =>
-      widget.source ??
-      SqlErdSource(delegate: widget.delegate!, dialect: widget.dialect!);
 
   /// The focused table as named in [schema]: `public.orders` falls back to
   /// `orders` when the current schema names it without a prefix.

@@ -11,6 +11,7 @@ import 'package:querya_desktop/features/erd/erd_layout.dart';
 import 'package:querya_desktop/features/erd/erd_model.dart';
 import 'package:querya_desktop/features/erd/erd_router.dart';
 import 'package:querya_desktop/features/erd/erd_view.dart';
+import 'package:querya_desktop/features/erd/erd_source.dart';
 import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
 
 import '../../support/fake_sql_execution_delegate.dart';
@@ -489,8 +490,7 @@ void main() {
       final saved = <String, Uint8List>{};
       await t.pumpWidget(queryaThemeTestShell(
         child: ErdView(
-          delegate: delegate(),
-          dialect: SqlDialect.sqlite,
+          source: SqlErdSource(delegate: delegate(), dialect: SqlDialect.sqlite),
           onOpenTable: (n) => opened = n,
           onSaveFile: (n, b) async => saved[n] = b,
         ),
@@ -528,7 +528,7 @@ void main() {
       await t.binding.setSurfaceSize(const material.Size(1200, 800));
       addTearDown(() => t.binding.setSurfaceSize(null));
       await t.pumpWidget(queryaThemeTestShell(
-        child: ErdView(delegate: delegate(), dialect: SqlDialect.sqlite),
+        child: ErdView(source: SqlErdSource(delegate: delegate(), dialect: SqlDialect.sqlite))),
       ));
       await t.pump();
       await t.pump();
@@ -568,7 +568,7 @@ void main() {
         ]);
       });
       await t.pumpWidget(queryaThemeTestShell(
-        child: ErdView(delegate: junction, dialect: SqlDialect.sqlite),
+        child: ErdView(source: SqlErdSource(delegate: junction, dialect: SqlDialect.sqlite))),
       ));
       await t.pump();
       await t.pump();
@@ -613,7 +613,7 @@ void main() {
     testWidgets('zoom buttons change the zoom label', (t) async {
       await t.binding.setSurfaceSize(const material.Size(1200, 800));
       await t.pumpWidget(queryaThemeTestShell(
-        child: ErdView(delegate: delegate(), dialect: SqlDialect.sqlite),
+        child: ErdView(source: SqlErdSource(delegate: delegate(), dialect: SqlDialect.sqlite))),
       ));
       await t.pump();
       await t.pump();
@@ -632,7 +632,7 @@ void main() {
         (t) async {
       await t.binding.setSurfaceSize(const material.Size(1200, 800));
       await t.pumpWidget(queryaThemeTestShell(
-        child: ErdView(delegate: threeTables(), dialect: SqlDialect.sqlite),
+        child: ErdView(source: SqlErdSource(delegate: threeTables(), dialect: SqlDialect.sqlite))),
       ));
       await t.pump();
       await t.pump();
@@ -652,7 +652,7 @@ void main() {
         (t) async {
       await t.binding.setSurfaceSize(const material.Size(1200, 800));
       await t.pumpWidget(queryaThemeTestShell(
-        child: ErdView(delegate: threeTables(), dialect: SqlDialect.sqlite),
+        child: ErdView(source: SqlErdSource(delegate: threeTables(), dialect: SqlDialect.sqlite))),
       ));
       await t.pump();
       await t.pump();
@@ -693,7 +693,7 @@ void main() {
         ]);
       });
       await t.pumpWidget(queryaThemeTestShell(
-        child: ErdView(delegate: wide, dialect: SqlDialect.sqlite),
+        child: ErdView(source: SqlErdSource(delegate: wide, dialect: SqlDialect.sqlite))),
       ));
       await t.pump();
       await t.pump();
@@ -712,9 +712,8 @@ void main() {
     testWidgets('a failed load shows a titled state with Retry', (t) async {
       await t.pumpWidget(queryaThemeTestShell(
         child: ErdView(
-          delegate: FakeSqlExecutionDelegate(
-              onExecute: (sql) => throw StateError('no access')),
-          dialect: SqlDialect.sqlite,
+          source: SqlErdSource(delegate: FakeSqlExecutionDelegate(
+              onExecute: (sql) => throw StateError('no access')), dialect: SqlDialect.sqlite),
         ),
       ));
       await t.pump();
@@ -726,9 +725,8 @@ void main() {
     testWidgets('shows empty state', (t) async {
       await t.pumpWidget(queryaThemeTestShell(
         child: ErdView(
-          delegate: FakeSqlExecutionDelegate(
-              onExecute: (_) => const SqlExecutionResult()),
-          dialect: SqlDialect.postgres,
+          source: SqlErdSource(delegate: FakeSqlExecutionDelegate(
+              onExecute: (_) => const SqlExecutionResult()), dialect: SqlDialect.postgres),
         ),
       ));
       await t.pump();

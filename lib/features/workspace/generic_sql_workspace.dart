@@ -9,6 +9,7 @@ import 'package:querya_desktop/core/storage/mutation_audit_recorder.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
+import 'package:querya_desktop/features/erd/erd_source.dart';
 import 'package:querya_desktop/core/database/sql_table_target_extractor.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
@@ -1179,8 +1180,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
     if (session.isDiagram) {
       return ErdView(
         key: material.ValueKey(session.id),
-        delegate: widget.delegate,
-        dialect: widget.dialect,
+        source: SqlErdSource(delegate: widget.delegate, dialect: widget.dialect),
         databaseName: effectiveDatabase,
         onOpenTable: _openTableFromDiagram,
       );
