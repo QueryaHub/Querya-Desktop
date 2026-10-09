@@ -143,6 +143,7 @@ class PostgresConnection {
   String? get connectionString => _connectionString;
 
   Connection? _conn;
+  Future<void>? _connecting;
   bool _isConnected = false;
   bool _inTransaction = false;
 
@@ -201,7 +202,21 @@ class PostgresConnection {
   /// [openFromUrl] already parses `sslmode`, `connect_timeout`, `query_timeout`
   /// from the URI. If `sslmode` is omitted, we fall back to [useSSL] so the
   /// form checkbox still applies; otherwise libpq-style URLs drive TLS mode.
-  Future<void> connect() async {
+  /// Single-flight: a caller that arrives while an attempt is in progress waits
+  /// for that attempt. Without this, two callers opened two sockets and two SSH
+  /// tunnels, and a failing attempt dropped the session the other one had made.
+  Future<void> connect() {
+    if (_isConnected && _conn != null) return Future<void>.value();
+    final inFlight = _connecting;
+    if (inFlight != null) return inFlight;
+    final attempt = _connectOnce();
+    _connecting = attempt;
+    return attempt.whenComplete(() {
+      if (identical(_connecting, attempt)) _connecting = null;
+    });
+  }
+
+  Future<void> _connectOnce() async {
     if (_isConnected && _conn != null) return;
 
     var effectivePassword = _password;

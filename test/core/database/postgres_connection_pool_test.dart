@@ -593,4 +593,38 @@ void main() {
       expect(replacement.disconnectCount, 1);
     });
   });
+
+  group('concurrent reconnect (#1214)', () {
+    test('two callers on a dropped slot share one reconnect and one setting',
+        () async {
+      final created = <FakePostgresConnection>[];
+      final pool = PostgresConnectionPool(
+        createAndConnect: (row, {required database, required mode}) async {
+          final c = FakePostgresConnection();
+          await c.connect();
+          created.add(c);
+          return c;
+        },
+      );
+      final r = _row();
+      final first = await pool.acquire(r,
+          database: 'postgres', mode: PgSessionMode.readOnly);
+      final conn = first.connection as FakePostgresConnection;
+      await conn.forceClose();
+
+      final leases = await Future.wait([
+        pool.acquire(r, database: 'postgres', mode: PgSessionMode.readOnly),
+        pool.acquire(r, database: 'postgres', mode: PgSessionMode.readOnly),
+      ]);
+
+      expect(conn.connectCount, 2, reason: 'initial connect plus one reconnect');
+      expect(conn.setReadOnlyCount, 1);
+      expect(identical(leases[0].connection, conn), isTrue);
+      expect(identical(leases[1].connection, conn), isTrue);
+      first.release();
+      for (final l in leases) {
+        l.release();
+      }
+    });
+  });
 }

@@ -145,6 +145,7 @@ class MysqlConnection {
   String? get connectionString => _connectionString;
 
   MySQLConnection? _conn;
+  Future<void>? _connecting;
   bool _isConnected = false;
   bool _inTransaction = false;
 
@@ -164,7 +165,21 @@ class MysqlConnection {
     return '`${id.replaceAll('`', '``')}`';
   }
 
-  Future<void> connect({int connectTimeoutMs = 10000}) async {
+  /// Single-flight: a caller that arrives while an attempt is in progress waits
+  /// for that attempt. Without this, two callers opened two sockets and two SSH
+  /// tunnels, and a failing attempt dropped the session the other one had made.
+  Future<void> connect({int connectTimeoutMs = 10000}) {
+    if (_isConnected && _conn != null) return Future<void>.value();
+    final inFlight = _connecting;
+    if (inFlight != null) return inFlight;
+    final attempt = _connectOnce(connectTimeoutMs);
+    _connecting = attempt;
+    return attempt.whenComplete(() {
+      if (identical(_connecting, attempt)) _connecting = null;
+    });
+  }
+
+  Future<void> _connectOnce(int connectTimeoutMs) async {
     if (_isConnected && _conn != null) return;
 
     var effectivePassword = _password;

@@ -234,4 +234,36 @@ void main() {
       expect(replacement.disconnectCount, 1);
     });
   });
+
+  group('concurrent reconnect (#1214)', () {
+    test('two callers on a dropped slot share one reconnect and one setting',
+        () async {
+      final pool = MysqlConnectionPool(
+        createAndConnect: (row, {required database, required mode}) async {
+          final c = FakeMysqlConnection();
+          await c.connect();
+          return c;
+        },
+      );
+      final r = _row();
+      final first = await pool.acquire(r,
+          database: 'app', mode: MysqlSessionMode.readOnly);
+      final conn = first.connection as FakeMysqlConnection;
+      await conn.forceClose();
+
+      final leases = await Future.wait([
+        pool.acquire(r, database: 'app', mode: MysqlSessionMode.readOnly),
+        pool.acquire(r, database: 'app', mode: MysqlSessionMode.readOnly),
+      ]);
+
+      expect(conn.connectCount, 2, reason: 'initial connect plus one reconnect');
+      expect(conn.setReadOnlyCount, 1);
+      expect(identical(leases[0].connection, conn), isTrue);
+      expect(identical(leases[1].connection, conn), isTrue);
+      first.release();
+      for (final l in leases) {
+        l.release();
+      }
+    });
+  });
 }

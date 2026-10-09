@@ -77,10 +77,7 @@ class MysqlConnectionPool {
       entry.idleTimer?.cancel();
       entry.idleTimer = null;
       entry.refs++;
-      if (!entry.connection.isConnected) {
-        await entry.connection.connect();
-        await entry.connection.setSessionReadOnly(mode.isReadOnlySession);
-      }
+      if (!entry.connection.isConnected) await _reconnect(entry, mode);
       return MysqlLease._(this, entry, entry.connection);
     }
 
@@ -113,10 +110,7 @@ class MysqlConnectionPool {
     entry.idleTimer?.cancel();
     entry.idleTimer = null;
     entry.refs++;
-    if (!entry.connection.isConnected) {
-      await entry.connection.connect();
-      await entry.connection.setSessionReadOnly(mode.isReadOnlySession);
-    }
+    if (!entry.connection.isConnected) await _reconnect(entry, mode);
     return MysqlLease._(this, entry, entry.connection);
   }
 
@@ -143,6 +137,21 @@ class MysqlConnectionPool {
   /// Releases one lease on [entry]. A lease taken before an [interrupt] points
   /// at an entry that is no longer in the pool: it must not touch the entry
   /// that replaced it under the same key, so it does nothing.
+  /// Brings a dropped entry back with one reconnect and one session setting,
+  /// even when several callers ask at once; they all wait for the same attempt.
+  Future<void> _reconnect(_PoolEntry entry, MysqlSessionMode mode) {
+    final inFlight = entry.reconnecting;
+    if (inFlight != null) return inFlight;
+    final attempt = () async {
+      await entry.connection.connect();
+      await entry.connection.setSessionReadOnly(mode.isReadOnlySession);
+    }();
+    entry.reconnecting = attempt;
+    return attempt.whenComplete(() {
+      if (identical(entry.reconnecting, attempt)) entry.reconnecting = null;
+    });
+  }
+
   void _release(_PoolEntry entry) {
     if (!identical(_pool[entry.key], entry)) return;
     entry.refs--;
@@ -203,6 +212,7 @@ class _PoolEntry {
 
   final MysqlConnection connection;
   final String key;
+  Future<void>? reconnecting;
   int refs = 0;
   Timer? idleTimer;
   DateTime lastUsed;
