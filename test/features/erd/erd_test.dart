@@ -774,7 +774,11 @@ void main() {
       await t.pump();
       expect(copied, startsWith('erDiagram'));
       expect(copied, contains('users ||--|{ orders'));
-      await t.pump(const Duration(seconds: 6));
+      // The toast's 5 s timer starts after its entry animation: step the
+      // clock frame by frame until it has gone.
+      for (var i = 0; i < 10; i++) {
+        await t.pump(const Duration(seconds: 1));
+      }
     });
 
     testWidgets('hiding every table says so and offers them back',
@@ -793,7 +797,8 @@ void main() {
         await t.pump();
         await t.pump(const Duration(milliseconds: 300));
         await t.tap(find.text('Hide from diagram'));
-        await t.pump(const Duration(milliseconds: 300));
+        // Let the menu popover close, or it takes the next tap.
+        await t.pumpAndSettle();
       }
       expect(find.text('All tables are hidden'), findsOneWidget);
       expect(find.text('No tables found'), findsNothing);
