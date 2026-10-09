@@ -7,15 +7,11 @@ import 'package:file_selector/file_selector.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/rendering.dart';
-import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/results/charts/chart_data.dart';
 import 'package:querya_desktop/features/results/charts/chart_format.dart';
 import 'package:querya_desktop/features/results/charts/chart_svg.dart';
 import 'package:querya_desktop/shared/widgets/querya_action_menu.dart';
-import 'package:querya_desktop/shared/widgets/querya_badge.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:querya_desktop/shared/widgets/querya_dropdown.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// Formats of the chart export menu.
 enum _ChartExport { png, svg }

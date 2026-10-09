@@ -1,13 +1,8 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
-import 'package:querya_desktop/core/motion/querya_animated_expand.dart';
-import 'package:querya_desktop/core/motion/querya_motion.dart';
-import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/features/workspace/grid_groupings_engine.dart';
 import 'package:querya_desktop/features/workspace/result_grid_view.dart';
-import 'package:querya_desktop/shared/widgets/querya_dropdown.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// Groupings / Pivot view tab for tabular data with hierarchical grouping and custom aggregations.
 class DataGridGroupingsView extends material.StatefulWidget {
