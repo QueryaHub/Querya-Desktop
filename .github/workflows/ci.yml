@@ -49,7 +49,8 @@ jobs:
         run: |
           APT="-o Acquire::Retries=3 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20"
           sudo apt-get $APT update
-          sudo apt-get $APT install -y libsecret-1-dev
+          # bubblewrap runs the extension sandbox tests; without it they skip.
+          sudo apt-get $APT install -y libsecret-1-dev bubblewrap
 
       - name: Get dependencies
         run: flutter pub get
