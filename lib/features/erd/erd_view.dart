@@ -741,7 +741,7 @@ class _ErdViewState extends material.State<ErdView> {
                 if (matches.isEmpty)
                   material.Padding(
                     padding: const material.EdgeInsets.all(8),
-                    child: Text('No tables match').muted().small(),
+                    child: const Text('No tables match').muted().small(),
                   ),
                 for (final t in matches)
                   material.GestureDetector(
