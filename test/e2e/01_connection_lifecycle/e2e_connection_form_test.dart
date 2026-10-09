@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:querya_desktop/core/storage/folders_storage.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' show Text, TextField;
 
 import '../helpers/e2e_app_harness.dart';
-import '../helpers/e2e_connection_helper.dart';
 
 /// #1050: connections created through the New connection dialog and the form
 /// of each database type, the way a user does it.
