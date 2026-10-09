@@ -30,6 +30,7 @@ import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
+import 'package:querya_desktop/features/erd/erd_view.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:querya_desktop/features/workspace/result_grid_view.dart';
 import 'package:vm_service/vm_service.dart' as vms;
@@ -152,6 +153,24 @@ Future<void> _runAll() async {
   await _scenario('scroll_h', () => _scrollGrid(Axis.horizontal, 18, 3000));
   await _scenario('hover_grid', _hoverGrid);
 
+  // #1173: Charts and Groupings over the 5 000 rows of the heavy query.
+  await _scenario('charts_5000', () async {
+    await _tap(_byText('Charts'));
+    await _wait(800);
+    for (final type in const ['Line', 'Pie', 'Bar']) {
+      final e = _findText(type);
+      if (e == null) continue;
+      await _tap(e);
+      await _wait(500);
+    }
+  });
+  await _scenario('groupings_5000', () async {
+    await _tap(_byText('Groupings'));
+    await _wait(1000);
+  });
+  await _tap(_byText('Grid'));
+  await _wait(500);
+
   await _scenario('typing', () async {
     final end = DateTime.now().add(const Duration(seconds: 3));
     var i = 0;
@@ -209,6 +228,104 @@ Future<void> _runAll() async {
       await _wait(400);
     }
   });
+
+  // #1173: five tabs holding results; a run in one of them should rebuild
+  // only that tab's pane.
+  for (var i = 0; i < 4; i++) {
+    SqlEditorCommandBridge.instance.invokeNew();
+    await _wait(300);
+    await _runInActiveTab('SELECT * FROM users;');
+  }
+  final ws = _workspace();
+  ws.paneBuildCount = 0;
+  await _scenario('multi_tab_run', () => _runInActiveTab('SELECT * FROM orders;'));
+  stdout.writeln('BENCH multi_tab_run panes rebuilt=${ws.paneBuildCount}');
+
+  // #1173: the diagram of a schema of 200 tables joined by foreign keys.
+  final ddl = StringBuffer('CREATE TABLE erd_t0 (id INTEGER PRIMARY KEY);\n');
+  for (var i = 1; i < 200; i++) {
+    ddl.writeln('CREATE TABLE erd_t$i (id INTEGER PRIMARY KEY, '
+        'parent_id INTEGER REFERENCES erd_t${(i - 1) ~/ 2}(id));');
+  }
+  SqlEditorCommandBridge.instance.invokeNew();
+  await _wait(300);
+  await _runInActiveTab(ddl.toString());
+  await _scenario('erd_open_200', () async {
+    await _tap(_byKey('open_diagram_tab'));
+    await _waitFor(() => _find((e) => e.widget.key == const ValueKey('erd_table_erd_t199')) != null,
+        'diagram of 200 tables');
+    await _wait(800);
+  });
+  await _scenario('erd_hover', () => _hoverOver(_find((e) => e.widget is ErdView)!, 3000));
+  await _scenario('erd_drag', () => _dragCard('erd_table_erd_t0', 2000));
+  await _scenario('erd_auto_layout', () async {
+    await _tap(_byKey('erd_auto_layout'));
+    await _wait(1200);
+  });
+}
+
+/// The SQL workspace of the open connection.
+dynamic _workspace() =>
+    _findState((s) => s.runtimeType.toString() == 'GenericSqlWorkspaceState')!;
+
+/// Puts [sql] into the active query tab, runs it and waits for the run to end.
+Future<void> _runInActiveTab(String sql) async {
+  final ws = _workspace();
+  final session = ws.activeSession;
+  session.controller.text = sql;
+  SqlEditorCommandBridge.instance.invokeExecute();
+  await _wait(100);
+  await _waitFor(() => !(ws.activeSession.running as bool), 'query run');
+  await _wait(400);
+}
+
+/// Moves the mouse over [root] for [ms], without pressing.
+Future<void> _hoverOver(Element root, int ms) async {
+  final box = root.renderObject! as RenderBox;
+  final origin = box.localToGlobal(Offset.zero);
+  final size = box.size;
+  final end = DateTime.now().add(Duration(milliseconds: ms));
+  var t = 0.0;
+  Offset? last;
+  while (DateTime.now().isBefore(end)) {
+    await SchedulerBinding.instance.endOfFrame;
+    t += 0.03;
+    final pos = origin +
+        Offset(size.width * (0.5 + 0.45 * math.sin(t)),
+            size.height * (0.5 + 0.4 * math.sin(t * 1.3)));
+    GestureBinding.instance.handlePointerEvent(PointerHoverEvent(
+      position: pos,
+      delta: last == null ? Offset.zero : pos - last,
+      kind: PointerDeviceKind.mouse,
+    ));
+    last = pos;
+  }
+}
+
+/// Presses the card with [key] and drags it in a circle for [ms].
+Future<void> _dragCard(String key, int ms) async {
+  final box = _byKey(key).renderObject! as RenderBox;
+  final start = box.localToGlobal(box.size.center(Offset.zero));
+  final b = GestureBinding.instance;
+  const pointer = 77;
+  b.handlePointerEvent(PointerDownEvent(
+      position: start, pointer: pointer, kind: PointerDeviceKind.mouse,
+      buttons: kPrimaryButton));
+  final end = DateTime.now().add(Duration(milliseconds: ms));
+  var t = 0.0;
+  var last = start;
+  while (DateTime.now().isBefore(end)) {
+    await SchedulerBinding.instance.endOfFrame;
+    t += 0.05;
+    final pos = start + Offset(160 * math.sin(t), 90 * (1 - math.cos(t)));
+    b.handlePointerEvent(PointerMoveEvent(
+        position: pos, delta: pos - last, pointer: pointer,
+        kind: PointerDeviceKind.mouse, buttons: kPrimaryButton));
+    last = pos;
+  }
+  b.handlePointerEvent(PointerUpEvent(
+      position: last, pointer: pointer, kind: PointerDeviceKind.mouse));
+  await _wait(400);
 }
 
 /// Live scroll position with extent under [root] along [axis], or null.
