@@ -619,8 +619,12 @@ void main() {
       await t.pump(const Duration(seconds: 1));
     });
 
+    // The card menu is a desktop popover; on a phone platform shadcn opens it
+    // as a sheet, which needs the app's drawer overlay.
+    final desktop = TargetPlatformVariant.only(material.TargetPlatform.linux);
+
     testWidgets('a card menu opens the table in SQL and shows its relations',
-        (t) async {
+        variant: desktop, (t) async {
       await t.binding.setSurfaceSize(const material.Size(1200, 800));
       String? inSql, relations;
       await t.pumpWidget(queryaThemeTestShell(
@@ -652,7 +656,8 @@ void main() {
       expect(relations, 'users');
     });
 
-    testWidgets('a card menu leaves out actions nobody handles', (t) async {
+    testWidgets('a card menu leaves out actions nobody handles',
+        variant: desktop, (t) async {
       await t.binding.setSurfaceSize(const material.Size(1200, 800));
       await t.pumpWidget(queryaThemeTestShell(
         child: ErdView(
