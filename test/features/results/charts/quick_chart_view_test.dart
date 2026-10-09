@@ -199,7 +199,7 @@ void main() {
       BarChartRodData(toY: 1234567),
     ]);
     expect(
-      tooltip.getTooltipItem(group, 0, group.barRods.first, 0).text,
+      tooltip.getTooltipItem(group, 0, group.barRods.first, 0)?.text,
       contains('1,234,567'),
     );
     final popover = Theme.of(t.element(find.byType(BarChart))).colorScheme.popover;
