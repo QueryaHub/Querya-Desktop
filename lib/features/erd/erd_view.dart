@@ -11,9 +11,11 @@ import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/erd/erd_catalog.dart';
 import 'package:querya_desktop/features/erd/erd_export.dart';
+import 'package:querya_desktop/features/erd/erd_geometry.dart';
 import 'package:querya_desktop/features/erd/erd_layout.dart';
 import 'package:querya_desktop/features/erd/erd_model.dart';
 import 'package:querya_desktop/features/erd/erd_router.dart';
+import 'package:querya_desktop/shared/widgets/app_toast.dart';
 import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
 import 'package:querya_desktop/shared/widgets/querya_action_button.dart';
 import 'package:querya_desktop/shared/widgets/querya_spinner.dart';
@@ -150,7 +152,16 @@ class _ErdViewState extends material.State<ErdView> {
     final boundary = _boundaryKey.currentContext?.findRenderObject()
         as RenderRepaintBoundary?;
     if (boundary == null) return;
-    final image = await boundary.toImage(pixelRatio: 2);
+    final ratio = ErdExport.pngPixelRatio(boundary.size);
+    if (ratio < 1) {
+      showAppToast(
+        context: context,
+        message: 'The diagram is larger than '
+            '${ErdExport.pngMaxSide} px per side, so the PNG is at '
+            '${(ratio * 100).round()}% resolution. The SVG export keeps full detail.',
+      );
+    }
+    final image = await boundary.toImage(pixelRatio: ratio);
     final data = await image.toByteData(format: ui.ImageByteFormat.png);
     if (data == null) return;
     await _save('diagram.png', data.buffer.asUint8List());
@@ -477,37 +488,14 @@ class _RelationPainter extends material.CustomPainter {
           ..strokeCap = material.StrokeCap.round
           ..strokeJoin = material.StrokeJoin.round;
         canvas.drawPath(roundedPath(r.points), paint);
-        _crowFoot(canvas, r.points[0], r.points[1], paint);
-        _oneBar(canvas, r.points.last, r.points[r.points.length - 2], paint);
+        for (final (a, b) in ErdGeometry.crowFoot(r.points[0], r.points[1])) {
+          canvas.drawLine(a, b, paint);
+        }
+        final (barA, barB) =
+            ErdGeometry.oneBar(r.points.last, r.points[r.points.length - 2]);
+        canvas.drawLine(barA, barB, paint);
       }
     }
-  }
-
-  /// "Many" end at the FK card: three prongs meeting 12 px out.
-  static void _crowFoot(
-      material.Canvas c, material.Offset edge, material.Offset next, material.Paint p) {
-    final d = _dir(edge, next);
-    final n = material.Offset(-d.dy, d.dx);
-    final tip = edge + d * 12;
-    c
-      ..drawLine(tip, edge + n * 6, p)
-      ..drawLine(tip, edge - n * 6, p)
-      ..drawLine(tip, edge, p);
-  }
-
-  /// "One" end at the referenced card: a bar across the line.
-  static void _oneBar(
-      material.Canvas c, material.Offset edge, material.Offset prev, material.Paint p) {
-    final d = _dir(edge, prev);
-    final n = material.Offset(-d.dy, d.dx);
-    final at = edge + d * 8;
-    c.drawLine(at + n * 6, at - n * 6, p);
-  }
-
-  static material.Offset _dir(material.Offset from, material.Offset to) {
-    final v = to - from;
-    final len = v.distance;
-    return len == 0 ? const material.Offset(1, 0) : v / len;
   }
 
   @override
@@ -521,16 +509,10 @@ class _RelationPainter extends material.CustomPainter {
 /// Polyline with corners rounded by up to 8 px.
 material.Path roundedPath(List<material.Offset> pts, {double radius = 8}) {
   final path = material.Path()..moveTo(pts.first.dx, pts.first.dy);
-  for (var i = 1; i < pts.length - 1; i++) {
-    final a = pts[i - 1], b = pts[i], c = pts[i + 1];
-    final r = [radius, (b - a).distance / 2, (c - b).distance / 2]
-        .reduce((x, y) => x < y ? x : y);
-    final inDir = (b - a) / ((b - a).distance == 0 ? 1 : (b - a).distance);
-    final outDir = (c - b) / ((c - b).distance == 0 ? 1 : (c - b).distance);
-    final p1 = b - inDir * r, p2 = b + outDir * r;
+  for (final (p1, corner, p2) in ErdGeometry.corners(pts, radius: radius)) {
     path
       ..lineTo(p1.dx, p1.dy)
-      ..quadraticBezierTo(b.dx, b.dy, p2.dx, p2.dy);
+      ..quadraticBezierTo(corner.dx, corner.dy, p2.dx, p2.dy);
   }
   path.lineTo(pts.last.dx, pts.last.dy);
   return path;

@@ -323,6 +323,36 @@ void main() {
       expect(svg, contains('t&lt;1&gt;'));
       expect(svg.trim(), endsWith('</svg>'));
     });
+
+    test('png ratio keeps the longest side within 8192 px', () {
+      final ratio = ErdExport.pngPixelRatio(const material.Size(20000, 9000));
+      expect((20000 * ratio).round(), lessThanOrEqualTo(8192));
+      expect(ratio, lessThan(1));
+      expect(
+          ErdExport.pngPixelRatio(const material.Size(800, 600)), 2);
+    });
+
+    test('svg draws both end markers, rounded routes and PK/FK pills', () {
+      final s = sample();
+      final layout = ErdLayout.compute(s);
+      final svg = ErdExport.toSvg(s, layout);
+      // The orders.user_id -> users.id relation: a crow's foot and a bar.
+      expect(svg, contains('<title>orders.user_id'));
+      expect(svg, contains(' Q '));
+      expect(svg, contains('>PK<'));
+      expect(svg, contains('>FK<'));
+      expect(svg, contains('clip-path="url(#card0)"'));
+    });
+
+    test('svg fits long types inside the card with an ellipsis', () {
+      const longType = "enum('pending','paid','shipped','cancelled','refunded')";
+      final s = ErdSchema.fromCatalog(columnRows: [
+        ['orders', 'status', longType, '0'],
+      ], fkRows: const []);
+      final svg = ErdExport.toSvg(s, ErdLayout.compute(s));
+      expect(svg, isNot(contains(longType)));
+      expect(svg, contains('…'));
+    });
   });
 
   group('ErdView', () {
