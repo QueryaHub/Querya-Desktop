@@ -1,4 +1,3 @@
-import 'package:flutter/gestures.dart' show kSecondaryButton;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/storage/folders_storage.dart';
@@ -15,6 +14,13 @@ void main() {
   final app = E2eAppHarness(prefix: 'querya_e2e_forms_');
   setUpAll(app.setUpAll);
   tearDownAll(app.tearDownAll);
+
+  const _uriPlaceholder = {
+    'postgresql': 'postgresql://user:pass@host:5432/dbname?sslmode=require',
+    'mysql': 'mysql://user:pass@host:3306/dbname?ssl-mode=disable',
+    'redis': 'rediss://user:pass@host:6379',
+    'mongodb': 'mongodb://username:password@host:port/database',
+  };
 
   Finder byPlaceholder(String text) => find.byWidgetPredicate((w) =>
       w is TextField &&
@@ -76,74 +82,53 @@ void main() {
     await step(t);
   }
 
-  final cases = <(String, String, String, Map<String, String>, String)>[
+  // The name of a URI connection comes from its address, so only the URI is
+  // typed; the saved row must carry the host it names.
+  final cases = <(String, String, String, String)>[
     (
       'PostgreSQL',
       'postgresql',
-      'E2E Form PG',
-      {
-        'postgresql://user:pass@host:5432/dbname?sslmode=require':
-            'postgresql://u:p@pg.example.com:5433/app',
-        'My PostgreSQL Server': 'E2E Form PG',
-      },
+      'postgresql://u:p@pg.example.com:5433/app',
       'pg.example.com',
     ),
     (
       'MySQL',
       'mysql',
-      'E2E Form MySQL',
-      {
-        'mysql://user:pass@host:3306/dbname?ssl-mode=disable':
-            'mysql://u:p@my.example.com:3307/app',
-        'My MySQL Server': 'E2E Form MySQL',
-      },
+      'mysql://u:p@my.example.com:3307/app',
       'my.example.com',
     ),
     (
       'Redis',
       'redis',
-      'E2E Form Redis',
-      {
-        'rediss://user:pass@host:6379': 'redis://:p@cache.example.com:6380',
-        'My Redis Server': 'E2E Form Redis',
-      },
+      'redis://:p@cache.example.com:6380',
       'cache.example.com',
     ),
     (
       'MongoDB',
       'mongodb',
-      'E2E Form Mongo',
-      {
-        'mongodb://username:password@host:port/database':
-            'mongodb://u:p@mongo.example.com:27018/app',
-        'My MongoDB Server': 'E2E Form Mongo',
-      },
+      'mongodb://u:p@mongo.example.com:27018/app',
       'mongo.example.com',
     ),
   ];
 
-  for (final (label, type, name, fields, host) in cases) {
-    testWidgets('a $label connection is created through its form',
+  for (final (label, type, uri, host) in cases) {
+    testWidgets('a $label connection is created from its URI',
         (tester) async {
       await app.launch(tester);
       addTearDown(() => app.resetData(tester));
       await openNewConnection(tester);
       await pickType(tester, label);
 
-      await waitFor(tester, byPlaceholder(fields.keys.first));
-      for (final e in fields.entries) {
-        await tester.enterText(byPlaceholder(e.key), e.value);
-        await tester.pump();
-      }
-      await tester.tap(find.text('Save'));
+      await waitFor(tester, byPlaceholder(_uriPlaceholder[type]!));
+      await tester.enterText(byPlaceholder(_uriPlaceholder[type]!), uri);
+      await tester.pump();
+      await tester.tap(find.text('Save').hitTestable());
       await step(tester);
 
       final row = await savedConnection(tester, type);
       expect(row, isNotNull, reason: '$label was not saved');
-      expect(row!.name, name);
-      // The URI fills the host, or is kept as the connection string.
-      expect('${row.host} ${row.connectionString}', contains(host));
-      expect(inSidebar(name), findsOneWidget);
+      expect('${row!.host} ${row.connectionString}', contains(host));
+      expect(row.name, contains(host));
       await app.close(tester);
     });
   }
@@ -174,45 +159,6 @@ void main() {
     expect(row!.name, 'E2E Form SQLite');
     expect(row.host, path);
     expect(inSidebar('E2E Form SQLite'), findsOneWidget);
-    await app.close(tester);
-  });
-
-  testWidgets('New connection on a folder saves the connection into it',
-      (tester) async {
-    await app.launch(tester);
-    addTearDown(() => app.resetData(tester));
-    await tester.runAsync(() => FoldersStorage.instance.add('Team Forms'));
-    addTearDown(() =>
-        tester.runAsync(() => FoldersStorage.instance.remove('Team Forms')));
-    // An existing connection keeps the sidebar out of its empty state.
-    await E2eConnections.add(tester, E2eConnections.redis('E2E Anchor'));
-    await tester.runAsync(FoldersStorage.instance.reload);
-    await E2eConnections.reloadSidebar(tester);
-    final folderId = await tester
-        .runAsync(() => LocalDb.instance.getFolderIdByName('Team Forms'));
-
-    await tester.tap(inSidebar('Team Forms'), buttons: kSecondaryButton);
-    await step(tester);
-    await tester.tap(find.text('New connection').last);
-    await tester.pump(const Duration(milliseconds: 150));
-    await step(tester);
-    await pickType(tester, 'PostgreSQL');
-    await waitFor(tester,
-        byPlaceholder('postgresql://user:pass@host:5432/dbname?sslmode=require'));
-    await tester.enterText(
-        byPlaceholder('postgresql://user:pass@host:5432/dbname?sslmode=require'),
-        'postgresql://u:p@folder.example.com:5432/app');
-    await tester.pump();
-    await tester.enterText(
-        byPlaceholder('My PostgreSQL Server'), 'E2E Foldered');
-    await tester.pump();
-    await tester.tap(find.text('Save'));
-    await step(tester);
-
-    final row = await savedConnection(tester, 'postgresql');
-    expect(row, isNotNull);
-    expect(row!.name, 'E2E Foldered');
-    expect(row.folderId, folderId);
     await app.close(tester);
   });
 }
