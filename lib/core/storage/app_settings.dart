@@ -110,6 +110,7 @@ abstract final class AppSettingsKeys {
   static const sqliteSqlStmtTimeoutSeconds = 'sqlite_sql_stmt_timeout_seconds';
   static const sqlResultMaxRows = 'sql_result_max_rows';
   static const sqlEditorFontSizePoints = 'sql_editor_font_size_points';
+  static const exportCurrentTheme = 'export_current_theme';
   static const sqlHistoryMaxEntries = 'sql_history_max_entries';
   static const themeMode = 'theme_mode';
   static const themePreset = 'theme_preset';
@@ -314,6 +315,22 @@ class AppSettings {
     await LocalDb.instance.setAppSetting(
       AppSettingsKeys.connectionsPanelWidth,
       normalized.toStringAsFixed(1),
+    );
+  }
+
+  /// Chart and diagram exports. False (default): a light palette for documents.
+  /// True: the colours of the current theme.
+  Future<bool> getExportCurrentTheme() async {
+    final value = await LocalDb.instance.getAppSetting(
+      AppSettingsKeys.exportCurrentTheme,
+    );
+    return value == '1' || value?.toLowerCase() == 'true';
+  }
+
+  Future<void> setExportCurrentTheme(bool value) async {
+    await LocalDb.instance.setAppSetting(
+      AppSettingsKeys.exportCurrentTheme,
+      value ? '1' : '0',
     );
   }
 

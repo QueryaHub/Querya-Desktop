@@ -588,8 +588,16 @@ void main() {
       await t.tap(find.byKey(const material.ValueKey('erd_export')));
       await t.pump();
       await t.tap(find.text('SVG'));
-      await t.pump();
+      // The export reads its setting first, which is real I/O.
+      for (var i = 0; i < 40 && !saved.containsKey('erd.svg'); i++) {
+        await t.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 50)));
+        await t.pump();
+      }
       expect(utf8.decode(saved['erd.svg']!), contains('<svg'));
+      // The dark test theme still exports the light palette by default.
+      expect(utf8.decode(saved['erd.svg']!),
+          contains('<rect width="100%" height="100%" fill="#ffffff"/>'));
 
       final card = find.byKey(const material.ValueKey('erd_table_users'));
       await t.tap(card);

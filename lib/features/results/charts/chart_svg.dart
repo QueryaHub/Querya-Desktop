@@ -27,6 +27,15 @@ class ChartSvgColors {
 class ChartSvg {
   ChartSvg._();
 
+  /// Light palette for documents: white background, dark text, and a series
+  /// palette that stays readable on white.
+  static const ChartSvgColors light = ChartSvgColors(
+    background: '#ffffff',
+    text: '#334155',
+    grid: '#e2e8f0',
+    series: ['#2563eb', '#0d9488', '#d97706', '#7c3aed', '#dc2626'],
+  );
+
   static const double width = 960;
   static const double height = 540;
   static const double _left = 64;
