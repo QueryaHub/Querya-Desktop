@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/features/results/charts/chart_data.dart';
 import 'package:querya_desktop/features/results/charts/quick_chart_view.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -10,6 +11,11 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 import '../../../support/querya_theme_test_shell.dart';
 
 void main() {
+  // The export reads its theme setting; the tests answer it without the
+  // local database, which is shared by test processes in CI.
+  setUp(() => AppSettings.exportCurrentThemeOverride = () async => false);
+  tearDown(() => AppSettings.exportCurrentThemeOverride = null);
+
   const columns = ['name', 'amount'];
   final rows = [
     ['a', '1'],
