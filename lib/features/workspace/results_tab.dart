@@ -401,34 +401,13 @@ class _ResultsTabState extends material.State<ResultsTab> {
                   children: [
                     // Grid / Groupings View Selector
                     material.SizedBox(
-                      height: 28,
-                      child: material.SegmentedButton<ResultViewMode>(
-                        segments: const [
-                          material.ButtonSegment(
-                            value: ResultViewMode.grid,
-                            label: Text('Grid'),
-                            icon: material.Icon(material.Icons.table_chart_outlined, size: 14),
-                          ),
-                          material.ButtonSegment(
-                            value: ResultViewMode.groupings,
-                            label: Text('Groupings'),
-                            icon: material.Icon(material.Icons.grid_view_rounded, size: 14),
-                          ),
-                          material.ButtonSegment(
-                            value: ResultViewMode.charts,
-                            label: Text('Charts'),
-                            icon: material.Icon(material.Icons.bar_chart_rounded, size: 14),
-                          ),
-                        ],
-                        selected: {_viewMode},
-                        onSelectionChanged: (selected) {
-                          setState(() => _viewMode = selected.first);
-                        },
-                        showSelectedIcon: false,
-                        style: material.SegmentedButton.styleFrom(
-                          padding: const material.EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                          visualDensity: material.VisualDensity.compact,
-                        ),
+                      height: 32,
+                      width: 240,
+                      child: QueryaTabStrip(
+                        labels: const ['Grid', 'Groupings', 'Charts'],
+                        selectedIndex: ResultViewMode.values.indexOf(_viewMode),
+                        onSelected: (i) =>
+                            setState(() => _viewMode = ResultViewMode.values[i]),
                       ),
                     ),
                     const Gap(10),
@@ -442,14 +421,13 @@ class _ResultsTabState extends material.State<ResultsTab> {
                     const Gap(16),
 
                     // Toggle Quick Filter
-                    material.IconButton(
+                    QueryaIconButton(
+ density: QueryaIconButtonDensity.dense,
                       icon: material.Icon(
                         _showFilterBar ? material.Icons.filter_alt : material.Icons.filter_alt_outlined,
                         size: 15,
                       ),
                       tooltip: 'Toggle Quick Filter',
-                      padding: material.EdgeInsets.zero,
-                      constraints: const material.BoxConstraints(minWidth: 28, minHeight: 28),
                       color: _showFilterBar || _filterText.isNotEmpty
                           ? Theme.of(context).colorScheme.primary
                           : Theme.of(context).colorScheme.mutedForeground,
@@ -464,7 +442,8 @@ class _ResultsTabState extends material.State<ResultsTab> {
                       listenable: PiiMaskingController.instance,
                       builder: (context, _) {
                         final masked = PiiMaskingController.instance.enabled;
-                        return material.IconButton(
+                        return QueryaIconButton(
+ density: QueryaIconButtonDensity.dense,
                           key: const material.Key(
                               'results_mask_sensitive_toggle'),
                           icon: material.Icon(
@@ -476,9 +455,6 @@ class _ResultsTabState extends material.State<ResultsTab> {
                           tooltip: masked
                               ? 'Sensitive data is masked — click to show'
                               : 'Mask sensitive data',
-                          padding: material.EdgeInsets.zero,
-                          constraints: const material.BoxConstraints(
-                              minWidth: 28, minHeight: 28),
                           color: masked
                               ? Theme.of(context).colorScheme.primary
                               : Theme.of(context).colorScheme.mutedForeground,
@@ -489,14 +465,13 @@ class _ResultsTabState extends material.State<ResultsTab> {
                     const Gap(4),
 
                     // Toggle Value Side Panel
-                    material.IconButton(
+                    QueryaIconButton(
+ density: QueryaIconButtonDensity.dense,
                       icon: material.Icon(
                         _showValuePanel ? material.Icons.dock : material.Icons.data_object_rounded,
                         size: 15,
                       ),
                       tooltip: 'Inspect Cell Panel',
-                      padding: material.EdgeInsets.zero,
-                      constraints: const material.BoxConstraints(minWidth: 28, minHeight: 28),
                       color: _showValuePanel
                           ? Theme.of(context).colorScheme.primary
                           : Theme.of(context).colorScheme.mutedForeground,

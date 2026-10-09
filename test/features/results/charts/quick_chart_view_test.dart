@@ -30,7 +30,7 @@ void main() {
       for (var i = 1; i <= 30; i++) ['cat$i', '$i'],
     ];
     await pumpView(t, columns, many);
-    await t.tap(find.text('Pie'));
+    await t.tap(find.bySemanticsLabel('Pie'));
     await t.pump();
 
     final pie = t.widget<PieChart>(find.byType(PieChart));
@@ -66,10 +66,10 @@ void main() {
   testWidgets('renders bar, line and pie', (t) async {
     await pumpView(t, columns, rows);
     expect(find.byType(BarChart), findsOneWidget);
-    await t.tap(find.text('Line'));
+    await t.tap(find.bySemanticsLabel('Line'));
     await t.pump();
     expect(find.byType(LineChart), findsOneWidget);
-    await t.tap(find.text('Pie'));
+    await t.tap(find.bySemanticsLabel('Pie'));
     await t.pump();
     expect(find.byType(PieChart), findsOneWidget);
   });
@@ -83,9 +83,15 @@ void main() {
       onSavePng: (png) async => saved = png,
     )));
     await t.pump();
+    await t.tap(find.byKey(const material.ValueKey('chart_export')));
+    await t.pumpAndSettle();
+    await t.tap(find.text('PNG'));
+    await t.pump();
     await t.runAsync(() async {
-      await t.tap(find.byKey(const material.ValueKey('chart_export')));
-      await Future<void>.delayed(const Duration(milliseconds: 500));
+      final deadline = DateTime.now().add(const Duration(seconds: 10));
+      while (saved == null && DateTime.now().isBefore(deadline)) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
     });
     await t.pump();
     expect(saved, isNotNull);
@@ -103,16 +109,20 @@ void main() {
     )));
     await t.pump();
 
-    await t.tap(find.byKey(const material.ValueKey('chart_export_svg')));
+    await t.tap(find.byKey(const material.ValueKey('chart_export')));
+    await t.pumpAndSettle();
+    await t.tap(find.text('SVG'));
     await t.pump();
     expect(saved, isNotNull);
     expect(saved, contains('<svg'));
     expect(saved, contains('<title>amount by name</title>'));
     expect('<rect '.allMatches(saved!).length, 1 + rows.length);
 
-    await t.tap(find.text('Pie'));
+    await t.tap(find.bySemanticsLabel('Pie'));
     await t.pump();
-    await t.tap(find.byKey(const material.ValueKey('chart_export_svg')));
+    await t.tap(find.byKey(const material.ValueKey('chart_export')));
+    await t.pumpAndSettle();
+    await t.tap(find.text('SVG'));
     await t.pump();
     expect('<path '.allMatches(saved!).length, rows.length);
   });

@@ -1,12 +1,8 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
-import 'package:querya_desktop/core/motion/querya_animated_expand.dart';
-import 'package:querya_desktop/core/motion/querya_motion.dart';
-import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/features/workspace/grid_groupings_engine.dart';
 import 'package:querya_desktop/features/workspace/result_grid_view.dart';
-import 'package:querya_desktop/shared/widgets/querya_dropdown.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Groupings / Pivot view tab for tabular data with hierarchical grouping and custom aggregations.
 class DataGridGroupingsView extends material.StatefulWidget {
@@ -242,15 +238,14 @@ class _DataGridGroupingsViewState
                     }
                   },
                 ),
-                material.IconButton(
+                QueryaIconButton(
+ density: QueryaIconButtonDensity.dense,
                   icon: material.Icon(
                     _sortAscending
                         ? material.Icons.arrow_upward_rounded
                         : material.Icons.arrow_downward_rounded,
                     size: 14,
                   ),
-                  padding: material.EdgeInsets.zero,
-                  constraints: const material.BoxConstraints(minWidth: 24, minHeight: 24),
                   color: cs.mutedForeground,
                   onPressed: () => setState(() {
                     _sortAscending = !_sortAscending;
@@ -261,10 +256,9 @@ class _DataGridGroupingsViewState
                 const Gap(8),
                 material.Tooltip(
                   message: 'Copy Pivot CSV to Clipboard',
-                  child: material.IconButton(
+                  child: QueryaIconButton(
+ density: QueryaIconButtonDensity.dense,
                     icon: const material.Icon(material.Icons.copy_rounded, size: 14),
-                    padding: material.EdgeInsets.zero,
-                    constraints: const material.BoxConstraints(minWidth: 24, minHeight: 24),
                     color: cs.mutedForeground,
                     onPressed: _exportPivot,
                   ),
