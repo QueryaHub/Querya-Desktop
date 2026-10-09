@@ -7,18 +7,21 @@ class ErdColumn {
     required this.type,
     this.isPrimaryKey = false,
     this.isForeignKey = false,
+    this.isNullable = false,
   });
 
   final String name;
   final String type;
   final bool isPrimaryKey;
   final bool isForeignKey;
+  final bool isNullable;
 
   ErdColumn copyWith({bool? isForeignKey}) => ErdColumn(
         name: name,
         type: type,
         isPrimaryKey: isPrimaryKey,
         isForeignKey: isForeignKey ?? this.isForeignKey,
+        isNullable: isNullable,
       );
 }
 
@@ -31,6 +34,7 @@ class ErdTable {
 }
 
 /// A foreign key: [fromTable].[fromColumn] references [toTable].[toColumn].
+/// [optional] when the referencing column may be NULL ("zero or many").
 @immutable
 class ErdRelation {
   const ErdRelation({
@@ -38,12 +42,14 @@ class ErdRelation {
     required this.fromColumn,
     required this.toTable,
     required this.toColumn,
+    this.optional = false,
   });
 
   final String fromTable;
   final String fromColumn;
   final String toTable;
   final String toColumn;
+  final bool optional;
 }
 
 @immutable
@@ -57,8 +63,9 @@ class ErdSchema {
 
   /// Builds a schema from flat catalog rows.
   ///
-  /// [columnRows]: `table, column, type, isPk`. [fkRows]: `table, column,
-  /// refTable, refColumn`. Relations to unknown tables are dropped.
+  /// [columnRows]: `table, column, type, isPk` and an optional fifth
+  /// `isNullable`. [fkRows]: `table, column, refTable, refColumn`. Relations to
+  /// unknown tables are dropped.
   factory ErdSchema.fromCatalog({
     required List<List<String>> columnRows,
     required List<List<String>> fkRows,
@@ -75,8 +82,14 @@ class ErdSchema {
         name: r[1],
         type: r[2],
         isPrimaryKey: _truthy(r[3]),
+        isNullable: r.length > 4 && _truthy(r[4]),
       ));
     }
+    final nullable = {
+      for (final t in cols.entries)
+        for (final c in t.value)
+          if (c.isNullable) '${t.key}\u0000${c.name}',
+    };
     final relations = <ErdRelation>[];
     final fkCols = <String>{};
     for (final r in fkRows) {
@@ -87,6 +100,7 @@ class ErdSchema {
         fromColumn: r[1],
         toTable: r[2],
         toColumn: r[3],
+        optional: nullable.contains('${r[0]}\u0000${r[1]}'),
       ));
       fkCols.add('${r[0]}\u0000${r[1]}');
     }

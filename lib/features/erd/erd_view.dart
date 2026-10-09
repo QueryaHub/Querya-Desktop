@@ -84,6 +84,10 @@ class _ErdViewState extends material.State<ErdView> {
   final Set<String> _collapsed = {};
   final Set<String> _hidden = {};
 
+  /// Relation under the pointer and the pointer position in canvas space.
+  ErdRelation? _edgeTip;
+  material.Offset? _edgeTipAt;
+
   bool _searchOpen = false;
   String _query = '';
   final _searchController = material.TextEditingController();
@@ -350,6 +354,50 @@ class _ErdViewState extends material.State<ErdView> {
     await _save('diagram.png', data.buffer.asUint8List());
   }
 
+  /// Pointer over the canvas: names the relation within 6 px of it, if any.
+  void _hoverCanvas(material.Offset p) {
+    ErdRelation? hit;
+    var best = 6.0;
+    for (final r in _routes) {
+      final d = ErdGeometry.distanceToRoute(r.points, p);
+      if (d <= best) {
+        best = d;
+        hit = r.relation;
+      }
+    }
+    if (hit == null && _edgeTip == null) return;
+    setState(() {
+      _edgeTip = hit;
+      _edgeTipAt = p;
+    });
+  }
+
+  void _leaveCanvas() {
+    if (_edgeTip == null) return;
+    setState(() => _edgeTip = null);
+  }
+
+  /// "orders.customer_id → customers.id" next to the pointer.
+  material.Widget _edgeTipLabel(material.BuildContext context, ErdRelation r) {
+    final cs = Theme.of(context).colorScheme;
+    return material.DecoratedBox(
+      decoration: material.BoxDecoration(
+        color: cs.popover,
+        borderRadius: material.BorderRadius.circular(6),
+        border: material.Border.all(color: cs.border),
+      ),
+      child: material.Padding(
+        padding:
+            const material.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: material.Text(
+          '${r.fromTable}.${r.fromColumn} → ${r.toTable}.${r.toColumn}',
+          style: material.TextStyle(
+              fontSize: 11, color: cs.popoverForeground),
+        ),
+      ),
+    );
+  }
+
   /// Find-a-table field and the tables it matches. Enter picks the first.
   material.Widget _searchPanel(ErdSchema schema) {
     if (!_searchOpen) return const material.SizedBox.shrink();
@@ -451,6 +499,16 @@ class _ErdViewState extends material.State<ErdView> {
                       onTap: _clearSelection,
                       child: material.Stack(
                         children: [
+                          // Lowest layer: sees the pointer wherever no card is,
+                          // so edges can name themselves on hover.
+                          material.Positioned.fill(
+                            child: material.MouseRegion(
+                              opaque: false,
+                              onHover: (e) => _hoverCanvas(e.localPosition),
+                              onExit: (_) => _leaveCanvas(),
+                              child: const material.SizedBox.expand(),
+                            ),
+                          ),
                           material.Positioned.fill(
                             child: material.CustomPaint(
                               painter: _RelationPainter(
@@ -516,6 +574,14 @@ class _ErdViewState extends material.State<ErdView> {
                                   onDragEnd: _dragEnd,
                                 ),
                                 ),
+                              ),
+                            ),
+                          if (_edgeTip != null && _edgeTipAt != null)
+                            material.Positioned(
+                              left: _edgeTipAt!.dx + 12,
+                              top: _edgeTipAt!.dy + 12,
+                              child: material.IgnorePointer(
+                                child: _edgeTipLabel(context, _edgeTip!),
                               ),
                             ),
                         ],
@@ -769,7 +835,7 @@ class _TableCard extends material.StatelessWidget {
                               const material.SizedBox(width: 6),
                               material.Flexible(
                                 flex: 2,
-                                child: Text(c.type,
+                                child: Text(c.isNullable ? '${c.type}?' : c.type,
                                     maxLines: 1,
                                     overflow: material.TextOverflow.ellipsis,
                                     style: material.TextStyle(
@@ -827,6 +893,17 @@ class _RelationPainter extends material.CustomPainter {
         canvas.drawPath(roundedPath(r.points), paint);
         for (final (a, b) in ErdGeometry.crowFoot(r.points[0], r.points[1])) {
           canvas.drawLine(a, b, paint);
+        }
+        // FK side: a circle when the column may be NULL ("zero or many"), a
+        // bar otherwise ("one or many").
+        if (r.relation.optional) {
+          final (c, radius) =
+              ErdGeometry.optionalCircle(r.points[0], r.points[1]);
+          canvas.drawCircle(c, radius, paint);
+        } else {
+          final (fa, fb) =
+              ErdGeometry.oneBar(r.points[0], r.points[1], distance: 17);
+          canvas.drawLine(fa, fb, paint);
         }
         final (barA, barB) =
             ErdGeometry.oneBar(r.points.last, r.points[r.points.length - 2]);

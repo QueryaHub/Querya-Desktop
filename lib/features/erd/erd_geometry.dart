@@ -31,12 +31,38 @@ abstract final class ErdGeometry {
     return [(tip, edge + n * 6), (tip, edge - n * 6), (tip, edge)];
   }
 
-  /// "One" end at the referenced card: a bar across the line, 8 px out.
-  static (Offset, Offset) oneBar(Offset edge, Offset prev) {
+  /// A bar across the line [distance] px out from [edge]: "one" end at the
+  /// referenced card, and the mandatory side of a foreign key.
+  static (Offset, Offset) oneBar(Offset edge, Offset prev, {double distance = 8}) {
     final d = _dir(edge, prev);
     final n = Offset(-d.dy, d.dx);
-    final at = edge + d * 8;
+    final at = edge + d * distance;
     return (at + n * 6, at - n * 6);
+  }
+
+  /// Circle that marks the optional side of a foreign key ("zero"), beyond
+  /// the crow's foot prongs: its centre and radius.
+  static (Offset, double) optionalCircle(Offset edge, Offset next) {
+    final d = _dir(edge, next);
+    return (edge + d * 17, 4);
+  }
+
+  /// Distance from [p] to the polyline [pts] (straight segments, no corner
+  /// rounding). Infinity for a route with fewer than two points.
+  static double distanceToRoute(List<Offset> pts, Offset p) {
+    var best = double.infinity;
+    for (var i = 1; i < pts.length; i++) {
+      final a = pts[i - 1], b = pts[i];
+      final ab = b - a;
+      final len2 = ab.dx * ab.dx + ab.dy * ab.dy;
+      final t = len2 == 0
+          ? 0.0
+          : (((p - a).dx * ab.dx + (p - a).dy * ab.dy) / len2).clamp(0.0, 1.0);
+      final nearest = a + ab * t.toDouble();
+      final dist = (p - nearest).distance;
+      if (dist < best) best = dist;
+    }
+    return best;
   }
 
   static Offset _dir(Offset from, Offset to) {
