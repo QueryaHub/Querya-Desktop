@@ -1,6 +1,7 @@
 import 'dart:async' show Timer;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show KeyDownEvent, LogicalKeyboardKey;
+import 'package:querya_desktop/shared/widgets/querya_icon_button.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// Kind of filter autocomplete suggestion.
@@ -420,15 +421,14 @@ class _DataGridFilterBarState extends material.State<DataGridFilterBar> {
                 ),
               ),
               const Gap(4),
-              material.IconButton(
+              QueryaIconButton(
+                density: QueryaIconButtonDensity.dense,
                 icon: material.Icon(
                   widget.onClose != null
                       ? material.Icons.clear_rounded
                       : material.Icons.close,
                   size: 14,
                 ),
-                padding: material.EdgeInsets.zero,
-                constraints: const material.BoxConstraints(minWidth: 20, minHeight: 20),
                 color: cs.mutedForeground,
                 tooltip: 'Clear filter',
                 onPressed: () {
@@ -441,10 +441,9 @@ class _DataGridFilterBarState extends material.State<DataGridFilterBar> {
             ],
             if (widget.onClose != null) ...[
               const Gap(2),
-              material.IconButton(
+              QueryaIconButton(
+                density: QueryaIconButtonDensity.dense,
                 icon: const material.Icon(material.Icons.close, size: 14),
-                padding: material.EdgeInsets.zero,
-                constraints: const material.BoxConstraints(minWidth: 20, minHeight: 20),
                 color: cs.mutedForeground,
                 tooltip: 'Close filter (Esc)',
                 onPressed: () {
