@@ -467,6 +467,8 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
                               ),
                             ),
                             const Gap(6),
+                            state.buildViewSwitch(),
+                            const Gap(4),
                             if (!widget.isView) ...[
                               state.buildEditModeButton(),
                               const Gap(4),

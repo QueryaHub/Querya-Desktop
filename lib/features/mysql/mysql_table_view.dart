@@ -430,6 +430,8 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
                               ),
                             ),
                             const Gap(6),
+                            state.buildViewSwitch(),
+                            const Gap(4),
                             if (!widget.isView) ...[
                               state.buildEditModeButton(),
                               const Gap(4),

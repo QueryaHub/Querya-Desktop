@@ -14,6 +14,7 @@ Future<GenericTableViewState> pumpGenericTableView(
   SqlDialect dialect = SqlDialect.postgres,
   bool isReadOnly = false,
   bool isView = false,
+  bool showRelations = true,
   int limit = 200,
 }) async {
   await tester.binding.setSurfaceSize(const material.Size(1300, 800));
@@ -30,6 +31,7 @@ Future<GenericTableViewState> pumpGenericTableView(
             schema: 'public',
             isReadOnly: isReadOnly,
             isView: isView,
+            showRelations: showRelations,
             limit: limit,
           ),
         ),
