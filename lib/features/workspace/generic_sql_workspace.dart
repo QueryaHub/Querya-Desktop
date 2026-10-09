@@ -402,6 +402,79 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
 
   /// Runs the selection, else the whole text. With [statementAtCursor] (run
   /// statement) only the statement under the caret, see [SqlStatementSplitter].
+  final Map<String, SqlResultGridSchema> _gridSchemaCache = {};
+
+  static String _schemaCacheKey(String sql, List<String> cols) =>
+      '${cols.join('\u0001')}\u0000$sql';
+
+  static final _readQueryRegex = RegExp(
+    r'^\s*(select|with|values|show|explain|pragma|describe)\b',
+    caseSensitive: false,
+  );
+
+  static bool _isReadQuery(String sql) => _readQueryRegex.hasMatch(sql);
+
+  String _resultStatus(
+    SqlExecutionResult result,
+    List<String> cols,
+    List<List<String>> outRows,
+    String? editHint,
+  ) {
+    if (result.statusMessage != null) {
+      return withEditHint(result.statusMessage!, editHint);
+    }
+    if (cols.isEmpty && outRows.isEmpty) {
+      return result.affectedRows != null
+          ? 'OK. Rows affected: ${result.affectedRows}.'
+          : 'Command completed.';
+    }
+    final cap = _resultMaxRows;
+    return withEditHint(
+      result.isTruncated
+          ? 'Showing first $cap row(s) (result capped).'
+          : '${outRows.length} row(s).',
+      editHint,
+    );
+  }
+
+  /// Applies the table schema to the result it was asked for. An answer that
+  /// arrives after the tab has moved on to another result is dropped.
+  void _applyGridSchema(
+    SqlQueryTabSession session,
+    String userSql,
+    List<String> cols,
+    List<List<String>> outRows,
+    SqlResultGridSchema gridSchema,
+    SqlExecutionResult result,
+  ) {
+    if (!mounted ||
+        !identical(session.rows, outRows) ||
+        session.lastExecutedSql != userSql) {
+      return;
+    }
+    final pks = gridSchema.primaryKeys;
+    final editHint = gridSchema.editHint(cols);
+    final canSave = sqlResultGridSaveEnabled(
+      sql: userSql,
+      resultColumns: cols,
+      primaryKeys: pks,
+    );
+    setState(() {
+      session.resultGridPrimaryKeys = canSave ? pks : const [];
+      session.resultGridColumnDataTypes = gridSchema.columnDataTypes;
+      session.resultGridColumnMeta = gridSchema.columnMeta;
+      session.stagingBuffer?.dispose();
+      session.stagingBuffer = canSave
+          ? DataGridStagingBuffer(
+              columns: cols,
+              rows: outRows,
+              primaryKeys: pks,
+            )
+          : null;
+      session.statusLine = _resultStatus(result, cols, outRows, editHint);
+    });
+  }
+
   Future<void> execute([
     SqlQueryTabSession? targetSession,
     bool statementAtCursor = false,
@@ -479,51 +552,42 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       final cols = result.columns;
       final outRows = result.rows;
 
-      final gridSchema = await widget.delegate.resolveTableSchema(userSql, cols);
-      final pks = gridSchema.primaryKeys;
-      final editHint = gridSchema.editHint(cols);
-      final canSave = sqlResultGridSaveEnabled(
-        sql: userSql,
-        resultColumns: cols,
-        primaryKeys: pks,
-      );
-
+      // Rows show now. The table schema (keys, types, edit hint) follows: from
+      // the cache, or from the delegate in the background.
+      final cacheKey = _schemaCacheKey(userSql, cols);
+      final cached = _gridSchemaCache[cacheKey];
       invalidatePane(session);
       setState(() {
         session.columns = cols;
         session.rows = outRows;
         session.affectedRows = result.affectedRows;
         session.lastExecutedSql = userSql;
-        session.resultGridPrimaryKeys = canSave ? pks : const [];
-        session.resultGridColumnDataTypes = gridSchema.columnDataTypes;
-        session.resultGridColumnMeta = gridSchema.columnMeta;
+        session.resultGridPrimaryKeys = const [];
+        session.resultGridColumnDataTypes = null;
+        session.resultGridColumnMeta = null;
         session.stagingBuffer?.dispose();
-        session.stagingBuffer = canSave
-            ? DataGridStagingBuffer(
-                columns: cols,
-                rows: outRows,
-                primaryKeys: pks,
-              )
-            : null;
-
-        if (result.statusMessage != null) {
-          session.statusLine = withEditHint(result.statusMessage!, editHint);
-        } else if (cols.isEmpty && outRows.isEmpty) {
-          session.statusLine = result.affectedRows != null
-              ? 'OK. Rows affected: ${result.affectedRows}.'
-              : 'Command completed.';
-        } else {
-          final n = outRows.length;
-          final cap = _resultMaxRows;
-          session.statusLine = withEditHint(
-            result.isTruncated
-                ? 'Showing first $cap row(s) (result capped).'
-                : '$n row(s).',
-            editHint,
-          );
-        }
+        session.stagingBuffer = null;
+        session.statusLine = _resultStatus(result, cols, outRows, null);
         session.running = false;
       });
+      // Anything that is not a read may change table shapes: forget the cache.
+      if (!_isReadQuery(userSql)) _gridSchemaCache.clear();
+
+      if (cached != null) {
+        _applyGridSchema(session, userSql, cols, outRows, cached, result);
+      } else {
+        unawaited(
+          widget.delegate.resolveTableSchema(userSql, cols).then(
+            (gridSchema) {
+              if (!mounted) return;
+              _gridSchemaCache[cacheKey] = gridSchema;
+              _applyGridSchema(
+                  session, userSql, cols, outRows, gridSchema, result);
+            },
+            onError: (_) {}, // The rows stay without save.
+          ),
+        );
+      }
 
       sw.stop();
       final duration = result.elapsed ?? sw.elapsed;
