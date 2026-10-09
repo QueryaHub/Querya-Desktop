@@ -2,6 +2,7 @@ import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
+import 'package:querya_desktop/core/database/sqlite_sql.dart';
 import 'package:querya_desktop/core/database/sqlite_service.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/editor/querya_code_editor.dart';
@@ -178,7 +179,7 @@ class SqliteTableDataDelegate extends TableDataMutationDelegate {
       throw StateError('Not connected');
     }
 
-    final rs = await conn.execute(sql);
+    final rs = await conn.execute(sqliteUniqueColumnsSql(sql));
     final cols = <String>[];
     if (rs.isNotEmpty) {
       cols.addAll(rs.first.keys);
