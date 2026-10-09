@@ -1,5 +1,5 @@
 import 'dart:convert' show utf8;
-import 'dart:math' show min;
+import 'dart:math' show min, pi;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -9,6 +9,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/rendering.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/results/charts/chart_data.dart';
+import 'package:querya_desktop/features/results/charts/chart_format.dart';
 import 'package:querya_desktop/features/results/charts/chart_svg.dart';
 import 'package:querya_desktop/shared/widgets/querya_badge.dart';
 import 'package:querya_desktop/shared/widgets/querya_dropdown.dart';
@@ -112,6 +113,23 @@ class _QuickChartViewState extends material.State<QuickChartView> {
         valueColumn: valueCol,
       );
 
+  /// What the X control means: a time axis for lines, categories otherwise.
+  String get _xLabel => _type == QuickChartType.line ? 'Time' : 'Category';
+
+  String get _xName => _labelCol == null ? '(row #)' : widget.columns[_labelCol!];
+
+  String get _yName => widget.columns[_valueCol!];
+
+  /// "`Y` by `X`", plus the aggregation when one is applied. Used on screen,
+  /// in the PNG and in the SVG.
+  String _chartTitle() {
+    final agg = _type == QuickChartType.line ? ChartAggregation.none : _aggregation;
+    final base = '$_yName by $_xName';
+    return agg == ChartAggregation.none
+        ? base
+        : '$base (${_aggregationLabel(agg)})';
+  }
+
   static String _aggregationLabel(ChartAggregation a) => switch (a) {
         ChartAggregation.none => 'None',
         ChartAggregation.sum => 'Sum',
@@ -163,7 +181,7 @@ class _QuickChartViewState extends material.State<QuickChartView> {
     final svg = ChartSvg.build(
       points: _series(valueCol).points,
       type: _type,
-      title: widget.columns[valueCol],
+      title: _chartTitle(),
       colors: ChartSvgColors(
         background: ChartSvgColors.hex(wb.surface.toARGB32()),
         text: ChartSvgColors.hex(wb.mutedForeground.toARGB32()),
@@ -228,7 +246,7 @@ class _QuickChartViewState extends material.State<QuickChartView> {
                 }),
               ),
               const material.SizedBox(width: 12),
-              const Text('X'),
+              Text(_xLabel),
               const material.SizedBox(width: 6),
               QueryaDropdown<int>(
                 key: const material.ValueKey('chart_x'),
@@ -245,7 +263,7 @@ class _QuickChartViewState extends material.State<QuickChartView> {
                 }),
               ),
               const material.SizedBox(width: 12),
-              const Text('Y'),
+              const Text('Value'),
               const material.SizedBox(width: 6),
               QueryaDropdown<int>(
                 key: const material.ValueKey('chart_y'),
@@ -321,12 +339,27 @@ class _QuickChartViewState extends material.State<QuickChartView> {
               color: wb.surface,
               child: material.Padding(
                 padding: const material.EdgeInsets.all(16),
-                child: points.isEmpty
-                    ? material.Center(
-                        child: Text('No data',
-                            style:
-                                material.TextStyle(color: wb.mutedForeground)))
-                    : _buildChart(context, points),
+                child: material.Column(
+                  crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                  children: [
+                    material.Text(_chartTitle(),
+                        maxLines: 1,
+                        overflow: material.TextOverflow.ellipsis,
+                        style: material.TextStyle(
+                            fontSize: 13,
+                            fontWeight: material.FontWeight.w600,
+                            color: wb.mutedForeground)),
+                    const material.SizedBox(height: 8),
+                    material.Expanded(
+                      child: points.isEmpty
+                          ? material.Center(
+                              child: Text('No data',
+                                  style: material.TextStyle(
+                                      color: wb.mutedForeground)))
+                          : _buildChart(context, points),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -465,35 +498,75 @@ class _QuickChartViewState extends material.State<QuickChartView> {
 
   material.Widget _buildChart(
       material.BuildContext context, List<ChartPoint> points) {
+    if (_type == QuickChartType.pie) return _buildPie(context, points);
+    return material.LayoutBuilder(
+        builder: (context, box) => _axisChart(context, points, box.maxWidth));
+  }
+
+  /// Bar and line charts. [width] decides whether X labels fit or rotate.
+  material.Widget _axisChart(
+      material.BuildContext context, List<ChartPoint> points, double width) {
     final palette = context.semanticPalette;
     final wb = context.workbench;
+    final cs = Theme.of(context).colorScheme;
     final label = material.TextStyle(color: wb.mutedForeground, fontSize: 10);
     final step = (points.length / 8).ceil().clamp(1, 1000);
+    // Labels shown: one per step. Rotate them when a slot is too narrow.
+    final shown = (points.length / step).ceil().clamp(1, 1000);
+    final slot = (width - 60) / shown;
+    final rotate = slot < 60;
 
     material.Widget bottom(double v, TitleMeta meta) {
       final i = v.toInt();
       if (i < 0 || i >= points.length || i % step != 0) {
         return const material.SizedBox.shrink();
       }
+      final text = material.Text(
+        points[i].label,
+        style: label,
+        maxLines: 1,
+        overflow: material.TextOverflow.ellipsis,
+      );
       return SideTitleWidget(
         meta: meta,
-        child: Text(points[i].label, style: label, maxLines: 1),
+        child: rotate
+            ? material.Transform.rotate(
+                angle: -pi / 4,
+                alignment: material.Alignment.topRight,
+                child: material.ConstrainedBox(
+                  constraints:
+                      const material.BoxConstraints(maxWidth: 120),
+                  child: text,
+                ),
+              )
+            : material.ConstrainedBox(
+                constraints: material.BoxConstraints(maxWidth: slot),
+                child: text,
+              ),
       );
     }
 
+    final axisLabel = material.TextStyle(color: wb.mutedForeground, fontSize: 11);
     final titles = FlTitlesData(
       topTitles: const AxisTitles(),
       rightTitles: const AxisTitles(),
       bottomTitles: AxisTitles(
+        axisNameSize: 18,
+        axisNameWidget: material.Text(_xName, style: axisLabel),
         sideTitles: SideTitles(
-            showTitles: true, reservedSize: 28, getTitlesWidget: bottom),
+            showTitles: true,
+            reservedSize: rotate ? 52 : 28,
+            getTitlesWidget: bottom),
       ),
       leftTitles: AxisTitles(
+        axisNameSize: 18,
+        axisNameWidget: material.Text(_yName, style: axisLabel),
         sideTitles: SideTitles(
           showTitles: true,
-          reservedSize: 48,
+          reservedSize: 52,
           getTitlesWidget: (v, meta) => SideTitleWidget(
-              meta: meta, child: Text(meta.formattedValue, style: label)),
+              meta: meta,
+              child: material.Text(ChartFormat.compact(v), style: label)),
         ),
       ),
     );
@@ -511,8 +584,12 @@ class _QuickChartViewState extends material.State<QuickChartView> {
           borderData: FlBorderData(show: false),
           barTouchData: BarTouchData(
             touchTooltipData: BarTouchTooltipData(
+              getTooltipColor: (_) => cs.popover,
+              tooltipBorder: material.BorderSide(color: cs.border),
               getTooltipItem: (group, _, rod, __) => BarTooltipItem(
-                  '${points[group.x].label}\n${rod.toY}', const TextStyle()),
+                  '${points[group.x].label}\n${ChartFormat.full(rod.toY)}',
+                  material.TextStyle(
+                      color: cs.popoverForeground, fontSize: 12)),
             ),
           ),
           barGroups: [
@@ -529,10 +606,14 @@ class _QuickChartViewState extends material.State<QuickChartView> {
           borderData: FlBorderData(show: false),
           lineTouchData: LineTouchData(
             touchTooltipData: LineTouchTooltipData(
+              getTooltipColor: (_) => cs.popover,
+              tooltipBorder: material.BorderSide(color: cs.border),
               getTooltipItems: (spots) => [
                 for (final s in spots)
                   LineTooltipItem(
-                      '${points[s.x.toInt()].label}\n${s.y}', const TextStyle()),
+                      '${points[s.x.toInt()].label}\n${ChartFormat.full(s.y)}',
+                      material.TextStyle(
+                          color: cs.popoverForeground, fontSize: 12)),
               ],
             ),
           ),
