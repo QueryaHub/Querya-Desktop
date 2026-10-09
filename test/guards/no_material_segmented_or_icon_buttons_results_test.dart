@@ -8,6 +8,9 @@ void main() {
   const scoped = [
     'lib/features/workspace/results_tab.dart',
     'lib/features/workspace/data_grid_groupings_view.dart',
+    // Pulled into the results tab through its imports.
+    'lib/features/workspace/data_grid_filter_bar.dart',
+    'lib/features/workspace/data_grid_value_panel.dart',
     'lib/features/results/charts/quick_chart_view.dart',
     'lib/features/mongodb/mongo_query_workspace.dart',
   ];

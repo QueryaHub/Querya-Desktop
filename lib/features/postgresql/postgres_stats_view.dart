@@ -29,6 +29,26 @@ class PostgresStatsView extends material.StatefulWidget {
   material.State<PostgresStatsView> createState() => _PostgresStatsViewState();
 }
 
+/// Adds one poll's numbers to [history]: connections as they are, and the
+/// commits of all databases as a rate per second (a counter).
+@visibleForTesting
+void recordServerStats(
+  MetricHistory history,
+  Map<String, dynamic> stats,
+  DateTime now,
+) {
+  history
+    ..record('connections_active',
+        ((stats['connections_active'] ?? 0) as num).toDouble(), now)
+    ..record('connections_total',
+        ((stats['connections_total'] ?? 0) as num).toDouble(), now);
+  var commits = 0;
+  for (final db in stats['databases'] as List? ?? const []) {
+    commits += ((db as Map)['xact_commit'] as num? ?? 0).toInt();
+  }
+  history.recordCounter('transactions_per_second', commits.toDouble(), now);
+}
+
 class _PostgresStatsViewState extends material.State<PostgresStatsView> {
   PgLease? _lease;
   PostgresConnection? get _connection => _lease?.connection;
@@ -104,19 +124,8 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
   }
 
   /// Records the poll's numbers. No query is added: the poll already fetched them.
-  void _recordHistory(Map<String, dynamic> stats) {
-    final now = DateTime.now();
-    _history
-      ..record('connections_active',
-          ((stats['connections_active'] ?? 0) as num).toDouble(), now)
-      ..record('connections_total',
-          ((stats['connections_total'] ?? 0) as num).toDouble(), now);
-    var commits = 0;
-    for (final db in stats['databases'] as List? ?? const []) {
-      commits += ((db as Map)['xact_commit'] as num? ?? 0).toInt();
-    }
-    _history.recordCounter('transactions_per_second', commits.toDouble(), now);
-  }
+  void _recordHistory(Map<String, dynamic> stats) =>
+      recordServerStats(_history, stats, DateTime.now());
 
   Future<void> _fetch() async {
     final c = _connection;
