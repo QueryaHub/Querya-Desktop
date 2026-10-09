@@ -227,6 +227,7 @@ class _ExtensionSqlWorkspaceState extends material.State<ExtensionSqlWorkspace> 
       initialTabTitle: widget.selectedObject?.name,
       supportsAutocommit: false,
       supportsStmtTimeout: false,
+      showDiagram: false,
       effectiveDatabaseName: () => widget.connectionRow.databaseName ?? '',
       headerBadge: material.Row(
         mainAxisSize: material.MainAxisSize.min,

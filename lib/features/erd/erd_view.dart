@@ -13,7 +13,7 @@ import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/erd/erd_canvas_controls.dart';
-import 'package:querya_desktop/features/erd/erd_catalog.dart';
+import 'package:querya_desktop/features/erd/erd_source.dart';
 import 'package:querya_desktop/features/erd/erd_export.dart';
 import 'package:querya_desktop/features/erd/erd_geometry.dart';
 import 'package:querya_desktop/features/erd/erd_layout.dart';
@@ -54,12 +54,20 @@ class ErdView extends material.StatefulWidget {
     required this.delegate,
     required this.dialect,
     this.databaseName = '',
+    this.source,
+    this.focusTable,
     this.onOpenTable,
     this.onSaveFile,
   });
 
   final SqlExecutionDelegate delegate;
   final SqlDialect dialect;
+
+  /// Where the tables come from; the delegate and dialect when omitted.
+  final ErdSource? source;
+
+  /// Table to pick and centre once the schema is drawn.
+  final String? focusTable;
 
   /// Names the exported files: `<databaseName>-erd.svg`.
   final String databaseName;
@@ -132,15 +140,28 @@ class _ErdViewState extends material.State<ErdView> {
       _error = null;
     });
     try {
-      final schema = await ErdCatalog.load(widget.delegate, widget.dialect);
+      final schema = await (widget.source ??
+              SqlErdSource(delegate: widget.delegate, dialect: widget.dialect))
+          .loadSchema();
       if (!mounted) return;
       setState(() {
         _schema = schema;
         _setLayout(ErdLayout.compute(_visibleOf(schema)));
         _loading = false;
       });
-      // The viewport is measured after this frame; fit the diagram then.
-      material.WidgetsBinding.instance.addPostFrameCallback((_) => _fit());
+      // The viewport is measured after this frame: fit the diagram, then pick
+      // and centre the focused table.
+      material.WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _fit();
+        final focus = widget.focusTable;
+        final full = _schema;
+        if (focus != null &&
+            full != null &&
+            full.tables.any((t) => t.name == focus)) {
+          _selectTable(_visibleOf(full), focus);
+        }
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
