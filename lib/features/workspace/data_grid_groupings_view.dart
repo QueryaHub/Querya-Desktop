@@ -242,15 +242,14 @@ class _DataGridGroupingsViewState
                     }
                   },
                 ),
-                material.IconButton(
+                QueryaIconButton(
+ density: QueryaIconButtonDensity.dense,
                   icon: material.Icon(
                     _sortAscending
                         ? material.Icons.arrow_upward_rounded
                         : material.Icons.arrow_downward_rounded,
                     size: 14,
                   ),
-                  padding: material.EdgeInsets.zero,
-                  constraints: const material.BoxConstraints(minWidth: 24, minHeight: 24),
                   color: cs.mutedForeground,
                   onPressed: () => setState(() {
                     _sortAscending = !_sortAscending;
@@ -261,10 +260,9 @@ class _DataGridGroupingsViewState
                 const Gap(8),
                 material.Tooltip(
                   message: 'Copy Pivot CSV to Clipboard',
-                  child: material.IconButton(
+                  child: QueryaIconButton(
+ density: QueryaIconButtonDensity.dense,
                     icon: const material.Icon(material.Icons.copy_rounded, size: 14),
-                    padding: material.EdgeInsets.zero,
-                    constraints: const material.BoxConstraints(minWidth: 24, minHeight: 24),
                     color: cs.mutedForeground,
                     onPressed: _exportPivot,
                   ),

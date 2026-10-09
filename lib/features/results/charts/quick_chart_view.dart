@@ -11,9 +11,14 @@ import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/results/charts/chart_data.dart';
 import 'package:querya_desktop/features/results/charts/chart_format.dart';
 import 'package:querya_desktop/features/results/charts/chart_svg.dart';
+import 'package:querya_desktop/shared/widgets/querya_action_menu.dart';
 import 'package:querya_desktop/shared/widgets/querya_badge.dart';
+import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/shared/widgets/querya_dropdown.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+
+/// Formats of the chart export menu.
+enum _ChartExport { png, svg }
 
 /// Saves rendered chart PNG bytes; replaceable in tests.
 typedef ChartPngSaver = Future<void> Function(Uint8List png);
@@ -233,9 +238,12 @@ class _QuickChartViewState extends material.State<QuickChartView> {
     final wb = context.workbench;
     if (_valueCol == null) {
       return material.Center(
-        child: Text(
-          'No numeric column to chart',
-          style: material.TextStyle(color: wb.mutedForeground),
+        child: QueryaEmptyState(
+          icon: material.Icon(material.Icons.bar_chart_rounded,
+              color: wb.mutedForeground),
+          title: 'No numeric column to chart',
+          description:
+              'Charts need a numeric column. Cast it in SQL, e.g. count(*)::int.',
         ),
       );
     }
@@ -253,24 +261,20 @@ class _QuickChartViewState extends material.State<QuickChartView> {
             runSpacing: 8,
             crossAxisAlignment: material.WrapCrossAlignment.center,
             children: [
-              material.SegmentedButton<QuickChartType>(
-                segments: const [
-                  material.ButtonSegment(
-                      value: QuickChartType.bar, label: Text('Bar')),
-                  material.ButtonSegment(
-                      value: QuickChartType.line, label: Text('Line')),
-                  material.ButtonSegment(
-                      value: QuickChartType.pie, label: Text('Pie')),
-                ],
-                selected: {_type},
-                showSelectedIcon: false,
-                onSelectionChanged: (s) => setState(() {
-                  _type = s.first;
-                  _topN = _type == QuickChartType.pie
-                      ? ChartData.pieTopN
-                      : ChartData.defaultTopN;
-                  _hoveredSlice = null;
-                }),
+              material.SizedBox(
+                height: 32,
+                width: 200,
+                child: QueryaTabStrip(
+                  labels: const ['Bar', 'Line', 'Pie'],
+                  selectedIndex: QuickChartType.values.indexOf(_type),
+                  onSelected: (i) => setState(() {
+                    _type = QuickChartType.values[i];
+                    _topN = _type == QuickChartType.pie
+                        ? ChartData.pieTopN
+                        : ChartData.defaultTopN;
+                    _hoveredSlice = null;
+                  }),
+                ),
               ),
               const material.SizedBox(width: 12),
               Text(_xLabel),
@@ -344,17 +348,42 @@ class _QuickChartViewState extends material.State<QuickChartView> {
                 ),
                 const material.SizedBox(width: 8),
               ],
-              material.IconButton(
-                key: const material.ValueKey('chart_export'),
-                tooltip: 'Export PNG',
-                icon: const material.Icon(material.Icons.image_outlined),
-                onPressed: _export,
-              ),
-              material.IconButton(
-                key: const material.ValueKey('chart_export_svg'),
-                tooltip: 'Export SVG',
-                icon: const material.Icon(material.Icons.polyline_outlined),
-                onPressed: _exportSvg,
+              QueryaActionMenu<_ChartExport>(
+                items: const [
+                  QueryaActionMenuItem(
+                    value: _ChartExport.png,
+                    label: 'PNG',
+                    icon: material.Icons.image_outlined,
+                  ),
+                  QueryaActionMenuItem(
+                    value: _ChartExport.svg,
+                    label: 'SVG',
+                    icon: material.Icons.polyline_outlined,
+                  ),
+                ],
+                onSelected: (format) {
+                  if (format == _ChartExport.png) {
+                    _export();
+                  } else {
+                    _exportSvg();
+                  }
+                },
+                child: material.Padding(
+                  key: const material.ValueKey('chart_export'),
+                  padding: const material.EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 4),
+                  child: material.Row(
+                    mainAxisSize: material.MainAxisSize.min,
+                    children: [
+                      material.Icon(material.Icons.file_download_outlined,
+                          size: 16, color: wb.mutedForeground),
+                      const material.SizedBox(width: 4),
+                      const Text('Export'),
+                      material.Icon(material.Icons.expand_more_rounded,
+                          size: 16, color: wb.mutedForeground),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
@@ -380,9 +409,13 @@ class _QuickChartViewState extends material.State<QuickChartView> {
                     material.Expanded(
                       child: points.isEmpty
                           ? material.Center(
-                              child: Text('No data',
-                                  style: material.TextStyle(
-                                      color: wb.mutedForeground)))
+                              child: QueryaEmptyState(
+                                icon: material.Icon(
+                                    material.Icons.bar_chart_rounded,
+                                    color: wb.mutedForeground),
+                                title: 'No data',
+                              ),
+                            )
                           : _buildChart(context, points),
                     ),
                   ],

@@ -83,8 +83,10 @@ void main() {
       onSavePng: (png) async => saved = png,
     )));
     await t.pump();
+    await t.tap(find.byKey(const material.ValueKey('chart_export')));
+    await t.pump();
     await t.runAsync(() async {
-      await t.tap(find.byKey(const material.ValueKey('chart_export')));
+      await t.tap(find.text('PNG'));
       await Future<void>.delayed(const Duration(milliseconds: 500));
     });
     await t.pump();
@@ -103,7 +105,9 @@ void main() {
     )));
     await t.pump();
 
-    await t.tap(find.byKey(const material.ValueKey('chart_export_svg')));
+    await t.tap(find.byKey(const material.ValueKey('chart_export')));
+    await t.pump();
+    await t.tap(find.text('SVG'));
     await t.pump();
     expect(saved, isNotNull);
     expect(saved, contains('<svg'));
@@ -112,7 +116,9 @@ void main() {
 
     await t.tap(find.text('Pie'));
     await t.pump();
-    await t.tap(find.byKey(const material.ValueKey('chart_export_svg')));
+    await t.tap(find.byKey(const material.ValueKey('chart_export')));
+    await t.pump();
+    await t.tap(find.text('SVG'));
     await t.pump();
     expect('<path '.allMatches(saved!).length, rows.length);
   });

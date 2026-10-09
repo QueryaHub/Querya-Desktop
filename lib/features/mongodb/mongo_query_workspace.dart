@@ -447,27 +447,14 @@ class _MongoQueryWorkspaceState extends material.State<MongoQueryWorkspace> {
             ],
             const Gap(16),
             // Mode switchers: Grid vs JSON
-            material.SegmentedButton<_ResultViewMode>(
-              segments: const [
-                material.ButtonSegment(
-                  value: _ResultViewMode.grid,
-                  icon: material.Icon(material.Icons.grid_on_rounded, size: 14),
-                  label: material.Text('Grid', style: material.TextStyle(fontSize: 12)),
-                ),
-                material.ButtonSegment(
-                  value: _ResultViewMode.json,
-                  icon: material.Icon(material.Icons.data_object_rounded, size: 14),
-                  label: material.Text('JSON', style: material.TextStyle(fontSize: 12)),
-                ),
-              ],
-              selected: {tab.viewMode},
-              onSelectionChanged: (selected) {
-                if (selected.isNotEmpty) {
-                  setState(() => tab.viewMode = selected.first);
-                }
-              },
-              style: material.SegmentedButton.styleFrom(
-                visualDensity: material.VisualDensity.compact,
+            material.SizedBox(
+              height: 32,
+              width: 160,
+              child: QueryaTabStrip(
+                labels: const ['Grid', 'JSON'],
+                selectedIndex: _ResultViewMode.values.indexOf(tab.viewMode),
+                onSelected: (i) =>
+                    setState(() => tab.viewMode = _ResultViewMode.values[i]),
               ),
             ),
           ],
