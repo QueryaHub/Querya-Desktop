@@ -528,7 +528,7 @@ void main() {
       await t.binding.setSurfaceSize(const material.Size(1200, 800));
       addTearDown(() => t.binding.setSurfaceSize(null));
       await t.pumpWidget(queryaThemeTestShell(
-        child: ErdView(source: SqlErdSource(delegate: delegate(), dialect: SqlDialect.sqlite))),
+        child: ErdView(source: SqlErdSource(delegate: delegate(), dialect: SqlDialect.sqlite)),
       ));
       await t.pump();
       await t.pump();
@@ -568,7 +568,7 @@ void main() {
         ]);
       });
       await t.pumpWidget(queryaThemeTestShell(
-        child: ErdView(source: SqlErdSource(delegate: junction, dialect: SqlDialect.sqlite))),
+        child: ErdView(source: SqlErdSource(delegate: junction, dialect: SqlDialect.sqlite)),
       ));
       await t.pump();
       await t.pump();
@@ -613,7 +613,7 @@ void main() {
     testWidgets('zoom buttons change the zoom label', (t) async {
       await t.binding.setSurfaceSize(const material.Size(1200, 800));
       await t.pumpWidget(queryaThemeTestShell(
-        child: ErdView(source: SqlErdSource(delegate: delegate(), dialect: SqlDialect.sqlite))),
+        child: ErdView(source: SqlErdSource(delegate: delegate(), dialect: SqlDialect.sqlite)),
       ));
       await t.pump();
       await t.pump();
@@ -632,7 +632,7 @@ void main() {
         (t) async {
       await t.binding.setSurfaceSize(const material.Size(1200, 800));
       await t.pumpWidget(queryaThemeTestShell(
-        child: ErdView(source: SqlErdSource(delegate: threeTables(), dialect: SqlDialect.sqlite))),
+        child: ErdView(source: SqlErdSource(delegate: threeTables(), dialect: SqlDialect.sqlite)),
       ));
       await t.pump();
       await t.pump();
@@ -652,7 +652,7 @@ void main() {
         (t) async {
       await t.binding.setSurfaceSize(const material.Size(1200, 800));
       await t.pumpWidget(queryaThemeTestShell(
-        child: ErdView(source: SqlErdSource(delegate: threeTables(), dialect: SqlDialect.sqlite))),
+        child: ErdView(source: SqlErdSource(delegate: threeTables(), dialect: SqlDialect.sqlite)),
       ));
       await t.pump();
       await t.pump();
@@ -693,7 +693,7 @@ void main() {
         ]);
       });
       await t.pumpWidget(queryaThemeTestShell(
-        child: ErdView(source: SqlErdSource(delegate: wide, dialect: SqlDialect.sqlite))),
+        child: ErdView(source: SqlErdSource(delegate: wide, dialect: SqlDialect.sqlite)),
       ));
       await t.pump();
       await t.pump();
