@@ -457,6 +457,7 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
     return GenericTableView(
       key: _genericKey,
       delegate: _delegate,
+      showRelations: false,
       title: tableTitle,
       tableTitle: '${widget.database}.${widget.tableName}',
       dialect: SqlDialect.postgres, // Generic fallback

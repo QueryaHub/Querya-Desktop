@@ -408,7 +408,13 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
           onRefresh: () => unawaited(state.refresh()),
           editAction: widget.isView || widget.isMaterializedView
               ? null
-              : state.buildEditModeButton(),
+              : material.Row(
+                  mainAxisSize: material.MainAxisSize.min,
+                  children: [
+                    state.buildViewSwitch(),
+                    state.buildEditModeButton(),
+                  ],
+                ),
         );
       },
     );

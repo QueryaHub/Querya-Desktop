@@ -6,6 +6,8 @@ import 'package:querya_desktop/core/storage/local_db.dart' show MutationAuditSou
 import 'package:querya_desktop/core/storage/mutation_audit_recorder.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
+import 'package:querya_desktop/features/erd/erd_source.dart';
+import 'package:querya_desktop/features/erd/erd_view.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/features/workspace/results_tab.dart';
 import 'package:querya_desktop/features/workspace/table_data_delegate.dart';
@@ -36,6 +38,9 @@ class GenericTableView extends material.StatefulWidget {
     this.subToolbar,
     this.errorAction,
     this.showExportToolbar = true,
+    this.showRelations = true,
+    this.onOpenNeighbour,
+    this.onOpenFullDiagram,
   });
 
   final TableDataMutationDelegate delegate;
@@ -54,6 +59,15 @@ class GenericTableView extends material.StatefulWidget {
   final material.Widget? subToolbar;
   final material.Widget? errorAction;
   final bool showExportToolbar;
+
+  /// Offers the Data | Relations switch. Extension tables have no diagram.
+  final bool showRelations;
+
+  /// Double click on a neighbour in the Relations view.
+  final void Function(String table)? onOpenNeighbour;
+
+  /// Opens the full diagram focused on this table.
+  final void Function(String table)? onOpenFullDiagram;
 
   @override
   material.State<GenericTableView> createState() => GenericTableViewState();
@@ -82,6 +96,82 @@ class GenericTableViewState extends material.State<GenericTableView> {
   bool _editMode = false;
 
   bool get isLoading => _loading;
+
+  bool _relationsMode = false;
+  bool _relationsVisited = false;
+  int _relationsDepth = 1;
+
+  bool get showsRelations =>
+      widget.showRelations && !widget.isView && !widget.isMaterializedView;
+
+  /// Neighbourhood source over this table's own read-only session.
+  ErdSource get _erdSource => SqlErdSource(
+        delegate: TableDataSqlAdapter(widget.delegate),
+        dialect: widget.dialect,
+      );
+
+  /// Data | Relations, for tables with a diagram source.
+  material.Widget buildViewSwitch() {
+    if (!showsRelations) return const material.SizedBox.shrink();
+    return QueryaTabStrip(
+      labels: const ['Data', 'Relations'],
+      selectedIndex: _relationsMode ? 1 : 0,
+      onSelected: selectView,
+    );
+  }
+
+  /// 0 shows the grid (Data), 1 the neighbourhood (Relations).
+  void selectView(int index) {
+    setState(() {
+      _relationsMode = index == 1;
+      if (_relationsMode) _relationsVisited = true;
+    });
+  }
+
+  /// Neighbourhood of this table. Built on the first switch and kept, so
+  /// the grid's state (staged edits, page, filter) is never disturbed.
+  material.Widget _buildRelations() {
+    final schema = widget.schema;
+    final focus = schema == null || schema.isEmpty
+        ? widget.tableName
+        : '$schema.${widget.tableName}';
+    void openFull() => widget.onOpenFullDiagram?.call(focus);
+    return material.Column(
+      crossAxisAlignment: material.CrossAxisAlignment.stretch,
+      children: [
+        material.Padding(
+          padding: const material.EdgeInsets.all(8),
+          child: material.Row(
+            children: [
+              for (final d in const [1, 2])
+                QueryaActionButton(
+                  key: material.ValueKey('relations_depth_$d'),
+                  label: 'Depth $d',
+                  onPressed: () => setState(() => _relationsDepth = d),
+                ),
+              const material.Spacer(),
+              QueryaActionButton(
+                key: const material.ValueKey('relations_open_diagram'),
+                label: 'Open full diagram',
+                onPressed: widget.onOpenFullDiagram == null ? null : openFull,
+              ),
+            ],
+          ),
+        ),
+        material.Expanded(
+          child: ErdView(
+            key: material.ValueKey('relations_${focus}_$_relationsDepth'),
+            source: _erdSource,
+            focusTable: focus,
+            neighbourhoodDepth: _relationsDepth,
+            onOpenTable: widget.onOpenNeighbour,
+            onOpenFullDiagram:
+                widget.onOpenFullDiagram == null ? null : openFull,
+          ),
+        ),
+      ],
+    );
+  }
   String? get error => _error;
   List<String> get columnNames => _columnNames;
   List<List<String>> get rows => _rows;
@@ -620,6 +710,7 @@ class GenericTableViewState extends material.State<GenericTableView> {
                         ),
                         const Gap(6),
                         if (!widget.isView && !widget.isMaterializedView) ...[
+                          buildViewSwitch(),
                           buildEditModeButton(),
                           const Gap(4),
                         ],
@@ -711,7 +802,10 @@ class GenericTableViewState extends material.State<GenericTableView> {
                 ),
               if (widget.subToolbar != null) widget.subToolbar!,
               material.Expanded(
-                child: ResultsTab(
+                child: material.IndexedStack(
+                  index: _relationsMode ? 1 : 0,
+                  children: [
+                ResultsTab(
                   columns: _columnNames,
                   rows: _rows,
                   errorMessage: _error,
@@ -725,6 +819,12 @@ class GenericTableViewState extends material.State<GenericTableView> {
                       _stagingBuffer != null ? applyStagedChanges : null,
                   isSaving: _isSaving,
                   errorAction: widget.errorAction,
+                ),
+                  if (_relationsVisited)
+                    _buildRelations()
+                  else
+                    const material.SizedBox.shrink(),
+                  ],
                 ),
               ),
             ],

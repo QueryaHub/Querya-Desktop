@@ -51,17 +51,26 @@ enum _ExportAction { mermaid, svg, png, copyMermaid }
 class ErdView extends material.StatefulWidget {
   const ErdView({
     super.key,
-    required this.delegate,
-    required this.dialect,
+    this.delegate,
+    this.dialect,
     this.databaseName = '',
     this.source,
     this.focusTable,
+    this.neighbourhoodDepth,
     this.onOpenTable,
+    this.onOpenFullDiagram,
     this.onSaveFile,
-  });
+  }) : assert(source != null || (delegate != null && dialect != null));
 
-  final SqlExecutionDelegate delegate;
-  final SqlDialect dialect;
+  /// Query runner and dialect, used when [source] is not given.
+  final SqlExecutionDelegate? delegate;
+  final SqlDialect? dialect;
+
+  /// Draw only [focusTable] and the tables within this many foreign keys.
+  final int? neighbourhoodDepth;
+
+  /// Opens the diagram's full schema, from a neighbourhood's empty state.
+  final material.VoidCallback? onOpenFullDiagram;
 
   /// Where the tables come from; the delegate and dialect when omitted.
   final ErdSource? source;
@@ -140,9 +149,11 @@ class _ErdViewState extends material.State<ErdView> {
       _error = null;
     });
     try {
-      final schema = await (widget.source ??
-              SqlErdSource(delegate: widget.delegate, dialect: widget.dialect))
-          .loadSchema();
+      final depth = widget.neighbourhoodDepth;
+      final focus = widget.focusTable;
+      final schema = depth != null && focus != null
+          ? await _source.loadNeighbourhood(focus, depth: depth)
+          : await _source.loadSchema();
       if (!mounted) return;
       setState(() {
         _schema = schema;
@@ -154,13 +165,8 @@ class _ErdViewState extends material.State<ErdView> {
       material.WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _fit();
-        final focus = widget.focusTable;
-        final full = _schema;
-        if (focus != null &&
-            full != null &&
-            full.tables.any((t) => t.name == focus)) {
-          _selectTable(_visibleOf(full), focus);
-        }
+        final picked = _focusIn(schema);
+        if (picked != null) _selectTable(_visibleOf(schema), picked);
       });
     } catch (e) {
       if (!mounted) return;
@@ -177,6 +183,20 @@ class _ErdViewState extends material.State<ErdView> {
     _routes = schema == null
         ? const []
         : ErdRouter.route(_visibleOf(schema), layout);
+  }
+
+  ErdSource get _source =>
+      widget.source ??
+      SqlErdSource(delegate: widget.delegate!, dialect: widget.dialect!);
+
+  /// The focused table as named in [schema]: `public.orders` falls back to
+  /// `orders` when the current schema names it without a prefix.
+  String? _focusIn(ErdSchema schema) {
+    final f = widget.focusTable;
+    if (f == null) return null;
+    if (schema.tables.any((t) => t.name == f)) return f;
+    final bare = f.contains('.') ? f.substring(f.indexOf('.') + 1) : f;
+    return schema.tables.any((t) => t.name == bare) ? bare : null;
   }
 
   /// The schema as drawn: hidden tables gone, columns cut to keys in keys-only
@@ -540,6 +560,19 @@ class _ErdViewState extends material.State<ErdView> {
           title: 'No tables found',
           description:
               'This schema has no tables, or this role cannot see them.',
+        ),
+      );
+    } else if (widget.neighbourhoodDepth != null &&
+        widget.focusTable != null &&
+        schema.relations.isEmpty) {
+      body = material.Center(
+        child: QueryaEmptyState(
+          icon: material.Icon(material.Icons.link_off_rounded,
+              color: wb.mutedForeground),
+          title: 'No foreign keys to or from ${widget.focusTable}',
+          description: 'This table has no relations within the schema.',
+          actionLabel: 'Open full diagram',
+          onAction: widget.onOpenFullDiagram,
         ),
       );
     } else {
