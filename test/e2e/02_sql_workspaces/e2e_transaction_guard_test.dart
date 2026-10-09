@@ -43,6 +43,13 @@ void main() {
     await E2eSqlWorkspace.settle(tester);
   }
 
+  /// Begin lives in the Session menu, not on the toolbar.
+  Future<void> beginFromSessionMenu(WidgetTester tester) async {
+    await tester.tap(find.byKey(const material.ValueKey('session_menu')));
+    await tester.pumpAndSettle();
+    await tapAndSettle(tester, 'Begin transaction');
+  }
+
   testWidgets('Begin opens a transaction, Rollback and Commit close it',
       timeout: _timeout, (tester) async {
     final delegate = _TxDelegate();
@@ -51,14 +58,14 @@ void main() {
     // Unknown until the first command refreshes the state.
     expect(find.text('Transaction —'), findsOneWidget);
 
-    await tapAndSettle(tester, 'Begin');
+    await beginFromSessionMenu(tester);
     expect(find.text('Transaction open'), findsOneWidget);
     expect(find.text('OK: BEGIN'), findsWidgets);
 
     await tapAndSettle(tester, 'Rollback');
     expect(find.text('Auto-commit'), findsOneWidget);
 
-    await tapAndSettle(tester, 'Begin');
+    await beginFromSessionMenu(tester);
     await tapAndSettle(tester, 'Commit');
     expect(find.text('Auto-commit'), findsOneWidget);
 

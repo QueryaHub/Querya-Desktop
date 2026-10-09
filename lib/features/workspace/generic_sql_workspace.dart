@@ -1152,6 +1152,15 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
                 onClose: _sessions.length > 1
                     ? (index) => unawaited(closeTab(index))
                     : null,
+                trailing: widget.showDiagram
+                    ? QueryaActionButton(
+                        key: const material.ValueKey('open_diagram_tab'),
+                        label: 'Diagram',
+                        icon: material.Icons.account_tree_outlined,
+                        tooltip: 'Schema diagram',
+                        onPressed: openDiagramTab,
+                      )
+                    : null,
               ),
               material.Expanded(
                 child: material.IndexedStack(
@@ -1185,8 +1194,6 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
         onOpenTable: _openTableFromDiagram,
       );
     }
-    final theme = Theme.of(context);
-    final accent = context.workbench.accent;
 
     return VerticalSplitPane(
       key: material.ValueKey(session.id),
@@ -1198,156 +1205,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
           material.Container(
             padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: SqlEditorChrome.sqlToolbarDecoration(context),
-            child: material.Column(
-              crossAxisAlignment: material.CrossAxisAlignment.stretch,
-              mainAxisSize: material.MainAxisSize.min,
-              children: [
-                material.Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  crossAxisAlignment: material.WrapCrossAlignment.center,
-                  children: [
-                    if (widget.headerBadge != null)
-                      widget.headerBadge!
-                    else
-                      const Text('Query').semiBold().small(),
-                    if (effectiveDatabase.isNotEmpty)
-                      Text('DB: $effectiveDatabase').muted().small(),
-                    if (widget.delegate.supportsTransactions) _txBadge(),
-                    QueryaActionButton(
-                      label: 'History',
-                      icon: material.Icons.history_rounded,
-                      size: ButtonSize.small,
-                      onPressed: widget.connectionRow.id != null && !session.running
-                          ? () => _openHistory(session)
-                          : null,
-                    ),
-                    material.Row(
-                      mainAxisSize: material.MainAxisSize.min,
-                      children: [
-                        QueryaActionButton(
-                          key: const material.ValueKey('run_script'),
-                          label: 'Execute (F5)',
-                          icon: material.Icons.play_arrow_rounded,
-                          loading: session.running,
-                          onPressed: () => execute(session),
-                        ),
-                        const material.SizedBox(width: 4),
-                        QueryaActionMenu<bool>(
-                          key: const material.ValueKey('run_menu'),
-                          items: [
-                            QueryaActionMenuItem(
-                              value: true,
-                              label: 'Run statement (${_modLabel}Enter)',
-                              icon: material.Icons.short_text_rounded,
-                            ),
-                            const QueryaActionMenuItem(
-                              value: false,
-                              label: 'Run script (F5)',
-                              icon: material.Icons.list_alt_rounded,
-                            ),
-                          ],
-                          onSelected: (atCursor) {
-                            if (!session.running) {
-                              unawaited(execute(session, atCursor));
-                            }
-                          },
-                          child: const material.Icon(
-                            material.Icons.expand_more_rounded,
-                            size: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (widget.delegate.supportsExplain)
-                      QueryaActionButton(
-                        key: const material.ValueKey('explain_query'),
-                        label: 'Explain',
-                        icon: material.Icons.account_tree_outlined,
-                        tooltip: 'Show the query plan',
-                        onPressed: session.running ? null : () => explain(session),
-                      ),
-                    if (session.running && widget.delegate.supportsCancel)
-                      QueryaActionButton(
-                        key: const material.ValueKey('cancel_query'),
-                        label: 'Cancel',
-                        icon: material.Icons.stop_rounded,
-                        isDestructive: true,
-                        tooltip: 'Interrupt the running query',
-                        onPressed: () => cancelRunning(session),
-                      ),
-                    if (widget.showDiagram)
-                      QueryaActionButton(
-                      key: const material.ValueKey('open_diagram_tab'),
-                      label: 'Diagram',
-                      onPressed: openDiagramTab,
-                    ),
-                    if (widget.extraToolbarTrailing?.call(context, session) case final extra?)
-                      extra,
-                  ],
-                ),
-                if (widget.supportsAutocommit || widget.supportsStmtTimeout || widget.delegate.supportsTransactions) ...[
-                  const Gap(8),
-                  material.Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    crossAxisAlignment: material.WrapCrossAlignment.center,
-                    children: [
-                      // Autocommit, statement timeout, Begin and Preferences live
-                      // in one Session menu.
-                      material.IgnorePointer(
-                        ignoring: session.running,
-                        child: material.Opacity(
-                          opacity: session.running ? 0.5 : 1,
-                          child: QueryaActionMenu<_SessionChoice>(
-                            key: const material.ValueKey('session_menu'),
-                            items: _sessionMenuItems(),
-                            onSelected: (choice) => _onSessionChoice(choice),
-                            child: material.Padding(
-                              padding: const material.EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 6),
-                              child: material.Row(
-                                mainAxisSize: material.MainAxisSize.min,
-                                children: [
-                                  material.Icon(material.Icons.tune_rounded,
-                                      size: 16, color: accent),
-                                  const material.SizedBox(width: 6),
-                                  Text(_autocommit
-                                      ? 'Session · auto-commit'
-                                      : 'Session · manual'),
-                                  const material.SizedBox(width: 4),
-                                  material.Icon(
-                                      material.Icons.expand_more_rounded,
-                                      size: 16,
-                                      color: accent),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Commit and Rollback only while a transaction is open; Begin
-                      // otherwise.
-                      if (widget.delegate.supportsTransactions)
-                        if (_txOpen == true) ...[
-                          QueryaActionButton(
-                            label: 'Commit',
-                            onPressed: session.running ? null : () => runTxCommand('COMMIT'),
-                          ),
-                          QueryaActionButton(
-                            label: 'Rollback',
-                            onPressed: session.running ? null : () => runTxCommand('ROLLBACK'),
-                          ),
-                        ] else
-                          QueryaActionButton(
-                            label: 'Begin',
-                            onPressed: session.running ? null : () => runTxCommand('BEGIN'),
-                          ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
+            child: _buildToolbarRow(context, session),
           ),
           const Divider(height: 1),
           Expanded(
@@ -1361,16 +1219,6 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       bottom: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          material.Container(
-            constraints: const material.BoxConstraints(minHeight: 44),
-            padding: const material.EdgeInsets.symmetric(horizontal: 12),
-            decoration: material.BoxDecoration(
-              color: theme.colorScheme.muted.withValues(alpha: 0.6),
-            ),
-            alignment: material.Alignment.centerLeft,
-            child: const Text('Data Output').semiBold().small(),
-          ),
-          const Divider(height: 1),
           Expanded(
             child: ResultsTab(
               columns: session.columns,
@@ -1393,6 +1241,166 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
               errorAction: widget.errorActionBuilder?.call(context, session),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  /// The toolbar in one row: Run and Explain, the editor tools, then the
+  /// session state. On a narrow window it scrolls sideways instead of wrapping.
+  material.Widget _buildToolbarRow(
+    material.BuildContext context,
+    SqlQueryTabSession session,
+  ) {
+    final accent = context.workbench.accent;
+    final historyEnabled = widget.connectionRow.id != null && !session.running;
+    return material.SingleChildScrollView(
+      scrollDirection: material.Axis.horizontal,
+      child: material.Row(
+        children: [
+          if (widget.headerBadge != null) ...[
+            widget.headerBadge!,
+            const material.SizedBox(width: 12),
+          ],
+          QueryaActionButton(
+            key: const material.ValueKey('run_script'),
+            label: 'Execute (F5)',
+            icon: material.Icons.play_arrow_rounded,
+            loading: session.running,
+            onPressed: () => execute(session),
+          ),
+          const material.SizedBox(width: 4),
+          QueryaActionMenu<bool>(
+            key: const material.ValueKey('run_menu'),
+            items: [
+              QueryaActionMenuItem(
+                value: true,
+                label: 'Run statement (${_modLabel}Enter)',
+                icon: material.Icons.short_text_rounded,
+              ),
+              const QueryaActionMenuItem(
+                value: false,
+                label: 'Run script (F5)',
+                icon: material.Icons.list_alt_rounded,
+              ),
+            ],
+            onSelected: (atCursor) {
+              if (!session.running) {
+                unawaited(execute(session, atCursor));
+              }
+            },
+            child: const material.Icon(
+              material.Icons.expand_more_rounded,
+              size: 16,
+            ),
+          ),
+          if (widget.delegate.supportsExplain) ...[
+            const material.SizedBox(width: 8),
+            QueryaActionButton(
+              key: const material.ValueKey('explain_query'),
+              label: 'Explain',
+              icon: material.Icons.account_tree_outlined,
+              tooltip: 'Show the query plan',
+              onPressed: session.running ? null : () => explain(session),
+            ),
+          ],
+          if (session.running && widget.delegate.supportsCancel) ...[
+            const material.SizedBox(width: 8),
+            QueryaActionButton(
+              key: const material.ValueKey('cancel_query'),
+              label: 'Cancel',
+              icon: material.Icons.stop_rounded,
+              isDestructive: true,
+              tooltip: 'Interrupt the running query',
+              onPressed: () => cancelRunning(session),
+            ),
+          ],
+          const material.SizedBox(width: 16),
+          QueryaIconButton(
+            key: const material.ValueKey('history_button'),
+            icon: material.Icons.history_rounded,
+            tooltip: 'History (${_modLabel}H)',
+            onPressed: historyEnabled ? () => _openHistory(session) : null,
+          ),
+          QueryaIconButton(
+            key: const material.ValueKey('format_button'),
+            icon: material.Icons.auto_fix_high_rounded,
+            tooltip: 'Format (Shift+Alt+F)',
+            onPressed: session.running ? null : () => session.formatSql(),
+          ),
+          QueryaIconButton(
+            key: const material.ValueKey('open_sql_button'),
+            icon: material.Icons.folder_open_outlined,
+            tooltip: 'Open .sql file',
+            onPressed: () => unawaited(openSqlFile()),
+          ),
+          QueryaIconButton(
+            key: const material.ValueKey('save_sql_button'),
+            icon: material.Icons.save_outlined,
+            tooltip: 'Save .sql file',
+            onPressed: () => unawaited(saveSqlFile()),
+          ),
+          const material.SizedBox(width: 16),
+          if (effectiveDatabase.isNotEmpty) ...[
+            QueryaBadge.status(
+              effectiveDatabase,
+              status: QueryaBadgeStatus.neutral,
+            ),
+            const material.SizedBox(width: 8),
+          ],
+          if (widget.delegate.supportsTransactions) ...[
+            _txBadge(),
+            if (_txOpen == true) ...[
+              const material.SizedBox(width: 8),
+              QueryaActionButton(
+                label: 'Commit',
+                onPressed:
+                    session.running ? null : () => runTxCommand('COMMIT'),
+              ),
+              const material.SizedBox(width: 4),
+              QueryaActionButton(
+                label: 'Rollback',
+                onPressed:
+                    session.running ? null : () => runTxCommand('ROLLBACK'),
+              ),
+            ],
+            const material.SizedBox(width: 8),
+          ],
+          // Autocommit, statement timeout, Begin and Preferences live in one
+          // Session menu.
+          material.IgnorePointer(
+            ignoring: session.running,
+            child: material.Opacity(
+              opacity: session.running ? 0.5 : 1,
+              child: QueryaActionMenu<_SessionChoice>(
+                key: const material.ValueKey('session_menu'),
+                items: _sessionMenuItems(),
+                onSelected: (choice) => _onSessionChoice(choice),
+                child: material.Padding(
+                  padding: const material.EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 6),
+                  child: material.Row(
+                    mainAxisSize: material.MainAxisSize.min,
+                    children: [
+                      material.Icon(material.Icons.tune_rounded,
+                          size: 16, color: accent),
+                      const material.SizedBox(width: 6),
+                      Text(_autocommit
+                          ? 'Session · auto-commit'
+                          : 'Session · manual'),
+                      const material.SizedBox(width: 4),
+                      material.Icon(material.Icons.expand_more_rounded,
+                          size: 16, color: accent),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (widget.extraToolbarTrailing?.call(context, session) case final extra?) ...[
+            const material.SizedBox(width: 8),
+            extra,
+          ],
         ],
       ),
     );

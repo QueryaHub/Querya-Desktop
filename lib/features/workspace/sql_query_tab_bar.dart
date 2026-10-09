@@ -11,6 +11,7 @@ class SqlQueryTabBar extends material.StatelessWidget {
     required this.onSelect,
     required this.onAdd,
     this.onClose,
+    this.trailing,
   });
 
   final List<SqlQueryTabSession> sessions;
@@ -18,6 +19,9 @@ class SqlQueryTabBar extends material.StatelessWidget {
   final material.ValueChanged<int> onSelect;
   final material.VoidCallback onAdd;
   final material.ValueChanged<int>? onClose;
+
+  /// Shown at the right end of the strip (the schema diagram button).
+  final material.Widget? trailing;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -45,6 +49,10 @@ class SqlQueryTabBar extends material.StatelessWidget {
               canClose: sessions.length > 1 ? (_) => true : (_) => false,
             ),
           ),
+          if (trailing != null) ...[
+            const material.SizedBox(width: 8),
+            trailing!,
+          ],
         ],
       ),
     );
