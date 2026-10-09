@@ -6,6 +6,7 @@ import 'package:querya_desktop/core/actions/data_grid_command_bridge.dart';
 import 'package:querya_desktop/core/actions/querya_command.dart';
 import 'package:querya_desktop/core/actions/querya_command_host.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
+import 'package:querya_desktop/core/actions/table_view_command_bridge.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
 import 'package:querya_desktop/features/connections/team_profile_actions.dart';
@@ -21,6 +22,7 @@ import 'package:querya_desktop/shared/services/data_export_service.dart';
 List<QueryaCommand> queryaCoreCommands() {
   final sql = SqlEditorCommandBridge.instance;
   final grid = DataGridCommandBridge.instance;
+  final tables = TableViewCommandBridge.instance;
   return [
     // -- Workspace ----------------------------------------------------------
     QueryaCommand(
@@ -158,6 +160,26 @@ List<QueryaCommand> queryaCoreCommands() {
           QueryaCommandHost.maybeOf(context)?.onToggleReadOnly != null,
       execute: (context) =>
           QueryaCommandHost.maybeOf(context)?.onToggleReadOnly?.call(),
+    ),
+
+    // -- Table --------------------------------------------------------------
+    QueryaCommand(
+      id: 'querya.table.showRelations',
+      title: 'Table: Show relations',
+      category: 'Table',
+      icon: Icons.account_tree_outlined,
+      aliases: const ['erd', 'diagram', 'foreign keys', 'references'],
+      isEnabled: (_) => tables.isActive,
+      execute: (_) => tables.invokeSelectView(1),
+    ),
+    QueryaCommand(
+      id: 'querya.table.showData',
+      title: 'Table: Show data',
+      category: 'Table',
+      icon: Icons.table_rows_outlined,
+      aliases: const ['grid', 'rows'],
+      isEnabled: (_) => tables.isActive,
+      execute: (_) => tables.invokeSelectView(0),
     ),
 
     // -- SQL ----------------------------------------------------------------
