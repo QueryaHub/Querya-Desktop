@@ -26,10 +26,18 @@ class PostgresSqlExecutionDelegate extends SqlExecutionDelegate {
     required this.isReadOnly,
     required this.effectiveDatabaseProvider,
     required this.autocommitProvider,
+    this.isMcp = false,
   });
 
   final ConnectionRow connectionRow;
   final bool isReadOnly;
+
+  /// MCP delegates run on the MCP session of their own, not the user's.
+  final bool isMcp;
+
+  PgSessionMode get _sessionMode => isMcp
+      ? PgSessionMode.mcp
+      : (isReadOnly ? PgSessionMode.readOnly : PgSessionMode.readWrite);
   final String Function() effectiveDatabaseProvider;
   final bool Function() autocommitProvider;
 
@@ -45,7 +53,7 @@ class PostgresSqlExecutionDelegate extends SqlExecutionDelegate {
     final lease = await PostgresService.instance.acquire(
       connectionRow,
       database: db,
-      mode: isReadOnly ? PgSessionMode.readOnly : PgSessionMode.readWrite,
+      mode: _sessionMode,
     );
     _lease = lease;
     _interruptDatabase = db;
@@ -164,7 +172,7 @@ class PostgresSqlExecutionDelegate extends SqlExecutionDelegate {
     PostgresService.instance.interrupt(
       connectionRow,
       database: _interruptDatabase ?? effectiveDatabaseProvider(),
-      mode: isReadOnly ? PgSessionMode.readOnly : PgSessionMode.readWrite,
+      mode: _sessionMode,
     );
     await _lease?.connection.forceClose();
     dropLease();

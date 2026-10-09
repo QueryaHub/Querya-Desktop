@@ -15,10 +15,13 @@ enum SqliteSessionMode {
 
   /// Table Browser Save (own `Database` so BEGIN/ATTACH do not leak).
   tableWrite,
+  /// MCP clients: a read-only session of their own, so an agent never shares
+  /// the user's session. Statements are bounded by [statementTimeout].
+  mcp,
 }
 
 extension SqliteSessionModeReadOnly on SqliteSessionMode {
-  bool get isReadOnlySession => this == SqliteSessionMode.readOnly;
+  bool get isReadOnlySession => this == SqliteSessionMode.readOnly || this == SqliteSessionMode.mcp;
 }
 
 /// Factory to build a connected SQLite connection.

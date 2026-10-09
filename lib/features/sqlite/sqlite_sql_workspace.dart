@@ -17,10 +17,18 @@ class SqliteSqlExecutionDelegate extends SqlExecutionDelegate {
   SqliteSqlExecutionDelegate({
     required this.connectionRow,
     required this.isReadOnly,
+    this.isMcp = false,
   });
 
   final ConnectionRow connectionRow;
   final bool isReadOnly;
+
+  /// MCP delegates run on the MCP session of their own, not the user's.
+  final bool isMcp;
+
+  SqliteSessionMode get _sessionMode => isMcp
+      ? SqliteSessionMode.mcp
+      : (isReadOnly ? SqliteSessionMode.readOnly : SqliteSessionMode.readWrite);
 
   SqliteLease? _lease;
 
@@ -32,9 +40,7 @@ class SqliteSqlExecutionDelegate extends SqlExecutionDelegate {
     _lease = null;
     final lease = await SqliteService.instance.acquire(
       connectionRow,
-      mode: isReadOnly
-          ? SqliteSessionMode.readOnly
-          : SqliteSessionMode.readWrite,
+      mode: _sessionMode,
     );
     _lease = lease;
   }

@@ -6,6 +6,9 @@ import 'package:querya_desktop/core/database/mysql_connection.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 
 /// Session policy for pooled connections: browse vs SQL editor (writes).
+/// Longest statement an MCP session may run; the server stops it after this.
+const Duration mcpStatementTimeout = Duration(seconds: 15);
+
 enum MysqlSessionMode {
   /// Tree catalog, stats, and Table Browser SELECT/COUNT.
   readOnly,
@@ -15,10 +18,17 @@ enum MysqlSessionMode {
 
   /// Table Browser Save (own TCP session so START TRANSACTION / SET / USE do not leak).
   tableWrite,
+  /// MCP clients: a read-only session of their own, so an agent never shares
+  /// the user's session. Statements are bounded by [statementTimeout].
+  mcp,
 }
 
 extension MysqlSessionModeReadOnly on MysqlSessionMode {
-  bool get isReadOnlySession => this == MysqlSessionMode.readOnly;
+  bool get isReadOnlySession => this == MysqlSessionMode.readOnly || this == MysqlSessionMode.mcp;
+
+  /// Server-side limit for every statement on this session, or null for none.
+  Duration? get statementTimeout =>
+      this == MysqlSessionMode.mcp ? mcpStatementTimeout : null;
 }
 
 typedef MysqlPoolConnectionFactory = Future<MysqlConnection> Function(
@@ -144,7 +154,10 @@ class MysqlConnectionPool {
     if (inFlight != null) return inFlight;
     final attempt = () async {
       await entry.connection.connect();
-      await entry.connection.setSessionReadOnly(mode.isReadOnlySession);
+      await entry.connection.configureSession(
+        readOnly: mode.isReadOnlySession,
+        statementTimeout: mode.statementTimeout,
+      );
     }();
     entry.reconnecting = attempt;
     return attempt.whenComplete(() {

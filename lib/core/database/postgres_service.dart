@@ -12,7 +12,10 @@ Future<PostgresConnection> _defaultCreateAndConnect(
 }) async {
   final conn = PostgresConnection.fromConnectionRow(row, database: database);
   await conn.connect();
-  await conn.setSessionReadOnly(mode.isReadOnlySession);
+  await conn.configureSession(
+        readOnly: mode.isReadOnlySession,
+        statementTimeout: mode.statementTimeout,
+      );
   return conn;
 }
 

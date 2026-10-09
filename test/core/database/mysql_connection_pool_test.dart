@@ -266,4 +266,35 @@ void main() {
       }
     });
   });
+
+  group('MCP session (#1217)', () {
+    test('MCP has its own slot, read-only, with a server-side statement timeout',
+        () async {
+      expect(MysqlSessionMode.mcp.isReadOnlySession, isTrue);
+      expect(MysqlSessionMode.readOnly.statementTimeout, isNull);
+      expect(MysqlSessionMode.mcp.statementTimeout, mcpStatementTimeout);
+    });
+
+    test('an MCP lease never shares the connection of the read-only slot',
+        () async {
+      final created = <FakeMysqlConnection>[];
+      final pool = MysqlConnectionPool(
+        createAndConnect: (row, {required database, required mode}) async {
+          final c = FakeMysqlConnection();
+          await c.connect();
+          created.add(c);
+          return c;
+        },
+      );
+      final r = _row();
+      final ui = await pool.acquire(r,
+          database: 'app', mode: MysqlSessionMode.readOnly);
+      final mcp = await pool.acquire(r,
+          database: 'app', mode: MysqlSessionMode.mcp);
+      expect(identical(ui.connection, mcp.connection), isFalse);
+      expect(created.length, 2);
+      ui.release();
+      mcp.release();
+    });
+  });
 }
