@@ -16,6 +16,7 @@ class McpCallRecord {
     this.sql,
     this.rowCount,
     this.error,
+    this.rule,
   });
 
   final DateTime at;
@@ -26,6 +27,9 @@ class McpCallRecord {
   final String? sql;
   final int? rowCount;
   final String? error;
+
+  /// The guard rule that refused the call, when a rule did.
+  final String? rule;
 }
 
 /// MCP session for one client: read-only tools and a `schema://` resource on
@@ -210,16 +214,16 @@ base class QueryaMcpServer extends MCPServer with ToolsSupport, ResourcesSupport
       }
       try {
         final (text, rows, sql) = await body(args);
-        _report(tool, started, sw.elapsed, connectionId, sql, rows, null);
+        _report(tool, started, sw.elapsed, connectionId, sql, rows, null, null);
         return CallToolResult(content: [TextContent(text: text)]);
       } on McpToolException catch (e) {
         _report(tool, started, sw.elapsed, connectionId,
-            rawSql, null, e.message);
+            rawSql, null, e.message, e.rule);
         return CallToolResult(
             isError: true, content: [TextContent(text: e.message)]);
       } catch (e) {
         final message = McpRedaction.redact('Internal error: $e');
-        _report(tool, started, sw.elapsed, connectionId, rawSql, null, message);
+        _report(tool, started, sw.elapsed, connectionId, rawSql, null, message, null);
         return CallToolResult(
             isError: true, content: [TextContent(text: message)]);
       }
@@ -227,7 +231,7 @@ base class QueryaMcpServer extends MCPServer with ToolsSupport, ResourcesSupport
   }
 
   void _report(String tool, DateTime at, Duration d, int? connectionId,
-      String? sql, int? rows, String? error) {
+      String? sql, int? rows, String? error, String? rule) {
     onCall?.call(McpCallRecord(
       at: at,
       client: _clientName,
@@ -237,6 +241,7 @@ base class QueryaMcpServer extends MCPServer with ToolsSupport, ResourcesSupport
       sql: sql,
       rowCount: rows,
       error: error,
+      rule: rule,
     ));
   }
 

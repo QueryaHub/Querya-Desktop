@@ -139,6 +139,7 @@ class McpServerController {
       rowCount: r.rowCount,
       durationMs: r.duration.inMilliseconds,
       error: r.error,
+      refusalRule: r.rule,
     ));
   }
 

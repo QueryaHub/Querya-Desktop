@@ -2,6 +2,15 @@ import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/sql_mutation_classifier.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 
+/// Why [McpSqlGuard] refused a query: a stable rule id for the audit log and
+/// the message the model reads.
+class McpSqlRefusal {
+  const McpSqlRefusal(this.rule, this.message);
+
+  final String rule;
+  final String message;
+}
+
 /// Decides whether SQL sent by an MCP client may run.
 ///
 /// First of three read-only layers (the others are the read-only database
@@ -55,23 +64,29 @@ abstract final class McpSqlGuard {
   static final _pragma =
       RegExp(r'^PRAGMA\s+(?:[A-Z_]+\.)?([A-Z_]+)\s*(\(\s*[A-Z_0-9]*\s*\))?$');
 
-  /// Returns `null` when [sql] may run, or the reason it may not.
-  static String? check(String sql, SqlDialect dialect) {
+  /// Returns `null` when [sql] may run, or the reason it may not, as the
+  /// message the model sees.
+  static String? check(String sql, SqlDialect dialect) =>
+      refusal(sql, dialect)?.message;
+
+  /// Returns `null` when [sql] may run, or why it may not: the rule that
+  /// refused it (stable, for the audit log) and the message for the model.
+  static McpSqlRefusal? refusal(String sql, SqlDialect dialect) {
     final statements = DestructiveSqlDetector.splitStatements(sql)
         .where((s) => DestructiveSqlDetector.stripCommentsAndStrings(s)
             .trim()
             .isNotEmpty)
         .toList();
-    if (statements.isEmpty) return 'The query is empty.';
+    if (statements.isEmpty) return const McpSqlRefusal('empty_query', 'The query is empty.');
     if (statements.length > 1) {
-      return 'Only one statement per call is allowed; send them separately.';
+      return const McpSqlRefusal('single_statement', 'Only one statement per call is allowed; send them separately.');
     }
     final statement = statements.single;
     // MySQL / MariaDB execute the body of `/*! ... */` and `/*M! ... */`
     // comments, which the comment stripper below would hide from the checks.
     if (dialect == SqlDialect.mysql &&
         RegExp(r'/\*M?!').hasMatch(statement)) {
-      return 'MySQL executable comments (/*! ... */) are not allowed.';
+      return const McpSqlRefusal('mysql_executable_comment', 'MySQL executable comments (/*! ... */) are not allowed.');
     }
     final upper = DestructiveSqlDetector.stripCommentsAndStrings(statement)
         .trim()
@@ -82,25 +97,25 @@ abstract final class McpSqlGuard {
     if (first == 'PRAGMA' && dialect == SqlDialect.sqlite) {
       final m = _pragma.firstMatch(upper.replaceAll(RegExp(r'\s+'), ' '));
       if (m != null && _readPragmas.contains(m.group(1))) return null;
-      return 'Only schema pragmas are allowed (${_readPragmas.map((p) => p.toLowerCase()).join(', ')}).';
+      return McpSqlRefusal('sqlite_pragma', 'Only schema pragmas are allowed (${_readPragmas.map((p) => p.toLowerCase()).join(', ')}).');
     }
     if (first == null || !_readStarts.contains(first)) {
-      return 'Only read-only queries are allowed (SELECT, WITH, EXPLAIN, SHOW, DESCRIBE).';
+      return const McpSqlRefusal('read_only_only', 'Only read-only queries are allowed (SELECT, WITH, EXPLAIN, SHOW, DESCRIBE).');
     }
     if (_forbiddenFunctions.hasMatch(upper)) {
-      return 'This query calls a server function that is not allowed over MCP.';
+      return const McpSqlRefusal('function_not_allowed', 'This query calls a server function that is not allowed over MCP.');
     }
     if (first == 'EXPLAIN') {
       if (_explainForbidden.hasMatch(upper)) {
-        return 'EXPLAIN is allowed only for read-only statements and without ANALYZE.';
+        return const McpSqlRefusal('explain_analyze_or_write', 'EXPLAIN is allowed only for read-only statements and without ANALYZE.');
       }
       return null;
     }
     if (isMutatingSqlStatement(statement)) {
-      return 'Data-modifying statements are not allowed over MCP.';
+      return const McpSqlRefusal('data_modifying', 'Data-modifying statements are not allowed over MCP.');
     }
     if (_selectSideEffects.hasMatch(upper)) {
-      return 'SELECT ... INTO and row locks (FOR UPDATE / FOR SHARE) are not allowed.';
+      return const McpSqlRefusal('select_into_or_lock', 'SELECT ... INTO and row locks (FOR UPDATE / FOR SHARE) are not allowed.');
     }
     return null;
   }

@@ -93,4 +93,28 @@ void main() {
       expect(await LocalDb.instance.listMcpActivity(), isEmpty);
     });
   });
+
+  test('an activity entry keeps the rule that refused its call (#1231)', () {
+    const entry = McpActivityEntry(
+      recordedAt: '2026-10-09T10:00:00Z',
+      client: 'test',
+      tool: 'run_query',
+      durationMs: 3,
+      error: 'Data-modifying statements are not allowed over MCP.',
+      refusalRule: 'data_modifying',
+    );
+    final back = McpActivityEntry.fromMap(entry.toMap());
+    expect(back.refusalRule, 'data_modifying');
+    expect(back.error, entry.error);
+    expect(
+      McpActivityEntry.fromMap({
+        'recorded_at': '2026-10-09T10:00:00Z',
+        'client': 'test',
+        'tool': 'run_query',
+        'duration_ms': 3,
+      }).refusalRule,
+      isNull,
+      reason: 'rows written before the column existed read as no rule',
+    );
+  });
 }

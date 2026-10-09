@@ -13,9 +13,12 @@ import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
 /// A failure the MCP client should see as a tool error (the model reads the
 /// message and can fix its call).
 class McpToolException implements Exception {
-  const McpToolException(this.message);
+  const McpToolException(this.message, {this.rule});
 
   final String message;
+
+  /// The guard rule that refused the call, when a rule did.
+  final String? rule;
 
   @override
   String toString() => message;
@@ -218,8 +221,10 @@ class McpQueryService {
   }
 
   void _guard(String sql, SqlDialect dialect) {
-    final reason = McpSqlGuard.check(sql, dialect);
-    if (reason != null) throw McpToolException(reason);
+    final refusal = McpSqlGuard.refusal(sql, dialect);
+    if (refusal != null) {
+      throw McpToolException(refusal.message, rule: refusal.rule);
+    }
   }
 
   Future<ErdSchema> _loadSchema(
