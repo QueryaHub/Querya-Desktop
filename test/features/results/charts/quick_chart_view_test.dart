@@ -85,8 +85,9 @@ void main() {
     await t.pump();
     await t.tap(find.byKey(const material.ValueKey('chart_export')));
     await t.pumpAndSettle();
+    await t.tap(find.text('PNG'));
+    await t.pump();
     await t.runAsync(() async {
-      await t.tap(find.text('PNG'));
       final deadline = DateTime.now().add(const Duration(seconds: 10));
       while (saved == null && DateTime.now().isBefore(deadline)) {
         await Future<void>.delayed(const Duration(milliseconds: 50));
