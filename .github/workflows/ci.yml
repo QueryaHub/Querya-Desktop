@@ -51,18 +51,9 @@ jobs:
           sudo apt-get $APT update
           # bubblewrap runs the extension sandbox tests; without it they skip.
           sudo apt-get $APT install -y libsecret-1-dev bubblewrap
-
-      # TEMPORARY diagnostics: why the sandbox probe in the extension tests
-      # cannot run on this runner. Remove once the sandbox test runs.
-      - name: Diagnose bubblewrap
-        if: runner.environment == 'github-hosted'
-        continue-on-error: true
-        run: |
-          sudo apt-get install -y bubblewrap >/dev/null 2>&1 || true
-          bwrap --ro-bind / / /bin/true; echo "bwrap exit=$?"
-          bwrap --unshare-user --ro-bind / / /bin/true; echo "bwrap userns exit=$?"
-          sysctl kernel.apparmor_restrict_unprivileged_userns kernel.unprivileged_userns_clone 2>&1 || true
-          ls /etc/apparmor.d | grep -i bwrap || echo "no bwrap apparmor profile"
+          # Ubuntu 24.04 blocks unprivileged user namespaces for bwrap ("setting
+          # up uid map: Permission denied"). This relaxes it on the CI VM only.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
       - name: Get dependencies
         run: flutter pub get
