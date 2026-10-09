@@ -749,6 +749,83 @@ void main() {
           closeTo(height, 0.5));
     });
 
+    testWidgets('Copy Mermaid puts the diagram on the clipboard', (t) async {
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
+      String? copied;
+      t.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String?;
+        }
+        return null;
+      });
+      addTearDown(() => t.binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null));
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(
+            source: SqlErdSource(delegate: delegate(), dialect: SqlDialect.sqlite)),
+      ));
+      await t.pump();
+      await t.pump();
+
+      await t.tap(find.byKey(const material.ValueKey('erd_export')));
+      await t.pump();
+      await t.tap(find.text('Copy Mermaid'));
+      await t.pump();
+      expect(copied, startsWith('erDiagram'));
+      expect(copied, contains('users ||--|{ orders'));
+      // The toast's 5 s timer starts after its entry animation: step the
+      // clock frame by frame until it has gone.
+      for (var i = 0; i < 10; i++) {
+        await t.pump(const Duration(seconds: 1));
+      }
+    });
+
+    testWidgets('hiding every table says so and offers them back',
+        variant: desktop, (t) async {
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(
+            source: SqlErdSource(delegate: delegate(), dialect: SqlDialect.sqlite)),
+      ));
+      await t.pump();
+      await t.pump();
+
+      for (final table in ['users', 'orders']) {
+        await t.tap(find.byKey(material.ValueKey('erd_table_$table')),
+            buttons: kSecondaryButton);
+        await t.pump();
+        await t.pump(const Duration(milliseconds: 300));
+        await t.tap(find.text('Hide from diagram'));
+        // Let the menu popover close, or it takes the next tap.
+        await t.pumpAndSettle();
+      }
+      expect(find.text('All tables are hidden'), findsOneWidget);
+      expect(find.text('No tables found'), findsNothing);
+
+      await t.tap(find.text('Show all tables'));
+      await t.pump();
+      await t.pump();
+      expect(find.byKey(const material.ValueKey('erd_table_users')),
+          findsOneWidget);
+    });
+
+    testWidgets('an empty schema names the database', (t) async {
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(
+          source: SqlErdSource(
+              delegate: FakeSqlExecutionDelegate(
+                  onExecute: (_) => const SqlExecutionResult()),
+              dialect: SqlDialect.postgres),
+          databaseName: 'shop',
+        ),
+      ));
+      await t.pump();
+      await t.pump();
+      expect(find.text('No tables found'), findsOneWidget);
+      expect(find.textContaining('shop'), findsOneWidget);
+    });
+
     testWidgets('a card can be dragged and Auto layout puts it back',
         (t) async {
       await t.binding.setSurfaceSize(const material.Size(1200, 800));

@@ -678,14 +678,32 @@ class _ErdViewState extends material.State<ErdView> {
           onAction: _load,
         ),
       );
+    } else if (full != null && full.tables.isNotEmpty && schema!.isEmpty) {
+      // Every table was hidden from the diagram: they exist, so say so and
+      // offer them back instead of "No tables found".
+      body = material.Center(
+        child: QueryaEmptyState(
+          icon: material.Icon(material.Icons.visibility_off_outlined,
+              color: wb.mutedForeground),
+          title: 'All tables are hidden',
+          description: '${_hidden.length} '
+              '${_hidden.length == 1 ? 'table is' : 'tables are'} hidden '
+              'from the diagram.',
+          actionLabel: 'Show all tables',
+          onAction: _showAllTables,
+        ),
+      );
     } else if (schema == null || layout == null || schema.isEmpty) {
+      final db = widget.databaseName;
       body = material.Center(
         child: QueryaEmptyState(
           icon: material.Icon(material.Icons.table_chart_outlined,
               color: wb.mutedForeground),
           title: 'No tables found',
-          description:
-              'This schema has no tables, or this role cannot see them.',
+          description: db.isEmpty
+              ? 'This schema has no tables, or this role cannot see them.'
+              : 'The current schema of $db has no tables, or this role '
+                  'cannot see them.',
         ),
       );
     } else if (widget.neighbourhoodDepth != null &&
