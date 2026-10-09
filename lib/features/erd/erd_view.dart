@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' show min;
 import 'dart:typed_data';
@@ -403,23 +404,71 @@ class _ErdViewState extends material.State<ErdView> {
     return focus == table || (neighbours[focus]?.contains(table) ?? false);
   }
 
+  /// Renders the canvas to a PNG. The picture is the diagram, not the
+  /// current interaction: a picked table, the hover highlight and the edge
+  /// label are cleared for the capture, and the pick comes back afterwards.
   Future<void> _exportPng() async {
     final boundary = _boundaryKey.currentContext?.findRenderObject()
         as RenderRepaintBoundary?;
     if (boundary == null) return;
-    final ratio = ErdExport.pngPixelRatio(boundary.size);
-    if (ratio < 1) {
-      showAppToast(
-        context: context,
-        message: 'The diagram is larger than '
-            '${ErdExport.pngMaxSide} px per side, so the PNG is at '
-            '${(ratio * 100).round()}% resolution. The SVG export keeps full detail.',
-      );
+    final picked = _selected;
+    final needsFrame = picked != null ||
+        _hovered.value != null ||
+        _edgeTipNotifier.value != null;
+    _hovered.value = null;
+    _edgeTipNotifier.value = null;
+    if (picked != null) setState(() => _selected = null);
+    try {
+      if (needsFrame) await material.WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+      final ratio = ErdExport.pngPixelRatio(boundary.size);
+      if (ratio < 1) {
+        showAppToast(
+          context: context,
+          message: 'The diagram is larger than '
+              '${ErdExport.pngMaxSide} px per side, so the PNG is at '
+              '${(ratio * 100).round()}% resolution. The SVG export keeps full detail.',
+        );
+      }
+      final image = await boundary.toImage(pixelRatio: ratio);
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      if (data == null) throw StateError('no image data');
+      await _save('$_fileStem.png', data.buffer.asUint8List());
+    } catch (e) {
+      if (mounted) {
+        showAppToast(
+          context: context,
+          variant: AppToastVariant.error,
+          message: 'Could not render the PNG ($e). '
+              'Export SVG instead: it has no size limit.',
+        );
+      }
+    } finally {
+      if (mounted && picked != null && _selected == null) {
+        setState(() => _selected = picked);
+      }
     }
-    final image = await boundary.toImage(pixelRatio: ratio);
-    final data = await image.toByteData(format: ui.ImageByteFormat.png);
-    if (data == null) return;
-    await _save('$_fileStem.png', data.buffer.asUint8List());
+  }
+
+  /// Colours of the current theme for the SVG export, as the screen draws the
+  /// cards and edges.
+  ErdSvgColors _svgColors() {
+    final wb = context.workbench;
+    final palette = context.semanticPalette;
+    String hex(material.Color c) => ErdSvgColors.hex(c.toARGB32());
+    return ErdSvgColors(
+      background: hex(wb.surface),
+      card: hex(wb.surface),
+      border: hex(wb.borderSubtle),
+      header: hex(material.Color.alphaBlend(
+          wb.accent.withValues(alpha: 0.10), wb.surface)),
+      text: hex(Theme.of(context).colorScheme.foreground),
+      muted: hex(wb.mutedForeground),
+      edge: hex(wb.mutedForeground),
+      primaryKey: hex(palette.type1),
+      foreignKey: hex(palette.type2),
+    );
   }
 
   /// `<database>-erd`, or `erd` when the database name is unknown.
@@ -436,9 +485,10 @@ class _ErdViewState extends material.State<ErdView> {
         _save(
             '$_fileStem.svg',
             Uint8List.fromList(utf8.encode(
-                ErdExport.toSvg(schema, layout, routes: _routes))));
+                ErdExport.toSvg(schema, layout,
+                    routes: _routes, colors: _svgColors()))));
       case _ExportAction.png:
-        _exportPng();
+        unawaited(_exportPng());
       case _ExportAction.copyMermaid:
         Clipboard.setData(ClipboardData(text: ErdExport.toMermaid(schema)));
         showAppToast(
