@@ -1,14 +1,162 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/actions/table_view_command_bridge.dart';
+import 'package:querya_desktop/core/database/table_mutation_engine.dart';
+import 'package:querya_desktop/features/erd/erd_catalog.dart';
 import 'package:querya_desktop/features/erd/erd_view.dart';
 import 'package:querya_desktop/features/workspace/results_tab.dart';
+import 'package:querya_desktop/features/workspace/table_data_delegate.dart';
 
 import '../../support/fake_table_data_delegate.dart';
 import '../../support/generic_table_view_harness.dart';
 
+/// A catalog around `users`: it references `orgs`, `orders` references it,
+/// `orgs` references `regions` (two keys away), `unrelated` has no keys.
+TableDataPage _catalog(String sql) {
+  for (final d in [SqlDialect.postgres, SqlDialect.mysql]) {
+    if (sql == ErdCatalog.foreignKeysSql(d)) {
+      return const TableDataPage(columns: ['t', 'c', 'rt', 'rc'], rows: [
+        ['orders', 'user_id', 'users', 'id'],
+        ['users', 'org_id', 'orgs', 'id'],
+        ['orgs', 'region_id', 'regions', 'id'],
+      ]);
+    }
+    if (sql == ErdCatalog.columnsSql(d) ||
+        sql == ErdCatalog.columnsSql(d, schema: 'public')) {
+      return const TableDataPage(columns: ['t', 'c', 'ty', 'pk'], rows: [
+        ['users', 'id', 'integer', '1'],
+        ['users', 'org_id', 'integer', '0'],
+        ['orders', 'id', 'integer', '1'],
+        ['orders', 'user_id', 'integer', '0'],
+        ['orgs', 'id', 'integer', '1'],
+        ['orgs', 'region_id', 'integer', '0'],
+        ['regions', 'id', 'integer', '1'],
+        ['unrelated', 'id', 'integer', '1'],
+      ]);
+    }
+  }
+  return const TableDataPage(columns: [], rows: []);
+}
+
+Future<void> _settleDiagram(WidgetTester t) async {
+  for (var i = 0; i < 5; i++) {
+    await t.pump();
+  }
+}
+
+Finder _card(String table) =>
+    find.byKey(material.ValueKey('erd_table_$table'));
+
+Iterable<double> _opacityOf(WidgetTester t, String table) =>
+    t.widgetList<material.Opacity>(find.ancestor(
+      of: _card(table),
+      matching: find.byType(material.Opacity),
+    )).map((o) => o.opacity);
+
 void main() {
   setUp(() => TableViewCommandBridge.instance.resetForTest());
+
+  for (final (dialect, schema) in [
+    (SqlDialect.postgres, 'public'),
+    // MySQL passes the database as the schema; its catalog names are bare.
+    (SqlDialect.mysql, 'shop'),
+  ]) {
+    testWidgets(
+        '${dialect.name}: referenced tables sit left, referencing ones right',
+        (t) async {
+      final state = await pumpGenericTableView(
+        t,
+        FakeTableDataDelegate(onCustomSql: _catalog),
+        dialect: dialect,
+        schema: schema,
+      );
+      state.selectView(1);
+      await _settleDiagram(t);
+
+      expect(_card('users'), findsOneWidget);
+      expect(_card('orgs'), findsOneWidget);
+      expect(_card('orders'), findsOneWidget);
+      expect(_card('unrelated'), findsNothing);
+      expect(_card('regions'), findsNothing, reason: 'two keys away at depth 1');
+
+      double x(String table) => t.getTopLeft(_card(table)).dx;
+      expect(x('orgs'), lessThan(x('users')));
+      expect(x('users'), lessThan(x('orders')));
+    });
+  }
+
+  testWidgets('depth 2 adds the tables two keys away; the table stays picked',
+      (t) async {
+    final state = await pumpGenericTableView(
+        t, FakeTableDataDelegate(onCustomSql: _catalog));
+    state.selectView(1);
+    await _settleDiagram(t);
+    expect(_card('regions'), findsNothing);
+
+    await t.tap(find.byKey(const material.ValueKey('relations_depth_2')));
+    await _settleDiagram(t);
+    expect(_card('regions'), findsOneWidget);
+    // The browsed table is picked: its neighbours stay clear, the table two
+    // keys away fades.
+    expect(_opacityOf(t, 'users'), isNot(contains(0.35)));
+    expect(_opacityOf(t, 'orgs'), isNot(contains(0.35)));
+    expect(_opacityOf(t, 'regions'), contains(0.35));
+  });
+
+  testWidgets('a double click on a neighbour asks to open it', (t) async {
+    final opened = <String>[];
+    final state = await pumpGenericTableView(
+      t,
+      FakeTableDataDelegate(onCustomSql: _catalog),
+      onOpenNeighbour: opened.add,
+    );
+    state.selectView(1);
+    await _settleDiagram(t);
+
+    await t.tap(_card('orders'));
+    await t.pump(const Duration(milliseconds: 50));
+    await t.tap(_card('orders'));
+    await t.pump(const Duration(milliseconds: 400));
+    expect(opened, ['orders']);
+  });
+
+  testWidgets('Data, Relations, Data keeps staged edits', (t) async {
+    final delegate = FakeTableDataDelegate(onCustomSql: _catalog);
+    final state = await pumpGenericTableView(t, delegate);
+    state.toggleEditMode();
+    await t.pumpAndSettle();
+    final buffer = state.stagingBuffer!;
+    buffer.setCell(0, 1, 'Alicia');
+    await t.pump();
+    expect(state.isDirty, isTrue);
+
+    state.selectView(1);
+    await _settleDiagram(t);
+    state.selectView(0);
+    await t.pump();
+
+    expect(identical(state.stagingBuffer, buffer), isTrue);
+    expect(state.isDirty, isTrue);
+    expect(buffer.effectiveRows[0][1], 'Alicia');
+  });
+
+  testWidgets('Data, Relations, Data keeps the page without reloading it',
+      (t) async {
+    final delegate = FakeTableDataDelegate(onCustomSql: _catalog);
+    final state = await pumpGenericTableView(t, delegate, limit: 2);
+    state.goToNextPage();
+    await t.pumpAndSettle();
+    expect(state.offset, 2);
+    final loads = delegate.pagesLoaded.length;
+
+    state.selectView(1);
+    await _settleDiagram(t);
+    state.selectView(0);
+    await t.pump();
+
+    expect(state.offset, 2);
+    expect(delegate.pagesLoaded.length, loads);
+  });
 
   testWidgets('a table offers the Data | Relations switch', (t) async {
     await pumpGenericTableView(t, FakeTableDataDelegate());

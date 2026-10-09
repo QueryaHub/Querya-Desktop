@@ -117,6 +117,8 @@ void main() {
           'select_into_or_lock');
       expect(ruleOf('EXPLAIN ANALYZE SELECT 1', SqlDialect.postgres),
           'explain_analyze_or_write');
+      expect(ruleOf('SELECT pg_terminate_backend(1)', SqlDialect.postgres),
+          'function_not_allowed');
     });
 
     test('a query that may run has no refusal and no rule', () {

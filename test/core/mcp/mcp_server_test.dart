@@ -192,6 +192,9 @@ void main() {
     expect(runQueries.first.sql, 'SELECT name FROM users');
     expect(runQueries.first.rowCount, 1);
     expect(runQueries.last.error, isNotNull);
+    // The refused call names the guard rule; the one that ran names none.
+    expect(runQueries.last.rule, 'read_only_only');
+    expect(runQueries.first.rule, isNull);
   });
 
   test('the endpoint file is private and removed on stop', () async {

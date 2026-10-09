@@ -10,6 +10,7 @@ class FakeTableDataDelegate extends TableDataMutationDelegate {
     List<List<String>>? rows,
     this.primaryKeys = const ['id'],
     this.failLoadWith,
+    this.onCustomSql,
   }) : rows = rows ??
             const [
               ['1', 'Alice', 'alice@example.com'],
@@ -23,6 +24,9 @@ class FakeTableDataDelegate extends TableDataMutationDelegate {
 
   /// When set, `loadPage` throws it.
   Object? failLoadWith;
+
+  /// When set, answers `loadCustomSql` (the diagram's catalog queries).
+  final TableDataPage Function(String sql)? onCustomSql;
 
   final pagesLoaded = <({int offset, int limit, bool refreshCount})>[];
   final customQueries = <String>[];
@@ -51,6 +55,8 @@ class FakeTableDataDelegate extends TableDataMutationDelegate {
   @override
   Future<TableDataPage> loadCustomSql(String sql) async {
     customQueries.add(sql);
+    final answer = onCustomSql;
+    if (answer != null) return answer(sql);
     return const TableDataPage(
       columns: ['n'],
       rows: [
