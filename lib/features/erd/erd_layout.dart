@@ -40,6 +40,17 @@ class ErdLayout {
     return Size(w, h);
   }
 
+  /// Zoom that fits [content] into [viewport] with a 24 px margin, never
+  /// enlarged. It may go below the usual minimum zoom of the view, so a
+  /// diagram of a few hundred tables still fits.
+  static double fitScale(Size content, Size viewport) {
+    const pad = 24.0;
+    if (content.width <= 0 || content.height <= 0) return 1;
+    final s = math.min((viewport.width - 2 * pad) / content.width,
+        (viewport.height - 2 * pad) / content.height);
+    return s.clamp(0.02, 1.0).toDouble();
+  }
+
   /// Vertical center of [column] inside [t]'s card (header when unknown).
   double columnY(ErdTable t, String column) {
     final i = t.columns.indexWhere((c) => c.name == column);
