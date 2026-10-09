@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/actions/table_view_command_bridge.dart';
 import 'package:querya_desktop/features/erd/erd_view.dart';
 import 'package:querya_desktop/features/workspace/results_tab.dart';
 
@@ -7,6 +8,8 @@ import '../../support/fake_table_data_delegate.dart';
 import '../../support/generic_table_view_harness.dart';
 
 void main() {
+  setUp(() => TableViewCommandBridge.instance.resetForTest());
+
   testWidgets('a table offers the Data | Relations switch', (t) async {
     await pumpGenericTableView(t, FakeTableDataDelegate());
     expect(find.text('Relations'), findsOneWidget);
@@ -45,5 +48,26 @@ void main() {
     // Offstage, not gone: the neighbourhood and the grid both stay alive.
     expect(find.byType(ErdView, skipOffstage: false), findsOneWidget);
     expect(find.byType(ResultsTab, skipOffstage: false), findsOneWidget);
+  });
+
+  testWidgets('the palette switches a table between Data and Relations',
+      (t) async {
+    final bridge = TableViewCommandBridge.instance;
+    await pumpGenericTableView(t, FakeTableDataDelegate());
+    expect(bridge.isActive, isTrue);
+
+    bridge.invokeSelectView(1);
+    await t.pump();
+    await t.pump();
+    expect(find.byType(ErdView), findsOneWidget);
+
+    bridge.invokeSelectView(0);
+    await t.pump();
+    expect(find.text('Relations'), findsOneWidget);
+  });
+
+  testWidgets('a view leaves nothing for the palette to switch', (t) async {
+    await pumpGenericTableView(t, FakeTableDataDelegate(), isView: true);
+    expect(TableViewCommandBridge.instance.isActive, isFalse);
   });
 }

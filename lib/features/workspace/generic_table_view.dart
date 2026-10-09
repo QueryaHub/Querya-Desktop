@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:querya_desktop/core/storage/local_db.dart' show MutationAuditSource;
 import 'package:querya_desktop/core/storage/mutation_audit_recorder.dart';
+import 'package:querya_desktop/core/actions/table_view_command_bridge.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/features/erd/erd_source.dart';
@@ -216,6 +217,18 @@ class GenericTableViewState extends material.State<GenericTableView> {
   void initState() {
     super.initState();
     _loadPage(refreshCount: true);
+    _syncRelationsCommand();
+  }
+
+  /// The Command Palette can switch Data / Relations only while this table
+  /// offers the switch.
+  void _syncRelationsCommand() {
+    final bridge = TableViewCommandBridge.instance;
+    if (showsRelations) {
+      bridge.register(owner: this, onSelectView: selectView);
+    } else {
+      bridge.unregister(owner: this);
+    }
   }
 
   @override
@@ -234,10 +247,12 @@ class GenericTableViewState extends material.State<GenericTableView> {
     } else if (oldWidget.isReadOnly != widget.isReadOnly) {
       _syncStagingToReadOnly();
     }
+    _syncRelationsCommand();
   }
 
   @override
   void dispose() {
+    TableViewCommandBridge.instance.unregister(owner: this);
     _resetStaging();
     widget.delegate.cancel(interruptIfBusy: true);
     widget.delegate.dispose();
