@@ -128,13 +128,14 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
   /// Records the poll's numbers. No query is added: the poll already fetched them.
   void _recordHistory(Map<String, dynamic> stats) {
     final now = DateTime.now();
-    double num(String key) =>
+    double statusValue(String key) =>
         double.tryParse((stats['status'] as Map<String, String>?)?[key] ?? '') ??
-        0;
+        0.0;
     _history
-      ..record('threads_connected', num('Threads_connected'), now)
-      ..record('threads_running', num('Threads_running'), now);
-    _history.recordCounter('queries_per_second', num('Questions'), now);
+      ..record('threads_connected', statusValue('Threads_connected'), now)
+      ..record('threads_running', statusValue('Threads_running'), now);
+    _history.recordCounter(
+        'queries_per_second', statusValue('Questions'), now);
   }
 
   Future<void> _onPollTick() async {
