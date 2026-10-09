@@ -158,4 +158,86 @@ void main() {
       expect(t.takeException(), isNull);
     });
   }
+
+  testWidgets('the pie grows with the pane and keeps its radius ratio (#1160)',
+      (t) async {
+    final widths = <double>[];
+    for (final width in [600.0, 1600.0]) {
+      await t.binding.setSurfaceSize(material.Size(width, 700));
+      await t.pumpWidget(queryaThemeTestShell(
+          child: QuickChartView(columns: columns, rows: rows)));
+      await t.pump();
+      await t.tap(find.bySemanticsLabel('Pie'));
+      await t.pump();
+
+      final size = t.getSize(find.byType(PieChart));
+      final radius =
+          t.widget<PieChart>(find.byType(PieChart)).data.sections.first.radius;
+      // Outer radius is 88% of the half side, the hole 45% of it: the slice
+      // band is 55% of the outer radius.
+      expect(radius, closeTo(size.width / 2 * 0.88 * 0.55, 0.01));
+      widths.add(size.width);
+    }
+    expect(widths[1], greaterThan(widths[0]));
+  });
+
+  testWidgets('bar tooltips show the full number on the theme popover (#1161)',
+      (t) async {
+    await pumpView(t, columns, [
+      ['a', '1234567'],
+      ['b', '20'],
+    ]);
+    await t.tap(find.bySemanticsLabel('Bar'));
+    await t.pump();
+
+    final tooltip = t
+        .widget<BarChart>(find.byType(BarChart))
+        .data
+        .barTouchData
+        .touchTooltipData;
+    final group = BarChartGroupData(x: 0, barRods: [
+      BarChartRodData(toY: 1234567),
+    ]);
+    expect(
+      tooltip.getTooltipItem(group, 0, group.barRods.first, 0)?.text,
+      contains('1,234,567'),
+    );
+    final popover = Theme.of(t.element(find.byType(BarChart))).colorScheme.popover;
+    expect(tooltip.getTooltipColor(group), popover);
+  });
+
+  testWidgets('many X labels rotate and reserve room, few do not (#1161)',
+      (t) async {
+    await t.binding.setSurfaceSize(const Size(400, 700));
+    await t.pumpWidget(queryaThemeTestShell(
+        child: QuickChartView(
+      columns: const ['label', 'value'],
+      rows: [
+        for (var i = 1; i <= 40; i++) ['a long category label number $i', '$i'],
+      ],
+    )));
+    await t.pump();
+    await t.tap(find.bySemanticsLabel('Bar'));
+    await t.pump();
+    final many = t
+        .widget<BarChart>(find.byType(BarChart))
+        .data
+        .titlesData
+        .bottomTitles
+        .sideTitles
+        .reservedSize;
+    expect(many, 52);
+
+    await pumpView(t, columns, rows);
+    await t.tap(find.bySemanticsLabel('Bar'));
+    await t.pump();
+    final few = t
+        .widget<BarChart>(find.byType(BarChart))
+        .data
+        .titlesData
+        .bottomTitles
+        .sideTitles
+        .reservedSize;
+    expect(few, 28);
+  });
 }
