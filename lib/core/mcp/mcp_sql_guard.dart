@@ -77,16 +77,16 @@ abstract final class McpSqlGuard {
             .trim()
             .isNotEmpty)
         .toList();
-    if (statements.isEmpty) return McpSqlRefusal('empty_query', 'The query is empty.');
+    if (statements.isEmpty) return const McpSqlRefusal('empty_query', 'The query is empty.');
     if (statements.length > 1) {
-      return McpSqlRefusal('single_statement', 'Only one statement per call is allowed; send them separately.');
+      return const McpSqlRefusal('single_statement', 'Only one statement per call is allowed; send them separately.');
     }
     final statement = statements.single;
     // MySQL / MariaDB execute the body of `/*! ... */` and `/*M! ... */`
     // comments, which the comment stripper below would hide from the checks.
     if (dialect == SqlDialect.mysql &&
         RegExp(r'/\*M?!').hasMatch(statement)) {
-      return McpSqlRefusal('mysql_executable_comment', 'MySQL executable comments (/*! ... */) are not allowed.');
+      return const McpSqlRefusal('mysql_executable_comment', 'MySQL executable comments (/*! ... */) are not allowed.');
     }
     final upper = DestructiveSqlDetector.stripCommentsAndStrings(statement)
         .trim()
@@ -100,22 +100,22 @@ abstract final class McpSqlGuard {
       return McpSqlRefusal('sqlite_pragma', 'Only schema pragmas are allowed (${_readPragmas.map((p) => p.toLowerCase()).join(', ')}).');
     }
     if (first == null || !_readStarts.contains(first)) {
-      return McpSqlRefusal('read_only_only', 'Only read-only queries are allowed (SELECT, WITH, EXPLAIN, SHOW, DESCRIBE).');
+      return const McpSqlRefusal('read_only_only', 'Only read-only queries are allowed (SELECT, WITH, EXPLAIN, SHOW, DESCRIBE).');
     }
     if (_forbiddenFunctions.hasMatch(upper)) {
-      return McpSqlRefusal('function_not_allowed', 'This query calls a server function that is not allowed over MCP.');
+      return const McpSqlRefusal('function_not_allowed', 'This query calls a server function that is not allowed over MCP.');
     }
     if (first == 'EXPLAIN') {
       if (_explainForbidden.hasMatch(upper)) {
-        return McpSqlRefusal('explain_analyze_or_write', 'EXPLAIN is allowed only for read-only statements and without ANALYZE.');
+        return const McpSqlRefusal('explain_analyze_or_write', 'EXPLAIN is allowed only for read-only statements and without ANALYZE.');
       }
       return null;
     }
     if (isMutatingSqlStatement(statement)) {
-      return McpSqlRefusal('data_modifying', 'Data-modifying statements are not allowed over MCP.');
+      return const McpSqlRefusal('data_modifying', 'Data-modifying statements are not allowed over MCP.');
     }
     if (_selectSideEffects.hasMatch(upper)) {
-      return McpSqlRefusal('select_into_or_lock', 'SELECT ... INTO and row locks (FOR UPDATE / FOR SHARE) are not allowed.');
+      return const McpSqlRefusal('select_into_or_lock', 'SELECT ... INTO and row locks (FOR UPDATE / FOR SHARE) are not allowed.');
     }
     return null;
   }
