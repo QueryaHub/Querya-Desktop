@@ -53,18 +53,13 @@ class _PostgresSequenceViewState extends material.State<PostgresSequenceView> {
   @override
   void dispose() {
     _scrollController.dispose();
-    _disconnectCurrent(interruptIfBusy: true);
+    _disconnectCurrent();
     super.dispose();
   }
 
-  void _disconnectCurrent({bool interruptIfBusy = false}) {
-    if (interruptIfBusy && _loading) {
-      PostgresService.instance.interrupt(
-        widget.connectionRow,
-        database: widget.database,
-        mode: PgSessionMode.readOnly,
-      );
-    }
+  /// Releases the lease. The session is shared with the tree, the table tabs
+  /// and MCP, so closing this view never interrupts it.
+  void _disconnectCurrent() {
     _lease?.release();
     _lease = null;
   }
