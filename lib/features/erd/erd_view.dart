@@ -7,7 +7,8 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart' show LogicalKeyboardKey;
+import 'package:flutter/services.dart'
+    show Clipboard, ClipboardData, LogicalKeyboardKey;
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
@@ -76,6 +77,13 @@ class _ErdViewState extends material.State<ErdView> {
   String? _dragging;
   String? _selected;
 
+  /// Density: only PK and FK columns, cards collapsed to their header, and
+  /// tables hidden from the diagram. Layout and routing follow the visible
+  /// schema from [_visibleOf].
+  bool _keysOnly = false;
+  final Set<String> _collapsed = {};
+  final Set<String> _hidden = {};
+
   bool _searchOpen = false;
   String _query = '';
   final _searchController = material.TextEditingController();
@@ -114,7 +122,7 @@ class _ErdViewState extends material.State<ErdView> {
       if (!mounted) return;
       setState(() {
         _schema = schema;
-        _setLayout(ErdLayout.compute(schema));
+        _setLayout(ErdLayout.compute(_visibleOf(schema)));
         _loading = false;
       });
       // The viewport is measured after this frame; fit the diagram then.
@@ -131,13 +139,61 @@ class _ErdViewState extends material.State<ErdView> {
   void _setLayout(ErdLayout layout) {
     _layout = layout;
     final schema = _schema;
-    _routes = schema == null ? const [] : ErdRouter.route(schema, layout);
+    _routes = schema == null
+        ? const []
+        : ErdRouter.route(_visibleOf(schema), layout);
   }
 
-  void _autoLayout() {
+  /// The schema as drawn: hidden tables gone, columns cut to keys in keys-only
+  /// mode, and collapsed cards without columns.
+  ErdSchema _visibleOf(ErdSchema schema) {
+    final tables = [
+      for (final t in schema.tables)
+        if (!_hidden.contains(t.name))
+          ErdTable(
+            name: t.name,
+            columns: _collapsed.contains(t.name)
+                ? const []
+                : [
+                    for (final c in t.columns)
+                      if (!_keysOnly || c.isPrimaryKey || c.isForeignKey) c,
+                  ],
+          ),
+    ];
+    final names = {for (final t in tables) t.name};
+    return ErdSchema(
+      tables: tables,
+      relations: [
+        for (final r in schema.relations)
+          if (names.contains(r.fromTable) && names.contains(r.toTable)) r,
+      ],
+    );
+  }
+
+  /// Recomputes the layout for the current density and visibility.
+  void _reflow() {
     final schema = _schema;
     if (schema == null) return;
-    setState(() => _setLayout(ErdLayout.compute(schema)));
+    setState(() => _setLayout(ErdLayout.compute(_visibleOf(schema))));
+  }
+
+  void _autoLayout() => _reflow();
+
+  void _toggleCollapsed(String table) {
+    setState(() {
+      if (!_collapsed.remove(table)) _collapsed.add(table);
+    });
+    _reflow();
+  }
+
+  void _hide(String table) {
+    setState(() => _hidden.add(table));
+    _reflow();
+  }
+
+  void _showAllTables() {
+    setState(_hidden.clear);
+    _reflow();
   }
 
   void _dragStart(String table) => setState(() => _dragging = table);
@@ -353,7 +409,8 @@ class _ErdViewState extends material.State<ErdView> {
   @override
   material.Widget build(material.BuildContext context) {
     final wb = context.workbench;
-    final schema = _schema;
+    final full = _schema;
+    final schema = full == null ? null : _visibleOf(full);
     final layout = _layout;
     material.Widget body;
     if (_loading) {
@@ -414,7 +471,32 @@ class _ErdViewState extends material.State<ErdView> {
                                         !_isFocused(schema, t.name)
                                     ? 0.35
                                     : 1,
-                                child: _TableCard(
+                                child: ContextMenu(
+                                  items: [
+                                    MenuButton(
+                                      onPressed: (_) =>
+                                          widget.onOpenTable?.call(t.name),
+                                      child: const Text('Open data'),
+                                    ),
+                                    MenuButton(
+                                      onPressed: (_) {
+                                        Clipboard.setData(
+                                            ClipboardData(text: t.name));
+                                      },
+                                      child: const Text('Copy name'),
+                                    ),
+                                    MenuButton(
+                                      onPressed: (_) => _toggleCollapsed(t.name),
+                                      child: Text(_collapsed.contains(t.name)
+                                          ? 'Expand'
+                                          : 'Collapse'),
+                                    ),
+                                    MenuButton(
+                                      onPressed: (_) => _hide(t.name),
+                                      child: const Text('Hide from diagram'),
+                                    ),
+                                  ],
+                                  child: _TableCard(
                                   table: t,
                                   highlighted: _isFocused(schema, t.name),
                                   dragging: _dragging == t.name,
@@ -432,6 +514,7 @@ class _ErdViewState extends material.State<ErdView> {
                                   onDragStart: () => _dragStart(t.name),
                                   onDragMove: (d) => _dragMove(t.name, d),
                                   onDragEnd: _dragEnd,
+                                ),
                                 ),
                               ),
                             ),
@@ -481,6 +564,25 @@ class _ErdViewState extends material.State<ErdView> {
                 icon: material.Icons.refresh_rounded,
                 onPressed: _loading ? null : _load,
               ),
+              QueryaActionButton(
+                key: const material.ValueKey('erd_keys_only'),
+                label: _keysOnly ? 'All columns' : 'Keys only',
+                icon: material.Icons.key_rounded,
+                tooltip: 'Show only primary and foreign keys',
+                onPressed: !ready
+                    ? null
+                    : () {
+                        setState(() => _keysOnly = !_keysOnly);
+                        _reflow();
+                      },
+              ),
+              if (_hidden.isNotEmpty)
+                QueryaActionButton(
+                  key: const material.ValueKey('erd_show_all'),
+                  label: 'Show ${_hidden.length} hidden',
+                  icon: material.Icons.visibility_outlined,
+                  onPressed: _showAllTables,
+                ),
               QueryaActionButton(
                 key: const material.ValueKey('erd_auto_layout'),
                 label: 'Auto layout',

@@ -558,6 +558,36 @@ void main() {
       expect(opacityOf(t, 'orders'), isNot(contains(0.35)));
     });
 
+    testWidgets('keys only hides plain columns and the toggle brings them back',
+        (t) async {
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
+      final wide = FakeSqlExecutionDelegate(onExecute: (sql) {
+        if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+          return const SqlExecutionResult(rows: [
+            ['orders', 'id', 'INTEGER', '1'],
+            ['orders', 'user_id', 'INTEGER', '0'],
+            ['orders', 'amount', 'REAL', '0'],
+          ]);
+        }
+        return const SqlExecutionResult();
+      });
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(delegate: wide, dialect: SqlDialect.sqlite),
+      ));
+      await t.pump();
+      await t.pump();
+      expect(find.text('amount'), findsOneWidget);
+
+      await t.tap(find.byKey(const material.ValueKey('erd_keys_only')));
+      await t.pump();
+      expect(find.text('amount'), findsNothing);
+      expect(find.text('user_id'), findsOneWidget);
+
+      await t.tap(find.byKey(const material.ValueKey('erd_keys_only')));
+      await t.pump();
+      expect(find.text('amount'), findsOneWidget);
+    });
+
     testWidgets('shows empty state', (t) async {
       await t.pumpWidget(queryaThemeTestShell(
         child: ErdView(
