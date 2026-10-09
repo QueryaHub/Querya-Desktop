@@ -12,8 +12,11 @@ on:
       - 'lib/features/workspace/**'
       - 'lib/core/database/**'
       - 'lib/core/csv/**'
+      - 'lib/features/erd/**'
+      - 'lib/features/results/**'
       - 'benchmark/**'
       - 'scripts/ci/bench_compare.py'
+      - 'scripts/ci/app_bench_report.py'
       - '.github/workflows/benchmark.yml'
   workflow_dispatch:
 
@@ -94,3 +97,43 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh pr comment "${{ github.event.pull_request.number }}" --body-file "$RUNNER_TEMP/report.md"
+
+  # #1173: ERD, charts / groupings and multi-tab SQL scenarios of the real app
+  # (benchmark/app_perf_bench.dart, Demo Playground, no database server),
+  # checked against per-scenario limits. Informational, like the grid bench.
+  app-bench:
+    name: App scenarios performance
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        timeout-minutes: 8
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev libsqlite3-dev xvfb libgl1-mesa-dri
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.1'
+          channel: 'stable'
+          cache: true
+
+      - name: Run the app scenarios
+        timeout-minutes: 20
+        run: |
+          flutter pub get
+          xvfb-run -a -s '-screen 0 1920x1080x24' flutter run --profile -d linux \
+            -t benchmark/app_perf_bench.dart \
+            --dart-define=ONLY=charts_5000,groupings_5000,multi_tab_run,erd_open_200,erd_hover,erd_drag,erd_auto_layout \
+            --dart-define=STREAMS= \
+            2>&1 | tee "$RUNNER_TEMP/app.log" || true
+
+      - name: Report
+        run: |
+          python3 scripts/ci/app_bench_report.py "$RUNNER_TEMP/app.log" > "$RUNNER_TEMP/app_report.txt"
+          cat "$RUNNER_TEMP/app_report.txt"
+          tail -n +2 "$RUNNER_TEMP/app_report.txt" >> "$GITHUB_STEP_SUMMARY"
