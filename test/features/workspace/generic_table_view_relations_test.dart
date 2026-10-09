@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/features/erd/erd_view.dart';
+import 'package:querya_desktop/features/workspace/results_tab.dart';
 
 import '../../support/fake_table_data_delegate.dart';
 import '../../support/generic_table_view_harness.dart';
@@ -41,6 +42,8 @@ void main() {
 
     await t.tap(find.text('Data'));
     await t.pump();
-    expect(find.byType(ErdView), findsOneWidget);
+    // Offstage, not gone: the neighbourhood and the grid both stay alive.
+    expect(find.byType(ErdView, skipOffstage: false), findsOneWidget);
+    expect(find.byType(ResultsTab, skipOffstage: false), findsOneWidget);
   });
 }
