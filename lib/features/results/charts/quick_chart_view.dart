@@ -259,7 +259,7 @@ class _QuickChartViewState extends material.State<QuickChartView> {
             children: [
               material.SizedBox(
                 height: 32,
-                width: 200,
+                width: 260,
                 child: QueryaTabStrip(
                   labels: const ['Bar', 'Line', 'Pie'],
                   selectedIndex: QuickChartType.values.indexOf(_type),
