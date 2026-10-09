@@ -286,7 +286,8 @@ class GenericTableViewState extends material.State<GenericTableView> {
   void dispose() {
     TableViewCommandBridge.instance.unregister(owner: this);
     _resetStaging();
-    widget.delegate.cancel(interruptIfBusy: true);
+    // Closing the tab releases its lease. It must not interrupt the shared
+    // session: other views of the database may be using it.
     widget.delegate.dispose();
     super.dispose();
   }

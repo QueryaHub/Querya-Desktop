@@ -221,19 +221,11 @@ class SqliteTableDataDelegate extends TableDataMutationDelegate {
     });
   }
 
+  /// Pooled sessions are shared with every other view of this database, so
+  /// cancelling never closes them: a statement that is still running finishes
+  /// or times out on its own, and the lease is released by [dispose].
   @override
-  void cancel({bool interruptIfBusy = false}) {
-    if (interruptIfBusy) {
-      SqliteService.instance.interrupt(
-        connectionRow,
-        mode: SqliteSessionMode.readOnly,
-      );
-      SqliteService.instance.interrupt(
-        connectionRow,
-        mode: SqliteSessionMode.tableWrite,
-      );
-    }
-  }
+  void cancel({bool interruptIfBusy = false}) {}
 
   @override
   void dispose() {

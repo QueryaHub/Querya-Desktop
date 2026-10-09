@@ -86,4 +86,15 @@ void main() {
     await t.pump();
     expect(find.byType(ErdView), findsNothing);
   });
+
+  testWidgets('closing a table tab releases its delegate without cancelling it',
+      (t) async {
+    final delegate = FakeTableDataDelegate();
+    await pumpGenericTableView(t, delegate);
+    await t.pumpWidget(const material.SizedBox());
+    await t.pump();
+    // The session is shared with other views: closing must not interrupt it.
+    expect(delegate.cancelCount, 0);
+    expect(delegate.disposeCount, 1);
+  });
 }

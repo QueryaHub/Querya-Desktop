@@ -233,21 +233,11 @@ class MysqlTableDataDelegate extends TableDataMutationDelegate {
     });
   }
 
+  /// Pooled sessions are shared with every other view of this database, so
+  /// cancelling never closes them: a statement that is still running finishes
+  /// or times out on its own, and the lease is released by [dispose].
   @override
-  void cancel({bool interruptIfBusy = false}) {
-    if (interruptIfBusy) {
-      MysqlService.instance.interrupt(
-        connectionRow,
-        database: database,
-        mode: MysqlSessionMode.readOnly,
-      );
-      MysqlService.instance.interrupt(
-        connectionRow,
-        database: database,
-        mode: MysqlSessionMode.tableWrite,
-      );
-    }
-  }
+  void cancel({bool interruptIfBusy = false}) {}
 
   @override
   void dispose() {
