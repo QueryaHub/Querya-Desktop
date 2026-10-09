@@ -564,12 +564,15 @@ void main() {
       final wide = FakeSqlExecutionDelegate(onExecute: (sql) {
         if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
           return const SqlExecutionResult(rows: [
+            ['users', 'id', 'INTEGER', '1'],
             ['orders', 'id', 'INTEGER', '1'],
             ['orders', 'user_id', 'INTEGER', '0'],
             ['orders', 'amount', 'REAL', '0'],
           ]);
         }
-        return const SqlExecutionResult();
+        return const SqlExecutionResult(rows: [
+          ['orders', 'user_id', 'users', 'id'],
+        ]);
       });
       await t.pumpWidget(queryaThemeTestShell(
         child: ErdView(delegate: wide, dialect: SqlDialect.sqlite),
