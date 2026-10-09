@@ -103,6 +103,7 @@ class _ErdViewState extends material.State<ErdView> {
   String? _hovered;
   String? _dragging;
   String? _selected;
+  bool _routeScheduled = false;
 
   /// Density: only PK and FK columns, cards collapsed to their header, and
   /// tables hidden from the diagram. Layout and routing follow the visible
@@ -259,8 +260,24 @@ class _ErdViewState extends material.State<ErdView> {
     if (_dragging != table || layout == null) return;
     final scale = _transform.value.getMaxScaleOnAxis();
     final delta = screenDelta / (scale == 0 ? 1 : scale);
+    // The card follows the pointer at once; the edges are routed once per frame.
     setState(() =>
-        _setLayout(layout.withPosition(table, layout.positions[table]! + delta)));
+        _layout = layout.withPosition(table, layout.positions[table]! + delta));
+    _scheduleRoutes();
+  }
+
+  /// Routes the edges once after the current frame, however many pointer
+  /// moves came before it.
+  void _scheduleRoutes() {
+    if (_routeScheduled) return;
+    _routeScheduled = true;
+    material.WidgetsBinding.instance.addPostFrameCallback((_) {
+      _routeScheduled = false;
+      final schema = _schema;
+      final layout = _layout;
+      if (!mounted || schema == null || layout == null) return;
+      setState(() => _routes = ErdRouter.route(_visibleOf(schema), layout));
+    });
   }
 
   void _dragEnd() {

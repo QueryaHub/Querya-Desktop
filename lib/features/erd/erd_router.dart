@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:querya_desktop/features/erd/erd_layout.dart';
@@ -183,32 +184,100 @@ class _Ends {
 }
 
 /// Sparse orthogonal visibility grid.
+///
+/// Obstacles are rasterized once: a node or a grid segment inside a card is
+/// marked blocked, so the search asks O(1) questions instead of testing every
+/// card for every expansion. The marks use the same strict bounds as the
+/// point test they replace.
 class _Grid {
-  _Grid(this.xs, this.ys, this.rects)
-      : _free = List.generate(
-          xs.length,
-          (i) => List.generate(
-              ys.length, (j) => !_insideAny(rects, Offset(xs[i], ys[j]))),
-        );
+  _Grid(this.xs, this.ys, this.rects) {
+    final w = xs.length, h = ys.length;
+    _node = Uint8List(w * h);
+    // Horizontal segment from node i to i+1 in row j: index i * h + j.
+    _hSeg = Uint8List(math.max(0, w - 1) * h);
+    // Vertical segment from node j to j+1 in column i: index i * (h - 1) + j.
+    _vSeg = Uint8List(w * math.max(0, h - 1));
+    final xm = [for (var i = 0; i + 1 < w; i++) (xs[i] + xs[i + 1]) / 2];
+    final ym = [for (var j = 0; j + 1 < h; j++) (ys[j] + ys[j + 1]) / 2];
+    for (final r in rects) {
+      final xLo = _upperBound(xs, r.left + 0.01);
+      final xHi = _lowerBound(xs, r.right - 0.01);
+      final yLo = _upperBound(ys, r.top + 0.01);
+      final yHi = _lowerBound(ys, r.bottom - 0.01);
+      for (var i = xLo; i < xHi; i++) {
+        for (var j = yLo; j < yHi; j++) {
+          _node[i * h + j] = 1;
+        }
+      }
+      // Horizontal segments: midpoint x inside the card, row inside it.
+      final mxLo = _upperBound(xm, r.left + 0.01);
+      final mxHi = _lowerBound(xm, r.right - 0.01);
+      for (var k = mxLo; k < mxHi; k++) {
+        for (var j = yLo; j < yHi; j++) {
+          _hSeg[k * h + j] = 1;
+        }
+      }
+      // Vertical segments: column inside the card, midpoint y inside it.
+      final myLo = _upperBound(ym, r.top + 0.01);
+      final myHi = _lowerBound(ym, r.bottom - 0.01);
+      for (var i = xLo; i < xHi; i++) {
+        for (var k = myLo; k < myHi; k++) {
+          _vSeg[i * (h - 1) + k] = 1;
+        }
+      }
+    }
+  }
 
   final List<double> xs, ys;
   final List<Rect> rects;
-  final List<List<bool>> _free;
+  late final Uint8List _node;
+  late final Uint8List _hSeg;
+  late final Uint8List _vSeg;
 
-  static bool _insideAny(List<Rect> rects, Offset p) {
-    for (final r in rects) {
-      if (p.dx > r.left + 0.01 &&
-          p.dx < r.right - 0.01 &&
-          p.dy > r.top + 0.01 &&
-          p.dy < r.bottom - 0.01) {
-        return true;
-      }
+  bool _blockedNode(int i, int j) => _node[i * ys.length + j] == 1;
+
+  /// Whether the grid segment leaving node (i, j) in direction [d] is blocked.
+  bool _blockedSegment(int i, int j, int d) {
+    final h = ys.length;
+    switch (d) {
+      case _left:
+        return _hSeg[(i - 1) * h + j] == 1;
+      case _right:
+        return _hSeg[i * h + j] == 1;
+      case _up:
+        return _vSeg[i * (h - 1) + (j - 1)] == 1;
+      default:
+        return _vSeg[i * (h - 1) + j] == 1;
     }
-    return false;
   }
 
-  bool _segmentFree(Offset a, Offset b) =>
-      !_insideAny(rects, Offset((a.dx + b.dx) / 2, (a.dy + b.dy) / 2));
+  /// First index whose value is >= [v].
+  static int _lowerBound(List<double> v, double x) {
+    var lo = 0, hi = v.length;
+    while (lo < hi) {
+      final mid = (lo + hi) >> 1;
+      if (v[mid] < x) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+    return lo;
+  }
+
+  /// First index whose value is > [v].
+  static int _upperBound(List<double> v, double x) {
+    var lo = 0, hi = v.length;
+    while (lo < hi) {
+      final mid = (lo + hi) >> 1;
+      if (v[mid] <= x) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+    return lo;
+  }
 
   int _ix(double x) => _index(xs, x);
   int _iy(double y) => _index(ys, y);
@@ -239,7 +308,7 @@ class _Grid {
     final goalAt = <int, (int goalIndex, int dir)>{};
     for (var g = 0; g < goals.length; g++) {
       final i = _ix(goals[g].$1.dx), j = _iy(goals[g].$1.dy);
-      if (i < 0 || j < 0 || !_free[i][j]) continue;
+      if (i < 0 || j < 0 || _blockedNode(i, j)) continue;
       goalAt[i * h + j] = (g, goals[g].$2);
     }
     if (goalAt.isEmpty) return null;
@@ -259,7 +328,7 @@ class _Grid {
     final heap = _Heap();
     for (var s = 0; s < starts.length; s++) {
       final i = _ix(starts[s].$1.dx), j = _iy(starts[s].$1.dy);
-      if (i < 0 || j < 0 || !_free[i][j]) continue;
+      if (i < 0 || j < 0 || _blockedNode(i, j)) continue;
       final k = key(i, j, starts[s].$2);
       cost[k] = 0;
       startOf[k] = s;
@@ -293,7 +362,7 @@ class _Grid {
       for (final nd in const [_left, _right, _up, _down]) {
         final ni = i + (nd == _left ? -1 : nd == _right ? 1 : 0);
         final nj = j + (nd == _up ? -1 : nd == _down ? 1 : 0);
-        if (ni < 0 || nj < 0 || ni >= w || nj >= h || !_free[ni][nj]) continue;
+        if (ni < 0 || nj < 0 || ni >= w || nj >= h || _blockedNode(ni, nj)) continue;
         // No U-turns.
         if ((d == _left && nd == _right) ||
             (d == _right && nd == _left) ||
@@ -302,7 +371,7 @@ class _Grid {
           continue;
         }
         final a = Offset(xs[i], ys[j]), b = Offset(xs[ni], ys[nj]);
-        if (!_segmentFree(a, b)) continue;
+        if (_blockedSegment(i, j, nd)) continue;
         final nc = c + (a - b).distance + (nd == d ? 0 : bendCost);
         final nk = key(ni, nj, nd);
         if (nc < (cost[nk] ?? double.infinity)) {
