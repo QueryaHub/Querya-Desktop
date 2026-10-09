@@ -10,6 +10,7 @@ import 'package:querya_desktop/core/database/postgres_connection.dart';
 class _ProbePostgres extends PostgresConnection {
   _ProbePostgres()
       : super(
+          id: 1,
           name: 'probe',
           host: 'localhost',
           port: 5432,
@@ -27,6 +28,7 @@ class _ProbePostgres extends PostgresConnection {
 class _ProbeMysql extends MysqlConnection {
   _ProbeMysql()
       : super(
+          id: 1,
           name: 'probe',
           host: 'localhost',
           port: 3306,

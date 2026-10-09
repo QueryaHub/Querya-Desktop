@@ -93,6 +93,9 @@ void main() {
     test('MysqlConnection.executeWithTimeout force-closes on timeout', () async {
       final conn = FakeSlowMysqlConnection();
       expect(conn.isConnected, isTrue);
+      // The statement never answers: the timeout is the only way out.
+      conn.runStatementForTest = (sql, params, iterable, timeout) =>
+          Completer<IResultSet>().future;
 
       try {
         await conn.executeWithTimeout(
