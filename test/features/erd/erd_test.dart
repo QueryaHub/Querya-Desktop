@@ -443,13 +443,17 @@ void main() {
       expect(find.byKey(const material.ValueKey('erd_table_orders')),
           findsOneWidget);
 
-      await t.tap(find.byKey(const material.ValueKey('erd_mermaid')));
+      await t.tap(find.byKey(const material.ValueKey('erd_export')));
       await t.pump();
-      expect(utf8.decode(saved['diagram.mmd']!), contains('erDiagram'));
+      await t.tap(find.text('Mermaid (.mmd)'));
+      await t.pump();
+      expect(utf8.decode(saved['erd.mmd']!), contains('erDiagram'));
 
-      await t.tap(find.byKey(const material.ValueKey('erd_svg')));
+      await t.tap(find.byKey(const material.ValueKey('erd_export')));
       await t.pump();
-      expect(utf8.decode(saved['diagram.svg']!), contains('<svg'));
+      await t.tap(find.text('SVG'));
+      await t.pump();
+      expect(utf8.decode(saved['erd.svg']!), contains('<svg'));
 
       final card = find.byKey(const material.ValueKey('erd_table_users'));
       await t.tap(card);
@@ -644,6 +648,20 @@ void main() {
       await t.tap(find.byKey(const material.ValueKey('erd_keys_only')));
       await t.pump();
       expect(find.text('amount'), findsOneWidget);
+    });
+
+    testWidgets('a failed load shows a titled state with Retry', (t) async {
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(
+          delegate: FakeSqlExecutionDelegate(
+              onExecute: (sql) => throw StateError('no access')),
+          dialect: SqlDialect.sqlite,
+        ),
+      ));
+      await t.pump();
+      await t.pump();
+      expect(find.text('Could not load the schema'), findsOneWidget);
+      expect(find.text('Retry'), findsOneWidget);
     });
 
     testWidgets('shows empty state', (t) async {

@@ -917,6 +917,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
         key: material.ValueKey(session.id),
         delegate: widget.delegate,
         dialect: widget.dialect,
+        databaseName: effectiveDatabase,
         onOpenTable: _openTableFromDiagram,
       );
     }
