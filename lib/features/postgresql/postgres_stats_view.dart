@@ -21,9 +21,14 @@ class PostgresStatsView extends material.StatefulWidget {
   const PostgresStatsView({
     super.key,
     required this.connectionRow,
+    @visibleForTesting this.statsSource,
   });
 
   final ConnectionRow connectionRow;
+
+  /// Replaces the pooled session's `serverStats()` in tests, so a counting
+  /// fake can stand in for the server. Null in the app.
+  final Future<Map<String, dynamic>> Function()? statsSource;
 
   @override
   material.State<PostgresStatsView> createState() => _PostgresStatsViewState();
@@ -100,6 +105,11 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
       _error = null;
       _stats = null;
     });
+    if (widget.statsSource != null) {
+      await _fetch();
+      if (mounted) _startTimer();
+      return;
+    }
     try {
       final lease = await PostgresService.instance.acquire(
         widget.connectionRow,
@@ -127,9 +137,17 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
   void _recordHistory(Map<String, dynamic> stats) =>
       recordServerStats(_history, stats, DateTime.now());
 
-  Future<void> _fetch() async {
+  /// Whether a poll can run: a test source, or a connected session.
+  bool get _canPoll {
     final c = _connection;
-    if (c == null || !c.isConnected) {
+    return widget.statsSource != null || (c != null && c.isConnected);
+  }
+
+  Future<Map<String, dynamic>> _serverStats() =>
+      widget.statsSource?.call() ?? _connection!.serverStats();
+
+  Future<void> _fetch() async {
+    if (!_canPoll) {
       if (!mounted) return;
       setState(() {
         _error = 'Not connected';
@@ -138,7 +156,7 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
       return;
     }
     try {
-      final stats = await c.serverStats();
+      final stats = await _serverStats();
       if (!mounted) return;
       _recordHistory(stats);
       if (!replaceIfChanged(_stats, stats, (v) => _stats = v)) {
@@ -163,10 +181,9 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
   }
 
   Future<void> _onPollTick() async {
-    final c = _connection;
-    if (c == null || !c.isConnected) return;
+    if (!_canPoll) return;
     try {
-      final stats = await c.serverStats();
+      final stats = await _serverStats();
       if (!mounted) return;
       _recordHistory(stats);
       // The sparklines move with every sample, so rebuild even when the numbers
@@ -182,11 +199,10 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final c = _connection;
     _timer = syncTickerGatedPeriodicTimer(
       context: context,
       timer: _timer,
-      shouldRun: c != null && c.isConnected && !_loading,
+      shouldRun: _canPoll && !_loading,
       interval: _pollInterval,
       onTick: () => unawaited(_onPollTick()),
     );
