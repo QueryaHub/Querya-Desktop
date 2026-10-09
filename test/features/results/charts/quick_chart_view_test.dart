@@ -42,6 +42,20 @@ void main() {
     expect(find.text('cat30'), findsOneWidget);
   });
 
+  testWidgets('40 long X labels render without overflow', (t) async {
+    final long = [
+      for (var i = 0; i < 40; i++)
+        ['a very long category name number $i for the axis', '${i + 1}'],
+    ];
+    await t.binding.setSurfaceSize(const Size(600, 500));
+    await t.pumpWidget(queryaThemeTestShell(
+      child: QuickChartView(columns: const ['label', 'amount'], rows: long),
+    ));
+    await t.pump();
+    expect(find.byType(BarChart), findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
+
   testWidgets('shows empty state without numeric column', (t) async {
     await pumpView(t, ['name'], [
       ['a'],
@@ -93,7 +107,7 @@ void main() {
     await t.pump();
     expect(saved, isNotNull);
     expect(saved, contains('<svg'));
-    expect(saved, contains('<title>amount</title>'));
+    expect(saved, contains('<title>amount by name</title>'));
     expect('<rect '.allMatches(saved!).length, 1 + rows.length);
 
     await t.tap(find.text('Pie'));
