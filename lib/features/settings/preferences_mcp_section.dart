@@ -349,6 +349,11 @@ class _ActivityRow extends material.StatelessWidget {
             style: material.TextStyle(
                 color: entry.error != null ? wb.destructive : wb.mutedForeground),
           ).xSmall(),
+          // The guard rule that refused the call, when one did.
+          if (entry.refusalRule != null)
+            Text('refused by ${entry.refusalRule}')
+                .xSmall()
+                .muted(),
         ],
       ),
     );
