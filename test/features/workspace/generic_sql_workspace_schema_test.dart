@@ -167,4 +167,26 @@ void main() {
     await runAndWait(tester, state);
     expect(delegate.probes, 1);
   });
+
+  testWidgets('another query on the same table reuses the lookup (#1171)',
+      (tester) async {
+    final delegate = _SchemaDelegate();
+    final state = await pumpWorkspace(tester, delegate, 'select * from users');
+    await runAndWait(tester, state);
+    state.activeSession.controller.text = 'select name from users';
+    await runAndWait(tester, state);
+    expect(delegate.lookups.length, 1);
+  });
+
+  testWidgets('a DDL run makes the next query on the table look it up again',
+      (tester) async {
+    final delegate = _SchemaDelegate();
+    final state = await pumpWorkspace(tester, delegate, 'select * from users');
+    await runAndWait(tester, state);
+    state.activeSession.controller.text = 'alter table users add column age int';
+    await runAndWait(tester, state);
+    state.activeSession.controller.text = 'select * from users';
+    await runAndWait(tester, state);
+    expect(delegate.lookups.length, 3);
+  });
 }
