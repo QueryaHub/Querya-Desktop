@@ -1,9 +1,12 @@
+import 'dart:math' show max, min, sqrt1_2;
 import 'dart:typed_data';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
+import 'package:querya_desktop/core/theme/parser/querya_theme_from_vscode.dart';
+import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/features/results/charts/chart_data.dart';
 import 'package:querya_desktop/features/results/charts/quick_chart_view.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -239,5 +242,87 @@ void main() {
         .sideTitles
         .reservedSize;
     expect(few, 28);
+  });
+
+  /// WCAG contrast ratio of two colours.
+  double contrast(material.Color a, material.Color b) {
+    final la = a.computeLuminance();
+    final lb = b.computeLuminance();
+    return (max(la, lb) + 0.05) / (min(la, lb) + 0.05);
+  }
+
+  // An imported VS Code theme (GitHub Dark-like colours).
+  final imported = buildQueryaThemeFromVsCodeColors(
+    brightness: material.Brightness.dark,
+    colors: const {
+      'editor.background': '#0d1117',
+      'editor.foreground': '#c9d1d9',
+      'editorWidget.background': '#161b22',
+      'editorHoverWidget.background': '#161b22',
+      'foreground': '#c9d1d9',
+      'widget.border': '#30363d',
+    },
+  );
+
+  for (final (name, theme) in [
+    ('light', QueryaTheme.lightDefault),
+    ('dark', QueryaTheme.darkDefault),
+    ('imported VS Code', imported),
+  ]) {
+    testWidgets('$name theme: the bar tooltip is readable (#1161)', (t) async {
+      await t.binding.setSurfaceSize(const Size(1000, 700));
+      await t.pumpWidget(queryaThemeTestShell(
+          data: theme,
+          child: QuickChartView(columns: columns, rows: rows)));
+      await t.pump();
+      await t.tap(find.bySemanticsLabel('Bar'));
+      await t.pump();
+
+      final tooltip = t
+          .widget<BarChart>(find.byType(BarChart))
+          .data
+          .barTouchData
+          .touchTooltipData;
+      final group = BarChartGroupData(x: 0, barRods: [
+        BarChartRodData(toY: 3),
+      ]);
+      final background = tooltip.getTooltipColor(group);
+      final text =
+          tooltip.getTooltipItem(group, 0, group.barRods.first, 0)!.textStyle.color!;
+      final cs = Theme.of(t.element(find.byType(BarChart))).colorScheme;
+      expect(background, cs.popover);
+      expect(text, cs.popoverForeground);
+      // WCAG AA for normal text.
+      expect(contrast(background, text), greaterThanOrEqualTo(4.5),
+          reason: 'popover $background, text $text');
+    });
+  }
+
+  testWidgets('40 rotated X labels are spaced so they do not overlap (#1161)',
+      (t) async {
+    await t.binding.setSurfaceSize(const Size(400, 700));
+    await t.pumpWidget(queryaThemeTestShell(
+        child: QuickChartView(
+      columns: const ['label', 'value'],
+      rows: [
+        for (var i = 1; i <= 40; i++) ['a long category label number $i', '$i'],
+      ],
+    )));
+    await t.pump();
+    await t.tap(find.bySemanticsLabel('Bar'));
+    await t.pump();
+
+    final labels = find.textContaining('a long category label number');
+    final n = labels.evaluate().length;
+    expect(n, inInclusiveRange(2, 8), reason: 'one label per step of five');
+    final xs = [for (var i = 0; i < n; i++) t.getCenter(labels.at(i)).dx]
+      ..sort();
+    final lineHeight = t.getSize(labels.first).height;
+    for (var i = 1; i < xs.length; i++) {
+      // At 45 degrees two neighbours are (dx * sin 45) apart across the text;
+      // more than a line height means they do not overlap.
+      expect((xs[i] - xs[i - 1]) * sqrt1_2, greaterThan(lineHeight),
+          reason: 'labels $i and ${i - 1}');
+    }
   });
 }
