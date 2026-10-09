@@ -459,6 +459,60 @@ void main() {
       expect(svg, contains('clip-path="url(#card0)"'));
     });
 
+    test('svg draws an edge and its end markers for every relation', () {
+      final s = ErdSchema.fromCatalog(columnRows: [
+        ['users', 'id', 'int', '1'],
+        ['orders', 'id', 'int', '1'],
+        ['orders', 'user_id', 'int', '0'],
+        ['payments', 'id', 'int', '1'],
+        ['payments', 'order_id', 'int', '0'],
+        ['payments', 'user_id', 'int', '0'],
+      ], fkRows: [
+        ['orders', 'user_id', 'users', 'id'],
+        ['payments', 'order_id', 'orders', 'id'],
+        ['payments', 'user_id', 'users', 'id'],
+      ]);
+      final layout = ErdLayout.compute(s);
+      final routes = ErdRouter.route(s, layout);
+      final drawn = routes.where((r) => r.points.length >= 2).length;
+      expect(drawn, s.relations.length);
+      final svg = ErdExport.toSvg(s, layout, routes: routes);
+      expect('class="erd-edge"'.allMatches(svg).length, drawn);
+      expect('class="erd-ends"'.allMatches(svg).length, drawn);
+      expect('<title>'.allMatches(svg).length, drawn);
+    });
+
+    test('svg shortens long table and column names to fit the card', () {
+      const table = 'customer_order_line_items_with_a_very_long_name';
+      const column = 'shipping_address_second_line_for_international_orders';
+      final s = ErdSchema.fromCatalog(columnRows: [
+        [table, column, 'text', '0'],
+      ], fkRows: const []);
+      final svg = ErdExport.toSvg(s, ErdLayout.compute(s));
+      expect(svg, isNot(contains(table)));
+      expect(svg, isNot(contains(column)));
+      expect('…'.allMatches(svg).length, greaterThanOrEqualTo(2));
+    });
+
+    test('svg lines up the column names of a card past the key slot', () {
+      final svg = ErdExport.toSvg(sample(), ErdLayout.compute(sample()));
+      double xOf(String name) => double.parse(
+          RegExp('<text x="([0-9.]+)" y="[0-9.]+"[^>]*>$name</text>')
+              .firstMatch(svg)!
+              .group(1)!);
+      // users: "id" is a PK, "name" is not; both start at the same x.
+      expect(xOf('name'), xOf('id'));
+    });
+
+    test('svg takes its colours from the caller', () {
+      final s = sample();
+      final svg = ErdExport.toSvg(s, ErdLayout.compute(s),
+          colors: const ErdSvgColors(background: '#123456', edge: '#abcdef'));
+      expect(svg, contains('fill="#123456"'));
+      expect(svg, contains('stroke="#abcdef"'));
+      expect(svg, contains('rx="8.0"'));
+    });
+
     test('svg fits long types inside the card with an ellipsis', () {
       const longType = "enum('pending','paid','shipped','cancelled','refunded')";
       final s = ErdSchema.fromCatalog(columnRows: [
@@ -520,6 +574,37 @@ void main() {
       await t.tap(card);
       await t.pump();
       expect(opened, 'users');
+      await t.pump(const Duration(seconds: 1));
+    });
+
+    testWidgets('PNG export works while a table is picked', (t) async {
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
+      final saved = <String, Uint8List>{};
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(
+          source: SqlErdSource(delegate: delegate(), dialect: SqlDialect.sqlite),
+          onSaveFile: (n, b) async => saved[n] = b,
+        ),
+      ));
+      await t.pump();
+      await t.pump();
+
+      // A single tap picks the table once the double-tap window has passed.
+      await t.tap(find.byKey(const material.ValueKey('erd_table_users')));
+      await t.pump(const Duration(milliseconds: 400));
+
+      await t.tap(find.byKey(const material.ValueKey('erd_export')));
+      await t.pumpAndSettle();
+      await t.tap(find.text('PNG'));
+      // The capture waits for a frame without the pick, then for the engine.
+      for (var i = 0; i < 40 && !saved.containsKey('erd.png'); i++) {
+        await t.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 50)));
+        await t.pump();
+      }
+      expect(saved['erd.png'], isNotNull);
+      expect(saved['erd.png']!.isNotEmpty, isTrue);
+      expect(t.takeException(), isNull);
       await t.pump(const Duration(seconds: 1));
     });
 

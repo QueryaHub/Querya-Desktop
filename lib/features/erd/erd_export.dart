@@ -6,6 +6,41 @@ import 'package:querya_desktop/features/erd/erd_layout.dart';
 import 'package:querya_desktop/features/erd/erd_model.dart';
 import 'package:querya_desktop/features/erd/erd_router.dart';
 
+/// Colours of the SVG export as `#rrggbb`. The defaults are a light theme;
+/// the diagram view passes the colours of the current theme, so the file looks
+/// like the screen.
+class ErdSvgColors {
+  const ErdSvgColors({
+    this.background = '#ffffff',
+    this.card = '#ffffff',
+    this.border = '#cbd5e1',
+    this.header = '#e8f1fd',
+    this.text = '#0f172a',
+    this.muted = '#64748b',
+    this.edge = '#64748b',
+    this.primaryKey = '#2563eb',
+    this.foreignKey = '#0d9488',
+  });
+
+  final String background;
+  final String card;
+  final String border;
+
+  /// Header band of a card (the accent over the card colour).
+  final String header;
+  final String text;
+
+  /// Column types, the column count and the optional-end circle outline.
+  final String muted;
+  final String edge;
+  final String primaryKey;
+  final String foreignKey;
+
+  /// `#rrggbb` for a 0xAARRGGBB colour value (alpha is dropped).
+  static String hex(int argb) =>
+      '#${(argb & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
+}
+
 /// Text exports of an [ErdSchema].
 class ErdExport {
   ErdExport._();
@@ -13,9 +48,16 @@ class ErdExport {
   /// Longest side of a PNG export, in pixels.
   static const int pngMaxSide = 8192;
 
-  // Rough glyph widths for the SVG text fitting: sans-serif at 12 px and 10 px.
+  // Rough glyph widths for the SVG text fitting: sans-serif at 12 px for
+  // names, monospace at 10 px for types and the column count.
   static const double _nameCharPx = 7.5;
   static const double _typeCharPx = 6.0;
+
+  /// Card corner radius, as on screen.
+  static const double _cardRadius = 8;
+
+  /// Width of one PK / FK pill and the gap after it.
+  static const double _pillStep = 21;
 
   static String _id(String s) {
     final r = s.replaceAll(RegExp(r'[^A-Za-z0-9_]'), '_');
@@ -91,16 +133,24 @@ class ErdExport {
   /// Standalone SVG rendering of the diagram, with the same positions and
   /// edge routes as the screen ([routes] defaults to a fresh routing).
   ///
-  /// Like the screen, it draws rounded cards with a tinted header, a crow's
-  /// foot at the FK end and a bar at the referenced end, PK and FK pills, and
-  /// clips text to each card.
-  static String toSvg(ErdSchema schema, ErdLayout layout, {List<ErdRoute>? routes}) {
+  /// Like the screen, it draws cards with an 8 px radius and a tinted header
+  /// with the column count, a crow's foot at the FK end and a bar at the
+  /// referenced end, PK and FK pills in a slot of the same width for every
+  /// row of a card, monospace types, and clips text to each card. Every edge
+  /// is an `erd-edge` path with a `<title>`, followed by its `erd-ends` path.
+  static String toSvg(
+    ErdSchema schema,
+    ErdLayout layout, {
+    List<ErdRoute>? routes,
+    ErdSvgColors colors = const ErdSvgColors(),
+  }) {
     final size = layout.size;
     final w = _n(size.width), h = _n(size.height);
     final b = StringBuffer()
       ..writeln('<svg xmlns="http://www.w3.org/2000/svg" width="$w" height="$h" '
-          'viewBox="0 0 $w $h" font-family="sans-serif" font-size="12">')
-      ..writeln('<rect width="100%" height="100%" fill="#ffffff"/>');
+          'viewBox="0 0 $w $h" font-family="sans-serif" font-size="12" '
+          'fill="${colors.text}">')
+      ..writeln('<rect width="100%" height="100%" fill="${colors.background}"/>');
     for (final r in routes ?? ErdRouter.route(schema, layout)) {
       if (r.points.length < 2) continue;
       final title = '${_esc(r.relation.fromTable)}.'
@@ -116,7 +166,8 @@ class ErdExport {
         final (centre, radius) =
             ErdGeometry.optionalCircle(r.points[0], r.points[1]);
         circle = '<circle cx="${_n(centre.dx)}" cy="${_n(centre.dy)}" '
-            'r="${_n(radius)}" fill="#ffffff" stroke="#64748b" stroke-width="1.5"/>';
+            'r="${_n(radius)}" fill="${colors.background}" '
+            'stroke="${colors.edge}" stroke-width="1.5"/>';
       } else {
         final (fa, fb) =
             ErdGeometry.oneBar(r.points[0], r.points[1], distance: 17);
@@ -126,11 +177,14 @@ class ErdExport {
           ErdGeometry.oneBar(r.points.last, r.points[r.points.length - 2]);
       ends.write('M ${_p(barA)} L ${_p(barB)}');
       b
-        ..writeln('<path d="${_routePath(r.points)}" fill="none" stroke="#64748b" '
-            'stroke-width="1.5" stroke-linejoin="round"><title>$title</title></path>')
-        ..writeln('<path d="$ends" fill="none" stroke="#64748b" stroke-width="1.5"/>');
+        ..writeln('<path class="erd-edge" d="${_routePath(r.points)}" '
+            'fill="none" stroke="${colors.edge}" stroke-width="1.5" '
+            'stroke-linejoin="round"><title>$title</title></path>')
+        ..writeln('<path class="erd-ends" d="$ends" fill="none" '
+            'stroke="${colors.edge}" stroke-width="1.5"/>');
       if (circle != null) b.writeln(circle);
     }
+    final rx = _n(_cardRadius);
     for (var ti = 0; ti < schema.tables.length; ti++) {
       final t = schema.tables[ti];
       final rect = layout.rectOf(t);
@@ -138,37 +192,54 @@ class ErdExport {
       final clip = 'card$ti';
       final inner = cw - 20;
       final typeAvail = inner * 0.4;
+      // One slot width for every row, so the names of a card line up.
+      var pills = 0;
+      for (final c in t.columns) {
+        final n = (c.isPrimaryKey ? 1 : 0) + (c.isForeignKey ? 1 : 0);
+        if (n > pills) pills = n;
+      }
+      final slot = pills * _pillStep;
+      final count = '${t.columns.length}';
+      final countWidth = count.length * _typeCharPx + 8;
       b
         ..writeln('<clipPath id="$clip"><rect x="${_n(left)}" y="${_n(top)}" '
-            'width="${_n(cw)}" height="${_n(ch)}" rx="6"/></clipPath>')
+            'width="${_n(cw)}" height="${_n(ch)}" rx="$rx"/></clipPath>')
         ..writeln('<rect x="${_n(left)}" y="${_n(top)}" width="${_n(cw)}" '
-            'height="${_n(ch)}" rx="6" fill="#f8fafc" stroke="#94a3b8"/>')
+            'height="${_n(ch)}" rx="$rx" fill="${colors.card}" '
+            'stroke="${colors.border}"/>')
         ..writeln('<g clip-path="url(#$clip)">')
         ..writeln('<rect x="${_n(left)}" y="${_n(top)}" width="${_n(cw)}" '
-            'height="${_n(ErdLayout.headerHeight)}" fill="#e0f2fe"/>')
+            'height="${_n(ErdLayout.headerHeight)}" fill="${colors.header}"/>')
         ..writeln('<text x="${_n(left + 10)}" y="${_n(top + 21)}" '
-            'font-weight="bold">${_esc(_fit(t.name, inner, _nameCharPx))}</text>');
+            'font-weight="bold">'
+            '${_esc(_fit(t.name, inner - countWidth, _nameCharPx))}</text>')
+        ..writeln('<text x="${_n(left + cw - 10)}" y="${_n(top + 21)}" '
+            'text-anchor="end" font-size="10" fill="${colors.muted}">'
+            '$count</text>');
       for (var i = 0; i < t.columns.length; i++) {
         final c = t.columns[i];
         final rowTop = top + ErdLayout.headerHeight + ErdLayout.rowHeight * i;
         final baseline = rowTop + 15;
         var x = left + 10;
         if (c.isPrimaryKey) {
-          b.writeln(_pill(x, rowTop, 'PK', '#2563eb'));
-          x += 21;
+          b.writeln(_pill(x, rowTop, 'PK', colors.primaryKey));
+          x += _pillStep;
         }
         if (c.isForeignKey) {
-          b.writeln(_pill(x, rowTop, 'FK', '#0d9488'));
-          x += 21;
+          b.writeln(_pill(x, rowTop, 'FK', colors.foreignKey));
         }
-        final nameAvail = inner - (x - left - 10) - typeAvail - 6;
+        final nameX = left + 10 + slot;
+        final type = c.isNullable ? '${c.type}?' : c.type;
+        final typeWidth = min(type.length * _typeCharPx, typeAvail);
+        final nameAvail = inner - slot - typeWidth - 6;
         b
-          ..writeln('<text x="${_n(x)}" y="${_n(baseline)}"'
+          ..writeln('<text x="${_n(nameX)}" y="${_n(baseline)}"'
               '${c.isPrimaryKey ? ' font-weight="bold"' : ''}>'
               '${_esc(_fit(c.name, nameAvail, _nameCharPx))}</text>')
           ..writeln('<text x="${_n(left + cw - 10)}" y="${_n(baseline)}" '
-              'text-anchor="end" font-size="10" fill="#64748b">'
-              '${_esc(_fit(c.isNullable ? '${c.type}?' : c.type, typeAvail, _typeCharPx))}</text>');
+              'text-anchor="end" font-size="10" font-family="monospace" '
+              'fill="${colors.muted}">'
+              '${_esc(_fit(type, typeAvail, _typeCharPx))}</text>');
       }
       b.writeln('</g>');
     }
