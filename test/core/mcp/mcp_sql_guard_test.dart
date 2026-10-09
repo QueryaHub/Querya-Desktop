@@ -96,4 +96,39 @@ void main() {
     refused('PRAGMA journal_mode', SqlDialect.sqlite);
     refused('PRAGMA table_info(users)', SqlDialect.postgres);
   });
+
+  group('refusal rule ids (#1231)', () {
+    String? ruleOf(String sql, SqlDialect d) =>
+        McpSqlGuard.refusal(sql, d)?.rule;
+
+    test('every refusal names the rule that caught it', () {
+      expect(ruleOf('', SqlDialect.postgres), 'empty_query');
+      expect(ruleOf('SELECT 1; SELECT 2', SqlDialect.postgres),
+          'single_statement');
+      expect(ruleOf('INSERT INTO t VALUES (1)', SqlDialect.sqlite),
+          'read_only_only');
+      expect(ruleOf('PRAGMA writable_schema = 1', SqlDialect.sqlite),
+          'sqlite_pragma');
+      expect(ruleOf('/*! DROP TABLE t */ SELECT 1', SqlDialect.mysql),
+          'mysql_executable_comment');
+      expect(ruleOf('WITH x AS (SELECT 1) DELETE FROM t', SqlDialect.postgres),
+          'data_modifying');
+      expect(ruleOf('SELECT 1 FOR UPDATE', SqlDialect.postgres),
+          'select_into_or_lock');
+      expect(ruleOf('EXPLAIN ANALYZE SELECT 1', SqlDialect.postgres),
+          'explain_analyze_or_write');
+    });
+
+    test('a query that may run has no refusal and no rule', () {
+      expect(McpSqlGuard.refusal('SELECT 1', SqlDialect.postgres), isNull);
+      expect(McpSqlGuard.check('SELECT 1', SqlDialect.postgres), isNull);
+    });
+
+    test('the message the model reads is unchanged by the rule id', () {
+      expect(McpSqlGuard.check('', SqlDialect.postgres),
+          'The query is empty.');
+      expect(McpSqlGuard.refusal('', SqlDialect.postgres)!.message,
+          'The query is empty.');
+    });
+  });
 }

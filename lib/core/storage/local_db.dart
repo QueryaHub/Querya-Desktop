@@ -11,7 +11,7 @@ import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const _dbName = 'querya.db';
-const _dbVersion = 11;
+const _dbVersion = 12;
 
 /// `app_settings` key under which each profile database's random id is
 /// stored (see [LocalDb._ensureProfileId] and issue #986).
@@ -221,7 +221,8 @@ class LocalDb {
         sql_text TEXT,
         row_count INTEGER,
         duration_ms INTEGER NOT NULL,
-        error TEXT
+        error TEXT,
+        refusal_rule TEXT
       )
     ''');
   }
@@ -339,6 +340,10 @@ class LocalDb {
     }
     if (oldVersion < 11) {
       await _createMcpActivityTable(db);
+    }
+    if (oldVersion >= 11 && oldVersion < 12) {
+      // The rule that refused a call, next to its error text.
+      await db.execute('ALTER TABLE mcp_activity ADD COLUMN refusal_rule TEXT');
     }
   }
 
@@ -835,6 +840,7 @@ class McpActivityEntry {
     this.rowCount,
     required this.durationMs,
     this.error,
+    this.refusalRule,
   });
 
   final int? id;
@@ -850,6 +856,9 @@ class McpActivityEntry {
   final int durationMs;
   final String? error;
 
+  /// The guard rule that refused the call (`read_only_only`, ...), when one did.
+  final String? refusalRule;
+
   Map<String, Object?> toMap() => {
         'id': id,
         'recorded_at': recordedAt,
@@ -861,6 +870,7 @@ class McpActivityEntry {
         'row_count': rowCount,
         'duration_ms': durationMs,
         'error': error,
+        'refusal_rule': refusalRule,
       };
 
   static McpActivityEntry fromMap(Map<String, Object?> m) => McpActivityEntry(
@@ -874,6 +884,7 @@ class McpActivityEntry {
         rowCount: _sqliteInt(m['row_count']),
         durationMs: _sqliteInt(m['duration_ms']) ?? 0,
         error: m['error'] as String?,
+        refusalRule: m['refusal_rule'] as String?,
       );
 }
 
