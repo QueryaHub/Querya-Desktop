@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/features/erd/erd_catalog.dart';
 import 'package:querya_desktop/features/erd/erd_export.dart';
+import 'package:querya_desktop/features/erd/erd_geometry.dart';
 import 'package:querya_desktop/features/erd/erd_layout.dart';
 import 'package:querya_desktop/features/erd/erd_model.dart';
 import 'package:querya_desktop/features/erd/erd_router.dart';
@@ -84,6 +85,29 @@ void main() {
         schema.relations.map((r) => '${r.fromColumn}->${r.toColumn}'),
         ['a->x', 'b->y'],
       );
+    });
+
+    test('every dialect reads column nullability', () {
+      expect(ErdCatalog.columnsSql(SqlDialect.postgres), contains('attnotnull'));
+      expect(ErdCatalog.columnsSql(SqlDialect.mysql), contains('is_nullable'));
+      expect(ErdCatalog.columnsSql(SqlDialect.sqlite), contains('"notnull"'));
+    });
+
+    test('a nullable foreign key is an optional relation', () {
+      final s = ErdSchema.fromCatalog(columnRows: [
+        ['users', 'id', 'int', '1', '0'],
+        ['orders', 'id', 'int', '1', '0'],
+        ['orders', 'customer_id', 'int', '0', '1'],
+        ['orders', 'user_id', 'int', '0', '0'],
+      ], fkRows: [
+        ['orders', 'customer_id', 'users', 'id'],
+        ['orders', 'user_id', 'users', 'id'],
+      ]);
+      final optional = {
+        for (final r in s.relations) r.fromColumn: r.optional,
+      };
+      expect(optional, {'customer_id': true, 'user_id': false});
+      expect(s.tables[1].columns[1].isNullable, isTrue);
     });
 
     test('load runs both queries through the delegate', () async {
@@ -322,6 +346,37 @@ void main() {
       expect(svg, startsWith('<svg'));
       expect(svg, contains('t&lt;1&gt;'));
       expect(svg.trim(), endsWith('</svg>'));
+    });
+
+    test('distance to a route is measured to its nearest segment', () {
+      final pts = [
+        const material.Offset(0, 0),
+        const material.Offset(100, 0),
+        const material.Offset(100, 50),
+      ];
+      expect(ErdGeometry.distanceToRoute(pts, const material.Offset(50, 4)),
+          closeTo(4, 1e-9));
+      expect(ErdGeometry.distanceToRoute(pts, const material.Offset(104, 25)),
+          closeTo(4, 1e-9));
+      expect(ErdGeometry.distanceToRoute(pts, const material.Offset(-3, 0)),
+          closeTo(3, 1e-9));
+    });
+
+    test('svg marks an optional FK end with a circle, a mandatory one with a bar',
+        () {
+      String svgFor(String nullable) {
+        final s = ErdSchema.fromCatalog(columnRows: [
+          ['users', 'id', 'int', '1', '0'],
+          ['orders', 'id', 'int', '1', '0'],
+          ['orders', 'customer_id', 'int', '0', nullable],
+        ], fkRows: [
+          ['orders', 'customer_id', 'users', 'id'],
+        ]);
+        return ErdExport.toSvg(s, ErdLayout.compute(s));
+      }
+
+      expect(svgFor('1'), contains('<circle'));
+      expect(svgFor('0'), isNot(contains('<circle')));
     });
 
     test('png ratio keeps the longest side within 8192 px', () {

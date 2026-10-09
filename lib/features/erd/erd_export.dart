@@ -110,6 +110,18 @@ class ErdExport {
       for (final (a, c) in ErdGeometry.crowFoot(r.points[0], r.points[1])) {
         ends.write('M ${_p(a)} L ${_p(c)} ');
       }
+      // FK side: a circle when the column may be NULL, a bar otherwise.
+      String? circle;
+      if (r.relation.optional) {
+        final (centre, radius) =
+            ErdGeometry.optionalCircle(r.points[0], r.points[1]);
+        circle = '<circle cx="${_n(centre.dx)}" cy="${_n(centre.dy)}" '
+            'r="${_n(radius)}" fill="#ffffff" stroke="#64748b" stroke-width="1.5"/>';
+      } else {
+        final (fa, fb) =
+            ErdGeometry.oneBar(r.points[0], r.points[1], distance: 17);
+        ends.write('M ${_p(fa)} L ${_p(fb)} ');
+      }
       final (barA, barB) =
           ErdGeometry.oneBar(r.points.last, r.points[r.points.length - 2]);
       ends.write('M ${_p(barA)} L ${_p(barB)}');
@@ -117,6 +129,7 @@ class ErdExport {
         ..writeln('<path d="${_routePath(r.points)}" fill="none" stroke="#64748b" '
             'stroke-width="1.5" stroke-linejoin="round"><title>$title</title></path>')
         ..writeln('<path d="$ends" fill="none" stroke="#64748b" stroke-width="1.5"/>');
+      if (circle != null) b.writeln(circle);
     }
     for (var ti = 0; ti < schema.tables.length; ti++) {
       final t = schema.tables[ti];
@@ -155,7 +168,7 @@ class ErdExport {
               '${_esc(_fit(c.name, nameAvail, _nameCharPx))}</text>')
           ..writeln('<text x="${_n(left + cw - 10)}" y="${_n(baseline)}" '
               'text-anchor="end" font-size="10" fill="#64748b">'
-              '${_esc(_fit(c.type, typeAvail, _typeCharPx))}</text>');
+              '${_esc(_fit(c.isNullable ? '${c.type}?' : c.type, typeAvail, _typeCharPx))}</text>');
       }
       b.writeln('</g>');
     }

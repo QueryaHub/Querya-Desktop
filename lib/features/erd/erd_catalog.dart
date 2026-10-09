@@ -3,7 +3,7 @@ import 'package:querya_desktop/features/erd/erd_model.dart';
 import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
 
 /// Catalog queries per dialect. Column query yields `table, column, type,
-/// isPk`; FK query yields `table, column, refTable, refColumn`.
+/// isPk, isNullable`; FK query yields `table, column, refTable, refColumn`.
 ///
 /// Every output column has a distinct alias: the SQLite driver returns rows as
 /// maps keyed by column name, so two `name` columns would collapse into one.
@@ -16,7 +16,8 @@ class ErdCatalog {
         SqlDialect.postgres => '''
 SELECT c.relname AS table_name, a.attname AS column_name,
   format_type(a.atttypid, a.atttypmod) AS data_type,
-  CASE WHEN pk.oid IS NULL THEN 0 ELSE 1 END AS is_pk
+  CASE WHEN pk.oid IS NULL THEN 0 ELSE 1 END AS is_pk,
+  CASE WHEN a.attnotnull THEN 0 ELSE 1 END AS is_nullable
 FROM pg_catalog.pg_attribute a
 JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
@@ -28,7 +29,8 @@ WHERE n.nspname = current_schema()
 ORDER BY c.relname, a.attnum''',
         SqlDialect.mysql => '''
 SELECT c.table_name, c.column_name, c.column_type,
-  IF(c.column_key = 'PRI', 1, 0)
+  IF(c.column_key = 'PRI', 1, 0),
+  IF(c.is_nullable = 'YES', 1, 0)
 FROM information_schema.columns c
 JOIN information_schema.tables t
   ON t.table_schema = c.table_schema AND t.table_name = c.table_name
@@ -37,7 +39,8 @@ WHERE c.table_schema = DATABASE()
 ORDER BY c.table_name, c.ordinal_position''',
         SqlDialect.sqlite => '''
 SELECT m.name AS table_name, p.name AS column_name, p.type AS data_type,
-  CASE WHEN p.pk > 0 THEN 1 ELSE 0 END AS is_pk
+  CASE WHEN p.pk > 0 THEN 1 ELSE 0 END AS is_pk,
+  CASE WHEN p."notnull" = 0 THEN 1 ELSE 0 END AS is_nullable
 FROM sqlite_master m JOIN pragma_table_info(m.name) p
 WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
 ORDER BY m.name, p.cid''',
