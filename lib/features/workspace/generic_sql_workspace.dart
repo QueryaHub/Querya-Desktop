@@ -1,3 +1,4 @@
+import 'package:querya_desktop/core/database/sql_statement_splitter.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -399,16 +400,28 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
     }
   }
 
-  Future<void> execute([SqlQueryTabSession? targetSession]) async {
+  /// Runs the selection, else the whole text. With [statementAtCursor] (run
+  /// statement) only the statement under the caret, see [SqlStatementSplitter].
+  Future<void> execute([
+    SqlQueryTabSession? targetSession,
+    bool statementAtCursor = false,
+  ]) async {
     final session = targetSession ?? _activeSession;
     if (session.running) return;
 
     final selection = session.controller.selection;
+    final text = session.controller.text;
     String userSql;
     if (selection.isValid && !selection.isCollapsed) {
-      userSql = selection.textInside(session.controller.text).trim();
+      userSql = selection.textInside(text).trim();
+    } else if (statementAtCursor) {
+      final span = SqlStatementSplitter.at(
+        SqlStatementSplitter.spans(text),
+        selection.isValid ? selection.baseOffset : text.length,
+      );
+      userSql = span == null ? '' : span.textIn(text);
     } else {
-      userSql = session.controller.text.trim();
+      userSql = text.trim();
     }
     if (userSql.isEmpty) return;
 
@@ -861,22 +874,28 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
             if (!_activeSession.running) unawaited(execute(_activeSession));
           },
           const material.SingleActivator(LogicalKeyboardKey.enter, control: true): () {
-            if (!_activeSession.running) unawaited(execute(_activeSession));
+            if (!_activeSession.running) unawaited(execute(_activeSession, true));
           },
           const material.SingleActivator(LogicalKeyboardKey.enter, meta: true): () {
+            if (!_activeSession.running) unawaited(execute(_activeSession, true));
+          },
+          const material.SingleActivator(LogicalKeyboardKey.enter, control: true, shift: true): () {
+            if (!_activeSession.running) unawaited(execute(_activeSession));
+          },
+          const material.SingleActivator(LogicalKeyboardKey.enter, meta: true, shift: true): () {
             if (!_activeSession.running) unawaited(execute(_activeSession));
           },
           const material.SingleActivator(LogicalKeyboardKey.numpadEnter, control: true): () {
-            if (!_activeSession.running) unawaited(execute(_activeSession));
+            if (!_activeSession.running) unawaited(execute(_activeSession, true));
           },
           const material.SingleActivator(LogicalKeyboardKey.numpadEnter, meta: true): () {
-            if (!_activeSession.running) unawaited(execute(_activeSession));
+            if (!_activeSession.running) unawaited(execute(_activeSession, true));
           },
           const material.SingleActivator(LogicalKeyboardKey.keyR, control: true): () {
-            if (!_activeSession.running) unawaited(execute(_activeSession));
+            if (!_activeSession.running) unawaited(execute(_activeSession, true));
           },
           const material.SingleActivator(LogicalKeyboardKey.keyR, meta: true): () {
-            if (!_activeSession.running) unawaited(execute(_activeSession));
+            if (!_activeSession.running) unawaited(execute(_activeSession, true));
           },
         },
         child: material.Focus(
