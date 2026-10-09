@@ -308,8 +308,10 @@ class McpQueryService {
     try {
       return await body(delegate, dialect);
     } on McpToolException catch (e) {
-      // Driver errors may quote connection strings or options.
-      throw McpToolException(McpRedaction.redact(e.message, row: row));
+      // Driver errors may quote connection strings or options. The guard rule
+      // goes on to the activity log.
+      throw McpToolException(McpRedaction.redact(e.message, row: row),
+          rule: e.rule);
     } finally {
       delegate.dispose();
     }
