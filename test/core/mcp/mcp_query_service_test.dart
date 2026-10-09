@@ -59,12 +59,15 @@ SqlExecutionResult _catalog(String sql) {
       ['users_pkey', 'CREATE UNIQUE INDEX users_pkey ON users (id)'],
     ]);
   }
-  if (sql.contains('FOREIGN KEY')) {
+  // PostgreSQL reads keys from pg_constraint (contype 'f'), MySQL and SQLite
+  // from their own catalogs.
+  if (sql.contains('FOREIGN KEY') || sql.contains("contype = 'f'")) {
     return const SqlExecutionResult(columns: ['t', 'c', 'rt', 'rc'], rows: [
       ['orders', 'user_id', 'users', 'id'],
     ]);
   }
-  if (sql.contains('information_schema.columns')) {
+  if (sql.contains('information_schema.columns') ||
+      sql.contains('pg_attribute')) {
     return const SqlExecutionResult(columns: ['t', 'c', 'ty', 'pk'], rows: [
       ['users', 'id', 'integer', '1'],
       ['users', 'name', 'text', '0'],

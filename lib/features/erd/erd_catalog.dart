@@ -11,24 +11,21 @@ class ErdCatalog {
   ErdCatalog._();
 
   static String columnsSql(SqlDialect d) => switch (d) {
+        // pg_catalog is readable by every role, unlike information_schema,
+        // which hides keys of tables the current role has only SELECT on.
         SqlDialect.postgres => '''
-SELECT c.table_name, c.column_name, c.data_type,
-  CASE WHEN pk.column_name IS NULL THEN 0 ELSE 1 END
-FROM information_schema.columns c
-JOIN information_schema.tables t
-  ON t.table_schema = c.table_schema AND t.table_name = c.table_name
-  AND t.table_type = 'BASE TABLE'
-LEFT JOIN (
-  SELECT kcu.table_schema, kcu.table_name, kcu.column_name
-  FROM information_schema.table_constraints tc
-  JOIN information_schema.key_column_usage kcu
-    ON tc.constraint_name = kcu.constraint_name
-    AND tc.table_schema = kcu.table_schema
-  WHERE tc.constraint_type = 'PRIMARY KEY'
-) pk ON pk.table_schema = c.table_schema AND pk.table_name = c.table_name
-  AND pk.column_name = c.column_name
-WHERE c.table_schema = current_schema()
-ORDER BY c.table_name, c.ordinal_position''',
+SELECT c.relname AS table_name, a.attname AS column_name,
+  format_type(a.atttypid, a.atttypmod) AS data_type,
+  CASE WHEN pk.oid IS NULL THEN 0 ELSE 1 END AS is_pk
+FROM pg_catalog.pg_attribute a
+JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
+JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+LEFT JOIN pg_catalog.pg_constraint pk
+  ON pk.conrelid = c.oid AND pk.contype = 'p' AND a.attnum = ANY (pk.conkey)
+WHERE n.nspname = current_schema()
+  AND c.relkind IN ('r', 'p')
+  AND a.attnum > 0 AND NOT a.attisdropped
+ORDER BY c.relname, a.attnum''',
         SqlDialect.mysql => '''
 SELECT c.table_name, c.column_name, c.column_type,
   IF(c.column_key = 'PRI', 1, 0)
@@ -47,17 +44,24 @@ ORDER BY m.name, p.cid''',
       };
 
   static String foreignKeysSql(SqlDialect d) => switch (d) {
+        // conkey and confkey are paired by position, so a composite key yields
+        // one row per column pair. References outside the current schema are
+        // skipped: their table names would otherwise match same-named tables.
         SqlDialect.postgres => '''
-SELECT kcu.table_name AS table_name, kcu.column_name AS column_name,
-  ccu.table_name AS ref_table, ccu.column_name AS ref_column
-FROM information_schema.table_constraints tc
-JOIN information_schema.key_column_usage kcu
-  ON tc.constraint_name = kcu.constraint_name
-  AND tc.table_schema = kcu.table_schema
-JOIN information_schema.constraint_column_usage ccu
-  ON ccu.constraint_name = tc.constraint_name
-  AND ccu.table_schema = tc.table_schema
-WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = current_schema()''',
+SELECT src.relname AS table_name, sa.attname AS column_name,
+  ref.relname AS ref_table, ra.attname AS ref_column
+FROM pg_catalog.pg_constraint con
+JOIN pg_catalog.pg_class src ON src.oid = con.conrelid
+JOIN pg_catalog.pg_namespace n ON n.oid = src.relnamespace
+JOIN pg_catalog.pg_class ref ON ref.oid = con.confrelid
+JOIN pg_catalog.pg_namespace rn ON rn.oid = ref.relnamespace
+CROSS JOIN LATERAL unnest(con.conkey, con.confkey) AS k(src_attnum, ref_attnum)
+JOIN pg_catalog.pg_attribute sa
+  ON sa.attrelid = con.conrelid AND sa.attnum = k.src_attnum
+JOIN pg_catalog.pg_attribute ra
+  ON ra.attrelid = con.confrelid AND ra.attnum = k.ref_attnum
+WHERE con.contype = 'f'
+  AND n.nspname = current_schema() AND rn.nspname = current_schema()''',
         SqlDialect.mysql => '''
 SELECT table_name, column_name, referenced_table_name, referenced_column_name
 FROM information_schema.key_column_usage
