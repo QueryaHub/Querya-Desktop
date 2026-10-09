@@ -572,7 +572,27 @@ class _QuickChartViewState extends material.State<QuickChartView> {
     final slot = (width - 60) / shown;
     final rotate = slot < 60;
 
+    // Line charts on a date X column place points at their real distance; the
+    // axis then shows dates instead of point labels.
+    final offsets = _type == QuickChartType.line
+        ? ChartData.timeOffsets(points)
+        : null;
+    final origin = offsets == null ? null : ChartData.timeOrigin(points);
+    final span = offsets == null ? Duration.zero : ChartData.timeSpan(points);
+    final timeTick = offsets == null || span == Duration.zero
+        ? null
+        : span.inMicroseconds / Duration.microsecondsPerDay / 6;
+
     material.Widget bottom(double v, TitleMeta meta) {
+      if (offsets != null && origin != null) {
+        final at = origin.add(Duration(
+            microseconds: (v * Duration.microsecondsPerDay).round()));
+        return SideTitleWidget(
+          meta: meta,
+          child: material.Text(ChartData.timeTickLabel(at, span),
+              style: label, maxLines: 1),
+        );
+      }
       final i = v.toInt();
       if (i < 0 || i >= points.length || i % step != 0) {
         return const material.SizedBox.shrink();
@@ -612,6 +632,7 @@ class _QuickChartViewState extends material.State<QuickChartView> {
         sideTitles: SideTitles(
             showTitles: true,
             reservedSize: rotate ? 52 : 28,
+            interval: timeTick,
             getTitlesWidget: bottom),
       ),
       leftTitles: AxisTitles(
@@ -667,7 +688,7 @@ class _QuickChartViewState extends material.State<QuickChartView> {
               getTooltipItems: (spots) => [
                 for (final s in spots)
                   LineTooltipItem(
-                      '${points[s.x.toInt()].label}\n${ChartFormat.full(s.y)}',
+                      '${points[offsets == null ? s.x.toInt() : ChartData.nearestOffset(offsets, s.x)].label}\n${ChartFormat.full(s.y)}',
                       material.TextStyle(
                           color: cs.popoverForeground, fontSize: 12)),
               ],
@@ -677,7 +698,7 @@ class _QuickChartViewState extends material.State<QuickChartView> {
             LineChartBarData(
               spots: [
                 for (var i = 0; i < points.length; i++)
-                  FlSpot(i.toDouble(), points[i].value),
+                  FlSpot(offsets?[i] ?? i.toDouble(), points[i].value),
               ],
               color: palette.type1,
               barWidth: 2,

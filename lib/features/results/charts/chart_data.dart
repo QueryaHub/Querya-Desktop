@@ -6,10 +6,13 @@ enum ChartAggregation { none, sum, count, avg, min, max }
 
 /// One labelled point of a chart series.
 class ChartPoint {
-  const ChartPoint(this.label, this.value);
+  const ChartPoint(this.label, this.value, {this.time});
 
   final String label;
   final double value;
+
+  /// The label as a date or timestamp, when the X column holds dates.
+  final DateTime? time;
 }
 
 /// Points ready to plot, plus how many parsed rows were left out of them.
@@ -41,6 +44,84 @@ class ChartData {
 
   /// Name of the slice that collects the categories beyond Top N.
   static const String otherLabel = 'Other';
+
+  static final _isoTime = RegExp(
+    r'^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?)?(Z|[+-]\d{2}:?\d{2})?$',
+  );
+  static final _hasZone = RegExp(r'(Z|[+-]\d{2}:?\d{2})$');
+
+  /// Parses an ISO date (`2026-01-31`) or timestamp (`2026-01-31 10:00`,
+  /// `2026-01-31T10:00:00Z`). Without a zone the wall-clock fields are kept, so
+  /// a day stays a day whatever the machine's time zone is.
+  static DateTime? parseTime(String raw) {
+    final text = raw.trim();
+    if (!_isoTime.hasMatch(text)) return null;
+    final parsed = DateTime.tryParse(text.replaceFirst(' ', 'T'));
+    if (parsed == null) return null;
+    if (_hasZone.hasMatch(text)) return parsed.toUtc();
+    return DateTime.utc(parsed.year, parsed.month, parsed.day, parsed.hour,
+        parsed.minute, parsed.second, parsed.millisecond, parsed.microsecond);
+  }
+
+  /// Whether every non-empty cell of [column] is a date or timestamp.
+  static bool isTimeColumn(List<List<String>> rows, int column) {
+    var seen = 0;
+    for (final row in rows) {
+      if (column >= row.length) continue;
+      final cell = row[column].trim();
+      if (cell.isEmpty) continue;
+      if (parseTime(cell) == null) return false;
+      seen++;
+    }
+    return seen > 0;
+  }
+
+  /// Earliest time among [points]; null unless every point has a time.
+  static DateTime? timeOrigin(List<ChartPoint> points) {
+    if (points.isEmpty || points.any((p) => p.time == null)) return null;
+    return points.map((p) => p.time!).reduce((a, b) => a.isBefore(b) ? a : b);
+  }
+
+  /// Days from the earliest point for every point, so the X axis places them
+  /// at their real distance. Null unless every point has a time.
+  static List<double>? timeOffsets(List<ChartPoint> points) {
+    final origin = timeOrigin(points);
+    if (origin == null) return null;
+    return [
+      for (final p in points)
+        p.time!.difference(origin).inMicroseconds / Duration.microsecondsPerDay,
+    ];
+  }
+
+  /// Length of the time axis: from the earliest point to the latest.
+  static Duration timeSpan(List<ChartPoint> points) {
+    final origin = timeOrigin(points);
+    if (origin == null) return Duration.zero;
+    final last = points.map((p) => p.time!).reduce((a, b) => a.isAfter(b) ? a : b);
+    return last.difference(origin);
+  }
+
+  /// Tick label for [time] on an axis spanning [span]: hours for a span under
+  /// two days, days under about 13 months, months beyond.
+  static String timeTickLabel(DateTime time, Duration span) {
+    String two(int v) => v.toString().padLeft(2, '0');
+    if (span < const Duration(days: 2)) {
+      return '${two(time.hour)}:${two(time.minute)}';
+    }
+    if (span < const Duration(days: 400)) {
+      return '${time.year}-${two(time.month)}-${two(time.day)}';
+    }
+    return '${time.year}-${two(time.month)}';
+  }
+
+  /// Index of the point whose X offset is nearest to [x].
+  static int nearestOffset(List<double> offsets, double x) {
+    var best = 0;
+    for (var i = 1; i < offsets.length; i++) {
+      if ((offsets[i] - x).abs() < (offsets[best] - x).abs()) best = i;
+    }
+    return best;
+  }
 
   /// Parses a cell as a finite number; `null` for empty / non numeric cells.
   static double? parseNumber(String raw) {
@@ -110,6 +191,12 @@ class ChartData {
     }
 
     if (type == QuickChartType.line) {
+      // Dates on the X axis plot in time order, at their real distance.
+      if (labelColumn != null &&
+          isTimeColumn(rows, labelColumn) &&
+          points.every((p) => p.time != null)) {
+        points = [...points]..sort((a, b) => a.time!.compareTo(b.time!));
+      }
       if (points.length <= maxPoints) return ChartSeries(points: points);
       return ChartSeries(
         points: points.sublist(0, maxPoints),
@@ -191,7 +278,7 @@ class ChartData {
       final label = labelColumn != null && labelColumn < row.length
           ? row[labelColumn]
           : '${i + 1}';
-      points.add(ChartPoint(label, v));
+      points.add(ChartPoint(label, v, time: parseTime(label)));
     }
     return points;
   }
@@ -203,17 +290,18 @@ class ChartData {
   ) {
     final groups = <String, _Group>{};
     for (final p in points) {
-      groups.putIfAbsent(p.label, _Group.new).add(p.value);
+      groups.putIfAbsent(p.label, () => _Group()..time = p.time).add(p.value);
     }
     return [
       for (final e in groups.entries)
-        ChartPoint(e.key, e.value.result(aggregation)),
+        ChartPoint(e.key, e.value.result(aggregation), time: e.value.time),
     ];
   }
 }
 
 /// Running totals for one X label.
 class _Group {
+  DateTime? time;
   double sum = 0;
   int count = 0;
   double min = double.infinity;

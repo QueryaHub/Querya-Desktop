@@ -105,8 +105,16 @@ class ChartSvg {
     final fill = colors.series.first;
     final zero = y(0);
     final line = <String>[];
+    // Line charts on a date X column place points at their real distance.
+    final offsets = bars ? null : ChartData.timeOffsets(points);
+    final spanDays = offsets == null ? 0.0 : offsets.reduce(math.max);
+    double xAt(int i) => offsets == null
+        ? _left + slot * (i + 0.5)
+        : spanDays == 0
+            ? _left + plotW / 2
+            : _left + plotW * offsets[i] / spanDays;
     for (var i = 0; i < points.length; i++) {
-      final cx = _left + slot * (i + 0.5);
+      final cx = xAt(i);
       final py = y(points[i].value);
       if (bars) {
         final w = slot * 0.7;
@@ -118,10 +126,24 @@ class ChartSvg {
       } else {
         line.add('${_n(cx)},${_n(py)}');
       }
-      if (i % step == 0) {
+      if (offsets == null && i % step == 0) {
         b.writeln('<text x="${_n(cx)}" y="${_n(height - _bottom + 18)}" '
             'text-anchor="middle" fill="${colors.text}">'
             '${escape(points[i].label)}</text>');
+      }
+    }
+    if (offsets != null) {
+      // Six dates on the time axis, labelled for the range they cover.
+      final origin = ChartData.timeOrigin(points)!;
+      final span = ChartData.timeSpan(points);
+      for (var k = 0; k <= 6; k++) {
+        final at = origin.add(Duration(
+            microseconds:
+                (spanDays * Duration.microsecondsPerDay * k / 6).round()));
+        final x = spanDays == 0 ? _left + plotW / 2 : _left + plotW * k / 6;
+        b.writeln('<text x="${_n(x)}" y="${_n(height - _bottom + 18)}" '
+            'text-anchor="middle" fill="${colors.text}">'
+            '${escape(ChartData.timeTickLabel(at, span))}</text>');
       }
     }
     if (!bars) {
