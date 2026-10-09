@@ -20,6 +20,7 @@ import 'package:querya_desktop/features/erd/erd_geometry.dart';
 import 'package:querya_desktop/features/erd/erd_layout.dart';
 import 'package:querya_desktop/features/erd/erd_model.dart';
 import 'package:querya_desktop/features/erd/erd_router.dart';
+import 'package:querya_desktop/core/export/svg_png.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/shared/widgets/app_toast.dart';
 import 'package:querya_desktop/shared/widgets/querya_action_menu.dart';
@@ -477,10 +478,19 @@ class _ErdViewState extends material.State<ErdView> {
     return focus == table || (neighbours[focus]?.contains(table) ?? false);
   }
 
-  /// Renders the canvas to a PNG. The picture is the diagram, not the
-  /// current interaction: a picked table, the hover highlight and the edge
+  /// PNG of the diagram. With the light palette it is drawn from the same SVG
+  /// the SVG export saves, so the two match. With the current theme it is a
+  /// screenshot of the canvas: a picked table, the hover highlight and the edge
   /// label are cleared for the capture, and the pick comes back afterwards.
-  Future<void> _exportPng() async {
+  Future<void> _exportPng(ErdSchema schema, ErdLayout layout) async {
+    final currentTheme = await AppSettings.instance.getExportCurrentTheme();
+    if (!mounted) return;
+    if (!currentTheme) {
+      final scale = ErdExport.pngPixelRatio(layout.size);
+      final svg = ErdExport.toSvg(schema, layout, routes: _routes);
+      await _save('$_fileStem.png', await svgToPng(svg, scale: scale));
+      return;
+    }
     final boundary = _boundaryKey.currentContext?.findRenderObject()
         as RenderRepaintBoundary?;
     if (boundary == null) return;
@@ -582,7 +592,7 @@ class _ErdViewState extends material.State<ErdView> {
       case _ExportAction.svg:
         unawaited(_exportSvg(schema, layout));
       case _ExportAction.png:
-        unawaited(_exportPng());
+        unawaited(_exportPng(schema, layout));
       case _ExportAction.toggleTheme:
         unawaited(_toggleExportTheme());
       case _ExportAction.copyMermaid:

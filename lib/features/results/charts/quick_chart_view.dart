@@ -8,6 +8,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/rendering.dart';
+import 'package:querya_desktop/core/export/svg_png.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/features/results/charts/chart_data.dart';
 import 'package:querya_desktop/features/results/charts/chart_format.dart';
@@ -193,7 +194,17 @@ class _QuickChartViewState extends material.State<QuickChartView> {
     return null;
   }
 
+  /// PNG of the chart. With the light palette it is drawn from the same SVG the
+  /// SVG export saves; with the current theme it is a screenshot of the screen.
   Future<void> _export() async {
+    final currentTheme = await AppSettings.instance.getExportCurrentTheme();
+    if (!mounted) return;
+    if (!currentTheme) {
+      final svg = _chartSvg(currentTheme: false);
+      if (svg == null) return;
+      await (widget.onSavePng ?? _defaultPngSaver)(await svgToPng(svg));
+      return;
+    }
     final boundary = _boundaryKey.currentContext?.findRenderObject()
         as RenderRepaintBoundary?;
     if (boundary == null) return;
@@ -203,14 +214,14 @@ class _QuickChartViewState extends material.State<QuickChartView> {
     await (widget.onSavePng ?? _defaultPngSaver)(data.buffer.asUint8List());
   }
 
-  Future<void> _exportSvg() async {
+  /// The chart as an SVG document, in the light palette or the current theme.
+  /// Null when there is no value column to chart.
+  String? _chartSvg({required bool currentTheme}) {
     final valueCol = _valueCol;
-    if (valueCol == null) return;
-    final currentTheme = await AppSettings.instance.getExportCurrentTheme();
-    if (!mounted) return;
+    if (valueCol == null) return null;
     final palette = context.semanticPalette;
     final wb = context.workbench;
-    final svg = ChartSvg.build(
+    return ChartSvg.build(
       points: _series(valueCol).points,
       type: _type,
       title: _chartTitle(),
@@ -232,6 +243,13 @@ class _QuickChartViewState extends material.State<QuickChartView> {
             )
           : ChartSvg.light,
     );
+  }
+
+  Future<void> _exportSvg() async {
+    final currentTheme = await AppSettings.instance.getExportCurrentTheme();
+    if (!mounted) return;
+    final svg = _chartSvg(currentTheme: currentTheme);
+    if (svg == null) return;
     await (widget.onSaveSvg ?? _defaultSvgSaver)(svg);
   }
 
