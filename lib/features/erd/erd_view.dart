@@ -8,6 +8,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/rendering.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/erd/erd_catalog.dart';
 import 'package:querya_desktop/features/erd/erd_export.dart';
 import 'package:querya_desktop/features/erd/erd_layout.dart';
@@ -301,6 +302,12 @@ class _TableCard extends material.StatelessWidget {
   final void Function(material.Offset delta) onDragMove;
   final material.VoidCallback onDragEnd;
 
+  /// Shadows read only on light surfaces, so a dark canvas gets twice the alpha.
+  double _shadowAlpha(material.Color canvas) {
+    final base = dragging ? 0.28 : 0.12;
+    return canvas.computeLuminance() < 0.5 ? base * 2 : base;
+  }
+
   @override
   material.Widget build(material.BuildContext context) {
     final wb = context.workbench;
@@ -335,8 +342,7 @@ class _TableCard extends material.StatelessWidget {
               ),
               boxShadow: [
                 material.BoxShadow(
-                  color: const material.Color(0xFF000000)
-                      .withValues(alpha: dragging ? 0.28 : 0.12),
+                  color: wb.shadow.withValues(alpha: _shadowAlpha(wb.canvas)),
                   blurRadius: dragging ? 18 : 8,
                   offset: material.Offset(0, dragging ? 6 : 2),
                 ),
@@ -373,40 +379,60 @@ class _TableCard extends material.StatelessWidget {
                   for (final c in table.columns)
                     material.SizedBox(
                       height: ErdLayout.rowHeight,
-                      child: material.Padding(
-                        padding:
-                            const material.EdgeInsets.symmetric(horizontal: 10),
-                        child: material.Row(
-                          children: [
-                            material.SizedBox(
-                              width: 20,
-                              child: c.isPrimaryKey
-                                  ? material.Icon(material.Icons.key_rounded,
-                                      size: 12, color: palette.type1)
-                                  : c.isForeignKey
-                                      ? material.Icon(material.Icons.link_rounded,
-                                          size: 12, color: palette.type2)
-                                      : null,
-                            ),
-                            material.Expanded(
-                              child: Text(c.name,
-                                  maxLines: 1,
-                                  overflow: material.TextOverflow.ellipsis,
-                                  style: material.TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: c.isPrimaryKey
-                                        ? material.FontWeight.w600
-                                        : material.FontWeight.normal,
-                                  )),
-                            ),
-                            const material.SizedBox(width: 6),
-                            Text(c.type,
-                                maxLines: 1,
-                                style: material.TextStyle(
-                                    fontSize: 10,
-                                    fontFamily: 'monospace',
-                                    color: wb.mutedForeground)),
-                          ],
+                      child: material.Tooltip(
+                        message: '${c.name} ${c.type}',
+                        child: material.Padding(
+                          padding: const material.EdgeInsets.symmetric(
+                              horizontal: 10),
+                          child: material.Row(
+                            children: [
+                              // A column can be both PK and FK (junction
+                              // tables), so both markers get a slot.
+                              material.SizedBox(
+                                width: 26,
+                                child: material.Row(
+                                  mainAxisSize: material.MainAxisSize.min,
+                                  children: [
+                                    if (c.isPrimaryKey)
+                                      material.Icon(material.Icons.key_rounded,
+                                          size: 11, color: palette.type1),
+                                    if (c.isPrimaryKey && c.isForeignKey)
+                                      const material.SizedBox(width: 4),
+                                    if (c.isForeignKey)
+                                      material.Icon(material.Icons.link_rounded,
+                                          size: 11, color: palette.type2),
+                                  ],
+                                ),
+                              ),
+                              // The name keeps about 60 % of the row, the type
+                              // at most 40 % and ellipsizes.
+                              material.Expanded(
+                                flex: 3,
+                                child: Text(c.name,
+                                    maxLines: 1,
+                                    overflow: material.TextOverflow.ellipsis,
+                                    style: material.TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: c.isPrimaryKey
+                                          ? material.FontWeight.w600
+                                          : material.FontWeight.normal,
+                                    )),
+                              ),
+                              const material.SizedBox(width: 6),
+                              material.Flexible(
+                                flex: 2,
+                                child: Text(c.type,
+                                    maxLines: 1,
+                                    overflow: material.TextOverflow.ellipsis,
+                                    style: material.TextStyle(
+                                        fontSize: 10,
+                                        fontFamily: QueryaTypography.mono,
+                                        fontFamilyFallback:
+                                            QueryaTypography.monoFontFamilyFallback,
+                                        color: wb.mutedForeground)),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),

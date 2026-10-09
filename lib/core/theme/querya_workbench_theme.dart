@@ -18,6 +18,7 @@ class QueryaWorkbenchTheme {
     required this.warning,
     required this.gitModified,
     required this.gitUntracked,
+    this.shadow = const Color(0xFF000000),
   });
 
   final Color canvas;
@@ -33,6 +34,9 @@ class QueryaWorkbenchTheme {
   final Color warning;
   final Color gitModified;
   final Color gitUntracked;
+
+  /// Base colour of elevation shadows; callers pick the alpha.
+  final Color shadow;
 
   /// Matches current [QueryaColors] / dark UI.
   static const QueryaWorkbenchTheme darkDefault = QueryaWorkbenchTheme(
@@ -66,6 +70,7 @@ class QueryaWorkbenchTheme {
     warning: Color(0xFFD97706),
     gitModified: Color(0xFFD97706),
     gitUntracked: Color(0xFF16A34A),
+    shadow: Color(0xFF0F172A),
   );
 
   QueryaWorkbenchTheme copyWith({
@@ -82,8 +87,10 @@ class QueryaWorkbenchTheme {
     Color? warning,
     Color? gitModified,
     Color? gitUntracked,
+    Color? shadow,
   }) {
     return QueryaWorkbenchTheme(
+      shadow: shadow ?? this.shadow,
       canvas: canvas ?? this.canvas,
       surface: surface ?? this.surface,
       sidebarBackground: sidebarBackground ?? this.sidebarBackground,
@@ -120,6 +127,7 @@ class QueryaWorkbenchTheme {
       warning: c(a.warning, b.warning),
       gitModified: c(a.gitModified, b.gitModified),
       gitUntracked: c(a.gitUntracked, b.gitUntracked),
+      shadow: c(a.shadow, b.shadow),
     );
   }
 
@@ -139,10 +147,12 @@ class QueryaWorkbenchTheme {
           success == other.success &&
           warning == other.warning &&
           gitModified == other.gitModified &&
-          gitUntracked == other.gitUntracked;
+          gitUntracked == other.gitUntracked &&
+          shadow == other.shadow;
 
   @override
   int get hashCode => Object.hash(
+        shadow,
         canvas,
         surface,
         sidebarBackground,
