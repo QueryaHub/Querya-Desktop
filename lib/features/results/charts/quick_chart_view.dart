@@ -199,7 +199,12 @@ class _QuickChartViewState extends material.State<QuickChartView> {
       children: [
         material.Padding(
           padding: const material.EdgeInsets.all(8),
-          child: material.Row(
+          // Wrap, not Row: on a narrow chart the controls move to a second
+          // line instead of overflowing and pushing the export buttons away.
+          child: material.Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            crossAxisAlignment: material.WrapCrossAlignment.center,
             children: [
               material.SegmentedButton<QuickChartType>(
                 segments: const [
@@ -279,7 +284,6 @@ class _QuickChartViewState extends material.State<QuickChartView> {
                       setState(() => _topN = (v == null || v == 0) ? null : v),
                 ),
               ],
-              const material.Spacer(),
               if (series.droppedRows > 0) ...[
                 QueryaBadge.status(
                   '${points.length} of ${points.length + series.droppedRows} rows',
