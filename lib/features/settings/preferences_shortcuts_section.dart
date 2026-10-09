@@ -38,7 +38,7 @@ class PreferencesShortcutsSection extends material.StatefulWidget {
           category: 'SQL Editor',
           action: 'Execute all statements',
           keys: [_modKey, 'Shift', 'Enter'],
-          description: 'Runs entire query script sequentially',
+          description: 'Runs the script one statement at a time, stops at the first error',
         ),
         ShortcutItem(
           category: 'SQL Editor',
@@ -75,12 +75,6 @@ class PreferencesShortcutsSection extends material.StatefulWidget {
           action: 'Format SQL statement',
           keys: ['Shift', 'Alt', 'F'],
           description: 'Formats keywords and statement indentation',
-        ),
-        const ShortcutItem(
-          category: 'SQL Editor',
-          action: 'Toggle full-screen editor',
-          keys: ['F11'],
-          description: 'Maximizes the SQL query workspace area',
         ),
 
         // Data Grid

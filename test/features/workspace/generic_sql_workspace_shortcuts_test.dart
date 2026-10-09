@@ -277,4 +277,66 @@ void main() {
 
     expect(state.activeSession.controller.text, isEmpty);
   });
+
+  testWidgets('Ctrl+Enter runs only the statement under the caret', timeout: _timeout,
+      (tester) async {
+    final delegate = FakeSqlExecutionDelegate();
+    final state = await pumpWorkspace(tester, delegate,
+        initialSql: 'SELECT 1; SELECT 2; SELECT 3');
+    // The caret sits inside "SELECT 2".
+    state.activeSession.controller.selection =
+        const TextSelection.collapsed(offset: 12);
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await settle(tester);
+
+    expect(delegate.executed, ['SELECT 2']);
+  });
+
+  testWidgets('a script stops at the first error and points at its statement',
+      timeout: _timeout, (tester) async {
+    final delegate = FakeSqlExecutionDelegate(
+      onExecute: (sql) {
+        if (sql == 'SELECT broken') throw Exception('no such column: broken');
+        return const SqlExecutionResult(affectedRows: 1);
+      },
+    );
+    final state = await pumpWorkspace(
+      tester,
+      delegate,
+      initialSql: 'SELECT 1;\nSELECT 2;\nSELECT broken;\nSELECT 4;\nSELECT 5',
+    );
+
+    unawaited(state.execute());
+    await settle(tester);
+
+    expect(delegate.executed, ['SELECT 1', 'SELECT 2', 'SELECT broken']);
+    expect(
+      state.activeSession.error,
+      'Statement 3 of 5 failed (line 3): Exception: no such column: broken',
+    );
+    expect(state.activeSession.controller.selection.baseOffset, 20);
+    expect(state.activeSession.running, isFalse);
+  });
+
+  testWidgets('a script that succeeds reports its statements and rows',
+      timeout: _timeout, (tester) async {
+    final delegate = FakeSqlExecutionDelegate(
+      onExecute: (_) => const SqlExecutionResult(affectedRows: 2),
+    );
+    final state = await pumpWorkspace(
+      tester,
+      delegate,
+      initialSql: 'INSERT INTO t VALUES (1);\nINSERT INTO t VALUES (2);\nINSERT INTO t VALUES (3)',
+    );
+
+    unawaited(state.execute());
+    await settle(tester);
+
+    expect(delegate.executed, hasLength(3));
+    expect(state.activeSession.statusLine, '3 statements · 6 rows affected');
+    expect(state.activeSession.affectedRows, 6);
+  });
 }
