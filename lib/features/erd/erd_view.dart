@@ -100,7 +100,7 @@ class _ErdViewState extends material.State<ErdView> {
   /// Table under the mouse, the one being dragged, and the one picked by a
   /// click or search: their edges are highlighted. A picked table stays
   /// highlighted when the mouse leaves.
-  String? _hovered;
+  final _hovered = material.ValueNotifier<String?>(null);
   String? _dragging;
   String? _selected;
   bool _routeScheduled = false;
@@ -113,8 +113,8 @@ class _ErdViewState extends material.State<ErdView> {
   final Set<String> _hidden = {};
 
   /// Relation under the pointer and the pointer position in canvas space.
-  ErdRelation? _edgeTip;
-  material.Offset? _edgeTipAt;
+  final _edgeTipNotifier =
+      material.ValueNotifier<(ErdRelation, material.Offset)?>(null);
 
   bool _searchOpen = false;
   String _query = '';
@@ -132,6 +132,8 @@ class _ErdViewState extends material.State<ErdView> {
   @override
   void dispose() {
     _transform.dispose();
+    _hovered.dispose();
+    _edgeTipNotifier.dispose();
     _searchController.dispose();
     _searchFocus.dispose();
     _canvasFocus.dispose();
@@ -290,7 +292,6 @@ class _ErdViewState extends material.State<ErdView> {
 
   /// The table whose relations are highlighted: the one being dragged, then
   /// the picked one, then the one under the mouse.
-  String? get _focusTable => _dragging ?? _selected ?? _hovered;
 
   double get _scale => _transform.value.getMaxScaleOnAxis();
 
@@ -393,14 +394,25 @@ class _ErdViewState extends material.State<ErdView> {
     return out;
   }
 
-  /// The focused table and the tables it is related to.
-  bool _isFocused(ErdSchema schema, String table) {
-    final focus = _focusTable;
+  /// Tables related to each table by a foreign key, either way. Built once per
+  /// build, so the focus test is a set lookup per card.
+  static Map<String, Set<String>> _neighbourMap(ErdSchema schema) {
+    final out = <String, Set<String>>{};
+    for (final r in schema.relations) {
+      out.putIfAbsent(r.fromTable, () => {}).add(r.toTable);
+      out.putIfAbsent(r.toTable, () => {}).add(r.fromTable);
+    }
+    return out;
+  }
+
+  /// Whether [table] is the focus or related to it.
+  static bool _isFocusedIn(
+    Map<String, Set<String>> neighbours,
+    String? focus,
+    String table,
+  ) {
     if (focus == null) return false;
-    if (focus == table) return true;
-    return schema.relations.any((r) =>
-        (r.fromTable == focus && r.toTable == table) ||
-        (r.toTable == focus && r.fromTable == table));
+    return focus == table || (neighbours[focus]?.contains(table) ?? false);
   }
 
   Future<void> _exportPng() async {
@@ -459,17 +471,11 @@ class _ErdViewState extends material.State<ErdView> {
         hit = r.relation;
       }
     }
-    if (hit == null && _edgeTip == null) return;
-    setState(() {
-      _edgeTip = hit;
-      _edgeTipAt = p;
-    });
+    // Only the tip layer listens: no rebuild of the view for a hover move.
+    _edgeTipNotifier.value = hit == null ? null : (hit, p);
   }
 
-  void _leaveCanvas() {
-    if (_edgeTip == null) return;
-    setState(() => _edgeTip = null);
-  }
+  void _leaveCanvas() => _edgeTipNotifier.value = null;
 
   /// "orders.customer_id → customers.id" next to the pointer.
   material.Widget _edgeTipLabel(material.BuildContext context, ErdRelation r) {
@@ -619,7 +625,12 @@ class _ErdViewState extends material.State<ErdView> {
                       // Empty canvas: a tap clears the selection.
                       behavior: material.HitTestBehavior.translucent,
                       onTap: _clearSelection,
-                      child: material.Stack(
+                      child: material.ValueListenableBuilder<String?>(
+                        valueListenable: _hovered,
+                        builder: (context, hovered, _) {
+                          final focus = _dragging ?? _selected ?? hovered;
+                          final neighbours = _neighbourMap(schema);
+                          return material.Stack(
                         children: [
                           // Lowest layer: sees the pointer wherever no card is,
                           // so edges can name themselves on hover.
@@ -637,7 +648,7 @@ class _ErdViewState extends material.State<ErdView> {
                                 routes: _routes,
                                 color: wb.mutedForeground,
                                 highlight: wb.accent,
-                                focus: _focusTable,
+                                focus: focus,
                               ),
                             ),
                           ),
@@ -648,7 +659,7 @@ class _ErdViewState extends material.State<ErdView> {
                               child: material.Opacity(
                                 // Unrelated cards fade while a table is picked.
                                 opacity: _selected != null &&
-                                        !_isFocused(schema, t.name)
+                                        !_isFocusedIn(neighbours, focus, t.name)
                                     ? 0.35
                                     : 1,
                                 child: ContextMenu(
@@ -678,19 +689,19 @@ class _ErdViewState extends material.State<ErdView> {
                                   ],
                                   child: _TableCard(
                                   table: t,
-                                  highlighted: _isFocused(schema, t.name),
+                                  highlighted:
+                                      _isFocusedIn(neighbours, focus, t.name),
                                   dragging: _dragging == t.name,
                                   onOpen: widget.onOpenTable == null
                                       ? null
                                       : () => widget.onOpenTable!(t.name),
                                   onSelect: () =>
                                       setState(() => _selected = t.name),
-                                  onHover: (inside) => setState(() => _hovered =
-                                      inside
-                                          ? t.name
-                                          : (_hovered == t.name
-                                              ? null
-                                              : _hovered)),
+                                  onHover: (inside) => _hovered.value = inside
+                                      ? t.name
+                                      : (_hovered.value == t.name
+                                          ? null
+                                          : _hovered.value),
                                   onDragStart: () => _dragStart(t.name),
                                   onDragMove: (d) => _dragMove(t.name, d),
                                   onDragEnd: _dragEnd,
@@ -698,15 +709,29 @@ class _ErdViewState extends material.State<ErdView> {
                                 ),
                               ),
                             ),
-                          if (_edgeTip != null && _edgeTipAt != null)
-                            material.Positioned(
-                              left: _edgeTipAt!.dx + 12,
-                              top: _edgeTipAt!.dy + 12,
-                              child: material.IgnorePointer(
-                                child: _edgeTipLabel(context, _edgeTip!),
+                          material.Positioned.fill(
+                            child: material.IgnorePointer(
+                              child: material.ValueListenableBuilder<
+                                  (ErdRelation, material.Offset)?>(
+                                valueListenable: _edgeTipNotifier,
+                                builder: (context, tip, _) => tip == null
+                                    ? const material.SizedBox.shrink()
+                                    : material.Stack(
+                                        children: [
+                                          material.Positioned(
+                                            left: tip.$2.dx + 12,
+                                            top: tip.$2.dy + 12,
+                                            child: _edgeTipLabel(
+                                                context, tip.$1),
+                                          ),
+                                        ],
+                                      ),
                               ),
                             ),
+                          ),
                         ],
+                          );
+                        },
                       ),
                     ),
                   ),
