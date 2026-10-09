@@ -17,7 +17,7 @@ import 'core/theme/theme_controller.dart';
 import 'features/updater/update_controller.dart';
 
 void main([List<String> args = const []]) async {
-  runZonedGuarded(() async {
+  unawaited(runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
     FileLaunchService.instance.processLaunchArguments(args);
 
@@ -46,5 +46,5 @@ void main([List<String> args = const []]) async {
     });
   }, (error, stack) {
     debugPrint('Unhandled async error: $error\n$stack');
-  });
+  }));
 }

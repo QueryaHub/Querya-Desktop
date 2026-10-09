@@ -34,8 +34,12 @@ class _FakePlugin implements HarnessPluginProcess {
   final calls = <String>[];
   final _stdout = StreamController<List<int>>();
   final _stderr = StreamController<List<int>>();
+  // The fake owns this stream for the whole test.
+  // ignore: close_sinks
   final _stdinController = StreamController<List<int>>();
   final _exit = Completer<int>();
+  // The fake owns this stream for the whole test.
+  // ignore: close_sinks
   late final IOSink _stdin = IOSink(_stdinController);
 
   void _reply(Map<String, Object?> body) {

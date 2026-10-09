@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
@@ -116,10 +117,10 @@ void main() {
       (tester) async {
     final ctx = await pumpHost(tester);
 
-    showAppDialog<void>(
+    unawaited(showAppDialog<void>(
       context: ctx,
       builder: (c) => const SimpleDialog(title: Text('X')),
-    );
+    ));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 40));
     expect(find.byType(BackdropFilter), findsWidgets);
@@ -146,10 +147,10 @@ void main() {
         (tester) async {
       final ctx = await pumpHost(tester);
 
-      showAppDialog<void>(
+      unawaited(showAppDialog<void>(
         context: ctx,
         builder: (c) => const SimpleDialog(title: Text('Blur')),
-      );
+      ));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 40));
 
@@ -171,10 +172,10 @@ void main() {
     testWidgets('settles at full blur and tint', (tester) async {
       final ctx = await pumpHost(tester);
 
-      showAppDialog<void>(
+      unawaited(showAppDialog<void>(
         context: ctx,
         builder: (c) => const SimpleDialog(title: Text('Settled')),
-      );
+      ));
       await tester.pumpAndSettle();
 
       final filter = tester.widget<BackdropFilter>(find.byType(BackdropFilter));
@@ -214,10 +215,10 @@ void main() {
 
   testWidgets('enter uses standard duration under full motion', (tester) async {
     final ctx = await pumpHost(tester);
-    showAppDialog<void>(
+    unawaited(showAppDialog<void>(
       context: ctx,
       builder: (c) => const AlertDialog(title: Text('Timed')),
-    );
+    ));
     await tester.pump();
 
     final route = ModalRoute.of(tester.element(find.text('Timed')));

@@ -67,7 +67,11 @@ class FakeSshServer {
 
 /// A transport that carries nothing; the fake client never reads it.
 class FakeSshSocket implements SSHSocket {
+  // The fake owns this stream for the whole test.
+  // ignore: close_sinks
   final _in = StreamController<Uint8List>();
+  // The fake owns this stream for the whole test.
+  // ignore: close_sinks
   final _out = StreamController<List<int>>();
 
   @override

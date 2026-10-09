@@ -116,18 +116,25 @@ class McpSocketHost {
         unawaited(onSession(StreamChannel.withCloseGuarantee(
             incoming.stream, outgoing.sink)));
       },
-      onDone: () => _closed(socket, incoming, authed),
-      onError: (_) => _closed(socket, incoming, authed),
+      onDone: () => _closed(socket, incoming, outgoing, authed),
+      onError: (_) => _closed(socket, incoming, outgoing, authed),
       cancelOnError: true,
     );
   }
 
-  void _closed(Socket socket, StreamController<String> incoming, bool authed) {
+  void _closed(
+    Socket socket,
+    StreamController<String> incoming,
+    StreamController<String> outgoing,
+    bool authed,
+  ) {
     if (_sockets.remove(socket) && authed) {
       _sessions--;
       _changes.add(null);
     }
     unawaited(incoming.close());
+    // The channel guarantees no write after the incoming side closed.
+    unawaited(outgoing.close());
     socket.destroy();
   }
 
