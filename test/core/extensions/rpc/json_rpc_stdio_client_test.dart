@@ -160,7 +160,7 @@ void main() {
       var peakAhead = 0;
       var handled = 0;
       for (final r in replies) {
-        r.then((_) => handled++);
+        unawaited(r.then((_) => handled++));
       }
       final watcher = Timer.periodic(const Duration(milliseconds: 1), (_) {
         peakAhead = math.max(peakAhead, produced - handled);

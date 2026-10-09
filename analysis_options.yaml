@@ -22,4 +22,8 @@ linter:
   rules:
     - prefer_const_constructors
     - prefer_const_declarations
+    - unawaited_futures
+    - cancel_subscriptions
+    - close_sinks
+    - avoid_void_async
 

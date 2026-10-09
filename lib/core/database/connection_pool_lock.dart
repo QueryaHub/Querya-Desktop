@@ -31,7 +31,7 @@ class PoolEntryLock<T> {
         // Ensure the pending entry is removed once the creation finishes, and
         // swallow errors on the cleanup chain so they don't become unhandled.
         final guarded = future.whenComplete(() => _pending.remove(key));
-        guarded.then((_) {}, onError: (_) {});
+        unawaited(guarded.then((_) {}, onError: (_) {}));
         result = future;
       }
     } finally {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -566,7 +567,7 @@ void main() {
 
     test('a dropped SSH connection is replaced, not reused', () async {
       final first = await open();
-      server.clients.single.close();
+      unawaited(server.clients.single.close());
 
       final second = await open();
 
@@ -582,7 +583,7 @@ void main() {
     test('a handle from a replaced session cannot release its successor',
         () async {
       final stale = await open();
-      server.clients.single.close();
+      unawaited(server.clients.single.close());
       final fresh = await open();
 
       await stale.release();

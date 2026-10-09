@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/features/workspace/save_error_description.dart';
@@ -111,10 +113,10 @@ void main() {
       ),
     ));
 
-    showTableViewSaveFailedDialog(
+    unawaited(showTableViewSaveFailedDialog(
       context: ctx,
       error: Exception('NOT NULL constraint failed: users.full_name'),
-    );
+    ));
     await tester.pumpAndSettle();
 
     expect(find.text('Missing required value'), findsOneWidget);

@@ -32,6 +32,8 @@ class _FakeProcess implements Process {
   int get pid => 7;
 
   @override
+  // The fake owns this stream for the whole test.
+  // ignore: close_sinks
   late final IOSink stdin;
 
   @override

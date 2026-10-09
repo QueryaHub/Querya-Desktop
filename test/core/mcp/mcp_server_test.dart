@@ -45,7 +45,11 @@ class _Session {
   final StreamController<List<int>> _toShim;
 
   static Future<_Session> open(File endpoint) async {
+    // The fake owns this stream for the whole test.
+    // ignore: close_sinks
     final toShim = StreamController<List<int>>();
+    // The fake owns this stream for the whole test.
+    // ignore: close_sinks
     final fromShim = StreamController<List<int>>();
     final shimDone = runMcpShim(
       input: toShim.stream,

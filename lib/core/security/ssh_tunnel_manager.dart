@@ -80,10 +80,10 @@ class _PooledTunnelSession {
       await serverSocket.close();
     } catch (_) {}
     try {
-      client.close();
+      unawaited(client.close());
     } catch (_) {}
     try {
-      jumpClient?.close();
+      unawaited(jumpClient?.close());
     } catch (_) {}
   }
 }
@@ -274,8 +274,8 @@ class SshTunnelManager {
     try {
       await client.authenticated;
     } catch (e) {
-      client.close();
-      jumpClient?.close();
+      unawaited(client.close());
+      unawaited(jumpClient?.close());
       if (observedFingerprint != null &&
           config.knownHostFingerprint != null &&
           config.knownHostFingerprint!.isNotEmpty) {
@@ -303,8 +303,8 @@ class SshTunnelManager {
       (clientSocket) async {
         try {
           final forward = await client.forwardLocal(remoteHost, remotePort);
-          forward.stream.cast<List<int>>().pipe(clientSocket).catchError((_) {});
-          clientSocket.cast<List<int>>().pipe(forward.sink).catchError((_) {});
+          unawaited(forward.stream.cast<List<int>>().pipe(clientSocket).catchError((_) {}));
+          unawaited(clientSocket.cast<List<int>>().pipe(forward.sink).catchError((_) {}));
         } catch (e) {
           clientSocket.destroy();
         }
@@ -461,7 +461,7 @@ class SshTunnelManager {
             testRemoteHost.trim(),
             testRemotePort,
           );
-          forward.close();
+          unawaited(forward.close());
         } catch (e) {
           return SshTestResult(
             ok: false,
@@ -483,8 +483,8 @@ class SshTunnelManager {
         error: 'SSH Connection failed: $e',
       );
     } finally {
-      client?.close();
-      jumpClient?.close();
+      unawaited(client?.close());
+      unawaited(jumpClient?.close());
     }
   }
 }

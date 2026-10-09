@@ -399,7 +399,7 @@ class MongoConnection {
         _openedDbs[databaseName] = db;
         return db;
       } finally {
-        _openingDbs.remove(databaseName);
+        unawaited(_openingDbs.remove(databaseName));
       }
     });
   }

@@ -32,6 +32,8 @@ class _FakeProcess implements Process {
   int get pid => 4242;
 
   @override
+  // The fake owns this stream for the whole test.
+  // ignore: close_sinks
   late final IOSink stdin;
 
   @override
@@ -131,6 +133,8 @@ void main() {
   group('JsonRpcStdioClient', () {
     test('sends request and completes with result', () async {
       final stdout = StreamController<List<int>>();
+      // The fake owns this stream for the whole test.
+      // ignore: close_sinks
       final stdin = StreamController<List<int>>();
       final client = JsonRpcStdioClient(
         stdout: stdout.stream,
@@ -158,6 +162,8 @@ void main() {
 
     test('maps JSON-RPC errors', () async {
       final stdout = StreamController<List<int>>();
+      // The fake owns this stream for the whole test.
+      // ignore: close_sinks
       final stdin = StreamController<List<int>>();
       final client = JsonRpcStdioClient(
         stdout: stdout.stream,
