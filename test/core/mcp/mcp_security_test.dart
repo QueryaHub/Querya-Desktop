@@ -212,6 +212,41 @@ void main() {
     }
   });
 
+  group('values and comments in unexpected places (#1231)', () {
+    // Each case is refused by the rule that matches where the write hides.
+    final placements = <(String, SqlDialect, String)>[
+      // A comment that looks like it hides the separator does not: the
+      // splitter sees the real `;` after it.
+      ('SELECT 1 /* ; */; DROP TABLE t', SqlDialect.postgres, 'single_statement'),
+      ('SELECT 1 -- ;\n; DROP TABLE t', SqlDialect.postgres, 'single_statement'),
+      // Dollar quoting keeps the `;` inside the string; the one after it splits.
+      ('SELECT \$\$ ; \$\$; DROP TABLE t', SqlDialect.postgres, 'single_statement'),
+      // A write nested in a CTE, behind a leading WITH.
+      ('WITH d AS (DELETE FROM t RETURNING *) SELECT * FROM d',
+          SqlDialect.postgres, 'data_modifying'),
+      // MySQL executes the body of an executable comment.
+      ('SELECT 1 /*!50000 ; DROP TABLE t */', SqlDialect.mysql,
+          'mysql_executable_comment'),
+      // Row locks hidden at the end of a read.
+      ('SELECT 1 FROM t WHERE id = 1 FOR UPDATE', SqlDialect.postgres,
+          'select_into_or_lock'),
+    ];
+
+    for (final (sql, dialect, rule) in placements) {
+      test('${dialect.name}: ${sql.replaceAll('\n', ' ')} -> $rule', () {
+        expect(McpSqlGuard.refusal(sql, dialect)?.rule, rule);
+      });
+    }
+
+    test('a write keyword inside a string literal is a value, not a write', () {
+      expect(
+        McpSqlGuard.refusal(
+            "SELECT 'DELETE FROM t; DROP TABLE t' AS note", SqlDialect.postgres),
+        isNull,
+      );
+    });
+  });
+
   group('no secret leaves through any tool', () {
     late FakeSqlExecutionDelegate db;
     late ServerConnection conn;
