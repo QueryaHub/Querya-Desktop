@@ -84,7 +84,8 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
 
-      expect(find.textContaining('Execute'), findsWidgets);
+      // The label hides on a narrow window; the button keeps its key.
+      expect(find.byKey(const material.ValueKey('run_script')), findsOneWidget);
     });
   });
 
