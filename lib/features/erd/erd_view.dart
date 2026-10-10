@@ -11,7 +11,6 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart'
     show Clipboard, ClipboardData, HardwareKeyboard, LogicalKeyboardKey;
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
-import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/erd/erd_canvas_controls.dart';
 import 'package:querya_desktop/features/erd/erd_card_measure.dart';
 import 'package:querya_desktop/core/erd/erd_catalog.dart';
@@ -26,6 +25,8 @@ import 'package:querya_desktop/features/erd/erd_layout.dart';
 import 'package:querya_desktop/core/erd/erd_model.dart';
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
 import 'package:querya_desktop/features/erd/erd_router.dart';
+import 'package:querya_desktop/features/erd/widgets/erd_relation_painter.dart';
+import 'package:querya_desktop/features/erd/widgets/erd_table_card.dart';
 import 'package:querya_desktop/core/export/image_pdf.dart';
 import 'package:querya_desktop/core/export/svg_png.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
@@ -38,6 +39,12 @@ import 'package:querya_desktop/shared/widgets/querya_action_button.dart';
 import 'package:querya_desktop/shared/widgets/querya_spinner.dart';
 import 'package:querya_desktop/shared/widgets/querya_tab_strip.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+
+// Moved out of this file (#1362); re-exported for existing importers.
+export 'package:querya_desktop/features/erd/widgets/erd_relation_painter.dart'
+    show roundedPath;
+export 'package:querya_desktop/features/erd/widgets/erd_table_card.dart'
+    show erdCardBuilds;
 
 /// Saves an exported diagram file; replaceable in tests.
 typedef ErdFileSaver = Future<void> Function(String name, Uint8List bytes);
@@ -67,17 +74,6 @@ enum _ExportAction {
   copyDbml,
   toggleTheme,
 }
-
-/// A card's focus: related to the focused table, and faded while another
-/// table is picked and this one is not related to it.
-/// A card's share of the focus: highlighted, faded, and the column of a
-/// picked relation on it, if any.
-typedef _CardFocus = ({bool highlighted, bool faded, String? column});
-
-/// Card builds so far. A test seam: hovering one card must not rebuild the
-/// others.
-@visibleForTesting
-int erdCardBuilds = 0;
 
 class ErdView extends material.StatefulWidget {
   const ErdView({
@@ -150,7 +146,7 @@ class _ErdViewState extends material.State<ErdView> {
   /// [_cardStates]; [_syncFocus] moves only the ones whose focus changed, so a
   /// hover rebuilds the cards it touches and not the whole canvas.
   final _focus = material.ValueNotifier<String?>(null);
-  final _cardStates = <String, material.ValueNotifier<_CardFocus>>{};
+  final _cardStates = <String, material.ValueNotifier<ErdCardFocus>>{};
   Map<String, Set<String>> _neighbours = const {};
 
   /// Density: only PK and FK columns, cards collapsed to their header, and
@@ -1389,7 +1385,7 @@ class _ErdViewState extends material.State<ErdView> {
   /// the one under the mouse.
   String? _currentFocus() => _dragging ?? _selected ?? _hovered.value;
 
-  _CardFocus _cardFocusFor(String table, String? focus) {
+  ErdCardFocus _cardFocusFor(String table, String? focus) {
     final p = _pickedRelation;
     if (p != null) {
       final on = table == p.fromTable || table == p.toTable;
@@ -1407,7 +1403,7 @@ class _ErdViewState extends material.State<ErdView> {
   }
 
   /// The notifier of card [table], made on first use with its current focus.
-  material.ValueNotifier<_CardFocus> _cardState(String table) =>
+  material.ValueNotifier<ErdCardFocus> _cardState(String table) =>
       _cardStates.putIfAbsent(
         table,
         () => material.ValueNotifier(_cardFocusFor(table, _currentFocus())),
@@ -2161,7 +2157,7 @@ class _ErdViewState extends material.State<ErdView> {
                               valueListenable: _focus,
                               builder: (context, focus, _) =>
                                   material.CustomPaint(
-                                painter: _RelationPainter(
+                                painter: ErdRelationPainter(
                                   routes: _routes,
                                   color: wb.mutedForeground,
                                   highlight: wb.accent,
@@ -2177,7 +2173,7 @@ class _ErdViewState extends material.State<ErdView> {
                               top: layout.positions[t.name]!.dy,
                               // Each card listens to its own focus, so a hover
                               // rebuilds only the cards it changes.
-                              child: material.ValueListenableBuilder<_CardFocus>(
+                              child: material.ValueListenableBuilder<ErdCardFocus>(
                                 valueListenable: _cardState(t.name),
                                 builder: (context, focus, _) => material.Opacity(
                                   // Unrelated cards fade while a table is picked.
@@ -2251,7 +2247,7 @@ class _ErdViewState extends material.State<ErdView> {
                                       child: const Text('Header colour'),
                                     ),
                                   ],
-                                  child: _TableCard(
+                                  child: ErdTableCard(
                                   table: t,
                                   width: layout.widthFor(t.name),
                                   headerColor: _headerColor(t.name),
@@ -2496,400 +2492,4 @@ class _ErdViewState extends material.State<ErdView> {
       ],
     );
   }
-}
-
-class _TableCard extends material.StatelessWidget {
-  const _TableCard({
-    required this.table,
-    required this.width,
-    required this.headerColor,
-    required this.highlighted,
-    this.marked = false,
-    this.focusColumn,
-    this.junctionOf,
-    required this.dragging,
-    required this.onHover,
-    required this.onDragStart,
-    required this.onDragMove,
-    required this.onDragEnd,
-    this.onOpen,
-    this.onSelect,
-  });
-
-  final ErdTable table;
-
-  /// From the layout: sized to the card's content (#1276).
-  final double width;
-
-  /// Header tint and icon: by schema, picked per table, or the accent.
-  final material.Color headerColor;
-  final bool highlighted;
-
-  /// Marked for a group with Shift / Ctrl + click (#1282).
-  final bool marked;
-
-  /// The column of a picked relation on this card, shaded (#1281).
-  final String? focusColumn;
-
-  /// For a many-to-many link table: the tables it links.
-  final String? junctionOf;
-  final bool dragging;
-  final material.VoidCallback? onOpen;
-  final material.VoidCallback? onSelect;
-  final void Function(bool inside) onHover;
-  final material.VoidCallback onDragStart;
-  final void Function(material.Offset delta) onDragMove;
-  final material.VoidCallback onDragEnd;
-
-  /// Everything a row knows, one fact a line.
-  static String _columnTip(ErdColumn c) => [
-        '${c.name}  ${c.type}',
-        if (c.isPrimaryKey) 'Primary key',
-        if (c.isForeignKey) 'Foreign key',
-        c.isNullable ? 'Nullable' : 'Not null',
-        if (c.isUnique && !c.isPrimaryKey) 'Unique',
-        if (c.isIdentity) 'Generated (identity / auto increment)',
-        if (c.defaultValue case final d?) 'Default: $d',
-        if (c.domainBase case final b?) 'Domain over $b',
-        if (c.enumValues.isNotEmpty) 'Values: ${_enumList(c.enumValues)}',
-        if (c.comment case final n?) 'Note: $n',
-      ].join('\n');
-
-  /// At most [cap] labels, then how many more.
-  static String _enumList(List<String> values, {int cap = 12}) =>
-      values.length <= cap
-          ? values.join(', ')
-          : '${values.take(cap).join(', ')} (+${values.length - cap} more)';
-
-  /// Shadows read only on light surfaces, so a dark canvas gets twice the alpha.
-  double _shadowAlpha(material.Color canvas) {
-    final base = dragging ? 0.28 : 0.12;
-    return canvas.computeLuminance() < 0.5 ? base * 2 : base;
-  }
-
-  @override
-  material.Widget build(material.BuildContext context) {
-    erdCardBuilds++;
-    final wb = context.workbench;
-    final palette = context.semanticPalette;
-    final radius = material.BorderRadius.circular(8);
-    return material.MouseRegion(
-        cursor: dragging
-            ? material.SystemMouseCursors.grabbing
-            : material.SystemMouseCursors.grab,
-        onEnter: (_) => onHover(true),
-        onExit: (_) => onHover(false),
-        // The card's pan recognizer joins the arena before the canvas's one
-        // and wins it, so dragging a card never pans the canvas. `down`
-        // reports the movement from the press, slop included.
-        child: material.GestureDetector(
-          key: material.ValueKey('erd_table_${table.name}'),
-          dragStartBehavior: DragStartBehavior.down,
-          onTap: onSelect,
-          onDoubleTap: onOpen,
-          onPanStart: (_) => onDragStart(),
-          onPanUpdate: (d) => onDragMove(d.delta),
-          onPanEnd: (_) => onDragEnd(),
-          onPanCancel: onDragEnd,
-          child: material.Container(
-            width: width,
-            height: ErdLayout.cardHeight(table),
-            decoration: material.BoxDecoration(
-              color: wb.surface,
-              borderRadius: radius,
-              border: material.Border.all(
-                color: highlighted || marked ? wb.accent : wb.borderSubtle,
-                width: highlighted ? 1.5 : 1,
-              ),
-              boxShadow: [
-                // A marked card gets a ring outside it, so its content area
-                // is the one the card was measured for.
-                if (marked)
-                  material.BoxShadow(color: wb.accent, spreadRadius: 2.5),
-                material.BoxShadow(
-                  color: wb.shadow.withValues(alpha: _shadowAlpha(wb.canvas)),
-                  blurRadius: dragging ? 18 : 8,
-                  offset: material.Offset(0, dragging ? 6 : 2),
-                ),
-              ],
-            ),
-            child: material.ClipRRect(
-              borderRadius: radius,
-              child: material.Column(
-                crossAxisAlignment: material.CrossAxisAlignment.start,
-                children: [
-                  material.Container(
-                    height: ErdLayout.headerHeight,
-                    color: headerColor.withValues(
-                        alpha: highlighted ? 0.18 : 0.10),
-                    padding: const material.EdgeInsets.symmetric(horizontal: 10),
-                    child: material.Row(
-                      children: [
-                        material.Icon(material.Icons.table_chart_outlined,
-                            size: 14, color: headerColor),
-                        const material.SizedBox(width: 6),
-                        material.Expanded(
-                          child: Text(table.name,
-                              maxLines: 1,
-                              overflow: material.TextOverflow.ellipsis,
-                              style: const material.TextStyle(
-                                  fontWeight: material.FontWeight.w600,
-                                  fontSize: 13)),
-                        ),
-                        // The table's comment in the database (#1279).
-                        if (table.comment case final note?) ...[
-                          material.Tooltip(
-                            message: note,
-                            child: material.Icon(material.Icons.notes_rounded,
-                                key: material.ValueKey(
-                                    'erd_note_${table.name}'),
-                                size: 13,
-                                color: wb.mutedForeground),
-                          ),
-                          const material.SizedBox(width: 6),
-                        ],
-                        // A many-to-many link table (#1281).
-                        if (junctionOf case final linked?) ...[
-                          material.Tooltip(
-                            message: 'Link table: many-to-many between $linked',
-                            child: Text('M:N',
-                                key: material.ValueKey(
-                                    'erd_junction_${table.name}'),
-                                style: material.TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: material.FontWeight.w700,
-                                    color: headerColor)),
-                          ),
-                          const material.SizedBox(width: 6),
-                        ],
-                        Text('${table.columns.length}',
-                            style: material.TextStyle(
-                                fontSize: 10, color: wb.mutedForeground)),
-                      ],
-                    ),
-                  ),
-                  for (final c in table.columns)
-                    material.Container(
-                      key: c.name == focusColumn
-                          ? material.ValueKey(
-                              'erd_focus_column_${table.name}_${c.name}')
-                          : null,
-                      height: ErdLayout.rowHeight,
-                      // The column of a picked relation (#1281).
-                      color: c.name == focusColumn
-                          ? wb.accent.withValues(alpha: 0.14)
-                          : null,
-                      child: material.Tooltip(
-                        message: _columnTip(c),
-                        child: material.Padding(
-                          padding: const material.EdgeInsets.symmetric(
-                              horizontal: 10),
-                          child: material.Row(
-                            children: [
-                              // A column can be both PK and FK (junction
-                              // tables), so both markers get a slot.
-                              material.SizedBox(
-                                width: 26,
-                                child: material.Row(
-                                  mainAxisSize: material.MainAxisSize.min,
-                                  children: [
-                                    if (c.isPrimaryKey)
-                                      material.Icon(material.Icons.key_rounded,
-                                          size: 11, color: palette.type1),
-                                    if (c.isPrimaryKey && c.isForeignKey)
-                                      const material.SizedBox(width: 4),
-                                    if (c.isForeignKey)
-                                      material.Icon(material.Icons.link_rounded,
-                                          size: 11, color: palette.type2),
-                                  ],
-                                ),
-                              ),
-                              // The card is measured to fit both; at its
-                              // maximum width the name gives way.
-                              material.Expanded(
-                                child: Text(c.name,
-                                    maxLines: 1,
-                                    overflow: material.TextOverflow.ellipsis,
-                                    style: material.TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: c.isPrimaryKey
-                                          ? material.FontWeight.w600
-                                          : material.FontWeight.normal,
-                                    )),
-                              ),
-                              const material.SizedBox(width: 8),
-                              material.ConstrainedBox(
-                                // Only a card at its maximum width has to
-                                // share: then the type keeps half the row.
-                                constraints: material.BoxConstraints(
-                                    maxWidth: width >= ErdLayout.maxCardWidth
-                                        ? (width - 56) / 2
-                                        : double.infinity),
-                                child: Text(c.isNullable ? '${c.type}?' : c.type,
-                                    maxLines: 1,
-                                    overflow: material.TextOverflow.ellipsis,
-                                    style: material.TextStyle(
-                                        fontSize: 10,
-                                        fontFamily: QueryaTypography.mono,
-                                        fontFamilyFallback:
-                                            QueryaTypography.monoFontFamilyFallback,
-                                        color: wb.mutedForeground)),
-                              ),
-                              if (c.comment != null) ...[
-                                const material.SizedBox(width: 3),
-                                material.Icon(material.Icons.notes_rounded,
-                                    key: material.ValueKey(
-                                        'erd_note_${table.name}_${c.name}'),
-                                    size: 10,
-                                    color: wb.mutedForeground),
-                              ],
-                              // UQ / AI / DF after the type (#1277).
-                              for (final b in c.badges) ...[
-                                const material.SizedBox(width: 3),
-                                Text(b,
-                                    key: material.ValueKey(
-                                        'erd_badge_${table.name}_${c.name}_$b'),
-                                    style: material.TextStyle(
-                                        fontSize: 9,
-                                        fontWeight: material.FontWeight.w700,
-                                        color: switch (b) {
-                                          'EN' => palette.type5,
-                                          'UQ' => palette.type3,
-                                          'AI' => palette.type4,
-                                          _ => wb.mutedForeground,
-                                        })),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-      ),
-    );
-  }
-}
-
-class _RelationPainter extends material.CustomPainter {
-  _RelationPainter({
-    required this.routes,
-    required this.color,
-    required this.highlight,
-    required this.focus,
-    this.picked,
-  });
-
-  final List<ErdRoute> routes;
-  final material.Color color;
-  final material.Color highlight;
-
-  /// Table whose relations are drawn on top in [highlight].
-  final String? focus;
-
-  /// A relation picked by a click: only it is drawn in [highlight] (#1281).
-  final ErdRelation? picked;
-
-  bool get _anyFocus => picked != null || focus != null;
-
-  bool _focused(ErdRoute r) {
-    final p = picked;
-    if (p != null) return r.relation.sameAs(p);
-    return focus != null &&
-        (r.relation.fromTable == focus || r.relation.toTable == focus);
-  }
-
-  void _label(material.Canvas canvas, String text, material.Offset at,
-      material.Color c) {
-    final tp = material.TextPainter(
-      text: material.TextSpan(
-          text: text,
-          style: material.TextStyle(
-              fontSize: 10, color: c, fontWeight: material.FontWeight.w600)),
-      textDirection: material.TextDirection.ltr,
-    )..layout();
-    tp.paint(canvas, at - material.Offset(tp.width / 2, tp.height / 2));
-    tp.dispose();
-  }
-
-  @override
-  void paint(material.Canvas canvas, material.Size size) {
-    // Others first, focused on top.
-    for (final pass in [false, true]) {
-      for (final r in routes) {
-        if (_focused(r) != pass || r.points.length < 2) continue;
-        final paint = material.Paint()
-          ..color = pass
-              ? highlight
-              : color.withValues(alpha: _anyFocus ? 0.35 : 0.85)
-          ..style = material.PaintingStyle.stroke
-          ..strokeWidth = pass ? 2 : 1.4
-          ..strokeCap = material.StrokeCap.round
-          ..strokeJoin = material.StrokeJoin.round;
-        canvas.drawPath(roundedPath(r.points), paint);
-        // FK end: a crow's foot ("many"), or a bar when the FK column is
-        // unique on its own ("one", #1281).
-        if (r.relation.oneToOne) {
-          final (oa, ob) = ErdGeometry.oneBar(r.points[0], r.points[1]);
-          canvas.drawLine(oa, ob, paint);
-        } else {
-          for (final (a, b)
-              in ErdGeometry.crowFoot(r.points[0], r.points[1])) {
-            canvas.drawLine(a, b, paint);
-          }
-        }
-        // FK side: a circle when the column may be NULL ("zero or many"), a
-        // bar otherwise ("one or many").
-        if (r.relation.optional) {
-          final (c, radius) =
-              ErdGeometry.optionalCircle(r.points[0], r.points[1]);
-          canvas.drawCircle(c, radius, paint);
-        } else {
-          final (fa, fb) =
-              ErdGeometry.oneBar(r.points[0], r.points[1], distance: 17);
-          canvas.drawLine(fa, fb, paint);
-        }
-        final (barA, barB) =
-            ErdGeometry.oneBar(r.points.last, r.points[r.points.length - 2]);
-        canvas.drawLine(barA, barB, paint);
-        // Cardinality labels, as dbdiagram writes them.
-        _label(canvas, r.relation.oneToOne ? '1' : '*',
-            ErdGeometry.endLabel(r.points[0], r.points[1]), paint.color);
-        _label(
-            canvas,
-            '1',
-            ErdGeometry.endLabel(
-                r.points.last, r.points[r.points.length - 2]),
-            paint.color);
-      }
-    }
-  }
-
-  /// Edges take no pointer: a CustomPaint is hit everywhere by default, which
-  /// hid the pointer from the hover layer below and so the edge label never
-  /// showed.
-  @override
-  bool? hitTest(material.Offset position) => false;
-
-  @override
-  bool shouldRepaint(_RelationPainter old) =>
-      old.routes != routes ||
-      old.color != color ||
-      old.highlight != highlight ||
-      old.focus != focus ||
-      old.picked != picked;
-}
-
-/// Polyline with corners rounded by up to 8 px.
-material.Path roundedPath(List<material.Offset> pts, {double radius = 8}) {
-  final path = material.Path()..moveTo(pts.first.dx, pts.first.dy);
-  for (final (p1, corner, p2) in ErdGeometry.corners(pts, radius: radius)) {
-    path
-      ..lineTo(p1.dx, p1.dy)
-      ..quadraticBezierTo(corner.dx, corner.dy, p2.dx, p2.dy);
-  }
-  path.lineTo(pts.last.dx, pts.last.dy);
-  return path;
 }
