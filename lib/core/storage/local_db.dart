@@ -611,9 +611,38 @@ class LocalDb {
     await db.insert('folders', {'name': n});
   }
 
+  /// Removes the folder **and the connections in it** (the foreign key
+  /// cascades), so their secrets go with them: the cascade does not reach the
+  /// OS keychain.
   Future<void> removeFolder(String name) async {
     final db = await _open();
+    final inside = await db.rawQuery(
+      'SELECT c.id AS id FROM connections c '
+      'JOIN folders f ON f.id = c.folder_id WHERE f.name = ?',
+      [name],
+    );
+    for (final row in inside) {
+      final id = _sqliteInt(row['id']);
+      if (id == null) continue;
+      _historyInsertCounts.removeWhere((k, _) => k.startsWith('$id::'));
+      try {
+        await ConnectionSecretsStore.deleteForConnection(id);
+      } catch (_) {
+        // Do not block removing the folder when the OS store fails.
+      }
+    }
     await db.delete('folders', where: 'name = ?', whereArgs: [name]);
+  }
+
+  /// How many connections [removeFolder] would delete.
+  Future<int> countConnectionsInFolder(String name) async {
+    final db = await _open();
+    final rows = await db.rawQuery(
+      'SELECT COUNT(*) AS n FROM connections c '
+      'JOIN folders f ON f.id = c.folder_id WHERE f.name = ?',
+      [name],
+    );
+    return _sqliteInt(rows.first['n']) ?? 0;
   }
 
   Future<void> clearFolders() async {
