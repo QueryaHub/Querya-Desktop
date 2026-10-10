@@ -5,6 +5,7 @@ import 'package:querya_desktop/core/actions/querya_command_host.dart';
 import 'package:querya_desktop/core/actions/querya_schema_object.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/features/command_palette/command_match_highlight.dart';
+import 'package:querya_desktop/features/command_palette/list_reveal.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Threshold where filter runs on a worker isolate (hundreds of tables).
@@ -53,7 +54,16 @@ class QuickSwitcherDialog extends StatefulWidget {
 class _QuickSwitcherDialogState extends State<QuickSwitcherDialog> {
   late final TextEditingController _controller;
   final _focusNode = FocusNode();
+  final _scroll = material.ScrollController();
   var _selected = 0;
+
+  /// Set by keyboard navigation: the list moves under a still pointer, and the
+  /// hover that causes must not take the selection back. Cleared as soon as
+  /// the mouse really moves.
+  var _ignoreHover = false;
+
+  static const _itemExtent = 40.0;
+  static const _listPadding = EdgeInsets.fromLTRB(8, 4, 8, 8);
   var _loading = false;
   String? _error;
   List<QueryaSchemaObject> _all = const [];
@@ -78,6 +88,7 @@ class _QuickSwitcherDialogState extends State<QuickSwitcherDialog> {
   @override
   void dispose() {
     _controller.removeListener(_onQueryChanged);
+    _scroll.dispose();
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -105,6 +116,7 @@ class _QuickSwitcherDialogState extends State<QuickSwitcherDialog> {
 
   void _onQueryChanged() {
     setState(() => _selected = 0);
+    if (_scroll.hasClients) _scroll.jumpTo(0);
     _applyFilter(_controller.text);
   }
 
@@ -133,7 +145,28 @@ class _QuickSwitcherDialogState extends State<QuickSwitcherDialog> {
     setState(() {
       _selected = (_selected + delta) % _hits.length;
       if (_selected < 0) _selected += _hits.length;
+      _ignoreHover = true;
     });
+    material.WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
+  }
+
+  /// Scrolls the list so the selected row is visible (#1369).
+  void _reveal() {
+    if (!mounted || !_scroll.hasClients || _hits.isEmpty) return;
+    final index = _selected.clamp(0, _hits.length - 1);
+    final position = _scroll.position;
+    final target = revealOffsetForItem(
+      index: index,
+      itemExtent: _itemExtent,
+      offset: position.pixels,
+      viewportExtent: position.viewportDimension,
+      leadingPadding: _listPadding.top,
+      trailingPadding: _listPadding.bottom,
+    );
+    if (target == null) return;
+    _scroll.jumpTo(
+      target.clamp(position.minScrollExtent, position.maxScrollExtent),
+    );
   }
 
   @override
@@ -217,17 +250,26 @@ class _QuickSwitcherDialogState extends State<QuickSwitcherDialog> {
         ),
       );
     }
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+    return material.Listener(
+      onPointerHover: (_) => _ignoreHover = false,
+      child: ListView.builder(
+      controller: _scroll,
+      padding: _listPadding,
       itemCount: hits.length,
-      itemExtent: 40,
+      itemExtent: _itemExtent,
       itemBuilder: (context, index) {
         final object = hits[index];
         final active = index == selectedIndex;
-        return material.InkWell(
+        return material.Semantics(
+          button: true,
+          selected: active,
+          child: material.InkWell(
           key: ValueKey(object.id),
           onTap: () => _open(object),
-          onHover: (_) => setState(() => _selected = index),
+          onHover: (_) {
+            if (_ignoreHover) return;
+            setState(() => _selected = index);
+          },
           borderRadius: BorderRadius.circular(6),
           child: DecoratedBox(
             decoration: BoxDecoration(
@@ -261,8 +303,10 @@ class _QuickSwitcherDialogState extends State<QuickSwitcherDialog> {
               ),
             ),
           ),
+          ),
         );
       },
+      ),
     );
   }
 }
