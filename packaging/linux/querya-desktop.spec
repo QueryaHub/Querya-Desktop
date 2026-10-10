@@ -12,6 +12,7 @@ Requires:       gtk3 >= 3.22
 Requires:       libsecret >= 0.18
 Requires:       glib2 >= 2.56
 Recommends:     libappindicator-gtk3
+Recommends:     bubblewrap
 
 %description
 Multi-database desktop client for PostgreSQL, MySQL, Redis, MongoDB,

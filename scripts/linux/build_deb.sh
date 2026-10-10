@@ -68,7 +68,7 @@ Architecture: ${ARCH}
 Maintainer: QueryaHub <noreply@querya.app>
 Installed-Size: ${INSTALLED_SIZE}
 Depends: libgtk-3-0, libsecret-1-0, libglib2.0-0
-Recommends: libayatana-appindicator3-1
+Recommends: libayatana-appindicator3-1, bubblewrap
 Homepage: https://github.com/QueryaHub/Querya-Desktop
 Description: Querya Desktop database client
  Multi-database desktop client for PostgreSQL, MySQL, Redis, MongoDB,
