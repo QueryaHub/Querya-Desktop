@@ -204,7 +204,8 @@ class PreferencesDialogContentState
         final matching = PreferencesShortcutsSection.allShortcuts.where(
           (s) =>
               s.action.toLowerCase().contains(q) ||
-              s.keys.any((k) => k.toLowerCase().contains(q)),
+              s.allKeys.any(
+                  (combo) => combo.any((k) => k.toLowerCase().contains(q))),
         );
         count += matching.length;
       case PreferencesCategory.about:

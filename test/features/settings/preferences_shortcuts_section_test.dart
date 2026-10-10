@@ -89,7 +89,11 @@ void main() {
       await tester.pumpWidget(buildTestWidget(searchQuery: 'F5'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Refresh schema / connection'), findsOneWidget);
+      // F5 runs the script in the SQL editor and reloads the table browser;
+      // it does not refresh the connection tree (#1148).
+      expect(find.text('Execute all statements'), findsOneWidget);
+      expect(find.text('Refresh table data'), findsOneWidget);
+      expect(find.text('Refresh schema / connection'), findsNothing);
       expect(find.text('Execute query / selection'), findsNothing);
     });
 

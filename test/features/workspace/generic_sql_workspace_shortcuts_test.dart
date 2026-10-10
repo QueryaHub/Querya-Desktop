@@ -11,6 +11,7 @@ import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/erd/erd_catalog.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/settings/preferences_shortcuts_section.dart';
 import 'package:querya_desktop/features/workspace/generic_sql_workspace.dart';
 import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' show OutlineButton;
@@ -537,4 +538,90 @@ void main() {
     expect(editor.executed, isEmpty,
         reason: 'the editor session must not carry the catalog reads');
   });
+
+  testWidgets('Shift+Alt+F formats the active tab', timeout: _timeout,
+      (tester) async {
+    final state = await pumpWorkspace(
+      tester,
+      FakeSqlExecutionDelegate(),
+      initialSql: 'select n from t',
+    );
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.pumpAndSettle();
+
+    expect(state.activeSession.controller.text, 'SELECT n FROM t');
+  });
+
+  testWidgets(
+      'every SQL Editor key in the shortcuts reference is bound in the '
+      'workspace (#1148)', timeout: _timeout, (tester) async {
+    await pumpWorkspace(tester, FakeSqlExecutionDelegate());
+
+    final bound = <material.SingleActivator>[
+      for (final w in tester.widgetList<material.CallbackShortcuts>(
+        find.descendant(
+          of: find.byType(GenericSqlWorkspace),
+          matching: find.byType(material.CallbackShortcuts),
+        ),
+      ))
+        ...w.bindings.keys.whereType<material.SingleActivator>(),
+    ];
+
+    final missing = <String>[];
+    for (final item in PreferencesShortcutsSection.allShortcuts
+        .where((s) => s.category == 'SQL Editor')) {
+      for (final combo in item.allKeys) {
+        final want = _activatorFor(combo);
+        final found = bound.any((b) =>
+            b.trigger == want.trigger &&
+            b.control == want.control &&
+            b.shift == want.shift &&
+            b.alt == want.alt &&
+            b.meta == want.meta);
+        if (!found) missing.add('${item.action}: ${combo.join('+')}');
+      }
+    }
+    expect(missing, isEmpty);
+  });
+}
+
+/// The activator a reference row describes, e.g. `['Ctrl', 'Shift', 'Enter']`.
+material.SingleActivator _activatorFor(List<String> keys) {
+  var control = false, shift = false, alt = false, meta = false;
+  LogicalKeyboardKey? trigger;
+  for (final k in keys) {
+    switch (k) {
+      case 'Ctrl':
+        control = true;
+      case '⌘':
+        meta = true;
+      case 'Shift':
+        shift = true;
+      case 'Alt':
+        alt = true;
+      case 'Enter':
+        trigger = LogicalKeyboardKey.enter;
+      case 'Tab':
+        trigger = LogicalKeyboardKey.tab;
+      case 'F5':
+        trigger = LogicalKeyboardKey.f5;
+      default:
+        expect(k.length, 1, reason: 'unknown key label "$k"');
+        trigger = LogicalKeyboardKey.findKeyByKeyId(
+            k.toLowerCase().codeUnitAt(0));
+    }
+  }
+  expect(trigger, isNotNull, reason: 'no key in ${keys.join('+')}');
+  return material.SingleActivator(
+    trigger!,
+    control: control,
+    shift: shift,
+    alt: alt,
+    meta: meta,
+  );
 }
