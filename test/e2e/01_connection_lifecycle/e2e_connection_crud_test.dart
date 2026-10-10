@@ -173,12 +173,18 @@ void main() {
       of: find.byType(ConnectionsPanel),
       matching: find.byType(CustomScrollView),
     ));
-    await dragTo(
-      tester.getCenter(inSidebar('E2E Dragged').first),
-      Offset(list.center.dx, list.bottom - 24),
-    );
-    row = await tester.runAsync(() => LocalDb.instance.getConnectionById(id));
-    expect(row!.folderId, isNull, reason: 'dropped on the list');
+    final drop = Offset(list.center.dx, list.bottom - 24);
+    await dragTo(tester.getCenter(inSidebar('E2E Dragged').first), drop);
+    // The write is real I/O: give it time before reading.
+    for (var i = 0; i < 20; i++) {
+      row = await tester.runAsync(() => LocalDb.instance.getConnectionById(id));
+      if (row!.folderId == null) break;
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(row!.folderId, isNull,
+        reason: 'dropped on the list at $drop; list $list');
 
     await E2eConnections.remove(tester, id);
     await tester.runAsync(() => FoldersStorage.instance.remove('Team D'));

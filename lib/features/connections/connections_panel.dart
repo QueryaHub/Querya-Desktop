@@ -684,7 +684,9 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     final name = await showNewFolderDialog(menuContext);
     if (name == null || !mounted) return;
     await FoldersStorage.instance.add(name);
-    if (mounted) setState(() => _folders = FoldersStorage.instance.folders);
+    // Reload, not only the names: the new folder needs its id in
+    // [_folderIdByName] before its contents are looked up.
+    if (mounted) await _loadData();
   }
 
   Future<void> _createConnection({
@@ -1253,10 +1255,10 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                                       _expandedFolders.remove(folderName);
                                     }
                                   },
-                                  connections: filteredConnections
-                                      .where((c) =>
-                                          c.folderId == _folderIdByName[name])
-                                      .toList(),
+                                  connections: connectionsInFolder(
+                                    filteredConnections,
+                                    _folderIdByName[name],
+                                  ),
                                   onRemove: () => _removeFolder(name),
                                   acceptsDrop: (id) => _acceptsDrop(id, name),
                                   onDrop: (id) => _dropConnection(id, name),
@@ -1336,4 +1338,19 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
   ),
 );
 }
+}
+
+/// The connections that live in the folder with id [folderId]. A folder whose
+/// id is not known yet holds none: matching `folderId == null` there listed
+/// every top-level connection inside a freshly created folder.
+@visibleForTesting
+List<ConnectionRow> connectionsInFolder(
+  List<ConnectionRow> connections,
+  int? folderId,
+) {
+  if (folderId == null) return const [];
+  return [
+    for (final c in connections)
+      if (c.folderId == folderId) c,
+  ];
 }
