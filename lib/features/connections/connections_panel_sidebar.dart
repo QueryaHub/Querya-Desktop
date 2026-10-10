@@ -76,6 +76,7 @@ class _ConnectionTile extends StatelessWidget {
     this.iconAsset,
     required this.onRemove,
     required this.onEdit,
+    this.moveItems = const [],
     this.onTap,
   });
 
@@ -85,6 +86,9 @@ class _ConnectionTile extends StatelessWidget {
   final String? iconAsset;
   final VoidCallback onRemove;
   final VoidCallback onEdit;
+
+  /// "Move to folder" menu entries; empty when there is nowhere to move.
+  final List<MenuItem> moveItems;
   final VoidCallback? onTap;
 
   @override
@@ -117,6 +121,7 @@ class _ConnectionTile extends StatelessWidget {
           onPressed: (_) => onEdit(),
           child: const Text('Edit connection…'),
         ),
+        ...moveItems,
         MenuButton(
           leading: material.Icon(material.Icons.delete_outline_rounded,
               size: 18, color: theme.colorScheme.mutedForeground),

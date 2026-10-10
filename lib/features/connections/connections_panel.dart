@@ -719,6 +719,46 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     }
   }
 
+  /// The "Move to folder" submenu of a connection: every other folder and,
+  /// when the connection is in one, "No folder". Empty when there is nowhere to
+  /// move it.
+  List<MenuItem> _moveItems(ConnectionRow conn) {
+    final theme = Theme.of(context);
+    final current = conn.folderId;
+    final targets = <MenuItem>[
+      for (final name in _folders)
+        if (_folderIdByName[name] != current)
+          MenuButton(
+            leading: material.Icon(material.Icons.folder_outlined,
+                size: 18, color: theme.colorScheme.mutedForeground),
+            onPressed: (_) => _moveConnection(conn, _folderIdByName[name]),
+            child: Text(name),
+          ),
+      if (current != null)
+        MenuButton(
+          leading: material.Icon(material.Icons.folder_off_outlined,
+              size: 18, color: theme.colorScheme.mutedForeground),
+          onPressed: (_) => _moveConnection(conn, null),
+          child: const Text('No folder'),
+        ),
+    ];
+    if (targets.isEmpty) return const [];
+    return [
+      MenuButton(
+        leading: material.Icon(material.Icons.drive_file_move_outlined,
+            size: 18, color: theme.colorScheme.mutedForeground),
+        subMenu: targets,
+        child: const Text('Move to folder'),
+      ),
+    ];
+  }
+
+  Future<void> _moveConnection(ConnectionRow conn, int? folderId) async {
+    if (conn.id == null) return;
+    await LocalDb.instance.setConnectionFolder(conn.id!, folderId);
+    if (mounted) await _loadData();
+  }
+
   Future<void> _closeSessionsOf(int id) async {
     await MongoService.instance.disconnectByConnectionId(id);
     await ExtensionDriverSession.instance.disconnect(id);
@@ -821,6 +861,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         iconAsset: QueryaIcons.connectionAsset(conn.type),
         onRemove: () => _removeConnection(conn.id!),
         onEdit: () => _editConnection(conn),
+        moveItems: _moveItems(conn),
         onTap: () => widget.onConnectionSelected?.call(conn),
         onPostgresObjectSelected: widget.onPostgresObjectSelected,
         onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
@@ -835,6 +876,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         iconAsset: QueryaIcons.connectionAsset(conn.type),
         onRemove: () => _removeConnection(conn.id!),
         onEdit: () => _editConnection(conn),
+        moveItems: _moveItems(conn),
         onTap: () => widget.onConnectionSelected?.call(conn),
         onMysqlObjectSelected: widget.onMysqlObjectSelected,
         onMysqlOpenSqlWorkspace: widget.onMysqlOpenSqlWorkspace,
@@ -849,6 +891,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         iconAsset: QueryaIcons.connectionAsset(conn.type),
         onRemove: () => _removeConnection(conn.id!),
         onEdit: () => _editConnection(conn),
+        moveItems: _moveItems(conn),
         onTap: () => widget.onConnectionSelected?.call(conn),
         onDatabaseTap: (db) => widget.onRedisDatabaseSelected?.call(conn, db),
         isExpanded: isExpanded,
@@ -862,6 +905,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         iconAsset: QueryaIcons.connectionAsset(conn.type),
         onRemove: () => _removeConnection(conn.id!),
         onEdit: () => _editConnection(conn),
+        moveItems: _moveItems(conn),
         onTap: () => widget.onConnectionSelected?.call(conn),
         onDatabaseTap: (db) => widget.onMongoDBDatabaseSelected?.call(conn, db),
         onCollectionTap: (db, col) =>
@@ -877,6 +921,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         iconAsset: QueryaIcons.connectionAsset(conn.type),
         onRemove: () => _removeConnection(conn.id!),
         onEdit: () => _editConnection(conn),
+        moveItems: _moveItems(conn),
         onTap: () => widget.onConnectionSelected?.call(conn),
         onSqliteObjectSelected: widget.onSqliteObjectSelected,
         onSqliteOpenSqlWorkspace: widget.onSqliteOpenSqlWorkspace,
@@ -891,6 +936,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         iconAsset: QueryaIcons.connectionAsset(conn.type),
         onRemove: () => _removeConnection(conn.id!),
         onEdit: () => _editConnection(conn),
+        moveItems: _moveItems(conn),
         onTap: () => widget.onConnectionSelected?.call(conn),
         onObjectSelected: widget.onExtensionObjectSelected,
         isExpanded: isExpanded,
@@ -904,6 +950,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
       iconAsset: QueryaIcons.connectionAsset(conn.type),
       onRemove: () => _removeConnection(conn.id!),
       onEdit: () => _editConnection(conn),
+        moveItems: _moveItems(conn),
       onTap: () => widget.onConnectionSelected?.call(conn),
     );
   }

@@ -9,6 +9,7 @@ class _ExtensionConnectionTile extends StatefulWidget {
     this.iconAsset,
     required this.onRemove,
     required this.onEdit,
+    this.moveItems = const [],
     this.onTap,
     this.onObjectSelected,
     this.isExpanded = false,
@@ -21,6 +22,9 @@ class _ExtensionConnectionTile extends StatefulWidget {
   final String? iconAsset;
   final VoidCallback onRemove;
   final VoidCallback onEdit;
+
+  /// "Move to folder" menu entries; empty when there is nowhere to move.
+  final List<MenuItem> moveItems;
   final VoidCallback? onTap;
 
   /// Fires when a table/view node is clicked in the schema tree.
@@ -193,6 +197,7 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
           onPressed: (_) => widget.onEdit(),
           child: const Text('Edit connection…'),
         ),
+        ...widget.moveItems,
         MenuButton(
           leading: material.Icon(material.Icons.delete_outline_rounded,
               size: 18, color: theme.colorScheme.mutedForeground),

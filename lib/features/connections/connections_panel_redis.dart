@@ -10,6 +10,7 @@ class _RedisConnectionTile extends StatefulWidget {
     this.iconAsset,
     required this.onRemove,
     required this.onEdit,
+    this.moveItems = const [],
     this.onTap,
     this.onDatabaseTap,
     this.isExpanded = false,
@@ -22,6 +23,9 @@ class _RedisConnectionTile extends StatefulWidget {
   final String? iconAsset;
   final VoidCallback onRemove;
   final VoidCallback onEdit;
+
+  /// "Move to folder" menu entries; empty when there is nowhere to move.
+  final List<MenuItem> moveItems;
   final VoidCallback? onTap;
   final void Function(int database)? onDatabaseTap;
   final bool isExpanded;
@@ -154,6 +158,7 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
           onPressed: (_) => widget.onEdit(),
           child: const Text('Edit connection…'),
         ),
+        ...widget.moveItems,
         MenuButton(
           leading: material.Icon(material.Icons.delete_outline_rounded,
               size: 18, color: theme.colorScheme.mutedForeground),

@@ -1,4 +1,6 @@
+import 'package:flutter/gestures.dart' show kSecondaryButton;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/folders_storage.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
@@ -9,6 +11,9 @@ import '../helpers/e2e_connection_helper.dart';
 void main() {
   final app = E2eAppHarness(prefix: 'querya_e2e_crud_');
   setUpAll(app.setUpAll);
+  // The welcome tour opens on a first launch without connections and its
+  // scrim covers the sidebar.
+  setUpAll(() => AppSettings.instance.setHasCompletedWelcomeTour(true));
   tearDownAll(app.tearDownAll);
 
   Finder inSidebar(String text) => find.descendant(
@@ -90,6 +95,45 @@ void main() {
 
     await E2eConnections.remove(tester, id);
     await tester.runAsync(() => FoldersStorage.instance.remove('Team B'));
+    await app.close(tester);
+  });
+
+  testWidgets('Move to folder in the connection menu moves it in and out',
+      (tester) async {
+    await app.launch(tester);
+    await tester.runAsync(() => FoldersStorage.instance.add('Team C'));
+    final folderId = await tester
+        .runAsync(() => LocalDb.instance.getFolderIdByName('Team C'));
+    final id = await E2eConnections.add(
+        tester, E2eConnections.redis('E2E Mover'));
+    await tester.runAsync(FoldersStorage.instance.reload);
+    await E2eConnections.reloadSidebar(tester);
+
+    Future<void> pick(String entry) async {
+      await tester.tap(inSidebar('E2E Mover').first,
+          buttons: kSecondaryButton);
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.text('Move to folder').last);
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.text(entry).last);
+      await tester.pump(const Duration(milliseconds: 300));
+      await E2eConnections.reloadSidebar(tester);
+    }
+
+    await pick('Team C');
+    var row =
+        await tester.runAsync(() => LocalDb.instance.getConnectionById(id));
+    expect(row!.folderId, folderId);
+
+    // Folders start collapsed: open it so the connection is in the tree.
+    await tester.tap(inSidebar('Team C'));
+    await tester.pump(const Duration(milliseconds: 300));
+    await pick('No folder');
+    row = await tester.runAsync(() => LocalDb.instance.getConnectionById(id));
+    expect(row!.folderId, isNull);
+
+    await E2eConnections.remove(tester, id);
+    await tester.runAsync(() => FoldersStorage.instance.remove('Team C'));
     await app.close(tester);
   });
 }
