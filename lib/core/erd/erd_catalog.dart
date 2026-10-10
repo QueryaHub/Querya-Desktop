@@ -43,7 +43,9 @@ SELECT ${_pgQualified('c', 'ns')} AS table_name, a.attname AS column_name,
   pg_get_expr(df.adbin, df.adrelid) AS column_default,
   CASE WHEN a.attidentity <> ''
     OR pg_get_expr(df.adbin, df.adrelid) LIKE 'nextval(%'
-    THEN 1 ELSE 0 END AS is_identity
+    THEN 1 ELSE 0 END AS is_identity,
+  col_description(c.oid, a.attnum) AS column_comment,
+  obj_description(c.oid, 'pg_class') AS table_comment
 FROM pg_catalog.pg_attribute a
 JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
 JOIN pg_catalog.pg_namespace ns ON ns.oid = c.relnamespace
@@ -61,7 +63,9 @@ SELECT c.table_name, c.column_name, c.column_type,
   IF(c.is_nullable = 'YES', 1, 0),
   IF(c.column_key = 'UNI', 1, 0),
   c.column_default,
-  IF(c.extra LIKE '%auto_increment%', 1, 0)
+  IF(c.extra LIKE '%auto_increment%', 1, 0),
+  c.column_comment,
+  t.table_comment
 FROM information_schema.columns c
 JOIN information_schema.tables t
   ON t.table_schema = c.table_schema AND t.table_name = c.table_name
@@ -81,7 +85,9 @@ SELECT m.name AS table_name, p.name AS column_name, p.type AS data_type,
   p.dflt_value AS column_default,
   CASE WHEN p.pk = 1 AND upper(p.type) = 'INTEGER'
     AND (SELECT COUNT(*) FROM pragma_table_info(m.name) WHERE pk > 0) = 1
-    THEN 1 ELSE 0 END AS is_identity
+    THEN 1 ELSE 0 END AS is_identity,
+  NULL AS column_comment,
+  NULL AS table_comment
 FROM sqlite_master m JOIN pragma_table_info(m.name) p
 WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
 ORDER BY m.name, p.cid''',

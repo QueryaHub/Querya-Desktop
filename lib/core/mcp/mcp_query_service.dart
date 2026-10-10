@@ -133,6 +133,7 @@ class McpQueryService {
   ) =>
       McpTableDescription(
         name: t.name,
+        comment: t.comment,
         columns: [
           for (final c in t.columns)
             McpColumnInfo(
@@ -142,6 +143,7 @@ class McpQueryService {
               unique: c.isUnique && !c.isPrimaryKey,
               identity: c.isIdentity,
               defaultValue: c.defaultValue,
+              comment: c.comment,
               references: [
                 for (final r in schema.relations)
                   if (r.fromTable == t.name && r.fromColumn == c.name)
@@ -430,6 +432,7 @@ class McpColumnInfo {
     this.unique = false,
     this.defaultValue,
     this.identity = false,
+    this.comment,
   });
 
   final String name;
@@ -438,6 +441,7 @@ class McpColumnInfo {
   final bool unique;
   final String? defaultValue;
   final bool identity;
+  final String? comment;
 
   /// `table.column` this column points to, when it is a foreign key.
   final String? references;
@@ -450,6 +454,7 @@ class McpColumnInfo {
         if (unique) 'unique': true,
         if (identity) 'identity': true,
         if (defaultValue != null) 'default': defaultValue,
+        if (comment != null) 'comment': comment,
       };
 }
 
@@ -467,14 +472,19 @@ class McpTableDescription {
     required this.name,
     required this.columns,
     required this.indexes,
+    this.comment,
   });
 
   final String name;
   final List<McpColumnInfo> columns;
   final List<McpIndexInfo> indexes;
 
+  /// The table's comment in the database: often what the table is for.
+  final String? comment;
+
   Map<String, Object?> toJson() => {
         'name': name,
+        if (comment != null) 'comment': comment,
         'columns': [for (final c in columns) c.toJson()],
         'indexes': [for (final i in indexes) i.toJson()],
       };

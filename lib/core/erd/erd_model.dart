@@ -11,6 +11,7 @@ class ErdColumn {
     this.isUnique = false,
     this.defaultValue,
     this.isIdentity = false,
+    this.comment,
   });
 
   final String name;
@@ -30,6 +31,10 @@ class ErdColumn {
   /// auto_increment, or SQLite's INTEGER PRIMARY KEY.
   final bool isIdentity;
 
+  /// The column's comment in the database (`COMMENT ON COLUMN`); null when
+  /// none (#1279).
+  final String? comment;
+
   /// Short markers after the type on a card and in exports (#1277).
   List<String> get badges => [
         if (isUnique && !isPrimaryKey) 'UQ',
@@ -46,15 +51,19 @@ class ErdColumn {
         isUnique: isUnique,
         defaultValue: defaultValue,
         isIdentity: isIdentity,
+        comment: comment,
       );
 }
 
 @immutable
 class ErdTable {
-  const ErdTable({required this.name, required this.columns});
+  const ErdTable({required this.name, required this.columns, this.comment});
 
   final String name;
   final List<ErdColumn> columns;
+
+  /// The table's comment in the database (`COMMENT ON TABLE`) (#1279).
+  final String? comment;
 }
 
 /// A foreign key: [fromTable].[fromColumn] references [toTable].[toColumn].
@@ -95,7 +104,8 @@ class ErdSchema {
   /// Builds a schema from flat catalog rows.
   ///
   /// [columnRows]: `table, column, type, isPk`, then optionally `isNullable`,
-  /// `isUnique`, `default` and `isIdentity` (#1277). [fkRows]: `table, column, refTable, refColumn`. Relations to
+  /// `isUnique`, `default` and `isIdentity` (#1277), then the column comment
+  /// and the table comment (#1279). [fkRows]: `table, column, refTable, refColumn`. Relations to
   /// unknown tables are dropped.
   factory ErdSchema.fromCatalog({
     required List<List<String>> columnRows,
@@ -103,6 +113,7 @@ class ErdSchema {
     bool truncated = false,
   }) {
     final order = <String>[];
+    final tableComments = <String, String>{};
     final cols = <String, List<ErdColumn>>{};
     for (final r in columnRows) {
       if (r.length < 4) continue;
@@ -118,7 +129,12 @@ class ErdSchema {
         isUnique: r.length > 5 && _truthy(r[5]),
         defaultValue: r.length > 6 ? _default(r[6]) : null,
         isIdentity: r.length > 7 && _truthy(r[7]),
+        comment: r.length > 8 ? _text(r[8]) : null,
       ));
+      if (r.length > 9) {
+        final tc = _text(r[9]);
+        if (tc != null) tableComments.putIfAbsent(r[0], () => tc);
+      }
     }
     final nullable = {
       for (final t in cols.entries)
@@ -144,6 +160,7 @@ class ErdSchema {
         for (final t in order)
           ErdTable(
             name: t,
+            comment: tableComments[t],
             columns: [
               for (final c in cols[t]!)
                 fkCols.contains('$t\u0000${c.name}')
@@ -167,5 +184,12 @@ class ErdSchema {
 String? _default(String raw) {
   final v = raw.trim();
   if (v.isEmpty || v == 'NULL' || v.toLowerCase() == 'null') return null;
+  return v;
+}
+
+/// A catalog text cell: empty and SQL NULL mean none.
+String? _text(String raw) {
+  final v = raw.trim();
+  if (v.isEmpty || v == 'NULL') return null;
   return v;
 }

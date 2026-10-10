@@ -48,7 +48,10 @@ class ErdCardMeasure {
   /// [ErdLayout.maxCardWidth].
   double width(ErdTable t) {
     // Padding 10, icon 14, gap 6, name, gap 8, count, padding 10, border 2.
-    var w = 50 + _text(t.name, _header) + _text('${t.columns.length}', _count);
+    var w = 50 +
+        _text(t.name, _header) +
+        _text('${t.columns.length}', _count) +
+        (t.comment != null ? 19 : 0);
     for (final c in t.columns) {
       final type = c.isNullable ? '${c.type}?' : c.type;
       // Padding 10, marker slot 26, name, gap 8, type, padding 10, border 2.
@@ -56,6 +59,7 @@ class ErdCardMeasure {
       var row = 60 +
           _text(c.name, c.isPrimaryKey ? _pkName : _name) +
           _text(type, _type);
+      if (c.comment != null) row += 13;
       for (final b in c.badges) {
         row += 3 + _text(b, _badge);
       }
