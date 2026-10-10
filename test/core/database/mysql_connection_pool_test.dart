@@ -275,6 +275,32 @@ void main() {
         l.release();
       }
     });
+
+    test('a dropped socket (isConnected = false) triggers reconnect upon acquire (#1373)',
+        () async {
+      final pool = MysqlConnectionPool(
+        createAndConnect: (row, {required database, required mode}) async {
+          final c = FakeMysqlConnection();
+          await c.connect();
+          return c;
+        },
+      );
+      final r = _row();
+      final lease1 = await pool.acquire(r, database: 'testdb');
+      final conn = lease1.connection as FakeMysqlConnection;
+      expect(conn.connectCount, 1);
+      lease1.release();
+
+      // Simulate remote socket drop without client calling forceClose()
+      conn._connected = false;
+      expect(conn.isConnected, isFalse);
+
+      final lease2 = await pool.acquire(r, database: 'testdb');
+      expect(conn.connectCount, 2,
+          reason: 'reconnected because isConnected was false');
+      expect(conn.isConnected, isTrue);
+      lease2.release();
+    });
   });
 
   group('MCP session (#1217)', () {

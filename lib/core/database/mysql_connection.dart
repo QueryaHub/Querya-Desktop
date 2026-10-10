@@ -166,7 +166,13 @@ class MysqlConnection {
   bool _isConnected = false;
   bool _inTransaction = false;
 
-  bool get isConnected => _isConnected && _conn != null;
+  bool get isConnected => _isConnected && _conn != null && _conn!.connected;
+
+  @visibleForTesting
+  void setConnectionForTest(MySQLConnection? conn, {bool isConnected = true}) {
+    _conn = conn;
+    _isConnected = isConnected;
+  }
 
   /// Scrubs sensitive in-memory credentials once the network handshake completes.
   void scrubCredentials() {
@@ -186,7 +192,7 @@ class MysqlConnection {
   /// for that attempt. Without this, two callers opened two sockets and two SSH
   /// tunnels, and a failing attempt dropped the session the other one had made.
   Future<void> connect({int connectTimeoutMs = 10000}) {
-    if (_isConnected && _conn != null) return Future<void>.value();
+    if (isConnected) return Future<void>.value();
     final inFlight = _connecting;
     if (inFlight != null) return inFlight;
     final attempt = _connectOnce(connectTimeoutMs);
@@ -201,7 +207,13 @@ class MysqlConnection {
   int _generation = 0;
 
   Future<void> _connectOnce(int connectTimeoutMs) async {
-    if (_isConnected && _conn != null) return;
+    if (isConnected) return;
+    if (_conn != null && !_conn!.connected) {
+      try {
+        await _conn?.close();
+      } catch (_) {}
+      _conn = null;
+    }
     final generation = _generation;
     MySQLConnection? opened;
     SshTunnelHandle? openedHandle;
@@ -296,6 +308,11 @@ class MysqlConnection {
       }
       if (generation != _generation) throw _ConnectSuperseded();
       _isConnected = true;
+      opened.onClose(() {
+        if (identical(_conn, opened)) {
+          _isConnected = false;
+        }
+      });
       scrubCredentials();
     } catch (e, st) {
       if (generation != _generation) {
@@ -537,6 +554,17 @@ class MysqlConnection {
         // step after a timeout and is closed. Statements queued behind this one
         // wait in the queue and are not affected.
         unawaited(forceClose());
+        rethrow;
+      } catch (e) {
+        if (c != null && !c.connected) {
+          unawaited(forceClose());
+        } else {
+          final mapped = mapDatabaseError(e, driver: DatabaseDriver.mysql);
+          if (mapped is ConnectionLostException ||
+              mapped is HostUnreachableException) {
+            unawaited(forceClose());
+          }
+        }
         rethrow;
       }
     });
