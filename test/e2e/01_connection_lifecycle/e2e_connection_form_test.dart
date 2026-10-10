@@ -135,6 +135,18 @@ void main() {
       addTearDown(() => app.resetData(tester));
       await openNewConnection(tester);
       await pickType(tester, label);
+      if (type == 'mongodb') {
+        // The MongoDB form shows its URI field behind a checkbox.
+        await waitFor(tester, find.text('Use connection string'), 'the form');
+        await tester.tap(find.descendant(
+          of: find.ancestor(
+            of: find.text('Use connection string'),
+            matching: find.byType(material.Row),
+          ).first,
+          matching: find.byType(material.Checkbox),
+        ));
+        await step(tester);
+      }
 
       await waitFor(
           tester, byPlaceholder(uriPlaceholder[type]!), 'the $label form');
