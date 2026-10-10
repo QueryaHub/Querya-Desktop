@@ -139,6 +139,9 @@ class McpQueryService {
               name: c.name,
               type: c.type,
               primaryKey: c.isPrimaryKey,
+              unique: c.isUnique && !c.isPrimaryKey,
+              identity: c.isIdentity,
+              defaultValue: c.defaultValue,
               references: [
                 for (final r in schema.relations)
                   if (r.fromTable == t.name && r.fromColumn == c.name)
@@ -424,11 +427,17 @@ class McpColumnInfo {
     required this.type,
     this.primaryKey = false,
     this.references,
+    this.unique = false,
+    this.defaultValue,
+    this.identity = false,
   });
 
   final String name;
   final String type;
   final bool primaryKey;
+  final bool unique;
+  final String? defaultValue;
+  final bool identity;
 
   /// `table.column` this column points to, when it is a foreign key.
   final String? references;
@@ -438,6 +447,9 @@ class McpColumnInfo {
         'type': type,
         if (primaryKey) 'primary_key': true,
         if (references != null) 'references': references,
+        if (unique) 'unique': true,
+        if (identity) 'identity': true,
+        if (defaultValue != null) 'default': defaultValue,
       };
 }
 

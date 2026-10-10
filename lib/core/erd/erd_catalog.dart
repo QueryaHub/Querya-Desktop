@@ -33,12 +33,23 @@ class ErdCatalog {
 SELECT ${_pgQualified('c', 'ns')} AS table_name, a.attname AS column_name,
   format_type(a.atttypid, a.atttypmod) AS data_type,
   CASE WHEN pk.oid IS NULL THEN 0 ELSE 1 END AS is_pk,
-  CASE WHEN a.attnotnull THEN 0 ELSE 1 END AS is_nullable
+  CASE WHEN a.attnotnull THEN 0 ELSE 1 END AS is_nullable,
+  CASE WHEN EXISTS (
+    SELECT 1 FROM pg_catalog.pg_index ui
+    WHERE ui.indrelid = c.oid AND ui.indisunique AND NOT ui.indisprimary
+      AND ui.indnatts = 1 AND ui.indkey[0] = a.attnum
+  ) THEN 1 ELSE 0 END AS is_unique,
+  pg_get_expr(df.adbin, df.adrelid) AS column_default,
+  CASE WHEN a.attidentity <> ''
+    OR pg_get_expr(df.adbin, df.adrelid) LIKE 'nextval(%'
+    THEN 1 ELSE 0 END AS is_identity
 FROM pg_catalog.pg_attribute a
 JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
 JOIN pg_catalog.pg_namespace ns ON ns.oid = c.relnamespace
 LEFT JOIN pg_catalog.pg_constraint pk
   ON pk.conrelid = c.oid AND pk.contype = 'p' AND a.attnum = ANY (pk.conkey)
+LEFT JOIN pg_catalog.pg_attrdef df
+  ON df.adrelid = c.oid AND df.adnum = a.attnum
 WHERE ns.nspname = ${schema == null ? 'current_schema()' : "'${_lit(schema)}'"}
   AND c.relkind IN ('r', 'p')
   AND a.attnum > 0 AND NOT a.attisdropped
@@ -46,7 +57,10 @@ ORDER BY table_name, a.attnum''',
         SqlDialect.mysql => '''
 SELECT c.table_name, c.column_name, c.column_type,
   IF(c.column_key = 'PRI', 1, 0),
-  IF(c.is_nullable = 'YES', 1, 0)
+  IF(c.is_nullable = 'YES', 1, 0),
+  IF(c.column_key = 'UNI', 1, 0),
+  c.column_default,
+  IF(c.extra LIKE '%auto_increment%', 1, 0)
 FROM information_schema.columns c
 JOIN information_schema.tables t
   ON t.table_schema = c.table_schema AND t.table_name = c.table_name
@@ -56,7 +70,17 @@ ORDER BY c.table_name, c.ordinal_position''',
         SqlDialect.sqlite => '''
 SELECT m.name AS table_name, p.name AS column_name, p.type AS data_type,
   CASE WHEN p.pk > 0 THEN 1 ELSE 0 END AS is_pk,
-  CASE WHEN p."notnull" = 0 THEN 1 ELSE 0 END AS is_nullable
+  CASE WHEN p."notnull" = 0 THEN 1 ELSE 0 END AS is_nullable,
+  CASE WHEN EXISTS (
+    SELECT 1 FROM pragma_index_list(m.name) il
+    WHERE il."unique" = 1 AND il.origin <> 'pk'
+      AND (SELECT COUNT(*) FROM pragma_index_info(il.name)) = 1
+      AND (SELECT ii.name FROM pragma_index_info(il.name) ii) = p.name
+  ) THEN 1 ELSE 0 END AS is_unique,
+  p.dflt_value AS column_default,
+  CASE WHEN p.pk = 1 AND upper(p.type) = 'INTEGER'
+    AND (SELECT COUNT(*) FROM pragma_table_info(m.name) WHERE pk > 0) = 1
+    THEN 1 ELSE 0 END AS is_identity
 FROM sqlite_master m JOIN pragma_table_info(m.name) p
 WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
 ORDER BY m.name, p.cid''',

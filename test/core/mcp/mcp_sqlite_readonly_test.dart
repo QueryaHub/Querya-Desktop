@@ -34,6 +34,8 @@ void main() {
     await seed.execute('CREATE TABLE orders (id INTEGER PRIMARY KEY, '
         'user_id INTEGER REFERENCES users(id), total REAL)');
     await seed.execute('CREATE INDEX orders_user ON orders (user_id)');
+    await seed.execute('CREATE TABLE accounts (id INTEGER PRIMARY KEY, '
+        "email TEXT UNIQUE, status TEXT DEFAULT 'new')");
     await seed.execute("INSERT INTO users VALUES (1, 'ann'), (2, 'bob')");
     await seed.execute('INSERT INTO orders VALUES (1, 1, 9.5)');
     await seed.disconnect();
@@ -75,6 +77,17 @@ void main() {
 
     final plan = await service.explainQuery(42, 'SELECT * FROM orders WHERE user_id = 1');
     expect(plan, isNotEmpty);
+  });
+
+  test('the real SQLite catalog reports unique, default and identity (#1277)',
+      () async {
+    final accounts = await service.describeTable(42, 'accounts');
+    final c = {for (final c in accounts.columns) c.name: c};
+    expect(c['id']!.identity, isTrue, reason: 'INTEGER PRIMARY KEY');
+    expect(c['email']!.unique, isTrue);
+    expect(c['email']!.defaultValue, isNull);
+    expect(c['status']!.defaultValue, "'new'");
+    expect(c['status']!.unique, isFalse);
   });
 
   test('the database itself refuses a write on the MCP session', () async {

@@ -36,6 +36,7 @@ class ErdCardMeasure {
   static const _count = TextStyle(fontSize: 10);
   static const _name = TextStyle(fontSize: 12);
   static const _pkName = TextStyle(fontSize: 12, fontWeight: FontWeight.w600);
+  static const _badge = TextStyle(fontSize: 9, fontWeight: FontWeight.w700);
   static const _type = TextStyle(
     fontSize: 10,
     fontFamily: QueryaTypography.mono,
@@ -52,9 +53,12 @@ class ErdCardMeasure {
       final type = c.isNullable ? '${c.type}?' : c.type;
       // Padding 10, marker slot 26, name, gap 8, type, padding 10, border 2.
       // Plus 4 px so sub-pixel rounding never ellipsizes.
-      final row = 60 +
+      var row = 60 +
           _text(c.name, c.isPrimaryKey ? _pkName : _name) +
           _text(type, _type);
+      for (final b in c.badges) {
+        row += 3 + _text(b, _badge);
+      }
       if (row > w) w = row;
     }
     return w
