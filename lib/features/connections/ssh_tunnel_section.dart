@@ -487,19 +487,22 @@ class _SshTunnelSectionState extends material.State<SshTunnelSection> {
                 child: material.Column(
                   crossAxisAlignment: material.CrossAxisAlignment.start,
                   children: [
-                    const Text('Known Host SHA-256 Fingerprint (optional)')
+                    const Text('Known host fingerprint (optional)')
                         .small()
                         .muted(),
                     const Gap(4),
                     TextField(
                       controller: _fingerprintController,
                       placeholder: const Text(
-                        'e.g. 7f8a12... (leave blank to trust on first connect)',
+                        'SHA256:... (leave blank to trust on first connect)',
                       ),
                     ),
                     const Gap(6),
                     const Text(
-                      'Protects against Man-in-the-Middle (MitM) attacks by rejecting mismatched host keys.',
+                      'Protects against Man-in-the-Middle (MitM) attacks by '
+                      'rejecting mismatched host keys. Paste what '
+                      '"ssh-keygen -lf" prints for the server\'s key, or the '
+                      'fingerprint shown by Test SSH Connection.',
                     ).muted().xSmall(),
                   ],
                 ),
