@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:mysql_client/mysql_client.dart';
 import 'package:querya_desktop/core/database/statement_queue.dart';
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
+import 'package:querya_desktop/core/database/querya_database_exception.dart';
 import 'package:querya_desktop/core/database/mysql_result_cells.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';

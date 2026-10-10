@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
+import 'package:querya_desktop/core/database/querya_database_exception.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_manager.dart';
 import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
@@ -242,7 +243,8 @@ class RedisConnection {
             );
       _socket = socket;
       final activeSocket = socket;
-      activeSocket.done.then((_) {
+      // Watches the socket for a drop; the future itself is not awaited.
+      unawaited(activeSocket.done.then((_) {
         if (identical(_socket, activeSocket)) {
           _isConnected = false;
         }
@@ -250,7 +252,7 @@ class RedisConnection {
         if (identical(_socket, activeSocket)) {
           _isConnected = false;
         }
-      });
+      }));
       final command = await client.connectWithSocket(socket);
       _command = command;
       command.setParser(redis.RedisParserBulkBinary());

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:postgres/postgres.dart';
 import 'package:querya_desktop/core/database/statement_queue.dart';
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
+import 'package:querya_desktop/core/database/querya_database_exception.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_manager.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
