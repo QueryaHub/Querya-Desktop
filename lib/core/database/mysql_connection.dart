@@ -196,8 +196,15 @@ class MysqlConnection {
     });
   }
 
+  /// Bumped by [disconnect] and [forceClose]: an attempt that started before
+  /// one of them must not come back as a connected session (#1313).
+  int _generation = 0;
+
   Future<void> _connectOnce(int connectTimeoutMs) async {
     if (_isConnected && _conn != null) return;
+    final generation = _generation;
+    MySQLConnection? opened;
+    SshTunnelHandle? openedHandle;
 
     var effectivePassword = _password;
     var effectiveConnectionString = _connectionString;
@@ -206,11 +213,11 @@ class MysqlConnection {
         (effectiveConnectionString == null ||
             effectiveConnectionString.isEmpty) &&
         id > 0) {
-      try {
-        final secrets = await ConnectionSecretsStore.readForConnection(id);
-        effectivePassword = secrets.password;
-        effectiveConnectionString = secrets.connectionString;
-      } catch (_) {}
+      // A store that cannot be read throws (#1303): connecting with no password
+      // would be reported as a wrong one.
+      final secrets = await ConnectionSecretsStore.readForConnection(id);
+      effectivePassword = secrets.password;
+      effectiveConnectionString = secrets.connectionString;
     }
 
     try {
@@ -226,12 +233,14 @@ class MysqlConnection {
             jumpPassword: stored.jumpPassword,
           );
         }
-        _sshTunnelHandle = await SshTunnelManager.instance.openTunnel(
+        openedHandle = await SshTunnelManager.instance.openTunnel(
           config: sshConfig!,
           secrets: sec ?? SshTunnelSecrets(),
           remoteHost: host,
           remotePort: port,
         );
+        if (generation != _generation) throw _ConnectSuperseded();
+        _sshTunnelHandle = openedHandle;
       }
 
       final user = username ?? '';
@@ -254,7 +263,7 @@ class MysqlConnection {
         final securityContext = buildSecurityContext(sslPaths);
         final effectiveHost = _sshTunnelHandle?.localHost ?? parsed.host;
         final effectivePort = _sshTunnelHandle?.localPort ?? parsed.port;
-        _conn = await MySQLConnection.createConnection(
+        opened = await MySQLConnection.createConnection(
           host: effectiveHost,
           port: effectivePort,
           userName: parsed.userName,
@@ -265,14 +274,15 @@ class MysqlConnection {
           sslVerifyCertificates: sslMode.verifyCertificates,
           sslServerName: sslMode.verifyIdentity && parsed.host is String ? parsed.host : null,
         );
-        await _conn!.connect(timeoutMs: connectTimeoutMs);
+        _conn = opened;
+        await opened.connect(timeoutMs: connectTimeoutMs);
       } else {
         final sslPaths =
             extractSslCertificatePathsFromString(effectiveConnectionString);
         final securityContext = buildSecurityContext(sslPaths);
         final effectiveHost = _sshTunnelHandle?.localHost ?? host;
         final effectivePort = _sshTunnelHandle?.localPort ?? port;
-        _conn = await MySQLConnection.createConnection(
+        opened = await MySQLConnection.createConnection(
           host: effectiveHost,
           port: effectivePort,
           userName: user,
@@ -281,11 +291,27 @@ class MysqlConnection {
           databaseName: database,
           securityContext: securityContext,
         );
-        await _conn!.connect(timeoutMs: connectTimeoutMs);
+        _conn = opened;
+        await opened.connect(timeoutMs: connectTimeoutMs);
       }
+      if (generation != _generation) throw _ConnectSuperseded();
       _isConnected = true;
       scrubCredentials();
     } catch (e, st) {
+      if (generation != _generation) {
+        // forceClose / disconnect ran while this attempt was in flight and
+        // reset the fields (a newer attempt may own them now): what this one
+        // opened is closed here, and it does not come back as connected.
+        if (identical(_conn, opened)) _conn = null;
+        try {
+          if (opened != null && opened.connected) await opened.close();
+        } catch (_) {}
+        try {
+          await openedHandle?.release();
+        } catch (_) {}
+        if (identical(_sshTunnelHandle, openedHandle)) _sshTunnelHandle = null;
+        throw StateError('The connection was closed while it was being opened');
+      }
       _isConnected = false;
       _conn = null;
       try {
@@ -375,6 +401,8 @@ class MysqlConnection {
   }
 
   Future<void> disconnect() async {
+    _generation++;
+    _connecting = null;
     _isConnected = false;
     _inTransaction = false;
     final c = _conn;
@@ -397,13 +425,17 @@ class MysqlConnection {
   /// Best-effort close. The `mysql_client` driver may not allow graceful [close]
   /// while a query is in progress.
   Future<void> forceClose() async {
+    _generation++;
+    _connecting = null;
     _isConnected = false;
     _inTransaction = false;
     final c = _conn;
     _conn = null;
-    if (c == null) return;
+    // No early return when there is no connection yet: an attempt may be
+    // between opening the tunnel and the handshake, and the tunnel is ours to
+    // release (#1313).
     try {
-      if (c.connected) {
+      if (c != null && c.connected) {
         await c.close();
       }
     } catch (e) {
@@ -858,3 +890,7 @@ class MysqlConnectionException implements Exception {
   @override
   String toString() => message;
 }
+
+/// Marks a connect attempt that [MysqlConnection.disconnect] or `forceClose`
+/// overtook; never leaves the library.
+class _ConnectSuperseded implements Exception {}

@@ -28,6 +28,19 @@ void main() {
       );
     });
 
+    test('percent-encodes a password with URI special characters', () {
+      // A raw `@` or `/` made Uri.replace throw a FormatException on Save.
+      final uri = injectUriPasswordIfMissing(
+        'postgresql://alice@db.example:5432/app',
+        'p@ss/w#rd',
+      );
+      expect(uri, 'postgresql://alice:p%40ss%2Fw%23rd@db.example:5432/app');
+      final parsed = Uri.parse(uri);
+      expect(parsed.host, 'db.example');
+      expect(
+          Uri.decodeComponent(parsed.userInfo.split(':').last), 'p@ss/w#rd');
+    });
+
     test('keeps existing password', () {
       const uri = 'postgresql://alice:keep@db.example:5432/app';
       expect(injectUriPasswordIfMissing(uri, 'other'), uri);

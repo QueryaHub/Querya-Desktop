@@ -207,6 +207,14 @@ class SshTunnelSecrets {
 
   bool get hasAny => !isEmpty;
 
+  /// An independent copy: opening a tunnel clears the secrets it is given.
+  SshTunnelSecrets copy() => SshTunnelSecrets(
+        password: password,
+        privateKey: privateKey,
+        passphrase: passphrase,
+        jumpPassword: jumpPassword,
+      );
+
   /// Overwrites in-memory secret buffers once authentication completes.
   void zero() {
     password = null;

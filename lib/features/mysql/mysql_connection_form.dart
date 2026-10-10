@@ -214,6 +214,14 @@ class _MysqlConnectionFormContentState
     try {
       final uri = _effectiveConnectionUri();
       final dbText = _databaseController.text.trim();
+      // Blank secret fields mean the saved ones when a connection is edited.
+      final secrets = await secretsForConnectionTest(
+        connectionId: widget.initial?.id,
+        password:
+            _passwordController.text.isEmpty ? null : _passwordController.text,
+        connectionString: uri.isEmpty ? null : uri,
+        sshSecrets: _sshConfig.enabled ? _sshSecrets : null,
+      );
       final conn = MysqlConnection(
         id: 0,
         name: _nameController.text.trim().isEmpty
@@ -225,12 +233,11 @@ class _MysqlConnectionFormContentState
         username: _usernameController.text.trim().isEmpty
             ? null
             : _usernameController.text.trim(),
-        password:
-            _passwordController.text.isEmpty ? null : _passwordController.text,
+        password: secrets.password,
         useSSL: _useSSL || _hasSslCertificateFields(),
-        connectionString: uri.isEmpty ? null : uri,
+        connectionString: secrets.connectionString,
         sshConfig: _sshConfig.enabled ? _sshConfig : null,
-        sshSecrets: _sshSecrets,
+        sshSecrets: secrets.sshSecrets,
       );
       final result = await conn.testConnection();
       if (mounted) {
@@ -522,6 +529,7 @@ class _MysqlConnectionFormContentState
                     SshTunnelSection(
                       config: _sshConfig,
                       secrets: _sshSecrets,
+                      connectionId: widget.initial?.id,
                       onChanged: (cfg) => setState(() => _sshConfig = cfg),
                       targetHost: _hostController.text.trim().isNotEmpty
                           ? _hostController.text.trim()

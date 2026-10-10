@@ -2,6 +2,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_manager.dart';
+import 'package:querya_desktop/features/connections/connection_edit_secrets.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Reusable UI section for configuring SSH Bastion / Jump Host tunneling
@@ -14,6 +15,7 @@ class SshTunnelSection extends material.StatefulWidget {
     required this.onChanged,
     this.targetHost,
     this.targetPort,
+    this.connectionId,
   });
 
   final SshTunnelConfig config;
@@ -21,6 +23,10 @@ class SshTunnelSection extends material.StatefulWidget {
   final material.ValueChanged<SshTunnelConfig> onChanged;
   final String? targetHost;
   final int? targetPort;
+
+  /// The saved connection being edited: its stored SSH secrets stand in for
+  /// the fields left blank when the tunnel is tested (#1302).
+  final int? connectionId;
 
   @override
   material.State<SshTunnelSection> createState() => _SshTunnelSectionState();
@@ -157,9 +163,16 @@ class _SshTunnelSectionState extends material.State<SshTunnelSection> {
           : _fingerprintController.text.trim(),
     );
 
+    final id = widget.connectionId;
+    final secrets = id == null || id <= 0
+        ? widget.secrets.copy()
+        : await mergeSshSecretsForConnectionUpdate(
+            connectionId: id,
+            editedSecrets: widget.secrets,
+          );
     final result = await SshTunnelManager.instance.testSshConnection(
       config: currentConfig,
-      secrets: widget.secrets,
+      secrets: secrets,
       testRemoteHost: widget.targetHost,
       testRemotePort: widget.targetPort,
     );
@@ -474,19 +487,22 @@ class _SshTunnelSectionState extends material.State<SshTunnelSection> {
                 child: material.Column(
                   crossAxisAlignment: material.CrossAxisAlignment.start,
                   children: [
-                    const Text('Known Host SHA-256 Fingerprint (optional)')
+                    const Text('Known host fingerprint (optional)')
                         .small()
                         .muted(),
                     const Gap(4),
                     TextField(
                       controller: _fingerprintController,
                       placeholder: const Text(
-                        'e.g. 7f8a12... (leave blank to trust on first connect)',
+                        'SHA256:... (leave blank to trust on first connect)',
                       ),
                     ),
                     const Gap(6),
                     const Text(
-                      'Protects against Man-in-the-Middle (MitM) attacks by rejecting mismatched host keys.',
+                      'Protects against Man-in-the-Middle (MitM) attacks by '
+                      'rejecting mismatched host keys. Paste what '
+                      '"ssh-keygen -lf" prints for the server\'s key, or the '
+                      'fingerprint shown by Test SSH Connection.',
                     ).muted().xSmall(),
                   ],
                 ),

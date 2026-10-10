@@ -288,19 +288,26 @@ class _MongoConnectionFormContentState
 
     try {
       final data = _formData;
+      // Blank secret fields mean the saved ones when a connection is edited.
+      final secrets = await secretsForConnectionTest(
+        connectionId: widget.initial?.id,
+        password: data.password,
+        connectionString: data.connectionString,
+        sshSecrets: _sshConfig.enabled ? _sshSecrets : null,
+      );
       final connection = MongoConnection(
         id: 0,
         name: data.name.isEmpty ? 'test' : data.name,
         host: data.host,
         port: data.port,
         username: data.username,
-        password: data.password,
+        password: secrets.password,
         database: data.database,
         authSource: data.authSource,
         useSSL: data.useSSL,
-        connectionString: data.connectionString,
+        connectionString: secrets.connectionString,
         sshConfig: _sshConfig.enabled ? _sshConfig : null,
-        sshSecrets: _sshSecrets,
+        sshSecrets: secrets.sshSecrets,
       );
 
       final result = await connection.testConnection();
@@ -613,6 +620,7 @@ class _MongoConnectionFormContentState
                       SshTunnelSection(
                         config: _sshConfig,
                         secrets: _sshSecrets,
+                        connectionId: widget.initial?.id,
                         onChanged: (cfg) => setState(() => _sshConfig = cfg),
                         targetHost: _hostController.text.trim().isNotEmpty
                             ? _hostController.text.trim()

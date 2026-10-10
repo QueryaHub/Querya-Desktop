@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:dartssh2/dartssh2.dart';
 
 /// In-memory stand-in for an SSH server and its clients, plugged into
@@ -20,14 +22,26 @@ class FakeSshServer {
   /// Per-user passwords that take precedence over [password].
   final userPasswords = <String, String>{};
 
-  /// Bytes the server presents as its host key fingerprint.
+  /// The server's host key. What the client's verify callback receives is its
+  /// OpenSSH fingerprint, `SHA256:<base64>` UTF-8 encoded, as dartssh2 passes it.
   Uint8List hostKey;
+
+  /// The fingerprint of [key], as OpenSSH prints it.
+  static String openSshFingerprint(List<int> key) =>
+      'SHA256:${base64.encode(sha256.convert(key).bytes).replaceAll('=', '')}';
+
+  /// What dartssh2 hands to `onVerifyHostKey` for [key].
+  static Uint8List presented(List<int> key) =>
+      Uint8List.fromList(utf8.encode(openSshFingerprint(key)));
 
   /// Whether public-key authentication succeeds.
   bool acceptPublicKeys;
 
   /// Makes the TCP connect fail.
   bool failConnect;
+
+  /// How long the TCP connect takes, to land another call inside it.
+  Duration? connectDelay;
 
   /// Every (host, port) the manager dialed, in order.
   final connects = <({String host, int port})>[];
@@ -41,6 +55,8 @@ class FakeSshServer {
     Duration? timeout,
   }) async {
     connects.add((host: host, port: port));
+    final delay = connectDelay;
+    if (delay != null) await Future<void>.delayed(delay);
     if (failConnect) throw StateError('connect to $host:$port failed');
     return FakeSshSocket();
   }
@@ -143,7 +159,11 @@ class FakeSshClient implements SSHClient {
   Future<void> _handshake() async {
     try {
       final trusted =
-          await onVerifyHostKey?.call('ssh-ed25519', server.hostKey) ?? true;
+          await onVerifyHostKey?.call(
+                'ssh-ed25519',
+                FakeSshServer.presented(server.hostKey),
+              ) ??
+              true;
       if (!trusted) throw SSHHostkeyError('host key rejected');
 
       final keys = identities;

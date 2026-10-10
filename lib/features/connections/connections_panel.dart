@@ -79,6 +79,7 @@ import 'package:querya_desktop/core/extensions/extension_driver_session.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/features/connections/sdui_tree_builder.dart';
 import 'package:querya_desktop/core/sdui/sdui_tree_schema.dart';
+import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/folders_storage.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
@@ -719,8 +720,20 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
   Future<void> _editConnection(ConnectionRow conn) async {
     final edited = await promptEditConnection(context, conn);
     if (edited == null || !mounted) return;
-    final toSave = await mergeSecretsForConnectionUpdate(edited);
-    await LocalDb.instance.updateConnection(toSave);
+    try {
+      final toSave = await mergeSecretsForConnectionUpdate(edited);
+      await LocalDb.instance.updateConnection(toSave);
+    } on SecretsStoreUnavailableException catch (e) {
+      // Saving would write the secrets it could not read as empty ones.
+      if (mounted) {
+        showAppToast(
+          context: context,
+          variant: AppToastVariant.error,
+          message: 'The connection was not saved. ${e.toString()}',
+        );
+      }
+      return;
+    }
     await _loadData();
     if (!mounted) return;
     ConnectionRow? updated;

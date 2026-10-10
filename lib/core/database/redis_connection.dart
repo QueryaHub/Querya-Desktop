@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -29,8 +30,24 @@ class RedisConnection {
     String? connectionString,
     this.sshConfig,
     this.sshSecrets,
-  })  : _password = password,
+    Duration? connectTimeout,
+  })  : _connectTimeout = connectTimeout,
+        _password = password,
         _connectionString = connectionString;
+
+  /// How long the TCP connect, the TLS handshake and `AUTH` / `PING` may take,
+  /// each. The same 10 s as PostgreSQL and MySQL (#1307). [Duration.zero] means
+  /// no limit.
+  ///
+  /// A test seam: widget tests that leave a connect pending when they end
+  /// (a view opening a real connection to a closed port) would fail on the
+  /// timer the limit creates, so `flutter_test_config.dart` sets it to zero.
+  @visibleForTesting
+  static Duration defaultConnectTimeout = const Duration(seconds: 10);
+
+  final Duration? _connectTimeout;
+
+  Duration get connectTimeout => _connectTimeout ?? defaultConnectTimeout;
 
   /// Parses [ConnectionRow.connectionString] (`redis://` / `rediss://`) for
   /// host, port, userinfo, and TLS. Pass [id] `-1` for a sidebar probe that
@@ -112,7 +129,23 @@ class RedisConnection {
     _connectionString = null;
   }
 
-  Future<void> connect() async {
+  /// Single-flight: a caller that arrives while an attempt is in progress waits
+  /// for that attempt. Without this, two callers opened two sockets and two SSH
+  /// tunnels, and the second overwrote the first's connection (#1307).
+  Future<void> connect() {
+    if (_isConnected && _command != null) return Future<void>.value();
+    final inFlight = _connecting;
+    if (inFlight != null) return inFlight;
+    final attempt = _connectOnce();
+    _connecting = attempt;
+    return attempt.whenComplete(() {
+      if (identical(_connecting, attempt)) _connecting = null;
+    });
+  }
+
+  Future<void>? _connecting;
+
+  Future<void> _connectOnce() async {
     try {
       await _openConnection();
     } on RedisConnectionException {
@@ -132,17 +165,21 @@ class RedisConnection {
         (effectiveConnectionString == null ||
             effectiveConnectionString.isEmpty) &&
         id > 0) {
-      try {
-        final secrets = await ConnectionSecretsStore.readForConnection(id);
-        effectivePassword = secrets.password;
-        effectiveConnectionString = secrets.connectionString;
-      } catch (_) {}
+      // A store that cannot be read throws (#1303): connecting with no password
+      // would be reported as a wrong one.
+      final secrets = await ConnectionSecretsStore.readForConnection(id);
+      effectivePassword = secrets.password;
+      effectiveConnectionString = secrets.connectionString;
     }
 
-    _conn = redis.RedisConnection();
+    final client = redis.RedisConnection();
+    _conn = client;
+    // Owned here so that a failed attempt can close it, wherever it failed.
+    Socket? socket;
     final sslPaths =
         extractSslCertificatePathsFromString(effectiveConnectionString);
     final secure = useSSL || sslPaths.hasAny;
+    final limit = connectTimeout > Duration.zero ? connectTimeout : null;
 
     try {
       if (sshConfig != null && sshConfig!.enabled) {
@@ -168,35 +205,33 @@ class RedisConnection {
       final effectiveHost = _sshTunnelHandle?.localHost ?? host;
       final effectivePort = _sshTunnelHandle?.localPort ?? port;
 
-      if (secure) {
-        final context = buildSecurityContext(sslPaths);
-        final socket = await SecureSocket.connect(
-          effectiveHost,
-          effectivePort,
-          context: context,
-        );
-        _command = await _conn!.connectWithSocket(socket);
-      } else {
-        _command = await _conn!.connect(effectiveHost, effectivePort);
-      }
-      _command!.setParser(redis.RedisParserBulkBinary());
-      if (effectivePassword != null && effectivePassword.isNotEmpty) {
-        if (username != null && username!.trim().isNotEmpty) {
-          await _command!
-              .send_object(['AUTH', username!.trim(), effectivePassword]);
-        } else {
-          await _command!.send_object(['AUTH', effectivePassword]);
-        }
-      }
-      final result = await _command!.send_object(['PING']);
-      if (result == null || result.toString().toUpperCase() != 'PONG') {
-        try {
-          await _conn?.close();
-        } catch (_) {}
-        _conn = null;
-        _command = null;
-        throw RedisConnectionException('PING failed');
-      }
+      // The socket is opened here, with a timeout, for plain and TLS alike.
+      socket = secure
+          ? await SecureSocket.connect(
+              effectiveHost,
+              effectivePort,
+              context: buildSecurityContext(sslPaths),
+              timeout: limit,
+            )
+          : await Socket.connect(
+              effectiveHost,
+              effectivePort,
+              timeout: limit,
+            );
+      final command = await client.connectWithSocket(socket);
+      _command = command;
+      command.setParser(redis.RedisParserBulkBinary());
+      // A server that accepts the TCP connection and then says nothing must
+      // not hold the caller either.
+      final handshake = _authenticate(command, effectivePassword);
+      await (limit == null
+          ? handshake
+          : handshake.timeout(
+              limit,
+              onTimeout: () => throw TimeoutException(
+                'Redis did not answer within ${limit.inSeconds} s',
+              ),
+            ));
       _isConnected = true;
       if (_clientReadOnly) {
         try {
@@ -210,11 +245,32 @@ class RedisConnection {
       _isConnected = false;
       _conn = null;
       _command = null;
+      // The attempt may have got as far as an open socket (a wrong password,
+      // a silent server): close it, or every failed try leaves one behind.
+      try {
+        socket?.destroy();
+      } catch (_) {}
       try {
         await _sshTunnelHandle?.release();
       } catch (_) {}
       _sshTunnelHandle = null;
       rethrow;
+    }
+  }
+
+  /// `AUTH` when there is a password, then `PING`.
+  Future<void> _authenticate(redis.Command command, String? password) async {
+    if (password != null && password.isNotEmpty) {
+      final user = username?.trim();
+      if (user != null && user.isNotEmpty) {
+        await command.send_object(['AUTH', user, password]);
+      } else {
+        await command.send_object(['AUTH', password]);
+      }
+    }
+    final result = await command.send_object(['PING']);
+    if (result == null || result.toString().toUpperCase() != 'PONG') {
+      throw RedisConnectionException('PING failed');
     }
   }
 
