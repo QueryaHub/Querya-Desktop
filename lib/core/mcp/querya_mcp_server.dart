@@ -107,7 +107,8 @@ base class QueryaMcpServer extends MCPServer with ToolsSupport, ResourcesSupport
 
   static final _listTables = Tool(
     name: 'list_tables',
-    description: 'Lists the tables of a connection with their column count.',
+    description: 'Lists the tables and views of a connection with their column '
+        'count; views carry "kind": "view".',
     inputSchema: Schema.object(
       properties: {'connection_id': _connectionId},
       required: ['connection_id'],

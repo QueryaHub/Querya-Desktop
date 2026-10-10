@@ -77,7 +77,7 @@ and most stdio clients:
 | Tool | Arguments | Returns |
 |---|---|---|
 | `list_connections` | — | shared connections: `id`, `name`, `type`, `environment`, `database` |
-| `list_tables` | `connection_id` | tables with their column count |
+| `list_tables` | `connection_id` | tables and views with their column count |
 | `describe_table` | `connection_id`, `table` | columns, types, primary key, foreign key targets, indexes |
 | `sample_rows` | `connection_id`, `table`, `rows` (1-100, default 20) | first rows of the table |
 | `run_query` | `connection_id`, `sql` | `columns`, `rows`, `row_count`, `truncated` |
@@ -97,8 +97,9 @@ can fix its query and retry.
 - **Rows:** at most 1000 per `run_query` (`truncated: true` when cut), 100 per
   `sample_rows`. **Cells** longer than 4 KB are cut with a marker.
 - **Time:** 15 s per statement.
-- **Tables:** base tables of the current schema / database; views are not
-  listed yet.
+- **Tables:** base tables and views of the current schema / database
+  (`kind: "view"`; PostgreSQL materialized views included). A view has no
+  primary key or index information.
 
 ## Activity log
 
