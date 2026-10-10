@@ -76,6 +76,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
 
   List<double> _columnWidths = const [];
   List<double> _columnOffsets = const [0];
+  final List<int> _columnSampleMaxRowChars = [];
   bool _widthsNeedUpdate = true;
   bool _userHasResized = false;
   double _scrollOffset = 0;

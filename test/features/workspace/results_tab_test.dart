@@ -143,6 +143,37 @@ void main() {
       );
       expect(result, equals(initial));
     });
+
+    test('reuses precomputed maxRowChars and yields identical distributed widths', () {
+      final columns = ['app_id', 'country', 'description'];
+      final rows = [
+        ['292030', 'kz', 'x' * 100],
+      ];
+      final maxRowChars = <int>[];
+      final initialWidths = computeResultGridColumnWidths(
+        columns: columns,
+        rows: rows,
+        outMaxRowChars: maxRowChars,
+      );
+      expect(maxRowChars, [6, 2, 100]);
+
+      final withoutPrecomputed = distributeResultGridSpareWidth(
+        columnWidths: initialWidths,
+        columns: columns,
+        rows: rows,
+        availableWidth: 1000.0,
+      );
+
+      final withPrecomputed = distributeResultGridSpareWidth(
+        columnWidths: initialWidths,
+        columns: columns,
+        rows: rows,
+        availableWidth: 1000.0,
+        maxRowChars: maxRowChars,
+      );
+
+      expect(withPrecomputed, equals(withoutPrecomputed));
+    });
   });
 
   group('sortResultGridRows', () {
