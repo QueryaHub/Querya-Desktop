@@ -878,6 +878,82 @@ class LocalDb {
     await db.delete('connections', where: 'id = ?', whereArgs: [id]);
   }
 
+  /// Resolves the absolute path to `querya.db`.
+  Future<String> databasePath() async {
+    if (_cachedDbPath != null) return _cachedDbPath!;
+    final dir = await AppDataRoot.applicationSupportDirectory();
+    final sub = Directory(p.join(dir.path, 'querya_desktop'));
+    if (!await sub.exists()) await sub.create(recursive: true);
+    _cachedDbPath = p.join(sub.path, _dbName);
+    return _cachedDbPath!;
+  }
+
+  /// Explicitly opens the database or throws if opening/migrating fails.
+  Future<Database> open() => _open();
+
+  /// Removes stale WAL, SHM, and lock sidecars (e.g. after a process crash or freeze).
+  Future<void> removeWalAndLockFiles() async {
+    await close();
+    final dbPath = await databasePath();
+    final walFile = File('$dbPath-wal');
+    final shmFile = File('$dbPath-shm');
+    final lockFile = File('$dbPath-lock');
+    if (await walFile.exists()) {
+      try {
+        await walFile.delete();
+      } catch (_) {}
+    }
+    if (await shmFile.exists()) {
+      try {
+        await shmFile.delete();
+      } catch (_) {}
+    }
+    if (await lockFile.exists()) {
+      try {
+        await lockFile.delete();
+      } catch (_) {}
+    }
+  }
+
+  /// Creates a timestamped backup copy of `querya.db` (and any sidecar files)
+  /// in the same directory and returns the backup file path.
+  Future<String> backupDatabaseFile() async {
+    await close();
+    final dbPath = await databasePath();
+    final dbFile = File(dbPath);
+    if (!await dbFile.exists()) {
+      throw FileSystemException('Database file does not exist', dbPath);
+    }
+    final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+    final backupPath = '$dbPath.corrupted.$timestamp.bak';
+    await dbFile.copy(backupPath);
+
+    final walFile = File('$dbPath-wal');
+    if (await walFile.exists()) {
+      try {
+        await walFile.copy('$backupPath-wal');
+      } catch (_) {}
+    }
+    return backupPath;
+  }
+
+  /// Resets the database file by creating a backup and removing the corrupted db
+  /// so a fresh schema can be created on the next launch.
+  Future<void> resetDatabaseFile() async {
+    await close();
+    final dbPath = await databasePath();
+    final dbFile = File(dbPath);
+    if (await dbFile.exists()) {
+      try {
+        await backupDatabaseFile();
+      } catch (_) {}
+      try {
+        await dbFile.delete();
+      } catch (_) {}
+    }
+    await removeWalAndLockFiles();
+  }
+
   Future<void> close() async {
     _openFuture = null;
     await _db?.close();

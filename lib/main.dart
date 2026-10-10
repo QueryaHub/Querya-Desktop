@@ -15,6 +15,7 @@ import 'core/platform/file_launch_service.dart';
 import 'core/security/ssl_certificate_support.dart';
 import 'core/storage/local_db.dart';
 import 'core/theme/theme_controller.dart';
+import 'features/recovery/querya_startup_recovery_app.dart';
 import 'features/updater/update_controller.dart';
 
 void main([List<String> args = const []]) async {
@@ -30,14 +31,27 @@ void main([List<String> args = const []]) async {
 
     DisplayRefreshService.initialize();
     await LocalDb.initFfi();
-    await SyntaxHighlightService.ensureInitialized();
-    await ThemeController.instance.load();
-    await UiScaleController.instance.load();
-    await QueryaMotionController.instance.load();
-    unawaited(UpdateController.instance.initialize());
-    unawaited(cleanupStaleMongoTlsTempFiles());
-    unawaited(McpServerController.instance.startIfEnabled());
-    runApp(const QueryaApp());
+
+    try {
+      await LocalDb.instance.open();
+      await SyntaxHighlightService.ensureInitialized();
+      await ThemeController.instance.load();
+      await UiScaleController.instance.load();
+      await QueryaMotionController.instance.load();
+      unawaited(UpdateController.instance.initialize());
+      unawaited(cleanupStaleMongoTlsTempFiles());
+      unawaited(McpServerController.instance.startIfEnabled());
+      runApp(const QueryaApp());
+    } catch (error, stack) {
+      debugPrint('Startup database initialization failed: $error\n$stack');
+      runApp(
+        QueryaStartupRecoveryApp(
+          error: error,
+          stackTrace: stack,
+        ),
+      );
+    }
+
     doWhenWindowReady(() {
       final win = appWindow;
       win.minSize = const Size(900, 600);

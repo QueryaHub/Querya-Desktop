@@ -280,6 +280,14 @@ abstract final class TableMutationEngine {
     Map<String, String>? columnDataTypes,
     Map<String, TableColumnMeta>? columnMeta,
   }) {
+    // Types for WHERE matching: explicit columnDataTypes win, columnMeta fills
+    // the gaps so text columns keep literal 'NULL' strings (#1368).
+    final whereColumnTypes = <String, String>{
+      if (columnMeta != null)
+        for (final e in columnMeta.entries)
+          if (e.value.dataType.isNotEmpty) e.key: e.value.dataType,
+      ...?columnDataTypes,
+    };
     final statements = <TableMutationStatement>[];
     final tableRef = quoteQualifiedTable(
       tableName,
@@ -317,7 +325,7 @@ abstract final class TableMutationEngine {
           primaryKeys: primaryKeys,
           row: origRow,
           dialect: dialect,
-          columnDataTypes: columnDataTypes,
+          columnDataTypes: whereColumnTypes,
         );
 
         final sql = 'UPDATE $tableRef SET ${setClauses.join(', ')} WHERE $whereClause';
@@ -382,7 +390,7 @@ abstract final class TableMutationEngine {
           primaryKeys: primaryKeys,
           row: origRow,
           dialect: dialect,
-          columnDataTypes: columnDataTypes,
+          columnDataTypes: whereColumnTypes,
         );
 
         final sql = 'DELETE FROM $tableRef WHERE $whereClause';
@@ -484,11 +492,13 @@ abstract final class TableMutationEngine {
           final matchedCol = columns[colIdx];
           final colName = quoteIdentifier(unquoteIdentifier(matchedCol), dialect);
           final val = row[colIdx];
-          if (val == 'NULL' || val == 'null') {
+          final colType = _lookupDataType(columnDataTypes, matchedCol) ??
+              _lookupDataType(columnDataTypes, pk);
+
+          final isText = colType != null && _isTextType(colType);
+          if (val == kNullSentinel || (!isText && (val == 'NULL' || val == 'null'))) {
             clauses.add('$colName IS NULL');
           } else {
-            final colType = _lookupDataType(columnDataTypes, matchedCol) ??
-                _lookupDataType(columnDataTypes, pk);
             clauses.add('$colName = ${formatLiteral(val, dialect, dataTypeName: colType)}');
           }
         }
@@ -500,11 +510,13 @@ abstract final class TableMutationEngine {
       for (var c = 0; c < columns.length; c++) {
         final colName = columns[c];
         final quotedCol = quoteIdentifier(unquoteIdentifier(colName), dialect);
-        final val = c < row.length ? row[c] : 'NULL';
-        if (val == 'NULL' || val == 'null') {
+        final val = c < row.length ? row[c] : kNullSentinel;
+        final colType = _lookupDataType(columnDataTypes, colName);
+
+        final isText = colType != null && _isTextType(colType);
+        if (val == kNullSentinel || (!isText && (val == 'NULL' || val == 'null'))) {
           clauses.add('$quotedCol IS NULL');
         } else {
-          final colType = _lookupDataType(columnDataTypes, colName);
           clauses.add('$quotedCol = ${formatLiteral(val, dialect, dataTypeName: colType)}');
         }
       }
