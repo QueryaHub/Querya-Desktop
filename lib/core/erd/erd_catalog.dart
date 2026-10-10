@@ -38,6 +38,7 @@ SELECT ${_pgQualified('c', 'ns')} AS table_name, a.attname AS column_name,
     SELECT 1 FROM pg_catalog.pg_index ui
     WHERE ui.indrelid = c.oid AND ui.indisunique AND NOT ui.indisprimary
       AND ui.indnatts = 1 AND ui.indkey[0] = a.attnum
+      AND ui.indpred IS NULL
   ) THEN 1 ELSE 0 END AS is_unique,
   pg_get_expr(df.adbin, df.adrelid) AS column_default,
   CASE WHEN a.attidentity <> ''

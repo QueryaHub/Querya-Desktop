@@ -43,6 +43,8 @@ void main() {
     }
     expect(ErdCatalog.columnsSql(SqlDialect.postgres), contains('attidentity'));
     expect(ErdCatalog.columnsSql(SqlDialect.postgres), contains('indisunique'));
+    // A partial unique index (`WHERE is_primary`) does not make a column unique.
+    expect(ErdCatalog.columnsSql(SqlDialect.postgres), contains('indpred IS NULL'));
     expect(ErdCatalog.columnsSql(SqlDialect.mysql), contains("'UNI'"));
     expect(ErdCatalog.columnsSql(SqlDialect.mysql), contains('auto_increment'));
     expect(ErdCatalog.columnsSql(SqlDialect.sqlite), contains('pragma_index_list'));
