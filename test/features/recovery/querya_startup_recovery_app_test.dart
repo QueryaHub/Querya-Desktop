@@ -98,30 +98,43 @@ void main() {
       expect(find.text('Start in Safe Mode'), findsOneWidget);
     });
 
-    testWidgets('retry callback triggers when database can be opened',
-        (tester) async {
-      var retried = false;
+    // testWidgets runs in FakeAsync: real file/SQLite I/O only completes inside
+    // tester.runAsync, otherwise the test hangs until the 10 minute timeout.
+    testWidgets(
+      'retry callback triggers when database can be opened',
+      (tester) async {
+        var retried = false;
 
-      // Ensure clean db can be opened
-      await LocalDb.instance.close();
-      final dbPath = await LocalDb.instance.databasePath();
-      final dbFile = File(dbPath);
-      if (await dbFile.exists()) await dbFile.delete();
+        // Ensure clean db can be opened
+        await tester.runAsync(() async {
+          await LocalDb.instance.close();
+          final dbPath = await LocalDb.instance.databasePath();
+          final dbFile = File(dbPath);
+          if (await dbFile.exists()) await dbFile.delete();
+        });
 
-      await tester.pumpWidget(
-        QueryaStartupRecoveryApp(
-          error: 'Transient startup lock error',
-          onRetrySuccess: () {
-            retried = true;
-          },
-        ),
-      );
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(
+          QueryaStartupRecoveryApp(
+            error: 'Transient startup lock error',
+            onRetrySuccess: () {
+              retried = true;
+            },
+          ),
+        );
+        await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Retry Opening'));
-      await tester.pumpAndSettle();
+        await tester.tap(find.text('Retry Opening'));
+        await tester.runAsync(() async {
+          final deadline = DateTime.now().add(const Duration(seconds: 10));
+          while (!retried && DateTime.now().isBefore(deadline)) {
+            await Future<void>.delayed(const Duration(milliseconds: 20));
+          }
+        });
+        await tester.pump();
 
-      expect(retried, isTrue);
-    });
+        expect(retried, isTrue);
+      },
+      timeout: const Timeout(Duration(seconds: 30)),
+    );
   });
 }
