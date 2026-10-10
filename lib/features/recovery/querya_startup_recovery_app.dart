@@ -1,11 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart' as material;
-import 'package:flutter/services.dart';
 import 'package:querya_desktop/app/app.dart';
 import 'package:querya_desktop/core/storage/app_data_root.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/core/theme/querya_theme_preset.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:querya_desktop/core/ui/querya_icons.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -105,7 +103,7 @@ class _QueryaStartupRecoveryAppState
     try {
       await LocalDb.instance.close();
       final tempDir = await Directory.systemTemp.createTemp('querya_safe_mode_');
-      AppDataRoot.mockPortableRootPath = tempDir.path;
+      AppDataRoot.setSafeModeRootPath(tempDir.path);
       await LocalDb.instance.open();
       _setStatus('Safe mode ready. Launching Querya...');
       if (mounted) {
@@ -124,7 +122,7 @@ class _QueryaStartupRecoveryAppState
 
   @override
   material.Widget build(material.BuildContext context) {
-    final themeData = QueryaThemePreset.queryaDark.data;
+    final themeData = ThemeController.instance.darkShadcnTheme;
     final colorScheme = themeData.colorScheme;
 
     return ShadcnApp(
@@ -164,7 +162,7 @@ class _QueryaStartupRecoveryAppState
                         ],
                       ),
                       const material.SizedBox(height: 16),
-                      Text(
+                      const Text(
                         'Querya could not open the profile database (querya.db) on startup. '
                         'This can happen after a crash, concurrent lock, file permission conflict, '
                         'or SQLite database corruption.',

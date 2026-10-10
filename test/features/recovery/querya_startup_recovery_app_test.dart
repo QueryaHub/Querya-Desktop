@@ -1,13 +1,10 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:querya_desktop/core/storage/app_data_root.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/recovery/querya_startup_recovery_app.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 class _FakePathProvider extends PathProviderPlatform {
   _FakePathProvider(this._root);
@@ -85,14 +82,9 @@ void main() {
   group('QueryaStartupRecoveryApp widget', () {
     testWidgets('renders recovery UI with error message and action buttons',
         (tester) async {
-      var retried = false;
-
       await tester.pumpWidget(
-        QueryaStartupRecoveryApp(
+        const QueryaStartupRecoveryApp(
           error: 'SqliteException(5): database is locked',
-          onRetrySuccess: () {
-            retried = true;
-          },
         ),
       );
       await tester.pumpAndSettle();
