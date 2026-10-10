@@ -14,6 +14,7 @@ class SqlEditorCommandBridge {
   VoidCallback? _onOpen;
   VoidCallback? _onSave;
   VoidCallback? _onExecute;
+  VoidCallback? _onExecuteStatement;
   VoidCallback? _onCloseTab;
   VoidCallback? _onNextTab;
   VoidCallback? _onPrevTab;
@@ -36,6 +37,7 @@ class SqlEditorCommandBridge {
     required VoidCallback onOpen,
     required VoidCallback onSave,
     VoidCallback? onExecute,
+    VoidCallback? onExecuteStatement,
     VoidCallback? onCloseTab,
     VoidCallback? onNextTab,
     VoidCallback? onPrevTab,
@@ -48,6 +50,7 @@ class SqlEditorCommandBridge {
     _onOpen = onOpen;
     _onSave = onSave;
     _onExecute = onExecute;
+    _onExecuteStatement = onExecuteStatement;
     _onCloseTab = onCloseTab;
     _onNextTab = onNextTab;
     _onPrevTab = onPrevTab;
@@ -64,6 +67,7 @@ class SqlEditorCommandBridge {
     _onOpen = null;
     _onSave = null;
     _onExecute = null;
+    _onExecuteStatement = null;
     _onCloseTab = null;
     _onNextTab = null;
     _onPrevTab = null;
@@ -106,6 +110,18 @@ class SqlEditorCommandBridge {
       return;
     }
     pendingAction = SqlEditorPendingAction.executeQuery;
+  }
+
+  /// Runs the selection or the statement at the cursor (Ctrl/Cmd+Enter);
+  /// [invokeExecute] runs the whole script. Falls back to [invokeExecute] when
+  /// the workspace has no statement mode.
+  void invokeExecuteStatement() {
+    final statement = _onExecuteStatement;
+    if (statement != null) {
+      statement();
+      return;
+    }
+    invokeExecute();
   }
 
   void invokeCloseTab() {
@@ -176,6 +192,7 @@ class SqlEditorCommandBridge {
     _onOpen = null;
     _onSave = null;
     _onExecute = null;
+    _onExecuteStatement = null;
     _onCloseTab = null;
     _onNextTab = null;
     _onPrevTab = null;
