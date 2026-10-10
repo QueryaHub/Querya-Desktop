@@ -392,18 +392,34 @@ class SshTunnelManager {
 
     // 4. Setup keep-alive ping timer
     Timer? keepAliveTimer;
+    _PooledTunnelSession? session;
     if (config.keepAliveIntervalSeconds > 0) {
+      var failedPings = 0;
       keepAliveTimer = Timer.periodic(
         Duration(seconds: config.keepAliveIntervalSeconds),
-        (_) {
-          if (!client.isClosed) {
-            client.ping().catchError((_) {});
+        (_) async {
+          if (client.isClosed) {
+            if (session != null) {
+              await _dropZombieSession(session);
+            }
+            return;
+          }
+          try {
+            await client.ping();
+            failedPings = 0;
+          } catch (_) {
+            failedPings++;
+            if (failedPings >= _maxKeepAlivePingFailures) {
+              if (session != null) {
+                await _dropZombieSession(session);
+              }
+            }
           }
         },
       );
     }
 
-    final session = _PooledTunnelSession(
+    session = _PooledTunnelSession(
       poolKey: poolKey,
       client: client,
       serverSocket: serverSocket,
@@ -418,8 +434,21 @@ class SshTunnelManager {
       localPort: localPort,
       remoteHost: remoteHost,
       remotePort: remotePort,
-      onRelease: () => _releaseSession(session),
+      onRelease: () => _releaseSession(session!),
     );
+  }
+
+  /// Number of consecutive failed keep-alive pings before considering the
+  /// SSH session dead and proactively closing the local forwarder and client.
+  static const int _maxKeepAlivePingFailures = 2;
+
+  /// Proactively drops a zombie session whose SSH connection or keep-alive pings
+  /// failed, closing the local listener and SSH client and evicting it from the pool.
+  Future<void> _dropZombieSession(_PooledTunnelSession session) async {
+    if (identical(_sessions[session.poolKey], session)) {
+      _sessions.remove(session.poolKey);
+    }
+    await session.close();
   }
 
   /// Drops one reference to [session]; the last one closes it. Handles keep a

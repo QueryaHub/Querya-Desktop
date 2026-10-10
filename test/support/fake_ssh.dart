@@ -193,6 +193,9 @@ class FakeSshClient implements SSHClient {
   @override
   Future<void> get authenticated => _authenticated.future;
 
+  /// If true, calls to [ping] will throw.
+  var failPing = false;
+
   @override
   bool get isClosed => _closed;
 
@@ -202,7 +205,10 @@ class FakeSshClient implements SSHClient {
   }
 
   @override
-  Future<void> ping() async => pingCount++;
+  Future<void> ping() async {
+    pingCount++;
+    if (failPing) throw StateError('ping failed');
+  }
 
   @override
   Future<SSHForwardChannel> forwardLocal(
