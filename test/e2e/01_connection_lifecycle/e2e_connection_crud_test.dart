@@ -165,9 +165,26 @@ void main() {
         await tester.runAsync(() => LocalDb.instance.getConnectionById(id));
     expect(first!.folderId, folderId, reason: 'dropped on the folder');
 
-    // The folder opens to show it. While it is dragged a strip appears at the
-    // top of the list; drop it there.
-    expect(inSidebar('E2E Dragged'), findsOneWidget);
+    // The panel reloads from the database after the drop (real I/O); the tile
+    // is under its folder once it has. Dragging before that starts from the
+    // old layout with the old folder.
+    for (var i = 0; i < 40; i++) {
+      final tile = inSidebar('E2E Dragged');
+      final folder = inSidebar('Team D');
+      if (tile.evaluate().isNotEmpty &&
+          folder.evaluate().isNotEmpty &&
+          tester.getCenter(tile.first).dy > tester.getCenter(folder.first).dy) {
+        break;
+      }
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(
+      tester.getCenter(inSidebar('E2E Dragged').first).dy,
+      greaterThan(tester.getCenter(inSidebar('Team D').first).dy),
+      reason: 'the connection is listed under its folder',
+    );
     final from = tester.getCenter(inSidebar('E2E Dragged').first);
     final gesture = await tester.startGesture(from);
     await gesture.moveBy(const Offset(0, 24));
