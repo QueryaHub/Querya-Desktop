@@ -62,6 +62,37 @@ WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
 ORDER BY m.name, p.cid''',
       };
 
+  /// Columns of the views (and PostgreSQL materialized views) of the current
+  /// schema or database, in the shape of [columnsSql]: no primary key, every
+  /// column nullable. MCP lists them next to the tables.
+  static String viewColumnsSql(SqlDialect d) => switch (d) {
+        SqlDialect.postgres => '''
+SELECT ${_pgQualified('c', 'ns')} AS table_name, a.attname AS column_name,
+  format_type(a.atttypid, a.atttypmod) AS data_type,
+  0 AS is_pk, 1 AS is_nullable
+FROM pg_catalog.pg_attribute a
+JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
+JOIN pg_catalog.pg_namespace ns ON ns.oid = c.relnamespace
+WHERE ns.nspname = current_schema()
+  AND c.relkind IN ('v', 'm')
+  AND a.attnum > 0 AND NOT a.attisdropped
+ORDER BY table_name, a.attnum''',
+        SqlDialect.mysql => '''
+SELECT c.table_name, c.column_name, c.column_type, 0, 1
+FROM information_schema.columns c
+JOIN information_schema.tables t
+  ON t.table_schema = c.table_schema AND t.table_name = c.table_name
+  AND t.table_type = 'VIEW'
+WHERE c.table_schema = DATABASE()
+ORDER BY c.table_name, c.ordinal_position''',
+        SqlDialect.sqlite => '''
+SELECT m.name AS table_name, p.name AS column_name, p.type AS data_type,
+  0 AS is_pk, 1 AS is_nullable
+FROM sqlite_master m JOIN pragma_table_info(m.name) p
+WHERE m.type = 'view' AND m.name NOT LIKE 'sqlite_%'
+ORDER BY m.name, p.cid''',
+      };
+
   /// Foreign keys of every user schema. A reference across schemas is named
   /// `schema.table` on the side that lives outside the current schema.
   static String foreignKeysSql(SqlDialect d) => switch (d) {

@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
+import 'package:querya_desktop/core/erd/erd_catalog.dart';
 import 'package:querya_desktop/core/mcp/mcp_access_store.dart';
 import 'package:querya_desktop/core/mcp/mcp_query_service.dart';
 import 'package:querya_desktop/core/security/connection_environment.dart';
@@ -220,6 +221,45 @@ void main() {
         {'name': 'users', 'columns': 2},
         {'name': 'orders', 'columns': 2},
       ]);
+    });
+
+    group('views', () {
+      setUp(() {
+        db.onExecute = (sql) {
+          if (sql == ErdCatalog.viewColumnsSql(SqlDialect.postgres)) {
+            return const SqlExecutionResult(columns: ['t', 'c', 'ty', 'pk'], rows: [
+              ['active_users', 'id', 'integer', '0'],
+              ['active_users', 'name', 'text', '0'],
+              // Already a table: stays a table.
+              ['users', 'id', 'integer', '0'],
+            ]);
+          }
+          return _catalog(sql);
+        };
+      });
+
+      test('listTables names the views next to the tables', () async {
+        final tables = await service().listTables(1);
+        expect([for (final t in tables) t.toJson()], [
+          {'name': 'users', 'columns': 2},
+          {'name': 'orders', 'columns': 2},
+          {'name': 'active_users', 'columns': 2, 'kind': 'view'},
+        ]);
+      });
+
+      test('describeTable of a view has columns and no index query', () async {
+        final view = await service().describeTable(1, 'active_users');
+        expect(view.columns.map((c) => c.name), ['id', 'name']);
+        expect(view.columns.any((c) => c.primaryKey), isFalse);
+        expect(view.indexes, isEmpty);
+        expect(db.executed.where((s) => s.contains('pg_indexes')), isEmpty);
+      });
+
+      test('sampleRows reads a view through its quoted name', () async {
+        await service().sampleRows(1, 'active_users', rows: 5);
+        expect(
+            db.executed.last, contains('"active_users"'));
+      });
     });
 
     test('describeTable has keys, references and indexes', () async {

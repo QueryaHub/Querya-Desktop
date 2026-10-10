@@ -82,10 +82,14 @@ class McpQueryService {
   }
 
   Future<List<McpTableSummary>> listTables(int connectionId) async {
-    final schema = await _withDelegate(connectionId, _loadSchema);
+    final cat = await _withDelegate(connectionId, _loadCatalog);
     return [
-      for (final t in schema.tables)
-        McpTableSummary(name: t.name, columnCount: t.columns.length),
+      for (final t in cat.schema.tables)
+        McpTableSummary(
+          name: t.name,
+          columnCount: t.columns.length,
+          isView: cat.views.contains(t.name),
+        ),
     ];
   }
 
@@ -93,7 +97,7 @@ class McpQueryService {
   /// the `schema://` resource.
   Future<List<McpTableDescription>> schemaOverview(int connectionId) {
     return _withDelegate(connectionId, (delegate, dialect) async {
-      final schema = await _loadSchema(delegate, dialect);
+      final schema = (await _loadCatalog(delegate, dialect)).schema;
       return [for (final t in schema.tables) _describe(schema, t, const [])];
     });
   }
@@ -103,8 +107,10 @@ class McpQueryService {
     String table,
   ) {
     return _withDelegate(connectionId, (delegate, dialect) async {
-      final schema = await _loadSchema(delegate, dialect);
+      final cat = await _loadCatalog(delegate, dialect);
+      final schema = cat.schema;
       final t = _findTable(schema, table);
+      if (cat.views.contains(t.name)) return _describe(schema, t, const []);
       final indexes = await _run(
         () => delegate.executeQuery(
           _indexesSql(dialect, t.name),
@@ -150,7 +156,8 @@ class McpQueryService {
   }) {
     final n = rows.clamp(1, maxSampleRows);
     return _withDelegate(connectionId, (delegate, dialect) async {
-      final t = _findTable(await _loadSchema(delegate, dialect), table);
+      final t =
+          _findTable((await _loadCatalog(delegate, dialect)).schema, table);
       final result = await _run(
         () => delegate.executeQuery(
           'SELECT * FROM ${quoteIdentifier(t.name, dialect)}',
@@ -225,6 +232,35 @@ class McpQueryService {
     if (refusal != null) {
       throw McpToolException(refusal.message, rule: refusal.rule);
     }
+  }
+
+  /// Tables and keys, then the views: a name that is already a table stays a
+  /// table. Views have no keys and no indexes.
+  Future<({ErdSchema schema, Set<String> views})> _loadCatalog(
+    SqlQueryRunner delegate,
+    SqlDialect dialect,
+  ) async {
+    final base = await _loadSchema(delegate, dialect);
+    final viewRows = await _run(
+      () => delegate.executeQuery(ErdCatalog.viewColumnsSql(dialect),
+          limit: _catalogRows, timeout: timeout),
+      dialect,
+    );
+    final known = {for (final t in base.tables) t.name};
+    final views = [
+      for (final t in ErdSchema.fromCatalog(
+              columnRows: viewRows.rows, fkRows: const [])
+          .tables)
+        if (!known.contains(t.name)) t,
+    ];
+    return (
+      schema: ErdSchema(
+        tables: [...base.tables, ...views],
+        relations: base.relations,
+        truncated: base.truncated,
+      ),
+      views: {for (final v in views) v.name},
+    );
   }
 
   Future<ErdSchema> _loadSchema(
@@ -365,12 +401,21 @@ class McpConnectionInfo {
 }
 
 class McpTableSummary {
-  const McpTableSummary({required this.name, required this.columnCount});
+  const McpTableSummary({
+    required this.name,
+    required this.columnCount,
+    this.isView = false,
+  });
 
   final String name;
   final int columnCount;
+  final bool isView;
 
-  Map<String, Object?> toJson() => {'name': name, 'columns': columnCount};
+  Map<String, Object?> toJson() => {
+        'name': name,
+        'columns': columnCount,
+        if (isView) 'kind': 'view',
+      };
 }
 
 class McpColumnInfo {
