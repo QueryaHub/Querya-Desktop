@@ -739,5 +739,55 @@ void main() {
 
       expect(server.clients.single.pingCount, 0);
     });
+
+    test(
+        'consecutive ping failures proactively close zombie session and listener',
+        () async {
+      final first = await open(config: _config(keepAlive: 1));
+      final client = server.clients.single;
+
+      expect(manager.activeSessionCount, 1);
+      expect(await _accepts(first.localPort), isTrue);
+
+      // Trigger ping failures
+      client.failPing = true;
+
+      // Wait for 2 consecutive ping intervals (2 * 1s) plus buffer
+      await Future<void>.delayed(const Duration(milliseconds: 2500));
+
+      // Session should be proactively evicted from manager and closed
+      expect(manager.activeSessionCount, 0);
+      expect(client.isClosed, isTrue);
+      expect(
+        await _accepts(first.localPort),
+        isFalse,
+        reason: 'local listener socket must be closed to prevent zombie accept',
+      );
+
+      // Reconnecting with the same config should open a fresh tunnel session
+      final fresh = await open(config: _config(keepAlive: 1));
+      expect(manager.activeSessionCount, 1);
+      expect(server.clients, hasLength(2));
+      expect(fresh.localPort, isNot(first.localPort));
+      expect(await _accepts(fresh.localPort), isTrue);
+    });
+
+    test('a single transient ping failure followed by success keeps session open',
+        () async {
+      final handle = await open(config: _config(keepAlive: 1));
+      final client = server.clients.single;
+
+      // First interval: fail ping once
+      client.failPing = true;
+      await Future<void>.delayed(const Duration(milliseconds: 1200));
+
+      // Recover before second failure
+      client.failPing = false;
+      await Future<void>.delayed(const Duration(milliseconds: 1200));
+
+      expect(manager.activeSessionCount, 1);
+      expect(client.isClosed, isFalse);
+      expect(await _accepts(handle.localPort), isTrue);
+    });
   });
 }
