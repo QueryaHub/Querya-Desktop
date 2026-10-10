@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:querya_desktop/app/app_wiring.dart';
+import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/storage/app_data_root.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 
@@ -13,6 +14,9 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   installAppWiring();
   ConnectionSecretsStore.backend = testMemorySecrets;
   testMemorySecrets.clear();
+  // A connect limit is a timer; a widget test that ends with a connect pending
+  // would fail on it (tests that exercise the limit pass their own).
+  RedisConnection.defaultConnectTimeout = Duration.zero;
   // Avoid copying the developer's real legacy profile into test temp dirs.
   AppDataRoot.mockLegacySupportCandidates = const [];
   await testMain();

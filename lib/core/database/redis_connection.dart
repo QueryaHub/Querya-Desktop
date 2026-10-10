@@ -30,14 +30,24 @@ class RedisConnection {
     String? connectionString,
     this.sshConfig,
     this.sshSecrets,
-    this.connectTimeout = defaultConnectTimeout,
-  })  : _password = password,
+    Duration? connectTimeout,
+  })  : _connectTimeout = connectTimeout,
+        _password = password,
         _connectionString = connectionString;
 
   /// How long the TCP connect, the TLS handshake and `AUTH` / `PING` may take,
-  /// each. The same 10 s as PostgreSQL and MySQL (#1307).
-  static const Duration defaultConnectTimeout = Duration(seconds: 10);
-  final Duration connectTimeout;
+  /// each. The same 10 s as PostgreSQL and MySQL (#1307). [Duration.zero] means
+  /// no limit.
+  ///
+  /// A test seam: widget tests that leave a connect pending when they end
+  /// (a view opening a real connection to a closed port) would fail on the
+  /// timer the limit creates, so `flutter_test_config.dart` sets it to zero.
+  @visibleForTesting
+  static Duration defaultConnectTimeout = const Duration(seconds: 10);
+
+  final Duration? _connectTimeout;
+
+  Duration get connectTimeout => _connectTimeout ?? defaultConnectTimeout;
 
   /// Parses [ConnectionRow.connectionString] (`redis://` / `rediss://`) for
   /// host, port, userinfo, and TLS. Pass [id] `-1` for a sidebar probe that
@@ -169,6 +179,7 @@ class RedisConnection {
     final sslPaths =
         extractSslCertificatePathsFromString(effectiveConnectionString);
     final secure = useSSL || sslPaths.hasAny;
+    final limit = connectTimeout > Duration.zero ? connectTimeout : null;
 
     try {
       if (sshConfig != null && sshConfig!.enabled) {
@@ -200,24 +211,27 @@ class RedisConnection {
               effectiveHost,
               effectivePort,
               context: buildSecurityContext(sslPaths),
-              timeout: connectTimeout,
+              timeout: limit,
             )
           : await Socket.connect(
               effectiveHost,
               effectivePort,
-              timeout: connectTimeout,
+              timeout: limit,
             );
       final command = await client.connectWithSocket(socket);
       _command = command;
       command.setParser(redis.RedisParserBulkBinary());
       // A server that accepts the TCP connection and then says nothing must
       // not hold the caller either.
-      await _authenticate(command, effectivePassword).timeout(
-        connectTimeout,
-        onTimeout: () => throw TimeoutException(
-          'Redis did not answer within ${connectTimeout.inSeconds} s',
-        ),
-      );
+      final handshake = _authenticate(command, effectivePassword);
+      await (limit == null
+          ? handshake
+          : handshake.timeout(
+              limit,
+              onTimeout: () => throw TimeoutException(
+                'Redis did not answer within ${limit.inSeconds} s',
+              ),
+            ));
       _isConnected = true;
       if (_clientReadOnly) {
         try {
