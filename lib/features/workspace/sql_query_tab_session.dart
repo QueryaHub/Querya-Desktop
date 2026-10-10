@@ -44,6 +44,9 @@ class SqlQueryTabSession {
   int? affectedRows;
   String? statusLine;
 
+  /// How long the last run took (the whole script for a multi-statement run).
+  Duration? elapsed;
+
   /// The EXPLAIN plan as a tree, and whether the result area shows it (or text).
   PlanNode? planRoot;
   bool planAsTree = true;

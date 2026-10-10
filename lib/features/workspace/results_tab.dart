@@ -51,6 +51,7 @@ class ResultsTab extends material.StatefulWidget {
     this.isLoading = false,
     this.affectedRows,
     this.statusLine,
+    this.elapsed,
     this.showExportToolbar = true,
     this.stagingBuffer,
     this.onApplyChanges,
@@ -65,6 +66,9 @@ class ResultsTab extends material.StatefulWidget {
   final bool isLoading;
   final int? affectedRows;
   final String? statusLine;
+
+  /// Time the query took, shown as a badge next to the row count.
+  final Duration? elapsed;
   final bool showExportToolbar;
   final DataGridStagingBuffer? stagingBuffer;
   final material.VoidCallback? onApplyChanges;
@@ -417,6 +421,14 @@ class _ResultsTabState extends material.State<ResultsTab> {
                               ? 'Rows affected: ${widget.affectedRows}'
                               : '${filteredRows.length}${_filterText.isNotEmpty ? ' of ${effectiveRows.length}' : ''} rows'),
                     ).small().semiBold(),
+                    if (widget.elapsed != null) ...[
+                      const Gap(8),
+                      QueryaBadge(
+                        key: const material.ValueKey('result_elapsed'),
+                        label: formatResultElapsed(widget.elapsed!),
+                        isMonospace: true,
+                      ),
+                    ],
 
                     const Gap(16),
 
@@ -663,4 +675,13 @@ Future<void> _showSaveFileErrorDialog(material.BuildContext context) {
       ),
     ),
   );
+}
+
+/// `14 ms`, `1.2 s`, `2 min 5 s`: what the elapsed badge shows.
+String formatResultElapsed(Duration d) {
+  if (d.inMilliseconds < 1000) return '${d.inMilliseconds} ms';
+  if (d.inSeconds < 60) {
+    return '${(d.inMilliseconds / 1000).toStringAsFixed(1)} s';
+  }
+  return '${d.inMinutes} min ${d.inSeconds % 60} s';
 }
