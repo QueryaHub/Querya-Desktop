@@ -790,4 +790,127 @@ void main() {
       expect(await _accepts(handle.localPort), isTrue);
     });
   });
+
+  group('robustness and resource hygiene (#1312)', () {
+    test('missing private key file fails clearly and reports the path', () async {
+      final missingPath = '/nonexistent/path/to/id_ed25519_${DateTime.now().microsecondsSinceEpoch}';
+      await expectLater(
+        open(
+          config: _config(
+            authType: SshAuthType.privateKey,
+            privateKeyPath: missingPath,
+          ),
+          secrets: SshTunnelSecrets(),
+        ),
+        throwsA(
+          isA<SshAuthenticationException>().having(
+            (e) => e.message,
+            'message',
+            allOf(
+              contains('not found'),
+              contains(missingPath),
+            ),
+          ),
+        ),
+      );
+      expect(manager.activeSessionCount, 0);
+      expect(server.connects, isEmpty);
+    });
+
+    test('empty private key file fails clearly with descriptive message', () async {
+      final tempDir = await Directory.systemTemp.createTemp('empty_key_test_');
+      final emptyFile = File(p.join(tempDir.path, 'id_empty'))..writeAsStringSync('   \n');
+      try {
+        await expectLater(
+          open(
+            config: _config(
+              authType: SshAuthType.privateKey,
+              privateKeyPath: emptyFile.path,
+            ),
+            secrets: SshTunnelSecrets(),
+          ),
+          throwsA(
+            isA<SshAuthenticationException>().having(
+              (e) => e.message,
+              'message',
+              allOf(
+                contains('empty'),
+                contains(emptyFile.path),
+              ),
+            ),
+          ),
+        );
+      } finally {
+        tempDir.deleteSync(recursive: true);
+      }
+      expect(manager.activeSessionCount, 0);
+      expect(server.connects, isEmpty);
+    });
+
+    test('failure during bastion authentication cleans up socket and jump host', () async {
+      server.userPasswords['jumper'] = 'jump-pass';
+      server.userPasswords['deploy'] = 'real-secret';
+
+      await expectLater(
+        open(
+          config: _config(jumpHost: 'jump.example', jumpUsername: 'jumper'),
+          secrets: SshTunnelSecrets(
+            password: 'wrong-bastion-password',
+            jumpPassword: 'jump-pass',
+          ),
+        ),
+        throwsA(isA<SshAuthenticationException>()),
+      );
+
+      expect(manager.activeSessionCount, 0);
+      expect(server.clients, hasLength(2));
+      expect(server.clients.every((c) => c.isClosed), isTrue);
+      expect(server.sockets.every((s) => s.isClosed), isTrue);
+    });
+
+    test('failure during jump host forwardLocal closes jump client and socket', () async {
+      server.userPasswords['jumper'] = 'jump-pass';
+      server.failForwardLocal = StateError('forwarding disabled on jump host');
+
+      await expectLater(
+        open(
+          config: _config(jumpHost: 'jump.example', jumpUsername: 'jumper'),
+          secrets: SshTunnelSecrets(
+            password: 'bastion-password',
+            jumpPassword: 'jump-pass',
+          ),
+        ),
+        throwsA(isA<SshConnectionException>()),
+      );
+
+      expect(manager.activeSessionCount, 0);
+      expect(server.clients, hasLength(1));
+      expect(server.clients.single.isClosed, isTrue);
+      expect(server.sockets.single.isClosed, isTrue);
+    });
+
+    test('concurrent openTunnel calls for the same target dial once and share session', () async {
+      server.connectDelay = const Duration(milliseconds: 100);
+
+      final future1 = open();
+      final future2 = open();
+
+      final results = await Future.wait([future1, future2]);
+      final h1 = results[0];
+      final h2 = results[1];
+
+      expect(h1.localPort, h2.localPort);
+      expect(manager.activeSessionCount, 1);
+      expect(server.clients, hasLength(1));
+      expect(server.connects, hasLength(1));
+
+      await h1.release();
+      expect(manager.activeSessionCount, 1);
+      expect(await _accepts(h2.localPort), isTrue);
+
+      await h2.release();
+      expect(manager.activeSessionCount, 0);
+      expect(await _accepts(h2.localPort), isFalse);
+    });
+  });
 }
