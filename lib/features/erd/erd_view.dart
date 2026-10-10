@@ -397,6 +397,7 @@ class _ErdViewState extends material.State<ErdView> {
         if (!_hidden.contains(t.name))
           ErdTable(
             name: t.name,
+            comment: t.comment,
             columns: _collapsed.contains(t.name) || _detail == ErdDetail.names
                 ? const []
                 : [
@@ -1389,6 +1390,7 @@ class _TableCard extends material.StatelessWidget {
         if (c.isUnique && !c.isPrimaryKey) 'Unique',
         if (c.isIdentity) 'Generated (identity / auto increment)',
         if (c.defaultValue case final d?) 'Default: $d',
+        if (c.comment case final n?) 'Note: $n',
       ].join('\n');
 
   /// Shadows read only on light surfaces, so a dark canvas gets twice the alpha.
@@ -1462,6 +1464,18 @@ class _TableCard extends material.StatelessWidget {
                                   fontWeight: material.FontWeight.w600,
                                   fontSize: 13)),
                         ),
+                        // The table's comment in the database (#1279).
+                        if (table.comment case final note?) ...[
+                          material.Tooltip(
+                            message: note,
+                            child: material.Icon(material.Icons.notes_rounded,
+                                key: material.ValueKey(
+                                    'erd_note_${table.name}'),
+                                size: 13,
+                                color: wb.mutedForeground),
+                          ),
+                          const material.SizedBox(width: 6),
+                        ],
                         Text('${table.columns.length}',
                             style: material.TextStyle(
                                 fontSize: 10, color: wb.mutedForeground)),
@@ -1527,6 +1541,14 @@ class _TableCard extends material.StatelessWidget {
                                             QueryaTypography.monoFontFamilyFallback,
                                         color: wb.mutedForeground)),
                               ),
+                              if (c.comment != null) ...[
+                                const material.SizedBox(width: 3),
+                                material.Icon(material.Icons.notes_rounded,
+                                    key: material.ValueKey(
+                                        'erd_note_${table.name}_${c.name}'),
+                                    size: 10,
+                                    color: wb.mutedForeground),
+                              ],
                               // UQ / AI / DF after the type (#1277).
                               for (final b in c.badges) ...[
                                 const material.SizedBox(width: 3),

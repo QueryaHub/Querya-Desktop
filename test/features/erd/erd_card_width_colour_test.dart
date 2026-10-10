@@ -163,4 +163,47 @@ void main() {
     expect(tip.message, contains("Default: 'new'"));
     expect(tip.message, contains('Nullable'));
   });
+
+  testWidgets('comments show as notes on the header and the row (#1279)',
+      (t) async {
+    await t.binding.setSurfaceSize(const material.Size(1200, 800));
+    addTearDown(() => t.binding.setSurfaceSize(null));
+    await t.pumpWidget(queryaThemeTestShell(
+      child: ErdView(
+        source: SqlErdSource(
+          delegate: FakeSqlExecutionDelegate(onExecute: (sql) {
+            if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+              return const SqlExecutionResult(rows: [
+                ['users', 'id', 'INTEGER', '1', '0', '0', 'NULL', '1', 'NULL', 'People'],
+                ['users', 'email', 'TEXT', '0', '0', '0', 'NULL', '0', 'Lower-cased', 'People'],
+                ['tags', 'id', 'INTEGER', '1', '0', '0', 'NULL', '1', 'NULL', 'NULL'],
+              ]);
+            }
+            return const SqlExecutionResult();
+          }),
+          dialect: SqlDialect.sqlite,
+        ),
+      ),
+    ));
+    await t.pump();
+    await t.pump();
+    final tableNote = find.byKey(const material.ValueKey('erd_note_users'));
+    expect(tableNote, findsOneWidget);
+    expect(
+        t.widget<material.Tooltip>(find.ancestor(
+                of: tableNote, matching: find.byType(material.Tooltip)))
+            .message,
+        'People');
+    expect(find.byKey(const material.ValueKey('erd_note_users_email')),
+        findsOneWidget);
+    expect(find.byKey(const material.ValueKey('erd_note_users_id')),
+        findsNothing);
+    expect(find.byKey(const material.ValueKey('erd_note_tags')), findsNothing);
+    final rowTip = t.widget<material.Tooltip>(find
+        .ancestor(
+            of: find.byKey(const material.ValueKey('erd_note_users_email')),
+            matching: find.byType(material.Tooltip))
+        .first);
+    expect(rowTip.message, contains('Note: Lower-cased'));
+  });
 }
