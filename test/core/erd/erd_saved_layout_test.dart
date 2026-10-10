@@ -12,7 +12,7 @@ void main() {
       positions: {'users': Offset(40.04, 80), 'orders': Offset(300, 120.5)},
       collapsed: {'orders'},
       hidden: {'audit'},
-      keysOnly: true,
+      detail: ErdDetail.keys,
       scale: 0.75,
       translation: Offset(-20, 10),
     );
@@ -23,7 +23,7 @@ void main() {
       expect(back.positions['orders'], const Offset(300, 120.5));
       expect(back.collapsed, {'orders'});
       expect(back.hidden, {'audit'});
-      expect(back.keysOnly, isTrue);
+      expect(back.detail, ErdDetail.keys);
       expect(back.scale, 0.75);
       expect(back.translation, const Offset(-20, 10));
     });
@@ -38,12 +38,19 @@ void main() {
       expect(partial.scale, isNull);
     });
 
+    test('a layout saved with the keys-only flag reads as the Keys level', () {
+      expect(ErdSavedLayout.decode('{"keysOnly":true}')!.detail, ErdDetail.keys);
+      expect(ErdSavedLayout.decode('{}')!.detail, ErdDetail.all);
+      expect(ErdSavedLayout.decode('{"detail":"names"}')!.detail,
+          ErdDetail.names);
+    });
+
     test('keepOnly drops tables that no longer exist', () {
       final kept = layout.keepOnly({'users'});
       expect(kept.positions.keys, ['users']);
       expect(kept.collapsed, isEmpty);
       expect(kept.hidden, isEmpty);
-      expect(kept.keysOnly, isTrue);
+      expect(kept.detail, ErdDetail.keys);
     });
   });
 
@@ -68,10 +75,11 @@ void main() {
           key, const ErdSavedLayout(positions: {'t': Offset(1, 2)}));
       await store.write(
           key, const ErdSavedLayout(positions: {'t': Offset(3, 4)}));
-      await store.write(other, const ErdSavedLayout(keysOnly: true));
+      await store.write(
+          other, const ErdSavedLayout(detail: ErdDetail.names));
 
       expect((await store.read(key))!.positions['t'], const Offset(3, 4));
-      expect((await store.read(other))!.keysOnly, isTrue);
+      expect((await store.read(other))!.detail, ErdDetail.names);
 
       await LocalDb.instance.removeConnection(id);
       expect(await store.read(key), isNull);

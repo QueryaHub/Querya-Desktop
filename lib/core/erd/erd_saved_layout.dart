@@ -3,6 +3,10 @@ import 'dart:ui';
 
 import 'package:querya_desktop/core/storage/local_db.dart';
 
+/// How much of each card the diagram shows (#1278), as dbdiagram's detail
+/// levels: the table name only, the key columns, or every column.
+enum ErdDetail { names, keys, all }
+
 /// What the user arranged on a diagram and wants back next time: card
 /// positions, collapsed and hidden tables, the detail level and the viewport.
 ///
@@ -13,7 +17,7 @@ class ErdSavedLayout {
     this.positions = const {},
     this.collapsed = const {},
     this.hidden = const {},
-    this.keysOnly = false,
+    this.detail = ErdDetail.all,
     this.scale,
     this.translation,
     this.headerColors = const {},
@@ -22,7 +26,7 @@ class ErdSavedLayout {
   final Map<String, Offset> positions;
   final Set<String> collapsed;
   final Set<String> hidden;
-  final bool keysOnly;
+  final ErdDetail detail;
 
   /// Zoom and pan of the canvas; null when never saved (the view fits).
   final double? scale;
@@ -36,7 +40,7 @@ class ErdSavedLayout {
       positions.isEmpty &&
       collapsed.isEmpty &&
       hidden.isEmpty &&
-      !keysOnly &&
+      detail == ErdDetail.all &&
       headerColors.isEmpty;
 
   /// The layout without the tables that no longer exist.
@@ -47,7 +51,7 @@ class ErdSavedLayout {
         },
         collapsed: collapsed.intersection(tables),
         hidden: hidden.intersection(tables),
-        keysOnly: keysOnly,
+        detail: detail,
         scale: scale,
         translation: translation,
         headerColors: {
@@ -64,7 +68,7 @@ class ErdSavedLayout {
         },
         'collapsed': collapsed.toList()..sort(),
         'hidden': hidden.toList()..sort(),
-        'keysOnly': keysOnly,
+        'detail': detail.name,
         if (scale != null) 'scale': scale,
         if (translation != null)
           'translation': [_round(translation!.dx), _round(translation!.dy)],
@@ -108,7 +112,11 @@ class ErdSavedLayout {
       positions: positions,
       collapsed: names(json['collapsed']),
       hidden: names(json['hidden']),
-      keysOnly: json['keysOnly'] == true,
+      detail: ErdDetail.values.firstWhere(
+        (d) => d.name == json['detail'],
+        // Layouts saved before #1278 had a keys-only flag.
+        orElse: () => json['keysOnly'] == true ? ErdDetail.keys : ErdDetail.all,
+      ),
       scale: scale is num && scale > 0 ? scale.toDouble() : null,
       translation: offset(json['translation']),
       headerColors: colors,
