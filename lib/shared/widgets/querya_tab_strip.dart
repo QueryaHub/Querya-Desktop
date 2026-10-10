@@ -6,6 +6,7 @@ import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/core/motion/querya_spring.dart';
 import 'package:querya_desktop/core/motion/querya_spring_controller.dart';
+import 'package:querya_desktop/core/ui/querya_tooltip.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// A compact, keyboard-operable tab strip using Querya's motion and theme.
@@ -172,8 +173,20 @@ class QueryaTabStripState extends material.State<QueryaTabStrip>
     _focusNodes[index].requestFocus();
   }
 
+  bool _canCloseAt(int index) =>
+      widget.onClose != null &&
+      (widget.canClose == null || widget.canClose!(index));
+
   material.KeyEventResult _onKeyEvent(int index, KeyEvent event) {
     if (event is! KeyDownEvent) return material.KeyEventResult.ignored;
+
+    // Delete / Backspace close the focused tab, as the close button does.
+    if (event.logicalKey == LogicalKeyboardKey.delete ||
+        event.logicalKey == LogicalKeyboardKey.backspace) {
+      if (!_canCloseAt(index)) return material.KeyEventResult.ignored;
+      widget.onClose!(index);
+      return material.KeyEventResult.handled;
+    }
 
     final last = widget.labels.length - 1;
     final int? target = switch (event.logicalKey) {
@@ -244,8 +257,7 @@ class QueryaTabStripState extends material.State<QueryaTabStrip>
           final selected = widget.selectedIndex == index;
           final focused = _focused[index];
           final label = widget.labels[index];
-          final showClose = widget.onClose != null &&
-              (widget.canClose == null || widget.canClose!(index));
+          final showClose = _canCloseAt(index);
           return material.Padding(
             padding: material.EdgeInsets.only(left: index == 0 ? 0 : 6),
             child: material.KeyedSubtree(
@@ -260,8 +272,7 @@ class QueryaTabStripState extends material.State<QueryaTabStrip>
                   selected: selected,
                   label: label,
                   onTap: () => _selectAndFocus(index),
-                  child: material.ExcludeSemantics(
-                    child: material.MouseRegion(
+                  child: material.MouseRegion(
                       cursor: material.SystemMouseCursors.click,
                       child: material.GestureDetector(
                         excludeFromSemantics: true,
@@ -271,10 +282,20 @@ class QueryaTabStripState extends material.State<QueryaTabStrip>
                           key: material.ValueKey('querya_tab_$label'),
                           duration: context.motionDuration(QueryaMotion.fast),
                           curve: context.motionCurve(QueryaMotion.enter),
-                          padding: material.EdgeInsets.symmetric(
-                            horizontal: showClose ? 10 : 12,
-                            vertical: widget.dense ? 4 : 8,
-                          ),
+                          // The close target is 24 px (#1372); the padding
+                          // around it shrinks so the tab keeps its height
+                          // and width.
+                          padding: showClose
+                              ? material.EdgeInsets.fromLTRB(
+                                  10,
+                                  widget.dense ? 2 : 6,
+                                  5,
+                                  widget.dense ? 2 : 6,
+                                )
+                              : material.EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: widget.dense ? 4 : 8,
+                                ),
                           decoration: material.BoxDecoration(
                             color: material.Colors.transparent,
                             borderRadius: material.BorderRadius.circular(6),
@@ -288,28 +309,48 @@ class QueryaTabStripState extends material.State<QueryaTabStrip>
                           child: material.Row(
                             mainAxisSize: material.MainAxisSize.min,
                             children: [
-                              selected
-                                  ? Text(label).small().semiBold()
-                                  : Text(label).small().muted(),
+                              // The tab's own node carries the label.
+                              material.ExcludeSemantics(
+                                child: selected
+                                    ? Text(label).small().semiBold()
+                                    : Text(label).small().muted(),
+                              ),
                               if (showClose) ...[
-                                const Gap(6),
-                                material.MouseRegion(
-                                  cursor: material.SystemMouseCursors.click,
-                                  child: material.GestureDetector(
-                                    behavior: material.HitTestBehavior.opaque,
+                                const Gap(2),
+                                material.Tooltip(
+                                  message: 'Close $label tab',
+                                  waitDuration: kQueryaTooltipWait,
+                                  excludeFromSemantics: true,
+                                  child: material.Semantics(
+                                    container: true,
+                                    button: true,
+                                    label: 'Close $label tab',
                                     onTap: () => widget.onClose!(index),
-                                    child: material.Container(
-                                      padding: const material.EdgeInsets.all(1),
-                                      decoration: material.BoxDecoration(
-                                        borderRadius:
-                                            material.BorderRadius.circular(4),
-                                      ),
-                                      child: material.Icon(
-                                        material.Icons.close_rounded,
-                                        size: 13,
-                                        color: selected
-                                            ? colors.foreground
-                                            : colors.mutedForeground,
+                                    child: material.ExcludeSemantics(
+                                      child: material.MouseRegion(
+                                        cursor:
+                                            material.SystemMouseCursors.click,
+                                        child: material.GestureDetector(
+                                          excludeFromSemantics: true,
+                                          behavior:
+                                              material.HitTestBehavior.opaque,
+                                          onTap: () => widget.onClose!(index),
+                                          child: material.SizedBox(
+                                            key: material.ValueKey(
+                                                'querya_tab_close_$label'),
+                                            width: 24,
+                                            height: 24,
+                                            child: material.Center(
+                                              child: material.Icon(
+                                                material.Icons.close_rounded,
+                                                size: 13,
+                                                color: selected
+                                                    ? colors.foreground
+                                                    : colors.mutedForeground,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -323,7 +364,6 @@ class QueryaTabStripState extends material.State<QueryaTabStrip>
                   ),
                 ),
               ),
-            ),
           );
         }),
         if (widget.onAdd != null) ...[

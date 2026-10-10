@@ -526,4 +526,83 @@ void main() {
 
     expect(scrollController.offset, greaterThan(0.0));
   });
+
+  group('closing tabs (#1372)', () {
+    Future<List<int>> pumpClosable(
+      WidgetTester tester, {
+      bool Function(int index)? canClose,
+    }) async {
+      final closed = <int>[];
+      await tester.pumpWidget(
+        stripShell(
+          child: material.Center(
+            child: QueryaTabStrip(
+              labels: const ['Server', 'SQL', 'History'],
+              selectedIndex: 0,
+              onSelected: (_) {},
+              onClose: closed.add,
+              canClose: canClose,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pumpAndSettle();
+      return closed;
+    }
+
+    testWidgets('Delete closes the focused tab', (tester) async {
+      final closed = await pumpClosable(tester);
+
+      await tester.tap(find.bySemanticsLabel('SQL'));
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+      await tester.pump();
+
+      expect(closed, [1]);
+    });
+
+    testWidgets('Backspace closes the focused tab', (tester) async {
+      final closed = await pumpClosable(tester);
+
+      await tester.tap(find.bySemanticsLabel('History'));
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
+      await tester.pump();
+
+      expect(closed, [2]);
+    });
+
+    testWidgets('Delete does nothing for a tab that cannot be closed',
+        (tester) async {
+      final closed = await pumpClosable(tester, canClose: (i) => i != 1);
+
+      await tester.tap(find.bySemanticsLabel('SQL'));
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+      await tester.pump();
+
+      expect(closed, isEmpty);
+    });
+
+    testWidgets('the close button has a 24 px target and a labelled button',
+        (tester) async {
+      final closed = await pumpClosable(tester);
+
+      final target = tester.getSize(
+        find.byKey(const material.ValueKey('querya_tab_close_SQL')),
+      );
+      expect(target.width, greaterThanOrEqualTo(24));
+      expect(target.height, greaterThanOrEqualTo(24));
+
+      expect(find.bySemanticsLabel('Close SQL tab'), findsOneWidget);
+      expect(find.byTooltip('Close SQL tab'), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const material.ValueKey('querya_tab_close_SQL')),
+      );
+      await tester.pump();
+      expect(closed, [1]);
+    });
+  });
 }
