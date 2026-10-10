@@ -400,7 +400,7 @@ class SshTunnelManager {
         (_) async {
           if (client.isClosed) {
             if (session != null) {
-              await _dropZombieSession(session!);
+              await _dropZombieSession(session);
             }
             return;
           }
@@ -411,7 +411,7 @@ class SshTunnelManager {
             failedPings++;
             if (failedPings >= _maxKeepAlivePingFailures) {
               if (session != null) {
-                await _dropZombieSession(session!);
+                await _dropZombieSession(session);
               }
             }
           }
