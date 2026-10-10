@@ -189,7 +189,7 @@ class _MainScreenState extends State<MainScreen> {
         logical == LogicalKeyboardKey.comma ||
         logical == const LogicalKeyboardKey(0x00000431); // Russian 'б'
     if (isCmdOrCtrl && !isShift && !isAlt && isComma) {
-      unawaited(showPreferencesDialog(context));
+      showPreferencesDialog(context);
       return true;
     }
 
