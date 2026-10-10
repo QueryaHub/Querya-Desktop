@@ -65,6 +65,10 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
   final Set<String> _loaded = {};
   final Set<String> _expanded = {};
   final Map<String, String> _expandErrors = {};
+  List<_VisibleRow>? _cachedVisibleRows;
+
+  @material.visibleForTesting
+  List<Object?>? get debugVisibleRows => _cachedVisibleRows;
 
   static const double _rowExtent = 28;
 
@@ -83,6 +87,7 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
       _loaded.clear();
       _expanded.clear();
       _expandErrors.clear();
+      _cachedVisibleRows = null;
     }
   }
 
@@ -90,6 +95,7 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
     setState(() {
       _expanded.add(node.id);
       _expandErrors.remove(node.id);
+      _cachedVisibleRows = null;
     });
     if (!node.expandable || _loaded.contains(node.id) || node.hasChildren) {
       return;
@@ -112,18 +118,23 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
         if (children.isEmpty) {
           _expandErrors[node.id] = 'No child objects found.';
         }
+        _cachedVisibleRows = null;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading.remove(node.id);
         _expandErrors[node.id] = e.toString();
+        _cachedVisibleRows = null;
       });
     }
   }
 
   void _onCollapse(SduiTreeNode node) {
-    setState(() => _expanded.remove(node.id));
+    setState(() {
+      _expanded.remove(node.id);
+      _cachedVisibleRows = null;
+    });
   }
 
   void _toggleExpand(SduiTreeNode node) {
@@ -143,6 +154,7 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
         node.id,
         (n) => n.copyWith(children: const []),
       );
+      _cachedVisibleRows = null;
     });
     await _onExpand(node);
   }
@@ -185,13 +197,13 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final rows = _flattenVisible();
+    final rows = _cachedVisibleRows ??= _flattenVisible();
     final list = material.ListView.builder(
       shrinkWrap: widget.maxHeight == null,
       physics: widget.maxHeight == null
           ? const material.NeverScrollableScrollPhysics()
           : const material.ClampingScrollPhysics(),
-      itemExtent: rows.any((r) => r.isError) ? null : _rowExtent,
+      itemExtent: _expandErrors.isNotEmpty ? null : _rowExtent,
       itemCount: rows.length,
       itemBuilder: (context, index) {
         final row = rows[index];
