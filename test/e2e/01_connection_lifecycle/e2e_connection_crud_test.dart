@@ -185,6 +185,9 @@ void main() {
       greaterThan(tester.getCenter(inSidebar('Team D').first).dy),
       reason: 'the connection is listed under its folder',
     );
+    // The folder is still unfolding (an animated, clipped height): a press on
+    // a half-revealed tile lands on whatever is behind it.
+    await tester.pump(const Duration(milliseconds: 600));
     final from = tester.getCenter(inSidebar('E2E Dragged').first);
     final gesture = await tester.startGesture(from);
     await gesture.moveBy(const Offset(0, 24));
