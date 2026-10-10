@@ -25,13 +25,6 @@ void main() {
       w.placeholder is Text &&
       (w.placeholder as Text).data == text);
 
-  /// The field's EditableText: enterText needs the text state, not the
-  /// TextField widget that wraps it.
-  Finder editableIn(Finder field) => find.descendant(
-        of: field,
-        matching: find.byType(material.EditableText),
-      );
-
   Finder inSidebar(String text) => find.descendant(
         of: find.byType(ConnectionsPanel),
         matching: find.text(text),
@@ -58,26 +51,32 @@ void main() {
 
   /// Pumps with real time in between until [finder] shows: dialogs read the
   /// extension registry and secrets from disk before they open.
-  Future<void> waitFor(WidgetTester t, Finder finder) async {
+  Future<void> waitFor(WidgetTester t, Finder finder, String what) async {
     for (var i = 0; i < 60 && finder.evaluate().isEmpty; i++) {
       await t.runAsync(
           () => Future<void>.delayed(const Duration(milliseconds: 25)));
       await t.pump(const Duration(milliseconds: 100));
     }
+    expect(finder, findsWidgets, reason: '$what did not show');
   }
 
   /// Picks [label] in the database type dialog and goes on to its form.
   Future<void> pickType(WidgetTester t, String label) async {
-    await waitFor(t, find.text('Select your database'));
-    expect(find.text('Select your database'), findsOneWidget);
-    await t.tap(find.text('Select database…'));
-    await step(t);
-    // Only the visible item: the picker's own label is in the tree too.
-    await t.tap(find.text(label).hitTestable().last);
+    await waitFor(t, find.text('Select your database'), 'the type dialog');
+    // The type card, not the "Database type" dropdown: an open dropdown menu
+    // consumes taps outside it, and in the element tree its items come before
+    // the cards, so a tap on the last visible label lands on a card and only
+    // closes the menu.
+    await t.tap(find.descendant(
+      of: find.byType(material.GridView),
+      matching: find.text(label),
+    ));
     await step(t);
     await t.tap(find.text('Next').hitTestable());
     await step(t);
     await step(t);
+    expect(find.text('Select your database'), findsNothing,
+        reason: 'Next did not leave the type dialog: $label was not selected');
   }
 
   Future<void> openNewConnection(WidgetTester t) async {
@@ -124,9 +123,9 @@ void main() {
       await openNewConnection(tester);
       await pickType(tester, label);
 
-      await waitFor(tester, byPlaceholder(uriPlaceholder[type]!));
-      await tester.enterText(
-          editableIn(byPlaceholder(uriPlaceholder[type]!)), uri);
+      await waitFor(
+          tester, byPlaceholder(uriPlaceholder[type]!), 'the $label form');
+      await tester.enterText(byPlaceholder(uriPlaceholder[type]!), uri);
       await tester.pump();
       await tester.tap(find.text('Save').hitTestable());
       await step(tester);
@@ -147,12 +146,11 @@ void main() {
     await pickType(tester, 'SQLite');
 
     final path = '${app.dataDir.path}/e2e_form.db';
-    await waitFor(tester, byPlaceholder('e.g. Local Cache'));
-    await tester.enterText(
-        editableIn(byPlaceholder('e.g. Local Cache')), 'E2E Form SQLite');
+    await waitFor(
+        tester, byPlaceholder('e.g. Local Cache'), 'the SQLite form');
+    await tester.enterText(byPlaceholder('e.g. Local Cache'), 'E2E Form SQLite');
     await tester.pump();
-    await tester.enterText(
-        editableIn(byPlaceholder('/path/to/database.db')), path);
+    await tester.enterText(byPlaceholder('/path/to/database.db'), path);
     await tester.pump();
     await tester.tap(find.text('Save'));
     // Saving creates the database file: real I/O.
