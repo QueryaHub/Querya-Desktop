@@ -275,7 +275,7 @@ class SshTunnelManager {
       return await future;
     } finally {
       if (identical(_pendingTunnels[poolKey], future)) {
-        _pendingTunnels.remove(poolKey);
+        unawaited(_pendingTunnels.remove(poolKey));
       }
     }
   }
@@ -288,56 +288,15 @@ class SshTunnelManager {
     required int remotePort,
   }) async {
     SSHClient? jumpClient;
+    SSHSocket? jumpSocket;
     SSHSocket? bastionSocket;
     SSHClient? client;
     ServerSocket? serverSocket;
     Timer? keepAliveTimer;
 
     try {
-      // 2. Connect to SSH Bastion (with optional Jump Host)
-      if (config.jumpHost != null && config.jumpHost!.trim().isNotEmpty) {
-        final jumpHost = config.jumpHost!.trim();
-        final jumpPort = config.jumpPort ?? 22;
-        final jumpUser = config.jumpUsername ?? config.username;
-
-        final rawJumpSocket = await _dial(
-          jumpHost,
-          jumpPort,
-          Duration(seconds: config.connectTimeoutSeconds),
-          what: 'SSH jump host',
-        );
-
-        jumpClient = _buildClient(
-          rawJumpSocket,
-          username: jumpUser,
-          onPasswordRequest: () =>
-              secrets.jumpPassword ?? secrets.password ?? '',
-        );
-        try {
-          await jumpClient.authenticated;
-        } catch (e) {
-          throw _sshFailure(e, jumpUser, jumpHost, jumpPort);
-        }
-
-        // Forward through jump host to target bastion (returns SSHForwardChannel which implements SSHSocket)
-        try {
-          bastionSocket =
-              await jumpClient.forwardLocal(config.host.trim(), config.port);
-        } catch (e) {
-          throw SshConnectionException(
-            'The SSH jump host $jumpHost:$jumpPort could not reach the bastion '
-            '${config.host.trim()}:${config.port}: $e',
-          );
-        }
-      } else {
-        bastionSocket = await _dial(
-          config.host.trim(),
-          config.port,
-          Duration(seconds: config.connectTimeoutSeconds),
-          what: 'SSH server',
-        );
-      }
-
+      // Resolve the private key first: a missing or unreadable key must fail
+      // before any socket is opened.
       // Prepare identities for private key auth
       List<SSHKeyPair> identities = [];
       if (config.authType == SshAuthType.privateKey) {
@@ -378,6 +337,50 @@ class SshTunnelManager {
             'No SSH private key or key path was provided',
           );
         }
+      }
+
+      // 2. Connect to SSH Bastion (with optional Jump Host)
+      if (config.jumpHost != null && config.jumpHost!.trim().isNotEmpty) {
+        final jumpHost = config.jumpHost!.trim();
+        final jumpPort = config.jumpPort ?? 22;
+        final jumpUser = config.jumpUsername ?? config.username;
+
+        jumpSocket = await _dial(
+          jumpHost,
+          jumpPort,
+          Duration(seconds: config.connectTimeoutSeconds),
+          what: 'SSH jump host',
+        );
+
+        jumpClient = _buildClient(
+          jumpSocket,
+          username: jumpUser,
+          onPasswordRequest: () =>
+              secrets.jumpPassword ?? secrets.password ?? '',
+        );
+        try {
+          await jumpClient.authenticated;
+        } catch (e) {
+          throw _sshFailure(e, jumpUser, jumpHost, jumpPort);
+        }
+
+        // Forward through jump host to target bastion (returns SSHForwardChannel which implements SSHSocket)
+        try {
+          bastionSocket =
+              await jumpClient.forwardLocal(config.host.trim(), config.port);
+        } catch (e) {
+          throw SshConnectionException(
+            'The SSH jump host $jumpHost:$jumpPort could not reach the bastion '
+            '${config.host.trim()}:${config.port}: $e',
+          );
+        }
+      } else {
+        bastionSocket = await _dial(
+          config.host.trim(),
+          config.port,
+          Duration(seconds: config.connectTimeoutSeconds),
+          what: 'SSH server',
+        );
       }
 
       // Host key verification (MitM protection)
@@ -501,6 +504,9 @@ class SshTunnelManager {
       } catch (_) {}
       try {
         unawaited(jumpClient?.close());
+      } catch (_) {}
+      try {
+        jumpSocket?.destroy();
       } catch (_) {}
       rethrow;
     }
