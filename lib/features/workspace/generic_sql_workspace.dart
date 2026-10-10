@@ -1,3 +1,4 @@
+import 'package:querya_desktop/core/database/statement_queue.dart';
 import 'package:querya_desktop/core/database/sql_statement_splitter.dart';
 import 'dart:async';
 import 'dart:io';
@@ -446,7 +447,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       if (mounted) {
         invalidatePane(session);
         setState(() {
-          session.error = 'Query timed out: ${e.message ?? e}';
+          session.error = statementTimeoutText(e);
           session.running = false;
         });
       }
@@ -798,7 +799,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       if (mounted) {
         invalidatePane(session);
         setState(() {
-          session.error = 'Query timed out: ${e.message ?? e}';
+          session.error = statementTimeoutText(e);
           session.running = false;
         });
         QueryaShellStatus.instance.endBusy();
@@ -860,9 +861,8 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
     return at == null ? const [] : [at];
   }
 
-  static String _runErrorText(Object e) => e is TimeoutException
-      ? 'Query timed out: ${e.message ?? e}'
-      : e.toString();
+  static String _runErrorText(Object e) =>
+      statementTimeoutText(e) ?? e.toString();
 
   /// Shows the query plan of the selection (or the whole editor text) in the
   /// result grid, one plan line per row.

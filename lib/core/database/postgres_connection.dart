@@ -3,6 +3,7 @@ import 'dart:io' show SecurityContext;
 
 import 'package:flutter/foundation.dart';
 import 'package:postgres/postgres.dart';
+import 'package:querya_desktop/core/database/statement_queue.dart';
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_manager.dart';
@@ -145,21 +146,16 @@ class PostgresConnection {
   Connection? _conn;
   Future<void>? _connecting;
 
-  /// Statements on this session run one at a time, here and not in the driver.
-  /// The driver starts a statement's timeout before the statement gets its turn,
-  /// so a statement that waited behind another one could cancel the other one.
-  Future<void> _statementQueue = Future<void>.value();
+  /// Statements on this session run one at a time, here and not in the
+  /// driver: a statement's timeout starts when it starts, and waiting for the
+  /// one before it has its own limit (#1216).
+  @visibleForTesting
+  final statementQueue = StatementQueue();
 
   /// Test seam: replaces the driver call of [execute].
   @visibleForTesting
   Future<Result> Function(String sql, Duration? timeout)? runStatementForTest;
 
-  Future<T> _serialized<T>(Future<T> Function() run) {
-    final previous = _statementQueue;
-    final turn = Completer<void>();
-    _statementQueue = turn.future;
-    return previous.then((_) => run()).whenComplete(() => turn.complete());
-  }
   bool _isConnected = false;
   bool _inTransaction = false;
 
@@ -408,7 +404,7 @@ class PostgresConnection {
     try {
       await connect();
       if (_conn != null) {
-        await _conn!.execute('SELECT 1');
+        await _queued((c) => c.execute('SELECT 1'));
         return (ok: true, error: null);
       }
       return (ok: false, error: 'Connection could not be established.');
@@ -429,7 +425,7 @@ class PostgresConnection {
   /// session stays usable. Only a bare [TimeoutException] closes it: then the
   /// protocol may be out of step.
   Future<Result> execute(String sql, {Duration? timeout}) {
-    return _serialized(() async {
+    return statementQueue.run(() async {
       final seam = runStatementForTest;
       final c = _conn;
       if (seam == null && (!isConnected || c == null)) {
@@ -447,6 +443,19 @@ class PostgresConnection {
       }
     });
   }
+
+  /// A driver call on this session in its turn of [statementQueue], for the
+  /// metadata and stats queries. Without the queue the driver would start the
+  /// call's default timeout while it waits, and could cancel the statement
+  /// that is running (#1216).
+  Future<Result> _queued(Future<Result> Function(Connection c) call) =>
+      statementQueue.run(() {
+        final c = _conn;
+        if (!isConnected || c == null) {
+          throw StateError('Not connected to PostgreSQL');
+        }
+        return call(c);
+      });
 
   /// [execute] with [timeout] as the statement's own limit. The limit starts
   /// when the statement starts: time spent waiting behind another statement on
@@ -467,7 +476,7 @@ class PostgresConnection {
     if (!isConnected || _conn == null) return null;
     if (_inTransaction) return true;
     try {
-      final r = await _conn!.execute(kPostgresOpenTransactionProbeSql);
+      final r = await _queued((c) => c.execute(kPostgresOpenTransactionProbeSql));
       if (r.isEmpty) return false;
       final open = r.first[0] == true;
       _inTransaction = open;
@@ -482,9 +491,9 @@ class PostgresConnection {
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to PostgreSQL');
     }
-    final result = await _conn!.execute(
+    final result = await _queued((c) => c.execute(
       "SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname",
-    );
+    ));
     return result.map((row) => row[0] as String).toList();
   }
 
@@ -492,11 +501,11 @@ class PostgresConnection {
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to PostgreSQL');
     }
-    final result = await _conn!.execute(
+    final result = await _queued((c) => c.execute(
       "SELECT schema_name FROM information_schema.schemata "
       "WHERE schema_name NOT IN ('pg_catalog', 'information_schema', 'pg_toast') "
       "ORDER BY schema_name",
-    );
+    ));
     return result.map((row) => row[0] as String).toList();
   }
 
@@ -506,7 +515,7 @@ class PostgresConnection {
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to PostgreSQL');
     }
-    final result = await _conn!.execute(
+    final result = await _queued((c) => c.execute(
       "SELECT n.nspname::text, c.relname::text, "
       "CASE c.relkind "
       "WHEN 'r' THEN 'table' "
@@ -521,7 +530,7 @@ class PostgresConnection {
       "AND n.nspname NOT LIKE 'pg_temp%' "
       "AND n.nspname NOT LIKE 'pg_toast_temp%' "
       "ORDER BY 1, 2",
-    );
+    ));
     return [
       for (final row in result)
         (
@@ -536,14 +545,14 @@ class PostgresConnection {
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to PostgreSQL');
     }
-    final result = await _conn!.execute(
+    final result = await _queued((c) => c.execute(
       Sql.named(
         "SELECT table_name FROM information_schema.tables "
         "WHERE table_schema = @schema AND table_type = 'BASE TABLE' "
         "ORDER BY table_name",
       ),
       parameters: {'schema': schema},
-    );
+    ));
     return result.map((row) => row[0] as String).toList();
   }
 
@@ -555,7 +564,7 @@ class PostgresConnection {
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to PostgreSQL');
     }
-    final colsRs = await _conn!.execute(
+    final colsRs = await _queued((c) => c.execute(
       Sql.named(
         'SELECT column_name, data_type, udt_name, is_nullable, column_default, '
         'is_generated, is_identity, identity_generation '
@@ -564,9 +573,9 @@ class PostgresConnection {
         'ORDER BY ordinal_position',
       ),
       parameters: {'schema': schema, 'table': table},
-    );
+    ));
 
-    final pkRs = await _conn!.execute(
+    final pkRs = await _queued((c) => c.execute(
       Sql.named(
         'SELECT kcu.column_name '
         'FROM information_schema.table_constraints tc '
@@ -579,7 +588,7 @@ class PostgresConnection {
         'ORDER BY kcu.ordinal_position',
       ),
       parameters: {'schema': schema, 'table': table},
-    );
+    ));
 
     final primaryKeys = pkRs.map((r) => r[0] as String).toList();
     final columns = <TableColumnMeta>[];
@@ -634,7 +643,7 @@ class PostgresConnection {
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to PostgreSQL');
     }
-    final result = await _conn!.execute(
+    final result = await _queued((c) => c.execute(
       Sql.named(
         'SELECT c.reltuples FROM pg_catalog.pg_class c '
         'JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace '
@@ -643,7 +652,7 @@ class PostgresConnection {
         'LIMIT 1',
       ),
       parameters: {'schema': schema, 'table': table},
-    );
+    ));
     if (result.isEmpty) return null;
     return postgresReltuplesEstimate(result.first[0]);
   }
@@ -661,14 +670,14 @@ class PostgresConnection {
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to PostgreSQL');
     }
-    final result = await _conn!.execute(
+    final result = await _queued((c) => c.execute(
       Sql.named(
         "SELECT table_name FROM information_schema.views "
         "WHERE table_schema = @schema "
         "ORDER BY table_name",
       ),
       parameters: {'schema': schema},
-    );
+    ));
     return result.map((row) => row[0] as String).toList();
   }
 
@@ -676,14 +685,14 @@ class PostgresConnection {
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to PostgreSQL');
     }
-    final result = await _conn!.execute(
+    final result = await _queued((c) => c.execute(
       Sql.named(
         "SELECT routine_name FROM information_schema.routines "
         "WHERE routine_schema = @schema AND routine_type = 'FUNCTION' "
         "ORDER BY routine_name",
       ),
       parameters: {'schema': schema},
-    );
+    ));
     return result.map((row) => row[0] as String).toList();
   }
 
@@ -691,14 +700,14 @@ class PostgresConnection {
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to PostgreSQL');
     }
-    final result = await _conn!.execute(
+    final result = await _queued((c) => c.execute(
       Sql.named(
         "SELECT sequence_name FROM information_schema.sequences "
         "WHERE sequence_schema = @schema "
         "ORDER BY sequence_name",
       ),
       parameters: {'schema': schema},
-    );
+    ));
     return result.map((row) => row[0] as String).toList();
   }
 
@@ -706,7 +715,7 @@ class PostgresConnection {
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to PostgreSQL');
     }
-    final result = await _conn!.execute('SELECT version()');
+    final result = await _queued((c) => c.execute('SELECT version()'));
     return result.first[0] as String;
   }
 
@@ -717,40 +726,40 @@ class PostgresConnection {
     }
     final stats = <String, dynamic>{};
 
-    final ver = await _conn!.execute('SELECT version()');
+    final ver = await _queued((c) => c.execute('SELECT version()'));
     stats['version'] = ver.first[0] as String;
 
-    final settings = await _conn!.execute(
+    final settings = await _queued((c) => c.execute(
       "SELECT name, setting FROM pg_settings "
       "WHERE name IN ('max_connections','shared_buffers','work_mem',"
       "'effective_cache_size','server_version','data_directory',"
       "'listen_addresses','port','server_encoding','timezone')",
-    );
+    ));
     final settingsMap = <String, String>{};
     for (final row in settings) {
       settingsMap[row[0] as String] = row[1] as String;
     }
     stats['settings'] = settingsMap;
 
-    final activity = await _conn!.execute(
+    final activity = await _queued((c) => c.execute(
       "SELECT count(*) AS total, "
       "count(*) FILTER (WHERE state = 'active') AS active, "
       "count(*) FILTER (WHERE state = 'idle') AS idle "
       "FROM pg_stat_activity",
-    );
+    ));
     if (activity.isNotEmpty) {
       stats['connections_total'] = activity.first[0];
       stats['connections_active'] = activity.first[1];
       stats['connections_idle'] = activity.first[2];
     }
 
-    final dbStats = await _conn!.execute(
+    final dbStats = await _queued((c) => c.execute(
       "SELECT datname, pg_database_size(datname) AS size, "
       "numbackends, xact_commit, xact_rollback, blks_read, blks_hit, "
       "tup_returned, tup_fetched, tup_inserted, tup_updated, tup_deleted "
       "FROM pg_stat_database WHERE datname NOT LIKE 'template%' "
       "ORDER BY datname",
-    );
+    ));
     final dbList = <Map<String, dynamic>>[];
     for (final row in dbStats) {
       dbList.add({
@@ -771,18 +780,18 @@ class PostgresConnection {
     stats['databases'] = dbList;
 
     try {
-      final uptime = await _conn!.execute(
+      final uptime = await _queued((c) => c.execute(
         "SELECT extract(epoch from (now() - pg_postmaster_start_time()))::bigint",
-      );
+      ));
       stats['uptime_seconds'] = uptime.first[0];
     } catch (e) {
       debugPrint('PostgresConnection.getServerStats uptime: $e');
     }
 
     try {
-      final dbSize = await _conn!.execute(
+      final dbSize = await _queued((c) => c.execute(
         "SELECT pg_database_size(current_database())",
-      );
+      ));
       stats['current_db_size'] = dbSize.first[0];
     } catch (e) {
       debugPrint('PostgresConnection.getServerStats database size: $e');
@@ -821,7 +830,7 @@ class PostgresConnection {
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to PostgreSQL');
     }
-    final result = await _conn!.execute(
+    final result = await _queued((c) => c.execute(
       Sql.named(
         r'''
 SELECT p.oid::regprocedure::text AS signature,
@@ -833,7 +842,7 @@ ORDER BY p.oid
 ''',
       ),
       parameters: {'schema': schema, 'name': name},
-    );
+    ));
     return result
         .map(
           (row) => PgFunctionOverload(
@@ -852,7 +861,7 @@ ORDER BY p.oid
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to PostgreSQL');
     }
-    final result = await _conn!.execute(
+    final result = await _queued((c) => c.execute(
       Sql.named(
         r'''
 SELECT last_value::text, start_value::text, min_value::text, max_value::text,
@@ -863,7 +872,7 @@ WHERE schemaname = @schema AND sequencename = @name
 ''',
       ),
       parameters: {'schema': schema, 'name': name},
-    );
+    ));
     if (result.isEmpty) return null;
     final row = result.first;
     final sc = row[7] as String;
@@ -897,13 +906,13 @@ WHERE schemaname = @schema AND sequencename = @name
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to PostgreSQL');
     }
-    final result = await _conn!.execute(
+    final result = await _queued((c) => c.execute(
       Sql.named(
         'SELECT matviewname FROM pg_matviews WHERE schemaname = @schema '
         'ORDER BY matviewname',
       ),
       parameters: {'schema': schema},
-    );
+    ));
     return result.map((row) => row[0] as String).toList();
   }
 
@@ -912,14 +921,14 @@ WHERE schemaname = @schema AND sequencename = @name
       throw StateError('Not connected to PostgreSQL');
     }
     final q = '${_quoteIdent(schema)}.${_quoteIdent(name)}';
-    await _conn!.execute('REFRESH MATERIALIZED VIEW $q');
+    await _queued((c) => c.execute('REFRESH MATERIALIZED VIEW $q'));
   }
 
   Future<List<PgIndexRow>> listIndexesInSchema(String schema) async {
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to PostgreSQL');
     }
-    final result = await _conn!.execute(
+    final result = await _queued((c) => c.execute(
       Sql.named(
         r'''
 SELECT c.relname::text,
@@ -936,7 +945,7 @@ ORDER BY c.relname, i.relname
 ''',
       ),
       parameters: {'schema': schema},
-    );
+    ));
     return result
         .map(
           (row) => PgIndexRow(
@@ -960,7 +969,7 @@ ORDER BY c.relname, i.relname
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to PostgreSQL');
     }
-    final result = await _conn!.execute(
+    final result = await _queued((c) => c.execute(
       Sql.named(
         r'''
 SELECT c.relname::text,
@@ -975,7 +984,7 @@ ORDER BY c.relname, t.tgname
 ''',
       ),
       parameters: {'schema': schema},
-    );
+    ));
     return result
         .map(
           (row) => PgTriggerRow(
@@ -991,7 +1000,7 @@ ORDER BY c.relname, t.tgname
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to PostgreSQL');
     }
-    final result = await _conn!.execute(
+    final result = await _queued((c) => c.execute(
       Sql.named(
         r'''
 SELECT t.typname::text,
@@ -1013,7 +1022,7 @@ ORDER BY t.typname
 ''',
       ),
       parameters: {'schema': schema},
-    );
+    ));
     return result
         .map(
           (row) => PgTypeRow(
@@ -1028,9 +1037,9 @@ ORDER BY t.typname
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to PostgreSQL');
     }
-    final result = await _conn!.execute(
+    final result = await _queued((c) => c.execute(
       'SELECT extname::text, extversion::text FROM pg_extension ORDER BY extname',
-    );
+    ));
     return result
         .map(
           (row) => PgExtensionRow(
@@ -1045,13 +1054,13 @@ ORDER BY t.typname
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to PostgreSQL');
     }
-    final result = await _conn!.execute(
+    final result = await _queued((c) => c.execute(
       r'''
 SELECT fdwname::text, fdwhandler::regproc::text
 FROM pg_foreign_data_wrapper
 ORDER BY fdwname
 ''',
-    );
+    ));
     return result
         .map(
           (row) => PgFdwRow(
@@ -1066,14 +1075,14 @@ ORDER BY fdwname
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to PostgreSQL');
     }
-    final result = await _conn!.execute(
+    final result = await _queued((c) => c.execute(
       r'''
 SELECT s.srvname::text, w.fdwname::text
 FROM pg_foreign_server s
 JOIN pg_foreign_data_wrapper w ON w.oid = s.srvfdw
 ORDER BY s.srvname
 ''',
-    );
+    ));
     return result
         .map(
           (row) => PgForeignServerRow(
@@ -1091,7 +1100,7 @@ ORDER BY s.srvname
     if (!isConnected || _conn == null) {
       throw StateError('Not connected to PostgreSQL');
     }
-    final result = await _conn!.execute(
+    final result = await _queued((c) => c.execute(
       Sql.named(
         r'''
 SELECT grantee::text, privilege_type::text, is_grantable::text
@@ -1101,7 +1110,7 @@ ORDER BY grantee, privilege_type
 ''',
       ),
       parameters: {'schema': schema, 'table': table},
-    );
+    ));
     return result
         .map(
           (row) => PgTablePrivilegeRow(

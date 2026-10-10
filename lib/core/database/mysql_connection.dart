@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:mysql_client/mysql_client.dart';
+import 'package:querya_desktop/core/database/statement_queue.dart';
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:querya_desktop/core/database/mysql_result_cells.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
@@ -147,10 +148,11 @@ class MysqlConnection {
   MySQLConnection? _conn;
   Future<void>? _connecting;
 
-  /// Statements on this session run one at a time, here. The client would
-  /// otherwise poll for the previous statement and give up after 10 s, which
-  /// closed the session for every caller.
-  Future<void> _statementQueue = Future<void>.value();
+  /// Statements on this session run one at a time, here and not in the
+  /// driver: a statement's timeout starts when it starts, and waiting for the
+  /// one before it has its own limit (#1216).
+  @visibleForTesting
+  final statementQueue = StatementQueue();
 
   /// Test seam: replaces the driver call of [execute].
   @visibleForTesting
@@ -161,12 +163,6 @@ class MysqlConnection {
     Duration? timeout,
   )? runStatementForTest;
 
-  Future<T> _serialized<T>(Future<T> Function() run) {
-    final previous = _statementQueue;
-    final turn = Completer<void>();
-    _statementQueue = turn.future;
-    return previous.then((_) => run()).whenComplete(() => turn.complete());
-  }
   bool _isConnected = false;
   bool _inTransaction = false;
 
@@ -485,7 +481,7 @@ class MysqlConnection {
     bool iterable,
     Duration? timeout,
   ) {
-    return _serialized(() async {
+    return statementQueue.run(() async {
       final seam = runStatementForTest;
       final c = _conn;
       if (seam == null && (!isConnected || c == null)) {
