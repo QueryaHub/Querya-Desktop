@@ -7,6 +7,7 @@ import 'package:syntax_highlight/syntax_highlight.dart';
 
 import 'highlighter_theme_from_querya.dart';
 import 'querya_code_language.dart';
+import 'querya_highlight_controller.dart';
 
 /// Global syntax highlighter setup for [QueryaCodeEditor].
 abstract final class SyntaxHighlightService {
