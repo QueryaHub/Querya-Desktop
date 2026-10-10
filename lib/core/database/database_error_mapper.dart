@@ -6,6 +6,7 @@ import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/database/querya_database_exception.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
+import 'package:querya_desktop/core/database/statement_queue.dart';
 
 /// Which engine produced an error; only used to tailor the wording.
 enum DatabaseDriver { postgres, mysql, sqlite, mongodb, redis, extension }
@@ -27,7 +28,15 @@ QueryaDatabaseException mapDatabaseError(
 
   QueryaDatabaseException? mapped;
 
-  if (_hasAny(lower, const [
+  if (error is StatementWaitTimeoutException) {
+    mapped = ConnectionTimeoutException(
+      error.message,
+      remediationHint: 'Wait for the running statement to finish, or cancel '
+          'it, then try again',
+      originalError: error,
+      stackTrace: stackTrace,
+    );
+  } else if (_hasAny(lower, const [
     'lock wait timeout',
     'lock timeout',
     'database is locked',
