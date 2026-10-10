@@ -30,6 +30,52 @@ Future<SshTunnelSecrets> mergeSshSecretsForConnectionUpdate({
   );
 }
 
+/// The secrets a *Test Connection* or *Test SSH connection* run uses (#1302).
+///
+/// An edit form never shows stored secrets, so a blank field means "the saved
+/// one", exactly as in [mergeSecretsForConnectionUpdate]; testing with the
+/// blank would fail with *Authentication failed* for a correct password. The
+/// result is read-only for the caller: nothing is written, and the SSH secrets
+/// are always a copy, because opening a tunnel clears what it is handed and
+/// the form goes on using its own.
+Future<
+    ({
+      String? password,
+      String? connectionString,
+      SshTunnelSecrets? sshSecrets,
+    })> secretsForConnectionTest({
+  required int? connectionId,
+  required String? password,
+  required String? connectionString,
+  required SshTunnelSecrets? sshSecrets,
+}) async {
+  final id = connectionId;
+  if (id == null || id <= 0) {
+    return (
+      password: password,
+      connectionString: connectionString,
+      sshSecrets: sshSecrets?.copy(),
+    );
+  }
+  final prev = await ConnectionSecretsStore.readForConnection(id);
+  final effectivePassword =
+      (password == null || password.isEmpty) ? prev.password : password;
+  var uri = connectionString;
+  if (uri != null && uri.trim().isNotEmpty) {
+    uri = injectUriPasswordIfMissing(uri, effectivePassword);
+  }
+  return (
+    password: effectivePassword,
+    connectionString: uri,
+    sshSecrets: sshSecrets == null
+        ? null
+        : await mergeSshSecretsForConnectionUpdate(
+            connectionId: id,
+            editedSecrets: sshSecrets,
+          ),
+  );
+}
+
 /// Keeps previous secure-store secrets when edit form fields are left blank.
 ///
 /// [ConnectionSecretsStore.writeForConnection] deletes empty values — callers

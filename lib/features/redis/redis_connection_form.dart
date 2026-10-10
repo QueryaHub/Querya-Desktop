@@ -197,7 +197,19 @@ class _RedisConnectionFormContentState
       _testResult = null;
     });
     try {
-      final conn = RedisConnection.fromConnectionRow(_draftRow());
+      final draft = _draftRow();
+      // Blank secret fields mean the saved ones when a connection is edited.
+      final secrets = await secretsForConnectionTest(
+        connectionId: widget.initial?.id,
+        password: draft.password,
+        connectionString: draft.connectionString,
+        sshSecrets: draft.sshSecrets,
+      );
+      final conn = RedisConnection.fromConnectionRow(draft.copyWith(
+        password: secrets.password,
+        connectionString: secrets.connectionString,
+        sshSecrets: secrets.sshSecrets,
+      ));
       final ok = await conn.testConnection();
       if (mounted) _showTestResult(ok ? 'success' : 'failed');
     } catch (e) {
@@ -456,6 +468,7 @@ class _RedisConnectionFormContentState
                     SshTunnelSection(
                       config: _sshConfig,
                       secrets: _sshSecrets,
+                      connectionId: widget.initial?.id,
                       onChanged: (cfg) => setState(() => _sshConfig = cfg),
                       targetHost: _hostController.text.trim().isNotEmpty
                           ? _hostController.text.trim()
