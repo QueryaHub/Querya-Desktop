@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/features/connections/connection_default_name.dart';
 import 'package:querya_desktop/core/security/connection_environment.dart';
 import 'package:querya_desktop/features/connections/environment_section.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
@@ -210,7 +211,14 @@ class _RedisConnectionFormContentState
     final host = _hostController.text.trim();
     final port = int.tryParse(_portController.text.trim()) ?? 6379;
     final uri = _effectiveConnectionUri();
-    final displayName = name.isNotEmpty ? name : 'Redis $host:$port';
+    final displayName = name.isNotEmpty
+        ? name
+        : defaultConnectionName(
+            label: 'Redis',
+            defaultPort: 6379,
+            uri: uri,
+            fields: 'Redis $host:$port',
+          );
     final initial = widget.initial;
     var row = ConnectionRow(
       id: id,

@@ -162,6 +162,8 @@ void main() {
       final secrets = await tester
           .runAsync(() => ConnectionSecretsStore.readForConnection(row.id!));
       expect(secrets!.connectionString, contains(host));
+      // The name comes from the URI's host, not the form's default one (#1257).
+      expect(row.name, contains(host));
       // The sidebar reloads from the database after the save.
       await waitFor(tester, inSidebar(row.name), 'the new connection');
       await app.close(tester);

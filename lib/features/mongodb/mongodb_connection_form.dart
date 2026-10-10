@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/features/connections/connection_default_name.dart';
 import 'package:querya_desktop/core/security/connection_environment.dart';
 import 'package:querya_desktop/features/connections/environment_section.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
@@ -315,8 +316,14 @@ class _MongoConnectionFormContentState
     final data = _formData;
     if (!data.isValid) return;
 
-    final displayName =
-        data.name.isNotEmpty ? data.name : 'MongoDB ${data.host}:${data.port}';
+    final displayName = data.name.isNotEmpty
+        ? data.name
+        : defaultConnectionName(
+            label: 'MongoDB',
+            defaultPort: 27017,
+            uri: data.connectionString ?? '',
+            fields: 'MongoDB ${data.host}:${data.port}',
+          );
 
     final initial = widget.initial;
     var row = ConnectionRow(

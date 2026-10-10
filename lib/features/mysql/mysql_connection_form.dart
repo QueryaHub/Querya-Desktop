@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/features/connections/connection_default_name.dart';
 import 'package:querya_desktop/core/security/connection_environment.dart';
 import 'package:querya_desktop/features/connections/environment_section.dart';
 import 'package:querya_desktop/core/database/mysql_connection.dart';
@@ -247,9 +248,13 @@ class _MysqlConnectionFormContentState
     final uri = _effectiveConnectionUri();
     final displayName = name.isNotEmpty
         ? name
-        : (uri.isNotEmpty
-            ? 'MySQL (URI)'
-            : 'MySQL $host:$port${database.isNotEmpty ? '/$database' : ''}');
+        : defaultConnectionName(
+            label: 'MySQL',
+            defaultPort: 3306,
+            uri: uri,
+            fields:
+                'MySQL $host:$port${database.isNotEmpty ? '/$database' : ''}',
+          );
     final initial = widget.initial;
     var row = ConnectionRow(
       id: initial?.id,
