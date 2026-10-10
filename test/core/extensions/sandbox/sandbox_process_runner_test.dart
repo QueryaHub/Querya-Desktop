@@ -132,6 +132,8 @@ void main() {
         '--ro-bind',
         '/',
         '/',
+        '--tmpfs',
+        '/home',
         '--bind',
         '/tmp/querya_sandbox/ext_1',
         '/tmp/querya_sandbox/ext_1',
@@ -148,6 +150,22 @@ void main() {
       expect(cmd.arguments, contains('32'));
     });
 
+    test('linux bwrap masks host home directory to prevent credential exfiltration', () {
+      final cmd = SandboxLaunchCommand.build(
+        pluginExecutable: '/opt/driver',
+        scratchPath: '/tmp/scratch',
+        extensionRoot: '/home/user/.querya/extensions/foo',
+        platformOverride: 'linux',
+      );
+      final homeTmpfsIndex = cmd.arguments.indexOf('/home');
+      expect(homeTmpfsIndex, isPositive);
+      expect(cmd.arguments[homeTmpfsIndex - 1], '--tmpfs');
+
+      final extRootIndex = cmd.arguments.lastIndexOf('/home/user/.querya/extensions/foo');
+      expect(extRootIndex, greaterThan(homeTmpfsIndex),
+          reason: 'extension root must be re-bound after --tmpfs /home');
+    });
+
     test('linux falls back to direct exec when bwrap missing', () {
       final cmd = SandboxLaunchCommand.build(
         pluginExecutable: '/bin/echo',
@@ -161,7 +179,7 @@ void main() {
       expect(cmd.usesOsSandbox, isFalse);
     });
 
-    test('macos builds sandbox-exec with seatbelt profile', () {
+    test('macos builds sandbox-exec with seatbelt profile denying /Users', () {
       final cmd = SandboxLaunchCommand.build(
         pluginExecutable: '/opt/driver',
         pluginArguments: const ['a'],
@@ -176,7 +194,9 @@ void main() {
       expect(profile, contains('(version 1)'));
       expect(profile, contains('(deny default)'));
       expect(profile, contains('(allow network*)'));
+      expect(profile, contains('(deny file-read* (subpath "/Users"))'));
       expect(profile, contains('(allow file-write* (subpath "/tmp/querya_sandbox/p_1"))'));
+      expect(profile, contains('(allow file-read* (subpath "/tmp/querya_sandbox/p_1"))'));
       expect(profile, contains('(allow file-read* (subpath "/Users/x/ext"))'));
       expect(cmd.arguments.sublist(2), ['/opt/driver', 'a']);
     });
