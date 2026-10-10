@@ -74,6 +74,15 @@ class ErdTable {
   final String name;
   final List<ErdColumn> columns;
 
+  /// A many-to-many link table: a primary key of exactly two columns that are
+  /// both foreign keys, and at most two other columns (#1281).
+  bool get isJunction {
+    final pk = [for (final c in columns) if (c.isPrimaryKey) c];
+    return pk.length == 2 &&
+        pk.every((c) => c.isForeignKey) &&
+        columns.length - pk.length <= 2;
+  }
+
   /// The table's comment in the database (`COMMENT ON TABLE`) (#1279).
   final String? comment;
 }
@@ -88,6 +97,7 @@ class ErdRelation {
     required this.toTable,
     required this.toColumn,
     this.optional = false,
+    this.oneToOne = false,
   });
 
   final String fromTable;
@@ -95,6 +105,16 @@ class ErdRelation {
   final String toTable;
   final String toColumn;
   final bool optional;
+
+  /// The referencing column is unique (a unique index or the whole primary
+  /// key), so at most one row points at each referenced row (#1281).
+  final bool oneToOne;
+
+  bool sameAs(ErdRelation other) =>
+      other.fromTable == fromTable &&
+      other.fromColumn == fromColumn &&
+      other.toTable == toTable &&
+      other.toColumn == toColumn;
 }
 
 @immutable
@@ -151,6 +171,18 @@ class ErdSchema {
         if (tc != null) tableComments.putIfAbsent(r[0], () => tc);
       }
     }
+    // Columns that alone identify a row: a single-column unique index, or the
+    // primary key when it is that one column.
+    final pkCount = {
+      for (final e in cols.entries)
+        e.key: e.value.where((c) => c.isPrimaryKey).length,
+    };
+    final uniqueAlone = {
+      for (final e in cols.entries)
+        for (final c in e.value)
+          if (c.isUnique || (c.isPrimaryKey && pkCount[e.key] == 1))
+            '${e.key}\u0000${c.name}',
+    };
     final nullable = {
       for (final t in cols.entries)
         for (final c in t.value)
@@ -167,6 +199,7 @@ class ErdSchema {
         toTable: r[2],
         toColumn: r[3],
         optional: nullable.contains('${r[0]}\u0000${r[1]}'),
+        oneToOne: uniqueAlone.contains('${r[0]}\u0000${r[1]}'),
       ));
       fkCols.add('${r[0]}\u0000${r[1]}');
     }
