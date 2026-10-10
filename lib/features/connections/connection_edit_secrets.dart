@@ -142,5 +142,9 @@ String injectUriPasswordIfMissing(String uri, String? password) {
     return uri;
   }
   final user = parts.first;
-  return parsed.replace(userInfo: '$user:$password').toString();
+  // `Uri.replace` rejects a raw `@`, `/`, `#` and the like in the userinfo
+  // (FormatException); the password goes in percent-encoded, as it is read.
+  return parsed
+      .replace(userInfo: '$user:${Uri.encodeComponent(password)}')
+      .toString();
 }
