@@ -72,5 +72,5 @@ Repeatable capture for the **native** connections tree (PG / MySQL / SQLite / Re
 
 - `lib/features/connections/connections_panel.dart` — `lazyConnectionTreeList`, selection `ValueNotifier` / `_ConnectionsTreeSelectionBuilder`
 - `lib/core/motion/querya_animated_expand.dart` — large-list expand morph gate
-- `lib/core/sdui/sdui_tree_builder.dart` — reference flat virtualized tree for extensions
+- `lib/features/connections/sdui_tree_builder.dart` — reference flat virtualized tree for extensions
 

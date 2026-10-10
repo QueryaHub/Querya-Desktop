@@ -70,7 +70,7 @@ import 'package:querya_desktop/core/database/sqlite_service.dart';
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
 import 'package:querya_desktop/core/extensions/extension_driver_session.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
-import 'package:querya_desktop/core/sdui/sdui_tree_builder.dart';
+import 'package:querya_desktop/features/connections/sdui_tree_builder.dart';
 import 'package:querya_desktop/core/sdui/sdui_tree_schema.dart';
 import 'package:querya_desktop/core/storage/folders_storage.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
