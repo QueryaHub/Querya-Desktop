@@ -24,7 +24,7 @@ void main() {
     testWidgets('renders Host and Port fields with custom labels and values',
         (tester) async {
       final hostController = material.TextEditingController(text: '127.0.0.1');
-      final portController = material.TextEditingController(text: '5432');
+      final portController = material.TextEditingController(text: '6543');
 
       await tester.pumpWidget(
         buildApp(
@@ -39,7 +39,7 @@ void main() {
       expect(find.text('Host'), findsOneWidget);
       expect(find.text('Port'), findsOneWidget);
       expect(find.text('127.0.0.1'), findsOneWidget);
-      expect(find.text('5432'), findsOneWidget);
+      expect(find.text('6543'), findsOneWidget);
     });
   });
 
@@ -80,7 +80,8 @@ void main() {
       );
 
       expect(find.text('Username'), findsOneWidget);
-      expect(find.text('Password'), findsOneWidget);
+      // Label plus the field's own placeholder.
+      expect(find.text('Password'), findsNWidgets(2));
       expect(find.byIcon(material.Icons.visibility), findsOneWidget);
 
       await tester.tap(find.byIcon(material.Icons.visibility));
@@ -108,7 +109,7 @@ void main() {
         ),
       );
 
-      expect(find.text('Remove saved password on save'), findsOneWidget);
+      expect(find.text('Remove the saved password'), findsOneWidget);
       expect(find.text('Leave blank to keep existing'), findsOneWidget);
     });
   });
