@@ -24,6 +24,17 @@ class QueryaTheme {
   /// VS Code `tokenColors` for syntax highlighting (imported themes).
   final List<TokenColorRule> tokenColors;
 
+  /// Hashes of token colour lists, keyed by the list itself: themes built by
+  /// [copyWith] and [lerp] (one per animation frame) share the list, so each
+  /// list is hashed once however many themes point at it.
+  static final Expando<int> _tokenColorsHashes =
+      Expando<int>('QueryaTheme.tokenColorsHash');
+
+  /// Hash of [tokenColors], computed once per list (#1353): the editor asks
+  /// for it on every build, and a full VS Code theme has hundreds of rules.
+  int get tokenColorsHash =>
+      _tokenColorsHashes[tokenColors] ??= Object.hashAll(tokenColors);
+
   static const QueryaTheme darkDefault = QueryaTheme(
     workbench: QueryaWorkbenchTheme.darkDefault,
     editor: QueryaEditorTheme.darkDefault,
