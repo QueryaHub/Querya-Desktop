@@ -16,6 +16,7 @@ import 'package:querya_desktop/features/erd/erd_card_measure.dart';
 import 'package:querya_desktop/core/erd/erd_catalog.dart';
 import 'package:querya_desktop/features/erd/erd_source.dart';
 import 'package:querya_desktop/features/erd/erd_export.dart';
+import 'package:querya_desktop/features/erd/erd_export_data.dart';
 import 'package:querya_desktop/core/erd/erd_geometry.dart';
 import 'package:querya_desktop/core/erd/erd_note_text.dart';
 import 'package:querya_desktop/features/erd/erd_group_dialog.dart';
@@ -26,7 +27,11 @@ import 'package:querya_desktop/core/erd/erd_layout_engine.dart';
 import 'package:querya_desktop/core/erd/erd_model.dart';
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
 import 'package:querya_desktop/core/erd/erd_router.dart';
+import 'package:querya_desktop/features/erd/widgets/erd_edge_tip_label.dart';
+import 'package:querya_desktop/features/erd/widgets/erd_group_frame.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_relation_painter.dart';
+import 'package:querya_desktop/features/erd/widgets/erd_search_panel.dart';
+import 'package:querya_desktop/features/erd/widgets/erd_views_menu.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_table_card.dart';
 import 'package:querya_desktop/core/export/image_pdf.dart';
 import 'package:querya_desktop/core/export/svg_png.dart';
@@ -1511,95 +1516,25 @@ class _ErdViewState extends material.State<ErdView> {
   }
 
   /// Header bands for the SVG: the screen's tint over the export's card colour.
-  Map<String, String> _headerFills(ErdSchema schema, String cardHex) {
-    final card = material.Color(
-        0xFF000000 | int.parse(cardHex.substring(1), radix: 16));
-    return {
-      for (final t in schema.tables)
-        if (erdHeaderSlot(t.name, _headerColors) != null)
-          t.name: ErdSvgColors.hex(material.Color.alphaBlend(
-                  _headerColor(t.name).withValues(alpha: 0.14), card)
-              .toARGB32()),
-    };
-  }
-
-  /// [name] cut to 28 characters with an ellipsis, for menus and the toolbar.
-  static String _shortName(String name) =>
-      name.length <= 28 ? name : '${name.substring(0, 27)}…';
+  Map<String, String> _headerFills(ErdSchema schema, String cardHex) =>
+      ErdExportData.headerFills(
+        schema,
+        cardHex,
+        headerColors: _headerColors,
+        headerColor: _headerColor,
+      );
 
   /// The toolbar's view switcher: All tables, the saved views, and the
   /// commands to save, rename and delete one.
-  material.Widget _viewsMenu() {
-    final wb = context.workbench;
-    final active = _viewById(_activeView);
-    return QueryaActionMenu<String>(
-      items: [
-        // A mark on every row, so the labels line up.
-        QueryaActionMenuItem(
-          value: 'all',
-          label: 'All tables',
-          icon: active == null
-              ? material.Icons.radio_button_checked_rounded
-              : material.Icons.radio_button_unchecked_rounded,
-        ),
-        for (final v in _views)
-          QueryaActionMenuItem(
-            value: 'view:${v.id}',
-            label: '${_shortName(v.name)} (${v.tables.length})',
-            icon: v.id == active?.id
-                ? material.Icons.radio_button_checked_rounded
-                : material.Icons.radio_button_unchecked_rounded,
-          ),
-        const QueryaActionMenuItem(
-          value: 'new',
-          label: 'Save as new view…',
-          icon: material.Icons.bookmark_add_outlined,
-        ),
-        if (active != null) ...[
-          const QueryaActionMenuItem(
-            value: 'rename',
-            label: 'Rename view…',
-            icon: material.Icons.edit_outlined,
-          ),
-          const QueryaActionMenuItem(
-            value: 'delete',
-            label: 'Delete view',
-            icon: material.Icons.delete_outline_rounded,
-          ),
-        ],
-      ],
-      onSelected: (v) {
-        switch (v) {
-          case 'all':
-            _switchView(null);
-          case 'new':
-            unawaited(_newView());
-          case 'rename':
-            unawaited(_renameView());
-          case 'delete':
-            _deleteView();
-          default:
-            if (v.startsWith('view:')) _switchView(v.substring(5));
-        }
-      },
-      child: material.Padding(
-        key: const material.ValueKey('erd_views'),
-        padding: const material.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: material.Row(
-          mainAxisSize: material.MainAxisSize.min,
-          children: [
-            material.Icon(material.Icons.bookmarks_outlined,
-                size: 16, color: wb.mutedForeground),
-            const material.SizedBox(width: 6),
-            Text(active == null ? 'All tables' : _shortName(active.name)),
-            const material.SizedBox(width: 4),
-            material.Icon(material.Icons.expand_more_rounded,
-                size: 16, color: wb.mutedForeground),
-          ],
-        ),
-      ),
-    );
-  }
+  material.Widget _viewsMenu() => ErdViewsMenu(
+        views: _views,
+        active: _viewById(_activeView),
+        onShowAll: () => _switchView(null),
+        onSwitch: _switchView,
+        onNew: () => unawaited(_newView()),
+        onRename: () => unawaited(_renameView()),
+        onDelete: _deleteView,
+      );
 
   /// Group entries of a card's menu: group it (with the marked tables), add
   /// it to a group, take it out of its group.
@@ -1642,174 +1577,42 @@ class _ErdViewState extends material.State<ErdView> {
   }
 
   /// Notes for the SVG, tinted as on screen over the export background.
-  List<ErdSvgNote> _svgNotes(ErdSvgColors colors) {
-    material.Color parse(String hex) =>
-        material.Color(0xFF000000 | int.parse(hex.substring(1), radix: 16));
-    final background = parse(colors.background);
-    final muted = parse(colors.muted);
-    return [
-      for (final n in _notes)
-        ErdSvgNote(
-          text: n.text,
-          rect: material.Rect.fromLTWH(n.x, n.y, n.width, n.height),
-          fill: ErdSvgColors.hex(material.Color.alphaBlend(
-                  (n.color == null ? muted : _slotColor(n.color!))
-                      .withValues(alpha: n.color == null ? _noteTint : 0.18),
-                  background)
-              .toARGB32()),
-          stroke: n.color == null
-              ? colors.border
-              : ErdSvgColors.hex(_slotColor(n.color!).toARGB32()),
-        ),
-    ];
-  }
+  List<ErdSvgNote> _svgNotes(ErdSvgColors colors) => ErdExportData.notes(
+        _notes,
+        colors,
+        slotColor: _slotColor,
+        noteTint: _noteTint,
+      );
 
   /// Group frames for the SVG: the screen's tint over the export background.
-  List<ErdSvgGroup> _svgGroups(ErdLayout layout, String backgroundHex) {
-    final background = material.Color(
-        0xFF000000 | int.parse(backgroundHex.substring(1), radix: 16));
-    return [
-      for (final g in _allGroups())
-        if (layout.frameOf(g.tables) case final frame?)
-          ErdSvgGroup(
-            name: g.name,
-            frame: frame,
-            fill: ErdSvgColors.hex(material.Color.alphaBlend(
-                    _slotColor(g.color).withValues(alpha: 0.06), background)
-                .toARGB32()),
-            stroke: ErdSvgColors.hex(_slotColor(g.color).toARGB32()),
-          ),
-    ];
-  }
+  List<ErdSvgGroup> _svgGroups(ErdLayout layout, String backgroundHex) =>
+      ErdExportData.groups(
+        _allGroups(),
+        layout,
+        backgroundHex,
+        slotColor: _slotColor,
+      );
 
   /// A group's frame: a tinted box that takes no pointer, and its title,
   /// which drags the whole group and has the group's menu.
-  List<material.Widget> _groupFrame(ErdGroup g, ErdLayout layout) {
-    final frame = layout.frameOf(g.tables);
-    if (frame == null) return const [];
-    final color = _slotColor(g.color);
-    final title = material.MouseRegion(
-      cursor: _draggingGroup == g.id
-          ? material.SystemMouseCursors.grabbing
-          : material.SystemMouseCursors.grab,
-      child: material.GestureDetector(
-        key: material.ValueKey('erd_group_${g.id}'),
-        dragStartBehavior: DragStartBehavior.down,
-        onTapDown: (_) => _canvasFocus.requestFocus(),
-        onPanStart: (_) {
-          _canvasFocus.requestFocus();
-          _groupDragStart(g.id);
-        },
-        onPanUpdate: (d) => _groupDragMove(g, d.delta),
-        onPanEnd: (_) => _groupDragEnd(),
-        onPanCancel: _groupDragEnd,
-        child: material.Row(
-          mainAxisSize: material.MainAxisSize.min,
-          children: [
-            material.Icon(
-                g.isSchema
-                    ? material.Icons.schema_outlined
-                    : material.Icons.folder_open_rounded,
-                size: 13,
-                color: color),
-            const material.SizedBox(width: 5),
-            material.Flexible(
-              child: Text(g.name,
-                  maxLines: 1,
-                  overflow: material.TextOverflow.ellipsis,
-                  style: material.TextStyle(
-                      fontSize: 12,
-                      fontWeight: material.FontWeight.w600,
-                      color: color)),
-            ),
-            if (g.note case final note?) ...[
-              const material.SizedBox(width: 5),
-              material.Tooltip(
-                message: note,
-                child: material.Icon(material.Icons.notes_rounded,
-                    key: material.ValueKey('erd_group_note_${g.id}'),
-                    size: 12,
-                    color: color),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-    return [
-      material.Positioned.fromRect(
-        rect: frame,
-        child: material.IgnorePointer(
-          child: material.DecoratedBox(
-            decoration: material.BoxDecoration(
-              color: color.withValues(alpha: 0.05),
-              borderRadius: material.BorderRadius.circular(12),
-              border: material.Border.all(color: color.withValues(alpha: 0.55)),
-            ),
-          ),
-        ),
-      ),
-      material.Positioned(
-        left: frame.left + 10,
-        top: frame.top + 3,
-        width: max(0.0, frame.width - 20),
-        height: ErdLayout.frameTitleHeight - 6,
-        child: material.Align(
-          alignment: material.Alignment.centerLeft,
-          child: g.isSchema
-              ? title
-              : ContextMenu(
-                  items: [
-                    MenuButton(
-                      key: material.ValueKey('erd_group_edit_${g.id}'),
-                      onPressed: (_) => unawaited(_editGroup(g)),
-                      child: const Text('Rename / note…'),
-                    ),
-                    MenuButton(
-                      subMenu: [
-                        for (var i = 0; i < erdHeaderSlots.length; i++)
-                          MenuButton(
-                            leading: material.Icon(material.Icons.circle,
-                                size: 12, color: _slotColor(erdHeaderSlots[i])),
-                            onPressed: (_) => _updateGroup(g.id,
-                                (o) => o.copyWith(color: erdHeaderSlots[i])),
-                            child: Text('Colour ${i + 1}'),
-                          ),
-                      ],
-                      child: const Text('Colour'),
-                    ),
-                    MenuButton(
-                      key: material.ValueKey('erd_group_ungroup_${g.id}'),
-                      onPressed: (_) => _ungroup(g.id),
-                      child: const Text('Ungroup'),
-                    ),
-                  ],
-                  child: title,
-                ),
-        ),
-      ),
-    ];
-  }
+  List<material.Widget> _groupFrame(ErdGroup g, ErdLayout layout) =>
+      ErdGroupFrame.build(
+        group: g,
+        layout: layout,
+        slotColor: _slotColor,
+        dragging: _draggingGroup == g.id,
+        onFocusCanvas: _canvasFocus.requestFocus,
+        onDragStart: () => _groupDragStart(g.id),
+        onDragMove: (delta) => _groupDragMove(g, delta),
+        onDragEnd: _groupDragEnd,
+        onEdit: () => unawaited(_editGroup(g)),
+        onColor: (slot) => _updateGroup(g.id, (o) => o.copyWith(color: slot)),
+        onUngroup: () => _ungroup(g.id),
+      );
 
   /// Colours of the current theme for the SVG export, as the screen draws the
   /// cards and edges.
-  ErdSvgColors _svgColors() {
-    final wb = context.workbench;
-    final palette = context.semanticPalette;
-    String hex(material.Color c) => ErdSvgColors.hex(c.toARGB32());
-    return ErdSvgColors(
-      background: hex(wb.surface),
-      card: hex(wb.surface),
-      border: hex(wb.borderSubtle),
-      header: hex(material.Color.alphaBlend(
-          wb.accent.withValues(alpha: 0.10), wb.surface)),
-      text: hex(Theme.of(context).colorScheme.foreground),
-      muted: hex(wb.mutedForeground),
-      edge: hex(wb.mutedForeground),
-      primaryKey: hex(palette.type1),
-      foreignKey: hex(palette.type2),
-    );
-  }
+  ErdSvgColors _svgColors() => ErdExportData.themeColors(context);
 
   /// `<database>-erd`, or `erd` when the database name is unknown.
   String get _fileStem =>
@@ -1880,77 +1683,19 @@ class _ErdViewState extends material.State<ErdView> {
   }
 
   /// "orders.customer_id → customers.id" next to the pointer.
-  material.Widget _edgeTipLabel(material.BuildContext context, ErdRelation r) {
-    final cs = Theme.of(context).colorScheme;
-    return material.DecoratedBox(
-      decoration: material.BoxDecoration(
-        color: cs.popover,
-        borderRadius: material.BorderRadius.circular(6),
-        border: material.Border.all(color: cs.border),
-      ),
-      child: material.Padding(
-        padding:
-            const material.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: material.Text(
-          '${r.fromTable}.${r.fromColumn} → ${r.toTable}.${r.toColumn}',
-          style: material.TextStyle(
-              fontSize: 11, color: cs.popoverForeground),
-        ),
-      ),
-    );
-  }
+  material.Widget _edgeTipLabel(material.BuildContext context, ErdRelation r) =>
+      ErdEdgeTipLabel(relation: r);
 
   /// Find-a-table field and the tables it matches. Enter picks the first.
   material.Widget _searchPanel(ErdSchema schema) {
     if (!_searchOpen) return const material.SizedBox.shrink();
-    final wb = context.workbench;
-    final matches = _matches(schema);
-    return material.Column(
-      mainAxisSize: material.MainAxisSize.min,
-      crossAxisAlignment: material.CrossAxisAlignment.stretch,
-      children: [
-        QueryaSearchField(
-          controller: _searchController,
-          focusNode: _searchFocus,
-          placeholder: 'Find table',
-          debounceDuration: Duration.zero,
-          onChanged: (v) => setState(() => _query = v.trim()),
-          onSubmitted: (_) {
-            if (matches.isNotEmpty) _pickFromSearch(schema, matches.first.name);
-          },
-        ),
-        if (_query.isNotEmpty)
-          material.Container(
-            margin: const material.EdgeInsets.only(top: 4),
-            decoration: material.BoxDecoration(
-              color: wb.surface,
-              borderRadius: material.BorderRadius.circular(8),
-              border: material.Border.all(color: wb.borderSubtle),
-            ),
-            child: material.Column(
-              crossAxisAlignment: material.CrossAxisAlignment.stretch,
-              children: [
-                if (matches.isEmpty)
-                  material.Padding(
-                    padding: const material.EdgeInsets.all(8),
-                    child: const Text('No tables match').muted().small(),
-                  ),
-                for (final t in matches)
-                  material.GestureDetector(
-                    key: material.ValueKey('erd_search_result_${t.name}'),
-                    behavior: material.HitTestBehavior.opaque,
-                    onTap: () => _pickFromSearch(schema, t.name),
-                    child: material.Padding(
-                      padding: const material.EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      child: material.Text(t.name,
-                          style: const material.TextStyle(fontSize: 12)),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-      ],
+    return ErdSearchPanel(
+      controller: _searchController,
+      focusNode: _searchFocus,
+      query: _query,
+      matches: _matches(schema),
+      onChanged: (v) => setState(() => _query = v.trim()),
+      onPick: (name) => _pickFromSearch(schema, name),
     );
   }
 
