@@ -212,7 +212,11 @@ if %ERRORLEVEL%==0 (
   timeout /t 1 /nobreak >NUL
   goto wait
 )
-xcopy /E /Y /I "%SRC%\\*" "%DST%\\"
+robocopy "%SRC%" "%DST%" /MIR /XD "QueryaData" /XF ".portable" /R:2 /W:1
+if %ERRORLEVEL% GEQ 8 (
+  echo Update failed with error %ERRORLEVEL%
+  exit /b %ERRORLEVEL%
+)
 start "" "%EXE%"
 del "%~f0"
 ''';

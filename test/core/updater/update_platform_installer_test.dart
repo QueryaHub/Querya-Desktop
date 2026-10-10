@@ -110,7 +110,7 @@ void main() {
       );
     });
 
-    test('windows batch script waits for pid', () {
+    test('windows batch script waits for pid and uses robocopy mirror with exclusions', () {
       final batch = buildWindowsReplaceBatch(
         pid: 99,
         sourceDir: 'C:\\tmp\\new',
@@ -119,6 +119,8 @@ void main() {
       );
       expect(batch, contains('set PID=99'));
       expect(batch, contains('querya_desktop.exe'));
+      expect(batch, contains('robocopy "%SRC%" "%DST%" /MIR /XD "QueryaData" /XF ".portable" /R:2 /W:1'));
+      expect(batch, contains('if %ERRORLEVEL% GEQ 8'));
     });
   });
 
