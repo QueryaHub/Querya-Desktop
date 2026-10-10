@@ -9,12 +9,11 @@ import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/features/connections/remove_saved_password_option.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
 import 'package:querya_desktop/features/connections/ssh_tunnel_section.dart';
 import 'package:querya_desktop/features/connections/forms/connection_auth_section.dart';
-import 'package:querya_desktop/features/connections/forms/connection_database_section.dart';
 import 'package:querya_desktop/features/connections/forms/connection_host_port_section.dart';
+import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
 import 'package:querya_desktop/shared/widgets/form_validity_notifier.dart';
 import 'package:querya_desktop/shared/widgets/ssl_certificate_fields.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -476,7 +475,9 @@ class _MongoConnectionFormContentState
                       ConnectionHostPortSection(
                         hostController: _hostController,
                         portController: _portController,
-                        defaultPort: '27017',
+                        portPlaceholder: '27017',
+                        portFlex: 1,
+                        gap: 12,
                       ),
                       const Gap(16),
                       // Authentication

@@ -10,7 +10,7 @@ import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/features/connections/remove_saved_password_option.dart';
+import 'package:querya_desktop/features/connections/ssh_tunnel_section.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
 import 'package:querya_desktop/features/connections/forms/connection_auth_section.dart';
 import 'package:querya_desktop/features/connections/forms/connection_database_section.dart';

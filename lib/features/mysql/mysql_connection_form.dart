@@ -12,7 +12,6 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/connections/forms/connection_auth_section.dart';
 import 'package:querya_desktop/features/connections/forms/connection_database_section.dart';
 import 'package:querya_desktop/features/connections/forms/connection_host_port_section.dart';
-import 'package:querya_desktop/features/connections/remove_saved_password_option.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
 import 'package:querya_desktop/features/connections/ssh_tunnel_section.dart';
 import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
@@ -422,7 +421,7 @@ class _MysqlConnectionFormContentState
                     ConnectionHostPortSection(
                       hostController: _hostController,
                       portController: _portController,
-                      defaultPort: '3306',
+                      portPlaceholder: '3306',
                     ),
                     const Gap(16),
                     ConnectionDatabaseSection(
@@ -434,7 +433,7 @@ class _MysqlConnectionFormContentState
                     ConnectionAuthSection(
                       usernameController: _usernameController,
                       passwordController: _passwordController,
-                      defaultUsername: 'root',
+                      usernamePlaceholder: 'root',
                       isEditing: _isEditing,
                       removeSavedPassword: _removeSavedPassword,
                       onRemoveSavedPasswordChanged: (v) =>

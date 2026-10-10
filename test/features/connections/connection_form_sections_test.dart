@@ -31,7 +31,7 @@ void main() {
           ConnectionHostPortSection(
             hostController: hostController,
             portController: portController,
-            defaultPort: '5432',
+            portPlaceholder: '5432',
           ),
         ),
       );
