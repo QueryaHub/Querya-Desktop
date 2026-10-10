@@ -141,6 +141,9 @@ class _ErdViewState extends material.State<ErdView> {
   final Set<String> _collapsed = {};
   final Set<String> _hidden = {};
 
+  /// Header colour picked per table (palette slot names, #1276).
+  final Map<String, String> _headerColors = {};
+
   /// Relation under the pointer and the pointer position in canvas space.
   final _edgeTipNotifier =
       material.ValueNotifier<(ErdRelation, material.Offset)?>(null);
@@ -242,6 +245,9 @@ class _ErdViewState extends material.State<ErdView> {
             ..clear()
             ..addAll(saved.hidden);
           _keysOnly = saved.keysOnly;
+          _headerColors
+            ..clear()
+            ..addAll(saved.headerColors);
         }
         _setLayout(
             _withSaved(ErdLayout.compute(_visibleOf(schema)), saved));
@@ -303,7 +309,7 @@ class _ErdViewState extends material.State<ErdView> {
     for (final e in computed.positions.entries) {
       final p = saved.positions[e.key];
       if (p != null) {
-        savedRight = max(savedRight, p.dx + ErdLayout.cardWidth);
+        savedRight = max(savedRight, p.dx + computed.widthFor(e.key));
       } else {
         newLeft = newLeft == null ? e.value.dx : min(newLeft, e.value.dx);
       }
@@ -343,6 +349,7 @@ class _ErdViewState extends material.State<ErdView> {
           collapsed: Set.of(_collapsed),
           hidden: Set.of(_hidden),
           keysOnly: _keysOnly,
+          headerColors: Map.of(_headerColors),
           scale: m.getMaxScaleOnAxis(),
           translation: material.Offset(t.x, t.y),
         ),
@@ -536,7 +543,7 @@ class _ErdViewState extends material.State<ErdView> {
     final table = schema.tables.firstWhere((t) => t.name == name);
     if (layout != null && vs != null) {
       final p = layout.positions[name]!;
-      final centre = material.Offset(p.dx + ErdLayout.cardWidth / 2,
+      final centre = material.Offset(p.dx + layout.widthFor(name) / 2,
           p.dy + ErdLayout.cardHeight(table) / 2);
       final s = _scale;
       final t = vs.center(material.Offset.zero) - centre * s;
@@ -673,7 +680,9 @@ class _ErdViewState extends material.State<ErdView> {
     if (!mounted) return;
     if (!currentTheme) {
       final scale = ErdExport.pngPixelRatio(layout.size);
-      final svg = ErdExport.toSvg(schema, layout, routes: _routes);
+      final svg = ErdExport.toSvg(schema, layout,
+          routes: _routes,
+          headerFills: _headerFills(schema, const ErdSvgColors().card));
       await _save('$_fileStem.png', await svgToPng(svg, scale: scale));
       return;
     }
@@ -733,7 +742,9 @@ class _ErdViewState extends material.State<ErdView> {
     await _save(
         '$_fileStem.svg',
         Uint8List.fromList(utf8.encode(ErdExport.toSvg(schema, layout,
-            routes: _routes, colors: colors))));
+            routes: _routes,
+            colors: colors,
+            headerFills: _headerFills(schema, colors.card)))));
   }
 
   /// Flips between the light export palette and the current theme.
@@ -747,6 +758,49 @@ class _ErdViewState extends material.State<ErdView> {
           ? 'Exports use the current theme'
           : 'Exports use the light palette for documents',
     );
+  }
+
+  /// Header colour of [table] on screen: the picked slot, the schema's slot,
+  /// or the accent for a table of the current schema.
+  material.Color _headerColor(String table) {
+    final slot = erdHeaderSlot(table, _headerColors);
+    if (slot == null) return context.workbench.accent;
+    return _slotColor(slot);
+  }
+
+  material.Color _slotColor(String slot) {
+    final p = context.semanticPalette;
+    return switch (slot) {
+      'type1' => p.type1,
+      'type2' => p.type2,
+      'type3' => p.type3,
+      'type4' => p.type4,
+      _ => p.type5,
+    };
+  }
+
+  void _setHeaderColor(String table, String? slot) {
+    setState(() {
+      if (slot == null) {
+        _headerColors.remove(table);
+      } else {
+        _headerColors[table] = slot;
+      }
+    });
+    _scheduleSave();
+  }
+
+  /// Header bands for the SVG: the screen's tint over the export's card colour.
+  Map<String, String> _headerFills(ErdSchema schema, String cardHex) {
+    final card = material.Color(
+        0xFF000000 | int.parse(cardHex.substring(1), radix: 16));
+    return {
+      for (final t in schema.tables)
+        if (erdHeaderSlot(t.name, _headerColors) != null)
+          t.name: ErdSvgColors.hex(material.Color.alphaBlend(
+                  _headerColor(t.name).withValues(alpha: 0.14), card)
+              .toARGB32()),
+    };
   }
 
   /// Colours of the current theme for the SVG export, as the screen draws the
@@ -1055,9 +1109,37 @@ class _ErdViewState extends material.State<ErdView> {
                                       onPressed: (_) => _hide(t.name),
                                       child: const Text('Hide from diagram'),
                                     ),
+                                    MenuButton(
+                                      key: material.ValueKey(
+                                          'erd_menu_colour_${t.name}'),
+                                      subMenu: [
+                                        MenuButton(
+                                          onPressed: (_) =>
+                                              _setHeaderColor(t.name, null),
+                                          child: const Text('Default'),
+                                        ),
+                                        for (var i = 0;
+                                            i < erdHeaderSlots.length;
+                                            i++)
+                                          MenuButton(
+                                            leading: material.Icon(
+                                              material.Icons.circle,
+                                              size: 12,
+                                              color: _slotColor(
+                                                  erdHeaderSlots[i]),
+                                            ),
+                                            onPressed: (_) => _setHeaderColor(
+                                                t.name, erdHeaderSlots[i]),
+                                            child: Text('Colour ${i + 1}'),
+                                          ),
+                                      ],
+                                      child: const Text('Header colour'),
+                                    ),
                                   ],
                                   child: _TableCard(
                                   table: t,
+                                  width: layout.widthFor(t.name),
+                                  headerColor: _headerColor(t.name),
                                   highlighted: focus.highlighted,
                                   dragging: _dragging == t.name,
                                   onOpen: widget.onOpenTable == null
@@ -1246,6 +1328,8 @@ class _ErdViewState extends material.State<ErdView> {
 class _TableCard extends material.StatelessWidget {
   const _TableCard({
     required this.table,
+    required this.width,
+    required this.headerColor,
     required this.highlighted,
     required this.dragging,
     required this.onHover,
@@ -1257,6 +1341,12 @@ class _TableCard extends material.StatelessWidget {
   });
 
   final ErdTable table;
+
+  /// From the layout: sized to the card's content (#1276).
+  final double width;
+
+  /// Header tint and icon: by schema, picked per table, or the accent.
+  final material.Color headerColor;
   final bool highlighted;
   final bool dragging;
   final material.VoidCallback? onOpen;
@@ -1297,7 +1387,7 @@ class _TableCard extends material.StatelessWidget {
           onPanEnd: (_) => onDragEnd(),
           onPanCancel: onDragEnd,
           child: material.Container(
-            width: ErdLayout.cardWidth,
+            width: width,
             height: ErdLayout.cardHeight(table),
             decoration: material.BoxDecoration(
               color: wb.surface,
@@ -1321,12 +1411,13 @@ class _TableCard extends material.StatelessWidget {
                 children: [
                   material.Container(
                     height: ErdLayout.headerHeight,
-                    color: wb.accent.withValues(alpha: highlighted ? 0.18 : 0.10),
+                    color: headerColor.withValues(
+                        alpha: highlighted ? 0.18 : 0.10),
                     padding: const material.EdgeInsets.symmetric(horizontal: 10),
                     child: material.Row(
                       children: [
                         material.Icon(material.Icons.table_chart_outlined,
-                            size: 14, color: wb.accent),
+                            size: 14, color: headerColor),
                         const material.SizedBox(width: 6),
                         material.Expanded(
                           child: Text(table.name,
@@ -1370,10 +1461,10 @@ class _TableCard extends material.StatelessWidget {
                                   ],
                                 ),
                               ),
-                              // The name keeps about 60 % of the row, the type
-                              // at most 40 % and ellipsizes.
+                              // The card is sized to fit both; when it hit its
+                              // maximum, the name gives way and the type keeps
+                              // at most half the row.
                               material.Expanded(
-                                flex: 3,
                                 child: Text(c.name,
                                     maxLines: 1,
                                     overflow: material.TextOverflow.ellipsis,
@@ -1384,9 +1475,10 @@ class _TableCard extends material.StatelessWidget {
                                           : material.FontWeight.normal,
                                     )),
                               ),
-                              const material.SizedBox(width: 6),
-                              material.Flexible(
-                                flex: 2,
+                              const material.SizedBox(width: 8),
+                              material.ConstrainedBox(
+                                constraints: material.BoxConstraints(
+                                    maxWidth: (width - 56) / 2),
                                 child: Text(c.isNullable ? '${c.type}?' : c.type,
                                     maxLines: 1,
                                     overflow: material.TextOverflow.ellipsis,

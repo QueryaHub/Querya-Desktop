@@ -357,7 +357,7 @@ void main() {
       final moved = l.withPosition('users', const material.Offset(2000, 1500));
       expect(moved.positions['users'], const material.Offset(2000, 1500));
       expect(moved.positions['orders'], l.positions['orders']);
-      expect(moved.size.width, greaterThan(2000 + ErdLayout.cardWidth));
+      expect(moved.size.width, greaterThan(2000 + moved.widthFor('users')));
       expect(moved.size.height, greaterThan(1500));
       expect(l.withPosition('users', const material.Offset(-50, -9)).positions['users'],
           const material.Offset(8, 8));
@@ -579,8 +579,10 @@ void main() {
           .map((m) => m.group(1)!);
       expect(texts, isNotEmpty);
       for (final text in texts) {
-        // The same per-glyph estimate the export cuts with: 7.5 px a glyph.
-        expect(text.length * 7.5, lessThanOrEqualTo(ErdLayout.cardWidth - 20),
+        // The same per-glyph estimate the export cuts with: 7.5 px a glyph,
+        // inside the widest card there is.
+        expect(text.length * 7.5,
+            lessThanOrEqualTo(ErdLayout.maxCardWidth - 20),
             reason: text);
       }
     });

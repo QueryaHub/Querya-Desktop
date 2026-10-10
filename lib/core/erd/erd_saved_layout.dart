@@ -16,6 +16,7 @@ class ErdSavedLayout {
     this.keysOnly = false,
     this.scale,
     this.translation,
+    this.headerColors = const {},
   });
 
   final Map<String, Offset> positions;
@@ -27,8 +28,16 @@ class ErdSavedLayout {
   final double? scale;
   final Offset? translation;
 
+  /// Header colour picked per table: a palette slot name ([erdHeaderSlots]),
+  /// not a colour, so it follows the theme.
+  final Map<String, String> headerColors;
+
   bool get isEmpty =>
-      positions.isEmpty && collapsed.isEmpty && hidden.isEmpty && !keysOnly;
+      positions.isEmpty &&
+      collapsed.isEmpty &&
+      hidden.isEmpty &&
+      !keysOnly &&
+      headerColors.isEmpty;
 
   /// The layout without the tables that no longer exist.
   ErdSavedLayout keepOnly(Set<String> tables) => ErdSavedLayout(
@@ -41,6 +50,10 @@ class ErdSavedLayout {
         keysOnly: keysOnly,
         scale: scale,
         translation: translation,
+        headerColors: {
+          for (final e in headerColors.entries)
+            if (tables.contains(e.key)) e.key: e.value,
+        },
       );
 
   Map<String, Object?> toJson() => {
@@ -55,6 +68,7 @@ class ErdSavedLayout {
         if (scale != null) 'scale': scale,
         if (translation != null)
           'translation': [_round(translation!.dx), _round(translation!.dy)],
+        if (headerColors.isNotEmpty) 'headerColors': headerColors,
       };
 
   static double _round(double v) => (v * 10).roundToDouble() / 10;
@@ -81,6 +95,15 @@ class ErdSavedLayout {
       }
     }
     final scale = json['scale'];
+    final colors = <String, String>{};
+    final rawColors = json['headerColors'];
+    if (rawColors is Map) {
+      for (final e in rawColors.entries) {
+        if (e.key is String && erdHeaderSlots.contains(e.value)) {
+          colors[e.key as String] = e.value as String;
+        }
+      }
+    }
     return ErdSavedLayout(
       positions: positions,
       collapsed: names(json['collapsed']),
@@ -88,6 +111,7 @@ class ErdSavedLayout {
       keysOnly: json['keysOnly'] == true,
       scale: scale is num && scale > 0 ? scale.toDouble() : null,
       translation: offset(json['translation']),
+      headerColors: colors,
     );
   }
 
@@ -100,6 +124,25 @@ class ErdSavedLayout {
       return null;
     }
   }
+}
+
+/// Palette slots a card header can take: the theme's five chart colours.
+const erdHeaderSlots = ['type1', 'type2', 'type3', 'type4', 'type5'];
+
+/// The header slot of [table]: the one picked for it, else one per schema
+/// (`sales.orders` and `sales.items` share a colour), else null for a table of
+/// the current schema, which keeps the accent.
+String? erdHeaderSlot(String table, Map<String, String> picked) {
+  final chosen = picked[table];
+  if (chosen != null) return chosen;
+  final dot = table.indexOf('.');
+  if (dot <= 0) return null;
+  final schema = table.substring(0, dot);
+  var hash = 0;
+  for (final unit in schema.codeUnits) {
+    hash = (hash * 31 + unit) & 0x7fffffff;
+  }
+  return erdHeaderSlots[hash % erdHeaderSlots.length];
 }
 
 /// Where a diagram's layout is kept between sessions.
