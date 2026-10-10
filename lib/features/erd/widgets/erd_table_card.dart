@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/erd/erd_model.dart';
@@ -19,6 +18,7 @@ int erdCardBuilds = 0;
 /// One table of the diagram: header, columns with their markers and badges.
 class ErdTableCard extends material.StatelessWidget {
   const ErdTableCard({
+    super.key,
     required this.table,
     required this.width,
     required this.headerColor,
