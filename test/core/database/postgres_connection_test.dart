@@ -574,6 +574,25 @@ void main() {
         ),
       );
     });
+
+    test('buildSettingsForTest initializes SecurityContext with trusted roots when useSSL is true (#1367)', () {
+      final connWithoutSsl = PostgresConnection(
+        id: 1,
+        name: 'test',
+        host: 'localhost',
+        useSSL: false,
+      );
+      expect(connWithoutSsl.buildSettingsForTest().securityContext, isNull);
+
+      final connWithSsl = PostgresConnection(
+        id: 2,
+        name: 'test-ssl',
+        host: 'localhost',
+        useSSL: true,
+      );
+      final settings = connWithSsl.buildSettingsForTest();
+      expect(settings.securityContext, isNotNull);
+    });
   });
 
   group('PostgresConnection socket state reflection (#1373)', () {
