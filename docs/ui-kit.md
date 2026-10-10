@@ -270,6 +270,7 @@ workbench keys fall back as described in [theme.md](theme.md).
 | `no_raw_material_dialogs_test.dart` | `AlertDialog` | `QueryaModalDialog`, `QueryaConfirmDialog` |
 | `no_material_dropdowns_test.dart` | `DropdownButton(FormField)`, `PopupMenuButton`, `showMenu` | `QueryaDropdown`, `QueryaActionMenu` |
 | `no_raw_progress_indicators_test.dart` | `CircularProgressIndicator` outside `QueryaSpinner` | `QueryaSpinner` |
+| `shared_does_not_import_shadcn_test.dart` | a new `package:shadcn_flutter` import in `lib/shared/` (ratchet: the allow-list only shrinks) | Flutter primitives and the kit tokens |
 
 When adding a new shared component that replaces a Material one, add a guard
 test in the same style and mention it here.
