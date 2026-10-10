@@ -40,6 +40,9 @@ class _AnimatedQueryaThemeState
   Widget build(BuildContext context) {
     return QueryaThemeScope(
       data: _data!.evaluate(animation),
+      // True only while the controller runs: the final frame, and a theme
+      // that never animates, are settled.
+      transitioning: animation.isAnimating,
       child: widget.child,
     );
   }

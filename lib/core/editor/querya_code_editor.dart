@@ -92,9 +92,17 @@ class _QueryaCodeEditorState extends State<QueryaCodeEditor> {
     widget.onChanged?.call(_effectiveController.text);
   }
 
-  void _syncThemeIfNeeded(QueryaTheme queryaTheme) {
+  void _syncThemeIfNeeded(
+    QueryaTheme queryaTheme, {
+    bool transitioning = false,
+  }) {
     final controller = _effectiveController;
     if (controller is! QueryaHighlightController) return;
+
+    // Mid-animation themes differ on every frame: building highlighters for
+    // them each time is wasted work and pushes real entries out of the pair
+    // cache. The final frame arrives with `transitioning` false (#1358).
+    if (transitioning && _lastEditorTheme != null) return;
 
     final editor = queryaTheme.editor;
     final tokenHash = queryaTheme.tokenColorsHash;
@@ -122,7 +130,10 @@ class _QueryaCodeEditorState extends State<QueryaCodeEditor> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _syncThemeIfNeeded(context.queryaTheme);
+    _syncThemeIfNeeded(
+      context.queryaTheme,
+      transitioning: QueryaThemeScope.isTransitioning(context),
+    );
   }
 
   @override
@@ -139,7 +150,10 @@ class _QueryaCodeEditorState extends State<QueryaCodeEditor> {
       _lastEditorTheme = null;
       _lastTokenColorsHash = 0;
       _attachListener();
-      _syncThemeIfNeeded(context.queryaTheme);
+      _syncThemeIfNeeded(
+        context.queryaTheme,
+        transitioning: QueryaThemeScope.isTransitioning(context),
+      );
     }
   }
 
