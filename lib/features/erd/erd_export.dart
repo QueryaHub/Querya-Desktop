@@ -161,8 +161,15 @@ class ErdExport {
           '${_esc(r.relation.fromColumn)} → ${_esc(r.relation.toTable)}.'
           '${_esc(r.relation.toColumn)}';
       final ends = StringBuffer();
-      for (final (a, c) in ErdGeometry.crowFoot(r.points[0], r.points[1])) {
-        ends.write('M ${_p(a)} L ${_p(c)} ');
+      // FK end: a crow's foot ("many"), or a bar when the FK column is
+      // unique on its own ("one", #1281).
+      if (r.relation.oneToOne) {
+        final (oa, ob) = ErdGeometry.oneBar(r.points[0], r.points[1]);
+        ends.write('M ${_p(oa)} L ${_p(ob)} ');
+      } else {
+        for (final (a, c) in ErdGeometry.crowFoot(r.points[0], r.points[1])) {
+          ends.write('M ${_p(a)} L ${_p(c)} ');
+        }
       }
       // FK side: a circle when the column may be NULL, a bar otherwise.
       String? circle;
@@ -187,6 +194,16 @@ class ErdExport {
         ..writeln('<path class="erd-ends" d="$ends" fill="none" '
             'stroke="${colors.edge}" stroke-width="1.5"/>');
       if (circle != null) b.writeln(circle);
+      final fkLabel = ErdGeometry.endLabel(r.points[0], r.points[1]);
+      final refLabel = ErdGeometry.endLabel(
+          r.points.last, r.points[r.points.length - 2]);
+      b
+        ..writeln('<text class="erd-end-label" x="${_n(fkLabel.dx)}" '
+            'y="${_n(fkLabel.dy + 4)}" font-size="10" text-anchor="middle" '
+            'fill="${colors.muted}">${r.relation.oneToOne ? '1' : '*'}</text>')
+        ..writeln('<text class="erd-end-label" x="${_n(refLabel.dx)}" '
+            'y="${_n(refLabel.dy + 4)}" font-size="10" text-anchor="middle" '
+            'fill="${colors.muted}">1</text>');
     }
     final rx = _n(_cardRadius);
     for (var ti = 0; ti < schema.tables.length; ti++) {

@@ -47,6 +47,14 @@ abstract final class ErdGeometry {
     return (edge + d * 17, 4);
   }
 
+  /// Where the `1` / `*` label of an edge end goes: 14 px along the edge from
+  /// [edge] and 9 px to its side, clear of the end markers (#1281).
+  static Offset endLabel(Offset edge, Offset next) {
+    final d = _dir(edge, next);
+    final n = Offset(-d.dy, d.dx);
+    return edge + d * 14 + n * 9;
+  }
+
   /// Distance from [p] to the polyline [pts] (straight segments, no corner
   /// rounding). Infinity for a route with fewer than two points.
   static double distanceToRoute(List<Offset> pts, Offset p) {
