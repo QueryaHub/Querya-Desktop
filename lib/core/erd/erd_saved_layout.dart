@@ -23,6 +23,8 @@ class ErdSavedLayout {
     this.headerColors = const {},
     this.groups = const [],
     this.notes = const [],
+    this.views = const [],
+    this.activeView,
   });
 
   final Map<String, Offset> positions;
@@ -44,6 +46,45 @@ class ErdSavedLayout {
   /// Sticky notes on the canvas (#1283).
   final List<ErdNote> notes;
 
+  /// Named views of the diagram (#1284) and the one the user is in. The
+  /// fields above are the *All tables* state; a view carries its own.
+  final List<ErdSavedView> views;
+  final String? activeView;
+
+  /// This state with no table hidden: what *All tables* is once the hidden
+  /// ones went into a view (#1284).
+  ErdSavedLayout showingAll() => ErdSavedLayout(
+        positions: positions,
+        collapsed: collapsed,
+        detail: detail,
+        scale: scale,
+        translation: translation,
+        headerColors: headerColors,
+        groups: groups,
+        notes: notes,
+        views: views,
+        activeView: activeView,
+      );
+
+  ErdSavedLayout withViews(
+    List<ErdSavedView> views,
+    String? activeView, {
+    Map<String, String>? headerColors,
+  }) =>
+      ErdSavedLayout(
+        positions: positions,
+        collapsed: collapsed,
+        hidden: hidden,
+        detail: detail,
+        scale: scale,
+        translation: translation,
+        headerColors: headerColors ?? this.headerColors,
+        groups: groups,
+        notes: notes,
+        views: views,
+        activeView: activeView,
+      );
+
   bool get isEmpty =>
       positions.isEmpty &&
       collapsed.isEmpty &&
@@ -51,7 +92,8 @@ class ErdSavedLayout {
       detail == ErdDetail.all &&
       headerColors.isEmpty &&
       groups.isEmpty &&
-      notes.isEmpty;
+      notes.isEmpty &&
+      views.isEmpty;
 
   /// The layout without the tables that no longer exist.
   ErdSavedLayout keepOnly(Set<String> tables) => ErdSavedLayout(
@@ -83,6 +125,9 @@ class ErdSavedLayout {
                 ? n
                 : n.copyWith(attachedTo: () => null),
         ],
+        // A dropped table leaves every view that listed it.
+        views: [for (final v in views) v.keepOnly(tables)],
+        activeView: activeView,
       );
 
   Map<String, Object?> toJson() => {
@@ -100,6 +145,8 @@ class ErdSavedLayout {
         if (headerColors.isNotEmpty) 'headerColors': headerColors,
         if (groups.isNotEmpty) 'groups': [for (final g in groups) g.toJson()],
         if (notes.isNotEmpty) 'notes': [for (final n in notes) n.toJson()],
+        if (views.isNotEmpty) 'views': [for (final v in views) v.toJson()],
+        if (activeView != null) 'activeView': activeView,
       };
 
   static double _round(double v) => (v * 10).roundToDouble() / 10;
@@ -155,6 +202,15 @@ class ErdSavedLayout {
         if (n != null && !notes.any((o) => o.id == n.id)) notes.add(n);
       }
     }
+    final views = <ErdSavedView>[];
+    final rawViews = json['views'];
+    if (rawViews is List) {
+      for (final raw in rawViews) {
+        final v = ErdSavedView.fromJson(raw);
+        if (v != null && !views.any((o) => o.id == v.id)) views.add(v);
+      }
+    }
+    final active = json['activeView'];
     return ErdSavedLayout(
       positions: positions,
       collapsed: names(json['collapsed']),
@@ -169,6 +225,9 @@ class ErdSavedLayout {
       headerColors: colors,
       groups: groups,
       notes: notes,
+      views: views,
+      activeView:
+          active is String && views.any((v) => v.id == active) ? active : null,
     );
   }
 
@@ -251,6 +310,73 @@ class ErdGroup {
       color: color,
       tables: names.toSet().toList(),
       note: note is String && note.trim().isNotEmpty ? note : null,
+    );
+  }
+}
+
+/// A named view of the diagram (#1284): the tables it shows and how they were
+/// arranged. [layout] has no hidden tables and no views of its own; what it
+/// shows is [tables].
+class ErdSavedView {
+  const ErdSavedView({
+    required this.id,
+    required this.name,
+    required this.tables,
+    required this.layout,
+  });
+
+  final String id;
+  final String name;
+  final Set<String> tables;
+  final ErdSavedLayout layout;
+
+  ErdSavedView copyWith({String? name}) => ErdSavedView(
+      id: id, name: name ?? this.name, tables: tables, layout: layout);
+
+  /// This view without the tables that no longer exist.
+  ErdSavedView keepOnly(Set<String> existing) => ErdSavedView(
+        id: id,
+        name: name,
+        tables: tables.intersection(existing),
+        layout: layout.keepOnly(existing),
+      );
+
+  /// The state to apply for this view: everything not in [tables] hidden,
+  /// the header colours of the diagram (they belong to it, not to a view).
+  ErdSavedLayout asLayout(
+          Set<String> all, Map<String, String> headerColors) =>
+      ErdSavedLayout(
+        positions: layout.positions,
+        collapsed: layout.collapsed,
+        hidden: all.difference(tables),
+        detail: layout.detail,
+        scale: layout.scale,
+        translation: layout.translation,
+        headerColors: headerColors,
+        groups: layout.groups,
+        notes: layout.notes,
+      );
+
+  Map<String, Object?> toJson() => {
+        'id': id,
+        'name': name,
+        'tables': tables.toList()..sort(),
+        'layout': layout.toJson(),
+      };
+
+  static ErdSavedView? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final id = json['id'], name = json['name'], tables = json['tables'];
+    if (id is! String || id.isEmpty) return null;
+    if (name is! String || name.trim().isEmpty) return null;
+    if (tables is! List) return null;
+    final layout = ErdSavedLayout.fromJson(json['layout']);
+    if (layout == null) return null;
+    return ErdSavedView(
+      id: id,
+      name: name,
+      tables: {for (final t in tables) if (t is String) t},
+      layout: layout,
     );
   }
 }
