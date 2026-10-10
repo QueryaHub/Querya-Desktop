@@ -91,9 +91,7 @@ class SqliteConnectionPool {
       entry.idleTimer?.cancel();
       entry.idleTimer = null;
       entry.refs++;
-      if (!entry.connection.isConnected) {
-        await entry.connection.connect();
-      }
+      await _ensureConnected(entry);
       return SqliteLease._(this, entry, entry.connection);
     }
 
@@ -125,9 +123,7 @@ class SqliteConnectionPool {
     entry.idleTimer?.cancel();
     entry.idleTimer = null;
     entry.refs++;
-    if (!entry.connection.isConnected) {
-      await entry.connection.connect();
-    }
+    await _ensureConnected(entry);
     return SqliteLease._(this, entry, entry.connection);
   }
 
@@ -141,6 +137,19 @@ class SqliteConnectionPool {
       }
       idle.sort((a, b) => a.value.lastUsed.compareTo(b.value.lastUsed));
       _removeEntryClosing(idle.first.key);
+    }
+  }
+
+  /// Reconnects a dropped entry for a lease that was just counted. When the
+  /// reconnect fails the count is given back, so the entry can be
+  /// idle-disposed or evicted instead of staying "in use" for good (#1306).
+  Future<void> _ensureConnected(_PoolEntry entry) async {
+    if (entry.connection.isConnected) return;
+    try {
+      await entry.connection.connect();
+    } catch (_) {
+      _release(entry);
+      rethrow;
     }
   }
 

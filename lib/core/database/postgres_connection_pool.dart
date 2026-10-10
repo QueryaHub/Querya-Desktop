@@ -99,7 +99,7 @@ class PostgresConnectionPool {
       entry.idleTimer?.cancel();
       entry.idleTimer = null;
       entry.refs++;
-      if (!entry.connection.isConnected) await _reconnect(entry, mode);
+      await _ensureConnected(entry, mode);
       return PgLease._(this, entry, entry.connection);
     }
 
@@ -132,8 +132,21 @@ class PostgresConnectionPool {
     entry.idleTimer?.cancel();
     entry.idleTimer = null;
     entry.refs++;
-    if (!entry.connection.isConnected) await _reconnect(entry, mode);
+    await _ensureConnected(entry, mode);
     return PgLease._(this, entry, entry.connection);
+  }
+
+  /// Makes the entry's connection usable for a lease that was just counted.
+  /// When the reconnect fails the count is given back, so the entry can be
+  /// idle-disposed or evicted instead of staying "in use" for good (#1306).
+  Future<void> _ensureConnected(_PoolEntry entry, PgSessionMode mode) async {
+    if (entry.connection.isConnected) return;
+    try {
+      await _reconnect(entry, mode);
+    } catch (_) {
+      _release(entry);
+      rethrow;
+    }
   }
 
   /// Brings a dropped entry back with one reconnect and one session setting,

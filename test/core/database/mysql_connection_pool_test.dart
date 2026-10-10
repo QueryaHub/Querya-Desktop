@@ -27,12 +27,20 @@ class FakeMysqlConnection extends MysqlConnection {
   bool? lastReadOnly;
   bool? openTransaction;
 
+  /// Thrown (once) by the next [connect].
+  Object? connectError;
+
   @override
   bool get isConnected => _connected;
 
   @override
   Future<void> connect({int connectTimeoutMs = 10000}) async {
     connectCount++;
+    final error = connectError;
+    if (error != null) {
+      connectError = null;
+      throw error;
+    }
     _connected = true;
   }
 
@@ -295,6 +303,52 @@ void main() {
       expect(created.length, 2);
       ui.release();
       mcp.release();
+    });
+  });
+
+  group('a failed reconnect gives the lease back (#1306)', () {
+    test('the entry is still idle-disposed afterwards', () async {
+      final fake = FakeMysqlConnection();
+      final pool = MysqlConnectionPool(
+        idleDisposeDelay: const Duration(milliseconds: 20),
+        createAndConnect: (row, {required database, required mode}) async {
+          await fake.connect();
+          return fake;
+        },
+      );
+      final first = await pool.acquire(_row(), database: 'db');
+      await fake.forceClose(); // the session dropped
+      fake.connectError = StateError('server restarted');
+      await expectLater(
+          pool.acquire(_row(), database: 'db'), throwsStateError);
+
+      first.release();
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      expect(fake.disconnectCount, 1);
+    });
+
+    test('failed reconnects do not exhaust the pool', () async {
+      final pool = MysqlConnectionPool(
+        maxEntries: 2,
+        createAndConnect: (row, {required database, required mode}) async {
+          final c = FakeMysqlConnection();
+          await c.connect();
+          return c;
+        },
+      );
+      for (final db in ['a', 'b']) {
+        final lease = await pool.acquire(_row(), database: db);
+        final fake = lease.connection as FakeMysqlConnection;
+        await fake.forceClose();
+        fake.connectError = StateError('down');
+        await expectLater(
+            pool.acquire(_row(), database: db), throwsStateError);
+        lease.release();
+      }
+      // Both slots are idle, so a third key evicts one instead of failing.
+      final c = await pool.acquire(_row(), database: 'c');
+      expect(c.connection.isConnected, isTrue);
+      c.release();
     });
   });
 }

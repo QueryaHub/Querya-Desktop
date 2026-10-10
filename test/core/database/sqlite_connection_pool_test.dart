@@ -24,12 +24,20 @@ class FakeSqliteConnection extends SqliteConnection {
   int forceCloseCount = 0;
   bool? openTransaction;
 
+  /// Thrown (once) by the next [connect].
+  Object? connectError;
+
   @override
   bool get isConnected => _connected;
 
   @override
   Future<void> connect() async {
     connectCount++;
+    final error = connectError;
+    if (error != null) {
+      connectError = null;
+      throw error;
+    }
     _connected = true;
   }
 
@@ -240,6 +248,49 @@ void main() {
       after.release();
       await Future<void>.delayed(const Duration(milliseconds: 100));
       expect(replacement.disconnectCount, 1);
+    });
+  });
+
+  group('a failed reconnect gives the lease back (#1306)', () {
+    test('the entry is still idle-disposed afterwards', () async {
+      final fake = FakeSqliteConnection();
+      final pool = SqliteConnectionPool(
+        idleDisposeDelay: const Duration(milliseconds: 20),
+        createAndConnect: (row, {required mode}) async {
+          await fake.connect();
+          return fake;
+        },
+      );
+      final first = await pool.acquire(_row());
+      await fake.forceClose(); // the file handle was lost
+      fake.connectError = StateError('file is gone');
+      await expectLater(pool.acquire(_row()), throwsStateError);
+
+      first.release();
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      expect(fake.disconnectCount, 1);
+    });
+
+    test('failed reconnects do not exhaust the pool', () async {
+      final pool = SqliteConnectionPool(
+        maxEntries: 2,
+        createAndConnect: (row, {required mode}) async {
+          final c = FakeSqliteConnection();
+          await c.connect();
+          return c;
+        },
+      );
+      for (final id in [1, 2]) {
+        final lease = await pool.acquire(_row(id: id));
+        final fake = lease.connection as FakeSqliteConnection;
+        await fake.forceClose();
+        fake.connectError = StateError('down');
+        await expectLater(pool.acquire(_row(id: id)), throwsStateError);
+        lease.release();
+      }
+      final c = await pool.acquire(_row(id: 3));
+      expect(c.connection.isConnected, isTrue);
+      c.release();
     });
   });
 }
