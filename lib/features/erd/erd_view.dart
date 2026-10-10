@@ -5,7 +5,6 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:file_selector/file_selector.dart';
-import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart'
@@ -18,7 +17,6 @@ import 'package:querya_desktop/features/erd/erd_source.dart';
 import 'package:querya_desktop/features/erd/erd_export.dart';
 import 'package:querya_desktop/features/erd/erd_export_data.dart';
 import 'package:querya_desktop/core/erd/erd_geometry.dart';
-import 'package:querya_desktop/core/erd/erd_note_text.dart';
 import 'package:querya_desktop/features/erd/erd_group_dialog.dart';
 import 'package:querya_desktop/features/erd/erd_note_dialog.dart';
 import 'package:querya_desktop/features/erd/erd_view_name_dialog.dart';
@@ -26,11 +24,13 @@ import 'package:querya_desktop/core/erd/erd_group_ops.dart';
 import 'package:querya_desktop/core/erd/erd_layout.dart';
 import 'package:querya_desktop/core/erd/erd_layout_engine.dart';
 import 'package:querya_desktop/core/erd/erd_model.dart';
+import 'package:querya_desktop/core/erd/erd_note_ops.dart';
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
 import 'package:querya_desktop/core/erd/erd_router.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_edge_tip_label.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_export_menu.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_group_frame.dart';
+import 'package:querya_desktop/features/erd/widgets/erd_note_card.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_relation_painter.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_search_panel.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_status_body.dart';
@@ -604,17 +604,9 @@ class _ErdViewState extends material.State<ErdView> {
     final text = await showErdNoteDialog(context,
         title: 'New note', action: 'Add');
     if (text == null || !mounted) return;
-    var n = 1;
-    while (_notes.any((o) => o.id == 'n$n')) {
-      n++;
-    }
-    final c = _viewCentre();
-    setState(() => _notes.add(ErdNote(
-          id: 'n$n',
-          text: text,
-          x: max(8.0, c.dx - ErdNote.defaultWidth / 2),
-          y: max(8.0, c.dy - ErdNote.defaultHeight / 2),
-        )));
+    final note =
+        ErdNoteOps.create(_notes, text: text, centre: _viewCentre());
+    setState(() => _notes.add(note));
     _scheduleSave();
   }
 
@@ -640,23 +632,15 @@ class _ErdViewState extends material.State<ErdView> {
   void _noteDragMove(String id, material.Offset screenDelta) {
     final i = _notes.indexWhere((n) => n.id == id);
     if (i < 0) return;
-    final scale = _scale;
-    final d = screenDelta / (scale == 0 ? 1 : scale);
-    final n = _notes[i];
-    setState(() => _notes[i] =
-        n.copyWith(x: max(0.0, n.x + d.dx), y: max(0.0, n.y + d.dy)));
+    final moved = ErdNoteOps.moved(_notes[i], screenDelta, _scale);
+    setState(() => _notes[i] = moved);
   }
 
   void _noteResize(String id, material.Offset screenDelta) {
     final i = _notes.indexWhere((n) => n.id == id);
     if (i < 0) return;
-    final scale = _scale;
-    final d = screenDelta / (scale == 0 ? 1 : scale);
-    final n = _notes[i];
-    setState(() => _notes[i] = n.copyWith(
-          width: max(ErdNote.minWidth, n.width + d.dx),
-          height: max(ErdNote.minHeight, n.height + d.dy),
-        ));
+    final resized = ErdNoteOps.resized(_notes[i], screenDelta, _scale);
+    setState(() => _notes[i] = resized);
   }
 
   /// The table nearest to a note's middle, to attach it to.
@@ -664,17 +648,7 @@ class _ErdViewState extends material.State<ErdView> {
     final layout = _layout;
     final schema = _schema;
     if (layout == null || schema == null) return null;
-    final c = material.Offset(n.x + n.width / 2, n.y + n.height / 2);
-    String? best;
-    var bestDistance = double.infinity;
-    for (final t in _visibleOf(schema).tables) {
-      final d = (layout.rectOf(t).center - c).distance;
-      if (d < bestDistance) {
-        bestDistance = d;
-        best = t.name;
-      }
-    }
-    return best;
+    return ErdNoteOps.nearestTable(n, layout, _visibleOf(schema));
   }
 
   /// Canvas size: the cards and every note.
@@ -691,174 +665,31 @@ class _ErdViewState extends material.State<ErdView> {
   /// exports.
   static const double _noteTint = 0.07;
 
-  /// Shadows read only on light surfaces, so a dark canvas gets twice the alpha.
-  double _shadowAlpha(material.Color canvas) =>
-      canvas.computeLuminance() < 0.5 ? 0.24 : 0.12;
-
-  material.Widget _noteWidget(ErdNote n) {
-    final wb = context.workbench;
-    final color = n.color == null ? null : _slotColor(n.color!);
-    final lines = parseErdNote(n.text);
-    final base = material.TextStyle(
-        fontSize: 12, color: Theme.of(context).colorScheme.foreground);
-    return material.Positioned(
-      left: n.x,
-      top: n.y,
-      width: n.width,
-      height: n.height,
-      child: ContextMenu(
-        items: [
-          MenuButton(
-            key: material.ValueKey('erd_note_edit_${n.id}'),
-            onPressed: (_) => unawaited(_editNote(n)),
-            child: const Text('Edit note…'),
-          ),
-          MenuButton(
-            subMenu: [
-              MenuButton(
-                onPressed: (_) =>
-                    _updateNote(n.id, (o) => o.copyWith(color: () => null)),
-                child: const Text('None'),
-              ),
-              for (var i = 0; i < erdHeaderSlots.length; i++)
-                MenuButton(
-                  leading: material.Icon(material.Icons.circle,
-                      size: 12, color: _slotColor(erdHeaderSlots[i])),
-                  onPressed: (_) => _updateNote(
-                      n.id, (o) => o.copyWith(color: () => erdHeaderSlots[i])),
-                  child: Text('Colour ${i + 1}'),
-                ),
-            ],
-            child: const Text('Colour'),
-          ),
-          if (n.attachedTo == null)
-            MenuButton(
-              key: material.ValueKey('erd_note_attach_${n.id}'),
-              onPressed: (_) {
-                final t = _nearestTable(n);
-                if (t != null) {
-                  _updateNote(n.id, (o) => o.copyWith(attachedTo: () => t));
-                }
-              },
-              child: const Text('Attach to nearest table'),
-            )
-          else
-            MenuButton(
-              key: material.ValueKey('erd_note_detach_${n.id}'),
-              onPressed: (_) =>
-                  _updateNote(n.id, (o) => o.copyWith(attachedTo: () => null)),
-              child: Text('Detach from ${n.attachedTo}'),
-            ),
-          MenuButton(
-            key: material.ValueKey('erd_note_delete_${n.id}'),
-            onPressed: (_) => _deleteNote(n.id),
-            child: const Text('Delete note'),
-          ),
-        ],
-        child: material.Stack(
-          children: [
-            material.Positioned.fill(
-              child: material.MouseRegion(
-                cursor: _draggingNote == n.id
-                    ? material.SystemMouseCursors.grabbing
-                    : material.SystemMouseCursors.grab,
-                child: material.GestureDetector(
-                  key: material.ValueKey('erd_note_${n.id}'),
-                  dragStartBehavior: DragStartBehavior.down,
-                  // Esc, zoom and search keys work after touching a note.
-                  onTapDown: (_) => _canvasFocus.requestFocus(),
-                  onPanStart: (_) {
-                    _canvasFocus.requestFocus();
-                    setState(() => _draggingNote = n.id);
-                  },
-                  onPanUpdate: (d) => _noteDragMove(n.id, d.delta),
-                  onPanEnd: (_) {
-                    setState(() => _draggingNote = null);
-                    _scheduleSave();
-                  },
-                  onPanCancel: () => setState(() => _draggingNote = null),
-                  onDoubleTap: () => unawaited(_editNote(n)),
-                  child: material.DecoratedBox(
-                    decoration: material.BoxDecoration(
-                      // Not the canvas colour: a plain note is a slightly
-                      // darker sheet with a shadow, like the cards.
-                      color: material.Color.alphaBlend(
-                          (color ?? wb.mutedForeground).withValues(
-                              alpha: color == null ? _noteTint : 0.18),
-                          wb.surface),
-                      borderRadius: material.BorderRadius.circular(6),
-                      border: material.Border.all(
-                          color: color ?? wb.borderSubtle,
-                          width: n.attachedTo == null ? 1 : 1.5),
-                      boxShadow: [
-                        material.BoxShadow(
-                          color: wb.shadow
-                              .withValues(alpha: _shadowAlpha(wb.canvas)),
-                          blurRadius: _draggingNote == n.id ? 14 : 6,
-                          offset: material.Offset(
-                              0, _draggingNote == n.id ? 5 : 2),
-                        ),
-                      ],
-                    ),
-                    child: material.ClipRect(
-                      child: material.Padding(
-                        padding: const material.EdgeInsets.all(8),
-                        child: material.SingleChildScrollView(
-                          physics: const material.NeverScrollableScrollPhysics(),
-                          child: material.Column(
-                            crossAxisAlignment: material.CrossAxisAlignment.start,
-                            children: [
-                              for (final line in lines)
-                                material.Text.rich(
-                                  material.TextSpan(
-                                    style: base,
-                                    children: [
-                                      if (line.bullet)
-                                        const material.TextSpan(text: '•  '),
-                                      for (final r in line.runs)
-                                        material.TextSpan(
-                                          text: r.text,
-                                          style: r.bold
-                                              ? const material.TextStyle(
-                                                  fontWeight:
-                                                      material.FontWeight.w700)
-                                              : null,
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            material.Positioned(
-              right: 0,
-              bottom: 0,
-              width: 16,
-              height: 16,
-              child: material.MouseRegion(
-                cursor: material.SystemMouseCursors.resizeDownRight,
-                child: material.GestureDetector(
-                  key: material.ValueKey('erd_note_resize_${n.id}'),
-                  dragStartBehavior: DragStartBehavior.down,
-                  onPanStart: (_) => _canvasFocus.requestFocus(),
-                  onPanUpdate: (d) => _noteResize(n.id, d.delta),
-                  onPanEnd: (_) => _scheduleSave(),
-                  child: material.Icon(material.Icons.drag_handle_rounded,
-                      size: 12, color: wb.mutedForeground),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  material.Widget _noteWidget(ErdNote n) => ErdNoteCard(
+        note: n,
+        tint: _noteTint,
+        slotColor: _slotColor,
+        dragging: _draggingNote == n.id,
+        onFocusCanvas: _canvasFocus.requestFocus,
+        onDragStart: () => setState(() => _draggingNote = n.id),
+        onDragMove: (d) => _noteDragMove(n.id, d),
+        onDragEnd: () {
+          setState(() => _draggingNote = null);
+          _scheduleSave();
+        },
+        onDragCancel: () => setState(() => _draggingNote = null),
+        onEdit: () => unawaited(_editNote(n)),
+        onChange: (change) => _updateNote(n.id, change),
+        onAttachNearest: () {
+          final t = _nearestTable(n);
+          if (t != null) {
+            _updateNote(n.id, (o) => o.copyWith(attachedTo: () => t));
+          }
+        },
+        onDelete: () => _deleteNote(n.id),
+        onResize: (d) => _noteResize(n.id, d),
+        onResizeEnd: _scheduleSave,
+      );
 
   void _groupDragStart(String id) => setState(() => _draggingGroup = id);
 
