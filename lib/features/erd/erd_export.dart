@@ -1,5 +1,5 @@
 import 'dart:math' show max, min;
-import 'dart:ui' show Offset, Size;
+import 'dart:ui' show Offset, Rect, Size;
 
 import 'package:querya_desktop/features/erd/erd_geometry.dart';
 import 'package:querya_desktop/features/erd/erd_layout.dart';
@@ -39,6 +39,22 @@ class ErdSvgColors {
   /// `#rrggbb` for a 0xAARRGGBB colour value (alpha is dropped).
   static String hex(int argb) =>
       '#${(argb & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
+}
+
+/// A group's frame in the SVG (#1282): its bounds from [ErdLayout.frameOf],
+/// the tinted fill and the outline and title colour, as `#rrggbb`.
+class ErdSvgGroup {
+  const ErdSvgGroup({
+    required this.name,
+    required this.frame,
+    required this.fill,
+    required this.stroke,
+  });
+
+  final String name;
+  final Rect frame;
+  final String fill;
+  final String stroke;
 }
 
 /// Text exports of an [ErdSchema].
@@ -147,6 +163,7 @@ class ErdExport {
     List<ErdRoute>? routes,
     ErdSvgColors colors = const ErdSvgColors(),
     Map<String, String> headerFills = const {},
+    List<ErdSvgGroup> groups = const [],
   }) {
     final size = layout.size;
     final w = _n(size.width), h = _n(size.height);
@@ -155,6 +172,18 @@ class ErdExport {
           'viewBox="0 0 $w $h" font-family="sans-serif" font-size="12" '
           'fill="${colors.text}">')
       ..writeln('<rect width="100%" height="100%" fill="${colors.background}"/>');
+    // Group frames under the edges and cards, as on screen.
+    for (final g in groups) {
+      final f = g.frame;
+      b
+        ..writeln('<rect class="erd-group" x="${_n(f.left)}" y="${_n(f.top)}" '
+            'width="${_n(f.width)}" height="${_n(f.height)}" rx="12" '
+            'fill="${g.fill}" stroke="${g.stroke}" stroke-width="1.2"/>')
+        ..writeln('<text class="erd-group-title" x="${_n(f.left + 12)}" '
+            'y="${_n(f.top + 16)}" font-size="12" font-weight="bold" '
+            'fill="${g.stroke}">'
+            '${_esc(_fit(g.name, f.width - 24, _nameCharPx))}</text>');
+    }
     for (final r in routes ?? ErdRouter.route(schema, layout)) {
       if (r.points.length < 2) continue;
       final title = '${_esc(r.relation.fromTable)}.'

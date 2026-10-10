@@ -21,6 +21,7 @@ class ErdSavedLayout {
     this.scale,
     this.translation,
     this.headerColors = const {},
+    this.groups = const [],
   });
 
   final Map<String, Offset> positions;
@@ -36,12 +37,16 @@ class ErdSavedLayout {
   /// not a colour, so it follows the theme.
   final Map<String, String> headerColors;
 
+  /// Groups the user made (#1282). A table is in one group at most.
+  final List<ErdGroup> groups;
+
   bool get isEmpty =>
       positions.isEmpty &&
       collapsed.isEmpty &&
       hidden.isEmpty &&
       detail == ErdDetail.all &&
-      headerColors.isEmpty;
+      headerColors.isEmpty &&
+      groups.isEmpty;
 
   /// The layout without the tables that no longer exist.
   ErdSavedLayout keepOnly(Set<String> tables) => ErdSavedLayout(
@@ -58,6 +63,14 @@ class ErdSavedLayout {
           for (final e in headerColors.entries)
             if (tables.contains(e.key)) e.key: e.value,
         },
+        groups: [
+          for (final g in groups)
+            if (g.tables.any(tables.contains))
+              g.copyWith(tables: [
+                for (final t in g.tables)
+                  if (tables.contains(t)) t,
+              ]),
+        ],
       );
 
   Map<String, Object?> toJson() => {
@@ -73,6 +86,7 @@ class ErdSavedLayout {
         if (translation != null)
           'translation': [_round(translation!.dx), _round(translation!.dy)],
         if (headerColors.isNotEmpty) 'headerColors': headerColors,
+        if (groups.isNotEmpty) 'groups': [for (final g in groups) g.toJson()],
       };
 
   static double _round(double v) => (v * 10).roundToDouble() / 10;
@@ -108,6 +122,18 @@ class ErdSavedLayout {
         }
       }
     }
+    final groups = <ErdGroup>[];
+    final grouped = <String>{};
+    final rawGroups = json['groups'];
+    if (rawGroups is List) {
+      for (final raw in rawGroups) {
+        final g = ErdGroup.fromJson(raw);
+        if (g == null || groups.any((o) => o.id == g.id)) continue;
+        // A table in two groups keeps the first.
+        final tables = [for (final t in g.tables) if (grouped.add(t)) t];
+        if (tables.isNotEmpty) groups.add(g.copyWith(tables: tables));
+      }
+    }
     return ErdSavedLayout(
       positions: positions,
       collapsed: names(json['collapsed']),
@@ -120,6 +146,7 @@ class ErdSavedLayout {
       scale: scale is num && scale > 0 ? scale.toDouble() : null,
       translation: offset(json['translation']),
       headerColors: colors,
+      groups: groups,
     );
   }
 
@@ -134,6 +161,104 @@ class ErdSavedLayout {
   }
 }
 
+/// A named set of tables drawn in a coloured frame, as dbdiagram's table
+/// groups (#1282). [color] is a palette slot name ([erdHeaderSlots]).
+///
+/// The user's groups are saved with the layout; a schema group ([isSchema]) is
+/// made by the view when the diagram spans several schemas and is not saved.
+class ErdGroup {
+  const ErdGroup({
+    required this.id,
+    required this.name,
+    required this.color,
+    required this.tables,
+    this.note,
+  });
+
+  final String id;
+  final String name;
+  final String color;
+  final String? note;
+  final List<String> tables;
+
+  static const schemaPrefix = 'schema:';
+
+  bool get isSchema => id.startsWith(schemaPrefix);
+
+  ErdGroup copyWith({
+    String? name,
+    String? color,
+    List<String>? tables,
+    String? Function()? note,
+  }) =>
+      ErdGroup(
+        id: id,
+        name: name ?? this.name,
+        color: color ?? this.color,
+        tables: tables ?? this.tables,
+        note: note == null ? this.note : note(),
+      );
+
+  Map<String, Object?> toJson() => {
+        'id': id,
+        'name': name,
+        'color': color,
+        if (note != null) 'note': note,
+        'tables': tables,
+      };
+
+  /// Null unless [json] has an id, a name, a known colour and tables.
+  static ErdGroup? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final id = json['id'], name = json['name'], color = json['color'];
+    final note = json['note'], tables = json['tables'];
+    if (id is! String || id.isEmpty || id.startsWith(schemaPrefix)) {
+      return null;
+    }
+    if (name is! String || name.trim().isEmpty) return null;
+    if (color is! String || !erdHeaderSlots.contains(color)) return null;
+    if (tables is! List) return null;
+    final names = [
+      for (final t in tables)
+        if (t is String) t,
+    ];
+    if (names.isEmpty) return null;
+    return ErdGroup(
+      id: id,
+      name: name,
+      color: color,
+      tables: names.toSet().toList(),
+      note: note is String && note.trim().isNotEmpty ? note : null,
+    );
+  }
+}
+
+/// Groups by schema for the tables of [tables] that no group of [groups]
+/// holds, when they span more than one schema; none otherwise. A table of the
+/// current schema (no `schema.` prefix) gets no frame.
+List<ErdGroup> erdSchemaGroups(
+    Iterable<String> tables, List<ErdGroup> groups) {
+  final schemas = <String, List<String>>{};
+  for (final t in tables) {
+    final dot = t.indexOf('.');
+    schemas.putIfAbsent(dot <= 0 ? '' : t.substring(0, dot), () => []).add(t);
+  }
+  if (schemas.length < 2) return const [];
+  final grouped = {for (final g in groups) ...g.tables};
+  return [
+    for (final e in schemas.entries)
+      if (e.key.isNotEmpty)
+        if ([for (final t in e.value) if (!grouped.contains(t)) t]
+            case final free when free.isNotEmpty)
+          ErdGroup(
+            id: '${ErdGroup.schemaPrefix}${e.key}',
+            name: e.key,
+            color: erdSchemaSlot(e.key),
+            tables: free,
+          ),
+  ];
+}
+
 /// Palette slots a card header can take: the theme's five chart colours.
 const erdHeaderSlots = ['type1', 'type2', 'type3', 'type4', 'type5'];
 
@@ -145,7 +270,11 @@ String? erdHeaderSlot(String table, Map<String, String> picked) {
   if (chosen != null) return chosen;
   final dot = table.indexOf('.');
   if (dot <= 0) return null;
-  final schema = table.substring(0, dot);
+  return erdSchemaSlot(table.substring(0, dot));
+}
+
+/// The palette slot of a schema: the same for every table in it.
+String erdSchemaSlot(String schema) {
   var hash = 0;
   for (final unit in schema.codeUnits) {
     hash = (hash * 31 + unit) & 0x7fffffff;
