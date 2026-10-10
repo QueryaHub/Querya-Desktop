@@ -14,7 +14,7 @@ import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/features/workspace/query_plan.dart';
 
 /// Execution delegate for MySQL / MariaDB connections.
-class MysqlSqlExecutionDelegate extends SqlExecutionDelegate {
+class MysqlSqlExecutionDelegate extends BaseSqlExecutionDelegate {
   MysqlSqlExecutionDelegate({
     required this.connectionRow,
     required this.isReadOnly,
@@ -129,16 +129,13 @@ class MysqlSqlExecutionDelegate extends SqlExecutionDelegate {
       affected = _affectedInt(rs.affectedRows);
     }
 
-    String? statusMsg;
-    if (cols.isEmpty && outRows.isEmpty) {
-      statusMsg = affected != null
-          ? 'OK. Rows affected: $affected.'
-          : 'Command completed.';
-    } else {
-      statusMsg = truncated
-          ? 'Showing first $cap row(s) (result capped).'
-          : '$n row(s).';
-    }
+    final statusMsg = formatStatusMessage(
+      columnCount: cols.length,
+      rowCount: n,
+      affectedRows: affected,
+      isTruncated: truncated,
+      cap: cap,
+    );
 
     return SqlExecutionResult(
       columns: cols,

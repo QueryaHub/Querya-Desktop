@@ -21,7 +21,7 @@ String _pgSqlSessionDatabase(ConnectionRow row) {
 }
 
 /// Execution delegate for PostgreSQL connections.
-class PostgresSqlExecutionDelegate extends SqlExecutionDelegate {
+class PostgresSqlExecutionDelegate extends BaseSqlExecutionDelegate {
   PostgresSqlExecutionDelegate({
     required this.connectionRow,
     required this.isReadOnly,
@@ -139,14 +139,14 @@ class PostgresSqlExecutionDelegate extends SqlExecutionDelegate {
     );
 
     final isTruncated = result.length >= cap;
-    String? statusMsg;
-    if (cols.isEmpty && outRows.isEmpty) {
-      statusMsg = 'Command completed. Rows affected: ${result.affectedRows}.';
-    } else {
-      statusMsg = isTruncated
-          ? 'Showing first $cap row(s) (result capped).'
-          : '${result.length} row(s).';
-    }
+    final statusMsg = formatStatusMessage(
+      columnCount: cols.length,
+      rowCount: outRows.length,
+      affectedRows: result.affectedRows,
+      isTruncated: isTruncated,
+      cap: cap,
+      successPrefix: 'Command completed.',
+    );
 
     return SqlExecutionResult(
       columns: cols,
