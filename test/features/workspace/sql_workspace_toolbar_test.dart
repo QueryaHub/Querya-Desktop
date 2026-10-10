@@ -2,10 +2,8 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
-import 'package:querya_desktop/features/workspace/query_plan.dart';
 import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
 import 'package:querya_desktop/features/workspace/sql_query_tab_session.dart';
-import 'package:querya_desktop/features/workspace/sql_result_grid_schema.dart';
 import 'package:querya_desktop/features/workspace/sql_workspace_toolbar.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
@@ -39,7 +37,7 @@ void main() {
     return ShadcnApp(
       theme: ThemeData.dark(),
       home: QueryaThemeScope(
-        theme: QueryaTheme.darkDefault,
+        data: QueryaTheme.darkDefault,
         child: material.Scaffold(
           body: child,
         ),

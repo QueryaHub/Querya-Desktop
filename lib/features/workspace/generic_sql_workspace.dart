@@ -21,8 +21,6 @@ import 'package:querya_desktop/core/layout/vertical_split_pane.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/ui/querya_shell_status.dart';
-import 'package:querya_desktop/features/settings/preferences_dialog.dart';
-import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
 import 'package:querya_desktop/features/workspace/dml_preview_dialog.dart';
@@ -772,9 +770,6 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       if (!afterPlainRead) await refreshTxStatus();
     }
   }
-
-  /// Shortcut prefix shown in the run menu: ⌘ on macOS, Ctrl elsewhere.
-  static String get _modLabel => Platform.isMacOS ? '⌘' : 'Ctrl+';
 
   void _openHistory(SqlQueryTabSession session) {
     final cid = widget.connectionRow.id;

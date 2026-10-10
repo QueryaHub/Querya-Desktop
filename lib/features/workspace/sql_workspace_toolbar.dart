@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart' as material;
-import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
 import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
