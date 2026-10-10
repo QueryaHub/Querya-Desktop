@@ -203,7 +203,8 @@ void main() {
     expect(row, isNotNull);
     expect(row!.name, 'E2E Form SQLite');
     expect(row.host, path);
-    expect(inSidebar('E2E Form SQLite'), findsOneWidget);
+    // The sidebar reloads from the database after the save.
+    await waitFor(tester, inSidebar('E2E Form SQLite'), 'the new connection');
     await app.close(tester);
   });
 

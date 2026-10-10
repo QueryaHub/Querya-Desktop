@@ -91,7 +91,6 @@ import 'package:querya_desktop/features/mongodb/mongo_database_dialog.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
 import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
 import 'new_folder_dialog.dart';
-import 'remove_folder_dialog.dart';
 
 part 'connections_panel_sidebar.dart';
 part 'connections_panel_redis.dart';
@@ -734,23 +733,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     await _loadData();
   }
 
-  /// Removing a folder deletes the connections in it, so a folder that holds
-  /// some is confirmed first and their open sessions are closed.
+  /// Removes the folder; its connections stay in the list without one.
   Future<void> _removeFolder(String name) async {
-    final inside = _connections
-        .where((c) => c.folderId == _folderIdByName[name] && c.id != null)
-        .toList();
-    if (inside.isNotEmpty) {
-      final ok = await confirmRemoveFolder(
-        context,
-        name: name,
-        connectionCount: inside.length,
-      );
-      if (!ok || !mounted) return;
-      for (final c in inside) {
-        await _closeSessionsOf(c.id!);
-      }
-    }
     await FoldersStorage.instance.remove(name);
     if (mounted) await _loadData();
   }
