@@ -124,4 +124,43 @@ void main() {
       expect(svg, contains('fill="${const ErdSvgColors().header}"'));
     });
   });
+
+  testWidgets('a row shows UQ, AI and DF and lists them in its tooltip (#1277)',
+      (t) async {
+    await t.binding.setSurfaceSize(const material.Size(1200, 800));
+    addTearDown(() => t.binding.setSurfaceSize(null));
+    await t.pumpWidget(queryaThemeTestShell(
+      child: ErdView(
+        source: SqlErdSource(
+          delegate: FakeSqlExecutionDelegate(onExecute: (sql) {
+            if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+              return const SqlExecutionResult(rows: [
+                ['users', 'id', 'INTEGER', '1', '0', '0', 'NULL', '1'],
+                ['users', 'email', 'TEXT', '0', '0', '1', 'NULL', '0'],
+                ['users', 'status', 'TEXT', '0', '1', '0', "'new'", '0'],
+              ]);
+            }
+            return const SqlExecutionResult();
+          }),
+          dialect: SqlDialect.sqlite,
+        ),
+      ),
+    ));
+    await t.pump();
+    await t.pump();
+    expect(find.byKey(const material.ValueKey('erd_badge_users_id_AI')),
+        findsOneWidget);
+    expect(find.byKey(const material.ValueKey('erd_badge_users_email_UQ')),
+        findsOneWidget);
+    expect(find.byKey(const material.ValueKey('erd_badge_users_status_DF')),
+        findsOneWidget);
+    expect(find.byKey(const material.ValueKey('erd_badge_users_id_UQ')),
+        findsNothing);
+    final tip = t.widget<material.Tooltip>(find.ancestor(
+      of: find.byKey(const material.ValueKey('erd_badge_users_status_DF')),
+      matching: find.byType(material.Tooltip),
+    ));
+    expect(tip.message, contains("Default: 'new'"));
+    expect(tip.message, contains('Nullable'));
+  });
 }

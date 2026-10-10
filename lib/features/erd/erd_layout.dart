@@ -46,7 +46,10 @@ class ErdLayout {
     for (final c in t.columns) {
       final type = c.isNullable ? '${c.type}?' : c.type;
       // Padding 10 + marker slot 26, name, gap 8, type, padding 10.
-      final row = 54 + c.name.length * _nameCharPx + type.length * _typeCharPx;
+      final row = 54 +
+          c.name.length * _nameCharPx +
+          type.length * _typeCharPx +
+          c.badges.length * 18;
       if (row > w) w = row;
     }
     return w.clamp(minCardWidth, maxCardWidth).ceilToDouble();

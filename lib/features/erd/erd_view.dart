@@ -1366,6 +1366,17 @@ class _TableCard extends material.StatelessWidget {
   final void Function(material.Offset delta) onDragMove;
   final material.VoidCallback onDragEnd;
 
+  /// Everything a row knows, one fact a line.
+  static String _columnTip(ErdColumn c) => [
+        '${c.name}  ${c.type}',
+        if (c.isPrimaryKey) 'Primary key',
+        if (c.isForeignKey) 'Foreign key',
+        c.isNullable ? 'Nullable' : 'Not null',
+        if (c.isUnique && !c.isPrimaryKey) 'Unique',
+        if (c.isIdentity) 'Generated (identity / auto increment)',
+        if (c.defaultValue case final d?) 'Default: $d',
+      ].join('\n');
+
   /// Shadows read only on light surfaces, so a dark canvas gets twice the alpha.
   double _shadowAlpha(material.Color canvas) {
     final base = dragging ? 0.28 : 0.12;
@@ -1447,7 +1458,7 @@ class _TableCard extends material.StatelessWidget {
                     material.SizedBox(
                       height: ErdLayout.rowHeight,
                       child: material.Tooltip(
-                        message: '${c.name} ${c.type}',
+                        message: _columnTip(c),
                         child: material.Padding(
                           padding: const material.EdgeInsets.symmetric(
                               horizontal: 10),
@@ -1502,6 +1513,21 @@ class _TableCard extends material.StatelessWidget {
                                             QueryaTypography.monoFontFamilyFallback,
                                         color: wb.mutedForeground)),
                               ),
+                              // UQ / AI / DF after the type (#1277).
+                              for (final b in c.badges) ...[
+                                const material.SizedBox(width: 3),
+                                Text(b,
+                                    key: material.ValueKey(
+                                        'erd_badge_${table.name}_${c.name}_$b'),
+                                    style: material.TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: material.FontWeight.w700,
+                                        color: switch (b) {
+                                          'UQ' => palette.type3,
+                                          'AI' => palette.type4,
+                                          _ => wb.mutedForeground,
+                                        })),
+                              ],
                             ],
                           ),
                         ),

@@ -234,7 +234,11 @@ class ErdExport {
           b.writeln(_pill(x, rowTop, 'FK', colors.foreignKey));
         }
         final nameX = left + 10 + slot;
-        final type = c.isNullable ? '${c.type}?' : c.type;
+        // Type, then the UQ / AI / DF markers as on screen (#1277).
+        final type = [
+          c.isNullable ? '${c.type}?' : c.type,
+          ...c.badges,
+        ].join(' ');
         final typeWidth = min(type.length * _typeCharPx, typeAvail);
         final nameAvail = inner - slot - typeWidth - 6;
         b

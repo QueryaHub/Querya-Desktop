@@ -8,6 +8,9 @@ class ErdColumn {
     this.isPrimaryKey = false,
     this.isForeignKey = false,
     this.isNullable = false,
+    this.isUnique = false,
+    this.defaultValue,
+    this.isIdentity = false,
   });
 
   final String name;
@@ -16,12 +19,33 @@ class ErdColumn {
   final bool isForeignKey;
   final bool isNullable;
 
+  /// A single-column unique constraint or index on it (a primary key is not
+  /// counted: it is unique anyway).
+  final bool isUnique;
+
+  /// The default expression as the database prints it; null when none.
+  final String? defaultValue;
+
+  /// Filled by the database: identity, serial / sequence default,
+  /// auto_increment, or SQLite's INTEGER PRIMARY KEY.
+  final bool isIdentity;
+
+  /// Short markers after the type on a card and in exports (#1277).
+  List<String> get badges => [
+        if (isUnique && !isPrimaryKey) 'UQ',
+        if (isIdentity) 'AI',
+        if (defaultValue != null && !isIdentity) 'DF',
+      ];
+
   ErdColumn copyWith({bool? isForeignKey}) => ErdColumn(
         name: name,
         type: type,
         isPrimaryKey: isPrimaryKey,
         isForeignKey: isForeignKey ?? this.isForeignKey,
         isNullable: isNullable,
+        isUnique: isUnique,
+        defaultValue: defaultValue,
+        isIdentity: isIdentity,
       );
 }
 
@@ -70,8 +94,8 @@ class ErdSchema {
 
   /// Builds a schema from flat catalog rows.
   ///
-  /// [columnRows]: `table, column, type, isPk` and an optional fifth
-  /// `isNullable`. [fkRows]: `table, column, refTable, refColumn`. Relations to
+  /// [columnRows]: `table, column, type, isPk`, then optionally `isNullable`,
+  /// `isUnique`, `default` and `isIdentity` (#1277). [fkRows]: `table, column, refTable, refColumn`. Relations to
   /// unknown tables are dropped.
   factory ErdSchema.fromCatalog({
     required List<List<String>> columnRows,
@@ -91,6 +115,9 @@ class ErdSchema {
         type: r[2],
         isPrimaryKey: _truthy(r[3]),
         isNullable: r.length > 4 && _truthy(r[4]),
+        isUnique: r.length > 5 && _truthy(r[5]),
+        defaultValue: r.length > 6 ? _default(r[6]) : null,
+        isIdentity: r.length > 7 && _truthy(r[7]),
       ));
     }
     final nullable = {
@@ -134,4 +161,11 @@ class ErdSchema {
     final s = v.trim().toLowerCase();
     return s == '1' || s == 't' || s == 'true' || s == 'yes';
   }
+}
+
+/// A catalog default cell: empty and SQL NULL mean "no default".
+String? _default(String raw) {
+  final v = raw.trim();
+  if (v.isEmpty || v == 'NULL' || v.toLowerCase() == 'null') return null;
+  return v;
 }
