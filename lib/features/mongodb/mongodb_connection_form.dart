@@ -9,9 +9,10 @@ import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/features/connections/remove_saved_password_option.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
 import 'package:querya_desktop/features/connections/ssh_tunnel_section.dart';
+import 'package:querya_desktop/features/connections/forms/connection_auth_section.dart';
+import 'package:querya_desktop/features/connections/forms/connection_host_port_section.dart';
 import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
 import 'package:querya_desktop/shared/widgets/form_validity_notifier.dart';
 import 'package:querya_desktop/shared/widgets/ssl_certificate_fields.dart';
@@ -101,7 +102,6 @@ class _MongoConnectionFormContentState
   bool _useConnectionString = false;
   bool _useSSL = false;
   bool _removeSavedPassword = false;
-  bool _showPassword = false;
   bool _isTesting = false;
   String? _testResult;
   Timer? _dismissTimer;
@@ -472,92 +472,25 @@ class _MongoConnectionFormContentState
                       ),
                       const Gap(16),
                       // Host and Port
-                      material.Row(
-                        children: [
-                          material.Expanded(
-                            flex: 3,
-                            child: material.Column(
-                              crossAxisAlignment:
-                                  material.CrossAxisAlignment.stretch,
-                              mainAxisSize: material.MainAxisSize.min,
-                              children: [
-                                const Text('Host').small().semiBold(),
-                                const Gap(8),
-                                TextField(
-                                  controller: _hostController,
-                                  placeholder: const Text('localhost'),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Gap(12),
-                          material.Expanded(
-                            flex: 1,
-                            child: material.Column(
-                              crossAxisAlignment:
-                                  material.CrossAxisAlignment.stretch,
-                              mainAxisSize: material.MainAxisSize.min,
-                              children: [
-                                const Text('Port').small().semiBold(),
-                                const Gap(8),
-                                TextField(
-                                  controller: _portController,
-                                  placeholder: const Text('27017'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                      ConnectionHostPortSection(
+                        hostController: _hostController,
+                        portController: _portController,
+                        portPlaceholder: '27017',
+                        portFlex: 1,
+                        gap: 12,
                       ),
                       const Gap(16),
                       // Authentication
-                      const Text('Authentication (Optional)')
-                          .small()
-                          .semiBold(),
-                      const Gap(8),
-                      TextField(
-                        controller: _usernameController,
-                        placeholder: const Text('Username'),
-                      ),
-                      const Gap(12),
-                      if (_isEditing)
-                        RemoveSavedPasswordOption(
-                          value: _removeSavedPassword,
-                          onChanged: (v) =>
-                              setState(() => _removeSavedPassword = v),
-                        ),
-                      material.Stack(
-                        children: [
-                          TextField(
-                            controller: _passwordController,
-                            enabled: !_removeSavedPassword,
-                            placeholder: Text(
-                              _isEditing
-                                  ? 'Leave blank to keep existing'
-                                  : 'Password',
-                            ),
-                            obscureText: !_showPassword,
-                          ),
-                          material.Positioned(
-                            right: 8,
-                            top: 0,
-                            bottom: 0,
-                            child: material.Center(
-                              child: material.IconButton(
-                                icon: material.Icon(
-                                  _showPassword
-                                      ? material.Icons.visibility_off
-                                      : material.Icons.visibility,
-                                  size: 20,
-                                ),
-                                onPressed: () => setState(
-                                    () => _showPassword = !_showPassword),
-                                padding: material.EdgeInsets.zero,
-                                constraints: const material.BoxConstraints(),
-                              ),
-                            ),
-                          ),
-                        ],
+                      ConnectionAuthSection(
+                        usernameController: _usernameController,
+                        passwordController: _passwordController,
+                        usernameLabel: 'Authentication (Optional)',
+                        usernamePlaceholder: 'Username',
+                        isEditing: _isEditing,
+                        removeSavedPassword: _removeSavedPassword,
+                        onRemoveSavedPasswordChanged: (v) =>
+                            setState(() => _removeSavedPassword = v),
+                        useRowLayout: false,
                       ),
                       const Gap(16),
                       // Database and Auth Source
