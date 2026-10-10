@@ -13,6 +13,7 @@ import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/settings/preferences_shortcuts_section.dart';
 import 'package:querya_desktop/features/workspace/generic_sql_workspace.dart';
+import 'package:querya_desktop/features/workspace/results_tab.dart' show formatResultElapsed;
 import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' show OutlineButton;
 
@@ -364,6 +365,41 @@ void main() {
     expect(run, findsOneWidget);
     expect(session, findsOneWidget);
     expect(tester.getCenter(session).dy, closeTo(tester.getCenter(run).dy, 1));
+  });
+
+  testWidgets('below the breakpoint the labels hide and the icons stay',
+      timeout: _timeout, (tester) async {
+    await pumpWorkspace(tester, FakeSqlExecutionDelegate());
+    expect(find.text('Execute (F5)'), findsOneWidget);
+    expect(find.text('Explain'), findsOneWidget);
+
+    await tester.binding.setSurfaceSize(const material.Size(800, 700));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Execute (F5)'), findsNothing);
+    expect(find.text('Explain'), findsNothing);
+    expect(find.byKey(const material.ValueKey('run_script')), findsOneWidget);
+    expect(find.byKey(const material.ValueKey('explain_query')), findsOneWidget);
+    expect(find.byTooltip('Show the query plan'), findsOneWidget);
+    expect(find.byTooltip('Execute (F5)'), findsOneWidget);
+  });
+
+  testWidgets('the results toolbar shows how long the query took',
+      timeout: _timeout, (tester) async {
+    final delegate = FakeSqlExecutionDelegate();
+    await pumpWorkspace(tester, delegate, initialSql: 'SELECT n FROM t');
+    expect(find.byKey(const material.ValueKey('result_elapsed')), findsNothing);
+
+    await tester.tap(find.widgetWithText(OutlineButton, 'Execute (F5)'));
+    await settle(tester);
+
+    expect(find.byKey(const material.ValueKey('result_elapsed')), findsOneWidget);
+  });
+
+  test('the elapsed badge reads ms, s and min', () {
+    expect(formatResultElapsed(const Duration(milliseconds: 14)), '14 ms');
+    expect(formatResultElapsed(const Duration(milliseconds: 1234)), '1.2 s');
+    expect(formatResultElapsed(const Duration(seconds: 125)), '2 min 5 s');
   });
 
   testWidgets('no Query caption and no Data Output bar above the results',

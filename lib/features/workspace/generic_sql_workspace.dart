@@ -661,6 +661,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       session.rows = [];
       session.affectedRows = null;
       session.statusLine = null;
+      session.elapsed = null;
       session.planRoot = null;
       session.resultGridPrimaryKeys = const [];
       session.resultGridColumnDataTypes = null;
@@ -756,6 +757,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
         session.stagingBuffer = null;
         session.statusLine = scriptStatus ??
             _resultStatus(result, cols, outRows, null);
+        session.elapsed = multi ? sw.elapsed : result.elapsed ?? sw.elapsed;
         session.running = false;
       });
       // Anything that is not a read may change table shapes: forget the cache.
@@ -903,6 +905,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       session.rows = [];
       session.affectedRows = null;
       session.statusLine = null;
+      session.elapsed = null;
       session.planRoot = null;
       session.resultGridPrimaryKeys = const [];
       session.resultGridColumnDataTypes = null;
@@ -1322,6 +1325,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
               isLoading: session.running,
               affectedRows: session.affectedRows,
               statusLine: session.statusLine,
+              elapsed: session.elapsed,
               stagingBuffer: session.stagingBuffer,
               columnDataTypes: session.resultGridColumnDataTypes,
               onApplyChanges: widget.isReadOnly ||
@@ -1349,7 +1353,12 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
   ) {
     final accent = context.workbench.accent;
     final historyEnabled = widget.connectionRow.id != null && !session.running;
-    return material.SingleChildScrollView(
+    return material.LayoutBuilder(
+      builder: (context, constraints) {
+        // Below the breakpoint the labels hide and the icons stay (the
+        // tooltips name them), so the toolbar stays on one row.
+        final compact = constraints.maxWidth < _toolbarCompactWidth;
+        return material.SingleChildScrollView(
       scrollDirection: material.Axis.horizontal,
       child: material.Row(
         children: [
@@ -1361,6 +1370,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
             key: const material.ValueKey('run_script'),
             label: 'Execute (F5)',
             icon: material.Icons.play_arrow_rounded,
+            compact: compact,
             loading: session.running,
             onPressed: () => execute(session),
           ),
@@ -1395,6 +1405,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
               key: const material.ValueKey('explain_query'),
               label: 'Explain',
               icon: material.Icons.account_tree_outlined,
+            compact: compact,
               tooltip: 'Show the query plan',
               onPressed: session.running ? null : () => explain(session),
             ),
@@ -1405,6 +1416,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
               key: const material.ValueKey('cancel_query'),
               label: 'Cancel',
               icon: material.Icons.stop_rounded,
+            compact: compact,
               isDestructive: true,
               tooltip: 'Interrupt the running query',
               onPressed: () => cancelRunning(session),
@@ -1480,10 +1492,12 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
                       material.Icon(material.Icons.tune_rounded,
                           size: 16, color: accent),
                       const material.SizedBox(width: 6),
-                      Text(_autocommit
-                          ? 'Session · auto-commit'
-                          : 'Session · manual'),
-                      const material.SizedBox(width: 4),
+                      if (!compact) ...[
+                        Text(_autocommit
+                            ? 'Session · auto-commit'
+                            : 'Session · manual'),
+                        const material.SizedBox(width: 4),
+                      ],
                       material.Icon(material.Icons.expand_more_rounded,
                           size: 16, color: accent),
                     ],
@@ -1499,7 +1513,12 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
         ],
       ),
     );
+      },
+    );
   }
+
+  /// Toolbar width below which button labels hide and only icons stay.
+  static const double _toolbarCompactWidth = 900;
 
   /// Transaction state as a badge: an open transaction is a warning, because
   /// work can be lost, and looks different from no transaction.

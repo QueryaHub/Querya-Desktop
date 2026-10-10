@@ -20,6 +20,7 @@ class QueryaActionButton extends material.StatelessWidget {
     this.isDestructive = false,
     this.tooltip,
     this.size = ButtonSize.normal,
+    this.compact = false,
   });
 
   final String label;
@@ -38,6 +39,10 @@ class QueryaActionButton extends material.StatelessWidget {
   final String? tooltip;
   final ButtonSize size;
 
+  /// Hides the label and keeps the icon (narrow toolbars). The label becomes
+  /// the tooltip when none is set. Without an [icon], [compact] has no effect.
+  final bool compact;
+
   @override
   material.Widget build(material.BuildContext context) {
     final workbench = context.workbench;
@@ -51,18 +56,24 @@ class QueryaActionButton extends material.StatelessWidget {
       leading = material.Icon(icon, size: 18, color: tone);
     }
 
+    final iconOnly = compact && leading != null;
     material.Widget button = OutlineButton(
       size: size,
       onPressed: enabled ? onPressed : null,
       leading: leading,
-      child: isDestructive
-          ? Text(label, style: material.TextStyle(color: tone))
-          : Text(label),
+      child: iconOnly
+          ? const material.SizedBox.shrink()
+          : isDestructive
+              ? Text(label, style: material.TextStyle(color: tone))
+              : Text(label),
     );
 
-    if (tooltip != null && tooltip!.isNotEmpty) {
+    final hint = (tooltip != null && tooltip!.isNotEmpty)
+        ? tooltip!
+        : (iconOnly ? label : null);
+    if (hint != null) {
       button = material.Tooltip(
-        message: tooltip!,
+        message: hint,
         waitDuration: kQueryaTooltipWait,
         child: button,
       );
