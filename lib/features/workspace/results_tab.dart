@@ -404,15 +404,15 @@ class _ResultsTabState extends material.State<ResultsTab> {
                   mainAxisSize: material.MainAxisSize.min,
                   children: [
                     // Grid / Groupings View Selector
-                    material.SizedBox(
-                      height: 32,
-                      width: 240,
-                      child: QueryaTabStrip(
-                        labels: const ['Grid', 'Groupings', 'Charts'],
-                        selectedIndex: ResultViewMode.values.indexOf(_viewMode),
-                        onSelected: (i) =>
-                            setState(() => _viewMode = ResultViewMode.values[i]),
-                      ),
+                    // Sized by its labels: a fixed box clipped the tabs and
+                    // let "Groupings" run into its neighbours at larger UI
+                    // scales.
+                    QueryaTabStrip(
+                      dense: true,
+                      labels: const ['Grid', 'Groupings', 'Charts'],
+                      selectedIndex: ResultViewMode.values.indexOf(_viewMode),
+                      onSelected: (i) =>
+                          setState(() => _viewMode = ResultViewMode.values[i]),
                     ),
                     const Gap(10),
                     Text(
