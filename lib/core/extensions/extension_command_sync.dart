@@ -10,7 +10,6 @@ import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/extensions/rpc/json_rpc_stdio_client.dart';
 import 'package:querya_desktop/core/extensions/rpc/plugin_rpc_exceptions.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/features/extensions/extension_connection_picker_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Pushes [ExtensionManifest.contributedCommands] into [QueryaCommandRegistry].
@@ -40,6 +39,16 @@ class ExtensionCommandSync {
     List<ConnectionRow> candidates,
     BuildContext context,
   )? pickerOverride;
+
+  /// Shows the connection picker for an ambiguous target and returns the chosen
+  /// connection id, or null if the user cancelled. The dialog lives in
+  /// `features/`, so the app installs it at startup (`lib/app/app_wiring.dart`).
+  Future<int?> Function({
+    required BuildContext context,
+    required String extensionName,
+    required String commandTitle,
+    required List<ConnectionRow> connections,
+  })? connectionPicker;
 
   /// Test/DI override for target resolution — bypasses the live-session
   /// lookup (which needs a real driver process to populate) so the
@@ -170,8 +179,9 @@ class ExtensionCommandSync {
       return override(manifest, command, candidates, context);
     }
 
-    if (candidates.isEmpty) return null;
-    return showExtensionConnectionPickerDialog(
+    final picker = connectionPicker;
+    if (candidates.isEmpty || picker == null) return null;
+    return picker(
       context: context,
       extensionName: manifest.name,
       commandTitle: command.title,

@@ -6,7 +6,7 @@ import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/mcp/mcp_access_store.dart';
 import 'package:querya_desktop/core/mcp/mcp_query_service.dart';
 import 'package:querya_desktop/core/mcp/mcp_redaction.dart';
-import 'package:querya_desktop/core/mcp/mcp_sql_delegates.dart';
+import 'package:querya_desktop/app/mcp_sql_delegates.dart';
 import 'package:querya_desktop/core/mcp/mcp_sql_guard.dart';
 import 'package:querya_desktop/core/mcp/querya_mcp_server.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
