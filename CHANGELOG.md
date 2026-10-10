@@ -46,6 +46,15 @@ Everything merged to `dev` since 0.4.18: the NoSQL workbench, SSH tunnelling and
 - **Fit to screen, zoom controls, table search, click to select (#1154)**; keys-only density, collapse and hide per table, card menu (#1155); Export menu and labelled states (#1157).
 - **Data | Relations view in the table browser (#1149)** and the palette commands `Table: Show relations` / `Table: Show data`.
 - **The diagram reads the catalog on its own read-only session (#1218)**; the PostgreSQL catalog comes from `pg_catalog` (#1167).
+- **The diagram keeps its layout (#1275)** — card positions, collapsed and hidden tables, detail level, zoom and pan, per connection and database, in Querya's own storage.
+- **Cards sized to their content, header colour by schema or per table (#1276)**; **Names / Keys / All detail levels on the toolbar (#1278)**.
+- **Column markers (#1277)** — `?` for nullable, `UQ`, `AI` (identity or sequence), `DF` (default) after the type, with the default in the tooltip.
+- **Comments and enums (#1279, #1280)** — table and column comments from the database as notes; enum values and a domain's base type, from PostgreSQL and MySQL.
+- **Relationship kinds (#1281)** — one-to-one ends drawn as a bar, `1` / `*` labels, a click on an edge picks the relationship, many-to-many link tables marked `M:N`.
+- **Table groups (#1282)** — Shift / Ctrl / Cmd + click, then *Group*: a named, coloured frame with a note that follows its cards; its title drags the group; a frame per schema when the diagram spans several; Auto layout keeps a group together.
+- **Sticky notes (#1283)** — Markdown-light text, colour, resize, optionally attached to a table so it moves with it.
+- **Saved views (#1284)** — name the set of shown tables, groups, notes and viewport; switch from the toolbar; *All tables* is always there.
+- **DBML and PDF export (#1285)** — DBML (file or clipboard) with keys, defaults, enums, refs, groups and notes; one-page PDF in A4 or A3.
 
 **SQL workspace**
 
