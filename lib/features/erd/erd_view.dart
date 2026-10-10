@@ -28,17 +28,18 @@ import 'package:querya_desktop/core/erd/erd_model.dart';
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
 import 'package:querya_desktop/core/erd/erd_router.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_edge_tip_label.dart';
+import 'package:querya_desktop/features/erd/widgets/erd_export_menu.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_group_frame.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_relation_painter.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_search_panel.dart';
+import 'package:querya_desktop/features/erd/widgets/erd_status_body.dart';
+import 'package:querya_desktop/features/erd/widgets/erd_table_menu.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_views_menu.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_table_card.dart';
 import 'package:querya_desktop/core/export/image_pdf.dart';
 import 'package:querya_desktop/core/export/svg_png.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/shared/widgets/app_toast.dart';
-import 'package:querya_desktop/shared/widgets/querya_action_menu.dart';
-import 'package:querya_desktop/shared/widgets/querya_empty_state.dart';
 import 'package:querya_desktop/features/workspace/sql_editor_chrome.dart';
 import 'package:querya_desktop/shared/widgets/querya_action_button.dart';
 import 'package:querya_desktop/shared/widgets/querya_spinner.dart';
@@ -67,19 +68,6 @@ Future<void> defaultErdFileSaver(String name, Uint8List bytes) async {
 }
 
 /// Interactive entity-relationship diagram of the connected database.
-/// Entries of the diagram's Export menu.
-enum _ExportAction {
-  mermaid,
-  svg,
-  png,
-  pdfA4,
-  pdfA3,
-  dbml,
-  copyMermaid,
-  copyDbml,
-  toggleTheme,
-}
-
 class ErdView extends material.StatefulWidget {
   const ErdView({
     super.key,
@@ -1617,32 +1605,32 @@ class _ErdViewState extends material.State<ErdView> {
   String get _fileStem =>
       widget.databaseName.isEmpty ? 'erd' : '${widget.databaseName}-erd';
 
-  void _export(_ExportAction action, ErdSchema schema, ErdLayout layout) {
+  void _export(ErdExportAction action, ErdSchema schema, ErdLayout layout) {
     switch (action) {
-      case _ExportAction.mermaid:
+      case ErdExportAction.mermaid:
         _save(
             '$_fileStem.mmd',
             Uint8List.fromList(utf8.encode(ErdExport.toMermaid(schema))));
-      case _ExportAction.svg:
+      case ErdExportAction.svg:
         unawaited(_exportSvg(schema, layout));
-      case _ExportAction.png:
+      case ErdExportAction.png:
         unawaited(_exportPng(schema, layout));
-      case _ExportAction.pdfA4:
+      case ErdExportAction.pdfA4:
         unawaited(_exportPdf(schema, layout, PdfPaper.a4));
-      case _ExportAction.pdfA3:
+      case ErdExportAction.pdfA3:
         unawaited(_exportPdf(schema, layout, PdfPaper.a3));
-      case _ExportAction.dbml:
+      case ErdExportAction.dbml:
         _save('$_fileStem.dbml',
             Uint8List.fromList(utf8.encode(_dbml(schema))));
-      case _ExportAction.copyDbml:
+      case ErdExportAction.copyDbml:
         Clipboard.setData(ClipboardData(text: _dbml(schema)));
         showAppToast(
           context: context,
           message: 'DBML copied to the clipboard',
         );
-      case _ExportAction.toggleTheme:
+      case ErdExportAction.toggleTheme:
         unawaited(_toggleExportTheme());
-      case _ExportAction.copyMermaid:
+      case ErdExportAction.copyMermaid:
         Clipboard.setData(ClipboardData(text: ErdExport.toMermaid(schema)));
         showAppToast(
           context: context,
@@ -1709,57 +1697,21 @@ class _ErdViewState extends material.State<ErdView> {
       body = const material.Center(
           child: QueryaSpinner(label: 'Loading schema…'));
     } else if (_error != null) {
-      body = material.Center(
-        child: QueryaEmptyState(
-          icon: material.Icon(material.Icons.error_outline_rounded,
-              color: wb.destructive),
-          title: 'Could not load the schema',
-          description: _error,
-          actionLabel: 'Retry',
-          onAction: _load,
-        ),
-      );
+      body = ErdStatusBody.error(context, message: _error, onRetry: _load);
     } else if (full != null && full.tables.isNotEmpty && schema!.isEmpty) {
       // Every table was hidden from the diagram: they exist, so say so and
       // offer them back instead of "No tables found".
-      body = material.Center(
-        child: QueryaEmptyState(
-          icon: material.Icon(material.Icons.visibility_off_outlined,
-              color: wb.mutedForeground),
-          title: 'All tables are hidden',
-          description: '${_hidden.length} '
-              '${_hidden.length == 1 ? 'table is' : 'tables are'} hidden '
-              'from the diagram.',
-          actionLabel: 'Show all tables',
-          onAction: _showAllTables,
-        ),
-      );
+      body = ErdStatusBody.allHidden(context,
+          hiddenCount: _hidden.length, onShowAll: _showAllTables);
     } else if (schema == null || layout == null || schema.isEmpty) {
-      final db = widget.databaseName;
-      body = material.Center(
-        child: QueryaEmptyState(
-          icon: material.Icon(material.Icons.table_chart_outlined,
-              color: wb.mutedForeground),
-          title: 'No tables found',
-          description: db.isEmpty
-              ? 'This schema has no tables, or this role cannot see them.'
-              : 'The current schema of $db has no tables, or this role '
-                  'cannot see them.',
-        ),
-      );
+      body = ErdStatusBody.noTables(context,
+          databaseName: widget.databaseName);
     } else if (widget.neighbourhoodDepth != null &&
         widget.focusTable != null &&
         schema.relations.isEmpty) {
-      body = material.Center(
-        child: QueryaEmptyState(
-          icon: material.Icon(material.Icons.link_off_rounded,
-              color: wb.mutedForeground),
-          title: 'No foreign keys to or from ${widget.focusTable}',
-          description: 'This table has no relations within the schema.',
-          actionLabel: 'Open full diagram',
-          onAction: widget.onOpenFullDiagram,
-        ),
-      );
+      body = ErdStatusBody.noRelations(context,
+          focusTable: widget.focusTable,
+          onOpenFullDiagram: widget.onOpenFullDiagram);
     } else {
       body = material.CallbackShortcuts(
         bindings: _bindings(),
@@ -1830,74 +1782,20 @@ class _ErdViewState extends material.State<ErdView> {
                                   // Unrelated cards fade while a table is picked.
                                   opacity: focus.faded ? 0.35 : 1,
                                   child: ContextMenu(
-                                  items: [
-                                    if (widget.onOpenTable case final open?)
-                                      MenuButton(
-                                        key: material.ValueKey(
-                                            'erd_menu_open_${t.name}'),
-                                        onPressed: (_) => open(t.name),
-                                        child: const Text('Open data'),
-                                      ),
-                                    if (widget.onOpenInSql case final inSql?)
-                                      MenuButton(
-                                        key: material.ValueKey(
-                                            'erd_menu_sql_${t.name}'),
-                                        onPressed: (_) => inSql(t.name),
-                                        child: const Text('Open in SQL'),
-                                      ),
-                                    if (widget.onShowRelations
-                                        case final relations?)
-                                      MenuButton(
-                                        key: material.ValueKey(
-                                            'erd_menu_relations_${t.name}'),
-                                        onPressed: (_) => relations(t.name),
-                                        child: const Text('Show relations'),
-                                      ),
-                                    MenuButton(
-                                      onPressed: (_) {
-                                        Clipboard.setData(
-                                            ClipboardData(text: t.name));
-                                      },
-                                      child: const Text('Copy name'),
-                                    ),
-                                    MenuButton(
-                                      onPressed: (_) => _toggleCollapsed(t.name),
-                                      child: Text(_collapsed.contains(t.name)
-                                          ? 'Expand'
-                                          : 'Collapse'),
-                                    ),
-                                    MenuButton(
-                                      onPressed: (_) => _hide(t.name),
-                                      child: const Text('Hide from diagram'),
-                                    ),
-                                    ..._groupMenu(t.name),
-                                    MenuButton(
-                                      key: material.ValueKey(
-                                          'erd_menu_colour_${t.name}'),
-                                      subMenu: [
-                                        MenuButton(
-                                          onPressed: (_) =>
-                                              _setHeaderColor(t.name, null),
-                                          child: const Text('Default'),
-                                        ),
-                                        for (var i = 0;
-                                            i < erdHeaderSlots.length;
-                                            i++)
-                                          MenuButton(
-                                            leading: material.Icon(
-                                              material.Icons.circle,
-                                              size: 12,
-                                              color: _slotColor(
-                                                  erdHeaderSlots[i]),
-                                            ),
-                                            onPressed: (_) => _setHeaderColor(
-                                                t.name, erdHeaderSlots[i]),
-                                            child: Text('Colour ${i + 1}'),
-                                          ),
-                                      ],
-                                      child: const Text('Header colour'),
-                                    ),
-                                  ],
+                                  items: ErdTableMenu.items(
+                                    table: t.name,
+                                    onOpenData: widget.onOpenTable,
+                                    onOpenInSql: widget.onOpenInSql,
+                                    onShowRelations: widget.onShowRelations,
+                                    collapsed: _collapsed.contains(t.name),
+                                    onToggleCollapsed: () =>
+                                        _toggleCollapsed(t.name),
+                                    onHide: () => _hide(t.name),
+                                    groupItems: _groupMenu(t.name),
+                                    slotColor: _slotColor,
+                                    onHeaderColor: (slot) =>
+                                        _setHeaderColor(t.name, slot),
+                                  ),
                                   child: ErdTableCard(
                                   table: t,
                                   width: layout.widthFor(t.name),
@@ -2063,76 +1961,12 @@ class _ErdViewState extends material.State<ErdView> {
                 ignoring: !ready,
                 child: material.Opacity(
                   opacity: ready ? 1 : 0.5,
-                  child: QueryaActionMenu<_ExportAction>(
-                    items: const [
-                      QueryaActionMenuItem(
-                        value: _ExportAction.toggleTheme,
-                        label: 'Toggle export theme (light / current)',
-                        icon: material.Icons.palette_outlined,
-                      ),
-                      QueryaActionMenuItem(
-                        value: _ExportAction.mermaid,
-                        label: 'Mermaid (.mmd)',
-                        icon: material.Icons.account_tree_outlined,
-                      ),
-                      QueryaActionMenuItem(
-                        value: _ExportAction.svg,
-                        label: 'SVG',
-                        icon: material.Icons.polyline_outlined,
-                      ),
-                      QueryaActionMenuItem(
-                        value: _ExportAction.png,
-                        label: 'PNG',
-                        icon: material.Icons.image_outlined,
-                      ),
-                      QueryaActionMenuItem(
-                        value: _ExportAction.pdfA4,
-                        label: 'PDF (A4)',
-                        icon: material.Icons.picture_as_pdf_outlined,
-                      ),
-                      QueryaActionMenuItem(
-                        value: _ExportAction.pdfA3,
-                        label: 'PDF (A3)',
-                        icon: material.Icons.picture_as_pdf_outlined,
-                      ),
-                      QueryaActionMenuItem(
-                        value: _ExportAction.dbml,
-                        label: 'DBML (.dbml)',
-                        icon: material.Icons.code_rounded,
-                      ),
-                      QueryaActionMenuItem(
-                        value: _ExportAction.copyDbml,
-                        label: 'Copy DBML',
-                        icon: material.Icons.content_copy_rounded,
-                      ),
-                      QueryaActionMenuItem(
-                        value: _ExportAction.copyMermaid,
-                        label: 'Copy Mermaid',
-                        icon: material.Icons.content_copy_rounded,
-                      ),
-                    ],
+                  child: ErdExportMenu(
                     onSelected: (action) {
                       if (schema != null && layout != null) {
                         _export(action, schema, layout);
                       }
                     },
-                    child: material.Padding(
-                      key: const material.ValueKey('erd_export'),
-                      padding: const material.EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      child: material.Row(
-                        mainAxisSize: material.MainAxisSize.min,
-                        children: [
-                          material.Icon(material.Icons.file_download_outlined,
-                              size: 16, color: wb.mutedForeground),
-                          const material.SizedBox(width: 6),
-                          const Text('Export'),
-                          const material.SizedBox(width: 4),
-                          material.Icon(material.Icons.expand_more_rounded,
-                              size: 16, color: wb.mutedForeground),
-                        ],
-                      ),
-                    ),
                   ),
                 ),
               ),
