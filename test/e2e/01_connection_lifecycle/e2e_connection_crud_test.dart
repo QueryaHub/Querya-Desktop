@@ -168,23 +168,20 @@ void main() {
     // The panel reloads from the database after the drop (real I/O); the tile
     // is under its folder once it has. Dragging before that starts from the
     // old layout with the old folder.
+    // The panel reloads from the database after the drop (real I/O). Until it
+    // has, it still holds the connection outside the folder: a drag started
+    // then has nothing to take out. (Its tile's position says nothing here:
+    // folders are listed first, so a top-level tile is below them too.)
+    final panel =
+        tester.state<ConnectionsPanelState>(find.byType(ConnectionsPanel));
     for (var i = 0; i < 40; i++) {
-      final tile = inSidebar('E2E Dragged');
-      final folder = inSidebar('Team D');
-      if (tile.evaluate().isNotEmpty &&
-          folder.evaluate().isNotEmpty &&
-          tester.getCenter(tile.first).dy > tester.getCenter(folder.first).dy) {
-        break;
-      }
+      if (panel.connectionFoldersForTesting[id] == folderId) break;
       await tester.runAsync(
           () => Future<void>.delayed(const Duration(milliseconds: 50)));
       await tester.pump(const Duration(milliseconds: 100));
     }
-    expect(
-      tester.getCenter(inSidebar('E2E Dragged').first).dy,
-      greaterThan(tester.getCenter(inSidebar('Team D').first).dy),
-      reason: 'the connection is listed under its folder',
-    );
+    expect(panel.connectionFoldersForTesting[id], folderId,
+        reason: 'the panel reloaded after the drop');
     // The folder is still unfolding (an animated, clipped height): a press on
     // a half-revealed tile lands on whatever is behind it.
     await tester.pump(const Duration(milliseconds: 600));
