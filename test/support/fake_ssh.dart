@@ -53,6 +53,12 @@ class FakeSshServer {
   /// Every client the manager built, in order.
   final clients = <FakeSshClient>[];
 
+  /// Every socket created by connect, in order.
+  final sockets = <FakeSshSocket>[];
+
+  /// If non-null, forwardLocal throws this error.
+  Object? failForwardLocal;
+
   Future<SSHSocket> connect(
     String host,
     int port, {
@@ -62,7 +68,9 @@ class FakeSshServer {
     final delay = connectDelay;
     if (delay != null) await Future<void>.delayed(delay);
     if (failConnect) throw StateError('connect to $host:$port failed');
-    return FakeSshSocket();
+    final s = FakeSshSocket();
+    sockets.add(s);
+    return s;
   }
 
   SSHClient build(
@@ -94,6 +102,9 @@ class FakeSshSocket implements SSHSocket {
   // ignore: close_sinks
   final _out = StreamController<List<int>>();
 
+  var isClosed = false;
+  var isDestroyed = false;
+
   @override
   Stream<Uint8List> get stream => _in.stream;
 
@@ -104,10 +115,15 @@ class FakeSshSocket implements SSHSocket {
   Future<void> get done => Future<void>.value();
 
   @override
-  Future<void> close() async {}
+  Future<void> close() async {
+    isClosed = true;
+  }
 
   @override
-  void destroy() {}
+  void destroy() {
+    isDestroyed = true;
+    isClosed = true;
+  }
 
   @override
   Future<void> flush() async {}
@@ -218,6 +234,8 @@ class FakeSshClient implements SSHClient {
     int localPort = 0,
   }) async {
     if (_closed) throw StateError('client closed');
+    final fail = server.failForwardLocal;
+    if (fail != null) throw fail;
     forwards.add((host: remoteHost, port: remotePort));
     return _EchoForwardChannel(received);
   }
