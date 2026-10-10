@@ -1343,5 +1343,50 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
-}
 
+  group('result view tabs', () {
+    testWidgets(
+        'Grid, Groupings and Charts sit side by side at any text scale',
+        (tester) async {
+      for (final scale in [1.0, 1.3, 1.6]) {
+        await tester.pumpWidget(
+          material.MediaQuery(
+            data: material.MediaQueryData(
+              size: const material.Size(900, 500),
+              textScaler: material.TextScaler.linear(scale),
+            ),
+            child: resultsShell(
+              child: material.Scaffold(
+                body: material.SizedBox(
+                  width: 900,
+                  height: 500,
+                  child: ResultsTab(
+                    columns: const ['id', 'name'],
+                    rows: const [
+                      ['1', 'Alice'],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final grid =
+            tester.getRect(find.byKey(const material.ValueKey('querya_tab_Grid')));
+        final groupings = tester.getRect(
+            find.byKey(const material.ValueKey('querya_tab_Groupings')));
+        final charts = tester.getRect(
+            find.byKey(const material.ValueKey('querya_tab_Charts')));
+
+        expect(grid.right, lessThanOrEqualTo(groupings.left), reason: 'x$scale');
+        expect(groupings.right, lessThanOrEqualTo(charts.left),
+            reason: 'x$scale');
+        // The tabs are as tall as their own content: nothing is clipped by a
+        // box that is shorter than them.
+        expect(tester.takeException(), isNull, reason: 'x$scale');
+      }
+    });
+  });
+}

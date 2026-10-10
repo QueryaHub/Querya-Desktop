@@ -25,6 +25,7 @@ class QueryaTabStrip extends material.StatefulWidget {
     this.onAdd,
     this.canClose,
     this.scrollController,
+    this.dense = false,
   }) : assert(labels.length > 0);
 
   final List<String> labels;
@@ -34,6 +35,10 @@ class QueryaTabStrip extends material.StatefulWidget {
   final material.VoidCallback? onAdd;
   final bool Function(int index)? canClose;
   final material.ScrollController? scrollController;
+
+  /// Tighter vertical padding for toolbars: the strip is as tall as a dense
+  /// icon button instead of a full tab row.
+  final bool dense;
 
   @override
   material.State<QueryaTabStrip> createState() => QueryaTabStripState();
@@ -268,7 +273,7 @@ class QueryaTabStripState extends material.State<QueryaTabStrip>
                           curve: context.motionCurve(QueryaMotion.enter),
                           padding: material.EdgeInsets.symmetric(
                             horizontal: showClose ? 10 : 12,
-                            vertical: 8,
+                            vertical: widget.dense ? 4 : 8,
                           ),
                           decoration: material.BoxDecoration(
                             color: material.Colors.transparent,

@@ -295,20 +295,17 @@ class _QuickChartViewState extends material.State<QuickChartView> {
             runSpacing: 8,
             crossAxisAlignment: material.WrapCrossAlignment.center,
             children: [
-              material.SizedBox(
-                height: 32,
-                width: 260,
-                child: QueryaTabStrip(
-                  labels: const ['Bar', 'Line', 'Pie'],
-                  selectedIndex: QuickChartType.values.indexOf(_type),
-                  onSelected: (i) => setState(() {
-                    _type = QuickChartType.values[i];
-                    _topN = _type == QuickChartType.pie
-                        ? ChartData.pieTopN
-                        : ChartData.defaultTopN;
-                    _hoveredSlice = null;
-                  }),
-                ),
+              QueryaTabStrip(
+                dense: true,
+                labels: const ['Bar', 'Line', 'Pie'],
+                selectedIndex: QuickChartType.values.indexOf(_type),
+                onSelected: (i) => setState(() {
+                  _type = QuickChartType.values[i];
+                  _topN = _type == QuickChartType.pie
+                      ? ChartData.pieTopN
+                      : ChartData.defaultTopN;
+                  _hoveredSlice = null;
+                }),
               ),
               const material.SizedBox(width: 12),
               Text(_xLabel),
