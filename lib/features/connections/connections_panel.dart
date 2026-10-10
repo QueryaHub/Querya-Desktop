@@ -1230,8 +1230,11 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
               // While a connection from a folder is dragged, a labelled place
               // to drop it: the empty part of the list works too, but nobody
               // would know.
-              if (_draggedId != null && _acceptsDrop(_draggedId!, null))
-                material.DragTarget<int>(
+              // A fixed slot: inserting and removing a child here would shift
+              // the list below it, and rebuilding it drops the tile that is
+              // being dragged (and the drag with it).
+              _draggedId != null && _acceptsDrop(_draggedId!, null)
+                  ? material.DragTarget<int>(
                   onWillAcceptWithDetails: (d) => _acceptsDrop(d.data, null),
                   onAcceptWithDetails: (d) => _dropConnection(d.data, null),
                   builder: (context, candidates, _) => material.Container(
@@ -1258,7 +1261,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                       ),
                     ),
                   ),
-                ),
+                )
+                  : const material.SizedBox.shrink(),
               Expanded(
                 child: material.RepaintBoundary(
                   child: material.DragTarget<int>(
