@@ -9,6 +9,55 @@ void main() {
       expect(result.error, 'URL/URI is required.');
     });
 
+    test('a password with special characters written as is imports (#1315)',
+        () {
+      for (final (url, password, host, db) in [
+        ('postgres://user:p@ss@db.example:5432/app', 'p@ss', 'db.example', 'app'),
+        ('postgres://user:p#ss@db.example/app', 'p#ss', 'db.example', 'app'),
+        ('mysql://root:pa/ss@localhost/shop', 'pa/ss', 'localhost', 'shop'),
+        ('redis://default:a?b@cache.example:6380', 'a?b', 'cache.example', null),
+      ]) {
+        final r = parseConnectionUrlInput(url);
+        expect(r.error, isNull, reason: url);
+        final row = r.row!;
+        expect(row.password, password, reason: url);
+        expect(row.host, host, reason: url);
+        expect(row.databaseName, db, reason: url);
+        // The stored string is the encoded, valid one.
+        expect(Uri.tryParse(row.connectionString!), isNotNull, reason: url);
+      }
+    });
+
+    test('an already encoded password is not encoded twice', () {
+      final row =
+          parseConnectionUrlInput('postgres://u:p%40ss@h:5432/db').row!;
+      expect(row.password, 'p@ss');
+      expect(row.connectionString, 'postgres://u:p%40ss@h:5432/db');
+    });
+
+    test('a URL that stays invalid names percent-encoding', () {
+      final r = parseConnectionUrlInput('not a url@x');
+      expect(r.row, isNull);
+      expect(r.error, contains('percent-encode'));
+      expect(parseConnectionUrlInput('not a url').error,
+          'Invalid URL/URI format.');
+    });
+
+    test('a Windows SQLite file URL has no slash before the drive', () {
+      final row = parseConnectionUrlInput('sqlite:///C:/data/app.db').row!;
+      expect(row.host, 'C:/data/app.db');
+      // A POSIX path keeps its slash.
+      expect(parseConnectionUrlInput('sqlite:///tmp/test.db').row!.host,
+          '/tmp/test.db');
+    });
+
+    test('an IPv6 host is bracketed in the default name', () {
+      final row =
+          parseConnectionUrlInput('postgresql://u:pw@[::1]:5432').row!;
+      expect(row.host, '::1');
+      expect(row.name, 'PostgreSQL: [::1]:5432');
+    });
+
     test('imports a MongoDB replica-set string with several hosts (#1309)',
         () {
       const url = 'mongodb://app:s3cret@db1.example:27017,db2.example:27018'

@@ -147,7 +147,11 @@ class MongoConnection {
     }
 
     // Add host and port
-    buffer.write(hostOverride ?? host);
+    // An IPv6 literal is bracketed in a URI.
+    final writtenHost = hostOverride ?? host;
+    buffer.write(writtenHost.contains(':') && !writtenHost.startsWith('[')
+        ? '[$writtenHost]'
+        : writtenHost);
     final effectivePort = portOverride ?? port;
     if (effectivePort != 27017 || hostOverride != null) {
       buffer.write(':$effectivePort');
