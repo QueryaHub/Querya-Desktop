@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
+import 'package:querya_desktop/core/database/querya_database_exception.dart';
 import 'package:querya_desktop/core/database/connection_pool_lock.dart';
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -104,6 +105,8 @@ class SqliteConnectionPool {
       });
     } on StateError {
       rethrow;
+    } on PoolExhaustedException {
+      rethrow;
     } on SqliteConnectionException {
       rethrow;
     } catch (e, st) {
@@ -131,8 +134,10 @@ class SqliteConnectionPool {
     while (_pool.length >= maxEntries) {
       final idle = _pool.entries.where((e) => e.value.refs == 0).toList();
       if (idle.isEmpty) {
-        throw StateError(
-          'SQLite connection pool exhausted: $maxEntries slots in use.',
+        throw PoolExhaustedException(
+          'The SQLite connection pool is full: $maxEntries sessions are in use',
+          remediationHint: 'Close tabs or connections you no longer use, '
+              'then try again',
         );
       }
       idle.sort((a, b) => a.value.lastUsed.compareTo(b.value.lastUsed));

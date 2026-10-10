@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/mysql_connection.dart';
 import 'package:querya_desktop/core/database/mysql_connection_pool.dart';
+import 'package:querya_desktop/core/database/querya_database_exception.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 
 ConnectionRow _row({int? id = 1}) => ConnectionRow(
@@ -96,7 +97,7 @@ void main() {
       );
     });
 
-    test('rethrows StateError directly when pool exhausted', () async {
+    test('a full pool is a typed exception, not Bad state', () async {
       final pool = MysqlConnectionPool(
         maxEntries: 1,
         createAndConnect: (row, {required database, required mode}) async =>
@@ -107,7 +108,8 @@ void main() {
 
       expect(
         () => pool.acquire(_row(id: 2), database: 'db2'),
-        throwsA(isA<StateError>()),
+        throwsA(isA<PoolExhaustedException>().having(
+            (e) => e.toString(), 'text', allOf(contains('MySQL'), contains('Close tabs')))),
       );
     });
 
