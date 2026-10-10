@@ -1,5 +1,4 @@
 import 'package:flutter/gestures.dart' show kSecondaryButton;
-import 'package:flutter/painting.dart' show Offset;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/folders_storage.dart';

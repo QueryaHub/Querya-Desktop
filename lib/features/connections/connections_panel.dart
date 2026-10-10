@@ -2,6 +2,12 @@ import 'dart:async' show Timer;
 
 import 'package:flutter/material.dart' as material
     show
+        DecoratedBox,
+        DecorationPosition,
+        DragTarget,
+        Draggable,
+        Opacity,
+        pointerDragAnchorStrategy,
         TextEditingValue,
         ValueListenableBuilder,
         BuildContext,
