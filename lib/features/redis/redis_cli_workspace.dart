@@ -308,12 +308,18 @@ class _RedisCliWorkspaceState extends material.State<RedisCliWorkspace> {
 
   void _scrollToBottom() {
     material.WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
+      if (!mounted || !_scrollController.hasClients) return;
+      final end = _scrollController.position.maxScrollExtent;
+      final duration = context.motionDuration(QueryaMotion.fast);
+      // animateTo needs a non-zero duration; reduced motion jumps.
+      if (duration > QueryaMotion.instant) {
         _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 150),
-          curve: material.Curves.easeOut,
+          end,
+          duration: duration,
+          curve: context.motionCurve(QueryaMotion.enter),
         );
+      } else {
+        _scrollController.jumpTo(end);
       }
     });
   }

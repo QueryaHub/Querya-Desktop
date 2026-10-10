@@ -737,7 +737,8 @@ class _FolderTile extends material.StatelessWidget {
             children: [
               material.AnimatedRotation(
                 turns: isExpanded ? 0.25 : 0.0,
-                duration: const Duration(milliseconds: 150),
+                duration: context.motionDuration(QueryaMotion.treeExpand),
+                curve: context.motionCurve(QueryaMotion.treeExpandCurve),
                 child: material.Icon(
                   material.Icons.chevron_right_rounded,
                   size: 18,
