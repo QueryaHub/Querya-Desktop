@@ -173,6 +173,7 @@ extension _GridViewLayout on _VirtualResultGridState {
       rows: _baseRows,
       minWidth: context.scaled(ResultGridMetrics.minColumnWidth),
       maxWidth: context.scaled(ResultGridMetrics.maxColumnWidth),
+      outMaxRowChars: _columnSampleMaxRowChars,
     );
   }
 

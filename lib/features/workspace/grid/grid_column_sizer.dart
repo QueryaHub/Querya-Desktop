@@ -81,17 +81,24 @@ class ResultGridColumnWindow {
 }
 
 /// Computes fixed column widths from headers and a sample of [rows].
+///
+/// When provided, [outMaxRowChars] is populated with the maximum content
+/// character length for each column across the sampled rows, which can be
+/// passed to [distributeResultGridSpareWidth] to eliminate redundant row
+/// sampling (#1349).
 List<double> computeResultGridColumnWidths({
   required List<String> columns,
   required List<List<String>> rows,
   double minWidth = ResultGridMetrics.minColumnWidth,
   double maxWidth = ResultGridMetrics.maxColumnWidth,
   int sampleRowCount = ResultGridMetrics.columnWidthSampleRows,
+  List<int>? outMaxRowChars,
 }) {
   if (columns.isEmpty) return const [];
 
   final widths = List<double>.filled(columns.length, minWidth);
   final sample = rows.length < sampleRowCount ? rows.length : sampleRowCount;
+  outMaxRowChars?.clear();
 
   for (var c = 0; c < columns.length; c++) {
     final headerWidth = columns[c].length * 7.5 + 38.0;
@@ -101,6 +108,7 @@ List<double> computeResultGridColumnWidths({
         maxRowChars = rows[r][c].length;
       }
     }
+    outMaxRowChars?.add(maxRowChars);
     final contentWidth = maxRowChars * 7.5 + 24.0;
     final naturalWidth = math.max(headerWidth, contentWidth);
     widths[c] = naturalWidth.clamp(minWidth, maxWidth);
@@ -114,6 +122,9 @@ int gridCellContextMenuItemsBuiltCount = 0;
 
 /// Distributes spare viewport width adaptively to columns that benefit from expansion,
 /// avoiding artificial stretching of compact columns.
+///
+/// If [maxRowChars] is provided (e.g. from [computeResultGridColumnWidths]),
+/// it is reused directly to avoid redundant row sampling passes (#1349).
 List<double> distributeResultGridSpareWidth({
   required List<double> columnWidths,
   required List<String> columns,
@@ -121,6 +132,7 @@ List<double> distributeResultGridSpareWidth({
   required double availableWidth,
   double maxColumnWidth = ResultGridMetrics.maxColumnWidth,
   int sampleRowCount = ResultGridMetrics.columnWidthSampleRows,
+  List<int>? maxRowChars,
 }) {
   if (columnWidths.isEmpty || columns.isEmpty) return columnWidths;
 
@@ -130,16 +142,22 @@ List<double> distributeResultGridSpareWidth({
 
   final sample = rows.length < sampleRowCount ? rows.length : sampleRowCount;
   final desiredWidths = List<double>.filled(columns.length, 0);
+  final hasPrecomputedChars =
+      maxRowChars != null && maxRowChars.length == columns.length;
 
   for (var c = 0; c < columns.length; c++) {
     final headerWidth = columns[c].length * 7.5 + 38.0;
-    var maxRowChars = 0;
-    for (var r = 0; r < sample; r++) {
-      if (c < rows[r].length && rows[r][c].length > maxRowChars) {
-        maxRowChars = rows[r][c].length;
+    var rowChars = 0;
+    if (hasPrecomputedChars) {
+      rowChars = maxRowChars[c];
+    } else {
+      for (var r = 0; r < sample; r++) {
+        if (c < rows[r].length && rows[r][c].length > rowChars) {
+          rowChars = rows[r][c].length;
+        }
       }
     }
-    final contentWidth = maxRowChars * 7.5 + 24.0;
+    final contentWidth = rowChars * 7.5 + 24.0;
     desiredWidths[c] = math.max(headerWidth, contentWidth);
   }
 

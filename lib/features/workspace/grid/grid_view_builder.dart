@@ -315,6 +315,7 @@ extension _GridViewBuilder on _VirtualResultGridState {
                     availableWidth: availableWidth,
                     maxColumnWidth:
                         context.scaled(ResultGridMetrics.maxColumnWidth),
+                    maxRowChars: _columnSampleMaxRowChars,
                   );
                   _distributedWidths = displayWidths;
                   _distributedForColumnWidths = _columnWidths;
