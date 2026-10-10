@@ -35,7 +35,7 @@ class _FakeSqlExecutionDelegate extends BaseSqlExecutionDelegate {
 void main() {
   Widget buildApp(Widget child) {
     return ShadcnApp(
-      theme: ThemeData.dark(),
+      theme: const ThemeData.dark(),
       home: QueryaThemeScope(
         data: QueryaTheme.darkDefault,
         child: material.Scaffold(
