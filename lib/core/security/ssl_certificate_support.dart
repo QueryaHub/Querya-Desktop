@@ -40,8 +40,24 @@ SslCertificatePaths extractSslCertificatePaths(Uri uri) {
 SslCertificatePaths extractSslCertificatePathsFromString(String? raw) {
   if (raw == null || raw.trim().isEmpty) return const SslCertificatePaths();
   final uri = Uri.tryParse(raw.trim());
-  if (uri == null) return const SslCertificatePaths();
-  return extractSslCertificatePaths(uri);
+  if (uri != null) return extractSslCertificatePaths(uri);
+  // Not a URI Dart accepts (a MongoDB host list, `h1:27017,h2:27017`): the
+  // certificate paths are still in its query.
+  final q = raw.indexOf('?');
+  if (q < 0) return const SslCertificatePaths();
+  var query = raw.substring(q + 1);
+  final hash = query.indexOf('#');
+  if (hash >= 0) query = query.substring(0, hash);
+  try {
+    final params = Uri.splitQueryString(query);
+    return SslCertificatePaths(
+      rootCert: params[kSslRootCertParam],
+      clientCert: params[kSslCertParam],
+      clientKey: params[kSslKeyParam],
+    );
+  } catch (_) {
+    return const SslCertificatePaths();
+  }
 }
 
 Map<String, String> sslCertificateQueryParams(SslCertificatePaths paths) {

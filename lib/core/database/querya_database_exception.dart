@@ -108,6 +108,22 @@ final class TableNotFoundException extends QueryaDatabaseException {
   final String? tableName;
 }
 
+/// A column referenced by a statement does not exist (#1310).
+final class ColumnNotFoundException extends QueryaDatabaseException {
+  const ColumnNotFoundException(
+    super.message, {
+    this.columnName,
+    this.tableName,
+    super.detailedExplanation,
+    super.remediationHint,
+    super.originalError,
+    super.stackTrace,
+  });
+
+  final String? columnName;
+  final String? tableName;
+}
+
 /// A lock could not be acquired in time (busy / locked / deadlock).
 final class LockTimeoutException extends QueryaDatabaseException {
   const LockTimeoutException(

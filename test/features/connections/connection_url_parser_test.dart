@@ -9,6 +9,32 @@ void main() {
       expect(result.error, 'URL/URI is required.');
     });
 
+    test('imports a MongoDB replica-set string with several hosts (#1309)',
+        () {
+      const url = 'mongodb://app:s3cret@db1.example:27017,db2.example:27018'
+          '/shop?replicaSet=rs0&authSource=admin';
+      final result = parseConnectionUrlInput(url);
+
+      expect(result.error, isNull);
+      final row = result.row!;
+      expect(row.type, 'mongodb');
+      expect(row.host, 'db1.example');
+      expect(row.port, 27017);
+      expect(row.username, 'app');
+      expect(row.password, 's3cret');
+      expect(row.databaseName, 'shop');
+      expect(row.authSource, 'admin');
+      // The whole string is kept, every seed in it.
+      expect(row.connectionString, url);
+    });
+
+    test('a multi-host string with SRV or TLS still reads its options', () {
+      final row = parseConnectionUrlInput(
+              'mongodb://h1:27017,h2:27017/db?ssl=true&replicaSet=rs')
+          .row!;
+      expect(row.useSSL, isTrue);
+    });
+
     test('returns error for invalid format', () {
       final result = parseConnectionUrlInput('not a url');
       expect(result.row, isNull);
