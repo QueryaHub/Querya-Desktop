@@ -9,11 +9,7 @@ import 'package:querya_desktop/shared/widgets/querya_tab_strip.dart';
 
 import '../../support/querya_theme_test_shell.dart';
 
-material.Widget _row({
-  QueryaControlSize? size,
-  double uiScale = 1,
-  bool wrapInScope = false,
-}) {
+material.Widget _row({QueryaControlSize? size, double uiScale = 1}) {
   final controls = material.Row(
     mainAxisSize: material.MainAxisSize.min,
     crossAxisAlignment: material.CrossAxisAlignment.start,
@@ -57,11 +53,7 @@ material.Widget _row({
   return queryaThemeTestShell(
     child: QueryaUiScaleScope(
       scale: uiScale,
-      child: material.Center(
-        child: wrapInScope && size != null
-            ? QueryaControlScope(size: size, child: controls)
-            : controls,
-      ),
+      child: material.Center(child: controls),
     ),
   );
 }
@@ -92,10 +84,6 @@ void main() {
 
     testWidgets('a control scope sets the size for the whole row',
         (tester) async {
-      await tester.pumpWidget(
-        _row(size: QueryaControlSize.md, wrapInScope: true),
-      );
-
       // The scope is the only source here: the controls get no size.
       await tester.pumpWidget(
         queryaThemeTestShell(
