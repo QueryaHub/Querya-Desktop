@@ -61,6 +61,45 @@ void main() {
     });
   });
 
+  group('missing columns (#1310)', () {
+    test('a column of an existing table is not a missing table', () {
+      final e = mapDatabaseError(
+        Exception('ERROR: column "nickname" of relation "users" does not exist'),
+        driver: DatabaseDriver.postgres,
+      );
+      expect(e, isA<ColumnNotFoundException>());
+      expect((e as ColumnNotFoundException).columnName, 'nickname');
+      expect(e.tableName, 'users');
+      expect(e.message, 'Column "nickname" does not exist in "users"');
+      expect(e, isNot(isA<TableNotFoundException>()));
+    });
+
+    test('PostgreSQL, MySQL and SQLite wordings without a table', () {
+      for (final (text, driver, name) in [
+        ('column "price" does not exist', DatabaseDriver.postgres, 'price'),
+        (
+          "Unknown column 'price' in 'field list'",
+          DatabaseDriver.mysql,
+          'price'
+        ),
+        ('no such column: orders.price', DatabaseDriver.sqlite, 'orders.price'),
+      ]) {
+        final e = mapDatabaseError(Exception(text), driver: driver);
+        expect(e, isA<ColumnNotFoundException>(), reason: text);
+        expect((e as ColumnNotFoundException).columnName, name);
+      }
+    });
+
+    test('a missing relation is still a missing table', () {
+      final e = mapDatabaseError(
+        Exception('ERROR: relation "orders" does not exist'),
+        driver: DatabaseDriver.postgres,
+      );
+      expect(e, isA<TableNotFoundException>());
+      expect((e as TableNotFoundException).tableName, 'orders');
+    });
+  });
+
   group('mapDatabaseError PostgreSQL', () {
     test('wrong password is AuthFailedException', () {
       final e = mapDatabaseError(

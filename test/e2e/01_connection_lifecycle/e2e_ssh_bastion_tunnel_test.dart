@@ -126,7 +126,7 @@ void main() {
     );
     expect(r.ok, isTrue);
     expect(r.serverFingerprint,
-        SshTunnelManager.formatFingerprint(server.hostKey));
+        FakeSshServer.openSshFingerprint(server.hostKey));
   });
 
   test('a wrong password and a changed host key are both refused', () async {
@@ -139,8 +139,7 @@ void main() {
     expect(bad.ok, isFalse);
 
     final pinned = config(
-        fingerprint:
-            SshTunnelManager.formatFingerprint(server.hostKey));
+        fingerprint: FakeSshServer.openSshFingerprint(server.hostKey));
     server.hostKey = server.hostKey..[0] = 99; // key changed after pinning
     await expectLater(
       manager.openTunnel(

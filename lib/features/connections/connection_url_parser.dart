@@ -1,3 +1,4 @@
+import 'package:querya_desktop/core/database/mongodb_uri.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 
 const _supportedSchemes = {
@@ -25,7 +26,18 @@ const _validPostgresSslModes = {
     return (row: null, error: 'URL/URI is required.');
   }
 
-  final uri = Uri.tryParse(trimmed);
+  var uri = Uri.tryParse(trimmed);
+  if (uri == null) {
+    // A MongoDB host list (`mongodb://h1:27017,h2:27017/db?replicaSet=rs0`)
+    // is valid MongoDB but not a URI Dart parses: read the first seed, the
+    // row keeps the whole string (#1309).
+    final mongo = MongoUri.tryParse(trimmed);
+    if (mongo != null) {
+      uri = Uri.tryParse(
+        mongo.copyWith(hosts: [mongo.hosts.first]).toString(),
+      );
+    }
+  }
   if (uri == null || uri.scheme.isEmpty) {
     return (row: null, error: 'Invalid URL/URI format.');
   }

@@ -367,7 +367,7 @@ void main() {
     });
 
     test(
-        'readForConnection and _hydrateConnection handle Keychain error gracefully without throwing',
+        'a store that cannot be read throws, and hydrating a list survives it',
         () async {
       const row = ConnectionRow(
         type: 'mysql',
@@ -380,20 +380,76 @@ void main() {
       );
       final id = await LocalDb.instance.addConnection(row);
 
-      testMemorySecrets.failNextRead = StateError('org.freedesktop.DBus.Error.NoReply');
+      testMemorySecrets.failNextRead =
+          Exception('org.freedesktop.DBus.Error.NoReply');
 
-      // readForConnection should return nulls instead of throwing
-      final secrets = await ConnectionSecretsStore.readForConnection(id);
-      expect(secrets.password, isNull);
-      expect(secrets.connectionString, isNull);
+      // Not "no password": the caller must be able to tell (#1303).
+      await expectLater(ConnectionSecretsStore.readForConnection(id),
+          throwsA(isA<SecretsStoreUnavailableException>()));
 
-      testMemorySecrets.failNextRead = StateError('Keychain locked');
+      testMemorySecrets.failNextRead = Exception('Keychain locked');
+      await expectLater(ConnectionSecretsStore.readSshSecretsForConnection(id),
+          throwsA(isA<SecretsStoreUnavailableException>()));
 
-      // getConnections(hydrateSecrets: true) should still succeed and return the connection row
+      // A list still loads: that row is just without its password.
+      testMemorySecrets.failNextRead = Exception('Keychain locked');
       final list = await LocalDb.instance.getConnections(hydrateSecrets: true);
       final conn = list.singleWhere((c) => c.id == id);
       expect(conn.name, 'MySQL_Faulty');
       expect(conn.password, isNull);
+
+      // And the secret is still there once the store answers again.
+      final secrets = await ConnectionSecretsStore.readForConnection(id);
+      expect(secrets.password, 'secret-password');
+    });
+
+    test('an absent secret reads as null, not as an error', () async {
+      final secrets = await ConnectionSecretsStore.readForConnection(987654);
+      expect(secrets.password, isNull);
+      expect(secrets.connectionString, isNull);
+      final ssh = await ConnectionSecretsStore.readSshSecretsForConnection(
+          987654);
+      expect(ssh.password, isNull);
+    });
+
+    test(
+        'an edit while the store cannot be read changes nothing and keeps '
+        'the saved password', () async {
+      const row = ConnectionRow(
+        type: 'postgresql',
+        name: 'Before',
+        host: 'localhost',
+        port: 5432,
+        username: 'admin',
+        password: 'keep-me',
+        createdAt: '2026-01-01T00:00:00Z',
+      );
+      final id = await LocalDb.instance.addConnection(row);
+      final edited = ConnectionRow(
+        id: id,
+        type: 'postgresql',
+        name: 'After',
+        host: 'localhost',
+        port: 5432,
+        username: 'admin',
+        createdAt: '2026-01-01T00:00:00Z',
+      );
+
+      // The merge reads the saved password first and stops there.
+      testMemorySecrets.failNextRead = Exception('Keychain locked');
+      await expectLater(mergeSecretsForConnectionUpdate(edited),
+          throwsA(isA<SecretsStoreUnavailableException>()));
+
+      // Writing the unmerged row would erase it: updateConnection refuses to
+      // run on a store it cannot read.
+      testMemorySecrets.failNextRead = Exception('Keychain locked');
+      await expectLater(LocalDb.instance.updateConnection(edited),
+          throwsA(isA<SecretsStoreUnavailableException>()));
+
+      final loaded = (await LocalDb.instance.getConnections(hydrateSecrets: true))
+          .singleWhere((c) => c.id == id);
+      expect(loaded.name, 'Before');
+      expect(loaded.password, 'keep-me');
     });
   });
 }

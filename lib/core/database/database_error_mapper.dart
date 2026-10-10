@@ -8,6 +8,7 @@ import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
 import 'package:querya_desktop/core/database/statement_queue.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_manager.dart';
+import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 
 /// Which engine produced an error; only used to tailor the wording.
 enum DatabaseDriver { postgres, mysql, sqlite, mongodb, redis, extension }
@@ -22,6 +23,16 @@ QueryaDatabaseException mapDatabaseError(
   DatabaseDriver? driver,
 }) {
   if (error is QueryaDatabaseException) return error;
+  if (error is SecretsStoreUnavailableException) {
+    // Not a wrong password: the saved one could not be read at all (#1303).
+    return UnknownDatabaseException(
+      SecretsStoreUnavailableException.message,
+      detailedExplanation: error.cause.toString(),
+      remediationHint: SecretsStoreUnavailableException.hint,
+      originalError: error,
+      stackTrace: stackTrace,
+    );
+  }
 
   // The tunnel's own failures, before any database text matching: *SSH
   // authentication failed for deploy@bastion* is not the database rejecting
@@ -117,6 +128,21 @@ QueryaDatabaseException mapDatabaseError(
       databaseName: db,
       remediationHint:
           'Check the database name in the connection settings or create it first',
+      originalError: error,
+      stackTrace: stackTrace,
+    );
+  } else if (_columnMatch(raw) case final column?) {
+    // Before the table patterns: `column "x" of relation "t" does not exist`
+    // contains `relation "t" does not exist` and is not a missing table.
+    mapped = ColumnNotFoundException(
+      column.table == null
+          ? 'Column "${column.name}" does not exist'
+          : 'Column "${column.name}" does not exist in "${column.table}"',
+      columnName: column.name,
+      tableName: column.table,
+      remediationHint:
+          'Check the column name, or refresh the object tree if it was added '
+          'or renamed',
       originalError: error,
       stackTrace: stackTrace,
     );
@@ -229,6 +255,24 @@ String _innermost(String raw) {
 
 bool _hasAny(String lower, List<String> needles) =>
     needles.any(lower.contains);
+
+/// A missing column in the words of PostgreSQL, MySQL or SQLite.
+({String name, String? table})? _columnMatch(String raw) {
+  final pg = RegExp(
+    r'column "([^"]+)" of relation "([^"]+)" does not exist',
+    caseSensitive: false,
+  ).firstMatch(raw);
+  if (pg != null) return (name: pg.group(1)!, table: pg.group(2));
+  for (final p in [
+    RegExp(r'column "([^"]+)" does not exist', caseSensitive: false),
+    RegExp(r"unknown column '([^']+)'", caseSensitive: false),
+    RegExp(r'no such column: ([\w."]+)', caseSensitive: false),
+  ]) {
+    final m = p.firstMatch(raw);
+    if (m != null) return (name: m.group(1)!, table: null);
+  }
+  return null;
+}
 
 String? _firstMatch(String text, List<RegExp> patterns) {
   for (final p in patterns) {
