@@ -1,4 +1,5 @@
 import 'package:flutter/gestures.dart' show kSecondaryButton;
+import 'package:flutter/painting.dart' show Offset;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/folders_storage.dart';
@@ -127,6 +128,55 @@ void main() {
     // is already inside a folder; the cause was not found.
     await E2eConnections.remove(tester, id);
     await tester.runAsync(() => FoldersStorage.instance.remove('Team C'));
+    await app.close(tester);
+  });
+
+
+  testWidgets('a connection is dragged into a folder and out of it again',
+      (tester) async {
+    await app.launch(tester);
+    await tester.runAsync(() => FoldersStorage.instance.add('Team D'));
+    final folderId = await tester
+        .runAsync(() => LocalDb.instance.getFolderIdByName('Team D'));
+    final id = await E2eConnections.add(
+        tester, E2eConnections.redis('E2E Dragged'));
+    await tester.runAsync(FoldersStorage.instance.reload);
+    await E2eConnections.reloadSidebar(tester);
+
+    Future<void> dragTo(Offset from, Offset to) async {
+      final gesture = await tester.startGesture(from);
+      // Past the drag slop, then onto the target in a few steps.
+      await gesture.moveBy(const Offset(0, 24));
+      await tester.pump(const Duration(milliseconds: 50));
+      await gesture.moveTo(to);
+      await tester.pump(const Duration(milliseconds: 50));
+      await gesture.up();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 100)));
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+
+    await dragTo(
+      tester.getCenter(inSidebar('E2E Dragged').first),
+      tester.getCenter(inSidebar('Team D')),
+    );
+    var row =
+        await tester.runAsync(() => LocalDb.instance.getConnectionById(id));
+    expect(row!.folderId, folderId, reason: 'dropped on the folder');
+
+    // The folder opens to show it; drag it onto the empty part of the list.
+    expect(inSidebar('E2E Dragged'), findsOneWidget);
+    final panel = tester.getRect(find.byType(ConnectionsPanel));
+    await dragTo(
+      tester.getCenter(inSidebar('E2E Dragged').first),
+      Offset(panel.center.dx, panel.bottom - 24),
+    );
+    row = await tester.runAsync(() => LocalDb.instance.getConnectionById(id));
+    expect(row!.folderId, isNull, reason: 'dropped on the list');
+
+    await E2eConnections.remove(tester, id);
+    await tester.runAsync(() => FoldersStorage.instance.remove('Team D'));
     await app.close(tester);
   });
 }

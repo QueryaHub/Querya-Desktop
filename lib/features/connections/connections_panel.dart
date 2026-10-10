@@ -839,7 +839,74 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     }
   }
 
+  /// A connection tile that can be dragged onto a folder (or onto the list
+  /// itself to leave its folder).
   Widget _buildConnectionTile(ConnectionRow conn) {
+    final tile = _connectionTileCore(conn);
+    final id = conn.id;
+    if (id == null) return tile;
+    final theme = Theme.of(context);
+    return material.Draggable<int>(
+      data: id,
+      maxSimultaneousDrags: 1,
+      dragAnchorStrategy: material.pointerDragAnchorStrategy,
+      feedback: material.Material(
+        color: material.Colors.transparent,
+        child: material.Container(
+          padding:
+              const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: material.BoxDecoration(
+            color: theme.colorScheme.popover,
+            borderRadius: material.BorderRadius.circular(8),
+            border: material.Border.all(color: theme.colorScheme.primary),
+          ),
+          child: material.Row(
+            mainAxisSize: material.MainAxisSize.min,
+            children: [
+              material.Icon(QueryaIcons.connectionIcon(conn.type),
+                  size: 16, color: theme.colorScheme.primary),
+              const material.SizedBox(width: 8),
+              material.Text(conn.name,
+                  style: material.TextStyle(
+                      fontSize: 13, color: theme.colorScheme.foreground)),
+            ],
+          ),
+        ),
+      ),
+      childWhenDragging: material.Opacity(opacity: 0.4, child: tile),
+      child: tile,
+    );
+  }
+
+  ConnectionRow? _connectionById(int id) {
+    for (final c in _connections) {
+      if (c.id == id) return c;
+    }
+    return null;
+  }
+
+  /// Whether dropping connection [id] on [folderName] (null: the list itself,
+  /// meaning "no folder") would change anything.
+  bool _acceptsDrop(int id, String? folderName) {
+    final conn = _connectionById(id);
+    if (conn == null) return false;
+    final target = folderName == null ? null : _folderIdByName[folderName];
+    if (folderName != null && target == null) return false;
+    return conn.folderId != target;
+  }
+
+  Future<void> _dropConnection(int id, String? folderName) async {
+    final conn = _connectionById(id);
+    if (conn == null || !_acceptsDrop(id, folderName)) return;
+    final target = folderName == null ? null : _folderIdByName[folderName];
+    await _moveConnection(conn, target);
+    if (folderName != null && mounted) {
+      // Show what was dropped.
+      setState(() => _expandedFolders.add(folderName));
+    }
+  }
+
+  Widget _connectionTileCore(ConnectionRow conn) {
     final isSelected = widget.selectedConnectionId != null &&
         widget.selectedConnectionId == conn.id;
     final isExpanded = _expandedConnections.contains(conn.id);
@@ -1144,7 +1211,10 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
               ),
               Expanded(
                 child: material.RepaintBoundary(
-                  child: material.CustomScrollView(
+                  child: material.DragTarget<int>(
+                    onWillAcceptWithDetails: (d) => _acceptsDrop(d.data, null),
+                    onAcceptWithDetails: (d) => _dropConnection(d.data, null),
+                    builder: (context, candidates, _) => material.CustomScrollView(
                     slivers: [
                       material.SliverPadding(
                         padding: const material.EdgeInsets.symmetric(
@@ -1182,6 +1252,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                                           c.folderId == _folderIdByName[name])
                                       .toList(),
                                   onRemove: () => _removeFolder(name),
+                                  acceptsDrop: (id) => _acceptsDrop(id, name),
+                                  onDrop: (id) => _dropConnection(id, name),
                                   onNewConnection: (folderName) async {
                                     final folderId = await LocalDb.instance
                                         .getFolderIdByName(folderName);
@@ -1249,6 +1321,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                   ),
                 ],
               ),
+                  ),
             ),
           ),
         ],
