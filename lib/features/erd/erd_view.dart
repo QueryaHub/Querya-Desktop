@@ -22,6 +22,7 @@ import 'package:querya_desktop/core/erd/erd_note_text.dart';
 import 'package:querya_desktop/features/erd/erd_group_dialog.dart';
 import 'package:querya_desktop/features/erd/erd_note_dialog.dart';
 import 'package:querya_desktop/features/erd/erd_view_name_dialog.dart';
+import 'package:querya_desktop/core/erd/erd_group_ops.dart';
 import 'package:querya_desktop/core/erd/erd_layout.dart';
 import 'package:querya_desktop/core/erd/erd_layout_engine.dart';
 import 'package:querya_desktop/core/erd/erd_model.dart';
@@ -373,52 +374,29 @@ class _ErdViewState extends material.State<ErdView> {
     ];
   }
 
-  ErdGroup? _groupOf(String table) {
-    for (final g in _groups) {
-      if (g.tables.contains(table)) return g;
-    }
-    return null;
-  }
+  ErdGroup? _groupOf(String table) => ErdGroupOps.groupOf(_groups, table);
 
-  /// [tables] out of every group but [except]; a group left empty goes.
-  void _ungroupTables(Set<String> tables, {String? except}) {
-    for (var i = _groups.length - 1; i >= 0; i--) {
-      final g = _groups[i];
-      if (g.id == except || !g.tables.any(tables.contains)) continue;
-      final left = [for (final t in g.tables) if (!tables.contains(t)) t];
-      if (left.isEmpty) {
-        _groups.removeAt(i);
-      } else {
-        _groups[i] = g.copyWith(tables: left);
-      }
-    }
+  void _replaceGroups(List<ErdGroup> groups) {
+    final next = List.of(groups);
+    _groups
+      ..clear()
+      ..addAll(next);
   }
 
   /// Asks for a name and groups [tables], taking them out of other groups.
   Future<void> _newGroup(Set<String> tables) async {
     if (tables.isEmpty) return;
-    var n = _groups.length + 1;
-    while (_groups.any((g) => g.name == 'Group $n')) {
-      n++;
-    }
+    final n = ErdGroupOps.nextNameNumber(_groups);
     final text = await showErdGroupDialog(context,
         title: 'New group', action: 'Create', name: 'Group $n');
     if (text == null || !mounted) return;
-    var id = 1;
-    while (_groups.any((g) => g.id == 'g$id')) {
-      id++;
-    }
     setState(() {
-      _ungroupTables(tables);
-      _groups.add(ErdGroup(
-        id: 'g$id',
+      _replaceGroups(ErdGroupOps.withNewGroup(
+        _groups,
+        tables: tables,
+        tableNames: [for (final t in _schema?.tables ?? const <ErdTable>[]) t.name],
         name: text.name,
         note: text.note,
-        color: erdHeaderSlots[(id - 1) % erdHeaderSlots.length],
-        tables: [
-          for (final t in _schema?.tables ?? const <ErdTable>[])
-            if (tables.contains(t.name)) t.name,
-        ],
       ));
       _marked.clear();
     });
@@ -447,16 +425,8 @@ class _ErdViewState extends material.State<ErdView> {
 
   void _addToGroup(String id, Set<String> tables) {
     setState(() {
-      _ungroupTables(tables, except: id);
-      final i = _groups.indexWhere((g) => g.id == id);
-      if (i < 0) return;
-      final g = _groups[i];
-      _groups[i] = g.copyWith(tables: [
-        ...g.tables,
-        for (final t in tables)
-          if (!g.tables.contains(t)) t,
-      ]);
-      _marked.clear();
+      _replaceGroups(ErdGroupOps.addTables(_groups, id, tables));
+      if (_groups.any((g) => g.id == id)) _marked.clear();
     });
     _gatherIfCovering(id);
     _scheduleSave();
@@ -486,7 +456,7 @@ class _ErdViewState extends material.State<ErdView> {
   }
 
   void _removeFromGroup(String table) {
-    setState(() => _ungroupTables({table}));
+    setState(() => _replaceGroups(ErdGroupOps.ungroupTables(_groups, {table})));
     _scheduleSave();
   }
 
