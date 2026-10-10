@@ -39,7 +39,6 @@ import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/shared/widgets/app_toast.dart';
 import 'package:querya_desktop/shared/widgets/querya_action_menu.dart';
 import 'package:querya_desktop/shared/widgets/querya_empty_state.dart';
-import 'package:querya_desktop/shared/widgets/querya_search_field.dart';
 import 'package:querya_desktop/features/workspace/sql_editor_chrome.dart';
 import 'package:querya_desktop/shared/widgets/querya_action_button.dart';
 import 'package:querya_desktop/shared/widgets/querya_spinner.dart';
