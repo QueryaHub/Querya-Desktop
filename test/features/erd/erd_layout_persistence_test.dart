@@ -110,7 +110,7 @@ void main() {
     final store = _MemoryStore()
       ..layouts[_key] = const ErdSavedLayout(
         hidden: {'users'},
-        keysOnly: true,
+        detail: ErdDetail.keys,
       );
     await pumpDiagram(t, store);
     expect(_card('users'), findsNothing);
@@ -155,7 +155,7 @@ void main() {
     await t.drag(_card('users'), const material.Offset(200, 120));
     await t.pump();
     final users = t.getTopLeft(_card('users'));
-    await t.tap(find.byKey(const material.ValueKey('erd_keys_only')));
+    await t.tap(find.byKey(const material.ValueKey('querya_tab_Keys')));
     await t.pump();
     expect(t.getTopLeft(_card('users')), users);
     await close(t);

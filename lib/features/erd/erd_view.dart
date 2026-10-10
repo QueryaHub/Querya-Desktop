@@ -31,6 +31,7 @@ import 'package:querya_desktop/shared/widgets/querya_search_field.dart';
 import 'package:querya_desktop/features/workspace/sql_editor_chrome.dart';
 import 'package:querya_desktop/shared/widgets/querya_action_button.dart';
 import 'package:querya_desktop/shared/widgets/querya_spinner.dart';
+import 'package:querya_desktop/shared/widgets/querya_tab_strip.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// Saves an exported diagram file; replaceable in tests.
@@ -138,7 +139,7 @@ class _ErdViewState extends material.State<ErdView> {
   /// Density: only PK and FK columns, cards collapsed to their header, and
   /// tables hidden from the diagram. Layout and routing follow the visible
   /// schema from [_visibleOf].
-  bool _keysOnly = false;
+  ErdDetail _detail = ErdDetail.all;
   final Set<String> _collapsed = {};
   final Set<String> _hidden = {};
 
@@ -245,7 +246,7 @@ class _ErdViewState extends material.State<ErdView> {
           _hidden
             ..clear()
             ..addAll(saved.hidden);
-          _keysOnly = saved.keysOnly;
+          _detail = saved.detail;
           _headerColors
             ..clear()
             ..addAll(saved.headerColors);
@@ -358,7 +359,7 @@ class _ErdViewState extends material.State<ErdView> {
           positions: Map.of(layout.positions),
           collapsed: Set.of(_collapsed),
           hidden: Set.of(_hidden),
-          keysOnly: _keysOnly,
+          detail: _detail,
           headerColors: Map.of(_headerColors),
           scale: m.getMaxScaleOnAxis(),
           translation: material.Offset(t.x, t.y),
@@ -396,11 +397,14 @@ class _ErdViewState extends material.State<ErdView> {
         if (!_hidden.contains(t.name))
           ErdTable(
             name: t.name,
-            columns: _collapsed.contains(t.name)
+            columns: _collapsed.contains(t.name) || _detail == ErdDetail.names
                 ? const []
                 : [
                     for (final c in t.columns)
-                      if (!_keysOnly || c.isPrimaryKey || c.isForeignKey) c,
+                      if (_detail == ErdDetail.all ||
+                          c.isPrimaryKey ||
+                          c.isForeignKey)
+                        c,
                   ],
           ),
     ];
@@ -1243,17 +1247,27 @@ class _ErdViewState extends material.State<ErdView> {
                 icon: material.Icons.refresh_rounded,
                 onPressed: _loading ? null : _load,
               ),
-              QueryaActionButton(
-                key: const material.ValueKey('erd_keys_only'),
-                label: _keysOnly ? 'All columns' : 'Keys only',
-                icon: material.Icons.key_rounded,
-                tooltip: 'Show only primary and foreign keys',
-                onPressed: !ready
-                    ? null
-                    : () {
-                        setState(() => _keysOnly = !_keysOnly);
+              // Detail level for every card; a card collapsed by hand stays
+              // collapsed (#1278).
+              material.IgnorePointer(
+                ignoring: !ready,
+                child: material.Opacity(
+                  opacity: ready ? 1 : 0.5,
+                  child: material.Tooltip(
+                    message: 'Table names only, key columns, or every column',
+                    child: QueryaTabStrip(
+                      key: const material.ValueKey('erd_detail'),
+                      dense: true,
+                      labels: const ['Names', 'Keys', 'All'],
+                      selectedIndex: ErdDetail.values.indexOf(_detail),
+                      onSelected: (i) {
+                        if (ErdDetail.values[i] == _detail) return;
+                        setState(() => _detail = ErdDetail.values[i]);
                         _reflow();
                       },
+                    ),
+                  ),
+                ),
               ),
               if (_hidden.isNotEmpty)
                 QueryaActionButton(

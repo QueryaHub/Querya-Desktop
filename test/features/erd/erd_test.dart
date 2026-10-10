@@ -1295,7 +1295,7 @@ void main() {
       expect(opacityOf(t, 'lonely'), isNot(contains(0.35)));
     });
 
-    testWidgets('keys only hides plain columns and the toggle brings them back',
+    testWidgets('detail levels: keys, names, then all columns again (#1278)',
         (t) async {
       await t.binding.setSurfaceSize(const material.Size(1200, 800));
       final wide = FakeSqlExecutionDelegate(onExecute: (sql) {
@@ -1318,12 +1318,23 @@ void main() {
       await t.pump();
       expect(find.text('amount'), findsOneWidget);
 
-      await t.tap(find.byKey(const material.ValueKey('erd_keys_only')));
+      await t.tap(find.byKey(const material.ValueKey('querya_tab_Keys')));
       await t.pump();
       expect(find.text('amount'), findsNothing);
       expect(find.text('user_id'), findsOneWidget);
 
-      await t.tap(find.byKey(const material.ValueKey('erd_keys_only')));
+      // Names: headers only, edges still drawn between the cards.
+      await t.tap(find.byKey(const material.ValueKey('querya_tab_Names')));
+      await t.pump();
+      expect(find.text('user_id'), findsNothing);
+      expect(find.byKey(const material.ValueKey('erd_table_orders')),
+          findsOneWidget);
+      expect(
+          t.getSize(find.byKey(const material.ValueKey('erd_table_orders')))
+              .height,
+          lessThan(ErdLayout.headerHeight + ErdLayout.rowHeight));
+
+      await t.tap(find.byKey(const material.ValueKey('querya_tab_All')));
       await t.pump();
       expect(find.text('amount'), findsOneWidget);
     });
