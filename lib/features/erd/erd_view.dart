@@ -728,6 +728,14 @@ class _ErdViewState extends material.State<ErdView> {
     return material.Size(w, h);
   }
 
+  /// Tint of a note without a colour over the canvas, on screen and in the
+  /// exports.
+  static const double _noteTint = 0.07;
+
+  /// Shadows read only on light surfaces, so a dark canvas gets twice the alpha.
+  double _shadowAlpha(material.Color canvas) =>
+      canvas.computeLuminance() < 0.5 ? 0.24 : 0.12;
+
   material.Widget _noteWidget(ErdNote n) {
     final wb = context.workbench;
     final color = n.color == null ? null : _slotColor(n.color!);
@@ -798,7 +806,12 @@ class _ErdViewState extends material.State<ErdView> {
                 child: material.GestureDetector(
                   key: material.ValueKey('erd_note_${n.id}'),
                   dragStartBehavior: DragStartBehavior.down,
-                  onPanStart: (_) => setState(() => _draggingNote = n.id),
+                  // Esc, zoom and search keys work after touching a note.
+                  onTapDown: (_) => _canvasFocus.requestFocus(),
+                  onPanStart: (_) {
+                    _canvasFocus.requestFocus();
+                    setState(() => _draggingNote = n.id);
+                  },
                   onPanUpdate: (d) => _noteDragMove(n.id, d.delta),
                   onPanEnd: (_) {
                     setState(() => _draggingNote = null);
@@ -808,14 +821,25 @@ class _ErdViewState extends material.State<ErdView> {
                   onDoubleTap: () => unawaited(_editNote(n)),
                   child: material.DecoratedBox(
                     decoration: material.BoxDecoration(
-                      color: color == null
-                          ? wb.surface
-                          : material.Color.alphaBlend(
-                              color.withValues(alpha: 0.18), wb.surface),
+                      // Not the canvas colour: a plain note is a slightly
+                      // darker sheet with a shadow, like the cards.
+                      color: material.Color.alphaBlend(
+                          (color ?? wb.mutedForeground).withValues(
+                              alpha: color == null ? _noteTint : 0.18),
+                          wb.surface),
                       borderRadius: material.BorderRadius.circular(6),
                       border: material.Border.all(
                           color: color ?? wb.borderSubtle,
                           width: n.attachedTo == null ? 1 : 1.5),
+                      boxShadow: [
+                        material.BoxShadow(
+                          color: wb.shadow
+                              .withValues(alpha: _shadowAlpha(wb.canvas)),
+                          blurRadius: _draggingNote == n.id ? 14 : 6,
+                          offset: material.Offset(
+                              0, _draggingNote == n.id ? 5 : 2),
+                        ),
+                      ],
                     ),
                     child: material.ClipRect(
                       child: material.Padding(
@@ -863,6 +887,7 @@ class _ErdViewState extends material.State<ErdView> {
                 child: material.GestureDetector(
                   key: material.ValueKey('erd_note_resize_${n.id}'),
                   dragStartBehavior: DragStartBehavior.down,
+                  onPanStart: (_) => _canvasFocus.requestFocus(),
                   onPanUpdate: (d) => _noteResize(n.id, d.delta),
                   onPanEnd: (_) => _scheduleSave(),
                   child: material.Icon(material.Icons.drag_handle_rounded,
@@ -1412,8 +1437,7 @@ class _ErdViewState extends material.State<ErdView> {
           routes: _routes,
           headerFills: _headerFills(schema, const ErdSvgColors().card),
           groups: _svgGroups(layout, const ErdSvgColors().background),
-          notes: _svgNotes(const ErdSvgColors().background,
-              const ErdSvgColors().border));
+          notes: _svgNotes(const ErdSvgColors()));
       await _save('$_fileStem.png', await svgToPng(svg, scale: scale));
       return;
     }
@@ -1493,7 +1517,7 @@ class _ErdViewState extends material.State<ErdView> {
         colors: colors,
         headerFills: _headerFills(schema, colors.card),
         groups: _svgGroups(layout, colors.background),
-        notes: _svgNotes(colors.background, colors.border));
+        notes: _svgNotes(colors));
   }
 
   /// The SVG export.
@@ -1596,6 +1620,10 @@ class _ErdViewState extends material.State<ErdView> {
     };
   }
 
+  /// [name] cut to 28 characters with an ellipsis, for menus and the toolbar.
+  static String _shortName(String name) =>
+      name.length <= 28 ? name : '${name.substring(0, 27)}…';
+
   /// The toolbar's view switcher: All tables, the saved views, and the
   /// commands to save, rename and delete one.
   material.Widget _viewsMenu() {
@@ -1603,16 +1631,21 @@ class _ErdViewState extends material.State<ErdView> {
     final active = _viewById(_activeView);
     return QueryaActionMenu<String>(
       items: [
+        // A mark on every row, so the labels line up.
         QueryaActionMenuItem(
           value: 'all',
           label: 'All tables',
-          icon: active == null ? material.Icons.check : null,
+          icon: active == null
+              ? material.Icons.radio_button_checked_rounded
+              : material.Icons.radio_button_unchecked_rounded,
         ),
         for (final v in _views)
           QueryaActionMenuItem(
             value: 'view:${v.id}',
-            label: '${v.name} (${v.tables.length})',
-            icon: v.id == active?.id ? material.Icons.check : null,
+            label: '${_shortName(v.name)} (${v.tables.length})',
+            icon: v.id == active?.id
+                ? material.Icons.radio_button_checked_rounded
+                : material.Icons.radio_button_unchecked_rounded,
           ),
         const QueryaActionMenuItem(
           value: 'new',
@@ -1655,7 +1688,7 @@ class _ErdViewState extends material.State<ErdView> {
             material.Icon(material.Icons.bookmarks_outlined,
                 size: 16, color: wb.mutedForeground),
             const material.SizedBox(width: 6),
-            Text(active?.name ?? 'All tables'),
+            Text(active == null ? 'All tables' : _shortName(active.name)),
             const material.SizedBox(width: 4),
             material.Icon(material.Icons.expand_more_rounded,
                 size: 16, color: wb.mutedForeground),
@@ -1674,6 +1707,12 @@ class _ErdViewState extends material.State<ErdView> {
       MenuButton(
         key: material.ValueKey('erd_menu_group_$table'),
         onPressed: (_) => unawaited(_newGroup(tables)),
+        // The way to put more tables in is not obvious: say it here.
+        trailing: tables.length == 1
+            ? Text('Shift+click marks more',
+                style: material.TextStyle(
+                    fontSize: 11, color: context.workbench.mutedForeground))
+            : null,
         child: Text(tables.length == 1
             ? 'New group…'
             : 'Group ${tables.length} tables…'),
@@ -1700,22 +1739,23 @@ class _ErdViewState extends material.State<ErdView> {
   }
 
   /// Notes for the SVG, tinted as on screen over the export background.
-  List<ErdSvgNote> _svgNotes(String backgroundHex, String borderHex) {
-    final background = material.Color(
-        0xFF000000 | int.parse(backgroundHex.substring(1), radix: 16));
+  List<ErdSvgNote> _svgNotes(ErdSvgColors colors) {
+    material.Color parse(String hex) =>
+        material.Color(0xFF000000 | int.parse(hex.substring(1), radix: 16));
+    final background = parse(colors.background);
+    final muted = parse(colors.muted);
     return [
       for (final n in _notes)
         ErdSvgNote(
           text: n.text,
           rect: material.Rect.fromLTWH(n.x, n.y, n.width, n.height),
-          fill: ErdSvgColors.hex((n.color == null
-                  ? background
-                  : material.Color.alphaBlend(
-                      _slotColor(n.color!).withValues(alpha: 0.18),
-                      background))
+          fill: ErdSvgColors.hex(material.Color.alphaBlend(
+                  (n.color == null ? muted : _slotColor(n.color!))
+                      .withValues(alpha: n.color == null ? _noteTint : 0.18),
+                  background)
               .toARGB32()),
           stroke: n.color == null
-              ? borderHex
+              ? colors.border
               : ErdSvgColors.hex(_slotColor(n.color!).toARGB32()),
         ),
     ];
@@ -1752,7 +1792,11 @@ class _ErdViewState extends material.State<ErdView> {
       child: material.GestureDetector(
         key: material.ValueKey('erd_group_${g.id}'),
         dragStartBehavior: DragStartBehavior.down,
-        onPanStart: (_) => _groupDragStart(g.id),
+        onTapDown: (_) => _canvasFocus.requestFocus(),
+        onPanStart: (_) {
+          _canvasFocus.requestFocus();
+          _groupDragStart(g.id);
+        },
         onPanUpdate: (d) => _groupDragMove(g, d.delta),
         onPanEnd: (_) => _groupDragEnd(),
         onPanCancel: _groupDragEnd,
@@ -2555,9 +2599,13 @@ class _TableCard extends material.StatelessWidget {
               borderRadius: radius,
               border: material.Border.all(
                 color: highlighted || marked ? wb.accent : wb.borderSubtle,
-                width: marked ? 2.5 : (highlighted ? 1.5 : 1),
+                width: highlighted ? 1.5 : 1,
               ),
               boxShadow: [
+                // A marked card gets a ring outside it, so its content area
+                // is the one the card was measured for.
+                if (marked)
+                  material.BoxShadow(color: wb.accent, spreadRadius: 2.5),
                 material.BoxShadow(
                   color: wb.shadow.withValues(alpha: _shadowAlpha(wb.canvas)),
                   blurRadius: dragging ? 18 : 8,
