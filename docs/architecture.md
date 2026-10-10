@@ -16,7 +16,23 @@ lib/
 ```
 
 The dependency direction is **features → core/shared**, never the reverse.
-`core/` and `shared/` must not import from `features/`.
+`core/` and `shared/` must not import from `features/` or `app/`
+(`test/guards/core_does_not_import_features_test.dart` checks it).
+
+When `core/` needs something that lives in `features/`, it declares a hook and
+`app/app_wiring.dart` installs it at startup (`installAppWiring()`, also run by
+`test/flutter_test_config.dart`):
+
+| Hook | Installed |
+|------|-----------|
+| `QueryaCommandRegistry.coreCommands` | `queryaCoreCommands` (`app/querya_core_commands.dart`): palette commands that open feature dialogs |
+| `ExtensionCommandSync.connectionPicker` | `showExtensionConnectionPickerDialog` |
+| `McpServerController.delegateFactory` | `createReadOnlyMcpDelegate` (`app/mcp_sql_delegates.dart`): the SQL editor's read-only delegates |
+
+Core code that only reads SQL depends on `SqlQueryRunner`
+(`core/database/sql_query_runner.dart`), which the workspace's
+`SqlExecutionDelegate` implements. The schema catalog behind the ER diagram and
+MCP (`ErdCatalog`, `ErdSchema`, `ErdTableNames`) is in `core/erd/`.
 
 ## `core/`
 
