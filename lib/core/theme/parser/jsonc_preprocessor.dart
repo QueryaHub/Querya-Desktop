@@ -9,8 +9,10 @@ String stripJsonc(String input) {
     final next = i + 1 < len ? input[i + 1] : '';
 
     if (ch == '"') {
-      out.write(_copyStringLiteral(input, i));
-      i = _skipStringLiteral(input, i);
+      // One scan finds the closing quote; the literal is copied as a slice.
+      final end = _stringLiteralEnd(input, i);
+      out.write(input.substring(i, end));
+      i = end;
       continue;
     }
 
@@ -54,37 +56,20 @@ String stripJsonc(String input) {
 
 bool _isWhitespace(String c) => c == ' ' || c == '\t' || c == '\n' || c == '\r';
 
-String _copyStringLiteral(String s, int start) {
-  final buf = StringBuffer();
-  var i = start;
-  buf.write(s[i]);
-  i++;
-  while (i < s.length) {
-    final ch = s[i];
-    buf.write(ch);
-    if (ch == '\\' && i + 1 < s.length) {
-      i++;
-      buf.write(s[i]);
-    } else if (ch == '"') {
-      i++;
-      break;
-    }
-    i++;
-  }
-  return buf.toString();
-}
-
-int _skipStringLiteral(String s, int start) {
+/// Offset after the string literal that opens at [start] (a `"`): past its
+/// closing quote, or the end of [s] when it is not terminated. A backslash
+/// escapes the next character.
+int _stringLiteralEnd(String s, int start) {
+  final len = s.length;
   var i = start + 1;
-  while (i < s.length) {
-    if (s[i] == '\\') {
+  while (i < len) {
+    final c = s.codeUnitAt(i);
+    if (c == 0x5C) {
       i += 2;
       continue;
     }
-    if (s[i] == '"') {
-      return i + 1;
-    }
+    if (c == 0x22) return i + 1;
     i++;
   }
-  return s.length;
+  return len;
 }
