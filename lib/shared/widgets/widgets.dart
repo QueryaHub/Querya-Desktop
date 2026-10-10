@@ -22,6 +22,7 @@ export 'querya_dropdown.dart'
 export 'connection_tree_loading_row.dart';
 export 'querya_action_button.dart';
 export 'querya_badge.dart';
+export 'querya_button.dart';
 export 'querya_empty_state.dart';
 export 'querya_icon_button.dart';
 export 'querya_modal_dialog.dart';
