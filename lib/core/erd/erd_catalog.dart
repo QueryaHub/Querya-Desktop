@@ -1,7 +1,7 @@
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
-import 'package:querya_desktop/features/erd/erd_model.dart';
-import 'package:querya_desktop/features/erd/erd_table_names.dart';
-import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
+import 'package:querya_desktop/core/erd/erd_model.dart';
+import 'package:querya_desktop/core/erd/erd_table_names.dart';
+import 'package:querya_desktop/core/database/sql_query_runner.dart';
 
 /// Catalog queries per dialect. Column query yields `table, column, type,
 /// isPk, isNullable`; FK query yields `table, column, refTable, refColumn`.
@@ -107,7 +107,7 @@ WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
 
   /// Loads the schema of the current database through [delegate].
   static Future<ErdSchema> load(
-    SqlExecutionDelegate delegate,
+    SqlQueryRunner delegate,
     SqlDialect dialect,
   ) async {
     final cols = await delegate.executeQuery(
@@ -128,7 +128,7 @@ WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
   /// Tables within [depth] foreign keys of [table] in either direction, with
   /// their columns. Cycles and self references end the walk.
   static Future<ErdSchema> loadNeighbourhood(
-    SqlExecutionDelegate delegate,
+    SqlQueryRunner delegate,
     SqlDialect dialect, {
     required String table,
     int depth = 1,

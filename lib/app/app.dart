@@ -12,6 +12,7 @@ import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import 'app_lifecycle_cleanup.dart';
+import 'app_wiring.dart';
 import '../features/main_screen/main_screen.dart';
 
 class QueryaApp extends StatelessWidget {
@@ -19,6 +20,7 @@ class QueryaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    installAppWiring();
     QueryaCommandRegistry.instance.ensureCoreDefaults();
     unawaited(LocalExtensionRegistry.instance.load());
     final themeController = ThemeController.instance;

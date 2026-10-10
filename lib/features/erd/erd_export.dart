@@ -3,7 +3,7 @@ import 'dart:ui' show Offset, Size;
 
 import 'package:querya_desktop/features/erd/erd_geometry.dart';
 import 'package:querya_desktop/features/erd/erd_layout.dart';
-import 'package:querya_desktop/features/erd/erd_model.dart';
+import 'package:querya_desktop/core/erd/erd_model.dart';
 import 'package:querya_desktop/features/erd/erd_router.dart';
 
 /// Colours of the SVG export as `#rrggbb`. The defaults are a light theme;

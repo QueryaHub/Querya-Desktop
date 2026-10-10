@@ -4,9 +4,10 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:querya_mcp_bridge/querya_mcp_bridge.dart';
+import 'package:querya_desktop/core/database/sql_query_runner.dart';
+import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/mcp/mcp_query_service.dart';
 import 'package:querya_desktop/core/mcp/mcp_socket_host.dart';
-import 'package:querya_desktop/core/mcp/mcp_sql_delegates.dart';
 import 'package:querya_desktop/core/mcp/querya_mcp_server.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 
@@ -19,13 +20,28 @@ class McpServerController {
     String? version,
     bool logActivity = false,
   })  : _logActivity = logActivity,
-        _service = service ??
-            McpQueryService(createDelegate: createReadOnlyMcpDelegate),
+        _service =
+            service ?? McpQueryService(createDelegate: _installedDelegate),
         _endpointFile = endpointFile ?? McpEndpoint.defaultFile(),
         _versionOverride = version;
 
   static final McpServerController instance =
       McpServerController(logActivity: true);
+
+  /// Read-only SQL sessions for the default service. The SQL drivers live in
+  /// `features/`, so the app installs them at startup (`lib/app/app_wiring.dart`).
+  static McpDelegateFactory? delegateFactory;
+
+  static SqlQueryRunner _installedDelegate(
+    ConnectionRow row,
+    SqlDialect dialect,
+  ) {
+    final factory = delegateFactory;
+    if (factory == null) {
+      throw StateError('MCP SQL sessions are not installed');
+    }
+    return factory(row, dialect);
+  }
 
   /// `app_settings` key; the server is off unless the user enables it.
   static const enabledKey = 'mcp_server_enabled';

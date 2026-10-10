@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
-import 'package:querya_desktop/features/erd/erd_model.dart';
+import 'package:querya_desktop/core/erd/erd_model.dart';
 
 /// Geometry of the diagram: card sizes, positions and canvas extent.
 ///

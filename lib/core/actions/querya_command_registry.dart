@@ -1,6 +1,5 @@
 import 'package:flutter/widgets.dart';
 import 'package:querya_desktop/core/actions/querya_command.dart';
-import 'package:querya_desktop/core/actions/querya_core_commands.dart';
 
 /// App-wide command catalog for Command Palette (CP-01) and later menus.
 class QueryaCommandRegistry extends ChangeNotifier {
@@ -11,11 +10,15 @@ class QueryaCommandRegistry extends ChangeNotifier {
   final Map<String, QueryaCommand> _commands = {};
   var _coreInstalled = false;
 
+  /// Builds the built-in commands. They open feature dialogs, so the app
+  /// installs the builder at startup (`lib/app/app_wiring.dart`).
+  List<QueryaCommand> Function() coreCommands = () => const [];
+
   /// Registers built-in commands once. Safe to call from [QueryaApp].
   void ensureCoreDefaults() {
     if (_coreInstalled) return;
     _coreInstalled = true;
-    registerAll(queryaCoreCommands());
+    registerAll(coreCommands());
   }
 
   void register(QueryaCommand command) {
@@ -32,7 +35,7 @@ class QueryaCommandRegistry extends ChangeNotifier {
   /// Re-installs any built-in ids that are missing or still owned by an extension.
   void restoreMissingCoreCommands() {
     var changed = false;
-    for (final command in queryaCoreCommands()) {
+    for (final command in coreCommands()) {
       final existing = _commands[command.id];
       if (existing == null || existing.sourceExtensionId != null) {
         _commands[command.id] = command;

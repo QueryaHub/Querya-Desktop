@@ -6,7 +6,7 @@ import 'package:querya_desktop/core/database/sqlite_service.dart';
 import 'package:querya_desktop/core/database/sqlite_sql.dart';
 import 'package:querya_desktop/core/mcp/mcp_access_store.dart';
 import 'package:querya_desktop/core/mcp/mcp_query_service.dart';
-import 'package:querya_desktop/core/mcp/mcp_sql_delegates.dart';
+import 'package:querya_desktop/app/mcp_sql_delegates.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 

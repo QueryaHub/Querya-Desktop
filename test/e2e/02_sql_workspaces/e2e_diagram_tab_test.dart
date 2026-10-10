@@ -2,7 +2,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
-import 'package:querya_desktop/features/erd/erd_catalog.dart';
+import 'package:querya_desktop/core/erd/erd_catalog.dart';
 import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
 
 import '../../support/fake_sql_execution_delegate.dart';

@@ -5,6 +5,7 @@ import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart';
 
 import 'app/app.dart';
+import 'app/app_wiring.dart';
 import 'core/editor/syntax_highlight_service.dart';
 import 'core/layout/ui_scale_controller.dart';
 import 'core/mcp/mcp_server_controller.dart';
@@ -19,6 +20,7 @@ import 'features/updater/update_controller.dart';
 void main([List<String> args = const []]) async {
   unawaited(runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
+    installAppWiring();
     FileLaunchService.instance.processLaunchArguments(args);
 
     FlutterError.onError = (details) {

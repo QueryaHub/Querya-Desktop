@@ -12,7 +12,7 @@ import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/actions/querya_command_host.dart';
 import 'package:querya_desktop/core/actions/table_view_command_bridge.dart';
 import 'package:querya_desktop/features/erd/erd_source.dart';
-import 'package:querya_desktop/features/erd/erd_table_names.dart';
+import 'package:querya_desktop/core/erd/erd_table_names.dart';
 import 'package:querya_desktop/core/database/sql_table_target_extractor.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/layout/vertical_split_pane.dart';

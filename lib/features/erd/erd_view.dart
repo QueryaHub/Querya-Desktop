@@ -13,12 +13,12 @@ import 'package:flutter/services.dart'
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/erd/erd_canvas_controls.dart';
-import 'package:querya_desktop/features/erd/erd_catalog.dart';
+import 'package:querya_desktop/core/erd/erd_catalog.dart';
 import 'package:querya_desktop/features/erd/erd_source.dart';
 import 'package:querya_desktop/features/erd/erd_export.dart';
 import 'package:querya_desktop/features/erd/erd_geometry.dart';
 import 'package:querya_desktop/features/erd/erd_layout.dart';
-import 'package:querya_desktop/features/erd/erd_model.dart';
+import 'package:querya_desktop/core/erd/erd_model.dart';
 import 'package:querya_desktop/features/erd/erd_router.dart';
 import 'package:querya_desktop/core/export/svg_png.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';

@@ -1,14 +1,17 @@
 import 'dart:async';
 
 import 'package:querya_desktop/features/workspace/query_plan.dart';
-import 'package:flutter/foundation.dart';
+import 'package:querya_desktop/core/database/sql_query_runner.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/features/workspace/sql_result_grid_schema.dart';
 
+export 'package:querya_desktop/core/database/sql_query_runner.dart';
+
 /// Strategy/delegate contract for executing queries, transactions and DML mutations
 /// across different DBMS drivers in [GenericSqlWorkspace].
-abstract class SqlExecutionDelegate {
+abstract class SqlExecutionDelegate implements SqlQueryRunner {
   /// Executes a query statement and returns columns, rows, affected count, and status details.
+  @override
   Future<SqlExecutionResult> executeQuery(
     String sql, {
     int? limit,
@@ -16,6 +19,7 @@ abstract class SqlExecutionDelegate {
   });
 
   /// Explains the SQL query plan if supported by the DBMS.
+  @override
   Future<String> explainQuery(String sql);
 
   /// The plan as a tree, when the driver can give one. [explainQuery] remains
@@ -23,6 +27,7 @@ abstract class SqlExecutionDelegate {
   Future<PlanNode?> explainTree(String sql) async => null;
 
   /// Whether [explainQuery] works for this driver (shows the Explain button).
+  @override
   bool get supportsExplain => true;
 
   /// Interrupts or cancels active query execution.
@@ -57,25 +62,6 @@ abstract class SqlExecutionDelegate {
       Future.error(UnsupportedError('DML mutations are not supported'));
 
   /// Releases resources (leases, connections, listeners) held by the delegate.
+  @override
   void dispose() {}
-}
-
-/// Result returned by [SqlExecutionDelegate.executeQuery].
-@immutable
-class SqlExecutionResult {
-  const SqlExecutionResult({
-    this.columns = const [],
-    this.rows = const [],
-    this.affectedRows,
-    this.statusMessage,
-    this.elapsed,
-    this.isTruncated = false,
-  });
-
-  final List<String> columns;
-  final List<List<String>> rows;
-  final int? affectedRows;
-  final String? statusMessage;
-  final Duration? elapsed;
-  final bool isTruncated;
 }

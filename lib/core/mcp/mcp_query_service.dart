@@ -1,14 +1,14 @@
 import 'dart:async';
 
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
+import 'package:querya_desktop/core/database/sql_query_runner.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
+import 'package:querya_desktop/core/erd/erd_catalog.dart';
+import 'package:querya_desktop/core/erd/erd_model.dart';
 import 'package:querya_desktop/core/mcp/mcp_access_store.dart';
 import 'package:querya_desktop/core/mcp/mcp_redaction.dart';
 import 'package:querya_desktop/core/mcp/mcp_sql_guard.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/features/erd/erd_catalog.dart';
-import 'package:querya_desktop/features/erd/erd_model.dart';
-import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
 
 /// A failure the MCP client should see as a tool error (the model reads the
 /// message and can fix its call).
@@ -26,7 +26,7 @@ class McpToolException implements Exception {
 
 /// Creates a **read-only** execution delegate for [row]; the service disposes
 /// it after each call.
-typedef McpDelegateFactory = SqlExecutionDelegate Function(
+typedef McpDelegateFactory = SqlQueryRunner Function(
   ConnectionRow row,
   SqlDialect dialect,
 );
@@ -228,7 +228,7 @@ class McpQueryService {
   }
 
   Future<ErdSchema> _loadSchema(
-    SqlExecutionDelegate delegate,
+    SqlQueryRunner delegate,
     SqlDialect dialect,
   ) async {
     final cols = await _run(
@@ -295,11 +295,11 @@ class McpQueryService {
 
   Future<T> _withDelegate<T>(
     int connectionId,
-    Future<T> Function(SqlExecutionDelegate delegate, SqlDialect dialect) body,
+    Future<T> Function(SqlQueryRunner delegate, SqlDialect dialect) body,
   ) async {
     final row = await _readableConnection(connectionId);
     final dialect = dialectOf(row.type)!;
-    final SqlExecutionDelegate delegate;
+    final SqlQueryRunner delegate;
     try {
       delegate = _createDelegate(row, dialect);
     } catch (e) {

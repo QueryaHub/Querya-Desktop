@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/actions/querya_command_host.dart';
 import 'package:querya_desktop/core/actions/querya_schema_object.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
-import 'package:querya_desktop/features/erd/erd_catalog.dart';
+import 'package:querya_desktop/core/erd/erd_catalog.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/workspace/generic_sql_workspace.dart';
