@@ -28,8 +28,8 @@ class RemoveSavedPasswordOption extends material.StatelessWidget {
             onChanged: (v) => onChanged(v ?? false),
           ),
           const Gap(8),
-          const material.Flexible(
-            child: Text('Remove the saved password').small(),
+          material.Flexible(
+            child: const Text('Remove the saved password').small(),
           ),
         ],
       ),
