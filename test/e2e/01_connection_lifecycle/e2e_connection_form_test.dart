@@ -1,18 +1,25 @@
+import 'package:flutter/gestures.dart' show kSecondaryButton;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/motion/querya_hover_surface.dart';
+import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
+import 'package:querya_desktop/core/storage/folders_storage.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' show Text, TextField;
 
 import '../helpers/e2e_app_harness.dart';
+import '../helpers/e2e_connection_helper.dart';
 
 /// #1050: connections created through the New connection dialog and the form
 /// of each database type, the way a user does it.
 void main() {
   final app = E2eAppHarness(prefix: 'querya_e2e_forms_');
   setUpAll(app.setUpAll);
+  // A first launch without connections opens the welcome tour, and its scrim
+  // covers the sidebar a scenario right-clicks.
+  setUpAll(() => AppSettings.instance.setHasCompletedWelcomeTour(true));
   tearDownAll(app.tearDownAll);
 
   const uriPlaceholder = {
@@ -197,6 +204,46 @@ void main() {
     expect(row!.name, 'E2E Form SQLite');
     expect(row.host, path);
     expect(inSidebar('E2E Form SQLite'), findsOneWidget);
+    await app.close(tester);
+  });
+
+  testWidgets('New connection on a folder saves the connection into it',
+      (tester) async {
+    await app.launch(tester);
+    addTearDown(() => app.resetData(tester));
+    await tester.runAsync(() => FoldersStorage.instance.add('Team Forms'));
+    addTearDown(() =>
+        tester.runAsync(() => FoldersStorage.instance.remove('Team Forms')));
+    // An existing connection keeps the sidebar out of its empty state.
+    await E2eConnections.add(tester, E2eConnections.redis('E2E Anchor'));
+    await tester.runAsync(FoldersStorage.instance.reload);
+    await E2eConnections.reloadSidebar(tester);
+    await waitFor(tester, inSidebar('Team Forms'), 'the folder');
+    final folderId = await tester
+        .runAsync(() => LocalDb.instance.getFolderIdByName('Team Forms'));
+    expect(folderId, isNotNull);
+
+    await tester.tap(inSidebar('Team Forms'), buttons: kSecondaryButton);
+    await step(tester);
+    await tester.tap(find.text('New connection').last);
+    // The handler reads the folder id from disk before the dialog.
+    await tester.pump(const Duration(milliseconds: 150));
+    await step(tester);
+    await pickType(tester, 'PostgreSQL');
+
+    final uriField = byPlaceholder(uriPlaceholder['postgresql']!);
+    await waitFor(tester, uriField, 'the PostgreSQL form');
+    await tester.enterText(uriField, 'postgresql://u:p@folder.example.com:5432/app');
+    await tester.pump();
+    await tester.enterText(byPlaceholder('My PostgreSQL Server'), 'E2E Foldered');
+    await tester.pump();
+    await tester.tap(find.text('Save').hitTestable());
+    await step(tester);
+
+    final row = await savedConnection(tester, 'postgresql');
+    expect(row, isNotNull, reason: 'the connection was not saved');
+    expect(row!.name, 'E2E Foldered');
+    expect(row.folderId, folderId);
     await app.close(tester);
   });
 }
