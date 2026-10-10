@@ -54,4 +54,21 @@ void main() {
     await db.removeFolder('Never existed');
     expect(await db.getFolderIdByName('Empty'), isNull);
   });
+
+  test('setConnectionFolder moves a connection into a folder and out again',
+      () async {
+    final db = LocalDb.instance;
+    await db.addFolder('Mover');
+    final folder = await db.getFolderIdByName('Mover');
+    final id = await db.addConnection(row('Movable'));
+    await ConnectionSecretsStore.writeForConnection(id, password: 'mv-pw');
+
+    await db.setConnectionFolder(id, folder);
+    expect((await db.getConnectionById(id))!.folderId, folder);
+
+    await db.setConnectionFolder(id, null);
+    expect((await db.getConnectionById(id))!.folderId, isNull);
+    expect((await ConnectionSecretsStore.readForConnection(id)).password,
+        'mv-pw');
+  });
 }

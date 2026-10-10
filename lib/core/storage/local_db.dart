@@ -628,6 +628,18 @@ class LocalDb {
     });
   }
 
+  /// Moves a connection into the folder [folderId], or out of any folder when
+  /// it is null. Only the folder changes: secrets and settings are untouched.
+  Future<void> setConnectionFolder(int connectionId, int? folderId) async {
+    final db = await _open();
+    await db.update(
+      'connections',
+      {'folder_id': folderId},
+      where: 'id = ?',
+      whereArgs: [connectionId],
+    );
+  }
+
   Future<void> clearFolders() async {
     final db = await _open();
     await db.delete('folders');

@@ -10,6 +10,7 @@ class _PostgresConnectionTile extends StatefulWidget {
     this.iconAsset,
     required this.onRemove,
     required this.onEdit,
+    this.moveItems = const [],
     this.onTap,
     this.onPostgresObjectSelected,
     this.onPostgresOpenSqlWorkspace,
@@ -23,6 +24,9 @@ class _PostgresConnectionTile extends StatefulWidget {
   final String? iconAsset;
   final VoidCallback onRemove;
   final VoidCallback onEdit;
+
+  /// "Move to folder" menu entries; empty when there is nowhere to move.
+  final List<MenuItem> moveItems;
   final VoidCallback? onTap;
   final void Function(
     ConnectionRow connection,
@@ -144,6 +148,7 @@ class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
           onPressed: (_) => widget.onEdit(),
           child: const Text('Edit connection…'),
         ),
+        ...widget.moveItems,
         MenuButton(
           leading: material.Icon(material.Icons.delete_outline_rounded,
               size: 18, color: theme.colorScheme.mutedForeground),
