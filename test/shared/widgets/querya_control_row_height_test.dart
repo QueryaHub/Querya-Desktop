@@ -99,10 +99,10 @@ void main() {
                     icon: const material.Icon(material.Icons.refresh),
                     onPressed: () {},
                   ),
-                  material.SizedBox(
+                  const material.SizedBox(
                     width: 160,
                     child: QueryaSearchField(
-                      key: const material.ValueKey('search'),
+                      key: material.ValueKey('search'),
                     ),
                   ),
                   QueryaTabStrip(
