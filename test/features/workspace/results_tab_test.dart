@@ -1356,13 +1356,13 @@ void main() {
               textScaler: material.TextScaler.linear(scale),
             ),
             child: resultsShell(
-              child: material.Scaffold(
+              child: const material.Scaffold(
                 body: material.SizedBox(
                   width: 900,
                   height: 500,
                   child: ResultsTab(
-                    columns: const ['id', 'name'],
-                    rows: const [
+                    columns: ['id', 'name'],
+                    rows: [
                       ['1', 'Alice'],
                     ],
                   ),
