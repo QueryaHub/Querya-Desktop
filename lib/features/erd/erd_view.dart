@@ -433,7 +433,27 @@ class _ErdViewState extends material.State<ErdView> {
       ));
       _marked.clear();
     });
+    _gatherIfCovering(_groups.last.id);
     _scheduleSave();
+  }
+
+  /// A group frame that would cover other cards: the group's tables are
+  /// packed into one block, the other cards stay (#1282).
+  void _gatherIfCovering(String id) {
+    final layout = _layout;
+    final i = _groups.indexWhere((g) => g.id == id);
+    if (layout == null || i < 0) return;
+    final tables = _groups[i].tables;
+    if (!layout.frameCoversOthers(tables)) return;
+    setState(() {
+      _setLayout(layout.gather(tables));
+      _followTables(layout);
+    });
+    showAppToast(
+      context: context,
+      message: 'Moved the tables of "${_groups[i].name}" together so its '
+          'frame covers no other table.',
+    );
   }
 
   void _addToGroup(String id, Set<String> tables) {
@@ -449,6 +469,7 @@ class _ErdViewState extends material.State<ErdView> {
       ]);
       _marked.clear();
     });
+    _gatherIfCovering(id);
     _scheduleSave();
   }
 
