@@ -116,6 +116,104 @@ class ErdLayout {
     );
   }
 
+  /// Whether the frame of [members] covers a card that is not one of them.
+  bool frameCoversOthers(Iterable<String> members) {
+    final set = members.toSet();
+    final frame = frameOf(set);
+    if (frame == null) return false;
+    for (final e in positions.entries) {
+      if (set.contains(e.key)) continue;
+      final r = e.value & Size(widthFor(e.key), _heights[e.key] ?? headerHeight);
+      if (frame.overlaps(r)) return true;
+    }
+    return false;
+  }
+
+  /// Gap between the cards of a gathered group.
+  static const double gatherGapX = 60;
+
+  /// Copy with the cards of [members] packed into one block, so their frame
+  /// covers no other card (#1282).
+  ///
+  /// The cards keep their reading order (top to bottom, left to right) in a
+  /// near-square grid. The block goes where the first of the members was, or
+  /// at the next member's place, and if none is free, to the right of every
+  /// other card. Cards that are not members never move.
+  ErdLayout gather(Iterable<String> members) {
+    final names = [for (final m in members) if (positions.containsKey(m)) m]
+      ..sort((a, b) {
+        final pa = positions[a]!, pb = positions[b]!;
+        final c = pa.dy.compareTo(pb.dy);
+        return c != 0 ? c : pa.dx.compareTo(pb.dx);
+      });
+    if (names.length < 2) return this;
+    final set = names.toSet();
+    final cols = math.sqrt(names.length).ceil();
+    final rows = (names.length / cols).ceil();
+    final colWidth = List<double>.filled(cols, 0);
+    final rowHeight = List<double>.filled(rows, 0);
+    for (var i = 0; i < names.length; i++) {
+      colWidth[i % cols] = math.max(colWidth[i % cols], widthFor(names[i]));
+      rowHeight[i ~/ cols] = math.max(
+          rowHeight[i ~/ cols], _heights[names[i]] ?? headerHeight);
+    }
+    // Offsets of each card inside the block.
+    final colX = <double>[0];
+    for (var c = 0; c < cols - 1; c++) {
+      colX.add(colX.last + colWidth[c] + gatherGapX);
+    }
+    final rowY = <double>[0];
+    for (var r = 0; r < rows - 1; r++) {
+      rowY.add(rowY.last + rowHeight[r] + cardGap);
+    }
+    final blockW = colX.last + colWidth.last;
+    final blockH = rowY.last + rowHeight.last;
+
+    final others = [
+      for (final e in positions.entries)
+        if (!set.contains(e.key))
+          (e.value & Size(widthFor(e.key), _heights[e.key] ?? headerHeight))
+              .inflate(8),
+    ];
+    // The block's frame, with room for its padding and title band.
+    bool free(Offset o) {
+      final frame = Rect.fromLTWH(
+        o.dx - framePadding,
+        o.dy - framePadding - frameTitleHeight,
+        blockW + 2 * framePadding,
+        blockH + 2 * framePadding + frameTitleHeight,
+      );
+      return !others.any(frame.overlaps);
+    }
+
+    const minX = framePadding + 8;
+    const minY = frameTitleHeight + framePadding + 8;
+    Offset clamp(Offset o) =>
+        Offset(math.max(minX, o.dx), math.max(minY, o.dy));
+    var origin = positions[names.first]!;
+    var placed = false;
+    for (final n in names) {
+      final o = clamp(positions[n]!);
+      if (free(o)) {
+        origin = o;
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      var right = 0.0;
+      for (final e in positions.entries) {
+        if (set.contains(e.key)) continue;
+        right = math.max(right, e.value.dx + widthFor(e.key));
+      }
+      origin = clamp(Offset(right + layerGap, positions[names.first]!.dy));
+    }
+    return withPositions({
+      for (var i = 0; i < names.length; i++)
+        names[i]: origin + Offset(colX[i % cols], rowY[i ~/ cols]),
+    });
+  }
+
   /// Copy with every table of [moves] at its new top-left, as
   /// [withPosition] places one.
   ErdLayout withPositions(Map<String, Offset> moves) {

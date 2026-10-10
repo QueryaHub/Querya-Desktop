@@ -14,10 +14,14 @@ import '../../support/querya_theme_test_shell.dart';
 
 /// #1282: groups made on the diagram, dragged by their title, kept.
 class _MemoryStore implements ErdLayoutStore {
+  _MemoryStore([this.initial]);
+
+  final ErdSavedLayout? initial;
   final layouts = <ErdLayoutKey, ErdSavedLayout>{};
 
   @override
-  Future<ErdSavedLayout?> read(ErdLayoutKey key) async => layouts[key];
+  Future<ErdSavedLayout?> read(ErdLayoutKey key) async =>
+      layouts[key] ?? initial;
 
   @override
   Future<void> write(ErdLayoutKey key, ErdSavedLayout layout) async =>
@@ -170,5 +174,34 @@ void main() {
     await t.tap(find.byKey(const material.ValueKey('erd_menu_ungroup_tags')));
     await t.pump(const Duration(milliseconds: 300));
     expect(_frame, findsNothing);
+  });
+
+  testWidgets('a group over other cards gathers its own tables, others stay',
+      variant: desktop, (t) async {
+    // users, orders and tags in a row: a frame around users and tags would
+    // cover orders.
+    final store = _MemoryStore(const ErdSavedLayout(positions: {
+      'users': Offset(40, 60),
+      'orders': Offset(300, 60),
+      'tags': Offset(560, 60),
+    }));
+    await pumpDiagram(t, store);
+    final orders = t.getRect(_card('orders'));
+
+    await mark(t, 'users');
+    await mark(t, 'tags');
+    await t.tap(find.byKey(const material.ValueKey('erd_group_marked')));
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 400));
+    await t.tap(find.byKey(const material.ValueKey('erd_group_submit')));
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 400));
+
+    expect(t.getRect(_card('orders')), orders);
+    final together =
+        t.getRect(_card('users')).expandToInclude(t.getRect(_card('tags')));
+    expect(together.overlaps(orders), isFalse);
+    expect(find.textContaining('together'), findsOneWidget);
+    await t.pump(const Duration(seconds: 5));
   });
 }

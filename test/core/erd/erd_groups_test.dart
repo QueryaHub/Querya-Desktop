@@ -147,6 +147,76 @@ void main() {
     });
   });
 
+  group('gather', () {
+    // A tall chain on the left and two loose tables far below it.
+    ErdLayout spread() => ErdLayout.compute(_schema()).withPositions({
+          'users': const Offset(40, 40),
+          'orders': const Offset(300, 40),
+          'items': const Offset(600, 40),
+          'tags': const Offset(40, 600),
+          'logs': const Offset(300, 600),
+          'audit': const Offset(1200, 700),
+        });
+
+    test('a frame over other cards is detected, a clear one is not', () {
+      final l = spread();
+      // Between users and items lies orders.
+      expect(l.frameCoversOthers(['users', 'items']), isTrue);
+      expect(l.frameCoversOthers(['users', 'orders', 'items']), isFalse);
+      expect(l.frameCoversOthers(['tags']), isFalse);
+    });
+
+    test('the gathered block covers no other card and others stay', () {
+      final l = spread();
+      final members = ['users', 'items', 'audit'];
+      final g = l.gather(members);
+      expect(g.frameCoversOthers(members), isFalse);
+      for (final t in ['orders', 'tags', 'logs']) {
+        expect(g.positions[t], l.positions[t], reason: t);
+      }
+      // The members are close: one frame, not a diagram-wide one.
+      final frame = g.frameOf(members)!;
+      expect(frame.width, lessThan(1000));
+      // No overlap between the members.
+      final schema = _schema();
+      final rects = [
+        for (final m in members)
+          g.rectOf(schema.tables.firstWhere((t) => t.name == m)),
+      ];
+      for (var i = 0; i < rects.length; i++) {
+        for (var j = i + 1; j < rects.length; j++) {
+          expect(rects[i].overlaps(rects[j]), isFalse);
+        }
+      }
+    });
+
+    test('when no member place is free the block goes to the right', () {
+      final s = _schema();
+      // Every card in one place of a tight row: nothing near is free.
+      final l = ErdLayout.compute(s).withPositions({
+        'users': const Offset(40, 40),
+        'orders': const Offset(280, 40),
+        'items': const Offset(520, 40),
+        'tags': const Offset(760, 40),
+        'logs': const Offset(1000, 40),
+        'audit': const Offset(1240, 40),
+      });
+      final g = l.gather(['users', 'items']);
+      expect(g.frameCoversOthers(['users', 'items']), isFalse);
+      final right = [
+        for (final t in ['orders', 'tags', 'logs', 'audit'])
+          g.positions[t]!.dx + g.widthFor(t),
+      ].reduce((a, b) => a > b ? a : b);
+      expect(g.positions['users']!.dx, greaterThan(right));
+    });
+
+    test('one table or unknown names change nothing', () {
+      final l = spread();
+      expect(identical(l.gather(['users']), l), isTrue);
+      expect(identical(l.gather(['nope', 'zzz']), l), isTrue);
+    });
+  });
+
   test('the SVG draws a frame and a title per group', () {
     final s = _schema();
     final l = ErdLayout.compute(s, groups: [
