@@ -67,6 +67,91 @@ void main() {
       expect(box.width, 32);
       expect(box.height, 32);
     });
+
+    testWidgets('draws a 2px focus ring while it has keyboard focus (#1370)',
+        (tester) async {
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: QueryaIconButton(
+            icon: const material.Icon(material.Icons.refresh),
+            onPressed: () {},
+          ),
+        ),
+      );
+
+      final materialFinder = find
+          .descendant(
+            of: find.byType(QueryaIconButton),
+            matching: find.byType(material.Material),
+          )
+          .first;
+      final inkFinder = find.descendant(
+        of: find.byType(QueryaIconButton),
+        matching: find.byType(material.InkWell),
+      );
+      double ringWidth() {
+        final shape =
+            tester.widget<material.Material>(materialFinder).shape!
+                as material.RoundedRectangleBorder;
+        return shape.side.width;
+      }
+
+      expect(ringWidth(), 0);
+
+      tester.widget<material.InkWell>(inkFinder).onFocusChange!(true);
+      await tester.pump();
+      expect(ringWidth(), 2);
+
+      tester.widget<material.InkWell>(inkFinder).onFocusChange!(false);
+      await tester.pump();
+      expect(ringWidth(), 0);
+    });
+
+    testWidgets('exposes button, enabled and selected state (#1370)',
+        (tester) async {
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: QueryaIconButton(
+            icon: const material.Icon(material.Icons.wrap_text),
+            tooltip: 'Word wrap',
+            isActive: true,
+            onPressed: () {},
+          ),
+        ),
+      );
+
+      expect(
+        find.byWidgetPredicate(
+          (w) =>
+              w is material.Semantics &&
+              w.properties.button == true &&
+              w.properties.enabled == true &&
+              w.properties.selected == true,
+        ),
+        findsWidgets,
+      );
+    });
+
+    testWidgets('a button without a callback is exposed as disabled (#1370)',
+        (tester) async {
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: const QueryaIconButton(
+            icon: material.Icon(material.Icons.refresh),
+          ),
+        ),
+      );
+
+      expect(
+        find.byWidgetPredicate(
+          (w) =>
+              w is material.Semantics &&
+              w.properties.button == true &&
+              w.properties.enabled == false,
+        ),
+        findsWidgets,
+      );
+    });
   });
 
   group('QueryaToolbarButton', () {

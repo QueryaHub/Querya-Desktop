@@ -18,7 +18,7 @@ enum QueryaIconButtonDensity {
 }
 
 /// Standard icon button with density presets, hover/active states, and built-in tooltip.
-class QueryaIconButton extends material.StatelessWidget {
+class QueryaIconButton extends material.StatefulWidget {
   const QueryaIconButton({
     super.key,
     required this.icon,
@@ -60,10 +60,26 @@ class QueryaIconButton extends material.StatelessWidget {
   final material.BorderRadius? borderRadius;
 
   @override
+  material.State<QueryaIconButton> createState() => _QueryaIconButtonState();
+}
+
+class _QueryaIconButtonState extends material.State<QueryaIconButton> {
+  /// Whether the button has keyboard focus (#1370): drawn as a 2px ring.
+  bool _focused = false;
+
+  @override
   material.Widget build(material.BuildContext context) {
+    final icon = widget.icon;
+    final tooltip = widget.tooltip;
+    final onPressed = widget.onPressed;
+    final density = widget.density;
+    final isActive = widget.isActive;
+    final isDestructive = widget.isDestructive;
+    final color = widget.color;
+    final activeColor = widget.activeColor;
     final cs = Theme.of(context).colorScheme;
     final workbench = QueryaThemeScope.maybeOf(context)?.workbench;
-    final radius = borderRadius ?? material.BorderRadius.circular(6);
+    final radius = widget.borderRadius ?? material.BorderRadius.circular(6);
 
     final isEnabled = onPressed != null;
 
@@ -98,19 +114,25 @@ class QueryaIconButton extends material.StatelessWidget {
       color: effectiveBgColor ?? material.Colors.transparent,
       shape: material.RoundedRectangleBorder(
         borderRadius: radius,
-        side: isActive
-            ? material.BorderSide(
-                color: (isDestructive ? destructiveColor : accentColor)
-                    .withValues(alpha: 0.3),
-                width: 1,
-              )
-            : material.BorderSide.none,
+        side: _focused
+            ? material.BorderSide(color: cs.ring, width: 2)
+            : isActive
+                ? material.BorderSide(
+                    color: (isDestructive ? destructiveColor : accentColor)
+                        .withValues(alpha: 0.3),
+                    width: 1,
+                  )
+                : material.BorderSide.none,
       ),
       clipBehavior: material.Clip.antiAlias,
       child: material.InkWell(
         onTap: onPressed,
+        onFocusChange: (focused) {
+          if (_focused != focused) setState(() => _focused = focused);
+        },
         borderRadius: radius,
         hoverColor: hoverColor,
+        focusColor: material.Colors.transparent,
         splashColor: (isDestructive ? destructiveColor : accentColor)
             .withValues(alpha: 0.2),
         child: material.SizedBox(
@@ -131,9 +153,16 @@ class QueryaIconButton extends material.StatelessWidget {
       ),
     );
 
-    if (tooltip != null && tooltip!.isNotEmpty) {
+    button = material.Semantics(
+      button: true,
+      enabled: onPressed != null,
+      selected: isActive,
+      child: button,
+    );
+
+    if (tooltip != null && tooltip.isNotEmpty) {
       button = material.Tooltip(
-        message: tooltip!,
+        message: tooltip,
         waitDuration: kQueryaTooltipWait,
         child: button,
       );
@@ -144,7 +173,7 @@ class QueryaIconButton extends material.StatelessWidget {
 }
 
 /// Standard toolbar button with optional leading icon, label, and shortcut hint.
-class QueryaToolbarButton extends material.StatelessWidget {
+class QueryaToolbarButton extends material.StatefulWidget {
   const QueryaToolbarButton({
     super.key,
     required this.label,
@@ -167,7 +196,24 @@ class QueryaToolbarButton extends material.StatelessWidget {
   final bool isDestructive;
 
   @override
+  material.State<QueryaToolbarButton> createState() =>
+      _QueryaToolbarButtonState();
+}
+
+class _QueryaToolbarButtonState extends material.State<QueryaToolbarButton> {
+  /// Whether the button has keyboard focus (#1370): drawn as a 2px ring.
+  bool _focused = false;
+
+  @override
   material.Widget build(material.BuildContext context) {
+    final label = widget.label;
+    final icon = widget.icon;
+    final tooltip = widget.tooltip;
+    final shortcutHint = widget.shortcutHint;
+    final onPressed = widget.onPressed;
+    final density = widget.density;
+    final isActive = widget.isActive;
+    final isDestructive = widget.isDestructive;
     final cs = Theme.of(context).colorScheme;
     final workbench = QueryaThemeScope.maybeOf(context)?.workbench;
     final isEnabled = onPressed != null;
@@ -202,7 +248,7 @@ class QueryaToolbarButton extends material.StatelessWidget {
               size: density.iconSize,
               color: effectiveFgColor,
             ),
-            child: icon!,
+            child: icon,
           ),
           const Gap(6),
         ],
@@ -223,7 +269,7 @@ class QueryaToolbarButton extends material.StatelessWidget {
               borderRadius: material.BorderRadius.circular(3),
             ),
             child: material.Text(
-              shortcutHint!,
+              shortcutHint,
               style: material.TextStyle(
                 fontSize: 9,
                 fontWeight: material.FontWeight.w500,
@@ -239,19 +285,25 @@ class QueryaToolbarButton extends material.StatelessWidget {
       color: effectiveBgColor,
       shape: material.RoundedRectangleBorder(
         borderRadius: radius,
-        side: isActive
-            ? material.BorderSide(
-                color: (isDestructive ? destructiveColor : accentColor)
-                    .withValues(alpha: 0.3),
-                width: 1,
-              )
-            : material.BorderSide.none,
+        side: _focused
+            ? material.BorderSide(color: cs.ring, width: 2)
+            : isActive
+                ? material.BorderSide(
+                    color: (isDestructive ? destructiveColor : accentColor)
+                        .withValues(alpha: 0.3),
+                    width: 1,
+                  )
+                : material.BorderSide.none,
       ),
       clipBehavior: material.Clip.antiAlias,
       child: material.InkWell(
         onTap: onPressed,
+        onFocusChange: (focused) {
+          if (_focused != focused) setState(() => _focused = focused);
+        },
         borderRadius: radius,
         hoverColor: hoverColor,
+        focusColor: material.Colors.transparent,
         child: material.Container(
           height: density.boxSize,
           padding: material.EdgeInsets.symmetric(
@@ -263,9 +315,16 @@ class QueryaToolbarButton extends material.StatelessWidget {
       ),
     );
 
-    if (tooltip != null && tooltip!.isNotEmpty) {
+    button = material.Semantics(
+      button: true,
+      enabled: onPressed != null,
+      selected: isActive,
+      child: button,
+    );
+
+    if (tooltip != null && tooltip.isNotEmpty) {
       button = material.Tooltip(
-        message: tooltip!,
+        message: tooltip,
         waitDuration: kQueryaTooltipWait,
         child: button,
       );
