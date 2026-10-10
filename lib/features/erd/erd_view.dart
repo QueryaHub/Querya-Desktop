@@ -1390,8 +1390,16 @@ class _TableCard extends material.StatelessWidget {
         if (c.isUnique && !c.isPrimaryKey) 'Unique',
         if (c.isIdentity) 'Generated (identity / auto increment)',
         if (c.defaultValue case final d?) 'Default: $d',
+        if (c.domainBase case final b?) 'Domain over $b',
+        if (c.enumValues.isNotEmpty) 'Values: ${_enumList(c.enumValues)}',
         if (c.comment case final n?) 'Note: $n',
       ].join('\n');
+
+  /// At most [cap] labels, then how many more.
+  static String _enumList(List<String> values, {int cap = 12}) =>
+      values.length <= cap
+          ? values.join(', ')
+          : '${values.take(cap).join(', ')} (+${values.length - cap} more)';
 
   /// Shadows read only on light surfaces, so a dark canvas gets twice the alpha.
   double _shadowAlpha(material.Color canvas) {
@@ -1559,6 +1567,7 @@ class _TableCard extends material.StatelessWidget {
                                         fontSize: 9,
                                         fontWeight: material.FontWeight.w700,
                                         color: switch (b) {
+                                          'EN' => palette.type5,
                                           'UQ' => palette.type3,
                                           'AI' => palette.type4,
                                           _ => wb.mutedForeground,

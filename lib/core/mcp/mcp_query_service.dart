@@ -144,6 +144,7 @@ class McpQueryService {
               identity: c.isIdentity,
               defaultValue: c.defaultValue,
               comment: c.comment,
+              enumValues: c.enumValues,
               references: [
                 for (final r in schema.relations)
                   if (r.fromTable == t.name && r.fromColumn == c.name)
@@ -433,6 +434,7 @@ class McpColumnInfo {
     this.defaultValue,
     this.identity = false,
     this.comment,
+    this.enumValues = const [],
   });
 
   final String name;
@@ -442,6 +444,7 @@ class McpColumnInfo {
   final String? defaultValue;
   final bool identity;
   final String? comment;
+  final List<String> enumValues;
 
   /// `table.column` this column points to, when it is a foreign key.
   final String? references;
@@ -455,6 +458,7 @@ class McpColumnInfo {
         if (identity) 'identity': true,
         if (defaultValue != null) 'default': defaultValue,
         if (comment != null) 'comment': comment,
+        if (enumValues.isNotEmpty) 'enum_values': enumValues,
       };
 }
 

@@ -12,6 +12,8 @@ class ErdColumn {
     this.defaultValue,
     this.isIdentity = false,
     this.comment,
+    this.enumValues = const [],
+    this.domainBase,
   });
 
   final String name;
@@ -35,8 +37,16 @@ class ErdColumn {
   /// none (#1279).
   final String? comment;
 
+  /// The labels of an enum type, in their order (#1280): PostgreSQL enums
+  /// (also behind a domain) and MySQL `enum(...)` columns.
+  final List<String> enumValues;
+
+  /// The base type when the column's type is a PostgreSQL domain.
+  final String? domainBase;
+
   /// Short markers after the type on a card and in exports (#1277).
   List<String> get badges => [
+        if (enumValues.isNotEmpty) 'EN',
         if (isUnique && !isPrimaryKey) 'UQ',
         if (isIdentity) 'AI',
         if (defaultValue != null && !isIdentity) 'DF',
@@ -52,6 +62,8 @@ class ErdColumn {
         defaultValue: defaultValue,
         isIdentity: isIdentity,
         comment: comment,
+        enumValues: enumValues,
+        domainBase: domainBase,
       );
 }
 
@@ -105,7 +117,8 @@ class ErdSchema {
   ///
   /// [columnRows]: `table, column, type, isPk`, then optionally `isNullable`,
   /// `isUnique`, `default` and `isIdentity` (#1277), then the column comment
-  /// and the table comment (#1279). [fkRows]: `table, column, refTable, refColumn`. Relations to
+  /// and the table comment (#1279), then the enum labels (separated by
+  /// U+001F) and a domain's base type (#1280). [fkRows]: `table, column, refTable, refColumn`. Relations to
   /// unknown tables are dropped.
   factory ErdSchema.fromCatalog({
     required List<List<String>> columnRows,
@@ -130,6 +143,8 @@ class ErdSchema {
         defaultValue: r.length > 6 ? _default(r[6]) : null,
         isIdentity: r.length > 7 && _truthy(r[7]),
         comment: r.length > 8 ? _text(r[8]) : null,
+        enumValues: _enumValues(r[2], r.length > 10 ? r[10] : ''),
+        domainBase: r.length > 11 ? _text(r[11]) : null,
       ));
       if (r.length > 9) {
         final tc = _text(r[9]);
@@ -192,4 +207,34 @@ String? _text(String raw) {
   final v = raw.trim();
   if (v.isEmpty || v == 'NULL') return null;
   return v;
+}
+
+/// Enum labels from the catalog cell, or from a MySQL `enum('a','b')` type.
+List<String> _enumValues(String type, String cell) {
+  final listed = _text(cell);
+  if (listed != null) return listed.split('\u001f');
+  final t = type.trim();
+  if (!t.toLowerCase().startsWith('enum(') || !t.endsWith(')')) return const [];
+  final body = t.substring(5, t.length - 1);
+  final out = <String>[];
+  final cur = StringBuffer();
+  var inQuote = false;
+  for (var i = 0; i < body.length; i++) {
+    final ch = body[i];
+    if (inQuote) {
+      if (ch == "'" && i + 1 < body.length && body[i + 1] == "'") {
+        cur.write("'");
+        i++;
+      } else if (ch == "'") {
+        inQuote = false;
+        out.add(cur.toString());
+        cur.clear();
+      } else {
+        cur.write(ch);
+      }
+    } else if (ch == "'") {
+      inQuote = true;
+    }
+  }
+  return out;
 }

@@ -45,9 +45,16 @@ SELECT ${_pgQualified('c', 'ns')} AS table_name, a.attname AS column_name,
     OR pg_get_expr(df.adbin, df.adrelid) LIKE 'nextval(%'
     THEN 1 ELSE 0 END AS is_identity,
   col_description(c.oid, a.attnum) AS column_comment,
-  obj_description(c.oid, 'pg_class') AS table_comment
+  obj_description(c.oid, 'pg_class') AS table_comment,
+  (SELECT string_agg(e.enumlabel, chr(31) ORDER BY e.enumsortorder)
+     FROM pg_catalog.pg_enum e
+     WHERE e.enumtypid = CASE WHEN ty.typtype = 'd'
+       THEN ty.typbasetype ELSE ty.oid END) AS enum_values,
+  CASE WHEN ty.typtype = 'd'
+    THEN format_type(ty.typbasetype, ty.typtypmod) END AS domain_base
 FROM pg_catalog.pg_attribute a
 JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
+JOIN pg_catalog.pg_type ty ON ty.oid = a.atttypid
 JOIN pg_catalog.pg_namespace ns ON ns.oid = c.relnamespace
 LEFT JOIN pg_catalog.pg_constraint pk
   ON pk.conrelid = c.oid AND pk.contype = 'p' AND a.attnum = ANY (pk.conkey)
