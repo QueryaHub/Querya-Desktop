@@ -1,5 +1,5 @@
 import 'package:flutter/gestures.dart' show kSecondaryButton;
-import 'package:flutter/widgets.dart' show CustomScrollView;
+import 'package:flutter/widgets.dart' show ValueKey;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/folders_storage.dart';
@@ -161,21 +161,25 @@ void main() {
       tester.getCenter(inSidebar('E2E Dragged').first),
       tester.getCenter(inSidebar('Team D')),
     );
-    var row =
+    final first =
         await tester.runAsync(() => LocalDb.instance.getConnectionById(id));
-    expect(row!.folderId, folderId, reason: 'dropped on the folder');
+    expect(first!.folderId, folderId, reason: 'dropped on the folder');
 
-    // The folder opens to show it; drag it onto the empty part of the list.
+    // The folder opens to show it. While it is dragged a strip appears at the
+    // top of the list; drop it there.
     expect(inSidebar('E2E Dragged'), findsOneWidget);
-    // The empty part of the list, inside the scroll view that is the target
-    // (the panel itself also has a header and a footer).
-    final list = tester.getRect(find.descendant(
-      of: find.byType(ConnectionsPanel),
-      matching: find.byType(CustomScrollView),
-    ));
-    final drop = Offset(list.center.dx, list.bottom - 24);
-    await dragTo(tester.getCenter(inSidebar('E2E Dragged').first), drop);
+    final from = tester.getCenter(inSidebar('E2E Dragged').first);
+    final gesture = await tester.startGesture(from);
+    await gesture.moveBy(const Offset(0, 24));
+    await tester.pump(const Duration(milliseconds: 100));
+    final strip = find.byKey(const ValueKey('drop_out_of_folder'));
+    expect(strip, findsOneWidget, reason: 'the drop strip shows while dragging');
+    await gesture.moveTo(tester.getCenter(strip));
+    await tester.pump(const Duration(milliseconds: 50));
+    await gesture.up();
+    await tester.pump(const Duration(milliseconds: 300));
     // The write is real I/O: give it time before reading.
+    ConnectionRow? row;
     for (var i = 0; i < 20; i++) {
       row = await tester
           .runAsync<ConnectionRow?>(() => LocalDb.instance.getConnectionById(id));
@@ -184,8 +188,7 @@ void main() {
           () => Future<void>.delayed(const Duration(milliseconds: 50)));
       await tester.pump(const Duration(milliseconds: 100));
     }
-    expect(row!.folderId, isNull,
-        reason: 'dropped on the list at $drop; list $list');
+    expect(row!.folderId, isNull, reason: 'dropped on the strip');
 
     await E2eConnections.remove(tester, id);
     await tester.runAsync(() => FoldersStorage.instance.remove('Team D'));

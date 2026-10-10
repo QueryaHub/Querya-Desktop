@@ -2,6 +2,7 @@ import 'dart:async' show Timer;
 
 import 'package:flutter/material.dart' as material
     show
+        Center,
         DecoratedBox,
         DecorationPosition,
         DragTarget,
@@ -573,6 +574,9 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
   List<String> _folders = [];
   List<ConnectionRow> _connections = [];
   Map<String, int> _folderIdByName = {};
+
+  /// The connection being dragged, while a drag is in progress.
+  int? _draggedId;
   final Set<String> _expandedFolders = {};
   final Set<int> _expandedConnections = {};
 
@@ -857,6 +861,12 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     return material.Draggable<int>(
       data: id,
       maxSimultaneousDrags: 1,
+      onDragStarted: () {
+        if (mounted) setState(() => _draggedId = id);
+      },
+      onDragEnd: (_) {
+        if (mounted) setState(() => _draggedId = null);
+      },
       dragAnchorStrategy: material.pointerDragAnchorStrategy,
       feedback: material.Material(
         color: material.Colors.transparent,
@@ -1217,6 +1227,38 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                 height: 1,
                 color: theme.colorScheme.border.withValues(alpha: 0.22),
               ),
+              // While a connection from a folder is dragged, a labelled place
+              // to drop it: the empty part of the list works too, but nobody
+              // would know.
+              if (_draggedId != null && _acceptsDrop(_draggedId!, null))
+                material.DragTarget<int>(
+                  onWillAcceptWithDetails: (d) => _acceptsDrop(d.data, null),
+                  onAcceptWithDetails: (d) => _dropConnection(d.data, null),
+                  builder: (context, candidates, _) => material.Container(
+                    key: const material.ValueKey('drop_out_of_folder'),
+                    margin: const material.EdgeInsets.fromLTRB(12, 8, 12, 0),
+                    padding: const material.EdgeInsets.symmetric(vertical: 10),
+                    decoration: material.BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(
+                          alpha: candidates.isEmpty ? 0.06 : 0.18),
+                      borderRadius: material.BorderRadius.circular(8),
+                      border: material.Border.all(
+                        color: theme.colorScheme.primary
+                            .withValues(alpha: candidates.isEmpty ? 0.4 : 1),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: material.Center(
+                      child: material.Text(
+                        'Drop here to take it out of the folder',
+                        style: material.TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               Expanded(
                 child: material.RepaintBoundary(
                   child: material.DragTarget<int>(
