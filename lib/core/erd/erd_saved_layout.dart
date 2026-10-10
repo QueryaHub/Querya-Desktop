@@ -22,6 +22,7 @@ class ErdSavedLayout {
     this.translation,
     this.headerColors = const {},
     this.groups = const [],
+    this.notes = const [],
   });
 
   final Map<String, Offset> positions;
@@ -40,13 +41,17 @@ class ErdSavedLayout {
   /// Groups the user made (#1282). A table is in one group at most.
   final List<ErdGroup> groups;
 
+  /// Sticky notes on the canvas (#1283).
+  final List<ErdNote> notes;
+
   bool get isEmpty =>
       positions.isEmpty &&
       collapsed.isEmpty &&
       hidden.isEmpty &&
       detail == ErdDetail.all &&
       headerColors.isEmpty &&
-      groups.isEmpty;
+      groups.isEmpty &&
+      notes.isEmpty;
 
   /// The layout without the tables that no longer exist.
   ErdSavedLayout keepOnly(Set<String> tables) => ErdSavedLayout(
@@ -71,6 +76,13 @@ class ErdSavedLayout {
                   if (tables.contains(t)) t,
               ]),
         ],
+        // A note of a gone table stays where it was, unattached.
+        notes: [
+          for (final n in notes)
+            n.attachedTo == null || tables.contains(n.attachedTo)
+                ? n
+                : n.copyWith(attachedTo: () => null),
+        ],
       );
 
   Map<String, Object?> toJson() => {
@@ -87,6 +99,7 @@ class ErdSavedLayout {
           'translation': [_round(translation!.dx), _round(translation!.dy)],
         if (headerColors.isNotEmpty) 'headerColors': headerColors,
         if (groups.isNotEmpty) 'groups': [for (final g in groups) g.toJson()],
+        if (notes.isNotEmpty) 'notes': [for (final n in notes) n.toJson()],
       };
 
   static double _round(double v) => (v * 10).roundToDouble() / 10;
@@ -134,6 +147,14 @@ class ErdSavedLayout {
         if (tables.isNotEmpty) groups.add(g.copyWith(tables: tables));
       }
     }
+    final notes = <ErdNote>[];
+    final rawNotes = json['notes'];
+    if (rawNotes is List) {
+      for (final raw in rawNotes) {
+        final n = ErdNote.fromJson(raw);
+        if (n != null && !notes.any((o) => o.id == n.id)) notes.add(n);
+      }
+    }
     return ErdSavedLayout(
       positions: positions,
       collapsed: names(json['collapsed']),
@@ -147,6 +168,7 @@ class ErdSavedLayout {
       translation: offset(json['translation']),
       headerColors: colors,
       groups: groups,
+      notes: notes,
     );
   }
 
@@ -229,6 +251,92 @@ class ErdGroup {
       color: color,
       tables: names.toSet().toList(),
       note: note is String && note.trim().isNotEmpty ? note : null,
+    );
+  }
+}
+
+/// A sticky note on the canvas (#1283): Markdown-light [text], an optional
+/// palette slot [color], a canvas rectangle, and optionally the table it
+/// follows.
+class ErdNote {
+  const ErdNote({
+    required this.id,
+    required this.text,
+    required this.x,
+    required this.y,
+    this.width = defaultWidth,
+    this.height = defaultHeight,
+    this.color,
+    this.attachedTo,
+  });
+
+  static const defaultWidth = 200.0;
+  static const defaultHeight = 110.0;
+  static const minWidth = 120.0;
+  static const minHeight = 60.0;
+
+  final String id;
+  final String text;
+  final double x;
+  final double y;
+  final double width;
+  final double height;
+
+  /// A palette slot ([erdHeaderSlots]); null is the neutral note.
+  final String? color;
+
+  /// The table this note moves with.
+  final String? attachedTo;
+
+  ErdNote copyWith({
+    String? text,
+    double? x,
+    double? y,
+    double? width,
+    double? height,
+    String? Function()? color,
+    String? Function()? attachedTo,
+  }) =>
+      ErdNote(
+        id: id,
+        text: text ?? this.text,
+        x: x ?? this.x,
+        y: y ?? this.y,
+        width: width ?? this.width,
+        height: height ?? this.height,
+        color: color == null ? this.color : color(),
+        attachedTo: attachedTo == null ? this.attachedTo : attachedTo(),
+      );
+
+  Map<String, Object?> toJson() => {
+        'id': id,
+        'text': text,
+        'x': _r(x),
+        'y': _r(y),
+        'w': _r(width),
+        'h': _r(height),
+        if (color != null) 'color': color,
+        if (attachedTo != null) 'table': attachedTo,
+      };
+
+  static double _r(double v) => (v * 10).roundToDouble() / 10;
+
+  static ErdNote? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final id = json['id'], text = json['text'];
+    final x = json['x'], y = json['y'], w = json['w'], h = json['h'];
+    final color = json['color'], table = json['table'];
+    if (id is! String || id.isEmpty || text is! String) return null;
+    if (x is! num || y is! num) return null;
+    return ErdNote(
+      id: id,
+      text: text,
+      x: x.toDouble(),
+      y: y.toDouble(),
+      width: w is num ? w.toDouble().clamp(minWidth, 2000) : defaultWidth,
+      height: h is num ? h.toDouble().clamp(minHeight, 2000) : defaultHeight,
+      color: color is String && erdHeaderSlots.contains(color) ? color : null,
+      attachedTo: table is String && table.isNotEmpty ? table : null,
     );
   }
 }

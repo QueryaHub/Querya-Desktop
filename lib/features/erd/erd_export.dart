@@ -1,6 +1,7 @@
 import 'dart:math' show max, min;
 import 'dart:ui' show Offset, Rect, Size;
 
+import 'package:querya_desktop/core/erd/erd_note_text.dart';
 import 'package:querya_desktop/features/erd/erd_geometry.dart';
 import 'package:querya_desktop/features/erd/erd_layout.dart';
 import 'package:querya_desktop/core/erd/erd_model.dart';
@@ -57,6 +58,21 @@ class ErdSvgGroup {
   final String stroke;
 }
 
+/// A sticky note in the SVG (#1283): its rectangle, text and colours.
+class ErdSvgNote {
+  const ErdSvgNote({
+    required this.text,
+    required this.rect,
+    required this.fill,
+    required this.stroke,
+  });
+
+  final String text;
+  final Rect rect;
+  final String fill;
+  final String stroke;
+}
+
 /// Text exports of an [ErdSchema].
 class ErdExport {
   ErdExport._();
@@ -68,6 +84,9 @@ class ErdExport {
   // names, monospace at 10 px for types and the column count.
   static const double _nameCharPx = 7.5;
   static const double _typeCharPx = 6.0;
+
+  /// Glyph width of a note's 11 px text.
+  static const double _noteCharPx = 6.2;
 
   /// Card corner radius, as on screen.
   static const double _cardRadius = 8;
@@ -164,8 +183,13 @@ class ErdExport {
     ErdSvgColors colors = const ErdSvgColors(),
     Map<String, String> headerFills = const {},
     List<ErdSvgGroup> groups = const [],
+    List<ErdSvgNote> notes = const [],
   }) {
-    final size = layout.size;
+    var size = layout.size;
+    for (final n in notes) {
+      size = Size(max(size.width, n.rect.right + ErdLayout.margin),
+          max(size.height, n.rect.bottom + ErdLayout.margin));
+    }
     final w = _n(size.width), h = _n(size.height);
     final b = StringBuffer()
       ..writeln('<svg xmlns="http://www.w3.org/2000/svg" width="$w" height="$h" '
@@ -295,6 +319,59 @@ class ErdExport {
               'text-anchor="end" font-size="10" font-family="monospace" '
               'fill="${colors.muted}">'
               '${_esc(_fit(type, typeAvail, _typeCharPx))}</text>');
+      }
+      b.writeln('</g>');
+    }
+    // Sticky notes above the cards, text wrapped to the note's width.
+    for (var i = 0; i < notes.length; i++) {
+      final note = notes[i];
+      final r = note.rect;
+      final avail = r.width - 16;
+      b
+        ..writeln('<clipPath id="note$i"><rect x="${_n(r.left)}" '
+            'y="${_n(r.top)}" width="${_n(r.width)}" height="${_n(r.height)}"/>'
+            '</clipPath>')
+        ..writeln('<rect class="erd-note" x="${_n(r.left)}" y="${_n(r.top)}" '
+            'width="${_n(r.width)}" height="${_n(r.height)}" rx="6" '
+            'fill="${note.fill}" stroke="${note.stroke}"/>')
+        ..writeln('<g clip-path="url(#note$i)" font-size="11">');
+      var y = r.top + 8 + 11;
+      for (final line in parseErdNote(note.text)) {
+        final prefix = line.bullet ? '•  ' : '';
+        final plain = '$prefix${line.plain}';
+        if (plain.length * _noteCharPx <= avail) {
+          final runs = StringBuffer();
+          for (final run in line.runs) {
+            runs.write(run.bold
+                ? '<tspan font-weight="bold">${_esc(run.text)}</tspan>'
+                : _esc(run.text));
+          }
+          b.writeln('<text class="erd-note-line" x="${_n(r.left + 8)}" '
+              'y="${_n(y)}" xml:space="preserve">${_esc(prefix)}$runs</text>');
+          y += 15;
+          continue;
+        }
+        // Too long for one line: wrapped by words, without the bold.
+        var current = prefix;
+        void flush() {
+          b.writeln('<text class="erd-note-line" x="${_n(r.left + 8)}" '
+              'y="${_n(y)}" xml:space="preserve">${_esc(current)}</text>');
+          y += 15;
+          current = '';
+        }
+
+        for (final word in line.plain.split(' ')) {
+          final next = current.isEmpty || current == prefix
+              ? '$current$word'
+              : '$current $word';
+          if (next.length * _noteCharPx > avail && current.trim().isNotEmpty) {
+            flush();
+            current = word;
+          } else {
+            current = next;
+          }
+        }
+        if (current.isNotEmpty) flush();
       }
       b.writeln('</g>');
     }
