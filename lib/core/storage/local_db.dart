@@ -803,6 +803,8 @@ class LocalDb {
     final previousRow = ConnectionRow.fromMap(previousMaps.first);
     final previousSecrets =
         await ConnectionSecretsStore.readForConnection(row.id!);
+    final previousSsh =
+        await ConnectionSecretsStore.readSshSecretsForConnection(row.id!);
 
     await db.transaction((txn) async {
       final count = await txn.update(
@@ -830,6 +832,10 @@ class LocalDb {
           passphrase: row.sshSecrets!.passphrase,
           jumpPassword: row.sshSecrets!.jumpPassword,
         );
+      } else if (row.sshTunnelConfig?.enabled != true) {
+        // The tunnel was turned off: its password and key do not stay in the
+        // keyring (#1311).
+        await ConnectionSecretsStore.writeSshSecretsForConnection(row.id!);
       }
     } catch (e) {
       await db.update(
@@ -843,6 +849,14 @@ class LocalDb {
           row.id!,
           password: previousSecrets.password,
           connectionString: previousSecrets.connectionString,
+        );
+        // The SSH secrets may be half written too (four keys, one by one).
+        await ConnectionSecretsStore.writeSshSecretsForConnection(
+          row.id!,
+          password: previousSsh.password,
+          privateKey: previousSsh.privateKey,
+          passphrase: previousSsh.passphrase,
+          jumpPassword: previousSsh.jumpPassword,
         );
       } catch (_) {
         // Best-effort restore of previous secrets; surface the original error.
@@ -1040,7 +1054,12 @@ class ConnectionRow {
     this.sortOrder = 0,
     required this.createdAt,
     this.sshSecrets,
+    this.removeSavedPassword = false,
   });
+
+  /// Set by an edit form (never stored): the saved password is to be removed,
+  /// not kept because the password field was left blank (#1311).
+  final bool removeSavedPassword;
 
   final int? id;
   final String type;
@@ -1194,6 +1213,7 @@ class ConnectionRow {
     int? sortOrder,
     String? createdAt,
     SshTunnelSecrets? sshSecrets,
+    bool? removeSavedPassword,
     bool clearPassword = false,
     bool clearConnectionString = false,
     bool clearSshSecrets = false,
@@ -1221,6 +1241,7 @@ class ConnectionRow {
       sortOrder: sortOrder ?? this.sortOrder,
       createdAt: createdAt ?? this.createdAt,
       sshSecrets: clearSshSecrets ? null : (sshSecrets ?? this.sshSecrets),
+      removeSavedPassword: removeSavedPassword ?? this.removeSavedPassword,
     );
   }
 

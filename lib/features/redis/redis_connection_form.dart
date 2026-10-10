@@ -8,6 +8,7 @@ import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/connections/remove_saved_password_option.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
 import 'package:querya_desktop/features/connections/ssh_tunnel_section.dart';
 import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
@@ -61,6 +62,7 @@ class _RedisConnectionFormContentState
   ConnectionEnvironment? _environment;
   final SshTunnelSecrets _sshSecrets = SshTunnelSecrets();
 
+  bool _removeSavedPassword = false;
   bool _useSSL = false;
   bool _showPassword = false;
   bool _isTesting = false;
@@ -204,6 +206,7 @@ class _RedisConnectionFormContentState
         password: draft.password,
         connectionString: draft.connectionString,
         sshSecrets: draft.sshSecrets,
+        useSavedPassword: !_removeSavedPassword,
       );
       final conn = RedisConnection.fromConnectionRow(draft.copyWith(
         password: secrets.password,
@@ -259,7 +262,10 @@ class _RedisConnectionFormContentState
 
   void _save() {
     if (!_formValidNotifier.value) return;
-    material.Navigator.of(context).pop(_draftRow(id: widget.initial?.id));
+    material.Navigator.of(context).pop(
+      _draftRow(id: widget.initial?.id)
+          .copyWith(removeSavedPassword: _removeSavedPassword),
+    );
   }
 
   @override
@@ -405,11 +411,18 @@ class _RedisConnectionFormContentState
                     ),
                     const Gap(16),
                     const Text('Password (optional)').small().semiBold(),
+                    if (_isEditing)
+                      RemoveSavedPasswordOption(
+                        value: _removeSavedPassword,
+                        onChanged: (v) =>
+                            setState(() => _removeSavedPassword = v),
+                      ),
                     const Gap(8),
                     material.Stack(
                       children: [
                         TextField(
                           controller: _passwordController,
+                          enabled: !_removeSavedPassword,
                           placeholder: Text(
                             _isEditing
                                 ? 'Leave blank to keep existing'

@@ -8,6 +8,7 @@ import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/connections/remove_saved_password_option.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
 import 'package:querya_desktop/features/connections/ssh_tunnel_section.dart';
 import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
@@ -98,6 +99,7 @@ class _MongoConnectionFormContentState
 
   bool _useConnectionString = false;
   bool _useSSL = false;
+  bool _removeSavedPassword = false;
   bool _showPassword = false;
   bool _isTesting = false;
   String? _testResult;
@@ -293,6 +295,7 @@ class _MongoConnectionFormContentState
         password: data.password,
         connectionString: data.connectionString,
         sshSecrets: _sshConfig.enabled ? _sshSecrets : null,
+        useSavedPassword: !_removeSavedPassword,
       );
       final connection = MongoConnection(
         id: 0,
@@ -354,6 +357,7 @@ class _MongoConnectionFormContentState
     );
     row = row.withSshTunnelConfig(_sshConfig.enabled ? _sshConfig : null);
     row = row.withEnvironment(_environment);
+    row = row.copyWith(removeSavedPassword: _removeSavedPassword);
 
     material.Navigator.of(context).pop(row);
   }
@@ -513,10 +517,17 @@ class _MongoConnectionFormContentState
                         placeholder: const Text('Username'),
                       ),
                       const Gap(12),
+                      if (_isEditing)
+                        RemoveSavedPasswordOption(
+                          value: _removeSavedPassword,
+                          onChanged: (v) =>
+                              setState(() => _removeSavedPassword = v),
+                        ),
                       material.Stack(
                         children: [
                           TextField(
                             controller: _passwordController,
+                            enabled: !_removeSavedPassword,
                             placeholder: Text(
                               _isEditing
                                   ? 'Leave blank to keep existing'
