@@ -26,6 +26,7 @@ import 'package:querya_desktop/features/erd/erd_layout.dart';
 import 'package:querya_desktop/core/erd/erd_model.dart';
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
 import 'package:querya_desktop/features/erd/erd_router.dart';
+import 'package:querya_desktop/core/export/image_pdf.dart';
 import 'package:querya_desktop/core/export/svg_png.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/shared/widgets/app_toast.dart';
@@ -55,7 +56,17 @@ Future<void> defaultErdFileSaver(String name, Uint8List bytes) async {
 
 /// Interactive entity-relationship diagram of the connected database.
 /// Entries of the diagram's Export menu.
-enum _ExportAction { mermaid, svg, png, copyMermaid, toggleTheme }
+enum _ExportAction {
+  mermaid,
+  svg,
+  png,
+  pdfA4,
+  pdfA3,
+  dbml,
+  copyMermaid,
+  copyDbml,
+  toggleTheme,
+}
 
 /// A card's focus: related to the focused table, and faded while another
 /// table is picked and this one is not related to it.
@@ -1429,20 +1440,62 @@ class _ErdViewState extends material.State<ErdView> {
     }
   }
 
-  /// The SVG export: the light palette for documents, unless the setting asks
-  /// for the current theme.
-  Future<void> _exportSvg(ErdSchema schema, ErdLayout layout) async {
+  /// The diagram as SVG text, in the export palette: light for documents,
+  /// unless the setting asks for the current theme.
+  Future<String?> _svgText(ErdSchema schema, ErdLayout layout) async {
     final currentTheme = await AppSettings.instance.getExportCurrentTheme();
-    if (!mounted) return;
+    if (!mounted) return null;
     final colors = currentTheme ? _svgColors() : const ErdSvgColors();
-    await _save(
-        '$_fileStem.svg',
-        Uint8List.fromList(utf8.encode(ErdExport.toSvg(schema, layout,
-            routes: _routes,
-            colors: colors,
-            headerFills: _headerFills(schema, colors.card),
-            groups: _svgGroups(layout, colors.background),
-            notes: _svgNotes(colors.background)))));
+    return ErdExport.toSvg(schema, layout,
+        routes: _routes,
+        colors: colors,
+        headerFills: _headerFills(schema, colors.card),
+        groups: _svgGroups(layout, colors.background),
+        notes: _svgNotes(colors.background));
+  }
+
+  /// The SVG export.
+  Future<void> _exportSvg(ErdSchema schema, ErdLayout layout) async {
+    final svg = await _svgText(schema, layout);
+    if (svg == null) return;
+    await _save('$_fileStem.svg', Uint8List.fromList(utf8.encode(svg)));
+  }
+
+  /// The PDF export: the SVG fitted on one page of [paper].
+  Future<void> _exportPdf(
+      ErdSchema schema, ErdLayout layout, PdfPaper paper) async {
+    final svg = await _svgText(schema, layout);
+    if (svg == null) return;
+    try {
+      await _save('$_fileStem.pdf', await svgToPdf(svg, paper: paper));
+    } catch (e) {
+      if (mounted) {
+        showAppToast(
+          context: context,
+          variant: AppToastVariant.error,
+          message: 'Could not render the PDF ($e). Export SVG instead.',
+        );
+      }
+    }
+  }
+
+  /// The DBML of what the diagram shows: its groups and notes, and the
+  /// header colours it draws.
+  String _dbml(ErdSchema schema) {
+    final shown = {for (final t in schema.tables) t.name};
+    return ErdExport.toDbml(
+      schema,
+      groups: [
+        for (final g in _groups)
+          if (g.tables.any(shown.contains)) g,
+      ],
+      notes: List.of(_notes),
+      headerColors: {
+        for (final t in schema.tables)
+          if (erdHeaderSlot(t.name, _headerColors) case final slot?)
+            t.name: ErdSvgColors.hex(_slotColor(slot).toARGB32()),
+      },
+    );
   }
 
   /// Flips between the light export palette and the current theme.
@@ -1783,6 +1836,19 @@ class _ErdViewState extends material.State<ErdView> {
         unawaited(_exportSvg(schema, layout));
       case _ExportAction.png:
         unawaited(_exportPng(schema, layout));
+      case _ExportAction.pdfA4:
+        unawaited(_exportPdf(schema, layout, PdfPaper.a4));
+      case _ExportAction.pdfA3:
+        unawaited(_exportPdf(schema, layout, PdfPaper.a3));
+      case _ExportAction.dbml:
+        _save('$_fileStem.dbml',
+            Uint8List.fromList(utf8.encode(_dbml(schema))));
+      case _ExportAction.copyDbml:
+        Clipboard.setData(ClipboardData(text: _dbml(schema)));
+        showAppToast(
+          context: context,
+          message: 'DBML copied to the clipboard',
+        );
       case _ExportAction.toggleTheme:
         unawaited(_toggleExportTheme());
       case _ExportAction.copyMermaid:
@@ -2285,6 +2351,26 @@ class _ErdViewState extends material.State<ErdView> {
                         value: _ExportAction.png,
                         label: 'PNG',
                         icon: material.Icons.image_outlined,
+                      ),
+                      QueryaActionMenuItem(
+                        value: _ExportAction.pdfA4,
+                        label: 'PDF (A4)',
+                        icon: material.Icons.picture_as_pdf_outlined,
+                      ),
+                      QueryaActionMenuItem(
+                        value: _ExportAction.pdfA3,
+                        label: 'PDF (A3)',
+                        icon: material.Icons.picture_as_pdf_outlined,
+                      ),
+                      QueryaActionMenuItem(
+                        value: _ExportAction.dbml,
+                        label: 'DBML (.dbml)',
+                        icon: material.Icons.code_rounded,
+                      ),
+                      QueryaActionMenuItem(
+                        value: _ExportAction.copyDbml,
+                        label: 'Copy DBML',
+                        icon: material.Icons.content_copy_rounded,
                       ),
                       QueryaActionMenuItem(
                         value: _ExportAction.copyMermaid,
