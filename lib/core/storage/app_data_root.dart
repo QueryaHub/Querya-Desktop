@@ -41,6 +41,12 @@ abstract final class AppDataRoot {
   @visibleForTesting
   static List<Directory>? mockLegacySupportCandidates;
 
+  /// Points the portable data root at [path] for the rest of this session
+  /// (used by Safe Mode to run against a clean temporary profile).
+  static void setSafeModeRootPath(String path) {
+    mockPortableRootPath = path;
+  }
+
   @visibleForTesting
   static void resetMocks() {
     mockPortableRootPath = null;
