@@ -40,6 +40,9 @@ class FakeSshServer {
   /// Makes the TCP connect fail.
   bool failConnect;
 
+  /// How long the TCP connect takes, to land another call inside it.
+  Duration? connectDelay;
+
   /// Every (host, port) the manager dialed, in order.
   final connects = <({String host, int port})>[];
 
@@ -52,6 +55,8 @@ class FakeSshServer {
     Duration? timeout,
   }) async {
     connects.add((host: host, port: port));
+    final delay = connectDelay;
+    if (delay != null) await Future<void>.delayed(delay);
     if (failConnect) throw StateError('connect to $host:$port failed');
     return FakeSshSocket();
   }
