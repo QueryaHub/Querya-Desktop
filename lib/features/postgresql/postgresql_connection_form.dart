@@ -704,8 +704,9 @@ class _PostgresConnectionFormContentState
                             const Text('SSL Mode').small(),
                             const Gap(12),
                             material.SizedBox(
-                              width: 160,
+                              width: 220,
                               child: QueryaDropdown<String>(
+                                expandToParent: true,
                                 value: _sslMode,
                                 onSelected: (mode) {
                                   if (mode != null) {
