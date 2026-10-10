@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart' show kSecondaryButton;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
@@ -42,6 +43,8 @@ Finder _card(String table) =>
     find.byKey(material.ValueKey('erd_table_$table'));
 
 void main() {
+  final desktop = TargetPlatformVariant.only(material.TargetPlatform.linux);
+
   Future<void> pumpDiagram(WidgetTester t, _MemoryStore store) async {
     await t.binding.setSurfaceSize(const material.Size(1200, 800));
     addTearDown(() => t.binding.setSurfaceSize(null));
@@ -81,13 +84,13 @@ void main() {
     await settle(t);
   }
 
-  testWidgets('a view restores its tables, positions and survives a reopen',
-      (t) async {
+  testWidgets('a view restores its tables and survives a reopen',
+      variant: desktop, (t) async {
     final store = _MemoryStore();
     await pumpDiagram(t, store);
 
     // Hide "tags" by hand, then keep that as a view.
-    await t.tap(_card('tags'), buttons: 2);
+    await t.tap(_card('tags'), buttons: kSecondaryButton);
     await settle(t);
     await t.tap(find.text('Hide from diagram'));
     await settle(t);
