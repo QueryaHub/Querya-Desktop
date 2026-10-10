@@ -219,6 +219,13 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
     super.dispose();
   }
 
+  void _formatActive() {
+    if (_activeSession.running) return;
+    _activeSession.formatSql();
+    invalidatePane(_activeSession);
+    setState(() {});
+  }
+
   void _registerSqlEditorCommands() {
     if (!mounted) return;
     SqlEditorCommandBridge.instance.register(
@@ -229,16 +236,17 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       onExecute: () {
         if (!_activeSession.running) unawaited(execute(_activeSession));
       },
+      onExecuteStatement: () {
+        if (!_activeSession.running) {
+          unawaited(execute(_activeSession, true));
+        }
+      },
       onCloseTab: () {
         if (_sessions.length > 1) unawaited(closeTab(_activeSessionIndex));
       },
       onNextTab: nextTab,
       onPrevTab: prevTab,
-      onFormat: () {
-        _activeSession.formatSql();
-        invalidatePane(_activeSession);
-        setState(() {});
-      },
+      onFormat: _formatActive,
       onClear: () {
         _activeSession.clearSql();
         invalidatePane(_activeSession);
@@ -1201,6 +1209,8 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
           const material.SingleActivator(LogicalKeyboardKey.keyR, meta: true): () {
             if (!_activeSession.running) unawaited(execute(_activeSession, true));
           },
+          const material.SingleActivator(LogicalKeyboardKey.keyF, shift: true, alt: true):
+              _formatActive,
         },
         child: material.Focus(
           autofocus: true,

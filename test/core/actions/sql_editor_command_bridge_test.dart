@@ -50,4 +50,37 @@ void main() {
     bridge.unregister(connectionId: 3);
     expect(bridge.isActive, isFalse);
   });
+
+  // #1148: outside the editor, Ctrl/Cmd+Enter runs the statement at the
+  // cursor and F5 runs the script, as inside it.
+  test('invokeExecuteStatement runs the statement, invokeExecute the script',
+      () {
+    final ran = <String>[];
+    SqlEditorCommandBridge.instance.register(
+      connectionId: 7,
+      onNew: () {},
+      onOpen: () {},
+      onSave: () {},
+      onExecute: () => ran.add('script'),
+      onExecuteStatement: () => ran.add('statement'),
+    );
+
+    SqlEditorCommandBridge.instance.invokeExecuteStatement();
+    SqlEditorCommandBridge.instance.invokeExecute();
+    expect(ran, ['statement', 'script']);
+  });
+
+  test('without a statement mode, invokeExecuteStatement runs the script', () {
+    final ran = <String>[];
+    SqlEditorCommandBridge.instance.register(
+      connectionId: 7,
+      onNew: () {},
+      onOpen: () {},
+      onSave: () {},
+      onExecute: () => ran.add('script'),
+    );
+
+    SqlEditorCommandBridge.instance.invokeExecuteStatement();
+    expect(ran, ['script']);
+  });
 }

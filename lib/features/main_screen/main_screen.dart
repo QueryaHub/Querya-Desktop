@@ -156,7 +156,9 @@ class _MainScreenState extends State<MainScreen> {
     final physical = event.physicalKey;
     final logical = event.logicalKey;
 
-    // 1. Execute SQL: F5, or (Ctrl/Cmd + Enter), or (Ctrl/Cmd + R)
+    // 1. Execute SQL, as in the editor: Ctrl/Cmd+Enter and Ctrl/Cmd+R run the
+    // selection or the statement at the cursor; F5 and Ctrl/Cmd+Shift+Enter
+    // run the whole script.
     final isEnter = physical == PhysicalKeyboardKey.enter ||
         physical == PhysicalKeyboardKey.numpadEnter ||
         logical == LogicalKeyboardKey.enter ||
@@ -167,13 +169,28 @@ class _MainScreenState extends State<MainScreen> {
         logical == LogicalKeyboardKey.keyR ||
         logical == const LogicalKeyboardKey(0x0000043a); // Russian 'к'
 
-    if ((isCmdOrCtrl && isEnter) ||
-        isF5 ||
-        (isCmdOrCtrl && !isShift && !isAlt && isKeyR)) {
-      if (SqlEditorCommandBridge.instance.canExecute) {
+    final runScript = isF5 || (isCmdOrCtrl && isShift && !isAlt && isEnter);
+    final runStatement = isCmdOrCtrl &&
+        !isShift &&
+        !isAlt &&
+        (isEnter || isKeyR);
+    if ((runScript || runStatement) &&
+        SqlEditorCommandBridge.instance.canExecute) {
+      if (runScript) {
         SqlEditorCommandBridge.instance.invokeExecute();
-        return true;
+      } else {
+        SqlEditorCommandBridge.instance.invokeExecuteStatement();
       }
+      return true;
+    }
+
+    // Preferences: Ctrl+, / Cmd+, (Physical comma, Logical comma, Russian 'б')
+    final isComma = physical == PhysicalKeyboardKey.comma ||
+        logical == LogicalKeyboardKey.comma ||
+        logical == const LogicalKeyboardKey(0x00000431); // Russian 'б'
+    if (isCmdOrCtrl && !isShift && !isAlt && isComma) {
+      unawaited(showPreferencesDialog(context));
+      return true;
     }
 
     // 2. Toggle Left Sidebar: Ctrl+B / Cmd+B (Physical B, Logical B, Russian 'и')
