@@ -458,17 +458,20 @@ class MongoConnection {
     }
   }
 
-  /// Tests the connection.
-  Future<bool> testConnection() async {
+  /// Tests the connection. [error] is the reason in the user's terms (#1308).
+  Future<({bool ok, String? error})> testConnection() async {
     try {
       await connect();
       if (_db != null) {
         await _db!.runCommand({'ping': 1});
-        return true;
+        return (ok: true, error: null);
       }
-      return false;
+      return (ok: false, error: 'Connection could not be established.');
     } catch (e) {
-      return false;
+      return (
+        ok: false,
+        error: describeDatabaseError(e, driver: DatabaseDriver.mongodb),
+      );
     }
   }
 

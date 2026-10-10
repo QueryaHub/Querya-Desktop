@@ -452,17 +452,23 @@ class MysqlConnection {
       ? 'SET SESSION TRANSACTION READ ONLY'
       : 'SET SESSION TRANSACTION READ WRITE';
 
-  Future<bool> testConnection() async {
+  /// Connects, runs `SELECT 1` and disconnects. [error] is the reason in the
+  /// user's terms (*Authentication failed. Check the username...*), not a
+  /// bare "failed" (#1308).
+  Future<({bool ok, String? error})> testConnection() async {
     try {
       await connect();
       if (_conn != null) {
         await execute('SELECT 1');
-        return true;
+        return (ok: true, error: null);
       }
-      return false;
+      return (ok: false, error: 'Connection could not be established.');
     } catch (e) {
       debugPrint('MysqlConnection.testConnection: $e');
-      return false;
+      return (
+        ok: false,
+        error: describeDatabaseError(e, driver: DatabaseDriver.mysql),
+      );
     } finally {
       await disconnect();
     }
