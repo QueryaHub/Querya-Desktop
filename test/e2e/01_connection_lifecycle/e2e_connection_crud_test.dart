@@ -1,5 +1,5 @@
 import 'package:flutter/gestures.dart' show kSecondaryButton;
-import 'package:flutter/widgets.dart' show ValueKey;
+import 'package:flutter/widgets.dart' show Draggable, ValueKey;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/folders_storage.dart';
@@ -193,7 +193,14 @@ void main() {
     await gesture.moveBy(const Offset(0, 24));
     await tester.pump(const Duration(milliseconds: 100));
     final strip = find.byKey(const ValueKey('drop_out_of_folder'));
-    expect(strip, findsOneWidget, reason: 'the drop strip shows while dragging');
+    final state =
+        tester.state<ConnectionsPanelState>(find.byType(ConnectionsPanel));
+    expect(strip, findsOneWidget,
+        reason: 'the drop strip shows while dragging; '
+            'dragging=${state.draggedConnectionIdForTesting} '
+            'folders=${state.connectionFoldersForTesting} id=$id '
+            'draggables=${find.byType(Draggable<int>).evaluate().length} '
+            'pressed at $from');
     await gesture.moveTo(tester.getCenter(strip));
     await tester.pump(const Duration(milliseconds: 50));
     await gesture.up();

@@ -577,6 +577,16 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
 
   /// The connection being dragged, while a drag is in progress.
   int? _draggedId;
+
+  @visibleForTesting
+  int? get draggedConnectionIdForTesting => _draggedId;
+
+  /// `id: folderId` of the connections the panel currently holds.
+  @visibleForTesting
+  Map<int, int?> get connectionFoldersForTesting => {
+        for (final c in _connections)
+          if (c.id != null) c.id!: c.folderId,
+      };
   final Set<String> _expandedFolders = {};
   final Set<int> _expandedConnections = {};
 
