@@ -13,9 +13,15 @@ class QueryaThemeScope extends InheritedWidget {
     super.key,
     required this.data,
     required super.child,
+    this.transitioning = false,
   });
 
   final QueryaTheme data;
+
+  /// Whether [data] is an intermediate frame of a theme animation. Consumers
+  /// that are costly to update (syntax highlighters) can wait for the final
+  /// frame instead of following every interpolated colour (#1358).
+  final bool transitioning;
 
   static QueryaTheme of(BuildContext context) {
     final scope =
@@ -28,8 +34,18 @@ class QueryaThemeScope extends InheritedWidget {
     return context.dependOnInheritedWidgetOfExactType<QueryaThemeScope>()?.data;
   }
 
+  /// Whether the theme is mid-animation. Registers a dependency, so the caller
+  /// is rebuilt when the animation ends.
+  static bool isTransitioning(BuildContext context) {
+    return context
+            .dependOnInheritedWidgetOfExactType<QueryaThemeScope>()
+            ?.transitioning ??
+        false;
+  }
+
   @override
-  bool updateShouldNotify(QueryaThemeScope oldWidget) => data != oldWidget.data;
+  bool updateShouldNotify(QueryaThemeScope oldWidget) =>
+      data != oldWidget.data || transitioning != oldWidget.transitioning;
 }
 
 /// Convenient access to [QueryaTheme] tokens and [Theme] / [ColorScheme] from [BuildContext].
