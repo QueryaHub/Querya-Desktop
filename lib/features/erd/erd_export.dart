@@ -146,6 +146,7 @@ class ErdExport {
     ErdLayout layout, {
     List<ErdRoute>? routes,
     ErdSvgColors colors = const ErdSvgColors(),
+    Map<String, String> headerFills = const {},
   }) {
     final size = layout.size;
     final w = _n(size.width), h = _n(size.height);
@@ -212,7 +213,8 @@ class ErdExport {
             'stroke="${colors.border}"/>')
         ..writeln('<g clip-path="url(#$clip)">')
         ..writeln('<rect x="${_n(left)}" y="${_n(top)}" width="${_n(cw)}" '
-            'height="${_n(ErdLayout.headerHeight)}" fill="${colors.header}"/>')
+            'height="${_n(ErdLayout.headerHeight)}" '
+            'fill="${headerFills[t.name] ?? colors.header}"/>')
         ..writeln('<text x="${_n(left + 10)}" y="${_n(top + 21)}" '
             'font-weight="bold">'
             '${_esc(_fit(t.name, inner - countWidth, _nameCharPx))}</text>')
