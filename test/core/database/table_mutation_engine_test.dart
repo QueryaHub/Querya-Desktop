@@ -625,5 +625,90 @@ void main() {
       expect(TableMutationEngine.normalizeIdentifier('`USER_ID`'), 'user_id');
       expect(TableMutationEngine.normalizeIdentifier('user_id'), 'user_id');
     });
+
+    test('preserves literal string NULL in WHERE clause for text primary key', () {
+      final plan = TableMutationEngine.generatePlan(
+        dialect: SqlDialect.postgres,
+        tableName: 'codes',
+        columns: ['code', 'description'],
+        primaryKeys: ['code'],
+        originalRows: [
+          ['NULL', 'Special null code'],
+        ],
+        modifiedCells: {
+          0: {1: 'Updated description'},
+        },
+        insertedRows: const [],
+        deletedRowIndices: const {},
+        columnMeta: {
+          'code': const TableColumnMeta(name: 'code', dataType: 'varchar'),
+          'description': const TableColumnMeta(name: 'description', dataType: 'text'),
+        },
+      );
+
+      expect(plan.statementCount, 1);
+      final stmt = plan.statements.first;
+      expect(stmt.type, MutationType.update);
+      expect(
+        stmt.sql,
+        "UPDATE \"codes\" SET \"description\" = 'Updated description' WHERE \"code\" = 'NULL'",
+      );
+    });
+
+    test('uses IS NULL in WHERE clause when value is kNullSentinel in text column', () {
+      final plan = TableMutationEngine.generatePlan(
+        dialect: SqlDialect.postgres,
+        tableName: 'codes',
+        columns: ['code', 'description'],
+        primaryKeys: ['code'],
+        originalRows: [
+          [TableMutationEngine.kNullSentinel, 'Special null code'],
+        ],
+        modifiedCells: {
+          0: {1: 'Updated description'},
+        },
+        insertedRows: const [],
+        deletedRowIndices: const {},
+        columnMeta: {
+          'code': const TableColumnMeta(name: 'code', dataType: 'varchar'),
+          'description': const TableColumnMeta(name: 'description', dataType: 'text'),
+        },
+      );
+
+      expect(plan.statementCount, 1);
+      final stmt = plan.statements.first;
+      expect(stmt.type, MutationType.update);
+      expect(
+        stmt.sql,
+        "UPDATE \"codes\" SET \"description\" = 'Updated description' WHERE \"code\" IS NULL",
+      );
+    });
+
+    test('preserves literal string NULL in unkeyed row match-all WHERE clause for text columns', () {
+      final plan = TableMutationEngine.generatePlan(
+        dialect: SqlDialect.mysql,
+        tableName: 'logs',
+        columns: ['tag', 'status'],
+        primaryKeys: const [],
+        originalRows: [
+          ['NULL', 'null'],
+        ],
+        modifiedCells: const {},
+        insertedRows: const [],
+        deletedRowIndices: {0},
+        columnMeta: {
+          'tag': const TableColumnMeta(name: 'tag', dataType: 'varchar(50)'),
+          'status': const TableColumnMeta(name: 'status', dataType: 'text'),
+        },
+      );
+
+      expect(plan.statementCount, 1);
+      final stmt = plan.statements.first;
+      expect(stmt.type, MutationType.delete);
+      expect(
+        stmt.sql,
+        "DELETE FROM `logs` WHERE `tag` = 'NULL' AND `status` = 'null'",
+      );
+    });
   });
 }
