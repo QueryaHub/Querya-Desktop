@@ -14,6 +14,9 @@ Widget queryaThemeTestShell({
     theme: td,
     darkTheme: td,
     themeMode: ThemeMode.dark,
+    // As in the app: the default is a sheet on the mobile platform the test
+    // binding reports, and a sheet needs a DrawerOverlay the app does not have.
+    menuHandler: const PopoverOverlayHandler(),
     builder: (context, appChild) => QueryaUiScaleScope(
       scale: 1.0,
       child: QueryaThemeScope(
