@@ -107,8 +107,11 @@ class MysqlSqlExecutionDelegate extends BaseSqlExecutionDelegate {
       },
     );
     final colList = rs.cols.toList();
-    final outRows = [
-      for (final row in taken.items)
+    final pool = StringInternPool();
+    final outRows = <List<String>>[];
+    for (var r = 0; r < taken.items.length; r++) {
+      final row = taken.items[r];
+      outRows.add(
         List.generate(
           row.numOfColumns,
           (i) {
@@ -116,10 +119,16 @@ class MysqlSqlExecutionDelegate extends BaseSqlExecutionDelegate {
             return mysqlResultCellToDisplayString(
               row.colAt(i),
               column: col,
+              pool: pool,
             );
           },
         ),
-    ];
+      );
+      if (kResultStringConvertYieldEvery > 0 &&
+          (r + 1) % kResultStringConvertYieldEvery == 0) {
+        await Future<void>.delayed(Duration.zero);
+      }
+    }
     final truncated =
         taken.truncated || (effectiveSql != sql && outRows.length >= cap);
     final n = outRows.length;

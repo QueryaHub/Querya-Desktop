@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mysql_client/mysql_client.dart';
 import 'package:mysql_client/mysql_protocol.dart';
 import 'package:querya_desktop/core/database/mysql_result_cells.dart';
+import 'package:querya_desktop/core/database/result_row_string_convert.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 
 void main() {
@@ -133,6 +134,17 @@ void main() {
       );
       expect(mysqlResultCellToDisplayString('1', column: col), 'true');
       expect(mysqlResultCellToDisplayString('0', column: col), 'false');
+    });
+
+    test('deduplicates identical strings via StringInternPool', () {
+      final pool = StringInternPool();
+      final str1 = String.fromCharCodes('intern_test'.codeUnits);
+      final str2 = String.fromCharCodes('intern_test'.codeUnits);
+      expect(identical(str1, str2), isFalse);
+
+      final res1 = mysqlResultCellToDisplayString(str1, pool: pool);
+      final res2 = mysqlResultCellToDisplayString(str2, pool: pool);
+      expect(identical(res1, res2), isTrue);
     });
   });
 }
