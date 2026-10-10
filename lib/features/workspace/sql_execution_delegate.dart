@@ -65,3 +65,30 @@ abstract class SqlExecutionDelegate implements SqlQueryRunner {
   @override
   void dispose() {}
 }
+
+/// Base execution delegate providing common execution boilerplate such as
+/// result status formatting and query limit injection.
+abstract class BaseSqlExecutionDelegate extends SqlExecutionDelegate {
+  /// Formats the result status message consistently across database dialects.
+  String formatStatusMessage({
+    required int columnCount,
+    required int rowCount,
+    int? affectedRows,
+    required bool isTruncated,
+    required int cap,
+    String? successPrefix,
+  }) {
+    if (columnCount == 0 && rowCount == 0) {
+      if (affectedRows != null) {
+        final prefix = successPrefix ?? 'OK.';
+        return '$prefix Rows affected: $affectedRows.';
+      }
+      return 'Command completed.';
+    }
+    if (isTruncated) {
+      return 'Showing first $cap row(s) (result capped).';
+    }
+    return '$rowCount row(s).';
+  }
+}
+

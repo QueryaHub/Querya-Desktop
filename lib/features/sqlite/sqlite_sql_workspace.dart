@@ -14,7 +14,7 @@ import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/features/workspace/query_plan.dart';
 
 /// Execution delegate for SQLite connections.
-class SqliteSqlExecutionDelegate extends SqlExecutionDelegate {
+class SqliteSqlExecutionDelegate extends BaseSqlExecutionDelegate {
   SqliteSqlExecutionDelegate({
     required this.connectionRow,
     required this.isReadOnly,
@@ -113,14 +113,13 @@ class SqliteSqlExecutionDelegate extends SqlExecutionDelegate {
 
     final outRows = await convertResultRowsToStringsAdaptive(rawRows);
 
-    String? statusMsg;
-    if (cols.isEmpty && outRows.isEmpty) {
-      statusMsg = 'Command completed.';
-    } else if (truncated || (injectedLimit && results.length >= cap)) {
-      statusMsg = 'Showing first $cap row(s) (result capped).';
-    } else {
-      statusMsg = '${results.length} row(s).';
-    }
+    final isTruncated = truncated || (injectedLimit && results.length >= cap);
+    final statusMsg = formatStatusMessage(
+      columnCount: cols.length,
+      rowCount: results.length,
+      isTruncated: isTruncated,
+      cap: cap,
+    );
 
     return SqlExecutionResult(
       columns: cols,
