@@ -227,10 +227,14 @@ class _PostgresConnectionFormContentState
       if (password != null && password.isNotEmpty)
         Uri.encodeComponent(password),
     ];
-    final effectiveMode = sslMode ??
-        (sslRootCert != null && sslRootCert.isNotEmpty
+    // A root CA with the default `require` mode means the user wants the
+    // server verified, same as _syncUriSslParams does for a typed URI.
+    final hasRootCert = sslRootCert != null && sslRootCert.isNotEmpty;
+    final requestedMode = sslMode ?? (_useSSL ? _sslMode : null);
+    final effectiveMode =
+        hasRootCert && (requestedMode == null || requestedMode == 'require')
             ? 'verify-full'
-            : (_useSSL ? _sslMode : null));
+            : requestedMode;
     final queryParams = <String, String>{
       if (sslRootCert != null && sslRootCert.isNotEmpty)
         'sslrootcert': sslRootCert,
