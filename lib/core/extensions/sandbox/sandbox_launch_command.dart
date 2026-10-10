@@ -104,8 +104,10 @@ class SandboxLaunchCommand {
       '--share-net',
       '--die-with-parent',
       '--new-session',
-      // Root filesystem read-only; scratch and (optional) extension root RW/RO.
+      // Root filesystem read-only; mask /home with a fresh empty tmpfs to prevent
+      // exfiltration of SSH keys, cloud credentials, shell histories, and session stores.
       '--ro-bind', '/', '/',
+      '--tmpfs', '/home',
       '--bind', scratchPath, scratchPath,
       '--chdir', scratchPath,
     ];
@@ -154,7 +156,8 @@ class SandboxLaunchCommand {
   }
 }
 
-/// Seatbelt (sandbox-exec) profile allowing network + scratch RW only.
+/// Seatbelt (sandbox-exec) profile allowing network + scratch RW only,
+/// explicitly denying access to host user credentials and home directories (/Users).
 String buildMacOsSeatbeltProfile({
   required String scratchPath,
   String? extensionRoot,
@@ -167,7 +170,9 @@ String buildMacOsSeatbeltProfile({
     ..writeln('(allow mach-lookup)')
     ..writeln('(allow network*)')
     ..writeln('(allow file-read*)')
-    ..writeln('(allow file-write* (subpath "$scratchPath"))');
+    ..writeln('(deny file-read* (subpath "/Users"))')
+    ..writeln('(allow file-write* (subpath "$scratchPath"))')
+    ..writeln('(allow file-read* (subpath "$scratchPath"))');
   if (extensionRoot != null && extensionRoot.isNotEmpty) {
     buffer.writeln('(allow file-read* (subpath "$extensionRoot"))');
   }
