@@ -7,6 +7,7 @@ import 'package:dart_mcp/stdio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/mcp/mcp_access_store.dart';
 import 'package:querya_mcp_bridge/querya_mcp_bridge.dart';
+import 'package:querya_desktop/core/mcp/mcp_mongo_service.dart';
 import 'package:querya_desktop/core/mcp/mcp_query_service.dart';
 import 'package:querya_desktop/core/mcp/mcp_server_controller.dart';
 import 'package:querya_desktop/core/mcp/querya_mcp_server.dart';
@@ -98,6 +99,10 @@ void main() {
     controller = McpServerController(
       endpointFile: endpoint,
       version: '9.9.9',
+      mongo: McpMongoService(
+        access: _All(),
+        loadConnections: () async => const [],
+      ),
       service: McpQueryService(
         createDelegate: (row, dialect) => db,
         access: _All(),
@@ -141,6 +146,9 @@ void main() {
       'sample_rows',
       'run_query',
       'explain_query',
+      'list_collections',
+      'find_documents',
+      'count_documents',
     });
     expect(tools.tools.every((t) => t.toolAnnotations?.readOnlyHint == true),
         isTrue);
