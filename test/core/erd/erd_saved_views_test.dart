@@ -71,4 +71,18 @@ void main() {
     expect(layout.headerColors, {'users': 'type1'});
     expect(layout.views, isEmpty);
   });
+
+  test('showingAll keeps the arrangement and hides nothing', () {
+    const state = ErdSavedLayout(
+      positions: {'a': Offset(1, 2)},
+      hidden: {'b'},
+      collapsed: {'a'},
+      detail: ErdDetail.names,
+    );
+    final all = state.showingAll();
+    expect(all.hidden, isEmpty);
+    expect(all.positions, state.positions);
+    expect(all.collapsed, {'a'});
+    expect(all.detail, ErdDetail.names);
+  });
 }

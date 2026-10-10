@@ -51,6 +51,21 @@ class ErdSavedLayout {
   final List<ErdSavedView> views;
   final String? activeView;
 
+  /// This state with no table hidden: what *All tables* is once the hidden
+  /// ones went into a view (#1284).
+  ErdSavedLayout showingAll() => ErdSavedLayout(
+        positions: positions,
+        collapsed: collapsed,
+        detail: detail,
+        scale: scale,
+        translation: translation,
+        headerColors: headerColors,
+        groups: groups,
+        notes: notes,
+        views: views,
+        activeView: activeView,
+      );
+
   ErdSavedLayout withViews(
     List<ErdSavedView> views,
     String? activeView, {

@@ -539,7 +539,11 @@ class _ErdViewState extends material.State<ErdView> {
         action: 'Save',
         name: 'View ${_views.length + 1}');
     if (name == null || !mounted) return;
+    final fromAll = _viewById(_activeView) == null;
     _captureCurrent();
+    // The tables hidden by hand now belong to the view; All tables shows
+    // every table, always.
+    if (fromAll) _base = _base.showingAll();
     var n = 1;
     while (_views.any((v) => v.id == 'v$n')) {
       n++;
