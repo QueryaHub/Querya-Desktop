@@ -92,6 +92,40 @@ class ErdLayout {
     return top + headerHeight + rowHeight * i + rowHeight / 2;
   }
 
+  /// Space between a group's frame and its cards, and the frame's title band
+  /// above them (#1282). Both fit in [margin].
+  static const double framePadding = 12;
+  static const double frameTitleHeight = 24;
+
+  /// The frame around [tables] (those in this layout): their cards' bounds
+  /// with [framePadding] and the title band on top; null when none is here.
+  Rect? frameOf(Iterable<String> tables) {
+    Rect? box;
+    for (final t in tables) {
+      final p = positions[t];
+      if (p == null) continue;
+      final r = p & Size(widthFor(t), _heights[t] ?? headerHeight);
+      box = box == null ? r : box.expandToInclude(r);
+    }
+    if (box == null) return null;
+    return Rect.fromLTRB(
+      box.left - framePadding,
+      box.top - framePadding - frameTitleHeight,
+      box.right + framePadding,
+      box.bottom + framePadding,
+    );
+  }
+
+  /// Copy with every table of [moves] at its new top-left, as
+  /// [withPosition] places one.
+  ErdLayout withPositions(Map<String, Offset> moves) {
+    final next = Map<String, Offset>.of(positions);
+    moves.forEach((table, topLeft) {
+      next[table] = Offset(math.max(8, topLeft.dx), math.max(8, topLeft.dy));
+    });
+    return ErdLayout._(next, _heights, _widths);
+  }
+
   /// Copy with [table] moved to [topLeft] (kept inside the canvas origin).
   ErdLayout withPosition(String table, Offset topLeft) {
     final next = Map<String, Offset>.of(positions);
@@ -107,10 +141,75 @@ class ErdLayout {
   /// [measure] gives a card's width; the screen passes one that measures the
   /// text with the card's own fonts (`ErdCardMeasure`), exports and tests may
   /// rely on the glyph estimate of [widthOf].
+  ///
+  /// [groups] keep their tables together (#1282): each group, and the tables
+  /// in none, is laid out on its own as a block, and the blocks are packed in
+  /// rows. A table goes with the first group that names it.
   factory ErdLayout.compute(
     ErdSchema schema, {
     double Function(ErdTable table)? measure,
+    List<Iterable<String>> groups = const [],
   }) {
+    final known = {for (final t in schema.tables) t.name};
+    final claimed = <String>{};
+    final blocks = <Set<String>>[
+      for (final g in groups)
+        {for (final t in g) if (known.contains(t) && claimed.add(t)) t},
+    ]..removeWhere((b) => b.isEmpty);
+    if (blocks.isEmpty) return ErdLayout._layered(schema, measure);
+    final rest = {for (final t in known) if (!claimed.contains(t)) t};
+    return ErdLayout._packed(
+      [
+        for (final b in [if (rest.isNotEmpty) rest, ...blocks])
+          ErdLayout._layered(_subset(schema, b), measure),
+      ],
+    );
+  }
+
+  static ErdSchema _subset(ErdSchema schema, Set<String> tables) => ErdSchema(
+        tables: [
+          for (final t in schema.tables)
+            if (tables.contains(t.name)) t,
+        ],
+        relations: [
+          for (final r in schema.relations)
+            if (tables.contains(r.fromTable) && tables.contains(r.toTable)) r,
+        ],
+      );
+
+  /// [parts] side by side in rows about as wide as the whole is tall. Each
+  /// part keeps its own margin, so frames of neighbouring blocks never meet.
+  factory ErdLayout._packed(List<ErdLayout> parts) {
+    final area = parts.fold<double>(
+        0, (s, p) => s + p.size.width * p.size.height);
+    final rowWidth = math.max(
+      parts.map((p) => p.size.width).reduce(math.max),
+      math.sqrt(area) * 1.6,
+    );
+    final positions = <String, Offset>{};
+    final heights = <String, double>{};
+    final widths = <String, double>{};
+    var x = 0.0, y = 0.0, rowHeight = 0.0;
+    for (final part in parts) {
+      final size = part.size;
+      if (x > 0 && x + size.width > rowWidth) {
+        x = 0;
+        y += rowHeight;
+        rowHeight = 0;
+      }
+      part.positions.forEach((n, p) => positions[n] = p.translate(x, y));
+      heights.addAll(part._heights);
+      widths.addAll(part._widths);
+      x += size.width;
+      rowHeight = math.max(rowHeight, size.height);
+    }
+    return ErdLayout._(positions, heights, widths);
+  }
+
+  factory ErdLayout._layered(
+    ErdSchema schema,
+    double Function(ErdTable table)? measure,
+  ) {
     final names = [for (final t in schema.tables) t.name];
     final byName = {for (final t in schema.tables) t.name: t};
     final heights = {for (final t in schema.tables) t.name: cardHeight(t)};

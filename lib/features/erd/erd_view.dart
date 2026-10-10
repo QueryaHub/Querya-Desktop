@@ -9,7 +9,7 @@ import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart'
-    show Clipboard, ClipboardData, LogicalKeyboardKey;
+    show Clipboard, ClipboardData, HardwareKeyboard, LogicalKeyboardKey;
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/erd/erd_canvas_controls.dart';
@@ -18,6 +18,7 @@ import 'package:querya_desktop/core/erd/erd_catalog.dart';
 import 'package:querya_desktop/features/erd/erd_source.dart';
 import 'package:querya_desktop/features/erd/erd_export.dart';
 import 'package:querya_desktop/features/erd/erd_geometry.dart';
+import 'package:querya_desktop/features/erd/erd_group_dialog.dart';
 import 'package:querya_desktop/features/erd/erd_layout.dart';
 import 'package:querya_desktop/core/erd/erd_model.dart';
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
@@ -155,6 +156,15 @@ class _ErdViewState extends material.State<ErdView> {
   /// Header colour picked per table (palette slot names, #1276).
   final Map<String, String> _headerColors = {};
 
+  /// The user's table groups, saved with the layout (#1282).
+  final List<ErdGroup> _groups = [];
+
+  /// Tables marked with Shift / Ctrl / Cmd + click, to be grouped.
+  final Set<String> _marked = {};
+
+  /// The group whose frame is being dragged by its title.
+  String? _draggingGroup;
+
   /// Relation under the pointer and the pointer position in canvas space.
   final _edgeTipNotifier =
       material.ValueNotifier<(ErdRelation, material.Offset)?>(null);
@@ -261,7 +271,11 @@ class _ErdViewState extends material.State<ErdView> {
           _headerColors
             ..clear()
             ..addAll(saved.headerColors);
+          _groups
+            ..clear()
+            ..addAll(saved.groups);
         }
+        _marked.clear();
         _setLayout(
             _withSaved(_compute(_visibleOf(schema)), saved));
         _loading = false;
@@ -307,7 +321,157 @@ class _ErdViewState extends material.State<ErdView> {
       base: material.DefaultTextStyle.of(context).style,
       textScaler: material.MediaQuery.textScalerOf(context),
     );
-    return ErdLayout.compute(schema, measure: measure.width);
+    return ErdLayout.compute(schema,
+        measure: measure.width,
+        groups: [for (final g in _allGroups()) g.tables]);
+  }
+
+  /// The user's groups, then one per schema for the tables in none when the
+  /// diagram spans several schemas.
+  List<ErdGroup> _allGroups() {
+    final schema = _schema;
+    if (schema == null) return List.of(_groups);
+    return [
+      ..._groups,
+      ...erdSchemaGroups([for (final t in schema.tables) t.name], _groups),
+    ];
+  }
+
+  ErdGroup? _groupOf(String table) {
+    for (final g in _groups) {
+      if (g.tables.contains(table)) return g;
+    }
+    return null;
+  }
+
+  /// [tables] out of every group but [except]; a group left empty goes.
+  void _ungroupTables(Set<String> tables, {String? except}) {
+    for (var i = _groups.length - 1; i >= 0; i--) {
+      final g = _groups[i];
+      if (g.id == except || !g.tables.any(tables.contains)) continue;
+      final left = [for (final t in g.tables) if (!tables.contains(t)) t];
+      if (left.isEmpty) {
+        _groups.removeAt(i);
+      } else {
+        _groups[i] = g.copyWith(tables: left);
+      }
+    }
+  }
+
+  /// Asks for a name and groups [tables], taking them out of other groups.
+  Future<void> _newGroup(Set<String> tables) async {
+    if (tables.isEmpty) return;
+    var n = _groups.length + 1;
+    while (_groups.any((g) => g.name == 'Group $n')) {
+      n++;
+    }
+    final text = await showErdGroupDialog(context,
+        title: 'New group', action: 'Create', name: 'Group $n');
+    if (text == null || !mounted) return;
+    var id = 1;
+    while (_groups.any((g) => g.id == 'g$id')) {
+      id++;
+    }
+    setState(() {
+      _ungroupTables(tables);
+      _groups.add(ErdGroup(
+        id: 'g$id',
+        name: text.name,
+        note: text.note,
+        color: erdHeaderSlots[(id - 1) % erdHeaderSlots.length],
+        tables: [
+          for (final t in _schema?.tables ?? const <ErdTable>[])
+            if (tables.contains(t.name)) t.name,
+        ],
+      ));
+      _marked.clear();
+    });
+    _scheduleSave();
+  }
+
+  void _addToGroup(String id, Set<String> tables) {
+    setState(() {
+      _ungroupTables(tables, except: id);
+      final i = _groups.indexWhere((g) => g.id == id);
+      if (i < 0) return;
+      final g = _groups[i];
+      _groups[i] = g.copyWith(tables: [
+        ...g.tables,
+        for (final t in tables)
+          if (!g.tables.contains(t)) t,
+      ]);
+      _marked.clear();
+    });
+    _scheduleSave();
+  }
+
+  Future<void> _editGroup(ErdGroup group) async {
+    final text = await showErdGroupDialog(context,
+        title: 'Edit group',
+        action: 'Save',
+        name: group.name,
+        note: group.note);
+    if (text == null || !mounted) return;
+    _updateGroup(group.id,
+        (g) => g.copyWith(name: text.name, note: () => text.note));
+  }
+
+  void _updateGroup(String id, ErdGroup Function(ErdGroup) change) {
+    final i = _groups.indexWhere((g) => g.id == id);
+    if (i < 0) return;
+    setState(() => _groups[i] = change(_groups[i]));
+    _scheduleSave();
+  }
+
+  void _ungroup(String id) {
+    setState(() => _groups.removeWhere((g) => g.id == id));
+    _scheduleSave();
+  }
+
+  void _removeFromGroup(String table) {
+    setState(() => _ungroupTables({table}));
+    _scheduleSave();
+  }
+
+  /// A click on a card: with Shift, Ctrl or Cmd it marks or unmarks the table
+  /// for a group, otherwise it picks it.
+  void _tapCard(String table) {
+    final keys = HardwareKeyboard.instance;
+    if (keys.isShiftPressed || keys.isControlPressed || keys.isMetaPressed) {
+      _canvasFocus.requestFocus();
+      setState(() {
+        if (!_marked.remove(table)) _marked.add(table);
+      });
+      return;
+    }
+    if (_marked.isNotEmpty) setState(_marked.clear);
+    _pick(table);
+  }
+
+  void _groupDragStart(String id) => setState(() => _draggingGroup = id);
+
+  /// Moves every visible table of [group] by [screenDelta], keeping its frame
+  /// inside the canvas.
+  void _groupDragMove(ErdGroup group, material.Offset screenDelta) {
+    final layout = _layout;
+    if (_draggingGroup != group.id || layout == null) return;
+    final frame = layout.frameOf(group.tables);
+    if (frame == null) return;
+    final scale = _scale;
+    var delta = screenDelta / (scale == 0 ? 1 : scale);
+    delta = material.Offset(
+        max(delta.dx, -frame.left), max(delta.dy, -frame.top));
+    setState(() => _layout = layout.withPositions({
+          for (final t in group.tables)
+            if (layout.positions[t] case final p?) t: p + delta,
+        }));
+    _scheduleRoutes();
+  }
+
+  void _groupDragEnd() {
+    if (_draggingGroup == null) return;
+    setState(() => _draggingGroup = null);
+    _scheduleSave();
   }
 
   Future<ErdSavedLayout?> _readSaved(ErdSchema schema) async {
@@ -372,6 +536,7 @@ class _ErdViewState extends material.State<ErdView> {
           hidden: Set.of(_hidden),
           detail: _detail,
           headerColors: Map.of(_headerColors),
+          groups: List.of(_groups),
           scale: m.getMaxScaleOnAxis(),
           translation: material.Offset(t.x, t.y),
         ),
@@ -458,6 +623,7 @@ class _ErdViewState extends material.State<ErdView> {
   void _hide(String table) {
     setState(() {
       _hidden.add(table);
+      _marked.remove(table);
       // A pick on a hidden table would leave every card faded.
       if (_selected == table) _selected = null;
     });
@@ -583,10 +749,13 @@ class _ErdViewState extends material.State<ErdView> {
   /// the zoom and search shortcuts work after a click anywhere on it.
   void _clearSelection() {
     _canvasFocus.requestFocus();
-    if (_selected == null && _pickedRelation == null) return;
+    if (_selected == null && _pickedRelation == null && _marked.isEmpty) {
+      return;
+    }
     setState(() {
       _selected = null;
       _pickedRelation = null;
+      _marked.clear();
     });
     _edgeTipNotifier.value = null;
     _syncFocus();
@@ -642,6 +811,10 @@ class _ErdViewState extends material.State<ErdView> {
       setState(() => _pickedRelation = null);
       _edgeTipNotifier.value = null;
       _syncFocus();
+      return;
+    }
+    if (_marked.isNotEmpty) {
+      setState(_marked.clear);
       return;
     }
     if (_selected != null) {
@@ -760,7 +933,8 @@ class _ErdViewState extends material.State<ErdView> {
       final scale = ErdExport.pngPixelRatio(layout.size);
       final svg = ErdExport.toSvg(schema, layout,
           routes: _routes,
-          headerFills: _headerFills(schema, const ErdSvgColors().card));
+          headerFills: _headerFills(schema, const ErdSvgColors().card),
+          groups: _svgGroups(layout, const ErdSvgColors().background));
       await _save('$_fileStem.png', await svgToPng(svg, scale: scale));
       return;
     }
@@ -822,7 +996,8 @@ class _ErdViewState extends material.State<ErdView> {
         Uint8List.fromList(utf8.encode(ErdExport.toSvg(schema, layout,
             routes: _routes,
             colors: colors,
-            headerFills: _headerFills(schema, colors.card)))));
+            headerFills: _headerFills(schema, colors.card),
+            groups: _svgGroups(layout, colors.background)))));
   }
 
   /// Flips between the light export palette and the current theme.
@@ -879,6 +1054,163 @@ class _ErdViewState extends material.State<ErdView> {
                   _headerColor(t.name).withValues(alpha: 0.14), card)
               .toARGB32()),
     };
+  }
+
+  /// Group entries of a card's menu: group it (with the marked tables), add
+  /// it to a group, take it out of its group.
+  List<MenuItem> _groupMenu(String table) {
+    final tables = {..._marked, table};
+    final current = _groupOf(table);
+    return [
+      MenuButton(
+        key: material.ValueKey('erd_menu_group_$table'),
+        onPressed: (_) => unawaited(_newGroup(tables)),
+        child: Text(tables.length == 1
+            ? 'New group…'
+            : 'Group ${tables.length} tables…'),
+      ),
+      if (_groups.any((g) => g.id != current?.id))
+        MenuButton(
+          subMenu: [
+            for (final g in _groups)
+              if (g.id != current?.id)
+                MenuButton(
+                  onPressed: (_) => _addToGroup(g.id, tables),
+                  child: Text(g.name),
+                ),
+          ],
+          child: const Text('Add to group'),
+        ),
+      if (current != null)
+        MenuButton(
+          key: material.ValueKey('erd_menu_ungroup_$table'),
+          onPressed: (_) => _removeFromGroup(table),
+          child: Text('Remove from ${current.name}'),
+        ),
+    ];
+  }
+
+  /// Group frames for the SVG: the screen's tint over the export background.
+  List<ErdSvgGroup> _svgGroups(ErdLayout layout, String backgroundHex) {
+    final background = material.Color(
+        0xFF000000 | int.parse(backgroundHex.substring(1), radix: 16));
+    return [
+      for (final g in _allGroups())
+        if (layout.frameOf(g.tables) case final frame?)
+          ErdSvgGroup(
+            name: g.name,
+            frame: frame,
+            fill: ErdSvgColors.hex(material.Color.alphaBlend(
+                    _slotColor(g.color).withValues(alpha: 0.06), background)
+                .toARGB32()),
+            stroke: ErdSvgColors.hex(_slotColor(g.color).toARGB32()),
+          ),
+    ];
+  }
+
+  /// A group's frame: a tinted box that takes no pointer, and its title,
+  /// which drags the whole group and has the group's menu.
+  List<material.Widget> _groupFrame(ErdGroup g, ErdLayout layout) {
+    final frame = layout.frameOf(g.tables);
+    if (frame == null) return const [];
+    final color = _slotColor(g.color);
+    final title = material.MouseRegion(
+      cursor: _draggingGroup == g.id
+          ? material.SystemMouseCursors.grabbing
+          : material.SystemMouseCursors.grab,
+      child: material.GestureDetector(
+        key: material.ValueKey('erd_group_${g.id}'),
+        dragStartBehavior: DragStartBehavior.down,
+        onPanStart: (_) => _groupDragStart(g.id),
+        onPanUpdate: (d) => _groupDragMove(g, d.delta),
+        onPanEnd: (_) => _groupDragEnd(),
+        onPanCancel: _groupDragEnd,
+        child: material.Row(
+          mainAxisSize: material.MainAxisSize.min,
+          children: [
+            material.Icon(
+                g.isSchema
+                    ? material.Icons.schema_outlined
+                    : material.Icons.folder_open_rounded,
+                size: 13,
+                color: color),
+            const material.SizedBox(width: 5),
+            material.Flexible(
+              child: Text(g.name,
+                  maxLines: 1,
+                  overflow: material.TextOverflow.ellipsis,
+                  style: material.TextStyle(
+                      fontSize: 12,
+                      fontWeight: material.FontWeight.w600,
+                      color: color)),
+            ),
+            if (g.note case final note?) ...[
+              const material.SizedBox(width: 5),
+              material.Tooltip(
+                message: note,
+                child: material.Icon(material.Icons.notes_rounded,
+                    key: material.ValueKey('erd_group_note_${g.id}'),
+                    size: 12,
+                    color: color),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+    return [
+      material.Positioned.fromRect(
+        rect: frame,
+        child: material.IgnorePointer(
+          child: material.DecoratedBox(
+            decoration: material.BoxDecoration(
+              color: color.withValues(alpha: 0.05),
+              borderRadius: material.BorderRadius.circular(12),
+              border: material.Border.all(color: color.withValues(alpha: 0.55)),
+            ),
+          ),
+        ),
+      ),
+      material.Positioned(
+        left: frame.left + 10,
+        top: frame.top + 3,
+        width: max(0.0, frame.width - 20),
+        height: ErdLayout.frameTitleHeight - 6,
+        child: material.Align(
+          alignment: material.Alignment.centerLeft,
+          child: g.isSchema
+              ? title
+              : ContextMenu(
+                  items: [
+                    MenuButton(
+                      key: material.ValueKey('erd_group_edit_${g.id}'),
+                      onPressed: (_) => unawaited(_editGroup(g)),
+                      child: const Text('Rename / note…'),
+                    ),
+                    MenuButton(
+                      subMenu: [
+                        for (var i = 0; i < erdHeaderSlots.length; i++)
+                          MenuButton(
+                            leading: material.Icon(material.Icons.circle,
+                                size: 12, color: _slotColor(erdHeaderSlots[i])),
+                            onPressed: (_) => _updateGroup(g.id,
+                                (o) => o.copyWith(color: erdHeaderSlots[i])),
+                            child: Text('Colour ${i + 1}'),
+                          ),
+                      ],
+                      child: const Text('Colour'),
+                    ),
+                    MenuButton(
+                      key: material.ValueKey('erd_group_ungroup_${g.id}'),
+                      onPressed: (_) => _ungroup(g.id),
+                      child: const Text('Ungroup'),
+                    ),
+                  ],
+                  child: title,
+                ),
+        ),
+      ),
+    ];
   }
 
   /// Colours of the current theme for the SVG export, as the screen draws the
@@ -1105,8 +1437,8 @@ class _ErdViewState extends material.State<ErdView> {
               material.InteractiveViewer(
                 constrained: false,
                 transformationController: _transform,
-                // A card drag must not pan the canvas.
-                panEnabled: _dragging == null,
+                // A card or group drag must not pan the canvas.
+                panEnabled: _dragging == null && _draggingGroup == null,
                 minScale: _zoomFloor,
                 maxScale: _maxScale,
                 boundaryMargin: const material.EdgeInsets.all(400),
@@ -1133,6 +1465,9 @@ class _ErdViewState extends material.State<ErdView> {
                               child: const material.SizedBox.expand(),
                             ),
                           ),
+                          // Group frames under the edges and cards (#1282).
+                          for (final g in _allGroups())
+                            ..._groupFrame(g, layout),
                           material.Positioned.fill(
                             child: material.ValueListenableBuilder<String?>(
                               valueListenable: _focus,
@@ -1200,6 +1535,7 @@ class _ErdViewState extends material.State<ErdView> {
                                       onPressed: (_) => _hide(t.name),
                                       child: const Text('Hide from diagram'),
                                     ),
+                                    ..._groupMenu(t.name),
                                     MenuButton(
                                       key: material.ValueKey(
                                           'erd_menu_colour_${t.name}'),
@@ -1238,7 +1574,8 @@ class _ErdViewState extends material.State<ErdView> {
                                   onOpen: widget.onOpenTable == null
                                       ? null
                                       : () => widget.onOpenTable!(t.name),
-                                  onSelect: () => _pick(t.name),
+                                  marked: _marked.contains(t.name),
+                                  onSelect: () => _tapCard(t.name),
                                   onHover: (inside) => _hovered.value = inside
                                       ? t.name
                                       : (_hovered.value == t.name
@@ -1348,6 +1685,15 @@ class _ErdViewState extends material.State<ErdView> {
                   ),
                 ),
               ),
+              if (_marked.isNotEmpty)
+                QueryaActionButton(
+                  key: const material.ValueKey('erd_group_marked'),
+                  label: 'Group ${_marked.length} '
+                      '${_marked.length == 1 ? 'table' : 'tables'}',
+                  icon: material.Icons.folder_open_rounded,
+                  tooltip: 'Shift / Ctrl + click marks more tables',
+                  onPressed: () => unawaited(_newGroup({..._marked})),
+                ),
               if (_hidden.isNotEmpty)
                 QueryaActionButton(
                   key: const material.ValueKey('erd_show_all'),
@@ -1434,6 +1780,7 @@ class _TableCard extends material.StatelessWidget {
     required this.width,
     required this.headerColor,
     required this.highlighted,
+    this.marked = false,
     this.focusColumn,
     this.junctionOf,
     required this.dragging,
@@ -1453,6 +1800,9 @@ class _TableCard extends material.StatelessWidget {
   /// Header tint and icon: by schema, picked per table, or the accent.
   final material.Color headerColor;
   final bool highlighted;
+
+  /// Marked for a group with Shift / Ctrl + click (#1282).
+  final bool marked;
 
   /// The column of a picked relation on this card, shaded (#1281).
   final String? focusColumn;
@@ -1524,8 +1874,8 @@ class _TableCard extends material.StatelessWidget {
               color: wb.surface,
               borderRadius: radius,
               border: material.Border.all(
-                color: highlighted ? wb.accent : wb.borderSubtle,
-                width: highlighted ? 1.5 : 1,
+                color: highlighted || marked ? wb.accent : wb.borderSubtle,
+                width: marked ? 2.5 : (highlighted ? 1.5 : 1),
               ),
               boxShadow: [
                 material.BoxShadow(
