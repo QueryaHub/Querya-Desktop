@@ -70,17 +70,16 @@ const _validPostgresSslModes = {
   return (row: row, error: null);
 }
 
-/// [input] with the user info (`user:password`, up to the last `@` before the
-/// query) percent-encoded, or null when there is none. Only used for a string
-/// `Uri` rejected, so an `@` in a path cannot be mistaken for one.
+/// [input] with the user info (`user:password`, up to the last `@`)
+/// percent-encoded, or null when there is none. Only used for a string `Uri`
+/// rejected, so an `@` in a path or a query cannot be mistaken for one.
 String? _percentEncodeUserInfo(String input) {
   final m = RegExp(r'^([A-Za-z][A-Za-z0-9+.\-]*://)(.*)$', dotAll: true)
       .firstMatch(input);
   if (m == null) return null;
   final rest = m.group(2)!;
-  final query = rest.indexOf('?');
-  final beforeQuery = query < 0 ? rest : rest.substring(0, query);
-  final at = beforeQuery.lastIndexOf('@');
+  // The last `@`: a `?` or `/` before it belongs to the password.
+  final at = rest.lastIndexOf('@');
   if (at <= 0) return null;
   final userInfo = rest.substring(0, at);
   final colon = userInfo.indexOf(':');
