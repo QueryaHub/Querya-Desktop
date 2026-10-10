@@ -141,6 +141,9 @@ void main() {
       'sample_rows',
       'run_query',
       'explain_query',
+      'list_collections',
+      'find_documents',
+      'count_documents',
     });
     expect(tools.tools.every((t) => t.toolAnnotations?.readOnlyHint == true),
         isTrue);

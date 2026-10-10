@@ -6,6 +6,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:querya_mcp_bridge/querya_mcp_bridge.dart';
 import 'package:querya_desktop/core/database/sql_query_runner.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
+import 'package:querya_desktop/core/mcp/mcp_mongo_service.dart';
 import 'package:querya_desktop/core/mcp/mcp_query_service.dart';
 import 'package:querya_desktop/core/mcp/mcp_socket_host.dart';
 import 'package:querya_desktop/core/mcp/querya_mcp_server.dart';
@@ -16,12 +17,14 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 class McpServerController {
   McpServerController({
     McpQueryService? service,
+    McpMongoService? mongo,
     File? endpointFile,
     String? version,
     bool logActivity = false,
   })  : _logActivity = logActivity,
         _service =
             service ?? McpQueryService(createDelegate: _installedDelegate),
+        _mongo = mongo ?? McpMongoService(),
         _endpointFile = endpointFile ?? McpEndpoint.defaultFile(),
         _versionOverride = version;
 
@@ -47,6 +50,7 @@ class McpServerController {
   static const enabledKey = 'mcp_server_enabled';
 
   final McpQueryService _service;
+  final McpMongoService _mongo;
 
   /// Persist every call to the `mcp_activity` table (the app instance only).
   final bool _logActivity;
@@ -105,6 +109,7 @@ class McpServerController {
         final server = QueryaMcpServer(
           channel,
           service: _service,
+          mongo: _mongo,
           version: version,
           onCall: _onCall,
         );
