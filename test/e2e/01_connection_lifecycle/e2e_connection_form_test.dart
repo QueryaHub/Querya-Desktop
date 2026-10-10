@@ -70,15 +70,18 @@ void main() {
     // the cards, so a tap on the last visible label lands on a card and only
     // closes the menu. The grid is shorter than a card here and the footer
     // covers the label, so tap the card itself (its centre is visible).
-    // Cards past the first row are built in the cache extent, offstage.
-    final card = find.ancestor(
-      of: find.descendant(
-        of: find.byType(material.GridView),
-        matching: find.text(label, skipOffstage: false),
-        skipOffstage: false,
-      ),
-      matching: find.byType(QueryaHoverSurface),
-    ).first;
+    final grid = find.byType(material.GridView);
+    final text = find.descendant(of: grid, matching: find.text(label));
+    // Cards past the first row are not built until the grid scrolls.
+    await t.scrollUntilVisible(
+      text,
+      60,
+      scrollable: find
+          .descendant(of: grid, matching: find.byType(material.Scrollable))
+          .first,
+    );
+    final card =
+        find.ancestor(of: text, matching: find.byType(QueryaHoverSurface)).first;
     await t.ensureVisible(card);
     await step(t);
     await t.tap(card);
@@ -147,7 +150,8 @@ void main() {
       final secrets = await tester
           .runAsync(() => ConnectionSecretsStore.readForConnection(row.id!));
       expect(secrets!.connectionString, contains(host));
-      expect(inSidebar(row.name), findsOneWidget);
+      // The sidebar reloads from the database after the save.
+      await waitFor(tester, inSidebar(row.name), 'the new connection');
       await app.close(tester);
     });
   }
