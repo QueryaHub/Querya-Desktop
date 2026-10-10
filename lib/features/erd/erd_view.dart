@@ -1162,11 +1162,13 @@ class _ErdViewState extends material.State<ErdView> {
     final layout = _layout;
     final vs = _viewportSize();
     if (layout == null || vs == null) return;
-    final s = ErdLayout.fitScale(layout.size, vs);
+    // The cards and every note: a note placed away from the cards counts.
+    final size = _canvasSize(layout);
+    final s = ErdLayout.fitScale(size, vs);
     final floor = min(_minScale, s);
     if (floor != _zoomFloor) setState(() => _zoomFloor = floor);
-    final tx = (vs.width - layout.size.width * s) / 2;
-    final ty = (vs.height - layout.size.height * s) / 2;
+    final tx = (vs.width - size.width * s) / 2;
+    final ty = (vs.height - size.height * s) / 2;
     _transform.value = Matrix4.identity()..translate(tx, ty)..scale(s);
   }
 
@@ -1384,26 +1386,37 @@ class _ErdViewState extends material.State<ErdView> {
     final currentTheme = await AppSettings.instance.getExportCurrentTheme();
     if (!mounted) return;
     if (!currentTheme) {
-      final scale = ErdExport.pngPixelRatio(layout.size);
+      final scale = ErdExport.pngPixelRatio(_canvasSize(layout));
       final svg = ErdExport.toSvg(schema, layout,
           routes: _routes,
           headerFills: _headerFills(schema, const ErdSvgColors().card),
           groups: _svgGroups(layout, const ErdSvgColors().background),
-          notes: _svgNotes(const ErdSvgColors().background));
+          notes: _svgNotes(const ErdSvgColors().background,
+              const ErdSvgColors().border));
       await _save('$_fileStem.png', await svgToPng(svg, scale: scale));
       return;
     }
     final boundary = _boundaryKey.currentContext?.findRenderObject()
         as RenderRepaintBoundary?;
     if (boundary == null) return;
+    // The pick, a picked relation and the marks for a group are screen
+    // state: none of them belongs in the image, and all come back after it.
     final picked = _selected;
+    final pickedRelation = _pickedRelation;
+    final marked = Set.of(_marked);
     final needsFrame = picked != null ||
+        pickedRelation != null ||
+        marked.isNotEmpty ||
         _hovered.value != null ||
         _edgeTipNotifier.value != null;
     _hovered.value = null;
     _edgeTipNotifier.value = null;
-    if (picked != null) {
-      setState(() => _selected = null);
+    if (picked != null || pickedRelation != null || marked.isNotEmpty) {
+      setState(() {
+        _selected = null;
+        _pickedRelation = null;
+        _marked.clear();
+      });
       _syncFocus();
     }
     try {
@@ -1433,8 +1446,16 @@ class _ErdViewState extends material.State<ErdView> {
         );
       }
     } finally {
-      if (mounted && picked != null && _selected == null) {
-        setState(() => _selected = picked);
+      if (mounted &&
+          (picked != null || pickedRelation != null || marked.isNotEmpty)) {
+        setState(() {
+          // What the user did during the capture wins.
+          if (_selected == null && _pickedRelation == null) {
+            _selected = picked;
+            _pickedRelation = pickedRelation;
+          }
+          if (_marked.isEmpty) _marked.addAll(marked);
+        });
         _syncFocus();
       }
     }
@@ -1451,7 +1472,7 @@ class _ErdViewState extends material.State<ErdView> {
         colors: colors,
         headerFills: _headerFills(schema, colors.card),
         groups: _svgGroups(layout, colors.background),
-        notes: _svgNotes(colors.background));
+        notes: _svgNotes(colors.background, colors.border));
   }
 
   /// The SVG export.
@@ -1658,7 +1679,7 @@ class _ErdViewState extends material.State<ErdView> {
   }
 
   /// Notes for the SVG, tinted as on screen over the export background.
-  List<ErdSvgNote> _svgNotes(String backgroundHex) {
+  List<ErdSvgNote> _svgNotes(String backgroundHex, String borderHex) {
     final background = material.Color(
         0xFF000000 | int.parse(backgroundHex.substring(1), radix: 16));
     return [
@@ -1673,7 +1694,7 @@ class _ErdViewState extends material.State<ErdView> {
                       background))
               .toARGB32()),
           stroke: n.color == null
-              ? '#cbd5e1'
+              ? borderHex
               : ErdSvgColors.hex(_slotColor(n.color!).toARGB32()),
         ),
     ];
