@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/actions/querya_schema_object.dart';
 import 'package:querya_desktop/core/actions/table_view_command_bridge.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/erd/erd_catalog.dart';
 import 'package:querya_desktop/features/erd/erd_view.dart';
+import 'package:querya_desktop/features/workspace/data_grid_filter_bar.dart';
 import 'package:querya_desktop/features/workspace/results_tab.dart';
 import 'package:querya_desktop/features/workspace/table_data_delegate.dart';
 
@@ -13,7 +15,7 @@ import '../../support/generic_table_view_harness.dart';
 /// A catalog around `users`: it references `orgs`, `orders` references it,
 /// `orgs` references `regions` (two keys away), `unrelated` has no keys.
 TableDataPage _catalog(String sql) {
-  for (final d in [SqlDialect.postgres, SqlDialect.mysql]) {
+  for (final d in SqlDialect.values) {
     if (sql == ErdCatalog.foreignKeysSql(d)) {
       return const TableDataPage(columns: ['t', 'c', 'rt', 'rc'], rows: [
         ['orders', 'user_id', 'users', 'id'],
@@ -60,6 +62,7 @@ void main() {
     (SqlDialect.postgres, 'public'),
     // MySQL passes the database as the schema; its catalog names are bare.
     (SqlDialect.mysql, 'shop'),
+    (SqlDialect.sqlite, null),
   ]) {
     testWidgets(
         '${dialect.name}: referenced tables sit left, referencing ones right',
@@ -120,6 +123,29 @@ void main() {
     expect(opened, ['orders']);
   });
 
+  testWidgets(
+      'a double click on a neighbour opens it through the host, in Relations',
+      (t) async {
+    final opened = <QueryaSchemaObject>[];
+    final state = await pumpGenericTableView(
+      t,
+      FakeTableDataDelegate(onCustomSql: _catalog),
+      onOpenSchemaObject: opened.add,
+    );
+    state.selectView(1);
+    await _settleDiagram(t);
+
+    await t.tap(_card('orders'));
+    await t.pump(const Duration(milliseconds: 50));
+    await t.tap(_card('orders'));
+    await t.pump(const Duration(milliseconds: 400));
+
+    expect(opened.map((o) => (o.name, o.schema, o.kind)),
+        [('orders', 'public', QueryaSchemaObjectKind.table)]);
+    // The neighbour's tab starts in Relations, like the table it came from.
+    expect(TableViewCommandBridge.instance.takePendingView(), 1);
+  });
+
   testWidgets('Data, Relations, Data keeps staged edits', (t) async {
     final delegate = FakeTableDataDelegate(onCustomSql: _catalog);
     final state = await pumpGenericTableView(t, delegate);
@@ -158,6 +184,32 @@ void main() {
     expect(delegate.pagesLoaded.length, loads);
   });
 
+  testWidgets('Data, Relations, Data keeps the quick filter', (t) async {
+    final state = await pumpGenericTableView(
+        t, FakeTableDataDelegate(onCustomSql: _catalog));
+    await t.tap(find.byTooltip('Toggle Quick Filter'));
+    await t.pumpAndSettle();
+    final field = find.descendant(
+      of: find.byType(DataGridFilterBar),
+      matching: find.byType(material.TextField),
+    );
+    await t.enterText(field, 'Bob');
+    // Let the filter bar's debounce fire.
+    await t.pump(const Duration(milliseconds: 400));
+    await t.pumpAndSettle();
+    expect(find.text('Alice'), findsNothing);
+    expect(find.text('Bob'), findsWidgets);
+
+    state.selectView(1);
+    await _settleDiagram(t);
+    state.selectView(0);
+    await t.pumpAndSettle();
+
+    expect(t.widget<material.TextField>(field).controller!.text, 'Bob');
+    expect(find.text('Alice'), findsNothing);
+    expect(find.text('Bob'), findsWidgets);
+  });
+
   testWidgets('a table offers the Data | Relations switch', (t) async {
     await pumpGenericTableView(t, FakeTableDataDelegate());
     expect(find.text('Relations'), findsOneWidget);
@@ -165,6 +217,12 @@ void main() {
 
   testWidgets('a view does not offer the switch', (t) async {
     await pumpGenericTableView(t, FakeTableDataDelegate(), isView: true);
+    expect(find.text('Relations'), findsNothing);
+  });
+
+  testWidgets('a materialized view does not offer the switch', (t) async {
+    await pumpGenericTableView(t, FakeTableDataDelegate(),
+        isMaterializedView: true);
     expect(find.text('Relations'), findsNothing);
   });
 
