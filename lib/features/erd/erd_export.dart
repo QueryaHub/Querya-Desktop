@@ -2,6 +2,8 @@ import 'dart:math' show max, min;
 import 'dart:ui' show Offset, Rect, Size;
 
 import 'package:querya_desktop/core/erd/erd_note_text.dart';
+import 'package:querya_desktop/core/erd/erd_saved_layout.dart'
+    show ErdGroup, ErdNote;
 import 'package:querya_desktop/features/erd/erd_geometry.dart';
 import 'package:querya_desktop/features/erd/erd_layout.dart';
 import 'package:querya_desktop/core/erd/erd_model.dart';
@@ -120,6 +122,167 @@ class ErdExport {
       final many = r.optional ? 'o{' : '|{';
       b.writeln(
           '  ${_id(r.toTable)} ||--$many ${_id(r.fromTable)} : "${r.fromColumn.replaceAll('"', '')}"');
+    }
+    return b.toString();
+  }
+
+  // --- DBML (#1285) ---
+
+  static final _dbmlPlainType = RegExp(
+      r'^[A-Za-z_][A-Za-z0-9_]*(\(\s*\d+(\s*,\s*\d+)*\s*\))?(\[\])?$');
+  static final _dbmlNumber = RegExp(r'^-?\d+(\.\d+)?$');
+  // 'text' with an optional ::cast after it.
+  static final _dbmlQuoted = RegExp(r"^'((?:[^']|'')*)'(?:::[^']*)?$");
+
+  static String _q(String name) => '"${name.replaceAll('"', r'\"')}"';
+
+  /// `"schema"."table"` for `schema.table`, else `"table"`.
+  static String _dbmlTable(String name) {
+    final dot = name.indexOf('.');
+    if (dot <= 0 || dot == name.length - 1) return _q(name);
+    return '${_q(name.substring(0, dot))}.${_q(name.substring(dot + 1))}';
+  }
+
+  /// A DBML string literal; one with a line break is a `'''` block.
+  static String _dbmlString(String s) {
+    final text = s.replaceAll(r'\', r'\\');
+    if (text.contains('\n')) {
+      return "'''\n${text.replaceAll("'''", r"\'''")}\n'''";
+    }
+    return "'${text.replaceAll("'", r"\'")}'";
+  }
+
+  /// A column's type: bare when DBML reads it as one word (`varchar(255)`),
+  /// quoted otherwise (`"timestamp with time zone"`).
+  static String _dbmlType(String type) {
+    final t = type.trim();
+    if (t.isEmpty) return '"unknown"';
+    return _dbmlPlainType.hasMatch(t) ? t : _q(t);
+  }
+
+  /// A default as DBML writes it: a number, a boolean or null as is, a string
+  /// literal as a string (its `::cast` dropped), anything else as an
+  /// expression in backticks.
+  static String _dbmlDefault(String value) {
+    final v = value.trim();
+    final lower = v.toLowerCase();
+    if (_dbmlNumber.hasMatch(v) ||
+        lower == 'true' ||
+        lower == 'false' ||
+        lower == 'null') {
+      return lower == 'null' || lower == 'true' || lower == 'false'
+          ? lower
+          : v;
+    }
+    final m = _dbmlQuoted.firstMatch(v);
+    if (m != null) {
+      return "'${m.group(1)!.replaceAll("''", r"\'")}'";
+    }
+    return '`${v.replaceAll('`', "'")}`';
+  }
+
+  /// The DBML of [schema] (the shown tables), for dbdiagram and dbdocs:
+  /// tables with `pk`, `unique`, `not null`, `default`, `increment` and
+  /// notes, enums, refs, table groups and sticky notes. [headerColors] are
+  /// `#rrggbb` per table.
+  ///
+  /// A foreign key on its own unique column is `-` (one-to-one), any other
+  /// `>` (many-to-one). Composite primary keys go in an `indexes` block.
+  static String toDbml(
+    ErdSchema schema, {
+    List<ErdGroup> groups = const [],
+    List<ErdNote> notes = const [],
+    Map<String, String> headerColors = const {},
+  }) {
+    final names = {for (final t in schema.tables) t.name};
+    final b = StringBuffer('// Exported from Querya\n');
+
+    // Enums by the name of their type; a type that is no plain word (MySQL's
+    // enum('a','b')) is named after its column.
+    final enums = <String, List<String>>{};
+    final enumOf = <String, String>{};
+    for (final t in schema.tables) {
+      for (final c in t.columns) {
+        if (c.enumValues.isEmpty) continue;
+        final type = c.type.trim();
+        final name = _dbmlPlainType.hasMatch(type) && !type.contains('(')
+            ? type
+            : '${t.name.replaceAll('.', '_')}_${c.name}';
+        enums.putIfAbsent(name, () => c.enumValues);
+        enumOf['${t.name}\u0000${c.name}'] = name;
+      }
+    }
+    for (final e in enums.entries) {
+      b.writeln('\nEnum ${_dbmlTable(e.key)} {');
+      for (final v in e.value) {
+        b.writeln('  ${_q(v)}');
+      }
+      b.writeln('}');
+    }
+
+    for (final t in schema.tables) {
+      final settings = [
+        if (headerColors[t.name] case final c?) 'headercolor: $c',
+        if (t.comment case final note?) 'note: ${_dbmlString(note)}',
+      ];
+      b.writeln('\nTable ${_dbmlTable(t.name)}'
+          '${settings.isEmpty ? '' : ' [${settings.join(', ')}]'} {');
+      final pks = [for (final c in t.columns) if (c.isPrimaryKey) c];
+      for (final c in t.columns) {
+        final type = enumOf['${t.name}\u0000${c.name}'] != null
+            ? _dbmlTable(enumOf['${t.name}\u0000${c.name}']!)
+            : _dbmlType(c.type);
+        final attrs = [
+          if (c.isPrimaryKey && pks.length == 1) 'pk',
+          if (c.isIdentity) 'increment',
+          // Spelled out for the columns of a composite key too, which carry
+          // no `pk` of their own.
+          if (!c.isNullable && !(c.isPrimaryKey && pks.length == 1))
+            'not null',
+          if (c.isUnique && !c.isPrimaryKey) 'unique',
+          if (c.defaultValue != null && !c.isIdentity)
+            'default: ${_dbmlDefault(c.defaultValue!)}',
+          if (c.comment case final note?) 'note: ${_dbmlString(note)}',
+        ];
+        b.writeln('  ${_q(c.name)} $type'
+            '${attrs.isEmpty ? '' : ' [${attrs.join(', ')}]'}');
+      }
+      if (pks.length > 1) {
+        b
+          ..writeln('')
+          ..writeln('  indexes {')
+          ..writeln('    (${pks.map((c) => _q(c.name)).join(', ')}) [pk]')
+          ..writeln('  }');
+      }
+      b.writeln('}');
+    }
+
+    var anyRef = false;
+    for (final r in schema.relations) {
+      if (!names.contains(r.fromTable) || !names.contains(r.toTable)) continue;
+      if (!anyRef) b.writeln('');
+      anyRef = true;
+      b.writeln('Ref: ${_dbmlTable(r.fromTable)}.${_q(r.fromColumn)} '
+          '${r.oneToOne ? '-' : '>'} '
+          '${_dbmlTable(r.toTable)}.${_q(r.toColumn)}');
+    }
+
+    for (final g in groups) {
+      final members = [for (final t in g.tables) if (names.contains(t)) t];
+      if (members.isEmpty) continue;
+      final settings = [
+        if (g.note case final note?) 'note: ${_dbmlString(note)}',
+      ];
+      b.writeln('\nTableGroup ${_q(g.name)}'
+          '${settings.isEmpty ? '' : ' [${settings.join(', ')}]'} {');
+      for (final t in members) {
+        b.writeln('  ${_dbmlTable(t)}');
+      }
+      b.writeln('}');
+    }
+
+    for (final n in notes) {
+      b.writeln('\nNote ${_q('note_${n.id}')} {\n  ${_dbmlString(n.text)}\n}');
     }
     return b.toString();
   }

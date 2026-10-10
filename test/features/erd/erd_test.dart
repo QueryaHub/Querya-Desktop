@@ -713,6 +713,42 @@ void main() {
       await t.pump(const Duration(seconds: 1));
     });
 
+    testWidgets('DBML and PDF export from the menu', (t) async {
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
+      final saved = <String, Uint8List>{};
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(
+          source:
+              SqlErdSource(delegate: delegate(), dialect: SqlDialect.sqlite),
+          onSaveFile: (n, b) async => saved[n] = b,
+        ),
+      ));
+      await t.pump();
+      await t.pump();
+
+      await t.tap(find.byKey(const material.ValueKey('erd_export')));
+      await t.pumpAndSettle();
+      await t.tap(find.text('DBML (.dbml)'));
+      await t.pump();
+      final dbml = utf8.decode(saved['erd.dbml']!);
+      expect(dbml, contains('Table "users" {'));
+      expect(dbml, contains('Ref: "orders"."user_id" > "users"."id"'));
+
+      await t.tap(find.byKey(const material.ValueKey('erd_export')));
+      await t.pumpAndSettle();
+      await t.tap(find.text('PDF (A3)'));
+      for (var i = 0; i < 60 && !saved.containsKey('erd.pdf'); i++) {
+        await t.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 50)));
+        await t.pump();
+      }
+      final pdf = saved['erd.pdf']!;
+      expect(utf8.decode(pdf.sublist(0, 8), allowMalformed: true),
+          startsWith('%PDF-1.4'));
+      expect(t.takeException(), isNull);
+      await t.pump(const Duration(seconds: 1));
+    });
+
     testWidgets('PNG export works while a table is picked', (t) async {
       await t.binding.setSurfaceSize(const material.Size(1200, 800));
       final saved = <String, Uint8List>{};
