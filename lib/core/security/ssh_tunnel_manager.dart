@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
@@ -147,9 +148,40 @@ class SshTunnelManager {
   @visibleForTesting
   int get activeSessionCount => _sessions.length;
 
-  /// Formats SHA-256 fingerprint as standard hex string (`aa:bb:cc...` or raw hex).
-  static String formatFingerprint(Uint8List bytes) {
-    return sha256.convert(bytes).toString();
+  /// The host key fingerprint as OpenSSH writes it: `SHA256:<base64>`, what
+  /// `ssh-keygen -lf` and `ssh-keyscan | ssh-keygen -lf -` print.
+  ///
+  /// dartssh2 hands the verify callback that string, UTF-8 encoded, not the
+  /// key; hashing those bytes again (as this method used to) gave a value no
+  /// other tool shows, and a fingerprint copied from one never matched (#1304).
+  static String formatFingerprint(Uint8List bytes) =>
+      utf8.decode(bytes, allowMalformed: true).trim();
+
+  /// Whether [pinned], what the user saved, is the host key [presented] by the
+  /// server. Accepted spellings:
+  /// - `SHA256:<base64>` as OpenSSH prints it (the prefix in any case, the
+  ///   base64 with or without padding; the base64 itself is case-sensitive);
+  /// - the bare base64 of it;
+  /// - the 64-digit hex a Querya version before this fix displayed (a SHA-256
+  ///   of the OpenSSH string, with or without `:`), so saved pins keep working.
+  static bool fingerprintMatches(String pinned, Uint8List presented) {
+    final observed = formatFingerprint(presented);
+    final text = pinned.trim();
+    if (text.isEmpty) return true;
+
+    String bare(String v) => v.replaceAll('=', '');
+    final observedBase64 = observed.startsWith('SHA256:')
+        ? bare(observed.substring(7))
+        : bare(observed);
+
+    final prefix = RegExp(r'^sha256:', caseSensitive: false);
+    if (prefix.hasMatch(text)) {
+      return bare(text.substring(7)) == observedBase64;
+    }
+    final legacyHex = sha256.convert(presented).toString();
+    final hex = text.replaceAll(':', '').toLowerCase();
+    if (RegExp(r'^[0-9a-f]{64}$').hasMatch(hex)) return hex == legacyHex;
+    return bare(text) == observedBase64;
   }
 
   /// Establishes or reuses an ephemeral local port forwarding tunnel.
@@ -247,16 +279,14 @@ class SshTunnelManager {
     String? observedFingerprint;
     Future<bool> handleVerifyHostKey(String type, Uint8List fingerprint) async {
       observedFingerprint = formatFingerprint(fingerprint);
-      if (config.knownHostFingerprint == null ||
-          config.knownHostFingerprint!.trim().isEmpty) {
+      final pinned = config.knownHostFingerprint;
+      if (pinned == null || pinned.trim().isEmpty) {
         return true; // TOFU / accept-new
       }
-      final expected = config.knownHostFingerprint!.trim().toLowerCase();
-      final actual = observedFingerprint!.toLowerCase();
-      if (actual != expected &&
-          actual.replaceAll(':', '') != expected.replaceAll(':', '')) {
+      if (!fingerprintMatches(pinned, fingerprint)) {
         debugPrint(
-          'SSH Host Key Mismatch! Expected: $expected, Actual: $actual',
+          'SSH Host Key Mismatch! Expected: ${pinned.trim()}, '
+          'Actual: $observedFingerprint',
         );
         return false;
       }

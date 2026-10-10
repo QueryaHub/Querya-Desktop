@@ -391,33 +391,87 @@ void main() {
 
   group('host key verification', () {
     final hostKey = [9, 8, 7, 6, 5];
-    final hexFingerprint = sha256.convert(hostKey).toString();
+    // What `ssh-keygen -lf` prints for the key.
+    final openSsh = FakeSshServer.openSshFingerprint(hostKey);
+    // What this app displayed before #1304: SHA-256 of that very string.
+    final legacyHex =
+        sha256.convert(utf8.encode(openSsh)).toString();
 
-    test('formatFingerprint is the SHA-256 hex digest', () {
+    test('formatFingerprint is the OpenSSH SHA256:<base64> form', () {
       expect(
-        SshTunnelManager.formatFingerprint(Uint8List.fromList(hostKey)),
-        hexFingerprint,
+        SshTunnelManager.formatFingerprint(FakeSshServer.presented(hostKey)),
+        openSsh,
+      );
+      expect(openSsh, startsWith('SHA256:'));
+      expect(openSsh, isNot(contains('=')));
+    });
+
+    test('a pin copied from ssh-keygen is accepted', () async {
+      server.hostKey = Uint8List.fromList(hostKey);
+
+      await open(config: _config(fingerprint: openSsh));
+
+      expect(manager.activeSessionCount, 1);
+    });
+
+    test('the prefix in any case, padding and the bare base64 also match',
+        () async {
+      server.hostKey = Uint8List.fromList(hostKey);
+      final base64Part = openSsh.substring('SHA256:'.length);
+      for (final pin in [
+        'sha256:$base64Part',
+        'SHA256:$base64Part=',
+        base64Part,
+        '  $openSsh  ',
+      ]) {
+        final fresh = SshTunnelManager.forTesting(
+          connector: server.connect,
+          clientBuilder: server.build,
+        );
+        await fresh.openTunnel(
+          config: _config(fingerprint: pin),
+          secrets: SshTunnelSecrets(password: 'secret'),
+          remoteHost: 'db.internal',
+          remotePort: 5432,
+        );
+        expect(fresh.activeSessionCount, 1, reason: pin);
+        await fresh.closeAll();
+      }
+    });
+
+    test('the base64 is case-sensitive: a different key does not match',
+        () async {
+      server.hostKey = Uint8List.fromList(hostKey);
+
+      await expectLater(
+        open(config: _config(fingerprint: openSsh.toLowerCase())),
+        throwsA(isA<SshHostKeyMismatchException>()),
       );
     });
 
-    test('a matching pinned fingerprint is accepted', () async {
-      server.hostKey = Uint8List.fromList(hostKey);
-
-      await open(config: _config(fingerprint: hexFingerprint));
-
-      expect(manager.activeSessionCount, 1);
-    });
-
-    test('colon-separated, upper-case fingerprints still match', () async {
+    test('a pin saved before the fix (hex of the displayed value) still works',
+        () async {
       server.hostKey = Uint8List.fromList(hostKey);
       final pairs = [
-        for (var i = 0; i < hexFingerprint.length; i += 2)
-          hexFingerprint.substring(i, i + 2).toUpperCase(),
+        for (var i = 0; i < legacyHex.length; i += 2)
+          legacyHex.substring(i, i + 2).toUpperCase(),
       ];
 
-      await open(config: _config(fingerprint: pairs.join(':')));
-
+      await open(config: _config(fingerprint: legacyHex));
       expect(manager.activeSessionCount, 1);
+
+      final other = SshTunnelManager.forTesting(
+        connector: server.connect,
+        clientBuilder: server.build,
+      );
+      await other.openTunnel(
+        config: _config(fingerprint: pairs.join(':')),
+        secrets: SshTunnelSecrets(password: 'secret'),
+        remoteHost: 'db.internal',
+        remotePort: 5432,
+      );
+      expect(other.activeSessionCount, 1);
+      await other.closeAll();
     });
 
     test('a changed host key is blocked as a possible man-in-the-middle',
@@ -430,7 +484,7 @@ void main() {
           isA<SshHostKeyMismatchException>().having(
             (e) => e.message,
             'message',
-            allOf(contains('bastion.example'), contains(hexFingerprint)),
+            allOf(contains('bastion.example'), contains(openSsh)),
           ),
         ),
       );
@@ -501,7 +555,7 @@ void main() {
       expect(r.ok, isTrue);
       expect(
         r.serverFingerprint,
-        SshTunnelManager.formatFingerprint(server.hostKey),
+        FakeSshServer.openSshFingerprint(server.hostKey),
       );
       expect(server.clients.single.forwards.single,
           (host: 'db.internal', port: 5432));
