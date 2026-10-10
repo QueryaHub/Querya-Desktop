@@ -6,8 +6,8 @@ MCP client (Claude Desktop, Claude Code, Cursor, VS Code, Gemini CLI, Continue,
 share and run **read-only** SQL through Querya. Querya has no chat of its own
 and needs no AI provider keys: the client brings the model.
 
-Supported: **PostgreSQL, MySQL, SQLite**. MongoDB, Redis and extension drivers
-are not exposed yet.
+Supported: **PostgreSQL, MySQL, SQLite** (SQL tools) and **MongoDB**
+(document tools). Redis and extension drivers are not exposed yet.
 
 ## How it works
 
@@ -83,6 +83,21 @@ and most stdio clients:
 | `run_query` | `connection_id`, `sql` | `columns`, `rows`, `row_count`, `truncated` |
 | `explain_query` | `connection_id`, `sql` (without `EXPLAIN`) | the execution plan, without running the query |
 
+**MongoDB connections** use their own tools:
+
+| Tool | Arguments | Returns |
+|---|---|---|
+| `list_collections` | `connection_id` | collection names (system collections hidden) |
+| `find_documents` | `connection_id`, `collection`, `filter`, `sort`, `limit` (1-100, default 20) | `documents`, `count`, `truncated` |
+| `count_documents` | `connection_id`, `collection`, `filter` | `count` |
+
+`filter` and `sort` are JSON objects in MongoDB query syntax. Server-side
+JavaScript (`$where`, `$function`, `$accumulator`) is refused at any depth, as
+are documents nested more than 12 levels or with more than 500 fields. No tool
+writes: the connection's saved user may be able to, Querya never asks it to.
+Each call uses its own connection and closes it. The collection must exist, and
+string values longer than 4 KB are cut with a marker.
+
 Resource: `schema://<connection_id>` — all tables with columns and keys, for
 clients that load context up front.
 
@@ -112,7 +127,7 @@ tool, connection, SQL, rows and duration, or the error). The app keeps the last
 | Symptom | Fix |
 |---|---|
 | "Querya Desktop is not running or its MCP server is off" | Start Querya and switch on **Enable MCP server**. |
-| `list_connections` is empty | Share at least one PostgreSQL / MySQL / SQLite connection. |
+| `list_connections` is empty | Share at least one PostgreSQL / MySQL / SQLite / MongoDB connection. |
 | "Connection N is not available" | The connection was unshared or deleted; call `list_connections` again. |
 | "Invalid Querya MCP token" | The token was regenerated or the app restarted with a new one: restart the MCP client. |
 | Client cannot find `querya-mcp` | Use the absolute path; on macOS / Flatpak download the release binary and `chmod +x` it. |
@@ -124,6 +139,7 @@ on Linux (fallback `~/.cache/querya`), `~/Library/Caches/Querya/` on macOS and
 
 ## For contributors
 
+- MongoDB: `lib/core/mcp/mcp_mongo_service.dart` (service, guard, session).
 - Query core: `lib/core/mcp/mcp_query_service.dart`, guard `mcp_sql_guard.dart`,
   error redaction `mcp_redaction.dart`, read-only delegates `mcp_sql_delegates.dart`.
 - Server and transport: `querya_mcp_server.dart` (`dart_mcp`),
