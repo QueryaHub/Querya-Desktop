@@ -1,4 +1,5 @@
 import 'package:flutter/gestures.dart' show kSecondaryButton;
+import 'package:flutter/widgets.dart' show CustomScrollView;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/folders_storage.dart';
@@ -166,10 +167,15 @@ void main() {
 
     // The folder opens to show it; drag it onto the empty part of the list.
     expect(inSidebar('E2E Dragged'), findsOneWidget);
-    final panel = tester.getRect(find.byType(ConnectionsPanel));
+    // The empty part of the list, inside the scroll view that is the target
+    // (the panel itself also has a header and a footer).
+    final list = tester.getRect(find.descendant(
+      of: find.byType(ConnectionsPanel),
+      matching: find.byType(CustomScrollView),
+    ));
     await dragTo(
       tester.getCenter(inSidebar('E2E Dragged').first),
-      Offset(panel.center.dx, panel.bottom - 24),
+      Offset(list.center.dx, list.bottom - 24),
     );
     row = await tester.runAsync(() => LocalDb.instance.getConnectionById(id));
     expect(row!.folderId, isNull, reason: 'dropped on the list');
