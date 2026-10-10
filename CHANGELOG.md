@@ -17,6 +17,11 @@ Everything merged to `dev` since 0.4.18: the NoSQL workbench, SSH tunnelling and
 - **Own session and server-side timeout (#1217)** — MCP queries run on their own read-only session with a server-side statement timeout, not on the user's.
 - **Refusal rule ids (#1231)** — every refused query records the guard rule that refused it; the activity list names it; the security suite covers values and comments placed where a shape check misses them.
 - **Views (#1268)** — `list_tables`, `describe_table` and `sample_rows` cover views and PostgreSQL materialized views (`kind: "view"`).
+- **MongoDB tools (#1271)** — read-only `list_collections`, `find_documents` and `count_documents` for MongoDB connections.
+
+**Connections**
+
+- **Move to folder (#1050)** — *Move to folder* in the connection's context menu, and dragging a connection into a folder or onto the list to take it out.
 
 **NoSQL**
 
@@ -55,6 +60,7 @@ Everything merged to `dev` since 0.4.18: the NoSQL workbench, SSH tunnelling and
 - **Sticky notes (#1283)** — Markdown-light text, colour, resize, optionally attached to a table so it moves with it.
 - **Saved views (#1284)** — name the set of shown tables, groups, notes and viewport; switch from the toolbar; *All tables* is always there.
 - **DBML and PDF export (#1285)** — DBML (file or clipboard) with keys, defaults, enums, refs, groups and notes; one-page PDF in A4 or A3.
+- **New table groups gather their tables** when a frame would cover other cards (#1282); Auto layout keeps a group together.
 
 **SQL workspace**
 
@@ -87,6 +93,17 @@ Everything merged to `dev` since 0.4.18: the NoSQL workbench, SSH tunnelling and
 - **Pooled sessions (#1212)** — a lease released after an interrupt no longer touches the entry that replaced it (#1213); one connect attempt per pooled connection and one reconnect per dropped slot (#1214); closing a table, sequence, routine, browser or stats view releases its lease without interrupting the shared session (#1215, #1237).
 - **Timeouts (#1216)** — statements on a session run one at a time, so a statement waiting in line no longer cancels the one running; a server-side cancel (57014) keeps the session, only a bare `TimeoutException` closes it; MySQL no longer closes the session after 10 s of waiting. "Query timed out after 30 s" and "Waited 120 s for the connection" are different errors.
 - **ERD** — SQLite diagram was always empty (#1134); long types fit the card and PK + FK are both shown (#1152); PNG capture is clean and size-capped (#1153); large diagrams fit and the search closes before the pick (#1154); Relations finds MySQL and current-schema PostgreSQL tables (#1250).
+- **ERD interface review** — the current-theme PNG leaves out a picked relation and group marks; Fit includes sticky notes placed away from the cards; notes without a colour use the export palette's outline; keys work after touching a note.
+- **Results** — the Grid, Groupings and Charts tabs no longer clip or overlap (#1272).
+- **PostgreSQL** — binary types without a driver codec no longer throw `FormatException` (#1273).
+- **Connections and secrets (#1302–#1311, #1314, #1315)** — Test Connection of an edited connection uses the saved password and SSH secrets; a saved password can be removed on edit; SSH secrets go with a disabled tunnel; a failed save restores them all; an unreadable keyring is reported as such, not as a wrong password; URL import accepts raw `@`, `#`, `?` in passwords, Windows SQLite paths and IPv6 hosts.
+- **Test Connection says why it fails (#1308)** — Redis, MySQL and MongoDB show the reason, as PostgreSQL does; reasons stay on screen for 20 s.
+- **Redis** — connect has a 10 s timeout, a failed `AUTH` closes its socket, concurrent connects share one attempt (#1307).
+- **Pools and reconnects (#1306, #1313)** — a failed reconnect gives its lease back, so the slot can be reused; MySQL `forceClose` during connect releases the SSH tunnel and does not revive the session.
+- **SSH** — host key fingerprints use the OpenSSH `SHA256:<base64>` form, and saved hex pins still match (#1304); tunnel failures name the bastion and are not reported as database authentication failures (#1305).
+- **Errors (#1310, #1316)** — a missing column is not reported as a missing table; a full pool, a lost session and TLS failures each have their own message and hint.
+- **MongoDB (#1309)** — connection strings with several hosts (replica sets) import and connect; through an SSH tunnel they connect directly to the tunnel endpoint, and `mongodb+srv://` with a tunnel gets an explanation.
+- **Editing a connection of a missing extension or driver** explains why nothing opens, and never opens another driver's form (#1314).
 - **Charts** — pie legend, distinct colours and donut size (#1160).
 - **SQLite** — columns with the same name stay separate in query results (#1144).
 - **Updater and Windows** — the Linux bundle replace preserves `QueryaData` and `.portable` (#1055); file associations and registry writes are optional (#1054).
