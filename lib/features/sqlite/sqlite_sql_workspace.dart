@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
-import 'package:querya_desktop/core/database/result_row_string_convert.dart';
 import 'package:querya_desktop/core/database/sql_limit.dart';
 import 'package:querya_desktop/core/database/sql_table_target_extractor.dart';
 import 'package:querya_desktop/core/database/sqlite_service.dart';
@@ -105,13 +104,17 @@ class SqliteSqlExecutionDelegate extends BaseSqlExecutionDelegate {
     final limitCount = truncated ? cap : results.length;
     final injectedLimit = effectiveSql != sql;
 
-    final rawRows = results.take(limitCount).map((row) {
-      return cols
-          .map((col) => sqliteResultCellToDisplayString(row[col]))
-          .toList();
-    }).toList();
+    final rawRows = <List<Object?>>[];
+    var count = 0;
+    for (final row in results) {
+      if (count >= limitCount) break;
+      rawRows.add([for (final col in cols) row[col]]);
+      count++;
+    }
 
-    final outRows = await convertResultRowsToStringsAdaptive(rawRows);
+    final outRows = await convertSqliteResultRowsToStringsAdaptive(
+      SqliteResultConvertJob(rowValues: rawRows),
+    );
 
     final isTruncated = truncated || (injectedLimit && results.length >= cap);
     final statusMsg = formatStatusMessage(

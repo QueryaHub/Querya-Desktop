@@ -156,4 +156,57 @@ void main() {
       expect(ticks, 1, reason: 'a queued task ran while conversion was in flight');
     });
   });
+
+  group('convertSqliteResultRowsToStringsAdaptive (single typed pass)', () {
+    List<List<Object?>> sample(int n) => [
+          for (var i = 0; i < n; i++)
+            [
+              i,
+              i.isEven ? 'active' : 'custom_$i',
+              i % 3 == 0 ? Uint8List.fromList([0xca, 0xfe]) : null,
+              null,
+            ],
+        ];
+
+    test('matches synchronous convertSqliteResultRowsToStrings', () async {
+      final job = SqliteResultConvertJob(rowValues: sample(1200));
+      expect(
+        await convertSqliteResultRowsToStringsAdaptive(job),
+        convertSqliteResultRowsToStrings(job),
+      );
+    });
+
+    test('interns repeated values so they share one string instance', () async {
+      final out = await convertSqliteResultRowsToStringsAdaptive(
+        SqliteResultConvertJob(
+          rowValues: [
+            for (var i = 0; i < 6; i++) [i, 'status_${i % 2}_${'x' * 4}'],
+          ],
+        ),
+      );
+      expect(identical(out[0][1], out[2][1]), isTrue);
+      expect(identical(out[1][1], out[3][1]), isTrue);
+    });
+
+    test('empty input yields empty output', () async {
+      expect(
+        await convertSqliteResultRowsToStringsAdaptive(
+          const SqliteResultConvertJob(rowValues: []),
+        ),
+        isEmpty,
+      );
+    });
+
+    test('formats blobs correctly as hex literals in adaptive mode', () async {
+      final out = await convertSqliteResultRowsToStringsAdaptive(
+        SqliteResultConvertJob(
+          rowValues: [
+            ['ok', Uint8List.fromList([0xde, 0xad]), null],
+          ],
+        ),
+      );
+      expect(out.single, ['ok', "X'dead'", 'NULL']);
+    });
+  });
 }
+
