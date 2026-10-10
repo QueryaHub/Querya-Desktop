@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:postgres/postgres.dart';
 import 'package:querya_desktop/core/database/statement_queue.dart';
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
+import 'package:querya_desktop/core/database/querya_database_exception.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_manager.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
@@ -159,7 +160,13 @@ class PostgresConnection {
   bool _isConnected = false;
   bool _inTransaction = false;
 
-  bool get isConnected => _isConnected && _conn != null;
+  bool get isConnected => _isConnected && _conn != null && _conn!.isOpen;
+
+  @visibleForTesting
+  void setConnectionForTest(Connection? conn, {bool isConnected = true}) {
+    _conn = conn;
+    _isConnected = isConnected;
+  }
 
   /// Scrubs sensitive in-memory credentials once the network handshake completes.
   void scrubCredentials() {
@@ -218,7 +225,7 @@ class PostgresConnection {
   /// for that attempt. Without this, two callers opened two sockets and two SSH
   /// tunnels, and a failing attempt dropped the session the other one had made.
   Future<void> connect() {
-    if (_isConnected && _conn != null) return Future<void>.value();
+    if (isConnected) return Future<void>.value();
     final inFlight = _connecting;
     if (inFlight != null) return inFlight;
     final attempt = _connectOnce();
@@ -229,7 +236,13 @@ class PostgresConnection {
   }
 
   Future<void> _connectOnce() async {
-    if (_isConnected && _conn != null) return;
+    if (isConnected) return;
+    if (_conn != null && !_conn!.isOpen) {
+      try {
+        await _conn?.close(force: true);
+      } catch (_) {}
+      _conn = null;
+    }
 
     var effectivePassword = _password;
     var effectiveConnectionString = _connectionString;
@@ -440,6 +453,17 @@ class PostgresConnection {
       } on TimeoutException catch (e) {
         if (e is! PgException) unawaited(forceClose());
         rethrow;
+      } catch (e) {
+        if (c != null && !c.isOpen) {
+          unawaited(forceClose());
+        } else {
+          final mapped = mapDatabaseError(e, driver: DatabaseDriver.postgres);
+          if (mapped is ConnectionLostException ||
+              mapped is HostUnreachableException) {
+            unawaited(forceClose());
+          }
+        }
+        rethrow;
       }
     });
   }
@@ -449,12 +473,25 @@ class PostgresConnection {
   /// call's default timeout while it waits, and could cancel the statement
   /// that is running (#1216).
   Future<Result> _queued(Future<Result> Function(Connection c) call) =>
-      statementQueue.run(() {
+      statementQueue.run(() async {
         final c = _conn;
         if (!isConnected || c == null) {
           throw StateError('Not connected to PostgreSQL');
         }
-        return call(c);
+        try {
+          return await call(c);
+        } catch (e) {
+          if (!c.isOpen) {
+            unawaited(forceClose());
+          } else {
+            final mapped = mapDatabaseError(e, driver: DatabaseDriver.postgres);
+            if (mapped is ConnectionLostException ||
+                mapped is HostUnreachableException) {
+              unawaited(forceClose());
+            }
+          }
+          rethrow;
+        }
       });
 
   /// [execute] with [timeout] as the statement's own limit. The limit starts

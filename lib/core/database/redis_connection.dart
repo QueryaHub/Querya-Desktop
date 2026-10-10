@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
+import 'package:querya_desktop/core/database/querya_database_exception.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_manager.dart';
 import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
@@ -119,9 +120,23 @@ class RedisConnection {
 
   redis.RedisConnection? _conn;
   redis.Command? _command;
+  Socket? _socket;
   bool _isConnected = false;
 
   bool get isConnected => _isConnected && _command != null;
+
+  @visibleForTesting
+  void setConnectionForTest({
+    redis.RedisConnection? conn,
+    redis.Command? command,
+    Socket? socket,
+    bool isConnected = true,
+  }) {
+    _conn = conn;
+    _command = command;
+    _socket = socket;
+    _isConnected = isConnected;
+  }
 
   /// Scrubs sensitive in-memory credentials once the network handshake completes.
   void scrubCredentials() {
@@ -133,7 +148,7 @@ class RedisConnection {
   /// for that attempt. Without this, two callers opened two sockets and two SSH
   /// tunnels, and the second overwrote the first's connection (#1307).
   Future<void> connect() {
-    if (_isConnected && _command != null) return Future<void>.value();
+    if (isConnected) return Future<void>.value();
     final inFlight = _connecting;
     if (inFlight != null) return inFlight;
     final attempt = _connectOnce();
@@ -156,7 +171,15 @@ class RedisConnection {
   }
 
   Future<void> _openConnection() async {
-    if (_isConnected && _command != null) return;
+    if (isConnected) return;
+    if (_socket != null) {
+      try {
+        _socket?.destroy();
+      } catch (_) {}
+      _socket = null;
+      _command = null;
+      _conn = null;
+    }
 
     var effectivePassword = _password;
     var effectiveConnectionString = _connectionString;
@@ -218,6 +241,18 @@ class RedisConnection {
               effectivePort,
               timeout: limit,
             );
+      _socket = socket;
+      final activeSocket = socket;
+      // Watches the socket for a drop; the future itself is not awaited.
+      unawaited(activeSocket.done.then((_) {
+        if (identical(_socket, activeSocket)) {
+          _isConnected = false;
+        }
+      }, onError: (_) {
+        if (identical(_socket, activeSocket)) {
+          _isConnected = false;
+        }
+      }));
       final command = await client.connectWithSocket(socket);
       _command = command;
       command.setParser(redis.RedisParserBulkBinary());
@@ -245,6 +280,7 @@ class RedisConnection {
       _isConnected = false;
       _conn = null;
       _command = null;
+      _socket = null;
       // The attempt may have got as far as an open socket (a wrong password,
       // a silent server): close it, or every failed try leaves one behind.
       try {
@@ -278,6 +314,11 @@ class RedisConnection {
     final wasConnected = _isConnected;
     _isConnected = false;
     _command = null;
+    final sock = _socket;
+    _socket = null;
+    try {
+      sock?.destroy();
+    } catch (_) {}
     final c = _conn;
     _conn = null;
     if (c != null && wasConnected) {
@@ -351,7 +392,18 @@ class RedisConnection {
     if (!isConnected || _command == null) {
       throw StateError('Not connected to Redis');
     }
-    return _command!.send_object(args);
+    try {
+      return await _command!.send_object(args);
+    } catch (e) {
+      final mapped = mapDatabaseError(e, driver: DatabaseDriver.redis);
+      if (mapped is ConnectionLostException ||
+          mapped is HostUnreachableException ||
+          e is SocketException) {
+        _isConnected = false;
+        unawaited(disconnect());
+      }
+      rethrow;
+    }
   }
 
   /// SELECT database index.
