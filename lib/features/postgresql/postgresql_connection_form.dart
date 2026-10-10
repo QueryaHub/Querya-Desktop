@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/features/connections/connection_test_result.dart';
 import 'package:querya_desktop/features/connections/connection_default_name.dart';
 import 'package:querya_desktop/core/security/connection_environment.dart';
 import 'package:querya_desktop/features/connections/environment_section.dart';
@@ -9,6 +10,7 @@ import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/connections/remove_saved_password_option.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
 import 'package:querya_desktop/features/connections/ssh_tunnel_section.dart';
 import 'package:querya_desktop/shared/widgets/form_validity_notifier.dart';
@@ -63,6 +65,7 @@ class _PostgresConnectionFormContentState
   final SshTunnelSecrets _sshSecrets = SshTunnelSecrets();
 
   bool _useSSL = false;
+  bool _removeSavedPassword = false;
   bool _showPassword = false;
   bool _isTesting = false;
   String? _testResult;
@@ -252,7 +255,7 @@ class _PostgresConnectionFormContentState
       _isTesting = false;
       _testResult = result;
     });
-    _dismissTimer = Timer(const Duration(seconds: 5), () {
+    _dismissTimer = Timer(connectionTestResultLifetime(result), () {
       if (mounted) setState(() => _testResult = null);
     });
   }
@@ -281,6 +284,7 @@ class _PostgresConnectionFormContentState
             _passwordController.text.isEmpty ? null : _passwordController.text,
         connectionString: hasUri ? uri : null,
         sshSecrets: _sshConfig.enabled ? _sshSecrets : null,
+        useSavedPassword: !_removeSavedPassword,
       );
       final conn = PostgresConnection(
         id: 0,
@@ -376,6 +380,7 @@ class _PostgresConnectionFormContentState
     );
     row = row.withSshTunnelConfig(_sshConfig.enabled ? _sshConfig : null);
     row = row.withEnvironment(_environment);
+    row = row.copyWith(removeSavedPassword: _removeSavedPassword);
     material.Navigator.of(context).pop(row);
   }
 
@@ -603,11 +608,18 @@ class _PostgresConnectionFormContentState
                                   material.CrossAxisAlignment.stretch,
                               children: [
                                 const Text('Password').small().semiBold(),
+                                if (_isEditing)
+                                  RemoveSavedPasswordOption(
+                                    value: _removeSavedPassword,
+                                    onChanged: (v) => setState(
+                                        () => _removeSavedPassword = v),
+                                  ),
                                 const Gap(8),
                                 material.Stack(
                                   children: [
                                     TextField(
                                       controller: _passwordController,
+                                      enabled: !_removeSavedPassword,
                                       placeholder: Text(
                                         _isEditing
                                             ? 'Leave blank to keep existing'
@@ -757,11 +769,7 @@ class _PostgresConnectionFormContentState
                           const Gap(10),
                           material.Expanded(
                             child: Text(
-                              _testResult == 'success'
-                                  ? 'Connection successful!'
-                                  : _testResult!.startsWith('error:')
-                                      ? _testResult!.substring(7)
-                                      : 'Connection failed',
+                              connectionTestMessage(_testResult!),
                               style: material.TextStyle(
                                 fontSize: 13,
                                 color: theme.foreground,

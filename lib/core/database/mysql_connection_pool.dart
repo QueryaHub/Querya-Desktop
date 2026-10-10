@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
+import 'package:querya_desktop/core/database/querya_database_exception.dart';
 import 'package:querya_desktop/core/database/connection_pool_lock.dart';
 import 'package:querya_desktop/core/database/mysql_connection.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -101,6 +102,8 @@ class MysqlConnectionPool {
       });
     } on StateError {
       rethrow;
+    } on PoolExhaustedException {
+      rethrow;
     } on MysqlConnectionException {
       rethrow;
     } catch (e, st) {
@@ -128,8 +131,10 @@ class MysqlConnectionPool {
     while (_pool.length >= maxEntries) {
       final idle = _pool.entries.where((e) => e.value.refs == 0).toList();
       if (idle.isEmpty) {
-        throw StateError(
-          'MySQL connection pool exhausted: $maxEntries slots in use.',
+        throw PoolExhaustedException(
+          'The MySQL connection pool is full: $maxEntries sessions are in use',
+          remediationHint: 'Close tabs or connections you no longer use, '
+              'then try again',
         );
       }
       idle.sort((a, b) => a.value.lastUsed.compareTo(b.value.lastUsed));

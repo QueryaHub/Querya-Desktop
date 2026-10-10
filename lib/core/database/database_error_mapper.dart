@@ -173,6 +173,55 @@ QueryaDatabaseException mapDatabaseError(
       originalError: error,
       stackTrace: stackTrace,
     );
+  } else if (error is TlsException ||
+      _hasAny(lower, const [
+        'certificate_verify_failed',
+        'certificate verify failed',
+        'handshakeexception',
+        'handshake error',
+        'unknown ca',
+        'self signed certificate',
+        'self-signed certificate',
+        'unable to get local issuer',
+        'certificate has expired',
+        'hostname mismatch',
+        'wrong version number',
+        'tlsv1 alert',
+        'ssl routines',
+        'server does not support ssl',
+      ])) {
+    mapped = TlsFailureException(
+      'The secure (TLS) connection to the server could not be established',
+      detailedExplanation: _innermost(raw),
+      remediationHint: 'Check the SSL mode and the root certificate in the '
+          'connection settings; a server without TLS needs SSL turned off',
+      originalError: error,
+      stackTrace: stackTrace,
+    );
+  } else if (_hasAny(lower, const [
+    'connection reset by peer',
+    'broken pipe',
+    'connection closed',
+    'connection is closed',
+    'connection was closed',
+    'connection terminated',
+    'terminating connection',
+    'server closed the connection',
+    'unexpected eof',
+    'the database system is shutting down',
+    'the database system is restarting',
+    'lost connection to mysql server',
+    'mysql server has gone away',
+    'connection lost',
+  ])) {
+    mapped = ConnectionLostException(
+      'The connection to the database was lost',
+      detailedExplanation: _innermost(raw),
+      remediationHint: 'The server closed the session (a restart, an idle '
+          'timeout or a network drop). Reconnect and try again',
+      originalError: error,
+      stackTrace: stackTrace,
+    );
   } else if (error is TimeoutException ||
       _hasAny(lower, const ['timed out', 'timeout expired', 'etimedout'])) {
     mapped = ConnectionTimeoutException(

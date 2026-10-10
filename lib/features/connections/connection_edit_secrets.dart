@@ -48,6 +48,7 @@ Future<
   required String? password,
   required String? connectionString,
   required SshTunnelSecrets? sshSecrets,
+  bool useSavedPassword = true,
 }) async {
   final id = connectionId;
   if (id == null || id <= 0) {
@@ -58,8 +59,10 @@ Future<
     );
   }
   final prev = await ConnectionSecretsStore.readForConnection(id);
-  final effectivePassword =
-      (password == null || password.isEmpty) ? prev.password : password;
+  // "Remove the saved password" is ticked: test without it (#1311).
+  final effectivePassword = (password == null || password.isEmpty)
+      ? (useSavedPassword ? prev.password : null)
+      : password;
   var uri = connectionString;
   if (uri != null && uri.trim().isNotEmpty) {
     uri = injectUriPasswordIfMissing(uri, effectivePassword);
@@ -91,7 +94,11 @@ Future<ConnectionRow> mergeSecretsForConnectionUpdate(
 
   final passwordEmpty =
       edited.password == null || edited.password!.trim().isEmpty;
-  final password = passwordEmpty ? prev.password : edited.password;
+  // A blank field keeps the saved password, unless the user asked to remove
+  // it (#1311). A password typed together with the request wins: it replaces.
+  final String? password = edited.removeSavedPassword && passwordEmpty
+      ? null
+      : (passwordEmpty ? prev.password : edited.password);
 
   var connectionString = edited.connectionString;
   if (connectionString == null || connectionString.trim().isEmpty) {

@@ -305,13 +305,18 @@ class RedisConnection {
     return RedisBulkValue.fromReply(result).text ?? '';
   }
 
-  Future<bool> testConnection() async {
+  /// Connects and disconnects. [error] is the reason in the user's terms
+  /// (#1308).
+  Future<({bool ok, String? error})> testConnection() async {
     try {
       await connect();
-      return true;
+      return (ok: true, error: null);
     } catch (e) {
       debugPrint('RedisConnection.testConnection: $e');
-      return false;
+      return (
+        ok: false,
+        error: describeDatabaseError(e, driver: DatabaseDriver.redis),
+      );
     } finally {
       await disconnect();
     }

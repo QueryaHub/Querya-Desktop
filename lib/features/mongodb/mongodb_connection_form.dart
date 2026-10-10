@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/features/connections/connection_test_result.dart';
 import 'package:querya_desktop/features/connections/connection_default_name.dart';
 import 'package:querya_desktop/core/security/connection_environment.dart';
 import 'package:querya_desktop/features/connections/environment_section.dart';
@@ -8,6 +9,7 @@ import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/connections/remove_saved_password_option.dart';
 import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
 import 'package:querya_desktop/features/connections/ssh_tunnel_section.dart';
 import 'package:querya_desktop/features/connections/ssl_certificate_support.dart';
@@ -98,6 +100,7 @@ class _MongoConnectionFormContentState
 
   bool _useConnectionString = false;
   bool _useSSL = false;
+  bool _removeSavedPassword = false;
   bool _showPassword = false;
   bool _isTesting = false;
   String? _testResult;
@@ -266,7 +269,7 @@ class _MongoConnectionFormContentState
       _isTesting = false;
       _testResult = result;
     });
-    _dismissTimer = Timer(const Duration(seconds: 5), () {
+    _dismissTimer = Timer(connectionTestResultLifetime(result), () {
       if (mounted) setState(() => _testResult = null);
     });
   }
@@ -293,6 +296,7 @@ class _MongoConnectionFormContentState
         password: data.password,
         connectionString: data.connectionString,
         sshSecrets: _sshConfig.enabled ? _sshSecrets : null,
+        useSavedPassword: !_removeSavedPassword,
       );
       final connection = MongoConnection(
         id: 0,
@@ -309,10 +313,12 @@ class _MongoConnectionFormContentState
         sshSecrets: secrets.sshSecrets,
       );
 
-      final success = await connection.testConnection();
+      final result = await connection.testConnection();
       await connection.disconnect();
 
-      if (mounted) _showTestResult(success ? 'success' : 'failed');
+      if (mounted) {
+        _showTestResult(result.ok ? 'success' : (result.error ?? 'failed'));
+      }
     } catch (e) {
       if (mounted) _showTestResult('error: $e');
     }
@@ -354,6 +360,7 @@ class _MongoConnectionFormContentState
     );
     row = row.withSshTunnelConfig(_sshConfig.enabled ? _sshConfig : null);
     row = row.withEnvironment(_environment);
+    row = row.copyWith(removeSavedPassword: _removeSavedPassword);
 
     material.Navigator.of(context).pop(row);
   }
@@ -513,10 +520,17 @@ class _MongoConnectionFormContentState
                         placeholder: const Text('Username'),
                       ),
                       const Gap(12),
+                      if (_isEditing)
+                        RemoveSavedPasswordOption(
+                          value: _removeSavedPassword,
+                          onChanged: (v) =>
+                              setState(() => _removeSavedPassword = v),
+                        ),
                       material.Stack(
                         children: [
                           TextField(
                             controller: _passwordController,
+                            enabled: !_removeSavedPassword,
                             placeholder: Text(
                               _isEditing
                                   ? 'Leave blank to keep existing'
@@ -669,11 +683,7 @@ class _MongoConnectionFormContentState
                           const Gap(10),
                           material.Expanded(
                             child: Text(
-                              _testResult == 'success'
-                                  ? 'Connection successful!'
-                                  : _testResult!.startsWith('error:')
-                                      ? _testResult!.substring(7)
-                                      : 'Connection failed',
+                              connectionTestMessage(_testResult!),
                               style: material.TextStyle(
                                 fontSize: 13,
                                 color: theme.foreground,

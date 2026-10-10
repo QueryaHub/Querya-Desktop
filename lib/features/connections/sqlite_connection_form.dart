@@ -3,6 +3,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:path/path.dart' as p;
 import 'package:querya_desktop/core/security/connection_environment.dart';
+import 'package:querya_desktop/features/connections/connection_test_result.dart';
 import 'package:querya_desktop/features/connections/environment_section.dart';
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
@@ -107,7 +108,7 @@ class _SqliteConnectionFormContentState
       _isTesting = false;
       _testResult = result;
     });
-    _dismissTimer = Timer(const Duration(seconds: 5), () {
+    _dismissTimer = Timer(connectionTestResultLifetime(result), () {
       if (mounted) setState(() => _testResult = null);
     });
   }
@@ -354,11 +355,7 @@ class _SqliteConnectionFormContentState
                             const Gap(10),
                             material.Expanded(
                               child: Text(
-                                _testResult == 'success'
-                                    ? 'Connection successful!'
-                                    : _testResult!.startsWith('error:')
-                                        ? _testResult!.substring(7)
-                                        : 'Connection failed',
+                                connectionTestMessage(_testResult!),
                                 style: material.TextStyle(
                                   fontSize: 13,
                                   color: theme.foreground,
