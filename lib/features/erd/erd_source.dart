@@ -1,6 +1,6 @@
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
-import 'package:querya_desktop/features/erd/erd_catalog.dart';
-import 'package:querya_desktop/features/erd/erd_model.dart';
+import 'package:querya_desktop/core/erd/erd_catalog.dart';
+import 'package:querya_desktop/core/erd/erd_model.dart';
 import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
 import 'package:querya_desktop/features/workspace/table_data_delegate.dart';
 

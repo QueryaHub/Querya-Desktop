@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:querya_desktop/features/erd/erd_layout.dart';
-import 'package:querya_desktop/features/erd/erd_model.dart';
+import 'package:querya_desktop/core/erd/erd_model.dart';
 
 /// One routed relation: an orthogonal polyline from the FK column row of
 /// [relation]'s `fromTable` to the referenced column row of `toTable`.

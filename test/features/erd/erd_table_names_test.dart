@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/actions/querya_schema_object.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
-import 'package:querya_desktop/features/erd/erd_table_names.dart';
+import 'package:querya_desktop/core/erd/erd_table_names.dart';
 
 void main() {
   group('ErdTableNames', () {
