@@ -63,16 +63,19 @@ void main() {
     expect(field.style?.color, const Color(0xFFABCDEF));
   });
 
-  testWidgets('SQL highlighting keeps external controller in sync',
+  testWidgets('SQL highlight controller works directly in QueryaCodeEditor',
       (tester) async {
-    final external = material.TextEditingController();
+    final controller = SyntaxHighlightService.createHighlightController(
+      language: QueryaCodeLanguage.sql,
+      text: '',
+    );
     await tester.pumpWidget(
       queryaThemeTestShell(
         child: material.SizedBox(
           width: 400,
           height: 200,
           child: QueryaCodeEditor(
-            controller: external,
+            controller: controller,
             language: QueryaCodeLanguage.sql,
           ),
         ),
@@ -83,8 +86,8 @@ void main() {
     await tester.enterText(find.byType(material.EditableText), 'SELECT 1');
     await tester.pump();
     await pumpSyntaxHighlightDebounce(tester);
-    expect(external.text, 'SELECT 1');
-    external.text = 'UPDATE x';
+    expect(controller.text, 'SELECT 1');
+    controller.text = 'UPDATE x';
     await tester.pump();
     await pumpSyntaxHighlightDebounce(tester);
     expect(

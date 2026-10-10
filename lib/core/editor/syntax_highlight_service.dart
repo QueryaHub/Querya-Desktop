@@ -7,6 +7,7 @@ import 'package:syntax_highlight/syntax_highlight.dart';
 
 import 'highlighter_theme_from_querya.dart';
 import 'querya_code_language.dart';
+import 'querya_highlight_controller.dart';
 
 /// Global syntax highlighter setup for [QueryaCodeEditor].
 abstract final class SyntaxHighlightService {
@@ -109,6 +110,30 @@ abstract final class SyntaxHighlightService {
         brightness: Brightness.dark,
         tokenColors: tokenColors,
       ),
+    );
+  }
+
+  /// Creates a [QueryaHighlightController] initialized with highlighters and grammar for [language].
+  /// If syntax highlighting is not initialized or [language] is plain, falls back to a plain [TextEditingController].
+  static TextEditingController createHighlightController({
+    required QueryaCodeLanguage language,
+    String? text,
+    QueryaTheme? queryaTheme,
+  }) {
+    if (!_initialized || language == QueryaCodeLanguage.plain) {
+      return TextEditingController(text: text);
+    }
+    final theme = queryaTheme ?? QueryaTheme.darkDefault;
+    final pair = createPair(language: language, queryaTheme: theme);
+    return QueryaHighlightController(
+      text: text,
+      language: language,
+      lightHighlighter: pair.light,
+      darkHighlighter: pair.dark,
+      lightThemeConfig: pair.lightThemeConfig,
+      darkThemeConfig: pair.darkThemeConfig,
+      grammarJson: pair.grammarJson,
+      wrapperColor: theme.editor.foreground,
     );
   }
 
