@@ -115,4 +115,12 @@ void main() {
     expect(spec.indexOf('%post\n'), lessThan(spec.indexOf('%files')));
     expect(spec.indexOf('%files'), lessThan(spec.indexOf('%changelog')));
   });
+
+  test('deb and rpm package definitions recommend bubblewrap for driver sandbox', () {
+    final debScript = File('scripts/linux/build_deb.sh').readAsStringSync();
+    expect(debScript, contains('Recommends: libayatana-appindicator3-1, bubblewrap'));
+
+    final spec = File('packaging/linux/querya-desktop.spec').readAsStringSync();
+    expect(spec, contains('Recommends:     bubblewrap'));
+  });
 }
