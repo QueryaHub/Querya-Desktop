@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
+import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
 /// Standard search and filter input field with debounce, clear button, and shortcut support.
 class QueryaSearchField extends material.StatefulWidget {
@@ -16,7 +17,8 @@ class QueryaSearchField extends material.StatefulWidget {
     this.onSubmitted,
     this.debounceDuration = const Duration(milliseconds: 250),
     this.autofocus = false,
-    this.height = 32,
+    this.height,
+    this.size,
     this.shortcutHint,
     this.width,
   });
@@ -42,8 +44,12 @@ class QueryaSearchField extends material.StatefulWidget {
   /// Whether to autofocus this search field.
   final bool autofocus;
 
-  /// Sizing height. Default is 32px for compact toolbar fit.
-  final double height;
+  /// Explicit height in px; wins over [size]. Prefer [size].
+  final double? height;
+
+  /// Control size (height, font, icon, radius). Without one the field takes the
+  /// nearest [QueryaControlScope], then [QueryaControlSize.md] (32 px).
+  final QueryaControlSize? size;
 
   /// Optional keybinding hint displayed at the trailing end (e.g. 'ESC', 'Ctrl+F').
   final String? shortcutHint;
@@ -132,16 +138,20 @@ class _QueryaSearchFieldState extends material.State<QueryaSearchField> {
   material.Widget build(material.BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final workbench = QueryaThemeScope.maybeOf(context)?.workbench;
+    final controlSize = widget.size ?? QueryaControlSize.of(context);
+    final fieldHeight = widget.height ?? controlSize.scaledHeight(context);
+    final fieldFont = controlSize.scaledFontSize(context);
 
     final searchIconColor = _hasText
         ? (workbench?.accent ?? cs.primary)
         : (workbench?.mutedForeground ?? cs.mutedForeground);
 
     material.Widget content = material.Container(
-      height: widget.height,
+      height: fieldHeight,
       decoration: material.BoxDecoration(
         color: cs.card,
-        borderRadius: material.BorderRadius.circular(6),
+        borderRadius:
+            material.BorderRadius.circular(controlSize.scaledRadius(context)),
         border: material.Border.all(
           color: _hasText
               ? (workbench?.accent ?? cs.primary).withValues(alpha: 0.5)
@@ -156,7 +166,7 @@ class _QueryaSearchFieldState extends material.State<QueryaSearchField> {
             padding: const material.EdgeInsets.only(left: 8, right: 6),
             child: material.Icon(
               material.Icons.search_rounded,
-              size: 16,
+              size: controlSize.scaledIconSize(context),
               color: searchIconColor,
             ),
           ),
@@ -178,7 +188,7 @@ class _QueryaSearchFieldState extends material.State<QueryaSearchField> {
                 onChanged: _onInputChanged,
                 onSubmitted: widget.onSubmitted,
                 style: material.TextStyle(
-                  fontSize: 12,
+                  fontSize: fieldFont,
                   color: cs.foreground,
                 ),
                 cursorHeight: 14,
@@ -186,7 +196,7 @@ class _QueryaSearchFieldState extends material.State<QueryaSearchField> {
                 decoration: material.InputDecoration(
                   hintText: widget.placeholder,
                   hintStyle: material.TextStyle(
-                    fontSize: 12,
+                    fontSize: fieldFont,
                     color: workbench?.mutedForeground ?? cs.mutedForeground,
                   ),
                   isDense: true,

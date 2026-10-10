@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
+import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 import 'package:querya_desktop/shared/widgets/querya_dropdown_tokens.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
@@ -47,6 +48,7 @@ class QueryaDropdown<T> extends material.StatefulWidget {
     this.menuMaxHeight = QueryaDropdownTokens.menuMaxHeight,
     this.hint,
     this.compact = false,
+    this.size,
   });
 
   final T value;
@@ -60,8 +62,14 @@ class QueryaDropdown<T> extends material.StatefulWidget {
   final double menuMaxHeight;
   final String? hint;
 
-  /// Smaller trigger and rows for toolbars / panel headers.
+  /// Smaller trigger and rows for toolbars / panel headers (same as
+  /// [QueryaControlSize.sm]).
   final bool compact;
+
+  /// Control size of the trigger. Without one: [QueryaControlSize.sm] when
+  /// [compact], else the nearest [QueryaControlScope], else
+  /// [QueryaControlSize.lg].
+  final QueryaControlSize? size;
 
   @override
   material.State<QueryaDropdown<T>> createState() => _QueryaDropdownState<T>();
@@ -75,6 +83,7 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
   List<material.Widget>? _cachedMenuChildren;
   List<QueryaDropdownItem<T>>? _cachedMenuItems;
   T? _cachedMenuValue;
+  QueryaControlSize? _cachedMenuSize;
   var _closingWithExit = false;
   var _exitGeneration = 0;
 
@@ -122,21 +131,35 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
       _controller = widget.controller ?? material.MenuController();
     }
     if (!listEquals(oldWidget.items, widget.items) ||
-        oldWidget.value != widget.value) {
+        oldWidget.value != widget.value ||
+        oldWidget.size != widget.size ||
+        oldWidget.compact != widget.compact) {
       _cachedMenuChildren = null;
     }
   }
 
-  List<material.Widget> _menuChildren(ColorScheme cs) {
+  /// The size this dropdown draws at: its own [QueryaDropdown.size], else
+  /// [QueryaControlSize.sm] when compact, else the nearest control scope, else
+  /// [QueryaControlSize.lg].
+  QueryaControlSize _controlSize(material.BuildContext context) {
+    final explicit = widget.size;
+    if (explicit != null) return explicit;
+    if (widget.compact) return QueryaControlSize.sm;
+    return QueryaControlScope.maybeOf(context) ?? QueryaControlSize.lg;
+  }
+
+  List<material.Widget> _menuChildren(ColorScheme cs, QueryaControlSize size) {
     if (_cachedMenuChildren != null &&
         listEquals(_cachedMenuItems, widget.items) &&
-        _cachedMenuValue == widget.value) {
+        _cachedMenuValue == widget.value &&
+        _cachedMenuSize == size) {
       return _cachedMenuChildren!;
     }
     _cachedMenuItems = List<QueryaDropdownItem<T>>.from(widget.items);
     _cachedMenuValue = widget.value;
+    _cachedMenuSize = size;
     _cachedMenuChildren = [
-      for (final item in widget.items) _menuItem(item, cs),
+      for (final item in widget.items) _menuItem(item, cs, size),
     ];
     return _cachedMenuChildren!;
   }
@@ -146,6 +169,7 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
     required String label,
     required ColorScheme cs,
     required bool expand,
+    required QueryaControlSize size,
   }) {
     final textColor =
         widget.enabled ? cs.popoverForeground : cs.mutedForeground;
@@ -157,6 +181,7 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
         context,
         textColor,
         compact: widget.compact,
+        size: size,
       ),
     );
     if (expand) {
@@ -172,13 +197,18 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
     return widget.hint ?? '';
   }
 
-  material.Widget _menuItem(QueryaDropdownItem<T> item, ColorScheme cs) {
+  material.Widget _menuItem(
+    QueryaDropdownItem<T> item,
+    ColorScheme cs,
+    QueryaControlSize size,
+  ) {
     return _QueryaDropdownMenuItem<T>(
       item: item,
       selected: item.value == widget.value,
       enabled: widget.enabled && item.enabled,
       colorScheme: cs,
       compact: widget.compact,
+      size: size,
       onPick: () {
         widget.onSelected(item.value);
         unawaited(_closeWithExit());
@@ -196,9 +226,11 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
     final borderColor = widget.enabled
         ? (_triggerHovered || _triggerFocused ? cs.ring : cs.border)
         : cs.border.withValues(alpha: 0.4);
+    final size = _controlSize(context);
     final triggerHeight = QueryaDropdownTokens.scaledTriggerHeight(
       context,
       compact: widget.compact,
+      size: size,
     );
     final chevronGap = context.scaled(QueryaDropdownTokens.triggerChevronGap);
     final chevronSize = context.scaled(QueryaDropdownTokens.triggerChevronSize);
@@ -220,6 +252,7 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
         padding: QueryaDropdownTokens.scaledTriggerPadding(
           context,
           compact: widget.compact,
+          size: size,
         ),
         decoration: material.BoxDecoration(
           color: _triggerHovered
@@ -239,6 +272,7 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
               label: label,
               cs: cs,
               expand: widget.expandToParent || fieldWidth != null,
+              size: size,
             ),
             material.SizedBox(width: chevronGap),
             material.Icon(
@@ -310,7 +344,7 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
     final fieldWidth = widget.expandToParent
         ? null
         : (widget.width != null ? context.scaled(widget.width!) : null);
-    final menuChildren = _menuChildren(cs);
+    final menuChildren = _menuChildren(cs, _controlSize(context));
     final scaledMaxHeight = context.scaled(widget.menuMaxHeight);
     final effectiveMaxHeight =
         widget.items.length > QueryaDropdownTokens.menuScrollItemThreshold
@@ -460,6 +494,7 @@ class _QueryaDropdownMenuItem<T> extends material.StatefulWidget {
     required this.enabled,
     required this.colorScheme,
     required this.compact,
+    required this.size,
     required this.onPick,
   });
 
@@ -468,6 +503,7 @@ class _QueryaDropdownMenuItem<T> extends material.StatefulWidget {
   final bool enabled;
   final ColorScheme colorScheme;
   final bool compact;
+  final QueryaControlSize size;
   final material.VoidCallback onPick;
 
   @override
@@ -507,6 +543,7 @@ class _QueryaDropdownMenuItemState<T>
     final itemHeight = QueryaDropdownTokens.scaledMenuItemHeight(
       context,
       compact: widget.compact,
+      size: widget.size,
     );
     final radius = context.scaled(QueryaDropdownTokens.menuBorderRadius);
     final slot = context.scaled(QueryaDropdownTokens.selectedCheckSlotWidth);
@@ -564,6 +601,7 @@ class _QueryaDropdownMenuItemState<T>
                       cs.popoverForeground,
                       selected: widget.selected,
                       compact: widget.compact,
+                      size: widget.size,
                     ),
                   ),
                 ),

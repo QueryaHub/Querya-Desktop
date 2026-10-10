@@ -6,6 +6,7 @@ import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/core/motion/querya_spring.dart';
 import 'package:querya_desktop/core/motion/querya_spring_controller.dart';
+import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 import 'package:querya_desktop/core/ui/querya_tooltip.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
@@ -27,6 +28,7 @@ class QueryaTabStrip extends material.StatefulWidget {
     this.canClose,
     this.scrollController,
     this.dense = false,
+    this.size,
   }) : assert(labels.length > 0);
 
   final List<String> labels;
@@ -37,9 +39,14 @@ class QueryaTabStrip extends material.StatefulWidget {
   final bool Function(int index)? canClose;
   final material.ScrollController? scrollController;
 
-  /// Tighter vertical padding for toolbars: the strip is as tall as a dense
-  /// icon button instead of a full tab row.
+  /// Tighter strip for toolbars: the same as [QueryaControlSize.sm], as tall
+  /// as a dense icon button instead of a full tab row.
   final bool dense;
+
+  /// Control size (tab height). Without one: [QueryaControlSize.sm] when
+  /// [dense], else the nearest [QueryaControlScope], else
+  /// [QueryaControlSize.lg].
+  final QueryaControlSize? size;
 
   @override
   material.State<QueryaTabStrip> createState() => QueryaTabStripState();
@@ -248,6 +255,11 @@ class QueryaTabStripState extends material.State<QueryaTabStrip>
   @override
   material.Widget build(material.BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final controlSize = widget.size ??
+        (widget.dense
+            ? QueryaControlSize.sm
+            : (QueryaControlScope.maybeOf(context) ?? QueryaControlSize.lg));
+    final tabHeight = controlSize.scaledHeight(context);
     _scheduleIndicatorSync();
 
     final tabs = material.Row(
@@ -282,23 +294,20 @@ class QueryaTabStripState extends material.State<QueryaTabStrip>
                           key: material.ValueKey('querya_tab_$label'),
                           duration: context.motionDuration(QueryaMotion.fast),
                           curve: context.motionCurve(QueryaMotion.enter),
-                          // The close target is 24 px (#1372); the padding
-                          // around it shrinks so the tab keeps its height
-                          // and width.
+                          // The tab is as tall as its control size; the row
+                          // centres its content. The close target is 24 px
+                          // (#1372), so its side padding is smaller.
+                          constraints:
+                              material.BoxConstraints(minHeight: tabHeight),
                           padding: showClose
-                              ? material.EdgeInsets.fromLTRB(
-                                  10,
-                                  widget.dense ? 2 : 6,
-                                  5,
-                                  widget.dense ? 2 : 6,
-                                )
-                              : material.EdgeInsets.symmetric(
+                              ? const material.EdgeInsets.fromLTRB(10, 0, 5, 0)
+                              : const material.EdgeInsets.symmetric(
                                   horizontal: 12,
-                                  vertical: widget.dense ? 4 : 8,
                                 ),
                           decoration: material.BoxDecoration(
                             color: material.Colors.transparent,
-                            borderRadius: material.BorderRadius.circular(6),
+                            borderRadius:
+                                material.BorderRadius.circular(QueryaControlMetrics.radius),
                             border: material.Border.all(
                               color: focused
                                   ? colors.ring
@@ -377,7 +386,8 @@ class QueryaTabStripState extends material.State<QueryaTabStrip>
                 key: const material.ValueKey('querya_tab_add_button'),
                 padding: const material.EdgeInsets.all(6),
                 decoration: material.BoxDecoration(
-                  borderRadius: material.BorderRadius.circular(6),
+                  borderRadius:
+                                material.BorderRadius.circular(QueryaControlMetrics.radius),
                 ),
                 child: material.Icon(
                   material.Icons.add_rounded,
@@ -469,7 +479,8 @@ class _TabStripIndicator extends material.StatelessWidget {
               child: material.DecoratedBox(
                 decoration: material.BoxDecoration(
                   color: color,
-                  borderRadius: material.BorderRadius.circular(6),
+                  borderRadius:
+                                material.BorderRadius.circular(QueryaControlMetrics.radius),
                 ),
               ),
             ),

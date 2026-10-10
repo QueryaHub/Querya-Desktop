@@ -1,20 +1,24 @@
 import 'package:flutter/material.dart' as material;
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
+import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 import 'package:querya_desktop/core/ui/querya_tooltip.dart';
 
-/// Density sizing presets for Querya icon and toolbar buttons.
+/// Legacy names of the control sizes: [dense] is [QueryaControlSize.sm] and
+/// [standard] is [QueryaControlSize.md]. New code passes a [QueryaControlSize].
 enum QueryaIconButtonDensity {
-  /// 28x28 box with 15px icon — ideal for dense trees, tab bars, and data grid calc bars.
-  dense(28, 15),
+  /// [QueryaControlSize.sm]: dense trees, tab bars, data grid calc bars.
+  dense(QueryaControlSize.sm),
 
-  /// 32x32 box with 18px icon — standard for top toolbars and header chrome.
-  standard(32, 18);
+  /// [QueryaControlSize.md]: top toolbars and header chrome.
+  standard(QueryaControlSize.md);
 
-  const QueryaIconButtonDensity(this.boxSize, this.iconSize);
+  const QueryaIconButtonDensity(this.controlSize);
 
-  final double boxSize;
-  final double iconSize;
+  final QueryaControlSize controlSize;
+
+  double get boxSize => controlSize.height;
+  double get iconSize => controlSize.iconSize;
 }
 
 /// Standard icon button with density presets, hover/active states, and built-in tooltip.
@@ -24,7 +28,8 @@ class QueryaIconButton extends material.StatefulWidget {
     required this.icon,
     this.tooltip,
     this.onPressed,
-    this.density = QueryaIconButtonDensity.standard,
+    this.density,
+    this.size,
     this.isActive = false,
     this.isDestructive = false,
     this.color,
@@ -41,8 +46,12 @@ class QueryaIconButton extends material.StatefulWidget {
   /// Callback when pressed. If null, the button is disabled.
   final material.VoidCallback? onPressed;
 
-  /// Sizing density: dense (28px) or standard (32px).
-  final QueryaIconButtonDensity density;
+  /// Legacy size name; [size] wins when both are set.
+  final QueryaIconButtonDensity? density;
+
+  /// Control size. Without one the button takes the nearest
+  /// [QueryaControlScope], then [QueryaControlSize.md].
+  final QueryaControlSize? size;
 
   /// Whether the button is currently in an active/toggled state.
   final bool isActive;
@@ -72,14 +81,19 @@ class _QueryaIconButtonState extends material.State<QueryaIconButton> {
     final icon = widget.icon;
     final tooltip = widget.tooltip;
     final onPressed = widget.onPressed;
-    final density = widget.density;
+    final controlSize = widget.size ??
+        widget.density?.controlSize ??
+        QueryaControlSize.of(context);
+    final boxSize = controlSize.scaledHeight(context);
+    final iconSize = controlSize.scaledIconSize(context);
     final isActive = widget.isActive;
     final isDestructive = widget.isDestructive;
     final color = widget.color;
     final activeColor = widget.activeColor;
     final cs = Theme.of(context).colorScheme;
     final workbench = QueryaThemeScope.maybeOf(context)?.workbench;
-    final radius = widget.borderRadius ?? material.BorderRadius.circular(6);
+    final radius = widget.borderRadius ??
+        material.BorderRadius.circular(controlSize.scaledRadius(context));
 
     final isEnabled = onPressed != null;
 
@@ -136,12 +150,12 @@ class _QueryaIconButtonState extends material.State<QueryaIconButton> {
         splashColor: (isDestructive ? destructiveColor : accentColor)
             .withValues(alpha: 0.2),
         child: material.SizedBox(
-          width: density.boxSize,
-          height: density.boxSize,
+          width: boxSize,
+          height: boxSize,
           child: material.Center(
             child: material.IconTheme(
               data: material.IconThemeData(
-                size: density.iconSize,
+                size: iconSize,
                 color: isEnabled
                     ? effectiveIconColor
                     : mutedColor.withValues(alpha: 0.4),
@@ -181,7 +195,8 @@ class QueryaToolbarButton extends material.StatefulWidget {
     this.tooltip,
     this.shortcutHint,
     this.onPressed,
-    this.density = QueryaIconButtonDensity.standard,
+    this.density,
+    this.size,
     this.isActive = false,
     this.isDestructive = false,
   });
@@ -191,7 +206,12 @@ class QueryaToolbarButton extends material.StatefulWidget {
   final String? tooltip;
   final String? shortcutHint;
   final material.VoidCallback? onPressed;
-  final QueryaIconButtonDensity density;
+
+  /// Legacy size name; [size] wins when both are set.
+  final QueryaIconButtonDensity? density;
+
+  /// Control size; see [QueryaIconButton.size].
+  final QueryaControlSize? size;
   final bool isActive;
   final bool isDestructive;
 
@@ -211,7 +231,9 @@ class _QueryaToolbarButtonState extends material.State<QueryaToolbarButton> {
     final tooltip = widget.tooltip;
     final shortcutHint = widget.shortcutHint;
     final onPressed = widget.onPressed;
-    final density = widget.density;
+    final controlSize = widget.size ??
+        widget.density?.controlSize ??
+        QueryaControlSize.of(context);
     final isActive = widget.isActive;
     final isDestructive = widget.isDestructive;
     final cs = Theme.of(context).colorScheme;
@@ -220,7 +242,8 @@ class _QueryaToolbarButtonState extends material.State<QueryaToolbarButton> {
 
     final destructiveColor = workbench?.destructive ?? cs.destructive;
     final accentColor = workbench?.accent ?? cs.primary;
-    final radius = material.BorderRadius.circular(6);
+    final radius =
+        material.BorderRadius.circular(controlSize.scaledRadius(context));
 
     final effectiveFgColor = isActive
         ? (isDestructive ? destructiveColor : accentColor)
@@ -245,17 +268,17 @@ class _QueryaToolbarButtonState extends material.State<QueryaToolbarButton> {
         if (icon != null) ...[
           material.IconTheme(
             data: material.IconThemeData(
-              size: density.iconSize,
+              size: controlSize.scaledIconSize(context),
               color: effectiveFgColor,
             ),
             child: icon,
           ),
-          const Gap(6),
+          Gap(controlSize.scaledIconGap(context)),
         ],
         material.Text(
           label,
           style: material.TextStyle(
-            fontSize: density == QueryaIconButtonDensity.dense ? 11 : 12,
+            fontSize: controlSize.scaledFontSize(context),
             fontWeight: material.FontWeight.w500,
             color: effectiveFgColor,
           ),
@@ -305,9 +328,9 @@ class _QueryaToolbarButtonState extends material.State<QueryaToolbarButton> {
         hoverColor: hoverColor,
         focusColor: material.Colors.transparent,
         child: material.Container(
-          height: density.boxSize,
+          height: controlSize.scaledHeight(context),
           padding: material.EdgeInsets.symmetric(
-            horizontal: density == QueryaIconButtonDensity.dense ? 8 : 10,
+            horizontal: controlSize.scaledHorizontalPadding(context),
           ),
           alignment: material.Alignment.center,
           child: content,
