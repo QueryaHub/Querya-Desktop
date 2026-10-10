@@ -13,6 +13,7 @@ import 'package:flutter/services.dart'
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/erd/erd_canvas_controls.dart';
+import 'package:querya_desktop/features/erd/erd_card_measure.dart';
 import 'package:querya_desktop/core/erd/erd_catalog.dart';
 import 'package:querya_desktop/features/erd/erd_source.dart';
 import 'package:querya_desktop/features/erd/erd_export.dart';
@@ -250,7 +251,7 @@ class _ErdViewState extends material.State<ErdView> {
             ..addAll(saved.headerColors);
         }
         _setLayout(
-            _withSaved(ErdLayout.compute(_visibleOf(schema)), saved));
+            _withSaved(_compute(_visibleOf(schema)), saved));
         _loading = false;
       });
       if (schema.truncated) {
@@ -286,6 +287,15 @@ class _ErdViewState extends material.State<ErdView> {
         _loading = false;
       });
     }
+  }
+
+  /// Layout with cards measured in this view's fonts and text scale.
+  ErdLayout _compute(ErdSchema schema) {
+    final measure = ErdCardMeasure(
+      base: material.DefaultTextStyle.of(context).style,
+      textScaler: material.MediaQuery.textScalerOf(context),
+    );
+    return ErdLayout.compute(schema, measure: measure.width);
   }
 
   Future<ErdSavedLayout?> _readSaved(ErdSchema schema) async {
@@ -412,7 +422,7 @@ class _ErdViewState extends material.State<ErdView> {
   void _reflow({bool arrange = false}) {
     final schema = _schema;
     if (schema == null) return;
-    final computed = ErdLayout.compute(_visibleOf(schema));
+    final computed = _compute(_visibleOf(schema));
     final current = _layout;
     setState(() => _setLayout(arrange || current == null
         ? computed
@@ -1461,9 +1471,8 @@ class _TableCard extends material.StatelessWidget {
                                   ],
                                 ),
                               ),
-                              // The card is sized to fit both; when it hit its
-                              // maximum, the name gives way and the type keeps
-                              // at most half the row.
+                              // The card is measured to fit both; at its
+                              // maximum width the name gives way.
                               material.Expanded(
                                 child: Text(c.name,
                                     maxLines: 1,
@@ -1477,8 +1486,12 @@ class _TableCard extends material.StatelessWidget {
                               ),
                               const material.SizedBox(width: 8),
                               material.ConstrainedBox(
+                                // Only a card at its maximum width has to
+                                // share: then the type keeps half the row.
                                 constraints: material.BoxConstraints(
-                                    maxWidth: (width - 56) / 2),
+                                    maxWidth: width >= ErdLayout.maxCardWidth
+                                        ? (width - 56) / 2
+                                        : double.infinity),
                                 child: Text(c.isNullable ? '${c.type}?' : c.type,
                                     maxLines: 1,
                                     overflow: material.TextOverflow.ellipsis,

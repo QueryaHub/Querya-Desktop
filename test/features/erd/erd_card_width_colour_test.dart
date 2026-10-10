@@ -55,7 +55,8 @@ void main() {
       expect(l.rectOf(s.tables.first).width, ErdLayout.widthOf(s.tables.first));
     });
 
-    testWidgets('a long type is shown whole on its card', (t) async {
+    testWidgets('a type is shown whole: the card is measured, not estimated',
+        (t) async {
       await t.binding.setSurfaceSize(const material.Size(1200, 800));
       addTearDown(() => t.binding.setSurfaceSize(null));
       await t.pumpWidget(queryaThemeTestShell(
@@ -65,7 +66,7 @@ void main() {
               if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
                 return const SqlExecutionResult(rows: [
                   ['events', 'id', 'INTEGER', '1'],
-                  ['events', 'created_at', 'timestamp with time zone', '0'],
+                  ['events', 'created', 'timestamp(6)', '0'],
                 ]);
               }
               return const SqlExecutionResult();
@@ -76,7 +77,8 @@ void main() {
       ));
       await t.pump();
       await t.pump();
-      final type = find.text('timestamp with time zone');
+      // Measured in the test font, whatever its glyph widths.
+      final type = find.text('timestamp(6)');
       expect(type, findsOneWidget);
       expect(t.renderObject<RenderParagraph>(type).didExceedMaxLines, isFalse);
       expect(t.getSize(find.byKey(const material.ValueKey('erd_table_events'))).width,

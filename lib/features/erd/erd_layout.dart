@@ -99,11 +99,19 @@ class ErdLayout {
   /// that reference it; inside a layer, cards are ordered by the average
   /// position of their neighbours to reduce crossings. Tables without
   /// relations go into a grid below.
-  factory ErdLayout.compute(ErdSchema schema) {
+  ///
+  /// [measure] gives a card's width; the screen passes one that measures the
+  /// text with the card's own fonts (`ErdCardMeasure`), exports and tests may
+  /// rely on the glyph estimate of [widthOf].
+  factory ErdLayout.compute(
+    ErdSchema schema, {
+    double Function(ErdTable table)? measure,
+  }) {
     final names = [for (final t in schema.tables) t.name];
     final byName = {for (final t in schema.tables) t.name: t};
     final heights = {for (final t in schema.tables) t.name: cardHeight(t)};
-    final widths = {for (final t in schema.tables) t.name: widthOf(t)};
+    final width = measure ?? widthOf;
+    final widths = {for (final t in schema.tables) t.name: width(t)};
     final neighbours = {for (final n in names) n: <String>{}};
     for (final r in schema.relations) {
       if (r.fromTable == r.toTable) continue;
