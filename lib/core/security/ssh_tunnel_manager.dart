@@ -184,6 +184,40 @@ class SshTunnelManager {
     return bare(text) == observedBase64;
   }
 
+  /// Opens the transport to [host]:[port]; a failure names the host, so it is
+  /// not mistaken for a database problem (#1305).
+  Future<SSHSocket> _dial(
+    String host,
+    int port,
+    Duration timeout, {
+    required String what,
+  }) async {
+    try {
+      return await _connect(host, port, timeout: timeout);
+    } catch (e) {
+      throw SshConnectionException('Cannot reach the $what $host:$port: $e');
+    }
+  }
+
+  /// What a failed SSH login or handshake is reported as: a rejected
+  /// credential is an authentication failure; anything else (a reset, a
+  /// timeout, a protocol error) is a connection failure, not a wrong password.
+  static Object _sshFailure(Object e, String user, String host, int port) {
+    if (e is SshAuthenticationException ||
+        e is SshHostKeyMismatchException ||
+        e is SshConnectionException) {
+      return e;
+    }
+    if (e is SSHAuthError) {
+      return SshAuthenticationException(
+        'SSH authentication failed for ${user.trim()}@${host.trim()}: $e',
+      );
+    }
+    return SshConnectionException(
+      'The SSH connection to ${host.trim()}:$port failed: $e',
+    );
+  }
+
   /// Establishes or reuses an ephemeral local port forwarding tunnel.
   Future<SshTunnelHandle> openTunnel({
     required SshTunnelConfig config,
@@ -224,10 +258,11 @@ class SshTunnelManager {
       final jumpPort = config.jumpPort ?? 22;
       final jumpUser = config.jumpUsername ?? config.username;
 
-      final rawJumpSocket = await _connect(
+      final rawJumpSocket = await _dial(
         jumpHost,
         jumpPort,
-        timeout: Duration(seconds: config.connectTimeoutSeconds),
+        Duration(seconds: config.connectTimeoutSeconds),
+        what: 'SSH jump host',
       );
 
       jumpClient = _buildClient(
@@ -236,15 +271,30 @@ class SshTunnelManager {
         onPasswordRequest: () =>
             secrets.jumpPassword ?? secrets.password ?? '',
       );
-      await jumpClient.authenticated;
+      try {
+        await jumpClient.authenticated;
+      } catch (e) {
+        unawaited(jumpClient.close());
+        throw _sshFailure(e, jumpUser, jumpHost, jumpPort);
+      }
 
       // Forward through jump host to target bastion (returns SSHForwardChannel which implements SSHSocket)
-      bastionSocket = await jumpClient.forwardLocal(config.host.trim(), config.port);
+      try {
+        bastionSocket =
+            await jumpClient.forwardLocal(config.host.trim(), config.port);
+      } catch (e) {
+        unawaited(jumpClient.close());
+        throw SshConnectionException(
+          'The SSH jump host $jumpHost:$jumpPort could not reach the bastion '
+          '${config.host.trim()}:${config.port}: $e',
+        );
+      }
     } else {
-      bastionSocket = await _connect(
+      bastionSocket = await _dial(
         config.host.trim(),
         config.port,
-        timeout: Duration(seconds: config.connectTimeoutSeconds),
+        Duration(seconds: config.connectTimeoutSeconds),
+        what: 'SSH server',
       );
     }
 
@@ -314,9 +364,7 @@ class SshTunnelManager {
           'Observed fingerprint: $observedFingerprint',
         );
       }
-      throw SshAuthenticationException(
-        'SSH authentication failed for ${config.username}@${config.host}: $e',
-      );
+      throw _sshFailure(e, config.username, config.host, config.port);
     }
 
     // Zero sensitive in-memory credentials immediately after successful authentication
@@ -521,6 +569,15 @@ class SshTunnelManager {
 
 class SshAuthenticationException implements Exception {
   const SshAuthenticationException(this.message);
+  final String message;
+  @override
+  String toString() => message;
+}
+
+/// The SSH server could not be reached or the session broke before any
+/// credential was judged: refused, timed out, reset, a protocol error.
+class SshConnectionException implements Exception {
+  const SshConnectionException(this.message);
   final String message;
   @override
   String toString() => message;
