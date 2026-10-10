@@ -51,7 +51,8 @@ class ErdCardMeasure {
     var w = 50 +
         _text(t.name, _header) +
         _text('${t.columns.length}', _count) +
-        (t.comment != null ? 19 : 0);
+        (t.comment != null ? 19 : 0) +
+        (t.isJunction ? 6 + _text('M:N', _badge) : 0);
     for (final c in t.columns) {
       final type = c.isNullable ? '${c.type}?' : c.type;
       // Padding 10, marker slot 26, name, gap 8, type, padding 10, border 2.

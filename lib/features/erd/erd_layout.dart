@@ -42,7 +42,8 @@ class ErdLayout {
   static double widthOf(ErdTable t) {
     // Padding 10 + icon 14 + gap 6, name, gap 6, column count, padding 10.
     var w = 46 + t.name.length * _headerCharPx +
-        '${t.columns.length}'.length * _typeCharPx;
+        '${t.columns.length}'.length * _typeCharPx +
+        (t.isJunction ? 24 : 0);
     for (final c in t.columns) {
       final type = c.isNullable ? '${c.type}?' : c.type;
       // Padding 10 + marker slot 26, name, gap 8, type, padding 10.

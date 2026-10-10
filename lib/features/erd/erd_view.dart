@@ -55,7 +55,9 @@ enum _ExportAction { mermaid, svg, png, copyMermaid, toggleTheme }
 
 /// A card's focus: related to the focused table, and faded while another
 /// table is picked and this one is not related to it.
-typedef _CardFocus = ({bool highlighted, bool faded});
+/// A card's share of the focus: highlighted, faded, and the column of a
+/// picked relation on it, if any.
+typedef _CardFocus = ({bool highlighted, bool faded, String? column});
 
 /// Card builds so far. A test seam: hovering one card must not rebuild the
 /// others.
@@ -142,6 +144,13 @@ class _ErdViewState extends material.State<ErdView> {
   ErdDetail _detail = ErdDetail.all;
   final Set<String> _collapsed = {};
   final Set<String> _hidden = {};
+
+  /// A relation picked by a click on its edge (#1281): its two tables and
+  /// columns are highlighted and its label stays until Esc.
+  ErdRelation? _pickedRelation;
+
+  /// Many-to-many link tables and what they link: `users and roles` (#1281).
+  Map<String, String> _junctions = const {};
 
   /// Header colour picked per table (palette slot names, #1276).
   final Map<String, String> _headerColors = {};
@@ -239,6 +248,8 @@ class _ErdViewState extends material.State<ErdView> {
       setState(() {
         _schema = schema;
         _neighbours = _neighbourMap(schema);
+        _junctions = _junctionMap(schema);
+        _pickedRelation = null;
         if (saved != null) {
           _collapsed
             ..clear()
@@ -572,15 +583,40 @@ class _ErdViewState extends material.State<ErdView> {
   /// the zoom and search shortcuts work after a click anywhere on it.
   void _clearSelection() {
     _canvasFocus.requestFocus();
-    if (_selected == null) return;
-    setState(() => _selected = null);
+    if (_selected == null && _pickedRelation == null) return;
+    setState(() {
+      _selected = null;
+      _pickedRelation = null;
+    });
+    _edgeTipNotifier.value = null;
+    _syncFocus();
+  }
+
+  /// A click on the canvas: on an edge it picks the relation, elsewhere it
+  /// clears the selection.
+  void _tapCanvas(material.Offset p) {
+    final hit = _relationAt(p);
+    if (hit == null) {
+      _clearSelection();
+      return;
+    }
+    _canvasFocus.requestFocus();
+    setState(() {
+      _pickedRelation = hit;
+      _selected = null;
+    });
+    _edgeTipNotifier.value = (hit, p);
     _syncFocus();
   }
 
   /// A click on a card picks it.
   void _pick(String name) {
     _canvasFocus.requestFocus();
-    setState(() => _selected = name);
+    setState(() {
+      _selected = name;
+      _pickedRelation = null;
+    });
+    _edgeTipNotifier.value = null;
     _syncFocus();
   }
 
@@ -600,6 +636,12 @@ class _ErdViewState extends material.State<ErdView> {
         _query = '';
       });
       _canvasFocus.requestFocus();
+      return;
+    }
+    if (_pickedRelation != null) {
+      setState(() => _pickedRelation = null);
+      _edgeTipNotifier.value = null;
+      _syncFocus();
       return;
     }
     if (_selected != null) {
@@ -638,6 +680,15 @@ class _ErdViewState extends material.State<ErdView> {
     return out;
   }
 
+  static Map<String, String> _junctionMap(ErdSchema schema) => {
+        for (final t in schema.tables)
+          if (t.isJunction)
+            t.name: {
+              for (final r in schema.relations)
+                if (r.fromTable == t.name) r.toTable,
+            }.join(' and '),
+      };
+
   /// Tables related to each table by a foreign key, either way. Built once per
   /// build, so the focus test is a set lookup per card.
   static Map<String, Set<String>> _neighbourMap(ErdSchema schema) {
@@ -664,8 +715,20 @@ class _ErdViewState extends material.State<ErdView> {
   String? _currentFocus() => _dragging ?? _selected ?? _hovered.value;
 
   _CardFocus _cardFocusFor(String table, String? focus) {
+    final p = _pickedRelation;
+    if (p != null) {
+      final on = table == p.fromTable || table == p.toTable;
+      final column = table == p.fromTable
+          ? p.fromColumn
+          : (table == p.toTable ? p.toColumn : null);
+      return (highlighted: on, faded: !on, column: column);
+    }
     final highlighted = _isFocusedIn(_neighbours, focus, table);
-    return (highlighted: highlighted, faded: _selected != null && !highlighted);
+    return (
+      highlighted: highlighted,
+      faded: _selected != null && !highlighted,
+      column: null,
+    );
   }
 
   /// The notifier of card [table], made on first use with its current focus.
@@ -866,6 +929,15 @@ class _ErdViewState extends material.State<ErdView> {
   /// Pointer over the canvas ([p] in canvas space): names the relation within
   /// 6 screen px of it, if any, whatever the zoom.
   void _hoverCanvas(material.Offset p) {
+    // A picked relation keeps its label until Esc or another click.
+    if (_pickedRelation != null) return;
+    final hit = _relationAt(p);
+    // Only the tip layer listens: no rebuild of the view for a hover move.
+    _edgeTipNotifier.value = hit == null ? null : (hit, p);
+  }
+
+  /// The relation within 6 screen px of [p] (canvas space), whatever the zoom.
+  ErdRelation? _relationAt(material.Offset p) {
     ErdRelation? hit;
     final scale = _scale;
     var best = 6.0 / (scale <= 0 ? 1 : scale);
@@ -876,11 +948,13 @@ class _ErdViewState extends material.State<ErdView> {
         hit = r.relation;
       }
     }
-    // Only the tip layer listens: no rebuild of the view for a hover move.
-    _edgeTipNotifier.value = hit == null ? null : (hit, p);
+    return hit;
   }
 
-  void _leaveCanvas() => _edgeTipNotifier.value = null;
+  void _leaveCanvas() {
+    if (_pickedRelation != null) return;
+    _edgeTipNotifier.value = null;
+  }
 
   /// "orders.customer_id → customers.id" next to the pointer.
   material.Widget _edgeTipLabel(material.BuildContext context, ErdRelation r) {
@@ -1043,9 +1117,10 @@ class _ErdViewState extends material.State<ErdView> {
                     width: layout.size.width,
                     height: layout.size.height,
                     child: material.GestureDetector(
-                      // Empty canvas: a tap clears the selection.
+                      // A tap on an edge picks its relation, elsewhere it clears
+                      // the selection (#1281).
                       behavior: material.HitTestBehavior.translucent,
-                      onTap: _clearSelection,
+                      onTapUp: (d) => _tapCanvas(d.localPosition),
                       child: material.Stack(
                         children: [
                           // Lowest layer: sees the pointer wherever no card is,
@@ -1068,6 +1143,7 @@ class _ErdViewState extends material.State<ErdView> {
                                   color: wb.mutedForeground,
                                   highlight: wb.accent,
                                   focus: focus,
+                                  picked: _pickedRelation,
                                 ),
                               ),
                             ),
@@ -1156,6 +1232,8 @@ class _ErdViewState extends material.State<ErdView> {
                                   width: layout.widthFor(t.name),
                                   headerColor: _headerColor(t.name),
                                   highlighted: focus.highlighted,
+                                  focusColumn: focus.column,
+                                  junctionOf: _junctions[t.name],
                                   dragging: _dragging == t.name,
                                   onOpen: widget.onOpenTable == null
                                       ? null
@@ -1356,6 +1434,8 @@ class _TableCard extends material.StatelessWidget {
     required this.width,
     required this.headerColor,
     required this.highlighted,
+    this.focusColumn,
+    this.junctionOf,
     required this.dragging,
     required this.onHover,
     required this.onDragStart,
@@ -1373,6 +1453,12 @@ class _TableCard extends material.StatelessWidget {
   /// Header tint and icon: by schema, picked per table, or the accent.
   final material.Color headerColor;
   final bool highlighted;
+
+  /// The column of a picked relation on this card, shaded (#1281).
+  final String? focusColumn;
+
+  /// For a many-to-many link table: the tables it links.
+  final String? junctionOf;
   final bool dragging;
   final material.VoidCallback? onOpen;
   final material.VoidCallback? onSelect;
@@ -1484,6 +1570,20 @@ class _TableCard extends material.StatelessWidget {
                           ),
                           const material.SizedBox(width: 6),
                         ],
+                        // A many-to-many link table (#1281).
+                        if (junctionOf case final linked?) ...[
+                          material.Tooltip(
+                            message: 'Link table: many-to-many between $linked',
+                            child: Text('M:N',
+                                key: material.ValueKey(
+                                    'erd_junction_${table.name}'),
+                                style: material.TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: material.FontWeight.w700,
+                                    color: headerColor)),
+                          ),
+                          const material.SizedBox(width: 6),
+                        ],
                         Text('${table.columns.length}',
                             style: material.TextStyle(
                                 fontSize: 10, color: wb.mutedForeground)),
@@ -1491,8 +1591,16 @@ class _TableCard extends material.StatelessWidget {
                     ),
                   ),
                   for (final c in table.columns)
-                    material.SizedBox(
+                    material.Container(
+                      key: c.name == focusColumn
+                          ? material.ValueKey(
+                              'erd_focus_column_${table.name}_${c.name}')
+                          : null,
                       height: ErdLayout.rowHeight,
+                      // The column of a picked relation (#1281).
+                      color: c.name == focusColumn
+                          ? wb.accent.withValues(alpha: 0.14)
+                          : null,
                       child: material.Tooltip(
                         message: _columnTip(c),
                         child: material.Padding(
@@ -1593,6 +1701,7 @@ class _RelationPainter extends material.CustomPainter {
     required this.color,
     required this.highlight,
     required this.focus,
+    this.picked,
   });
 
   final List<ErdRoute> routes;
@@ -1602,9 +1711,30 @@ class _RelationPainter extends material.CustomPainter {
   /// Table whose relations are drawn on top in [highlight].
   final String? focus;
 
-  bool _focused(ErdRoute r) =>
-      focus != null &&
-      (r.relation.fromTable == focus || r.relation.toTable == focus);
+  /// A relation picked by a click: only it is drawn in [highlight] (#1281).
+  final ErdRelation? picked;
+
+  bool get _anyFocus => picked != null || focus != null;
+
+  bool _focused(ErdRoute r) {
+    final p = picked;
+    if (p != null) return r.relation.sameAs(p);
+    return focus != null &&
+        (r.relation.fromTable == focus || r.relation.toTable == focus);
+  }
+
+  void _label(material.Canvas canvas, String text, material.Offset at,
+      material.Color c) {
+    final tp = material.TextPainter(
+      text: material.TextSpan(
+          text: text,
+          style: material.TextStyle(
+              fontSize: 10, color: c, fontWeight: material.FontWeight.w600)),
+      textDirection: material.TextDirection.ltr,
+    )..layout();
+    tp.paint(canvas, at - material.Offset(tp.width / 2, tp.height / 2));
+    tp.dispose();
+  }
 
   @override
   void paint(material.Canvas canvas, material.Size size) {
@@ -1613,14 +1743,24 @@ class _RelationPainter extends material.CustomPainter {
       for (final r in routes) {
         if (_focused(r) != pass || r.points.length < 2) continue;
         final paint = material.Paint()
-          ..color = pass ? highlight : color.withValues(alpha: focus == null ? 0.85 : 0.35)
+          ..color = pass
+              ? highlight
+              : color.withValues(alpha: _anyFocus ? 0.35 : 0.85)
           ..style = material.PaintingStyle.stroke
           ..strokeWidth = pass ? 2 : 1.4
           ..strokeCap = material.StrokeCap.round
           ..strokeJoin = material.StrokeJoin.round;
         canvas.drawPath(roundedPath(r.points), paint);
-        for (final (a, b) in ErdGeometry.crowFoot(r.points[0], r.points[1])) {
-          canvas.drawLine(a, b, paint);
+        // FK end: a crow's foot ("many"), or a bar when the FK column is
+        // unique on its own ("one", #1281).
+        if (r.relation.oneToOne) {
+          final (oa, ob) = ErdGeometry.oneBar(r.points[0], r.points[1]);
+          canvas.drawLine(oa, ob, paint);
+        } else {
+          for (final (a, b)
+              in ErdGeometry.crowFoot(r.points[0], r.points[1])) {
+            canvas.drawLine(a, b, paint);
+          }
         }
         // FK side: a circle when the column may be NULL ("zero or many"), a
         // bar otherwise ("one or many").
@@ -1636,6 +1776,15 @@ class _RelationPainter extends material.CustomPainter {
         final (barA, barB) =
             ErdGeometry.oneBar(r.points.last, r.points[r.points.length - 2]);
         canvas.drawLine(barA, barB, paint);
+        // Cardinality labels, as dbdiagram writes them.
+        _label(canvas, r.relation.oneToOne ? '1' : '*',
+            ErdGeometry.endLabel(r.points[0], r.points[1]), paint.color);
+        _label(
+            canvas,
+            '1',
+            ErdGeometry.endLabel(
+                r.points.last, r.points[r.points.length - 2]),
+            paint.color);
       }
     }
   }
@@ -1651,7 +1800,8 @@ class _RelationPainter extends material.CustomPainter {
       old.routes != routes ||
       old.color != color ||
       old.highlight != highlight ||
-      old.focus != focus;
+      old.focus != focus ||
+      old.picked != picked;
 }
 
 /// Polyline with corners rounded by up to 8 px.
