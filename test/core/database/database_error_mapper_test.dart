@@ -10,6 +10,53 @@ import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
 
 void main() {
+  group('lost sessions and TLS (#1316)', () {
+    test('a reset or closed session is a lost connection, not a refusal', () {
+      for (final text in [
+        'SocketException: Connection reset by peer (OS Error: Connection '
+            'reset by peer, errno = 104)',
+        'SocketException: Broken pipe',
+        'ERROR: terminating connection due to administrator command',
+        'Lost connection to MySQL server during query',
+        'PgException: Connection is closed',
+      ]) {
+        final e = mapDatabaseError(Exception(text));
+        expect(e, isA<ConnectionLostException>(), reason: text);
+        expect(e, isNot(isA<HostUnreachableException>()), reason: text);
+        expect(e.remediationHint, contains('Reconnect'));
+      }
+    });
+
+    test('a refused connection is still unreachable', () {
+      final e = mapDatabaseError(const SocketException(
+          'Connection refused (OS Error: Connection refused, errno = 111)'));
+      expect(e, isA<HostUnreachableException>());
+    });
+
+    test('certificate and handshake failures point at the SSL settings', () {
+      for (final error in <Object>[
+        const HandshakeException(
+            'Handshake error in client (OS Error: CERTIFICATE_VERIFY_FAILED: '
+            'self signed certificate)'),
+        Exception('TlsException: unknown ca'),
+        Exception('WRONG_VERSION_NUMBER: wrong version number'),
+      ]) {
+        final e = mapDatabaseError(error, driver: DatabaseDriver.postgres);
+        expect(e, isA<TlsFailureException>(), reason: '$error');
+        expect(e.remediationHint, contains('SSL mode'));
+        expect(e.remediationHint, contains('root certificate'));
+      }
+    });
+
+    test('an authentication failure is not taken for TLS', () {
+      final e = mapDatabaseError(
+        Exception('password authentication failed for user "bob"'),
+        driver: DatabaseDriver.postgres,
+      );
+      expect(e, isA<AuthFailedException>());
+    });
+  });
+
   group('mapDatabaseError PostgreSQL', () {
     test('wrong password is AuthFailedException', () {
       final e = mapDatabaseError(

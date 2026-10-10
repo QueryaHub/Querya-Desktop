@@ -119,6 +119,40 @@ final class LockTimeoutException extends QueryaDatabaseException {
   });
 }
 
+/// An established session was closed under the client: the server restarted
+/// or closed an idle session, or the network dropped (#1316).
+final class ConnectionLostException extends QueryaDatabaseException {
+  const ConnectionLostException(
+    super.message, {
+    super.detailedExplanation,
+    super.remediationHint,
+    super.originalError,
+    super.stackTrace,
+  });
+}
+
+/// The TLS handshake or the server certificate was rejected (#1316).
+final class TlsFailureException extends QueryaDatabaseException {
+  const TlsFailureException(
+    super.message, {
+    super.detailedExplanation,
+    super.remediationHint,
+    super.originalError,
+    super.stackTrace,
+  });
+}
+
+/// Every slot of a connection pool is in use (#1316).
+final class PoolExhaustedException extends QueryaDatabaseException {
+  const PoolExhaustedException(
+    super.message, {
+    super.detailedExplanation,
+    super.remediationHint,
+    super.originalError,
+    super.stackTrace,
+  });
+}
+
 /// Anything the mapper does not recognize; keeps the original text.
 final class UnknownDatabaseException extends QueryaDatabaseException {
   const UnknownDatabaseException(

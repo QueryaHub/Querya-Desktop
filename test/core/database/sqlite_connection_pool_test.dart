@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/database/querya_database_exception.dart';
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
 import 'package:querya_desktop/core/database/sqlite_connection_pool.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -292,5 +293,24 @@ void main() {
       expect(c.connection.isConnected, isTrue);
       c.release();
     });
+  });
+
+  test('a full pool is a typed exception with a hint, not Bad state (#1316)',
+      () async {
+    final pool = SqliteConnectionPool(
+      maxEntries: 1,
+      createAndConnect: (row, {required mode}) async =>
+          FakeSqliteConnection(id: row.id ?? 1),
+    );
+    await pool.acquire(_row(id: 1)); // in use
+
+    await expectLater(
+      pool.acquire(_row(id: 2)),
+      throwsA(isA<PoolExhaustedException>().having(
+          (e) => e.toString(),
+          'text',
+          allOf(contains('SQLite'), contains('Close tabs'),
+              isNot(contains('Bad state'))))),
+    );
   });
 }
