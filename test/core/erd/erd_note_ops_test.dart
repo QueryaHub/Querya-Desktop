@@ -68,12 +68,12 @@ void main() {
 
   group('ErdNoteOps.nearestTable', () {
     test('picks the table whose card is closest to the note', () {
-      final schema = ErdSchema(
+      const schema = ErdSchema(
         tables: [
-          const ErdTable(name: 'a', columns: []),
-          const ErdTable(name: 'b', columns: []),
+          ErdTable(name: 'a', columns: []),
+          ErdTable(name: 'b', columns: []),
         ],
-        relations: const [],
+        relations: [],
       );
       final layout = ErdLayout.compute(schema);
       final near = layout.rectOf(schema.tables[1]).center;
