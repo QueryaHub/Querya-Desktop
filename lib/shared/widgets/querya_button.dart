@@ -75,7 +75,7 @@ class QueryaButton extends material.StatefulWidget {
 
   /// The main action: filled with the accent.
   const QueryaButton.primary({
-    Key? key,
+    material.Key? key,
     required String label,
     material.VoidCallback? onPressed,
     material.IconData? icon,
@@ -105,7 +105,7 @@ class QueryaButton extends material.StatefulWidget {
 
   /// An ordinary action: outlined.
   const QueryaButton.secondary({
-    Key? key,
+    material.Key? key,
     required String label,
     material.VoidCallback? onPressed,
     material.IconData? icon,
@@ -139,7 +139,7 @@ class QueryaButton extends material.StatefulWidget {
 
   /// Cancel, Close and tertiary actions: no fill, no outline.
   const QueryaButton.ghost({
-    Key? key,
+    material.Key? key,
     required String label,
     material.VoidCallback? onPressed,
     material.IconData? icon,
@@ -173,7 +173,7 @@ class QueryaButton extends material.StatefulWidget {
 
   /// An irreversible action: filled with the destructive colour.
   const QueryaButton.destructive({
-    Key? key,
+    material.Key? key,
     required String label,
     material.VoidCallback? onPressed,
     material.IconData? icon,
@@ -203,7 +203,7 @@ class QueryaButton extends material.StatefulWidget {
 
   /// An icon-only button: square, with a tooltip that doubles as its label.
   const QueryaButton.icon({
-    Key? key,
+    material.Key? key,
     required material.IconData icon,
     required String tooltip,
     material.VoidCallback? onPressed,
