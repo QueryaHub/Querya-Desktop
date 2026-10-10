@@ -97,7 +97,7 @@ class _QueryaCodeEditorState extends State<QueryaCodeEditor> {
     if (controller is! QueryaHighlightController) return;
 
     final editor = queryaTheme.editor;
-    final tokenHash = Object.hashAll(queryaTheme.tokenColors);
+    final tokenHash = queryaTheme.tokenColorsHash;
     if (_lastEditorTheme == editor && _lastTokenColorsHash == tokenHash) {
       return;
     }

@@ -64,7 +64,7 @@ abstract final class SyntaxHighlightService {
     final cacheKey = Object.hash(
       language,
       queryaTheme.editor,
-      Object.hashAll(queryaTheme.tokenColors),
+      queryaTheme.tokenColorsHash,
     );
     final cached = _pairCache[cacheKey];
     if (cached != null) return cached;
