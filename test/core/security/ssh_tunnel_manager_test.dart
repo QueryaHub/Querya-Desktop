@@ -168,10 +168,49 @@ void main() {
       expect(server.clients.single.isClosed, isTrue);
     });
 
-    test('an unreachable bastion surfaces the connect error', () async {
+    test('an unreachable bastion is a connection failure naming the host',
+        () async {
       server.failConnect = true;
 
-      await expectLater(open(), throwsA(isA<StateError>()));
+      await expectLater(
+        open(),
+        throwsA(isA<SshConnectionException>().having(
+          (e) => e.message,
+          'message',
+          allOf(contains('bastion.example:2222'), contains('failed')),
+        )),
+      );
+      expect(manager.activeSessionCount, 0);
+    });
+
+    test('a reset during the handshake is not reported as a wrong password',
+        () async {
+      server.failHandshake = const SocketException('Connection reset by peer');
+
+      await expectLater(
+        open(),
+        throwsA(isA<SshConnectionException>().having(
+          (e) => e.message,
+          'message',
+          allOf(contains('bastion.example:2222'), contains('reset by peer')),
+        )),
+      );
+    });
+
+    test('a rejected jump host login names the jump host and user', () async {
+      server.userPasswords['jumper'] = 'right';
+
+      await expectLater(
+        open(
+          config: _config(jumpHost: 'jump.example', jumpUsername: 'jumper'),
+          secrets: SshTunnelSecrets(password: 'secret', jumpPassword: 'wrong'),
+        ),
+        throwsA(isA<SshAuthenticationException>().having(
+          (e) => e.message,
+          'message',
+          allOf(contains('jumper@jump.example')),
+        )),
+      );
       expect(manager.activeSessionCount, 0);
     });
 

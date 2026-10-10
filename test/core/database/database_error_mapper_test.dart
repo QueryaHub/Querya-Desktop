@@ -8,8 +8,59 @@ import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/database/querya_database_exception.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
+import 'package:querya_desktop/core/security/ssh_tunnel_manager.dart';
 
 void main() {
+  group('SSH tunnel failures (#1305)', () {
+    test('a rejected SSH login is not the database refusing the credentials',
+        () {
+      final e = mapDatabaseError(
+        const SshAuthenticationException(
+            'SSH authentication failed for deploy@bastion.example: rejected'),
+        driver: DatabaseDriver.postgres,
+      );
+      expect(e, isNot(isA<AuthFailedException>()));
+      expect(e.message, contains('deploy@bastion.example'));
+      expect(e.remediationHint, contains('SSH'));
+    });
+
+    test('the one-line text keeps the host and points at the tunnel settings',
+        () {
+      final text = describeDatabaseError(
+        const SshAuthenticationException(
+            'SSH authentication failed for deploy@bastion.example: rejected'),
+        driver: DatabaseDriver.postgres,
+      );
+      expect(text, contains('deploy@bastion.example'));
+      expect(text, contains('SSH tunnel settings'));
+      expect(text, isNot(contains('username and password in the connection')));
+    });
+
+    test('a connection failure of the tunnel is unreachable, not authentication',
+        () {
+      final e = mapDatabaseError(
+        const SshConnectionException(
+            'The SSH connection to bastion.example:22 failed: reset'),
+      );
+      expect(e, isA<HostUnreachableException>());
+      expect(e.message, contains('bastion.example:22'));
+    });
+
+    test('a host key mismatch says not to connect', () {
+      final e = mapDatabaseError(const SshHostKeyMismatchException(
+          'SSH host key verification failed for bastion.example.'));
+      expect(e.remediationHint, contains('do not connect'));
+    });
+
+    test('a database authentication failure behind a tunnel is still one', () {
+      final e = mapDatabaseError(
+        Exception('password authentication failed for user "bob"'),
+        driver: DatabaseDriver.postgres,
+      );
+      expect(e, isA<AuthFailedException>());
+    });
+  });
+
   group('mapDatabaseError PostgreSQL', () {
     test('wrong password is AuthFailedException', () {
       final e = mapDatabaseError(

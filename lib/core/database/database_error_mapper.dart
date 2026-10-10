@@ -7,6 +7,7 @@ import 'package:querya_desktop/core/database/querya_database_exception.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
 import 'package:querya_desktop/core/database/statement_queue.dart';
+import 'package:querya_desktop/core/security/ssh_tunnel_manager.dart';
 
 /// Which engine produced an error; only used to tailor the wording.
 enum DatabaseDriver { postgres, mysql, sqlite, mongodb, redis, extension }
@@ -21,6 +22,38 @@ QueryaDatabaseException mapDatabaseError(
   DatabaseDriver? driver,
 }) {
   if (error is QueryaDatabaseException) return error;
+
+  // The tunnel's own failures, before any database text matching: *SSH
+  // authentication failed for deploy@bastion* is not the database rejecting
+  // the credentials (#1305).
+  if (error is SshAuthenticationException) {
+    return UnknownDatabaseException(
+      error.message,
+      remediationHint: 'Check the SSH user, password or key and the bastion '
+          'host in the connection\'s SSH tunnel settings',
+      originalError: error,
+      stackTrace: stackTrace,
+    );
+  }
+  if (error is SshHostKeyMismatchException) {
+    return UnknownDatabaseException(
+      error.message,
+      remediationHint: 'The server presented a different host key than the '
+          'pinned one. If the server was reinstalled, update the fingerprint '
+          'in the SSH tunnel settings; otherwise do not connect',
+      originalError: error,
+      stackTrace: stackTrace,
+    );
+  }
+  if (error is SshConnectionException) {
+    return HostUnreachableException(
+      error.message,
+      remediationHint: 'Check the SSH host and port, the network and any '
+          'firewall',
+      originalError: error,
+      stackTrace: stackTrace,
+    );
+  }
 
   final raw = _fullText(error);
   final lower = raw.toLowerCase();
@@ -157,7 +190,9 @@ QueryaDatabaseException mapDatabaseError(
 /// place of `error.toString()` without losing information.
 String describeDatabaseError(Object error, {DatabaseDriver? driver}) {
   final mapped = mapDatabaseError(error, driver: driver);
-  if (mapped is UnknownDatabaseException) return error.toString();
+  if (mapped is UnknownDatabaseException && mapped.remediationHint == null) {
+    return error.toString();
+  }
   return mapped.displayText;
 }
 

@@ -29,6 +29,10 @@ class FakeSshServer {
   /// Makes the TCP connect fail.
   bool failConnect;
 
+  /// When set, the handshake of every client fails with this (a reset, a
+  /// protocol error) before any credential is judged.
+  Object? failHandshake;
+
   /// Every (host, port) the manager dialed, in order.
   final connects = <({String host, int port})>[];
 
@@ -142,6 +146,8 @@ class FakeSshClient implements SSHClient {
 
   Future<void> _handshake() async {
     try {
+      final broken = server.failHandshake;
+      if (broken != null) throw broken;
       final trusted =
           await onVerifyHostKey?.call('ssh-ed25519', server.hostKey) ?? true;
       if (!trusted) throw SSHHostkeyError('host key rejected');
