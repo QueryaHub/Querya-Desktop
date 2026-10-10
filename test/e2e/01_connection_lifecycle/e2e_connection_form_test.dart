@@ -13,7 +13,7 @@ void main() {
   setUpAll(app.setUpAll);
   tearDownAll(app.tearDownAll);
 
-  const _uriPlaceholder = {
+  const uriPlaceholder = {
     'postgresql': 'postgresql://user:pass@host:5432/dbname?sslmode=require',
     'mysql': 'mysql://user:pass@host:3306/dbname?ssl-mode=disable',
     'redis': 'rediss://user:pass@host:6379',
@@ -124,9 +124,9 @@ void main() {
       await openNewConnection(tester);
       await pickType(tester, label);
 
-      await waitFor(tester, byPlaceholder(_uriPlaceholder[type]!));
+      await waitFor(tester, byPlaceholder(uriPlaceholder[type]!));
       await tester.enterText(
-          editableIn(byPlaceholder(_uriPlaceholder[type]!)), uri);
+          editableIn(byPlaceholder(uriPlaceholder[type]!)), uri);
       await tester.pump();
       await tester.tap(find.text('Save').hitTestable());
       await step(tester);
