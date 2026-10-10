@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/motion/querya_hover_surface.dart';
+import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' show Text, TextField;
@@ -69,10 +70,12 @@ void main() {
     // the cards, so a tap on the last visible label lands on a card and only
     // closes the menu. The grid is shorter than a card here and the footer
     // covers the label, so tap the card itself (its centre is visible).
+    // Cards past the first row are built in the cache extent, offstage.
     final card = find.ancestor(
       of: find.descendant(
         of: find.byType(material.GridView),
-        matching: find.text(label),
+        matching: find.text(label, skipOffstage: false),
+        skipOffstage: false,
       ),
       matching: find.byType(QueryaHoverSurface),
     ).first;
@@ -94,8 +97,7 @@ void main() {
     await step(t);
   }
 
-  // The name of a URI connection comes from its address, so only the URI is
-  // typed; the saved row must carry the host it names.
+  // Only the URI is typed; the secure store must keep the address it names.
   final cases = <(String, String, String, String)>[
     (
       'PostgreSQL',
@@ -140,8 +142,12 @@ void main() {
 
       final row = await savedConnection(tester, type);
       expect(row, isNotNull, reason: '$label was not saved');
-      expect('${row!.host} ${row.connectionString}', contains(host));
-      expect(row.name, contains(host));
+      // The URI is a secret: it goes to the secure store, not querya.db.
+      expect(row!.connectionString, anyOf(isNull, isEmpty));
+      final secrets = await tester
+          .runAsync(() => ConnectionSecretsStore.readForConnection(row.id!));
+      expect(secrets!.connectionString, contains(host));
+      expect(inSidebar(row.name), findsOneWidget);
       await app.close(tester);
     });
   }
