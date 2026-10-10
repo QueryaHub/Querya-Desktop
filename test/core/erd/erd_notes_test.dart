@@ -77,10 +77,10 @@ void main() {
         columnRows: const [['users', 'id', 'int', '1']], fkRows: const []);
     final l = ErdLayout.compute(s);
     final svg = ErdExport.toSvg(s, l, notes: [
-      ErdSvgNote(
+      const ErdSvgNote(
         text: '**Legacy** & old\n- a very long line that has to wrap around '
             'because the note is narrow',
-        rect: const Rect.fromLTWH(300, 500, 140, 100),
+        rect: Rect.fromLTWH(300, 500, 140, 100),
         fill: '#ffffe0',
         stroke: '#cbd5e1',
       ),
