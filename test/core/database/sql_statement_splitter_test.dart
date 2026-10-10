@@ -92,4 +92,44 @@ void main() {
           isNull);
     });
   });
+
+  group('SqlStatementSplitter line numbers and dollar quotes (#1350)', () {
+    test('lines stay exact across many statements', () {
+      const count = 5000;
+      final sql = List.generate(count, (i) => 'select $i;').join('\n');
+      final spans = SqlStatementSplitter.spans(sql);
+
+      expect(spans, hasLength(count));
+      for (var i = 0; i < count; i++) {
+        expect(spans[i].line, i + 1, reason: 'statement $i');
+      }
+    });
+
+    test('multi-line statements and blank lines count every newline', () {
+      const sql = 'select\n  1;\n\n\nselect 2;\nselect\n3';
+      final spans = SqlStatementSplitter.spans(sql);
+
+      expect(spans.map((s) => s.line), [1, 5, 6]);
+    });
+
+    test('a dollar quote far into the script is recognised', () {
+      final padding = 'select 1;\n' * 50;
+      final sql = '${padding}do \$body\$ begin perform 1; end \$body\$; select 2';
+      final spans = SqlStatementSplitter.spans(sql);
+
+      expect(spans, hasLength(52));
+      expect(
+        spans[50].textIn(sql),
+        'do \$body\$ begin perform 1; end \$body\$',
+      );
+      expect(spans[51].textIn(sql), 'select 2');
+    });
+
+    test('numbered parameters are not dollar quotes', () {
+      expect(
+        texts('select \$1; select \$2, \$3'),
+        ['select \$1', 'select \$2, \$3'],
+      );
+    });
+  });
 }

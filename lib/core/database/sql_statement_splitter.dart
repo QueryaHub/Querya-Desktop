@@ -22,11 +22,28 @@ class SqlStatementSpan {
 /// literals, quoted identifiers, comments and PostgreSQL dollar quotes do not
 /// end a statement.
 abstract final class SqlStatementSplitter {
+  /// `$tag$` or `$$`, matched at an offset (no `^`: it would only match at the
+  /// start of the script). One compiled instance for every dollar sign.
+  static final RegExp _dollarTag = RegExp(r'\$([a-zA-Z0-9_]*)\$');
+
   static List<SqlStatementSpan> spans(String sql) {
     final out = <SqlStatementSpan>[];
     final len = sql.length;
     var i = 0;
     var segmentStart = 0;
+
+    // Statement starts only move forward, so the line of each one is found by
+    // counting newlines from the previous start instead of from the top of the
+    // script: one pass in total (#1350).
+    var lineCountedTo = 0;
+    var line = 1;
+    int lineAt(int offset) {
+      while (lineCountedTo < offset) {
+        if (sql.codeUnitAt(lineCountedTo) == 0x0A) line++;
+        lineCountedTo++;
+      }
+      return line;
+    }
 
     void close(int end) {
       var s = segmentStart;
@@ -38,7 +55,7 @@ abstract final class SqlStatementSplitter {
         e--;
       }
       if (e > s) {
-        out.add(SqlStatementSpan(start: s, end: e, line: _lineOf(sql, s)));
+        out.add(SqlStatementSpan(start: s, end: e, line: lineAt(s)));
       }
     }
 
@@ -65,8 +82,7 @@ abstract final class SqlStatementSplitter {
 
       // Dollar quote: $tag$ ... $tag$.
       if (c == '\$') {
-        final match =
-            RegExp(r'^\$([a-zA-Z0-9_]*)\$').matchAsPrefix(sql.substring(i));
+        final match = _dollarTag.matchAsPrefix(sql, i);
         if (match != null) {
           final tag = match.group(0)!;
           final close = sql.indexOf(tag, i + tag.length);
@@ -143,12 +159,4 @@ abstract final class SqlStatementSplitter {
 
   static bool _isBlank(int c) =>
       c == 0x20 || c == 0x09 || c == 0x0A || c == 0x0D || c == 0x0B || c == 0x0C;
-
-  static int _lineOf(String sql, int offset) {
-    var line = 1;
-    for (var i = 0; i < offset; i++) {
-      if (sql.codeUnitAt(i) == 0x0A) line++;
-    }
-    return line;
-  }
 }
