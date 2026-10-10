@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/motion/querya_hover_surface.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' show Text, TextField;
@@ -66,11 +67,18 @@ void main() {
     // The type card, not the "Database type" dropdown: an open dropdown menu
     // consumes taps outside it, and in the element tree its items come before
     // the cards, so a tap on the last visible label lands on a card and only
-    // closes the menu.
-    await t.tap(find.descendant(
-      of: find.byType(material.GridView),
-      matching: find.text(label),
-    ));
+    // closes the menu. The grid is shorter than a card here and the footer
+    // covers the label, so tap the card itself (its centre is visible).
+    final card = find.ancestor(
+      of: find.descendant(
+        of: find.byType(material.GridView),
+        matching: find.text(label),
+      ),
+      matching: find.byType(QueryaHoverSurface),
+    ).first;
+    await t.ensureVisible(card);
+    await step(t);
+    await t.tap(card);
     await step(t);
     await t.tap(find.text('Next').hitTestable());
     await step(t);
