@@ -1,3 +1,4 @@
+import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
 import 'package:querya_desktop/core/database/statement_queue.dart';
 import 'package:querya_desktop/core/database/sql_statement_splitter.dart';
 import 'dart:async';
@@ -1267,6 +1268,13 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
         key: material.ValueKey(session.id),
         source: SqlErdSource(delegate: _diagramDelegate, dialect: widget.dialect),
         databaseName: effectiveDatabase,
+        layoutStore: const LocalDbErdLayoutStore(),
+        layoutKey: widget.connectionRow.id == null
+            ? null
+            : ErdLayoutKey(
+                connectionId: widget.connectionRow.id!,
+                scope: effectiveDatabase,
+              ),
         onOpenTable: _openTableFromDiagram,
         onOpenInSql: _openTableInSql,
         onShowRelations:

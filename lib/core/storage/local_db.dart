@@ -11,7 +11,7 @@ import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const _dbName = 'querya.db';
-const _dbVersion = 12;
+const _dbVersion = 13;
 
 /// `app_settings` key under which each profile database's random id is
 /// stored (see [LocalDb._ensureProfileId] and issue #986).
@@ -181,6 +181,7 @@ class LocalDb {
     ''');
     await _createMutationAuditTable(db);
     await _createMcpActivityTable(db);
+    await _createErdLayoutsTable(db);
     ConnectionSecretsStore.profileId = await _ensureProfileId(db);
   }
 
@@ -345,6 +346,49 @@ class LocalDb {
       // The rule that refused a call, next to its error text.
       await db.execute('ALTER TABLE mcp_activity ADD COLUMN refusal_rule TEXT');
     }
+    if (oldVersion < 13) {
+      await _createErdLayoutsTable(db);
+    }
+  }
+
+  /// What the user arranged on an ER diagram (#1275), one row per connection
+  /// and scope (database / schema), removed with its connection.
+  Future<void> _createErdLayoutsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS erd_layouts (
+        connection_id INTEGER NOT NULL
+          REFERENCES connections(id) ON DELETE CASCADE,
+        scope TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (connection_id, scope)
+      )
+    ''');
+  }
+
+  Future<String?> readErdLayout(int connectionId, String scope) async {
+    final db = await _open();
+    final rows = await db.query(
+      'erd_layouts',
+      columns: ['payload'],
+      where: 'connection_id = ? AND scope = ?',
+      whereArgs: [connectionId, scope],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first['payload'] as String?;
+  }
+
+  Future<void> writeErdLayout(
+    int connectionId,
+    String scope,
+    String payload,
+  ) async {
+    final db = await _open();
+    await db.rawInsert(
+      'INSERT OR REPLACE INTO erd_layouts '
+      '(connection_id, scope, payload, updated_at) VALUES (?, ?, ?, ?)',
+      [connectionId, scope, payload, DateTime.now().toUtc().toIso8601String()],
+    );
   }
 
   Future<String?> getAppSetting(String key) async {
