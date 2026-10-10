@@ -21,6 +21,7 @@ import 'package:querya_desktop/features/erd/erd_geometry.dart';
 import 'package:querya_desktop/core/erd/erd_note_text.dart';
 import 'package:querya_desktop/features/erd/erd_group_dialog.dart';
 import 'package:querya_desktop/features/erd/erd_note_dialog.dart';
+import 'package:querya_desktop/features/erd/erd_view_name_dialog.dart';
 import 'package:querya_desktop/features/erd/erd_layout.dart';
 import 'package:querya_desktop/core/erd/erd_model.dart';
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
@@ -167,6 +168,12 @@ class _ErdViewState extends material.State<ErdView> {
   /// The group whose frame is being dragged by its title.
   String? _draggingGroup;
 
+  /// Saved views of the diagram (#1284), the one the user is in, and the
+  /// *All tables* state while a view is active.
+  final List<ErdSavedView> _views = [];
+  String? _activeView;
+  ErdSavedLayout _base = const ErdSavedLayout();
+
   /// Sticky notes on the canvas, saved with the layout (#1283).
   final List<ErdNote> _notes = [];
   String? _draggingNote;
@@ -259,34 +266,30 @@ class _ErdViewState extends material.State<ErdView> {
       final schema = depth != null && focus != null
           ? await widget.source.loadNeighbourhood(focus, depth: depth)
           : await widget.source.loadSchema();
-      final saved = await _readSaved(schema);
+      final stored = await _readSaved(schema);
       if (!mounted) return;
+      // The state to show: the diagram's own, or the view it was left in.
+      var saved = stored;
+      if (stored != null) {
+        _base = stored;
+        _views
+          ..clear()
+          ..addAll(stored.views);
+        _activeView = stored.activeView;
+        final view = _viewById(_activeView);
+        if (view != null) {
+          saved = view.asLayout(
+              {for (final t in schema.tables) t.name}, stored.headerColors);
+        }
+      }
       setState(() {
         _schema = schema;
         _neighbours = _neighbourMap(schema);
         _junctions = _junctionMap(schema);
         _pickedRelation = null;
-        if (saved != null) {
-          _collapsed
-            ..clear()
-            ..addAll(saved.collapsed);
-          _hidden
-            ..clear()
-            ..addAll(saved.hidden);
-          _detail = saved.detail;
-          _headerColors
-            ..clear()
-            ..addAll(saved.headerColors);
-          _groups
-            ..clear()
-            ..addAll(saved.groups);
-          _notes
-            ..clear()
-            ..addAll(saved.notes);
-        }
+        if (saved != null) _applyState(saved, colours: true);
         _marked.clear();
-        _setLayout(
-            _withSaved(_compute(_visibleOf(schema)), saved));
+        _setLayout(_withSaved(_compute(_visibleOf(schema)), saved));
         _loading = false;
       });
       if (schema.truncated) {
@@ -322,6 +325,30 @@ class _ErdViewState extends material.State<ErdView> {
         _loading = false;
       });
     }
+  }
+
+  /// The state of the diagram a [ErdSavedLayout] holds: what is collapsed
+  /// and hidden, the detail, groups and notes. Header colours belong to the
+  /// diagram, so a view switch leaves them ([colours] false).
+  void _applyState(ErdSavedLayout s, {required bool colours}) {
+    _collapsed
+      ..clear()
+      ..addAll(s.collapsed);
+    _hidden
+      ..clear()
+      ..addAll(s.hidden);
+    _detail = s.detail;
+    if (colours) {
+      _headerColors
+        ..clear()
+        ..addAll(s.headerColors);
+    }
+    _groups
+      ..clear()
+      ..addAll(s.groups);
+    _notes
+      ..clear()
+      ..addAll(s.notes);
   }
 
   /// Layout with cards measured in this view's fonts and text scale.
@@ -455,6 +482,101 @@ class _ErdViewState extends material.State<ErdView> {
     }
     if (_marked.isNotEmpty) setState(_marked.clear);
     _pick(table);
+  }
+
+  /// Applies [target] (a view's state, or the diagram's own) and its
+  /// viewport, after the current state was kept where it belongs.
+  void _showState(String? viewId, ErdSavedLayout target) {
+    final schema = _schema;
+    if (schema == null) return;
+    setState(() {
+      _activeView = viewId;
+      _selected = null;
+      _pickedRelation = null;
+      _marked.clear();
+      _applyState(target, colours: false);
+      _setLayout(_withSaved(_compute(_visibleOf(schema)), target));
+    });
+    _syncFocus();
+    material.WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final scale = target.scale, translation = target.translation;
+      if (scale != null && translation != null) {
+        _restoring = true;
+        _transform.value = Matrix4.identity()
+          ..translate(translation.dx, translation.dy)
+          ..scale(scale);
+        _restoring = false;
+      } else {
+        _fit();
+      }
+    });
+    _scheduleSave();
+  }
+
+  /// Switches to the view [id], or to *All tables* for null.
+  void _switchView(String? id) {
+    final schema = _schema;
+    if (schema == null || id == _activeView) return;
+    _captureCurrent();
+    if (id == null) {
+      _showState(null, _base);
+      return;
+    }
+    final view = _viewById(id);
+    if (view == null) return;
+    _showState(
+        id,
+        view.asLayout({for (final t in schema.tables) t.name}, _headerColors));
+  }
+
+  /// Saves what the diagram shows as a new view and moves into it.
+  Future<void> _newView() async {
+    final schema = _schema;
+    if (schema == null) return;
+    final name = await showErdViewNameDialog(context,
+        title: 'New view',
+        action: 'Save',
+        name: 'View ${_views.length + 1}');
+    if (name == null || !mounted) return;
+    _captureCurrent();
+    var n = 1;
+    while (_views.any((v) => v.id == 'v$n')) {
+      n++;
+    }
+    setState(() {
+      _views.add(ErdSavedView(
+        id: 'v$n',
+        name: name,
+        tables: {
+          for (final t in schema.tables)
+            if (!_hidden.contains(t.name)) t.name,
+        },
+        layout: _current(),
+      ));
+      _activeView = 'v$n';
+    });
+    _scheduleSave();
+  }
+
+  Future<void> _renameView() async {
+    final view = _viewById(_activeView);
+    if (view == null) return;
+    final name = await showErdViewNameDialog(context,
+        title: 'Rename view', action: 'Rename', name: view.name);
+    if (name == null || !mounted) return;
+    final i = _views.indexWhere((v) => v.id == view.id);
+    if (i < 0) return;
+    setState(() => _views[i] = _views[i].copyWith(name: name));
+    _scheduleSave();
+  }
+
+  /// Deletes the active view and goes back to *All tables*.
+  void _deleteView() {
+    final id = _activeView;
+    if (id == null) return;
+    _views.removeWhere((v) => v.id == id);
+    _showState(null, _base);
   }
 
   /// Moves the notes attached to a table by what the table moved, from
@@ -795,25 +917,62 @@ class _ErdViewState extends material.State<ErdView> {
     });
   }
 
+  /// What the diagram shows and how it is arranged right now.
+  ErdSavedLayout _current() {
+    final m = _transform.value;
+    final t = m.getTranslation();
+    return ErdSavedLayout(
+      positions: Map.of(_layout?.positions ?? const {}),
+      collapsed: Set.of(_collapsed),
+      hidden: Set.of(_hidden),
+      detail: _detail,
+      headerColors: Map.of(_headerColors),
+      groups: List.of(_groups),
+      notes: List.of(_notes),
+      scale: m.getMaxScaleOnAxis(),
+      translation: material.Offset(t.x, t.y),
+    );
+  }
+
+  /// Writes the current state to where it belongs: the active view, or the
+  /// diagram's own (*All tables*) state.
+  void _captureCurrent() {
+    final schema = _schema;
+    if (schema == null || _layout == null) return;
+    final cur = _current();
+    final i = _views.indexWhere((v) => v.id == _activeView);
+    if (i < 0) {
+      _base = cur;
+      return;
+    }
+    _views[i] = ErdSavedView(
+      id: _views[i].id,
+      name: _views[i].name,
+      tables: {
+        for (final t in schema.tables)
+          if (!_hidden.contains(t.name)) t.name,
+      },
+      layout: cur,
+    );
+  }
+
+  ErdSavedView? _viewById(String? id) {
+    for (final v in _views) {
+      if (v.id == id) return v;
+    }
+    return null;
+  }
+
   Future<void> _saveNow() async {
     final layout = _layout;
     if (!_persists || layout == null) return;
-    final m = _transform.value;
-    final t = m.getTranslation();
+    _captureCurrent();
     try {
       await widget.layoutStore!.write(
         widget.layoutKey!,
-        ErdSavedLayout(
-          positions: Map.of(layout.positions),
-          collapsed: Set.of(_collapsed),
-          hidden: Set.of(_hidden),
-          detail: _detail,
-          headerColors: Map.of(_headerColors),
-          groups: List.of(_groups),
-          notes: List.of(_notes),
-          scale: m.getMaxScaleOnAxis(),
-          translation: material.Offset(t.x, t.y),
-        ),
+        // The diagram's own state, with the header colours as they are now.
+        _base.withViews(List.of(_views), _activeView,
+            headerColors: Map.of(_headerColors)),
       );
     } catch (_) {
       // Keeping the layout is a convenience: a failed write is not an error
@@ -1336,6 +1495,75 @@ class _ErdViewState extends material.State<ErdView> {
                   _headerColor(t.name).withValues(alpha: 0.14), card)
               .toARGB32()),
     };
+  }
+
+  /// The toolbar's view switcher: All tables, the saved views, and the
+  /// commands to save, rename and delete one.
+  material.Widget _viewsMenu() {
+    final wb = context.workbench;
+    final active = _viewById(_activeView);
+    return QueryaActionMenu<String>(
+      items: [
+        QueryaActionMenuItem(
+          value: 'all',
+          label: 'All tables',
+          icon: active == null ? material.Icons.check : null,
+        ),
+        for (final v in _views)
+          QueryaActionMenuItem(
+            value: 'view:${v.id}',
+            label: '${v.name} (${v.tables.length})',
+            icon: v.id == active?.id ? material.Icons.check : null,
+          ),
+        const QueryaActionMenuItem(
+          value: 'new',
+          label: 'Save as new view…',
+          icon: material.Icons.bookmark_add_outlined,
+        ),
+        if (active != null) ...[
+          const QueryaActionMenuItem(
+            value: 'rename',
+            label: 'Rename view…',
+            icon: material.Icons.edit_outlined,
+          ),
+          const QueryaActionMenuItem(
+            value: 'delete',
+            label: 'Delete view',
+            icon: material.Icons.delete_outline_rounded,
+          ),
+        ],
+      ],
+      onSelected: (v) {
+        switch (v) {
+          case 'all':
+            _switchView(null);
+          case 'new':
+            unawaited(_newView());
+          case 'rename':
+            unawaited(_renameView());
+          case 'delete':
+            _deleteView();
+          default:
+            if (v.startsWith('view:')) _switchView(v.substring(5));
+        }
+      },
+      child: material.Padding(
+        key: const material.ValueKey('erd_views'),
+        padding: const material.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: material.Row(
+          mainAxisSize: material.MainAxisSize.min,
+          children: [
+            material.Icon(material.Icons.bookmarks_outlined,
+                size: 16, color: wb.mutedForeground),
+            const material.SizedBox(width: 6),
+            Text(active?.name ?? 'All tables'),
+            const material.SizedBox(width: 4),
+            material.Icon(material.Icons.expand_more_rounded,
+                size: 16, color: wb.mutedForeground),
+          ],
+        ),
+      ),
+    );
   }
 
   /// Group entries of a card's menu: group it (with the marked tables), add
@@ -1991,6 +2219,13 @@ class _ErdViewState extends material.State<ErdView> {
                   ),
                 ),
               ),
+              // Also with every table hidden: a view may be that empty, and
+              // the way out is another view.
+              if (_persists &&
+                  !_loading &&
+                  _error == null &&
+                  (_schema?.tables.isNotEmpty ?? false))
+                _viewsMenu(),
               QueryaActionButton(
                 key: const material.ValueKey('erd_add_note'),
                 label: 'Note',
