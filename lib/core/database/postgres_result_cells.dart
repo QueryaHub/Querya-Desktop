@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:postgres/postgres.dart';
+import 'package:querya_desktop/core/database/postgres_value_format.dart';
 
 /// Schema type for the grid codec: prefer `udt_name` over `data_type`.
 ///
@@ -35,7 +36,9 @@ String postgresResultCellToDisplayString(
   String? dataTypeName,
 }) {
   if (value == null) return 'NULL';
-  if (value is UndecodedBytes) return value.asString;
+  // Binary values the driver has no codec for (money, inet, bit, composite
+  // types, ...): `asString` threw FormatException on them.
+  if (value is UndecodedBytes) return postgresUndecodedText(value);
 
   if (value is Uint8List) {
     return postgresByteaHexDisplay(value);
@@ -69,7 +72,7 @@ String postgresResultCellToDisplayString(
     return postgresArrayLiteral(value);
   }
 
-  return value.toString();
+  return postgresDriverValueText(value) ?? value.toString();
 }
 
 /// PostgreSQL bytea text `\xdeadbeef`.
@@ -117,6 +120,9 @@ String _postgresArrayElement(Object? e) {
   }
   if (e is DateTime) return e.toIso8601String();
   if (e is bool) return e ? 't' : 'f';
+  if (e is UndecodedBytes) return _postgresArrayQuote(postgresUndecodedText(e));
+  final driverText = postgresDriverValueText(e);
+  if (driverText != null) return _postgresArrayQuote(driverText);
   if (e is String) return _postgresArrayQuote(e);
   return e.toString();
 }
