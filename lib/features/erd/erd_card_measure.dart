@@ -1,7 +1,7 @@
 import 'package:flutter/painting.dart';
 import 'package:querya_desktop/core/erd/erd_model.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
-import 'package:querya_desktop/features/erd/erd_layout.dart';
+import 'package:querya_desktop/core/erd/erd_layout.dart';
 
 /// Measures what a table card shows with the card's own fonts, so the card is
 /// exactly as wide as its header and its widest `name  type` row (#1276).

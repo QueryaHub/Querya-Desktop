@@ -4,10 +4,10 @@ import 'dart:ui' show Offset, Rect, Size;
 import 'package:querya_desktop/core/erd/erd_note_text.dart';
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart'
     show ErdGroup, ErdNote;
-import 'package:querya_desktop/features/erd/erd_geometry.dart';
-import 'package:querya_desktop/features/erd/erd_layout.dart';
+import 'package:querya_desktop/core/erd/erd_geometry.dart';
+import 'package:querya_desktop/core/erd/erd_layout.dart';
 import 'package:querya_desktop/core/erd/erd_model.dart';
-import 'package:querya_desktop/features/erd/erd_router.dart';
+import 'package:querya_desktop/core/erd/erd_router.dart';
 
 /// Colours of the SVG export as `#rrggbb`. The defaults are a light theme;
 /// the diagram view passes the colours of the current theme, so the file looks
