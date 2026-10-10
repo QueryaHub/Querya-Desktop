@@ -206,11 +206,11 @@ class MysqlConnection {
         (effectiveConnectionString == null ||
             effectiveConnectionString.isEmpty) &&
         id > 0) {
-      try {
-        final secrets = await ConnectionSecretsStore.readForConnection(id);
-        effectivePassword = secrets.password;
-        effectiveConnectionString = secrets.connectionString;
-      } catch (_) {}
+      // A store that cannot be read throws (#1303): connecting with no password
+      // would be reported as a wrong one.
+      final secrets = await ConnectionSecretsStore.readForConnection(id);
+      effectivePassword = secrets.password;
+      effectiveConnectionString = secrets.connectionString;
     }
 
     try {

@@ -7,6 +7,7 @@ import 'package:querya_desktop/core/database/querya_database_exception.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
 import 'package:querya_desktop/core/database/statement_queue.dart';
+import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 
 /// Which engine produced an error; only used to tailor the wording.
 enum DatabaseDriver { postgres, mysql, sqlite, mongodb, redis, extension }
@@ -21,6 +22,16 @@ QueryaDatabaseException mapDatabaseError(
   DatabaseDriver? driver,
 }) {
   if (error is QueryaDatabaseException) return error;
+  if (error is SecretsStoreUnavailableException) {
+    // Not a wrong password: the saved one could not be read at all (#1303).
+    return UnknownDatabaseException(
+      SecretsStoreUnavailableException.message,
+      detailedExplanation: error.cause.toString(),
+      remediationHint: SecretsStoreUnavailableException.hint,
+      originalError: error,
+      stackTrace: stackTrace,
+    );
+  }
 
   final raw = _fullText(error);
   final lower = raw.toLowerCase();
