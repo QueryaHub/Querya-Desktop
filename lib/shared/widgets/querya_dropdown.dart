@@ -264,7 +264,7 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
     }
 
     // No ink/ripple: hover tint + focus ring only (desktop behaviour).
-    return material.Focus(
+    final trigger = material.Focus(
       canRequestFocus: widget.enabled,
       onFocusChange: (f) => setState(() => _triggerFocused = f),
       onKeyEvent: (node, event) {
@@ -289,6 +289,17 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
             ? material.SizedBox(width: fieldWidth, child: triggerBody)
             : triggerBody,
       ),
+    );
+
+    // A screen reader hears a button with the current value that says whether
+    // its menu is open (#1371).
+    return material.Semantics(
+      button: true,
+      enabled: widget.enabled,
+      expanded: controller.isOpen,
+      value: label,
+      hint: widget.hint,
+      child: trigger,
     );
   }
 
@@ -500,59 +511,64 @@ class _QueryaDropdownMenuItemState<T>
     final radius = context.scaled(QueryaDropdownTokens.menuBorderRadius);
     final slot = context.scaled(QueryaDropdownTokens.selectedCheckSlotWidth);
 
-    return material.MouseRegion(
-      cursor: widget.enabled
-          ? material.SystemMouseCursors.click
-          : material.SystemMouseCursors.basic,
-      onEnter: widget.enabled ? (_) => setState(() => _hovered = true) : null,
-      onExit: widget.enabled ? (_) => setState(() => _hovered = false) : null,
-      child: material.MenuItemButton(
-        // Keep overlay mounted so parent can play exit fade-slide before close.
-        closeOnActivate: false,
-        onFocusChange: (f) => setState(() => _focused = f),
-        style: material.MenuItemButton.styleFrom(
-          minimumSize: material.Size(double.infinity, itemHeight),
-          padding: material.EdgeInsets.zero,
-          foregroundColor: cs.popoverForeground,
-          disabledForegroundColor: cs.mutedForeground.withValues(alpha: 0.5),
-          overlayColor: material.Colors.transparent,
-          shape: material.RoundedRectangleBorder(
-            borderRadius: material.BorderRadius.circular(radius),
+    return material.Semantics(
+      button: true,
+      enabled: widget.enabled,
+      selected: widget.selected,
+      child: material.MouseRegion(
+        cursor: widget.enabled
+            ? material.SystemMouseCursors.click
+            : material.SystemMouseCursors.basic,
+        onEnter: widget.enabled ? (_) => setState(() => _hovered = true) : null,
+        onExit: widget.enabled ? (_) => setState(() => _hovered = false) : null,
+        child: material.MenuItemButton(
+          // Keep overlay mounted so parent can play exit fade-slide before close.
+          closeOnActivate: false,
+          onFocusChange: (f) => setState(() => _focused = f),
+          style: material.MenuItemButton.styleFrom(
+            minimumSize: material.Size(double.infinity, itemHeight),
+            padding: material.EdgeInsets.zero,
+            foregroundColor: cs.popoverForeground,
+            disabledForegroundColor: cs.mutedForeground.withValues(alpha: 0.5),
+            overlayColor: material.Colors.transparent,
+            shape: material.RoundedRectangleBorder(
+              borderRadius: material.BorderRadius.circular(radius),
+            ),
           ),
-        ),
-        onPressed: widget.enabled ? widget.onPick : null,
-        child: material.AnimatedContainer(
-          duration: context.motionDuration(QueryaMotion.fast),
-          curve: context.motionCurve(QueryaMotion.enter),
-          constraints: material.BoxConstraints(minHeight: itemHeight),
-          padding: material.EdgeInsets.symmetric(
-            horizontal:
-                context.scaled(QueryaDropdownTokens.menuItemPadding.horizontal),
-            vertical:
-                context.scaled(QueryaDropdownTokens.menuItemPadding.vertical),
-          ),
-          decoration: material.BoxDecoration(
-            color: bg,
-            borderRadius: material.BorderRadius.circular(radius),
-          ),
-          child: material.Row(
-            children: [
-              material.SizedBox(width: slot, child: _leading(context, cs)),
-              material.SizedBox(width: context.scaled(6)),
-              material.Expanded(
-                child: material.Text(
-                  widget.item.label,
-                  maxLines: 1,
-                  overflow: material.TextOverflow.ellipsis,
-                  style: QueryaDropdownTokens.menuItemTextStyle(
-                    context,
-                    cs.popoverForeground,
-                    selected: widget.selected,
-                    compact: widget.compact,
+          onPressed: widget.enabled ? widget.onPick : null,
+          child: material.AnimatedContainer(
+            duration: context.motionDuration(QueryaMotion.fast),
+            curve: context.motionCurve(QueryaMotion.enter),
+            constraints: material.BoxConstraints(minHeight: itemHeight),
+            padding: material.EdgeInsets.symmetric(
+              horizontal:
+                  context.scaled(QueryaDropdownTokens.menuItemPadding.horizontal),
+              vertical:
+                  context.scaled(QueryaDropdownTokens.menuItemPadding.vertical),
+            ),
+            decoration: material.BoxDecoration(
+              color: bg,
+              borderRadius: material.BorderRadius.circular(radius),
+            ),
+            child: material.Row(
+              children: [
+                material.SizedBox(width: slot, child: _leading(context, cs)),
+                material.SizedBox(width: context.scaled(6)),
+                material.Expanded(
+                  child: material.Text(
+                    widget.item.label,
+                    maxLines: 1,
+                    overflow: material.TextOverflow.ellipsis,
+                    style: QueryaDropdownTokens.menuItemTextStyle(
+                      context,
+                      cs.popoverForeground,
+                      selected: widget.selected,
+                      compact: widget.compact,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
