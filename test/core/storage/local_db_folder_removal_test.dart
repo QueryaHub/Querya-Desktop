@@ -6,8 +6,8 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 
 import '../../support/local_db_test_support.dart';
 
-/// Removing a folder deletes the connections in it (foreign key cascade). Their
-/// secrets are in the OS store, which the cascade does not reach.
+/// `connections.folder_id` cascades on delete; removing a folder must not take
+/// its connections, or their saved passwords, with it.
 void main() {
   late Directory dir;
 
@@ -23,28 +23,35 @@ void main() {
         createdAt: DateTime.utc(2026).toIso8601String(),
       );
 
-  test('removing a folder deletes its connections and their secrets',
+  test('removing a folder keeps its connections, now without a folder',
       () async {
     final db = LocalDb.instance;
-    await db.addFolder('Doomed');
-    final folderId = await db.getFolderIdByName('Doomed');
-    final inside = await db.addConnection(row('Inside', folderId: folderId));
-    final outside = await db.addConnection(row('Outside'));
-    await ConnectionSecretsStore.writeForConnection(inside, password: 'in-pw');
-    await ConnectionSecretsStore.writeForConnection(outside,
-        password: 'out-pw');
+    await db.addFolder('Team A');
+    await db.addFolder('Team B');
+    final a = await db.getFolderIdByName('Team A');
+    final b = await db.getFolderIdByName('Team B');
+    final inA = await db.addConnection(row('In A', folderId: a));
+    final inB = await db.addConnection(row('In B', folderId: b));
+    final root = await db.addConnection(row('Root'));
+    await ConnectionSecretsStore.writeForConnection(inA, password: 'a-pw');
 
-    expect(await db.countConnectionsInFolder('Doomed'), 1);
-    expect(await db.countConnectionsInFolder('Nowhere'), 0);
+    await db.removeFolder('Team A');
 
-    await db.removeFolder('Doomed');
+    final byId = {for (final c in await db.getConnections()) c.id: c};
+    expect(byId.keys, containsAll([inA, inB, root]));
+    expect(byId[inA]!.folderId, isNull);
+    expect(byId[inB]!.folderId, b, reason: 'another folder is untouched');
+    expect(byId[root]!.folderId, isNull);
+    expect(await db.getFolderIdByName('Team A'), isNull);
+    expect((await ConnectionSecretsStore.readForConnection(inA)).password,
+        'a-pw');
+  });
 
-    final names = (await db.getConnections()).map((c) => c.name);
-    expect(names, contains('Outside'));
-    expect(names, isNot(contains('Inside')));
-    expect((await ConnectionSecretsStore.readForConnection(inside)).password,
-        anyOf(isNull, isEmpty));
-    expect((await ConnectionSecretsStore.readForConnection(outside)).password,
-        'out-pw');
+  test('removing an empty or unknown folder is harmless', () async {
+    final db = LocalDb.instance;
+    await db.addFolder('Empty');
+    await db.removeFolder('Empty');
+    await db.removeFolder('Never existed');
+    expect(await db.getFolderIdByName('Empty'), isNull);
   });
 }
