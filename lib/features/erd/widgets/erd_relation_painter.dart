@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/erd/erd_model.dart';
-import 'package:querya_desktop/features/erd/erd_geometry.dart';
-import 'package:querya_desktop/features/erd/erd_router.dart';
+import 'package:querya_desktop/core/erd/erd_geometry.dart';
+import 'package:querya_desktop/core/erd/erd_router.dart';
 
 /// Draws the relations of the diagram: rounded polylines with crow's feet and
 /// cardinality markers.

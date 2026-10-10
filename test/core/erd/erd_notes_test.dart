@@ -5,7 +5,7 @@ import 'package:querya_desktop/core/erd/erd_model.dart';
 import 'package:querya_desktop/core/erd/erd_note_text.dart';
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
 import 'package:querya_desktop/features/erd/erd_export.dart';
-import 'package:querya_desktop/features/erd/erd_layout.dart';
+import 'package:querya_desktop/core/erd/erd_layout.dart';
 
 /// #1283: sticky notes.
 void main() {

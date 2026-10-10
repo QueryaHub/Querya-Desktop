@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/erd/erd_model.dart';
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
 import 'package:querya_desktop/features/erd/erd_export.dart';
-import 'package:querya_desktop/features/erd/erd_layout.dart';
+import 'package:querya_desktop/core/erd/erd_layout.dart';
 
 /// #1282: table groups.
 ErdSchema _schema() => ErdSchema.fromCatalog(columnRows: const [

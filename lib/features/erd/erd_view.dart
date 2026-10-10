@@ -16,15 +16,16 @@ import 'package:querya_desktop/features/erd/erd_card_measure.dart';
 import 'package:querya_desktop/core/erd/erd_catalog.dart';
 import 'package:querya_desktop/features/erd/erd_source.dart';
 import 'package:querya_desktop/features/erd/erd_export.dart';
-import 'package:querya_desktop/features/erd/erd_geometry.dart';
+import 'package:querya_desktop/core/erd/erd_geometry.dart';
 import 'package:querya_desktop/core/erd/erd_note_text.dart';
 import 'package:querya_desktop/features/erd/erd_group_dialog.dart';
 import 'package:querya_desktop/features/erd/erd_note_dialog.dart';
 import 'package:querya_desktop/features/erd/erd_view_name_dialog.dart';
-import 'package:querya_desktop/features/erd/erd_layout.dart';
+import 'package:querya_desktop/core/erd/erd_layout.dart';
+import 'package:querya_desktop/core/erd/erd_layout_engine.dart';
 import 'package:querya_desktop/core/erd/erd_model.dart';
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
-import 'package:querya_desktop/features/erd/erd_router.dart';
+import 'package:querya_desktop/core/erd/erd_router.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_relation_painter.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_table_card.dart';
 import 'package:querya_desktop/core/export/image_pdf.dart';
@@ -291,12 +292,12 @@ class _ErdViewState extends material.State<ErdView> {
       }
       setState(() {
         _schema = schema;
-        _neighbours = _neighbourMap(schema);
-        _junctions = _junctionMap(schema);
+        _neighbours = ErdLayoutEngine.neighbourMap(schema);
+        _junctions = ErdLayoutEngine.junctionMap(schema);
         _pickedRelation = null;
         if (saved != null) _applyState(saved, colours: true);
         _marked.clear();
-        _setLayout(_withSaved(_compute(_visibleOf(schema)), saved));
+        _setLayout(ErdLayoutEngine.withSaved(_compute(_visibleOf(schema)), saved));
         _loading = false;
       });
       if (schema.truncated) {
@@ -322,7 +323,7 @@ class _ErdViewState extends material.State<ErdView> {
         } else {
           _fit();
         }
-        final picked = _focusIn(schema);
+        final picked = ErdLayoutEngine.focusIn(schema, widget.focusTable);
         if (picked != null) _selectTable(_visibleOf(schema), picked);
       });
     } catch (e) {
@@ -523,7 +524,7 @@ class _ErdViewState extends material.State<ErdView> {
       _pickedRelation = null;
       _marked.clear();
       _applyState(target, colours: false);
-      _setLayout(_withSaved(_compute(_visibleOf(schema)), target));
+      _setLayout(ErdLayoutEngine.withSaved(_compute(_visibleOf(schema)), target));
     });
     _syncFocus();
     material.WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -936,33 +937,6 @@ class _ErdViewState extends material.State<ErdView> {
     }
   }
 
-  /// [computed] with the saved cards back where the user left them. Tables
-  /// the saved layout does not know (new in the database) keep their computed
-  /// arrangement, moved right of the saved cards so nothing overlaps.
-  ErdLayout _withSaved(ErdLayout computed, ErdSavedLayout? saved) {
-    if (saved == null || saved.positions.isEmpty) return computed;
-    var layout = computed;
-    var savedRight = 0.0;
-    double? newLeft;
-    for (final e in computed.positions.entries) {
-      final p = saved.positions[e.key];
-      if (p != null) {
-        savedRight = max(savedRight, p.dx + computed.widthFor(e.key));
-      } else {
-        newLeft = newLeft == null ? e.value.dx : min(newLeft, e.value.dx);
-      }
-    }
-    final shift = newLeft == null
-        ? 0.0
-        : savedRight + ErdLayout.layerGap - newLeft;
-    for (final e in computed.positions.entries) {
-      final p = saved.positions[e.key];
-      layout = layout.withPosition(
-          e.key, p ?? e.value.translate(shift, 0));
-    }
-    return layout;
-  }
-
   /// Saves the layout once the changes pause.
   void _scheduleSave() {
     if (!_persists || _restoring || _schema == null || _layout == null) {
@@ -1045,45 +1019,13 @@ class _ErdViewState extends material.State<ErdView> {
         : ErdRouter.route(_visibleOf(schema), layout);
   }
 
-  /// The focused table as named in [schema]: `public.orders` falls back to
-  /// `orders` when the current schema names it without a prefix.
-  String? _focusIn(ErdSchema schema) {
-    final f = widget.focusTable;
-    if (f == null) return null;
-    if (schema.tables.any((t) => t.name == f)) return f;
-    final bare = f.contains('.') ? f.substring(f.indexOf('.') + 1) : f;
-    return schema.tables.any((t) => t.name == bare) ? bare : null;
-  }
-
-  /// The schema as drawn: hidden tables gone, columns cut to keys in keys-only
-  /// mode, and collapsed cards without columns.
-  ErdSchema _visibleOf(ErdSchema schema) {
-    final tables = [
-      for (final t in schema.tables)
-        if (!_hidden.contains(t.name))
-          ErdTable(
-            name: t.name,
-            comment: t.comment,
-            columns: _collapsed.contains(t.name) || _detail == ErdDetail.names
-                ? const []
-                : [
-                    for (final c in t.columns)
-                      if (_detail == ErdDetail.all ||
-                          c.isPrimaryKey ||
-                          c.isForeignKey)
-                        c,
-                  ],
-          ),
-    ];
-    final names = {for (final t in tables) t.name};
-    return ErdSchema(
-      tables: tables,
-      relations: [
-        for (final r in schema.relations)
-          if (names.contains(r.fromTable) && names.contains(r.toTable)) r,
-      ],
-    );
-  }
+  /// The schema as drawn, for the current density and visibility.
+  ErdSchema _visibleOf(ErdSchema schema) => ErdLayoutEngine.visibleOf(
+        schema,
+        hidden: _hidden,
+        collapsed: _collapsed,
+        detail: _detail,
+      );
 
   /// Recomputes the layout for the current density and visibility.
   ///
@@ -1098,7 +1040,7 @@ class _ErdViewState extends material.State<ErdView> {
     setState(() {
       _setLayout(arrange || current == null
           ? computed
-          : _withSaved(computed, ErdSavedLayout(positions: current.positions)));
+          : ErdLayoutEngine.withSaved(computed, ErdSavedLayout(positions: current.positions)));
       if (current != null) _followTables(current);
     });
     _scheduleSave();
@@ -1321,13 +1263,8 @@ class _ErdViewState extends material.State<ErdView> {
     }
   }
 
-  List<ErdTable> _matches(ErdSchema schema) {
-    final q = _query.toLowerCase();
-    return [
-      for (final t in schema.tables)
-        if (t.name.toLowerCase().contains(q)) t,
-    ].take(8).toList();
-  }
+  List<ErdTable> _matches(ErdSchema schema) =>
+      ErdLayoutEngine.matches(schema, _query);
 
   /// Keyboard shortcuts for both Ctrl (Linux, Windows) and Cmd (macOS).
   Map<material.ShortcutActivator, material.VoidCallback> _bindings() {
@@ -1351,36 +1288,6 @@ class _ErdViewState extends material.State<ErdView> {
     return out;
   }
 
-  static Map<String, String> _junctionMap(ErdSchema schema) => {
-        for (final t in schema.tables)
-          if (t.isJunction)
-            t.name: {
-              for (final r in schema.relations)
-                if (r.fromTable == t.name) r.toTable,
-            }.join(' and '),
-      };
-
-  /// Tables related to each table by a foreign key, either way. Built once per
-  /// build, so the focus test is a set lookup per card.
-  static Map<String, Set<String>> _neighbourMap(ErdSchema schema) {
-    final out = <String, Set<String>>{};
-    for (final r in schema.relations) {
-      out.putIfAbsent(r.fromTable, () => {}).add(r.toTable);
-      out.putIfAbsent(r.toTable, () => {}).add(r.fromTable);
-    }
-    return out;
-  }
-
-  /// Whether [table] is the focus or related to it.
-  static bool _isFocusedIn(
-    Map<String, Set<String>> neighbours,
-    String? focus,
-    String table,
-  ) {
-    if (focus == null) return false;
-    return focus == table || (neighbours[focus]?.contains(table) ?? false);
-  }
-
   /// The table the diagram focuses: the dragged one, then the picked one, then
   /// the one under the mouse.
   String? _currentFocus() => _dragging ?? _selected ?? _hovered.value;
@@ -1394,7 +1301,7 @@ class _ErdViewState extends material.State<ErdView> {
           : (table == p.toTable ? p.toColumn : null);
       return (highlighted: on, faded: !on, column: column);
     }
-    final highlighted = _isFocusedIn(_neighbours, focus, table);
+    final highlighted = ErdLayoutEngine.isFocusedIn(_neighbours, focus, table);
     return (
       highlighted: highlighted,
       faded: _selected != null && !highlighted,

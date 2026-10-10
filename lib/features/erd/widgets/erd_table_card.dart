@@ -4,7 +4,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/erd/erd_model.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
-import 'package:querya_desktop/features/erd/erd_layout.dart';
+import 'package:querya_desktop/core/erd/erd_layout.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 /// A card's share of the focus: highlighted, faded, and the column of a
