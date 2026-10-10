@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math' show min;
+import 'dart:math' show max, min;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -19,6 +19,7 @@ import 'package:querya_desktop/features/erd/erd_export.dart';
 import 'package:querya_desktop/features/erd/erd_geometry.dart';
 import 'package:querya_desktop/features/erd/erd_layout.dart';
 import 'package:querya_desktop/core/erd/erd_model.dart';
+import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
 import 'package:querya_desktop/features/erd/erd_router.dart';
 import 'package:querya_desktop/core/export/svg_png.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
@@ -71,7 +72,15 @@ class ErdView extends material.StatefulWidget {
     this.onShowRelations,
     this.onOpenFullDiagram,
     this.onSaveFile,
+    this.layoutStore,
+    this.layoutKey,
   });
+
+  /// Keeps what the user arranged (positions, collapsed and hidden tables,
+  /// keys only, zoom and pan) between sessions under [layoutKey] (#1275). A
+  /// neighbourhood view is never kept: it is not the user's arrangement.
+  final ErdLayoutStore? layoutStore;
+  final ErdLayoutKey? layoutKey;
 
   /// Draw only [focusTable] and the tables within this many foreign keys.
   final int? neighbourhoodDepth;
@@ -153,8 +162,22 @@ class _ErdViewState extends material.State<ErdView> {
   /// fit the viewport (a schema of a few hundred tables).
   double _zoomFloor = _minScale;
 
+  /// Saves of the layout wait for a pause in the changes.
+  Timer? _saveTimer;
+  bool _restoring = false;
+
+  bool get _persists =>
+      widget.layoutStore != null &&
+      widget.layoutKey != null &&
+      widget.neighbourhoodDepth == null;
+
   @override
   void dispose() {
+    if (_saveTimer?.isActive ?? false) {
+      _saveTimer!.cancel();
+      unawaited(_saveNow());
+    }
+    _transform.removeListener(_scheduleSave);
     _transform.dispose();
     _hovered.dispose();
     _focus.dispose();
@@ -173,6 +196,7 @@ class _ErdViewState extends material.State<ErdView> {
     super.initState();
     _searchFocus.addListener(_onSearchFocus);
     _hovered.addListener(_syncFocus);
+    _transform.addListener(_scheduleSave);
     _load();
   }
 
@@ -205,11 +229,22 @@ class _ErdViewState extends material.State<ErdView> {
       final schema = depth != null && focus != null
           ? await widget.source.loadNeighbourhood(focus, depth: depth)
           : await widget.source.loadSchema();
+      final saved = await _readSaved(schema);
       if (!mounted) return;
       setState(() {
         _schema = schema;
         _neighbours = _neighbourMap(schema);
-        _setLayout(ErdLayout.compute(_visibleOf(schema)));
+        if (saved != null) {
+          _collapsed
+            ..clear()
+            ..addAll(saved.collapsed);
+          _hidden
+            ..clear()
+            ..addAll(saved.hidden);
+          _keysOnly = saved.keysOnly;
+        }
+        _setLayout(
+            _withSaved(ErdLayout.compute(_visibleOf(schema)), saved));
         _loading = false;
       });
       if (schema.truncated) {
@@ -224,7 +259,17 @@ class _ErdViewState extends material.State<ErdView> {
       // and centre the focused table.
       material.WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        _fit();
+        final scale = saved?.scale;
+        final translation = saved?.translation;
+        if (scale != null && translation != null) {
+          _restoring = true;
+          _transform.value = Matrix4.identity()
+            ..translate(translation.dx, translation.dy)
+            ..scale(scale);
+          _restoring = false;
+        } else {
+          _fit();
+        }
         final picked = _focusIn(schema);
         if (picked != null) _selectTable(_visibleOf(schema), picked);
       });
@@ -234,6 +279,77 @@ class _ErdViewState extends material.State<ErdView> {
         _error = e.toString();
         _loading = false;
       });
+    }
+  }
+
+  Future<ErdSavedLayout?> _readSaved(ErdSchema schema) async {
+    if (!_persists) return null;
+    try {
+      final saved = await widget.layoutStore!.read(widget.layoutKey!);
+      return saved?.keepOnly({for (final t in schema.tables) t.name});
+    } catch (_) {
+      return null; // A broken saved layout must not keep the diagram away.
+    }
+  }
+
+  /// [computed] with the saved cards back where the user left them. Tables
+  /// the saved layout does not know (new in the database) keep their computed
+  /// arrangement, moved right of the saved cards so nothing overlaps.
+  ErdLayout _withSaved(ErdLayout computed, ErdSavedLayout? saved) {
+    if (saved == null || saved.positions.isEmpty) return computed;
+    var layout = computed;
+    var savedRight = 0.0;
+    double? newLeft;
+    for (final e in computed.positions.entries) {
+      final p = saved.positions[e.key];
+      if (p != null) {
+        savedRight = max(savedRight, p.dx + ErdLayout.cardWidth);
+      } else {
+        newLeft = newLeft == null ? e.value.dx : min(newLeft, e.value.dx);
+      }
+    }
+    final shift = newLeft == null
+        ? 0.0
+        : savedRight + ErdLayout.layerGap - newLeft;
+    for (final e in computed.positions.entries) {
+      final p = saved.positions[e.key];
+      layout = layout.withPosition(
+          e.key, p ?? e.value.translate(shift, 0));
+    }
+    return layout;
+  }
+
+  /// Saves the layout once the changes pause.
+  void _scheduleSave() {
+    if (!_persists || _restoring || _schema == null || _layout == null) {
+      return;
+    }
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(milliseconds: 600), () {
+      unawaited(_saveNow());
+    });
+  }
+
+  Future<void> _saveNow() async {
+    final layout = _layout;
+    if (!_persists || layout == null) return;
+    final m = _transform.value;
+    final t = m.getTranslation();
+    try {
+      await widget.layoutStore!.write(
+        widget.layoutKey!,
+        ErdSavedLayout(
+          positions: Map.of(layout.positions),
+          collapsed: Set.of(_collapsed),
+          hidden: Set.of(_hidden),
+          keysOnly: _keysOnly,
+          scale: m.getMaxScaleOnAxis(),
+          translation: material.Offset(t.x, t.y),
+        ),
+      );
+    } catch (_) {
+      // Keeping the layout is a convenience: a failed write is not an error
+      // the user can act on.
     }
   }
 
@@ -282,13 +398,22 @@ class _ErdViewState extends material.State<ErdView> {
   }
 
   /// Recomputes the layout for the current density and visibility.
-  void _reflow() {
+  ///
+  /// The cards stay where they are unless [arrange]: collapsing, hiding or
+  /// showing keys only must not throw away what the user arranged. Only
+  /// *Auto layout* computes every position again.
+  void _reflow({bool arrange = false}) {
     final schema = _schema;
     if (schema == null) return;
-    setState(() => _setLayout(ErdLayout.compute(_visibleOf(schema))));
+    final computed = ErdLayout.compute(_visibleOf(schema));
+    final current = _layout;
+    setState(() => _setLayout(arrange || current == null
+        ? computed
+        : _withSaved(computed, ErdSavedLayout(positions: current.positions))));
+    _scheduleSave();
   }
 
-  void _autoLayout() => _reflow();
+  void _autoLayout() => _reflow(arrange: true);
 
   void _toggleCollapsed(String table) {
     setState(() {
@@ -347,6 +472,7 @@ class _ErdViewState extends material.State<ErdView> {
     if (_dragging == null) return;
     setState(() => _dragging = null);
     _syncFocus();
+    _scheduleSave();
   }
 
   Future<void> _save(String name, Uint8List bytes) =>
