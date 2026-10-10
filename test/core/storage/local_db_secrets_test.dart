@@ -451,5 +451,161 @@ void main() {
       expect(loaded.name, 'Before');
       expect(loaded.password, 'keep-me');
     });
+
+    test('Remove the saved password removes it; a typed one replaces it',
+        () async {
+      const row = ConnectionRow(
+        type: 'postgresql',
+        name: 'PG',
+        host: 'localhost',
+        port: 5432,
+        username: 'admin',
+        password: 'old-secret',
+        createdAt: '2026-01-01T00:00:00Z',
+      );
+      final id = await LocalDb.instance.addConnection(row);
+      ConnectionRow edit({String? password, bool remove = false}) =>
+          ConnectionRow(
+            id: id,
+            type: 'postgresql',
+            name: 'PG',
+            host: 'localhost',
+            port: 5432,
+            username: 'admin',
+            password: password,
+            createdAt: '2026-01-01T00:00:00Z',
+            removeSavedPassword: remove,
+          );
+
+      // Blank keeps it (as before) ...
+      var merged = await mergeSecretsForConnectionUpdate(edit());
+      expect(merged.password, 'old-secret');
+
+      // ... unless removal was asked for.
+      merged = await mergeSecretsForConnectionUpdate(edit(remove: true));
+      expect(merged.password, isNull);
+      await LocalDb.instance.updateConnection(merged);
+      expect((await ConnectionSecretsStore.readForConnection(id)).password,
+          isNull);
+
+      // A password typed with the request replaces: nothing is lost by it.
+      merged = await mergeSecretsForConnectionUpdate(
+          edit(password: 'new-secret', remove: true));
+      expect(merged.password, 'new-secret');
+    });
+
+    test('turning the SSH tunnel off removes its secrets from the store',
+        () async {
+      final withTunnel = ConnectionRow(
+        type: 'postgresql',
+        name: 'PG via bastion',
+        host: 'db.internal',
+        port: 5432,
+        createdAt: '2026-01-01T00:00:00Z',
+        sshSecrets: SshTunnelSecrets(
+          password: 'ssh-pass',
+          privateKey: 'ssh-key',
+          passphrase: 'phrase',
+          jumpPassword: 'jump',
+        ),
+      ).withSshTunnelConfig(const SshTunnelConfig(
+        enabled: true,
+        host: 'bastion.example',
+        port: 22,
+        username: 'deploy',
+      ));
+      final id = await LocalDb.instance.addConnection(withTunnel);
+      expect(
+          (await ConnectionSecretsStore.readSshSecretsForConnection(id))
+              .privateKey,
+          'ssh-key');
+
+      // The form saves without a tunnel and without SSH secrets.
+      final off = ConnectionRow(
+        id: id,
+        type: 'postgresql',
+        name: 'PG via bastion',
+        host: 'db.internal',
+        port: 5432,
+        createdAt: '2026-01-01T00:00:00Z',
+      ).withSshTunnelConfig(null);
+      await LocalDb.instance.updateConnection(
+          await mergeSecretsForConnectionUpdate(off));
+
+      final left = await ConnectionSecretsStore.readSshSecretsForConnection(id);
+      expect(left.password, isNull);
+      expect(left.privateKey, isNull);
+      expect(left.passphrase, isNull);
+      expect(left.jumpPassword, isNull);
+    });
+
+    test('a failed update restores the SSH secrets as well', () async {
+      const tunnel = SshTunnelConfig(
+        enabled: true,
+        host: 'bastion.example',
+        port: 22,
+        username: 'deploy',
+      );
+      final id = await LocalDb.instance.addConnection(ConnectionRow(
+        type: 'postgresql',
+        name: 'PG',
+        host: 'db.internal',
+        port: 5432,
+        password: 'db-pass',
+        createdAt: '2026-01-01T00:00:00Z',
+        sshSecrets:
+            SshTunnelSecrets(password: 'ssh-old', privateKey: 'key-old'),
+      ).withSshTunnelConfig(tunnel));
+
+      // Writes of the update: password, connection string, then the four SSH
+      // keys: the fourth write (the private key) fails.
+      final real = ConnectionSecretsStore.backend;
+      ConnectionSecretsStore.backend = _FailsOnWrite(real, failOn: 4);
+      addTearDown(() => ConnectionSecretsStore.backend = real);
+
+      await expectLater(
+        LocalDb.instance.updateConnection(ConnectionRow(
+          id: id,
+          type: 'postgresql',
+          name: 'PG',
+          host: 'db.internal',
+          port: 5432,
+          password: 'db-pass',
+          createdAt: '2026-01-01T00:00:00Z',
+          sshSecrets:
+              SshTunnelSecrets(password: 'ssh-new', privateKey: 'key-new'),
+        ).withSshTunnelConfig(tunnel)),
+        throwsA(isA<StateError>()),
+      );
+      ConnectionSecretsStore.backend = real;
+
+      final ssh = await ConnectionSecretsStore.readSshSecretsForConnection(id);
+      expect(ssh.password, 'ssh-old');
+      expect(ssh.privateKey, 'key-old');
+      expect((await ConnectionSecretsStore.readForConnection(id)).password,
+          'db-pass');
+    });
   });
+}
+
+/// A backend whose [failOn]th write (1-based, counted from the first write
+/// through it) throws; every other call goes to [inner].
+class _FailsOnWrite implements SecretsStorageBackend {
+  _FailsOnWrite(this.inner, {required this.failOn});
+
+  final SecretsStorageBackend inner;
+  final int failOn;
+  int _writes = 0;
+
+  @override
+  Future<String?> read(String key) => inner.read(key);
+
+  @override
+  Future<void> write(String key, String? value) async {
+    if (++_writes == failOn) throw StateError('keyring write failed');
+    await inner.write(key, value);
+  }
+
+  @override
+  Future<void> delete(String key) => inner.delete(key);
 }
