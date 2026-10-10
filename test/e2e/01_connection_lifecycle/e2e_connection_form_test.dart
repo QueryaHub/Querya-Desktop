@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart' show kSecondaryButton;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/motion/querya_hover_surface.dart';
+import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/folders_storage.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
@@ -16,6 +17,9 @@ import '../helpers/e2e_connection_helper.dart';
 void main() {
   final app = E2eAppHarness(prefix: 'querya_e2e_forms_');
   setUpAll(app.setUpAll);
+  // A first launch without connections opens the welcome tour, and its scrim
+  // covers the sidebar a scenario right-clicks.
+  setUpAll(() => AppSettings.instance.setHasCompletedWelcomeTour(true));
   tearDownAll(app.tearDownAll);
 
   const uriPlaceholder = {
