@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/features/connections/connection_default_name.dart';
 import 'package:querya_desktop/core/security/connection_environment.dart';
 import 'package:querya_desktop/features/connections/environment_section.dart';
 import 'package:querya_desktop/core/database/postgres_connection.dart';
@@ -335,13 +336,14 @@ class _PostgresConnectionFormContentState
       }
     }
 
-    final effectiveHost = uriHost ?? host;
-    final effectivePort = uriPort ?? port;
     final displayName = name.isNotEmpty
         ? name
-        : (effectiveUri.isNotEmpty
-            ? 'PostgreSQL: $effectiveHost:$effectivePort'
-            : 'PostgreSQL $host:$port/$database');
+        : defaultConnectionName(
+            label: 'PostgreSQL',
+            defaultPort: 5432,
+            uri: effectiveUri,
+            fields: 'PostgreSQL $host:$port/$database',
+          );
     final initial = widget.initial;
     var row = ConnectionRow(
       id: initial?.id,
