@@ -25,9 +25,28 @@ const _validPostgresSslModes = {
     return (row: null, error: 'URL/URI is required.');
   }
 
-  final uri = Uri.tryParse(trimmed);
+  var uri = Uri.tryParse(trimmed);
+  var url = trimmed;
+  if (uri == null) {
+    // A password with `@`, `/`, `#`, `?` or `:` written as is, as cloud
+    // consoles show it (#1315): read the user info up to the last `@` and
+    // encode it.
+    final recovered = _percentEncodeUserInfo(trimmed);
+    final u = recovered == null ? null : Uri.tryParse(recovered);
+    if (u != null) {
+      uri = u;
+      url = recovered!;
+    }
+  }
   if (uri == null || uri.scheme.isEmpty) {
-    return (row: null, error: 'Invalid URL/URI format.');
+    return (
+      row: null,
+      error: trimmed.contains('@')
+          ? 'Invalid URL/URI format. If the password contains special '
+              'characters, percent-encode them (@ is %40, / is %2F, # is '
+              '%23, ? is %3F, : is %3A).'
+          : 'Invalid URL/URI format.',
+    );
   }
 
   final scheme = uri.scheme.toLowerCase();
@@ -44,12 +63,38 @@ const _validPostgresSslModes = {
     return (row: null, error: sslResult.error);
   }
 
-  final row = _buildConnectionRow(trimmed, uri, scheme, sslResult.useSSL);
+  final row = _buildConnectionRow(url, uri, scheme, sslResult.useSSL);
   if (row == null) {
     return (row: null, error: 'Failed to parse connection URL.');
   }
   return (row: row, error: null);
 }
+
+/// [input] with the user info (`user:password`, up to the last `@` before the
+/// query) percent-encoded, or null when there is none. Only used for a string
+/// `Uri` rejected, so an `@` in a path cannot be mistaken for one.
+String? _percentEncodeUserInfo(String input) {
+  final m = RegExp(r'^([A-Za-z][A-Za-z0-9+.\-]*://)(.*)$', dotAll: true)
+      .firstMatch(input);
+  if (m == null) return null;
+  final rest = m.group(2)!;
+  final query = rest.indexOf('?');
+  final beforeQuery = query < 0 ? rest : rest.substring(0, query);
+  final at = beforeQuery.lastIndexOf('@');
+  if (at <= 0) return null;
+  final userInfo = rest.substring(0, at);
+  final colon = userInfo.indexOf(':');
+  final user = colon < 0 ? userInfo : userInfo.substring(0, colon);
+  final encodedUser = _encodeOnce(user);
+  final encoded = colon < 0
+      ? encodedUser
+      : '$encodedUser:${_encodeOnce(userInfo.substring(colon + 1))}';
+  return '${m.group(1)}$encoded${rest.substring(at)}';
+}
+
+/// [v] percent-encoded, leaving what already is (`%40` stays `%40`).
+String _encodeOnce(String v) => Uri.encodeComponent(v)
+    .replaceAllMapped(RegExp(r'%25([0-9A-Fa-f]{2})'), (m) => '%${m.group(1)}');
 
 ({bool? useSSL, String? error}) _resolveSslForScheme(String scheme, Uri uri) {
   final type = _schemeToType(scheme);
@@ -135,6 +180,9 @@ ConnectionRow? _buildConnectionRow(
       path = ':memory:';
     } else if (url.startsWith('sqlite:///')) {
       path = uri.path;
+      // `sqlite:///C:/data/app.db` is the file `C:/data/app.db`: the slash
+      // before a drive letter is the URI's, not the path's.
+      if (RegExp(r'^/[A-Za-z]:[/\\]').hasMatch(path)) path = path.substring(1);
     } else if (url.startsWith('sqlite://')) {
       path = url.substring(9);
     } else if (url.startsWith('sqlite:')) {
@@ -203,7 +251,11 @@ String _connectionName(
         : 'SQLite (${host!.split('/').last})';
   }
 
-  final cleanHost = host ?? 'localhost';
+  var cleanHost = host ?? 'localhost';
+  // `PostgreSQL: [::1]:5432`, not `PostgreSQL: ::1:5432`.
+  if (cleanHost.contains(':') && !cleanHost.startsWith('[')) {
+    cleanHost = '[$cleanHost]';
+  }
   final cleanPort = port ?? defaultPort;
   final cleanDb = databaseName ?? '';
   final typeName = switch (type) {
