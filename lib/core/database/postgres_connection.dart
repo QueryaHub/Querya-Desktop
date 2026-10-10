@@ -191,9 +191,13 @@ class PostgresConnection {
     );
   }
 
+  @visibleForTesting
+  ConnectionSettings buildSettingsForTest() => _buildSettings();
+
   ConnectionSettings _buildSettings() {
     SecurityContext? securityContext;
-    if ((sslRootCert != null && sslRootCert!.trim().isNotEmpty) ||
+    if (useSSL ||
+        (sslRootCert != null && sslRootCert!.trim().isNotEmpty) ||
         (sslCert != null && sslCert!.trim().isNotEmpty) ||
         (sslKey != null && sslKey!.trim().isNotEmpty)) {
       securityContext = SecurityContext(withTrustedRoots: true);
@@ -314,7 +318,11 @@ class PostgresConnection {
             encoding: parsed.encoding,
             replicationMode: parsed.replicationMode,
             queryTimeout: parsed.queryTimeout ?? const Duration(seconds: 30),
-            securityContext: parsed.securityContext ?? _buildSettings().securityContext,
+            securityContext: parsed.securityContext ??
+                _buildSettings().securityContext ??
+                (sslMode != SslMode.disable
+                    ? SecurityContext(withTrustedRoots: true)
+                    : null),
             sslMode: sslMode,
           ),
         );

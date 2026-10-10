@@ -65,6 +65,7 @@ class _PostgresConnectionFormContentState
   final SshTunnelSecrets _sshSecrets = SshTunnelSecrets();
 
   bool _useSSL = false;
+  String _sslMode = 'require';
   bool _removeSavedPassword = false;
   bool _showPassword = false;
   bool _isTesting = false;
@@ -102,8 +103,18 @@ class _PostgresConnectionFormContentState
       _usernameController.text = initial.username ?? '';
       _databaseController.text = initial.databaseName ?? '';
       _useSSL = initial.useSSL;
+      final connStr = initial.connectionString;
       _connectionStringController.text =
-          redactUriPassword(initial.connectionString) ?? '';
+          redactUriPassword(connStr) ?? '';
+      if (connStr != null && connStr.isNotEmpty) {
+        final parsed = Uri.tryParse(connStr);
+        final mode = parsed?.queryParameters['sslmode'];
+        if (mode != null && mode.isNotEmpty) {
+          _sslMode = mode;
+        } else if (_useSSL) {
+          _sslMode = 'require';
+        }
+      }
       if (initial.sshTunnelConfig != null) {
         _sshConfig = initial.sshTunnelConfig!;
       }
@@ -136,6 +147,11 @@ class _PostgresConnectionFormContentState
     _sslRootCertController.text = parsed.queryParameters['sslrootcert'] ?? '';
     _sslCertController.text = parsed.queryParameters['sslcert'] ?? '';
     _sslKeyController.text = parsed.queryParameters['sslkey'] ?? '';
+    final mode = parsed.queryParameters['sslmode'];
+    if (mode != null && mode.isNotEmpty) {
+      _sslMode = mode;
+      _useSSL = mode != 'disable';
+    }
   }
 
   void _setOrRemoveSslParam(
@@ -160,9 +176,13 @@ class _PostgresConnectionFormContentState
     _setOrRemoveSslParam(params, 'sslrootcert', _sslRootCertController);
     _setOrRemoveSslParam(params, 'sslcert', _sslCertController);
     _setOrRemoveSslParam(params, 'sslkey', _sslKeyController);
-    if (!params.containsKey('sslmode') &&
-        _sslRootCertController.text.trim().isNotEmpty) {
-      params['sslmode'] = 'verify-full';
+    if (_useSSL) {
+      params['sslmode'] = _sslRootCertController.text.trim().isNotEmpty &&
+              _sslMode == 'require'
+          ? 'verify-full'
+          : _sslMode;
+    } else {
+      params.remove('sslmode');
     }
     final newUri = Uri(
       scheme: parsed.scheme,
@@ -199,6 +219,7 @@ class _PostgresConnectionFormContentState
     String? sslRootCert,
     String? sslCert,
     String? sslKey,
+    String? sslMode,
   }) {
     final userInfoParts = <String>[
       if (username != null && username.isNotEmpty)
@@ -206,11 +227,15 @@ class _PostgresConnectionFormContentState
       if (password != null && password.isNotEmpty)
         Uri.encodeComponent(password),
     ];
+    final effectiveMode = sslMode ??
+        (sslRootCert != null && sslRootCert.isNotEmpty
+            ? 'verify-full'
+            : (_useSSL ? _sslMode : null));
     final queryParams = <String, String>{
-      if (sslRootCert != null && sslRootCert.isNotEmpty) ...{
+      if (sslRootCert != null && sslRootCert.isNotEmpty)
         'sslrootcert': sslRootCert,
-        'sslmode': 'verify-full',
-      },
+      if (effectiveMode != null && effectiveMode.isNotEmpty)
+        'sslmode': effectiveMode,
       if (sslCert != null && sslCert.isNotEmpty) 'sslcert': sslCert,
       if (sslKey != null && sslKey.isNotEmpty) 'sslkey': sslKey,
     };
@@ -230,16 +255,19 @@ class _PostgresConnectionFormContentState
     final sslRootCert = _sslRootCertController.text.trim();
     final sslCert = _sslCertController.text.trim();
     final sslKey = _sslKeyController.text.trim();
-    if (sslRootCert.isEmpty && sslCert.isEmpty && sslKey.isEmpty) return '';
+    if (!_useSSL && sslRootCert.isEmpty && sslCert.isEmpty && sslKey.isEmpty) {
+      return '';
+    }
     return _buildConnectionUri(
       host: _hostController.text.trim(),
       port: int.tryParse(_portController.text.trim()) ?? 5432,
       username: _usernameController.text.trim(),
       password: _passwordController.text,
       database: _databaseController.text.trim(),
-      sslRootCert: sslRootCert,
-      sslCert: sslCert,
-      sslKey: sslKey,
+      sslRootCert: sslRootCert.isEmpty ? null : sslRootCert,
+      sslCert: sslCert.isEmpty ? null : sslCert,
+      sslKey: sslKey.isEmpty ? null : sslKey,
+      sslMode: _useSSL ? _sslMode : null,
     );
   }
 
@@ -667,10 +695,42 @@ class _PostgresConnectionFormContentState
                       ),
                       if (_useSSL) ...[
                         const Gap(8),
+                        material.Row(
+                          children: [
+                            const Text('SSL Mode').small(),
+                            const Gap(12),
+                            material.SizedBox(
+                              width: 160,
+                              child: QueryaDropdown<String>(
+                                value: _sslMode,
+                                onSelected: (mode) {
+                                  if (mode != null) {
+                                    setState(() => _sslMode = mode);
+                                    _syncUriSslParams();
+                                  }
+                                },
+                                items: const [
+                                  QueryaDropdownItem(
+                                    value: 'require',
+                                    label: 'require (encrypted)',
+                                  ),
+                                  QueryaDropdownItem(
+                                    value: 'verify-ca',
+                                    label: 'verify-ca (check CA)',
+                                  ),
+                                  QueryaDropdownItem(
+                                    value: 'verify-full',
+                                    label: 'verify-full (strict)',
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Gap(8),
                         const Text(
-                          'Without a Root CA this is sslmode=require: traffic is '
-                          'encrypted but the server certificate is not checked '
-                          '(MITM is possible). A Root CA enables verify-full. '
+                          'require encrypts traffic without checking server certificates. '
+                          'verify-ca and verify-full enforce CA validation against trusted roots. '
                           'A URI sslmode= value always wins.',
                         ).muted().small(),
                         const Gap(16),
