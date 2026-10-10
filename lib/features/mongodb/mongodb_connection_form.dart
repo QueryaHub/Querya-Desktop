@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/features/connections/connection_test_result.dart';
 import 'package:querya_desktop/features/connections/connection_default_name.dart';
 import 'package:querya_desktop/core/security/connection_environment.dart';
 import 'package:querya_desktop/features/connections/environment_section.dart';
@@ -266,7 +267,7 @@ class _MongoConnectionFormContentState
       _isTesting = false;
       _testResult = result;
     });
-    _dismissTimer = Timer(const Duration(seconds: 5), () {
+    _dismissTimer = Timer(connectionTestResultLifetime(result), () {
       if (mounted) setState(() => _testResult = null);
     });
   }
@@ -309,10 +310,12 @@ class _MongoConnectionFormContentState
         sshSecrets: secrets.sshSecrets,
       );
 
-      final success = await connection.testConnection();
+      final result = await connection.testConnection();
       await connection.disconnect();
 
-      if (mounted) _showTestResult(success ? 'success' : 'failed');
+      if (mounted) {
+        _showTestResult(result.ok ? 'success' : (result.error ?? 'failed'));
+      }
     } catch (e) {
       if (mounted) _showTestResult('error: $e');
     }
@@ -669,11 +672,7 @@ class _MongoConnectionFormContentState
                           const Gap(10),
                           material.Expanded(
                             child: Text(
-                              _testResult == 'success'
-                                  ? 'Connection successful!'
-                                  : _testResult!.startsWith('error:')
-                                      ? _testResult!.substring(7)
-                                      : 'Connection failed',
+                              connectionTestMessage(_testResult!),
                               style: material.TextStyle(
                                 fontSize: 13,
                                 color: theme.foreground,
