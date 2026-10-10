@@ -198,7 +198,7 @@ class McpMongoService {
     Map<String, dynamic>? filter,
     Map<String, dynamic>? sort,
     int limit = 20,
-  }) {
+  }) async {
     _guard(filter, 'filter');
     _guard(sort, 'sort');
     final n = limit.clamp(1, maxDocuments);
@@ -227,7 +227,7 @@ class McpMongoService {
     int connectionId,
     String collection, {
     Map<String, dynamic>? filter,
-  }) {
+  }) async {
     _guard(filter, 'filter');
     return _withSession(connectionId, (session) async {
       final name = await _knownCollection(session, collection);

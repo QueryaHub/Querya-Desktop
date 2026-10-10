@@ -19,13 +19,12 @@ class _Access implements McpAccessPolicy {
 
 class _FakeSession implements McpMongoSession {
   _FakeSession({
-    this.collections = const ['users', 'orders', 'system.views'],
     this.docs = const [],
     this.failWith,
     this.hang = false,
   });
 
-  final List<String> collections;
+  final collections = const ['users', 'orders', 'system.views'];
   final List<Map<String, dynamic>> docs;
   final Object? failWith;
   final bool hang;
@@ -258,9 +257,9 @@ void main() {
           'n': 7,
         },
       ]);
-      final r = await service(maxField: 10).find(1, 'users');
+      final r = await service(maxField: 30).find(1, 'users');
       final d = r.documents.single;
-      expect(d['bio'], startsWith('xxxxxxxxxx… [truncated 40 chars]'));
+      expect(d['bio'], '${'x' * 30}… [truncated 20 chars]');
       expect(d['at'], '2026-01-02T00:00:00.000Z');
       expect(d['tags'], ['a', 'b']);
       expect(d['n'], 7);
