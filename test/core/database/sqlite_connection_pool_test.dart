@@ -96,7 +96,8 @@ void main() {
       l3.release();
     });
 
-    test('throws StateError when all slots busy at maxEntries', () async {
+    test('throws PoolExhaustedException when all slots busy at maxEntries',
+        () async {
       final pool = SqliteConnectionPool(
         maxEntries: 2,
         createAndConnect: (row, {required mode}) async =>
@@ -108,7 +109,7 @@ void main() {
 
       expect(
         () => pool.acquire(_row(id: 3)),
-        throwsA(isA<StateError>()),
+        throwsA(isA<PoolExhaustedException>()),
       );
     });
 

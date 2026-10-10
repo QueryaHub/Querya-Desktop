@@ -490,7 +490,7 @@ void main() {
       final l1 = await pool.acquire(_row(id: 1), database: 'postgres');
       await expectLater(
         pool.acquire(_row(id: 2), database: 'postgres'),
-        throwsA(isA<StateError>()),
+        throwsA(isA<PoolExhaustedException>()),
       );
       l1.release();
     });
