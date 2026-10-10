@@ -2,6 +2,13 @@ import 'dart:async' show Timer;
 
 import 'package:flutter/material.dart' as material
     show
+        Center,
+        DecoratedBox,
+        DecorationPosition,
+        DragTarget,
+        Draggable,
+        Opacity,
+        pointerDragAnchorStrategy,
         TextEditingValue,
         ValueListenableBuilder,
         BuildContext,
@@ -567,6 +574,19 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
   List<String> _folders = [];
   List<ConnectionRow> _connections = [];
   Map<String, int> _folderIdByName = {};
+
+  /// The connection being dragged, while a drag is in progress.
+  int? _draggedId;
+
+  @visibleForTesting
+  int? get draggedConnectionIdForTesting => _draggedId;
+
+  /// `id: folderId` of the connections the panel currently holds.
+  @visibleForTesting
+  Map<int, int?> get connectionFoldersForTesting => {
+        for (final c in _connections)
+          if (c.id != null) c.id!: c.folderId,
+      };
   final Set<String> _expandedFolders = {};
   final Set<int> _expandedConnections = {};
 
@@ -678,7 +698,9 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     final name = await showNewFolderDialog(menuContext);
     if (name == null || !mounted) return;
     await FoldersStorage.instance.add(name);
-    if (mounted) setState(() => _folders = FoldersStorage.instance.folders);
+    // Reload, not only the names: the new folder needs its id in
+    // [_folderIdByName] before its contents are looked up.
+    if (mounted) await _loadData();
   }
 
   Future<void> _createConnection({
@@ -839,7 +861,80 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     }
   }
 
+  /// A connection tile that can be dragged onto a folder (or onto the list
+  /// itself to leave its folder).
   Widget _buildConnectionTile(ConnectionRow conn) {
+    final tile = _connectionTileCore(conn);
+    final id = conn.id;
+    if (id == null) return tile;
+    final theme = Theme.of(context);
+    return material.Draggable<int>(
+      data: id,
+      maxSimultaneousDrags: 1,
+      onDragStarted: () {
+        if (mounted) setState(() => _draggedId = id);
+      },
+      onDragEnd: (_) {
+        if (mounted) setState(() => _draggedId = null);
+      },
+      dragAnchorStrategy: material.pointerDragAnchorStrategy,
+      feedback: material.Material(
+        color: material.Colors.transparent,
+        child: material.Container(
+          padding:
+              const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: material.BoxDecoration(
+            color: theme.colorScheme.popover,
+            borderRadius: material.BorderRadius.circular(8),
+            border: material.Border.all(color: theme.colorScheme.primary),
+          ),
+          child: material.Row(
+            mainAxisSize: material.MainAxisSize.min,
+            children: [
+              material.Icon(QueryaIcons.connectionIcon(conn.type),
+                  size: 16, color: theme.colorScheme.primary),
+              const material.SizedBox(width: 8),
+              material.Text(conn.name,
+                  style: material.TextStyle(
+                      fontSize: 13, color: theme.colorScheme.foreground)),
+            ],
+          ),
+        ),
+      ),
+      childWhenDragging: material.Opacity(opacity: 0.4, child: tile),
+      child: tile,
+    );
+  }
+
+  ConnectionRow? _connectionById(int id) {
+    for (final c in _connections) {
+      if (c.id == id) return c;
+    }
+    return null;
+  }
+
+  /// Whether dropping connection [id] on [folderName] (null: the list itself,
+  /// meaning "no folder") would change anything.
+  bool _acceptsDrop(int id, String? folderName) {
+    final conn = _connectionById(id);
+    if (conn == null) return false;
+    final target = folderName == null ? null : _folderIdByName[folderName];
+    if (folderName != null && target == null) return false;
+    return conn.folderId != target;
+  }
+
+  Future<void> _dropConnection(int id, String? folderName) async {
+    final conn = _connectionById(id);
+    if (conn == null || !_acceptsDrop(id, folderName)) return;
+    final target = folderName == null ? null : _folderIdByName[folderName];
+    await _moveConnection(conn, target);
+    if (folderName != null && mounted) {
+      // Show what was dropped.
+      setState(() => _expandedFolders.add(folderName));
+    }
+  }
+
+  Widget _connectionTileCore(ConnectionRow conn) {
     final isSelected = widget.selectedConnectionId != null &&
         widget.selectedConnectionId == conn.id;
     final isExpanded = _expandedConnections.contains(conn.id);
@@ -1142,9 +1237,48 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                 height: 1,
                 color: theme.colorScheme.border.withValues(alpha: 0.22),
               ),
+              // While a connection from a folder is dragged, a labelled place
+              // to drop it: the empty part of the list works too, but nobody
+              // would know.
+              // A fixed slot: inserting and removing a child here would shift
+              // the list below it, and rebuilding it drops the tile that is
+              // being dragged (and the drag with it).
+              _draggedId != null && _acceptsDrop(_draggedId!, null)
+                  ? material.DragTarget<int>(
+                  onWillAcceptWithDetails: (d) => _acceptsDrop(d.data, null),
+                  onAcceptWithDetails: (d) => _dropConnection(d.data, null),
+                  builder: (context, candidates, _) => material.Container(
+                    key: const material.ValueKey('drop_out_of_folder'),
+                    margin: const material.EdgeInsets.fromLTRB(12, 8, 12, 0),
+                    padding: const material.EdgeInsets.symmetric(vertical: 10),
+                    decoration: material.BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(
+                          alpha: candidates.isEmpty ? 0.06 : 0.18),
+                      borderRadius: material.BorderRadius.circular(8),
+                      border: material.Border.all(
+                        color: theme.colorScheme.primary
+                            .withValues(alpha: candidates.isEmpty ? 0.4 : 1),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: material.Center(
+                      child: material.Text(
+                        'Drop here to take it out of the folder',
+                        style: material.TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+                  : const material.SizedBox.shrink(),
               Expanded(
                 child: material.RepaintBoundary(
-                  child: material.CustomScrollView(
+                  child: material.DragTarget<int>(
+                    onWillAcceptWithDetails: (d) => _acceptsDrop(d.data, null),
+                    onAcceptWithDetails: (d) => _dropConnection(d.data, null),
+                    builder: (context, candidates, _) => material.CustomScrollView(
                     slivers: [
                       material.SliverPadding(
                         padding: const material.EdgeInsets.symmetric(
@@ -1177,11 +1311,13 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                                       _expandedFolders.remove(folderName);
                                     }
                                   },
-                                  connections: filteredConnections
-                                      .where((c) =>
-                                          c.folderId == _folderIdByName[name])
-                                      .toList(),
+                                  connections: connectionsInFolder(
+                                    filteredConnections,
+                                    _folderIdByName[name],
+                                  ),
                                   onRemove: () => _removeFolder(name),
+                                  acceptsDrop: (id) => _acceptsDrop(id, name),
+                                  onDrop: (id) => _dropConnection(id, name),
                                   onNewConnection: (folderName) async {
                                     final folderId = await LocalDb.instance
                                         .getFolderIdByName(folderName);
@@ -1249,6 +1385,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                   ),
                 ],
               ),
+                  ),
             ),
           ),
         ],
@@ -1257,4 +1394,19 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
   ),
 );
 }
+}
+
+/// The connections that live in the folder with id [folderId]. A folder whose
+/// id is not known yet holds none: matching `folderId == null` there listed
+/// every top-level connection inside a freshly created folder.
+@visibleForTesting
+List<ConnectionRow> connectionsInFolder(
+  List<ConnectionRow> connections,
+  int? folderId,
+) {
+  if (folderId == null) return const [];
+  return [
+    for (final c in connections)
+      if (c.folderId == folderId) c,
+  ];
 }

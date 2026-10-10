@@ -1,4 +1,5 @@
 import 'package:flutter/gestures.dart' show kSecondaryButton;
+import 'package:flutter/widgets.dart' show Draggable, ValueKey;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/folders_storage.dart';
@@ -127,6 +128,94 @@ void main() {
     // is already inside a folder; the cause was not found.
     await E2eConnections.remove(tester, id);
     await tester.runAsync(() => FoldersStorage.instance.remove('Team C'));
+    await app.close(tester);
+  });
+
+
+  testWidgets('a connection is dragged into a folder and out of it again',
+      (tester) async {
+    await app.launch(tester);
+    await tester.runAsync(() => FoldersStorage.instance.add('Team D'));
+    final folderId = await tester
+        .runAsync(() => LocalDb.instance.getFolderIdByName('Team D'));
+    final id = await E2eConnections.add(
+        tester, E2eConnections.redis('E2E Dragged'));
+    await tester.runAsync(FoldersStorage.instance.reload);
+    await E2eConnections.reloadSidebar(tester);
+
+    Future<void> dragTo(Offset from, Offset to) async {
+      final gesture = await tester.startGesture(from);
+      // Past the drag slop, then onto the target in a few steps.
+      await gesture.moveBy(const Offset(0, 24));
+      await tester.pump(const Duration(milliseconds: 50));
+      await gesture.moveTo(to);
+      await tester.pump(const Duration(milliseconds: 50));
+      await gesture.up();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 100)));
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+
+    await dragTo(
+      tester.getCenter(inSidebar('E2E Dragged').first),
+      tester.getCenter(inSidebar('Team D')),
+    );
+    final first =
+        await tester.runAsync(() => LocalDb.instance.getConnectionById(id));
+    expect(first!.folderId, folderId, reason: 'dropped on the folder');
+
+    // The panel reloads from the database after the drop (real I/O); the tile
+    // is under its folder once it has. Dragging before that starts from the
+    // old layout with the old folder.
+    // The panel reloads from the database after the drop (real I/O). Until it
+    // has, it still holds the connection outside the folder: a drag started
+    // then has nothing to take out. (Its tile's position says nothing here:
+    // folders are listed first, so a top-level tile is below them too.)
+    final panel =
+        tester.state<ConnectionsPanelState>(find.byType(ConnectionsPanel));
+    for (var i = 0; i < 40; i++) {
+      if (panel.connectionFoldersForTesting[id] == folderId) break;
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(panel.connectionFoldersForTesting[id], folderId,
+        reason: 'the panel reloaded after the drop');
+    // The folder is still unfolding (an animated, clipped height): a press on
+    // a half-revealed tile lands on whatever is behind it.
+    await tester.pump(const Duration(milliseconds: 600));
+    final from = tester.getCenter(inSidebar('E2E Dragged').first);
+    final gesture = await tester.startGesture(from);
+    await gesture.moveBy(const Offset(0, 24));
+    await tester.pump(const Duration(milliseconds: 100));
+    final strip = find.byKey(const ValueKey('drop_out_of_folder'));
+    final state =
+        tester.state<ConnectionsPanelState>(find.byType(ConnectionsPanel));
+    expect(strip, findsOneWidget,
+        reason: 'the drop strip shows while dragging; '
+            'dragging=${state.draggedConnectionIdForTesting} '
+            'folders=${state.connectionFoldersForTesting} id=$id '
+            'draggables=${find.byType(Draggable<int>).evaluate().length} '
+            'pressed at $from');
+    await gesture.moveTo(tester.getCenter(strip));
+    await tester.pump(const Duration(milliseconds: 50));
+    await gesture.up();
+    await tester.pump(const Duration(milliseconds: 300));
+    // The write is real I/O: give it time before reading.
+    ConnectionRow? row;
+    for (var i = 0; i < 20; i++) {
+      row = await tester
+          .runAsync<ConnectionRow?>(() => LocalDb.instance.getConnectionById(id));
+      if (row!.folderId == null) break;
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(row!.folderId, isNull, reason: 'dropped on the strip');
+
+    await E2eConnections.remove(tester, id);
+    await tester.runAsync(() => FoldersStorage.instance.remove('Team D'));
     await app.close(tester);
   });
 }
