@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/actions/sql_script_format.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
+import 'package:querya_desktop/core/editor/querya_code_language.dart';
+import 'package:querya_desktop/core/editor/syntax_highlight_service.dart';
 import 'package:querya_desktop/features/workspace/query_plan.dart';
 import 'package:querya_desktop/core/unsaved_work_registry.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
@@ -17,7 +19,12 @@ class SqlQueryTabSession {
     this.filePath,
     double initialFraction = 0.65,
     this.isDiagram = false,
-  })  : controller = material.TextEditingController(text: initialSql ?? ''),
+    material.TextEditingController? customController,
+  })  : controller = customController ??
+            SyntaxHighlightService.createHighlightController(
+              language: QueryaCodeLanguage.sql,
+              text: initialSql ?? '',
+            ),
         _savedSql = initialSql ?? '',
         topFraction = material.ValueNotifier<double>(initialFraction) {
     controller.addListener(_onTextChanged);

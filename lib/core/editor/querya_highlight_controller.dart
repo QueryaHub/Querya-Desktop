@@ -23,12 +23,31 @@ class QueryaHighlightController extends TextEditingController {
   });
 
   final QueryaCodeLanguage language;
-  final Highlighter lightHighlighter;
-  final Highlighter darkHighlighter;
-  final String lightThemeConfig;
-  final String darkThemeConfig;
+  Highlighter lightHighlighter;
+  Highlighter darkHighlighter;
+  String lightThemeConfig;
+  String darkThemeConfig;
   final String grammarJson;
-  final Color wrapperColor;
+  Color wrapperColor;
+
+  /// Updates highlighters and theme configs when application theme changes.
+  void updateTheme({
+    required Highlighter lightHighlighter,
+    required Highlighter darkHighlighter,
+    required String lightThemeConfig,
+    required String darkThemeConfig,
+    required Color wrapperColor,
+  }) {
+    this.lightHighlighter = lightHighlighter;
+    this.darkHighlighter = darkHighlighter;
+    this.lightThemeConfig = lightThemeConfig;
+    this.darkThemeConfig = darkThemeConfig;
+    this.wrapperColor = wrapperColor;
+    _cachedSpan = null;
+    _cachedText = null;
+    _cachedBrightness = null;
+    notifyListeners();
+  }
 
   TextSpan? _cachedSpan;
   String? _cachedText;
