@@ -280,6 +280,14 @@ abstract final class TableMutationEngine {
     Map<String, String>? columnDataTypes,
     Map<String, TableColumnMeta>? columnMeta,
   }) {
+    // Types for WHERE matching: explicit columnDataTypes win, columnMeta fills
+    // the gaps so text columns keep literal 'NULL' strings (#1368).
+    final whereColumnTypes = <String, String>{
+      if (columnMeta != null)
+        for (final e in columnMeta.entries)
+          if (e.value.dataType.isNotEmpty) e.key: e.value.dataType,
+      ...?columnDataTypes,
+    };
     final statements = <TableMutationStatement>[];
     final tableRef = quoteQualifiedTable(
       tableName,
@@ -317,7 +325,7 @@ abstract final class TableMutationEngine {
           primaryKeys: primaryKeys,
           row: origRow,
           dialect: dialect,
-          columnDataTypes: columnDataTypes,
+          columnDataTypes: whereColumnTypes,
         );
 
         final sql = 'UPDATE $tableRef SET ${setClauses.join(', ')} WHERE $whereClause';
@@ -382,7 +390,7 @@ abstract final class TableMutationEngine {
           primaryKeys: primaryKeys,
           row: origRow,
           dialect: dialect,
-          columnDataTypes: columnDataTypes,
+          columnDataTypes: whereColumnTypes,
         );
 
         final sql = 'DELETE FROM $tableRef WHERE $whereClause';
