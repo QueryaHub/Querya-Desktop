@@ -177,7 +177,8 @@ void main() {
     await dragTo(tester.getCenter(inSidebar('E2E Dragged').first), drop);
     // The write is real I/O: give it time before reading.
     for (var i = 0; i < 20; i++) {
-      row = await tester.runAsync(() => LocalDb.instance.getConnectionById(id));
+      row = await tester
+          .runAsync<ConnectionRow?>(() => LocalDb.instance.getConnectionById(id));
       if (row!.folderId == null) break;
       await tester.runAsync(
           () => Future<void>.delayed(const Duration(milliseconds: 50)));
