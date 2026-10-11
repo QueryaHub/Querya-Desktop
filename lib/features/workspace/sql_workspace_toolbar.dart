@@ -127,13 +127,9 @@ class SqlWorkspaceToolbar extends StatelessWidget {
 
   material.Widget _txBadge() {
     final open = txOpen;
-    if (open == null) {
-      return const QueryaBadge.status(
-        'Transaction —',
-        status: QueryaBadgeStatus.neutral,
-      );
-    }
-    if (open) {
+    // An unknown state (before the first run) reads as the commit mode, not
+    // as a dash.
+    if (open == true) {
       return const QueryaBadge.status(
         'Transaction open',
         status: QueryaBadgeStatus.warning,

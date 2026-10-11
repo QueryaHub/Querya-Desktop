@@ -1598,7 +1598,13 @@ class _ErdViewState extends material.State<ErdView>
         material.Container(
           decoration: SqlEditorChrome.sqlToolbarDecoration(context),
           padding: const material.EdgeInsets.all(8),
-          child: QueryaControlScope(
+          child: material.LayoutBuilder(
+            builder: (context, constraints) {
+              // Below ~1100 px the labels of Note, Auto layout and the hidden
+              // tables button give way to icons (the tooltips keep the names)
+              // so the toolbar stays on one row.
+              final compact = constraints.maxWidth < 1100;
+              return QueryaControlScope(
             size: QueryaControlSize.md,
             child: material.Wrap(
             spacing: 8,
@@ -1641,6 +1647,7 @@ class _ErdViewState extends material.State<ErdView>
                 _viewsMenu(),
               QueryaButton.secondary(
                 key: const material.ValueKey('erd_add_note'),
+                compact: compact,
                 label: 'Note',
                 icon: material.Icons.sticky_note_2_outlined,
                 tooltip: 'Add a sticky note to the diagram',
@@ -1649,6 +1656,7 @@ class _ErdViewState extends material.State<ErdView>
               if (_marked.isNotEmpty)
                 QueryaButton.secondary(
                   key: const material.ValueKey('erd_group_marked'),
+                compact: compact,
                   label: 'Group ${_marked.length} '
                       '${_marked.length == 1 ? 'table' : 'tables'}',
                   icon: material.Icons.folder_open_rounded,
@@ -1658,12 +1666,14 @@ class _ErdViewState extends material.State<ErdView>
               if (_hidden.isNotEmpty)
                 QueryaButton.secondary(
                   key: const material.ValueKey('erd_show_all'),
+                compact: compact,
                   label: 'Show ${_hidden.length} hidden',
                   icon: material.Icons.visibility_outlined,
                   onPressed: _showAllTables,
                 ),
               QueryaButton.secondary(
                 key: const material.ValueKey('erd_auto_layout'),
+                compact: compact,
                 label: 'Auto layout',
                 icon: material.Icons.auto_fix_high_rounded,
                 tooltip: 'Arrange the tables again (undoes manual moves)',
@@ -1684,6 +1694,8 @@ class _ErdViewState extends material.State<ErdView>
               ),
             ],
             ),
+              );
+            },
           ),
         ),
         material.Expanded(child: material.ClipRect(child: body)),

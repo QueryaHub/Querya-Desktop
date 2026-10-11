@@ -129,7 +129,7 @@ class PreferencesSwitchRow extends StatelessWidget {
         onTap: isInteractive ? () => onChanged!(!value) : null,
         borderRadius: material.BorderRadius.circular(6),
         child: material.Padding(
-          padding: const material.EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+          padding: const material.EdgeInsets.symmetric(vertical: 6),
           child: material.Row(
             crossAxisAlignment: material.CrossAxisAlignment.center,
             children: [

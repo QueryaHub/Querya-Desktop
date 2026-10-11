@@ -38,6 +38,32 @@ void main() {
       expect(taps, 0);
     });
 
+    testWidgets('a disabled primary is a grey chip, not a faded accent',
+        (tester) async {
+      await tester.pumpWidget(
+        _shell(const QueryaButton.primary(label: 'Save')),
+      );
+      expect(
+        find.descendant(
+          of: find.byType(QueryaButton),
+          matching: find.byType(material.Opacity),
+        ),
+        findsNothing,
+      );
+
+      // Other disabled variants still fade.
+      await tester.pumpWidget(
+        _shell(const QueryaButton.secondary(label: 'Save')),
+      );
+      expect(
+        find.descendant(
+          of: find.byType(QueryaButton),
+          matching: find.byType(material.Opacity),
+        ),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('a loading button does not fire', (tester) async {
       var taps = 0;
       await tester.pumpWidget(

@@ -257,14 +257,14 @@ class PreferencesMcpSectionState
                 key: material.ValueKey('mcp_copy_${kind.name}'),
                 label: 'Copy ${kind.label} config',
                 icon: material.Icons.copy_rounded,
-                size: QueryaControlSize.sm,
+                size: QueryaControlSize.md,
                 onPressed: () => unawaited(_copy(kind)),
               ),
             QueryaButton.secondary(
               key: const material.ValueKey('mcp_regenerate'),
               label: 'Regenerate token',
               icon: material.Icons.key_rounded,
-              size: QueryaControlSize.sm,
+              size: QueryaControlSize.md,
               tooltip: 'Disconnects connected clients; they reconnect on '
                   'their next start.',
               onPressed: _enabled && !_busy ? () => unawaited(_regenerate()) : null,
@@ -286,7 +286,7 @@ class PreferencesMcpSectionState
             QueryaButton.secondary(
               key: const material.ValueKey('mcp_clear_log'),
               label: 'Clear',
-              size: QueryaControlSize.sm,
+              size: QueryaControlSize.md,
               onPressed: _activity.isEmpty ? null : () => unawaited(_clearLog()),
             ),
           ],

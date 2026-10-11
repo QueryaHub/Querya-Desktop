@@ -318,14 +318,21 @@ class _QueryaButtonState extends material.State<QueryaButton> {
       final base = w.variant == QueryaButtonVariant.primary
           ? wb.accent
           : wb.destructive;
-      foreground = w.variant == QueryaButtonVariant.primary
-          ? wb.onAccent
-          : _onColor(base);
-      final tint = _pressed && enabled
-          ? 0.22
-          : (_hovered && enabled ? 0.12 : 0.0);
-      background =
-          material.Color.alphaBlend(foreground.withValues(alpha: tint), base);
+      if (w.onPressed == null) {
+        // A disabled filled button is a quiet grey chip, not a faded accent:
+        // the label of a half-transparent teal button was hard to read.
+        foreground = scheme.mutedForeground;
+        background = scheme.muted;
+      } else {
+        foreground = w.variant == QueryaButtonVariant.primary
+            ? wb.onAccent
+            : _onColor(base);
+        final tint = _pressed && enabled
+            ? 0.22
+            : (_hovered && enabled ? 0.12 : 0.0);
+        background =
+            material.Color.alphaBlend(foreground.withValues(alpha: tint), base);
+      }
     } else {
       final toneColor = w.tone == QueryaButtonTone.destructive
           ? wb.destructive
@@ -467,7 +474,7 @@ class _QueryaButtonState extends material.State<QueryaButton> {
       ),
     );
 
-    if (w.onPressed == null) {
+    if (w.onPressed == null && !filled) {
       button = material.Opacity(opacity: 0.5, child: button);
     }
 
