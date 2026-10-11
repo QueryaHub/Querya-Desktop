@@ -219,6 +219,36 @@ void main() {
       );
       expect(res, equals([0]));
     });
+
+    test('filterRowIndicesAdaptive executes synchronously below threshold', () async {
+      final res = await GridFilterEngine.filterRowIndicesAdaptive(
+        filterText: 'status = ACTIVE',
+        columns: columns,
+        rows: rows,
+        threshold: 10,
+      );
+      expect(res, equals([0, 2]));
+    });
+
+    test('filterRowIndicesAdaptive executes via isolate at or above threshold', () async {
+      final res = await GridFilterEngine.filterRowIndicesAdaptive(
+        filterText: 'status = ACTIVE',
+        columns: columns,
+        rows: rows,
+        threshold: 2,
+      );
+      expect(res, equals([0, 2]));
+    });
+
+    test('filterRowIndicesAdaptive returns all indices immediately on empty filter', () async {
+      final res = await GridFilterEngine.filterRowIndicesAdaptive(
+        filterText: '   ',
+        columns: columns,
+        rows: rows,
+        threshold: 2,
+      );
+      expect(res, equals([0, 1, 2, 3]));
+    });
   });
 
   group('GridSelectionCalcEngine', () {

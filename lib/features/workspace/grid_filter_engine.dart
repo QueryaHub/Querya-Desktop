@@ -1,9 +1,67 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart' as foundation;
+
+/// Default threshold for offloading data grid filtering to a background isolate.
+const int kFilterIsolateThreshold = 3000;
+
+class FilterIsolateParams {
+  const FilterIsolateParams({
+    required this.filterText,
+    required this.columns,
+    required this.rows,
+  });
+
+  final String filterText;
+  final List<String> columns;
+  final List<List<String>> rows;
+}
+
+List<int> _filterRowIndicesIsolate(FilterIsolateParams params) {
+  return GridFilterEngine.filterRowIndices(
+    filterText: params.filterText,
+    columns: params.columns,
+    rows: params.rows,
+  );
+}
+
 /// Client-side filter engine for Data Grid.
 ///
 /// Evaluates complex multi-clause expressions with AND / OR / NOT, parentheses,
 /// column predicates (`col = val`, `col > 10`, `col LIKE '%test%'`, `col IN ('a', 'b')`,
 /// `col IS NULL`, `col BETWEEN x AND y`), and free-text substring search.
 abstract final class GridFilterEngine {
+  static const int defaultIsolateThreshold = kFilterIsolateThreshold;
+
+  /// Adaptively evaluates [filterText] against [rows]:
+  /// synchronously for small datasets (< [threshold]), and offloaded to a
+  /// background isolate via [foundation.compute] for larger datasets to avoid blocking UI frames.
+  static Future<List<int>> filterRowIndicesAdaptive({
+    required String filterText,
+    required List<String> columns,
+    required List<List<String>> rows,
+    int threshold = defaultIsolateThreshold,
+  }) async {
+    final trimmed = filterText.trim();
+    if (trimmed.isEmpty || columns.isEmpty || rows.isEmpty) {
+      return List<int>.generate(rows.length, (i) => i);
+    }
+    if (rows.length < threshold) {
+      return filterRowIndices(
+        filterText: filterText,
+        columns: columns,
+        rows: rows,
+      );
+    }
+    return foundation.compute(
+      _filterRowIndicesIsolate,
+      FilterIsolateParams(
+        filterText: filterText,
+        columns: columns,
+        rows: rows,
+      ),
+    );
+  }
+
   /// Evaluates [filterText] against [rows] with respect to [columns].
   /// Returns the list of matching row indices.
   static List<int> filterRowIndices({

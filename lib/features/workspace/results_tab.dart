@@ -109,6 +109,96 @@ class _ResultsTabState extends material.State<ResultsTab> {
   List<List<String>>? _memoEffectiveRows;
   List<List<String>> _cachedFilteredRows = const [];
   List<int>? _cachedFilteredIndices;
+  int _filterSeq = 0;
+  Timer? _filterDebounceTimer;
+
+  void _onFilterChanged(String text) {
+    if (_filterText == text) return;
+    _filterText = text;
+    final effectiveRows = widget.stagingBuffer != null
+        ? widget.stagingBuffer!.effectiveRows
+        : widget.rows;
+    _applyFilter(effectiveRows, widget.columns);
+  }
+
+  void _onFilterClosed() {
+    _showFilterBar = false;
+    _filterDebounceTimer?.cancel();
+    _filterSeq++;
+    _filterText = '';
+    final effectiveRows = widget.stagingBuffer != null
+        ? widget.stagingBuffer!.effectiveRows
+        : widget.rows;
+    _memoFilterText = '';
+    _memoEffectiveRows = effectiveRows;
+    _memoColumns = widget.columns;
+    _cachedFilteredRows = effectiveRows;
+    _cachedFilteredIndices = null;
+    setState(() {});
+  }
+
+  void _applyFilter(
+    List<List<String>> effectiveRows,
+    List<String> columns, {
+    bool forceSyncIfSmall = true,
+  }) {
+    final seq = ++_filterSeq;
+    _filterDebounceTimer?.cancel();
+
+    if (_filterText.trim().isEmpty) {
+      _memoFilterText = _filterText;
+      _memoEffectiveRows = effectiveRows;
+      _memoColumns = columns;
+      _cachedFilteredRows = effectiveRows;
+      _cachedFilteredIndices = null;
+      if (mounted) setState(() {});
+      return;
+    }
+
+    if (forceSyncIfSmall &&
+        effectiveRows.length < GridFilterEngine.defaultIsolateThreshold) {
+      final filteredIndices = GridFilterEngine.filterRowIndices(
+        filterText: _filterText,
+        columns: columns,
+        rows: effectiveRows,
+      );
+      final isFiltered = filteredIndices.length != effectiveRows.length;
+      final filteredRows = !isFiltered
+          ? effectiveRows
+          : filteredIndices.map((i) => effectiveRows[i]).toList();
+
+      _memoFilterText = _filterText;
+      _memoEffectiveRows = effectiveRows;
+      _memoColumns = columns;
+      _cachedFilteredRows = filteredRows;
+      _cachedFilteredIndices = isFiltered ? filteredIndices : null;
+      if (mounted) setState(() {});
+      return;
+    }
+
+    _filterDebounceTimer = Timer(const Duration(milliseconds: 150), () {
+      unawaited(
+        GridFilterEngine.filterRowIndicesAdaptive(
+          filterText: _filterText,
+          columns: columns,
+          rows: effectiveRows,
+        ).then((filteredIndices) {
+          if (!mounted || seq != _filterSeq) return;
+          final isFiltered = filteredIndices.length != effectiveRows.length;
+          final filteredRows = !isFiltered
+              ? effectiveRows
+              : filteredIndices.map((i) => effectiveRows[i]).toList();
+          setState(() {
+            _memoFilterText = _filterText;
+            _memoEffectiveRows = effectiveRows;
+            _memoColumns = columns;
+            _cachedFilteredRows = filteredRows;
+            _cachedFilteredIndices = isFiltered ? filteredIndices : null;
+          });
+        }),
+      );
+    });
+  }
 
   List<List<String>> _getFilteredRows(
     List<List<String>> effectiveRows,
@@ -120,24 +210,35 @@ class _ResultsTabState extends material.State<ResultsTab> {
       return _cachedFilteredRows;
     }
 
-    final filteredIndices = GridFilterEngine.filterRowIndices(
-      filterText: _filterText,
-      columns: columns,
-      rows: effectiveRows,
-    );
+    if (_filterText.trim().isEmpty) {
+      _memoFilterText = _filterText;
+      _memoEffectiveRows = effectiveRows;
+      _memoColumns = columns;
+      _cachedFilteredRows = effectiveRows;
+      _cachedFilteredIndices = null;
+      return effectiveRows;
+    }
 
-    final isFiltered = filteredIndices.length != effectiveRows.length;
-    final filteredRows = !isFiltered
-        ? effectiveRows
-        : filteredIndices.map((i) => effectiveRows[i]).toList();
+    if (effectiveRows.length < GridFilterEngine.defaultIsolateThreshold) {
+      final filteredIndices = GridFilterEngine.filterRowIndices(
+        filterText: _filterText,
+        columns: columns,
+        rows: effectiveRows,
+      );
+      final isFiltered = filteredIndices.length != effectiveRows.length;
+      final filteredRows = !isFiltered
+          ? effectiveRows
+          : filteredIndices.map((i) => effectiveRows[i]).toList();
+      _memoFilterText = _filterText;
+      _memoEffectiveRows = effectiveRows;
+      _memoColumns = columns;
+      _cachedFilteredRows = filteredRows;
+      _cachedFilteredIndices = isFiltered ? filteredIndices : null;
+      return filteredRows;
+    }
 
-    _memoFilterText = _filterText;
-    _memoEffectiveRows = effectiveRows;
-    _memoColumns = columns;
-    _cachedFilteredRows = filteredRows;
-    _cachedFilteredIndices = isFiltered ? filteredIndices : null;
-
-    return filteredRows;
+    _applyFilter(effectiveRows, columns, forceSyncIfSmall: false);
+    return _cachedFilteredRows.isNotEmpty ? _cachedFilteredRows : effectiveRows;
   }
 
   @override
@@ -150,6 +251,22 @@ class _ResultsTabState extends material.State<ResultsTab> {
   void didUpdateWidget(covariant ResultsTab oldWidget) {
     super.didUpdateWidget(oldWidget);
     _syncGridBridge();
+    if (!identical(oldWidget.rows, widget.rows) ||
+        !identical(oldWidget.columns, widget.columns) ||
+        oldWidget.stagingBuffer != widget.stagingBuffer) {
+      final effectiveRows = widget.stagingBuffer != null
+          ? widget.stagingBuffer!.effectiveRows
+          : widget.rows;
+      if (_filterText.isNotEmpty) {
+        _applyFilter(effectiveRows, widget.columns);
+      } else {
+        _memoFilterText = '';
+        _memoEffectiveRows = effectiveRows;
+        _memoColumns = widget.columns;
+        _cachedFilteredRows = effectiveRows;
+        _cachedFilteredIndices = null;
+      }
+    }
   }
 
   void _syncGridBridge() {
@@ -247,6 +364,8 @@ class _ResultsTabState extends material.State<ResultsTab> {
 
   @override
   void dispose() {
+    _filterDebounceTimer?.cancel();
+    _filterSeq++;
     _statsDebounce?.cancel();
     _statsSeq++;
     _selectedRowIndex.dispose();
@@ -542,14 +661,11 @@ class _ResultsTabState extends material.State<ResultsTab> {
           expanded: _showFilterBar || _filterText.isNotEmpty,
           child: DataGridFilterBar(
             filterText: _filterText,
-            onFilterChanged: (text) => setState(() => _filterText = text),
+            onFilterChanged: _onFilterChanged,
             totalRowCount: effectiveRows.length,
             filteredRowCount: filteredRows.length,
             columns: widget.columns,
-            onClose: () => setState(() {
-              _showFilterBar = false;
-              _filterText = '';
-            }),
+            onClose: _onFilterClosed,
           ),
         ),
 
