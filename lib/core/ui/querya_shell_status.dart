@@ -85,6 +85,25 @@ class QueryaShellStatus extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Replaces the shown message and query metrics, for example with those of
+  /// the tab that has just been selected, or with a notice such as `Nothing to
+  /// run`. Nulls clear the field. While a query is running the busy message
+  /// owns the bar and this does nothing.
+  void setQueryMetrics({
+    String? message,
+    int? rowCount,
+    int? columnCount,
+    Duration? duration,
+  }) {
+    if (_isBusy) return;
+    _statusMessage = message;
+    _messageIsBusy = false;
+    _rowCount = rowCount;
+    _columnCount = columnCount;
+    _lastQueryDuration = duration;
+    notifyListeners();
+  }
+
   /// Clears busy + metrics (e.g. connection switch).
   void clear() {
     _isBusy = false;

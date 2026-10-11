@@ -55,4 +55,38 @@ void main() {
 
     expect(status.statusMessage, '1 row(s).');
   });
+
+  test('setQueryMetrics replaces the numbers of the last run (#1479)', () {
+    status.reportQueryResult(
+      duration: const Duration(milliseconds: 48),
+      rowCount: 8,
+      columnCount: 6,
+      message: 'OK',
+    );
+
+    status.setQueryMetrics();
+
+    expect(status.statusMessage, isNull);
+    expect(status.rowCount, isNull);
+    expect(status.columnCount, isNull);
+    expect(status.lastQueryDuration, isNull);
+  });
+
+  test('setQueryMetrics shows a notice and drops the old counts (#1478)', () {
+    status.reportQueryResult(rowCount: 1, columnCount: 1, message: '1 row(s).');
+
+    status.setQueryMetrics(message: 'Nothing to run');
+
+    expect(status.statusMessage, 'Nothing to run');
+    expect(status.rowCount, isNull);
+  });
+
+  test('setQueryMetrics leaves a running query\'s busy message alone', () {
+    status.beginBusy(message: 'Running query…');
+
+    status.setQueryMetrics(message: 'Nothing to run');
+
+    expect(status.isBusy, isTrue);
+    expect(status.statusMessage, 'Running query…');
+  });
 }

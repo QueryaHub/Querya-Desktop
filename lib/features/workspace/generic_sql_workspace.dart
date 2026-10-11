@@ -533,6 +533,31 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
     });
   }
 
+  /// The status bar already shows the row and column counts on its right and
+  /// the result bar the row count: a plain `N row(s).` is not repeated there.
+  static String? _shellMessage(String? statusLine) =>
+      statusLine != null && RegExp(r'^\d+ row\(s\)\.$').hasMatch(statusLine)
+          ? null
+          : statusLine;
+
+  /// The tab whose numbers the status bar shows.
+  SqlQueryTabSession? _statusSession;
+
+  /// Shows the active tab's own numbers in the status bar (a tab that has not
+  /// run shows none).
+  void _publishActiveStatus() {
+    if (!mounted) return;
+    final session = _activeSession;
+    if (session.running) return;
+    final hasResult = session.columns.isNotEmpty || session.rows.isNotEmpty;
+    QueryaShellStatus.instance.setQueryMetrics(
+      message: _shellMessage(session.statusLine),
+      rowCount: hasResult ? session.rows.length : null,
+      columnCount: hasResult ? session.columns.length : null,
+      duration: session.elapsed,
+    );
+  }
+
   /// Runs the statement at the caret ([statementAtCursor]: the selection, or
   /// the one statement under the caret), or else the script: the selection, or
   /// the whole text. A script runs one statement at a time and stops at the
@@ -554,7 +579,11 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       selected: selected,
       caret: selection.isValid ? selection.baseOffset : scope.length,
     );
-    if (spans.isEmpty) return;
+    if (spans.isEmpty) {
+      // Say so: a silent Run on an empty editor reads as a broken button.
+      QueryaShellStatus.instance.setQueryMetrics(message: 'Nothing to run');
+      return;
+    }
     if (!mounted) return;
     final scopeStart = selected ? selection.start : 0;
     final texts = [for (final s in spans) s.textIn(scope)];
@@ -731,7 +760,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
         duration: duration,
         rowCount: outRows.length,
         columnCount: cols.length,
-        message: session.statusLine,
+        message: _shellMessage(session.statusLine),
       );
 
       // One history entry per run, with the text that ran.
@@ -836,7 +865,10 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
             ? selection.textInside(session.controller.text)
             : session.controller.text)
         .trim();
-    if (sql.isEmpty) return;
+    if (sql.isEmpty) {
+      QueryaShellStatus.instance.setQueryMetrics(message: 'Nothing to explain');
+      return;
+    }
 
     invalidatePane(session);
     setState(() {
@@ -1072,6 +1104,11 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
 
   @override
   material.Widget build(material.BuildContext context) {
+    if (!identical(_statusSession, _activeSession)) {
+      _statusSession = _activeSession;
+      material.WidgetsBinding.instance
+          .addPostFrameCallback((_) => _publishActiveStatus());
+    }
     return Actions(
       actions: <Type, Action<Intent>>{
         NewSqlIntent: CallbackAction<NewSqlIntent>(
