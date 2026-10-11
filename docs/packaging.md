@@ -87,7 +87,7 @@ custom TLS stores) may need extra permissions, e.g.:
 flatpak override --user com.queryahub.querya_desktop --filesystem=/var/run/postgresql:ro
 ```
 
-Flathub submission can reuse [`packaging/linux/flatpak/com.queryahub.querya_desktop.yml`](../packaging/linux/flatpak/com.queryahub.querya_desktop.yml).
+Flathub submission uses [`packaging/linux/flatpak/com.queryahub.querya_desktop.flathub.yml`](../packaging/linux/flatpak/com.queryahub.querya_desktop.flathub.yml) (downloads release zip with checksum), while local build script uses [`packaging/linux/flatpak/com.queryahub.querya_desktop.yml`](../packaging/linux/flatpak/com.queryahub.querya_desktop.yml).
 
 ## APT and DNF repository (`repo.querya.app`)
 
