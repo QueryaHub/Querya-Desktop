@@ -3,7 +3,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' as foundation;
 import 'package:flutter/gestures.dart'
-    show kDoubleTapTimeout, kPrimaryMouseButton, kSecondaryMouseButton;
+    show
+        kDoubleTapTimeout,
+        kPrimaryMouseButton,
+        kSecondaryMouseButton,
+        PointerHoverEvent;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart'
     show Clipboard, ClipboardData, HardwareKeyboard, LogicalKeyboardKey;
@@ -106,22 +110,16 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   List<String>? _piiKindsSource;
   List<PiiKind?>? _piiKinds;
 
-  // Row callbacks live in extension methods, whose tear-offs are not equal
+  // Edit callbacks live in extension methods, whose tear-offs are not equal
   // across evaluations. They are captured once so [_DataRow.sameAs] can keep
   // reusing unchanged rows.
-  late final _cellSecondaryTapCb = _onCellSecondaryTap;
   late final _commitEditCb = _commitEdit;
   late final _cancelEditCb = _cancelEdit;
   late final _openInspectorCb = _openInspector;
-  late final _copyCellCb = _handleCopyCell;
-  late final _filterByValueCb = _handleFilterByValue;
-  late final _filterComparisonCb = _handleFilterComparison;
-  late final _setNullCb = _handleSetNull;
-  late final _setEmptyCb = _handleSetEmpty;
-  late final _revertCellCb = _handleRevertCell;
-  late final _duplicateRowCb = _handleDuplicateRow;
-  late final _toggleDeleteRowCb = _handleToggleDeleteRow;
-  late final _revertRowCb = _handleRevertRow;
+
+  Timer? _cellTooltipTimer;
+  ResultGridCellCoordinate? _cellTooltipCoord;
+  material.OverlayEntry? _cellTooltipOverlayEntry;
 
   @material.visibleForTesting
   int get rowWidgetsCacheCount => _rowWidgets.length;
@@ -165,6 +163,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   void initState() {
     super.initState();
     _horizontalController.addListener(_onHorizontalScroll);
+    _verticalController.addListener(_onVerticalScroll);
     PiiMaskingController.instance.addListener(_onPiiMaskingChanged);
     widget.stagingBuffer?.addListener(_onStagingBufferChanged);
     _lastKnownStagedRowCount = _baseRows.length;
@@ -260,8 +259,135 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     }
   }
 
+  void _onVerticalScroll() {
+    _hideCellTooltip();
+  }
+
+  void _onGridPointerHover(
+    PointerHoverEvent event, {
+    required double rowHeight,
+  }) {
+    if (_sortedRows.isEmpty || widget.columns.isEmpty) {
+      _hideCellTooltip();
+      return;
+    }
+
+    final cell = _cellAtOffset(
+      localPosition: event.localPosition,
+      rowHeight: rowHeight,
+    );
+    if (cell == null) {
+      _hideCellTooltip();
+      return;
+    }
+
+    if (cell == _cellTooltipCoord) {
+      return;
+    }
+
+    _hideCellTooltip();
+    _cellTooltipCoord = cell;
+
+    final rowData =
+        cell.row < _sortedRows.length ? _sortedRows[cell.row] : null;
+    final text = (rowData != null && cell.column < rowData.length)
+        ? _maskCellText(_piiKinds, cell.column, rowData[cell.column])
+        : '';
+    final colName =
+        cell.column < widget.columns.length ? widget.columns[cell.column] : '';
+    final dataTypeName = widget.columnDataTypes?[colName];
+
+    final tooltipMsg = ResultGridMetrics.cellTooltipMessage(
+      text: text,
+      dataTypeName: dataTypeName,
+      columnName: colName,
+    );
+    if (tooltipMsg == null) return;
+
+    _cellTooltipTimer = Timer(kQueryaTooltipWait, () {
+      if (!mounted || _cellTooltipCoord != cell) return;
+      _showCellTooltip(event.position, tooltipMsg);
+    });
+  }
+
+  void _onGridPointerExit() {
+    _hideCellTooltip();
+  }
+
+  void _showCellTooltip(Offset globalPosition, String message) {
+    _hideCellTooltip(preserveCoord: true);
+    final overlay = material.Overlay.maybeOf(context);
+    if (overlay == null || !mounted) return;
+
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final media = material.MediaQuery.maybeOf(context);
+    final screenW = media?.size.width ?? 1920.0;
+    final screenH = media?.size.height ?? 1080.0;
+
+    final left = (globalPosition.dx + 10.0).clamp(8.0, screenW - 320.0);
+    final top = (globalPosition.dy + 18.0).clamp(8.0, screenH - 120.0);
+
+    _cellTooltipOverlayEntry = material.OverlayEntry(
+      builder: (context) {
+        return material.Positioned(
+          left: left,
+          top: top,
+          child: material.IgnorePointer(
+            child: material.Material(
+              color: material.Colors.transparent,
+              child: material.Container(
+                padding: const material.EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 5,
+                ),
+                decoration: material.BoxDecoration(
+                  color: cs.popover,
+                  borderRadius: BorderRadius.circular(theme.radiusSm),
+                  border: material.Border.all(
+                    color: cs.border,
+                    width: 0.8,
+                  ),
+                  boxShadow: const [
+                    material.BoxShadow(
+                      color: material.Color(0x33000000),
+                      blurRadius: 6,
+                      offset: material.Offset(0, 2),
+                    ),
+                  ],
+                ),
+                constraints: const material.BoxConstraints(maxWidth: 360),
+                child: material.Text(
+                  message,
+                  style: material.TextStyle(
+                    fontSize: 11,
+                    fontFamily: 'monospace',
+                    color: cs.popoverForeground,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    overlay.insert(_cellTooltipOverlayEntry!);
+  }
+
+  void _hideCellTooltip({bool preserveCoord = false}) {
+    _cellTooltipTimer?.cancel();
+    _cellTooltipTimer = null;
+    if (!preserveCoord) {
+      _cellTooltipCoord = null;
+    }
+    _cellTooltipOverlayEntry?.remove();
+    _cellTooltipOverlayEntry?.dispose();
+    _cellTooltipOverlayEntry = null;
+  }
+
   @override
   void dispose() {
+    _hideCellTooltip();
     _selectionValuesDebounce?.cancel();
     PiiMaskingController.instance.removeListener(_onPiiMaskingChanged);
     _stopAutoScroll();
@@ -269,6 +395,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     widget.stagingBuffer?.removeListener(_onStagingBufferChanged);
     _horizontalController.removeListener(_onHorizontalScroll);
     _horizontalController.dispose();
+    _verticalController.removeListener(_onVerticalScroll);
     _verticalController.dispose();
     _focusNode.dispose();
     _sortedRows = const [];

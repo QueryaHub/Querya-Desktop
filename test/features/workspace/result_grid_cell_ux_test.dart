@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/features/workspace/grid_cell_editor.dart';
 import 'package:querya_desktop/features/workspace/result_grid_view.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import '../../support/querya_theme_test_shell.dart';
 
@@ -214,6 +215,83 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(GridCellEditor), findsNothing);
+    });
+  });
+
+  group('VirtualResultGrid hoisted context menu and tooltips (#1346)', () {
+    testWidgets('_GridCell does not mount per-cell ContextMenu or Tooltip widgets',
+        (tester) async {
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: const material.SizedBox(
+            width: 800,
+            height: 400,
+            child: VirtualResultGrid(
+              columns: ['id', 'bio'],
+              rows: [
+                ['1', 'Very long bio text that exceeds standard display bounds'],
+                ['2', 'Another long bio description value for testing'],
+              ],
+              columnDataTypes: {'id': 'integer', 'bio': 'text'},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Ensure no per-cell ContextMenu or Tooltip widgets exist inside row cells.
+      expect(
+        find.descendant(
+          of: find.byKey(const material.ValueKey('result-row-0')),
+          matching: find.byType(material.Tooltip),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const material.ValueKey('result-row-0')),
+          matching: find.byType(ContextMenu),
+        ),
+        findsNothing,
+      );
+    });
+
+    testWidgets('hovering over cell shows tooltip overlay and mouse exit hides it',
+        (tester) async {
+      const longBio = 'Very long bio text that exceeds standard display bounds';
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: const material.SizedBox(
+            width: 800,
+            height: 400,
+            child: VirtualResultGrid(
+              columns: ['id', 'bio'],
+              rows: [
+                ['1', longBio],
+              ],
+              columnDataTypes: {'id': 'integer', 'bio': 'text'},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(gesture.removePointer);
+
+      // Move mouse to cell with long text and schema metadata
+      await gesture.moveTo(tester.getCenter(find.text(longBio)));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      // Tooltip is shown in overlay
+      expect(find.text('bio · text\n$longBio'), findsOneWidget);
+
+      // Moving mouse away hides the tooltip
+      await gesture.moveTo(const material.Offset(10, 10));
+      await tester.pump();
+
+      expect(find.text('bio · text\n$longBio'), findsNothing);
     });
   });
 }

@@ -331,8 +331,12 @@ class _QueryaButtonState extends material.State<QueryaButton> {
           ? wb.destructive
           : scheme.foreground;
       if (w.isActive) {
-        foreground = wb.accent;
-        background = wb.accent.withValues(alpha: _pressed ? 0.22 : 0.14);
+        // A toggled button is tinted with its tone: the accent, or the
+        // destructive colour for a destructive one.
+        final activeColor =
+            w.tone == QueryaButtonTone.destructive ? wb.destructive : wb.accent;
+        foreground = activeColor;
+        background = activeColor.withValues(alpha: _pressed ? 0.22 : 0.14);
       } else {
         foreground = toneColor;
         final tint = _pressed && enabled

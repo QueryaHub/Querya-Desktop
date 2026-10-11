@@ -16,20 +16,9 @@ class _DataRow extends material.StatefulWidget {
     this.stagingBuffer,
     this.stagedSignature = 0,
     this.editingCell,
-    this.canFilter = false,
-    this.onCellSecondaryTap,
     this.onCommitEdit,
     this.onCancelEdit,
     this.onOpenInspector,
-    this.onCopyCell,
-    this.onFilterByValue,
-    this.onFilterComparison,
-    this.onSetNull,
-    this.onSetEmpty,
-    this.onRevertCell,
-    this.onDuplicateRow,
-    this.onToggleDeleteRow,
-    this.onRevertRow,
     this.columnDataTypes,
     this.piiKinds,
   });
@@ -50,8 +39,6 @@ class _DataRow extends material.StatefulWidget {
   /// see staged-state changes the (shared, mutable) buffer reference hides.
   final int stagedSignature;
   final ResultGridCellCoordinate? editingCell;
-  final bool canFilter;
-  final void Function(int row, int col)? onCellSecondaryTap;
   final void Function(
     int row,
     int col,
@@ -63,22 +50,6 @@ class _DataRow extends material.StatefulWidget {
   })? onCommitEdit;
   final material.VoidCallback? onCancelEdit;
   final void Function(int row, int col)? onOpenInspector;
-  final void Function(
-    int row,
-    int col, {
-    bool withHeaders,
-    bool asJson,
-    bool asCsv,
-  })? onCopyCell;
-  final void Function(int row, int col, {required bool invert})?
-      onFilterByValue;
-  final void Function(int row, int col, String operator)? onFilterComparison;
-  final void Function(int row, int col)? onSetNull;
-  final void Function(int row, int col)? onSetEmpty;
-  final void Function(int row, int col)? onRevertCell;
-  final void Function(int row)? onDuplicateRow;
-  final void Function(int row)? onToggleDeleteRow;
-  final void Function(int row)? onRevertRow;
   final Map<String, String>? columnDataTypes;
 
   /// Per-column PII kind while "Mask sensitive data" is on (null when off).
@@ -104,20 +75,9 @@ class _DataRow extends material.StatefulWidget {
           identical(stagingBuffer, other.stagingBuffer) &&
           stagedSignature == other.stagedSignature &&
           editingCell == other.editingCell &&
-          canFilter == other.canFilter &&
-          onCellSecondaryTap == other.onCellSecondaryTap &&
           onCommitEdit == other.onCommitEdit &&
           onCancelEdit == other.onCancelEdit &&
           onOpenInspector == other.onOpenInspector &&
-          onCopyCell == other.onCopyCell &&
-          onFilterByValue == other.onFilterByValue &&
-          onFilterComparison == other.onFilterComparison &&
-          onSetNull == other.onSetNull &&
-          onSetEmpty == other.onSetEmpty &&
-          onRevertCell == other.onRevertCell &&
-          onDuplicateRow == other.onDuplicateRow &&
-          onToggleDeleteRow == other.onToggleDeleteRow &&
-          onRevertRow == other.onRevertRow &&
           identical(columnDataTypes, other.columnDataTypes) &&
           identical(piiKinds, other.piiKinds);
 
@@ -195,23 +155,11 @@ class _DataRow extends material.StatefulWidget {
                     isSelectionRight: selection != null &&
                         selection!.contains(rowIndex, c) &&
                         c == selection!.endColumn,
-                    canFilter: canFilter,
-                    hasStagingBuffer: stagingBuffer != null,
                     dataTypeName:
                         columnDataTypes?[c < columns.length ? columns[c] : ''],
-                    onSecondaryTap: onCellSecondaryTap,
                     onCommitEdit: onCommitEdit,
                     onCancelEdit: onCancelEdit,
                     onOpenInspector: onOpenInspector,
-                    onCopyCell: onCopyCell,
-                    onFilterByValue: onFilterByValue,
-                    onFilterComparison: onFilterComparison,
-                    onSetNull: onSetNull,
-                    onSetEmpty: onSetEmpty,
-                    onRevertCell: onRevertCell,
-                    onDuplicateRow: onDuplicateRow,
-                    onToggleDeleteRow: onToggleDeleteRow,
-                    onRevertRow: onRevertRow,
                   ),
                 ),
               if (window.trailingWidth > 0)

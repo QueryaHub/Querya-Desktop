@@ -631,13 +631,21 @@ class _ContextMenuState extends State<ContextMenu> {
       onSecondaryTapDown: !widget.enabled
           ? null
           : (details) {
-              _showContextMenu(context, details.globalPosition,
-                  _resolveChildren(context), widget.direction);
+              showContextMenuListenable(
+                context: context,
+                position: details.globalPosition,
+                children: _resolveChildren(context),
+                direction: widget.direction,
+              );
             },
       onLongPressStart: enableLongPress && widget.enabled
           ? (details) {
-              _showContextMenu(context, details.globalPosition,
-                  _resolveChildren(context), widget.direction);
+              showContextMenuListenable(
+                context: context,
+                position: details.globalPosition,
+                children: _resolveChildren(context),
+                direction: widget.direction,
+              );
             }
           : null,
       child: widget.child,
@@ -645,12 +653,43 @@ class _ContextMenuState extends State<ContextMenu> {
   }
 }
 
-Future<void> _showContextMenu(
-  BuildContext context,
-  Offset position,
-  ValueListenable<List<MenuItem>> children,
-  Axis direction,
-) async {
+/// Shows a context menu at [position] with the given [items].
+Future<void> showContextMenu({
+  required BuildContext context,
+  required Offset position,
+  required List<MenuItem> items,
+  Axis direction = Axis.vertical,
+}) {
+  return showContextMenuListenable(
+    context: context,
+    position: position,
+    children: ValueNotifier(items),
+    direction: direction,
+  );
+}
+
+/// Shows a context menu at [position] with lazily evaluated [itemsBuilder].
+Future<void> showContextMenuBuilder({
+  required BuildContext context,
+  required Offset position,
+  required List<MenuItem> Function(BuildContext context) itemsBuilder,
+  Axis direction = Axis.vertical,
+}) {
+  return showContextMenuListenable(
+    context: context,
+    position: position,
+    children: ValueNotifier(itemsBuilder(context)),
+    direction: direction,
+  );
+}
+
+/// Shows a context menu at [position] with [children] listenable.
+Future<void> showContextMenuListenable({
+  required BuildContext context,
+  required Offset position,
+  required ValueListenable<List<MenuItem>> children,
+  Axis direction = Axis.vertical,
+}) async {
   final key = GlobalKey<OverlayHandlerStateMixin>();
   final theme = Theme.of(context);
   final overlayManager = OverlayManager.of(context);

@@ -375,6 +375,9 @@ extension _GridViewBuilder on _VirtualResultGridState {
                               cursor: widget.stagingBuffer != null
                                   ? material.SystemMouseCursors.text
                                   : material.SystemMouseCursors.basic,
+                              onHover: (e) =>
+                                  _onGridPointerHover(e, rowHeight: rowHeight),
+                              onExit: (_) => _onGridPointerExit(),
                               child: material.Listener(
                                 behavior: material.HitTestBehavior.translucent,
                                 onPointerDown: (e) =>
@@ -411,21 +414,9 @@ extension _GridViewBuilder on _VirtualResultGridState {
                                       editingCell: _editingCell?.row == rowIndex
                                           ? _editingCell
                                           : null,
-                                      canFilter:
-                                          widget.onFilterRequested != null,
-                                      onCellSecondaryTap: _cellSecondaryTapCb,
                                       onCommitEdit: _commitEditCb,
                                       onCancelEdit: _cancelEditCb,
                                       onOpenInspector: _openInspectorCb,
-                                      onCopyCell: _copyCellCb,
-                                      onFilterByValue: _filterByValueCb,
-                                      onFilterComparison: _filterComparisonCb,
-                                      onSetNull: _setNullCb,
-                                      onSetEmpty: _setEmptyCb,
-                                      onRevertCell: _revertCellCb,
-                                      onDuplicateRow: _duplicateRowCb,
-                                      onToggleDeleteRow: _toggleDeleteRowCb,
-                                      onRevertRow: _revertRowCb,
                                       columnDataTypes: widget.columnDataTypes,
                                       piiKinds: piiKinds,
                                     );
