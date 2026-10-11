@@ -30,19 +30,16 @@ void main() {
     testWidgets('respects sm size (28px)', (tester) async {
       await tester.pumpWidget(
         queryaThemeTestShell(
-          child: const QueryaIconButton(
-            icon: material.Icon(material.Icons.refresh),
-            size: QueryaControlSize.sm,
+          child: const material.Center(
+            child: QueryaIconButton(
+              icon: material.Icon(material.Icons.refresh),
+              size: QueryaControlSize.sm,
+            ),
           ),
         ),
       );
 
-      final box = tester.widget<material.SizedBox>(
-        find.ancestor(
-          of: find.byIcon(material.Icons.refresh),
-          matching: find.byType(material.SizedBox),
-        ),
-      );
+      final box = tester.getSize(find.byType(QueryaIconButton));
 
       expect(box.width, 28);
       expect(box.height, 28);
@@ -51,61 +48,42 @@ void main() {
     testWidgets('respects md size (32px)', (tester) async {
       await tester.pumpWidget(
         queryaThemeTestShell(
-          child: const QueryaIconButton(
-            icon: material.Icon(material.Icons.refresh),
-            size: QueryaControlSize.md,
+          child: const material.Center(
+            child: QueryaIconButton(
+              icon: material.Icon(material.Icons.refresh),
+              size: QueryaControlSize.md,
+            ),
           ),
         ),
       );
 
-      final box = tester.widget<material.SizedBox>(
-        find.ancestor(
-          of: find.byIcon(material.Icons.refresh),
-          matching: find.byType(material.SizedBox),
-        ),
-      );
+      final box = tester.getSize(find.byType(QueryaIconButton));
 
       expect(box.width, 32);
       expect(box.height, 32);
     });
 
-    testWidgets('draws a 2px focus ring while it has keyboard focus (#1370)',
+    testWidgets('is a QueryaButton: ghost, icon only, tone from isDestructive',
         (tester) async {
       await tester.pumpWidget(
         queryaThemeTestShell(
           child: QueryaIconButton(
-            icon: const material.Icon(material.Icons.refresh),
+            icon: const material.Icon(material.Icons.delete_outline),
+            tooltip: 'Delete',
+            isDestructive: true,
+            isActive: true,
             onPressed: () {},
           ),
         ),
       );
 
-      final materialFinder = find
-          .descendant(
-            of: find.byType(QueryaIconButton),
-            matching: find.byType(material.Material),
-          )
-          .first;
-      final inkFinder = find.descendant(
-        of: find.byType(QueryaIconButton),
-        matching: find.byType(material.InkWell),
-      );
-      double ringWidth() {
-        final shape =
-            tester.widget<material.Material>(materialFinder).shape!
-                as material.RoundedRectangleBorder;
-        return shape.side.width;
-      }
-
-      expect(ringWidth(), 0);
-
-      tester.widget<material.InkWell>(inkFinder).onFocusChange!(true);
-      await tester.pump();
-      expect(ringWidth(), 2);
-
-      tester.widget<material.InkWell>(inkFinder).onFocusChange!(false);
-      await tester.pump();
-      expect(ringWidth(), 0);
+      final button = tester.widget<QueryaButton>(find.byType(QueryaButton));
+      expect(button.variant, QueryaButtonVariant.ghost);
+      expect(button.label, isNull);
+      expect(button.icon, material.Icons.delete_outline);
+      expect(button.tone, QueryaButtonTone.destructive);
+      expect(button.isActive, isTrue);
+      expect(button.tooltip, 'Delete');
     });
 
     testWidgets('exposes button, enabled and selected state (#1370)',

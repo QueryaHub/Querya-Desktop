@@ -93,4 +93,174 @@ extension _GridCellActions on _VirtualResultGridState {
     widget.stagingBuffer!.revertRow(_toModelRowIndex(row));
   }
 
+  void _openCellContextMenu(int row, int col, material.Offset globalPosition) {
+    showContextMenuBuilder(
+      context: context,
+      position: globalPosition,
+      itemsBuilder: (ctx) => _buildCellContextMenuItems(ctx, row, col),
+    );
+  }
+
+  List<MenuItem> _buildCellContextMenuItems(
+    material.BuildContext context,
+    int row,
+    int column,
+  ) {
+    gridCellContextMenuItemsBuiltCount++;
+    final rowData = row < _sortedRows.length ? _sortedRows[row] : null;
+    final text = (rowData != null && column < rowData.length)
+        ? rowData[column]
+        : '';
+    final columnName =
+        column < widget.columns.length ? widget.columns[column] : '';
+    final preview = text.length > 24 ? '${text.substring(0, 22)}…' : text;
+    final isNull = text == 'NULL';
+    final numVal = num.tryParse(text);
+    final canFilter = widget.onFilterRequested != null;
+    final hasStagingBuffer = widget.stagingBuffer != null;
+    final modelRow = _toModelRowIndex(row);
+    final rowStatus = widget.stagingBuffer?.getRowStatus(modelRow) ??
+        StagedRowStatus.unchanged;
+    final cellStatus = widget.stagingBuffer?.getCellStatus(modelRow, column) ??
+        StagedCellStatus.clean;
+    final cs = Theme.of(context).colorScheme;
+
+    return [
+      MenuButton(
+        leading:
+            const material.Icon(material.Icons.content_copy_rounded, size: 16),
+        trailing: const material.Text('Ctrl+C',
+            style: material.TextStyle(fontSize: 11)),
+        onPressed: (_) => _handleCopyCell(row, column),
+        child: const material.Text('Copy Value'),
+      ),
+      MenuButton(
+        leading:
+            const material.Icon(material.Icons.table_chart_outlined, size: 16),
+        trailing: const material.Text('Ctrl+Shift+C',
+            style: material.TextStyle(fontSize: 11)),
+        onPressed: (_) => _handleCopyCell(row, column, withHeaders: true),
+        child: const material.Text('Copy with Headers'),
+      ),
+      MenuButton(
+        leading:
+            const material.Icon(material.Icons.data_object_rounded, size: 16),
+        onPressed: (_) => _handleCopyCell(row, column, asJson: true),
+        child: const material.Text('Copy as JSON'),
+      ),
+      MenuButton(
+        leading: const material.Icon(material.Icons.grid_on_rounded, size: 16),
+        onPressed: (_) => _handleCopyCell(row, column, asCsv: true),
+        child: const material.Text('Copy as CSV'),
+      ),
+      if (canFilter && columnName.isNotEmpty) ...[
+        const MenuDivider(),
+        MenuButton(
+          leading:
+              const material.Icon(material.Icons.filter_alt_outlined, size: 16),
+          onPressed: (_) => _handleFilterByValue(row, column, invert: false),
+          child: material.Text(
+            isNull
+                ? 'Filter by NULL ($columnName IS NULL)'
+                : 'Filter by Value ($columnName = $preview)',
+          ),
+        ),
+        MenuButton(
+          leading: const material.Icon(material.Icons.filter_alt_off_outlined,
+              size: 16),
+          onPressed: (_) => _handleFilterByValue(row, column, invert: true),
+          child: material.Text(
+            isNull
+                ? 'Filter Out NULL ($columnName IS NOT NULL)'
+                : 'Filter Out ($columnName != $preview)',
+          ),
+        ),
+        if (numVal != null) ...[
+          MenuButton(
+            leading: const material.Icon(material.Icons.chevron_right_rounded,
+                size: 16),
+            onPressed: (_) => _handleFilterComparison(row, column, '>'),
+            child: material.Text('Filter > $text ($columnName > $text)'),
+          ),
+          MenuButton(
+            leading: const material.Icon(material.Icons.chevron_left_rounded,
+                size: 16),
+            onPressed: (_) => _handleFilterComparison(row, column, '<'),
+            child: material.Text('Filter < $text ($columnName < $text)'),
+          ),
+        ],
+      ],
+      const MenuDivider(),
+      MenuButton(
+        leading:
+            const material.Icon(material.Icons.visibility_outlined, size: 16),
+        trailing: const material.Text('Ctrl+I',
+            style: material.TextStyle(fontSize: 11)),
+        onPressed: (_) => _openInspector(row, column),
+        child: const material.Text('Inspect Cell Value…'),
+      ),
+      if (hasStagingBuffer) ...[
+        MenuButton(
+          leading: const material.Icon(
+              material.Icons.remove_circle_outline_rounded,
+              size: 16),
+          trailing: const material.Text('Alt+N',
+              style: material.TextStyle(fontSize: 11)),
+          onPressed: (_) => _handleSetNull(row, column),
+          child: const material.Text('Set NULL'),
+        ),
+        MenuButton(
+          leading: const material.Icon(material.Icons.format_clear_rounded,
+              size: 16),
+          onPressed: (_) => _handleSetEmpty(row, column),
+          child: const material.Text('Set to Empty String'),
+        ),
+        if (cellStatus == StagedCellStatus.modified)
+          MenuButton(
+            leading: const material.Icon(material.Icons.undo_rounded, size: 16),
+            onPressed: (_) => _handleRevertCell(row, column),
+            child: const material.Text('Revert Cell Changes'),
+          ),
+        const MenuDivider(),
+        MenuButton(
+          leading: const material.Icon(material.Icons.content_paste_go_rounded,
+              size: 16),
+          trailing: const material.Text('Ctrl+D',
+              style: material.TextStyle(fontSize: 11)),
+          onPressed: (_) => _handleDuplicateRow(row),
+          child: const material.Text('Duplicate Row'),
+        ),
+        MenuButton(
+          leading: material.Icon(
+            rowStatus == StagedRowStatus.deleted
+                ? material.Icons.restore_from_trash_rounded
+                : material.Icons.delete_outline_rounded,
+            size: 16,
+            color: rowStatus == StagedRowStatus.deleted
+                ? null
+                : cs.destructive,
+          ),
+          onPressed: (_) => _handleToggleDeleteRow(row),
+          child: material.Text(
+            rowStatus == StagedRowStatus.deleted
+                ? 'Restore Deleted Row'
+                : 'Delete Row',
+            style: material.TextStyle(
+              color: rowStatus == StagedRowStatus.deleted
+                  ? null
+                  : cs.destructive,
+            ),
+          ),
+        ),
+        if (rowStatus == StagedRowStatus.modified ||
+            rowStatus == StagedRowStatus.deleted)
+          MenuButton(
+            leading:
+                const material.Icon(material.Icons.restore_rounded, size: 16),
+            onPressed: (_) => _handleRevertRow(row),
+            child: const material.Text('Revert Row Changes'),
+          ),
+      ],
+    ];
+  }
 }

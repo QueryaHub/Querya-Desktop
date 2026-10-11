@@ -320,7 +320,6 @@ class _DataGridValuePanelState extends material.State<DataGridValuePanel> {
                 QueryaIconButton(
                   size: QueryaControlSize.sm,
                   icon: const material.Icon(material.Icons.close, size: 14),
-                  color: cs.mutedForeground,
                   onPressed: widget.onClose,
                 ),
               ],
@@ -386,14 +385,11 @@ class _DataGridValuePanelState extends material.State<DataGridValuePanel> {
                     size: 14,
                   ),
                   isActive: _wordWrap,
-                  color: cs.mutedForeground,
-                  activeColor: cs.primary,
                   onPressed: () => setState(() => _wordWrap = !_wordWrap),
                 ),
                 QueryaIconButton(
                   size: QueryaControlSize.sm,
                   icon: const material.Icon(material.Icons.copy_rounded, size: 14),
-                  color: cs.mutedForeground,
                   onPressed: () {
                     Clipboard.setData(ClipboardData(text: _controller.text));
                   },

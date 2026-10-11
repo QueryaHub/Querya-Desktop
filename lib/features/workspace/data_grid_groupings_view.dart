@@ -250,7 +250,6 @@ class _DataGridGroupingsViewState
                         : material.Icons.arrow_downward_rounded,
                     size: 14,
                   ),
-                  color: cs.mutedForeground,
                   onPressed: () => setState(() {
                     _sortAscending = !_sortAscending;
                     _recomputeGroups();
@@ -263,7 +262,6 @@ class _DataGridGroupingsViewState
                   child: QueryaIconButton(
                     size: QueryaControlSize.sm,
                     icon: const material.Icon(material.Icons.copy_rounded, size: 14),
-                    color: cs.mutedForeground,
                     onPressed: _exportPivot,
                   ),
                 ),

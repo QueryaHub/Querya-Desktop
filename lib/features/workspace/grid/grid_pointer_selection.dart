@@ -87,8 +87,22 @@ extension _GridPointerSelection on _VirtualResultGridState {
     PointerDownEvent event, {
     required double rowHeight,
   }) {
-    if (event.buttons != kPrimaryMouseButton) return;
+    _hideCellTooltip();
     if (_sortedRows.isEmpty || widget.columns.isEmpty) return;
+
+    if (event.buttons == kSecondaryMouseButton) {
+      final cell = _cellAtOffset(
+        localPosition: event.localPosition,
+        rowHeight: rowHeight,
+      );
+      if (cell != null) {
+        _onCellSecondaryTap(cell.row, cell.column);
+        _openCellContextMenu(cell.row, cell.column, event.position);
+      }
+      return;
+    }
+
+    if (event.buttons != kPrimaryMouseButton) return;
 
     if (_editingCell != null) {
       final downCell = _cellAtOffset(
