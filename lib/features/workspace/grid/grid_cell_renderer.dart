@@ -135,9 +135,11 @@ class _GridCell extends material.StatelessWidget {
                         : material.Colors.transparent))));
 
     // Primary/secondary gestures and hover tooltips are hoisted to the grid
-    // level (#983, #1346). _GridCell is now a pure lightweight leaf widget
-    // without per-cell ContextMenu, Listener, or Tooltip.
-    return material.Container(
+    // level (#983, #1346). _GridCell is a lightweight leaf widget.
+    // ExcludeSemantics prevents redundant per-cell Text semantics nodes,
+    // preserving the single row semantics label per row (#981).
+    return material.ExcludeSemantics(
+      child: material.Container(
       width: width,
       height: double.infinity,
       padding: const material.EdgeInsets.symmetric(horizontal: 10),
@@ -185,6 +187,7 @@ class _GridCell extends material.StatelessWidget {
             ),
         ],
       ),
+    ),
     );
   }
 }
