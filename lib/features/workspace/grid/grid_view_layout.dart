@@ -8,6 +8,7 @@ extension _GridViewLayout on _VirtualResultGridState {
   /// only decides which columns are built (virtualized window). So rebuild only
   /// when the viewport runs past the built window, not on every pan frame.
   void _onHorizontalScroll() {
+    _hideCellTooltip();
     if (!_horizontalController.hasClients) return;
     final offset = _horizontalController.offset;
     if ((offset - _scrollOffset).abs() < 0.5) return;
