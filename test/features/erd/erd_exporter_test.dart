@@ -110,9 +110,9 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     final dbml = source.saved['shop-erd.dbml']!;
-    expect(dbml, contains('Table users'));
-    expect(dbml, contains('Table orders'));
-    expect(dbml, contains('Ref'));
+    expect(dbml, contains('Table "users"'));
+    expect(dbml, contains('Table "orders"'));
+    expect(dbml, contains('Ref: "orders"."user_id" > "users"."id"'));
   });
 
   test('dbml() leaves out groups of tables that are not shown', () {

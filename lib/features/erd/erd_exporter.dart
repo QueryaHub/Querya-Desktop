@@ -149,9 +149,10 @@ class ErdExporter {
         if (data == null) throw StateError('no image data');
         await _source.saveFile('$stem.png', data.buffer.asUint8List());
       } catch (e) {
-        if (_source.exportMounted) {
+        final failed = _source.exportContext;
+        if (failed.mounted) {
           showAppToast(
-            context: _source.exportContext,
+            context: failed,
             variant: AppToastVariant.error,
             message: 'Could not render the PNG ($e). '
                 'Export SVG instead: it has no size limit.',
@@ -192,9 +193,10 @@ class ErdExporter {
       await _source.saveFile(
           '${_source.fileStem}.pdf', await svgToPdf(svg, paper: paper));
     } catch (e) {
-      if (_source.exportMounted) {
+      final failed = _source.exportContext;
+      if (failed.mounted) {
         showAppToast(
-          context: _source.exportContext,
+          context: failed,
           variant: AppToastVariant.error,
           message: 'Could not render the PDF ($e). Export SVG instead.',
         );
@@ -206,9 +208,10 @@ class ErdExporter {
   Future<void> _toggleExportTheme() async {
     final now = !await AppSettings.instance.getExportCurrentTheme();
     await AppSettings.instance.setExportCurrentTheme(now);
-    if (!_source.exportMounted) return;
+    final context = _source.exportContext;
+    if (!context.mounted) return;
     showAppToast(
-      context: _source.exportContext,
+      context: context,
       message: now
           ? 'Exports use the current theme'
           : 'Exports use the light palette for documents',
