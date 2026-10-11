@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/features/mongodb/mongo_documents_view.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
+import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
+    hide TextExtension;
 
 import '../../support/querya_theme_test_shell.dart';
 

@@ -3,7 +3,8 @@ import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/database/redis_info.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
+import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
+    hide TextExtension;
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
 /// Shows all Redis databases (db0–dbN) with key counts.

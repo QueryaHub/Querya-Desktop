@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/redis_bulk.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
+import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
+    hide TextExtension;
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
 /// Editor for a Redis list: RPUSH add bar plus an indexed item list with

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
+import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
+    hide TextExtension;
 
 void main() {
   Widget wrap(Widget child) {

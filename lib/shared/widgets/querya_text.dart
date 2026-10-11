@@ -35,6 +35,13 @@ extension QueryaTextStyles on material.Widget {
   /// Weight 700.
   material.Widget bold() => _weight(material.FontWeight.w700);
 
+  /// One line, cut with an ellipsis.
+  material.Widget ellipsis() => _QueryaStyledText(
+        child: this,
+        overflow: material.TextOverflow.ellipsis,
+        maxLines: 1,
+      );
+
   /// The muted foreground colour.
   material.Widget muted() => _QueryaStyledText(
         child: this,
@@ -61,15 +68,24 @@ extension QueryaTextStyles on material.Widget {
 }
 
 class _QueryaStyledText extends material.StatelessWidget {
-  const _QueryaStyledText({required this.child, required this.style});
+  const _QueryaStyledText({
+    required this.child,
+    this.style,
+    this.overflow,
+    this.maxLines,
+  });
 
   final material.Widget child;
-  final material.TextStyle Function(material.BuildContext context) style;
+  final material.TextStyle Function(material.BuildContext context)? style;
+  final material.TextOverflow? overflow;
+  final int? maxLines;
 
   @override
   material.Widget build(material.BuildContext context) {
     return material.DefaultTextStyle.merge(
-      style: style(context),
+      style: style?.call(context),
+      overflow: overflow,
+      maxLines: maxLines,
       child: child,
     );
   }

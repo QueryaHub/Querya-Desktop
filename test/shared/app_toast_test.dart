@@ -2,7 +2,8 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/shared/widgets/app_toast.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
+import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
+    hide TextExtension;
 
 import '../support/querya_theme_test_shell.dart';
 

@@ -7,7 +7,8 @@ import 'package:querya_desktop/core/motion/querya_switching_body.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/unsaved_work_guard.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
+import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
+    hide TextExtension;
 
 import 'mongo_aggregation_workspace.dart';
 import 'mongo_collections_view.dart';

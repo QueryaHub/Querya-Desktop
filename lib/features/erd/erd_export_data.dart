@@ -4,7 +4,8 @@ import 'package:querya_desktop/core/erd/erd_model.dart';
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/erd/erd_export.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
+import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
+    hide TextExtension;
 
 /// Turns what the diagram shows on screen (header tints, notes, group frames,
 /// theme colours) into the plain values the SVG / DBML export takes (#1362).

@@ -10,7 +10,8 @@ import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/querya_sparkline.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
+import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
+    hide TextExtension;
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
 const _pollInterval = Duration(seconds: 5);

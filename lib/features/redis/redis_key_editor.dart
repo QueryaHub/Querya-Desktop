@@ -9,7 +9,8 @@ import 'package:querya_desktop/features/redis/editors/redis_string_editor.dart';
 import 'package:querya_desktop/features/redis/editors/redis_zset_editor.dart';
 import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
+import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
+    hide TextExtension;
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
 /// Viewer / editor for a single Redis key. Type-aware: string, hash,

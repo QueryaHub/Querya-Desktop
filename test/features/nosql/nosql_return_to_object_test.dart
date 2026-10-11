@@ -4,7 +4,8 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/main_screen/main_screen_workspace_state.dart';
 import 'package:querya_desktop/features/mongodb/mongo_stats_view.dart';
 import 'package:querya_desktop/features/redis/redis_view.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
+import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
+    hide TextExtension;
 import 'package:querya_desktop/shared/widgets/querya_button.dart';
 
 void main() {

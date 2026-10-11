@@ -5,7 +5,8 @@ import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/theme/querya_semantic_palette.dart';
 import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
+import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
+    hide TextExtension;
 
 import 'redis_key_tree_engine.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';

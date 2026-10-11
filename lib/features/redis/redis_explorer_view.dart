@@ -7,7 +7,8 @@ import 'package:querya_desktop/core/database/redis_service.dart';
 import 'package:querya_desktop/core/motion/querya_switching_body.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
+import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
+    hide TextExtension;
 
 import 'redis_keys_view.dart';
 import 'redis_key_editor.dart';

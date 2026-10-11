@@ -8,7 +8,8 @@ import 'package:querya_desktop/features/redis/editors/redis_list_editor.dart';
 import 'package:querya_desktop/features/redis/editors/redis_set_editor.dart';
 import 'package:querya_desktop/features/redis/editors/redis_string_editor.dart';
 import 'package:querya_desktop/features/redis/editors/redis_zset_editor.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
+import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
+    hide TextExtension;
 
 import '../../support/querya_theme_test_shell.dart';
 

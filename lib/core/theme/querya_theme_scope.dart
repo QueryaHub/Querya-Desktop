@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
+import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
+    hide TextExtension;
 
 import 'querya_editor_theme.dart';
 import 'querya_semantic_palette.dart';
