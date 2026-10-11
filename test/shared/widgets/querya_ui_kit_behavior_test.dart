@@ -125,8 +125,8 @@ void main() {
         ),
       );
 
-      final ink = tester.widget<material.InkWell>(find.byType(material.InkWell));
-      expect(ink.onTap, isNull);
+      final button = tester.widget<QueryaButton>(find.byType(QueryaButton));
+      expect(button.onPressed, isNull);
     });
 
     testWidgets('a tooltip message is attached when given', (tester) async {

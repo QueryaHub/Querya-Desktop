@@ -431,7 +431,6 @@ class _DataGridFilterBarState extends material.State<DataGridFilterBar> {
                       : material.Icons.close,
                   size: 14,
                 ),
-                color: cs.mutedForeground,
                 tooltip: 'Clear filter',
                 onPressed: () {
                   _debounceTimer?.cancel();
@@ -446,7 +445,6 @@ class _DataGridFilterBarState extends material.State<DataGridFilterBar> {
               QueryaIconButton(
                 size: QueryaControlSize.sm,
                 icon: const material.Icon(material.Icons.close, size: 14),
-                color: cs.mutedForeground,
                 tooltip: 'Close filter (Esc)',
                 onPressed: () {
                   _debounceTimer?.cancel();

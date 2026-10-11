@@ -270,7 +270,6 @@ class _MongoCreateIndexDialogState
                     ),
                     tooltip: 'Remove Field',
                     size: QueryaControlSize.sm,
-                    color: cs.destructive,
                     onPressed: () => _removeField(i),
                   ),
                 ],

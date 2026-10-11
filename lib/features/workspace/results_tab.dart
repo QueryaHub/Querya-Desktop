@@ -565,9 +565,7 @@ class _ResultsTabState extends material.State<ResultsTab> {
                         size: 15,
                       ),
                       tooltip: 'Toggle Quick Filter',
-                      color: _showFilterBar || _filterText.isNotEmpty
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.mutedForeground,
+                      isActive: _showFilterBar || _filterText.isNotEmpty,
                       onPressed: () {
                         setState(() => _showFilterBar = !_showFilterBar);
                       },
@@ -591,9 +589,7 @@ class _ResultsTabState extends material.State<ResultsTab> {
                           tooltip: masked
                               ? 'Sensitive data is masked — click to show'
                               : 'Mask sensitive data',
-                          color: masked
-                              ? Theme.of(context).colorScheme.primary
-                              : Theme.of(context).colorScheme.mutedForeground,
+                          isActive: masked,
                           onPressed: PiiMaskingController.instance.toggle,
                         );
                       },
@@ -607,9 +603,7 @@ class _ResultsTabState extends material.State<ResultsTab> {
                         size: 15,
                       ),
                       tooltip: 'Inspect Cell Panel',
-                      color: _showValuePanel
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.mutedForeground,
+                      isActive: _showValuePanel,
                       onPressed: () {
                         setState(() => _showValuePanel = !_showValuePanel);
                       },

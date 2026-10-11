@@ -2,10 +2,17 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 import 'package:querya_desktop/core/ui/querya_tooltip.dart';
+import 'package:querya_desktop/shared/widgets/querya_button.dart';
 
-/// Standard icon button sized by [QueryaControlSize], with hover / active
-/// states and a built-in tooltip.
-class QueryaIconButton extends material.StatefulWidget {
+/// Icon-only button of the Querya kit, a thin wrapper over [QueryaButton]
+/// (#1440): the same states as every other button (hover, pressed,
+/// keyboard-only focus ring, disabled, `selected` semantics), square at its
+/// [QueryaControlSize].
+///
+/// [icon] is a plain `Icon`: its glyph is used, the size and colour come from
+/// the control size and the button's state. [isActive] tints it with the
+/// accent, [isDestructive] with the destructive colour.
+class QueryaIconButton extends material.StatelessWidget {
   const QueryaIconButton({
     super.key,
     required this.icon,
@@ -14,15 +21,13 @@ class QueryaIconButton extends material.StatefulWidget {
     this.size,
     this.isActive = false,
     this.isDestructive = false,
-    this.color,
-    this.activeColor,
     this.borderRadius,
   });
 
-  /// The icon widget or Icon to render.
-  final material.Widget icon;
+  /// The `Icon` to render.
+  final material.Icon icon;
 
-  /// Optional tooltip message shown on hover using [kQueryaTooltipWait].
+  /// Shown on hover after [kQueryaTooltipWait]; also the spoken label.
   final String? tooltip;
 
   /// Callback when pressed. If null, the button is disabled.
@@ -35,132 +40,29 @@ class QueryaIconButton extends material.StatefulWidget {
   /// Whether the button is currently in an active/toggled state.
   final bool isActive;
 
-  /// Whether clicking triggers a destructive action (tinted red on hover).
+  /// Whether clicking triggers a destructive action.
   final bool isDestructive;
 
-  /// Custom icon color in normal state.
-  final material.Color? color;
-
-  /// Custom icon color in active state.
-  final material.Color? activeColor;
-
-  /// Custom border radius. Defaults to 6px.
+  /// Custom border radius; defaults to the control size's radius.
   final material.BorderRadius? borderRadius;
 
   @override
-  material.State<QueryaIconButton> createState() => _QueryaIconButtonState();
-}
-
-class _QueryaIconButtonState extends material.State<QueryaIconButton> {
-  /// Whether the button has keyboard focus (#1370): drawn as a 2px ring.
-  bool _focused = false;
-
-  @override
   material.Widget build(material.BuildContext context) {
-    final icon = widget.icon;
-    final tooltip = widget.tooltip;
-    final onPressed = widget.onPressed;
-    final controlSize = widget.size ??
-        QueryaControlSize.of(context);
-    final boxSize = controlSize.scaledHeight(context);
-    final iconSize = controlSize.scaledIconSize(context);
-    final isActive = widget.isActive;
-    final isDestructive = widget.isDestructive;
-    final color = widget.color;
-    final activeColor = widget.activeColor;
-    final cs = context.colors;
-    final workbench = QueryaThemeScope.maybeOf(context)?.workbench;
-    final radius = widget.borderRadius ??
-        material.BorderRadius.circular(controlSize.scaledRadius(context));
-
-    final isEnabled = onPressed != null;
-
-    final destructiveColor = workbench?.destructive ?? cs.destructive;
-    final accentColor = workbench?.accent ?? cs.primary;
-    final mutedColor = workbench?.mutedForeground ?? cs.mutedForeground;
-
-    // Normal icon color
-    final normalColor = color ??
-        (isDestructive
-            ? destructiveColor
-            : (isEnabled ? cs.foreground : cs.mutedForeground.withValues(alpha: 0.5)));
-
-    // Effective icon color
-    final effectiveIconColor = isActive
-        ? (activeColor ?? (isDestructive ? destructiveColor : accentColor))
-        : normalColor;
-
-    // Effective background color for active state
-    material.Color? effectiveBgColor;
-    if (isActive) {
-      effectiveBgColor = isDestructive
-          ? destructiveColor.withValues(alpha: 0.16)
-          : accentColor.withValues(alpha: 0.14);
-    }
-
-    final hoverColor = isDestructive
-        ? destructiveColor.withValues(alpha: 0.12)
-        : cs.muted.withValues(alpha: 0.35);
-
-    material.Widget button = material.Material(
-      color: effectiveBgColor ?? material.Colors.transparent,
-      shape: material.RoundedRectangleBorder(
-        borderRadius: radius,
-        side: _focused
-            ? material.BorderSide(color: cs.ring, width: 2)
-            : isActive
-                ? material.BorderSide(
-                    color: (isDestructive ? destructiveColor : accentColor)
-                        .withValues(alpha: 0.3),
-                    width: 1,
-                  )
-                : material.BorderSide.none,
-      ),
-      clipBehavior: material.Clip.antiAlias,
-      child: material.InkWell(
-        onTap: onPressed,
-        onFocusChange: (focused) {
-          if (_focused != focused) setState(() => _focused = focused);
-        },
-        borderRadius: radius,
-        hoverColor: hoverColor,
-        focusColor: material.Colors.transparent,
-        splashColor: (isDestructive ? destructiveColor : accentColor)
-            .withValues(alpha: 0.2),
-        child: material.SizedBox(
-          width: boxSize,
-          height: boxSize,
-          child: material.Center(
-            child: material.IconTheme(
-              data: material.IconThemeData(
-                size: iconSize,
-                color: isEnabled
-                    ? effectiveIconColor
-                    : mutedColor.withValues(alpha: 0.4),
-              ),
-              child: icon,
-            ),
-          ),
-        ),
-      ),
+    final glyph = icon.icon;
+    assert(glyph != null, 'QueryaIconButton needs an Icon with a glyph');
+    return QueryaButton(
+      variant: QueryaButtonVariant.ghost,
+      icon: glyph,
+      tooltip: tooltip,
+      semanticLabel: tooltip,
+      onPressed: onPressed,
+      isActive: isActive,
+      size: size,
+      tone: isDestructive
+          ? QueryaButtonTone.destructive
+          : QueryaButtonTone.normal,
+      borderRadius: borderRadius,
     );
-
-    button = material.Semantics(
-      button: true,
-      enabled: onPressed != null,
-      selected: isActive,
-      child: button,
-    );
-
-    if (tooltip != null && tooltip.isNotEmpty) {
-      button = material.Tooltip(
-        message: tooltip,
-        waitDuration: kQueryaTooltipWait,
-        child: button,
-      );
-    }
-
-    return button;
   }
 }
 
