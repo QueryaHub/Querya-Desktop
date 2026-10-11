@@ -776,7 +776,7 @@ class _FolderTile extends material.StatelessWidget {
               const material.Spacer(),
               if (onDelete != null)
                 QueryaIconButton(
-icon: material.Icon(material.Icons.delete_outline_rounded),
+icon: const material.Icon(material.Icons.delete_outline_rounded),
 tooltip: 'Delete folder (${folder.totalKeyCount} keys)',
 size: QueryaControlSize.sm,
 isDestructive: true,
@@ -934,7 +934,7 @@ class _KeyTile extends material.StatelessWidget {
               const Gap(4),
               if (onDelete != null)
                 QueryaIconButton(
-icon: material.Icon(material.Icons.delete_rounded),
+icon: const material.Icon(material.Icons.delete_rounded),
 tooltip: 'Delete key',
 size: QueryaControlSize.sm,
 isDestructive: true,

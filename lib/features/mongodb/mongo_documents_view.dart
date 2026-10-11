@@ -763,14 +763,14 @@ class _DocumentCardState extends State<_DocumentCard> {
                       ),
                       const Gap(8),
                       QueryaIconButton(
-                        icon: material.Icon(material.Icons.edit_rounded),
+                        icon: const material.Icon(material.Icons.edit_rounded),
                         tooltip: 'Open document',
                         size: QueryaControlSize.sm,
                         onPressed: widget.onView,
                       ),
                       const Gap(4),
                       QueryaIconButton(
-                        icon: material.Icon(material.Icons.delete_rounded),
+                        icon: const material.Icon(material.Icons.delete_rounded),
                         tooltip: 'Delete document',
                         size: QueryaControlSize.sm,
                         isDestructive: true,

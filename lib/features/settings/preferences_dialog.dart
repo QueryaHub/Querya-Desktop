@@ -347,7 +347,7 @@ class PreferencesDialogContentState
                       ),
                       const Gap(8),
                       QueryaIconButton(
-icon: material.Icon(material.Icons.close_rounded),
+icon: const material.Icon(material.Icons.close_rounded),
 tooltip: 'Close',
 size: QueryaControlSize.sm,
 onPressed: () => material.Navigator.of(context).pop(),

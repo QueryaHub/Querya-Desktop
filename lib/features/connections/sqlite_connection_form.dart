@@ -365,7 +365,7 @@ class _SqliteConnectionFormContentState
                               ).small(),
                             ),
                             QueryaIconButton(
-icon: material.Icon(material.Icons.close),
+icon: const material.Icon(material.Icons.close),
 tooltip: 'Dismiss',
 size: QueryaControlSize.sm,
 onPressed: _dismissResult,

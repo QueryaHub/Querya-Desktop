@@ -314,7 +314,7 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
                   const Spacer(),
                   // Actions
                   QueryaIconButton(
-            icon: material.Icon(material.Icons.copy_rounded),
+            icon: const material.Icon(material.Icons.copy_rounded),
             tooltip: 'Copy Document JSON',
             size: QueryaControlSize.sm,
             onPressed: () => _copyText(
@@ -325,7 +325,7 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
                   if (widget.onDocumentTap != null) ...[
                     const Gap(4),
                     QueryaIconButton(
-            icon: material.Icon(material.Icons.open_in_new_rounded),
+            icon: const material.Icon(material.Icons.open_in_new_rounded),
             tooltip: 'View / Edit Document',
             size: QueryaControlSize.sm,
             onPressed: () => widget.onDocumentTap!(doc),
@@ -334,7 +334,7 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
                   if (widget.onDeleteDocument != null) ...[
                     const Gap(4),
                     QueryaIconButton(
-            icon: material.Icon(material.Icons.delete_outline_rounded),
+            icon: const material.Icon(material.Icons.delete_outline_rounded),
             tooltip: 'Delete Document',
             size: QueryaControlSize.sm,
             isDestructive: true,
@@ -545,14 +545,14 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
           ),
           const Spacer(),
           QueryaIconButton(
-            icon: material.Icon(material.Icons.alt_route_rounded),
+            icon: const material.Icon(material.Icons.alt_route_rounded),
             tooltip: 'Copy JSON Path ($jsonPath)',
             size: QueryaControlSize.sm,
             onPressed: () => _copyText(jsonPath, 'JSON Path: $jsonPath'),
           ),
           const Gap(4),
           QueryaIconButton(
-            icon: material.Icon(material.Icons.copy_rounded),
+            icon: const material.Icon(material.Icons.copy_rounded),
             tooltip: 'Copy JSON',
             size: QueryaControlSize.sm,
             onPressed: () {
@@ -649,14 +649,14 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
           ),
           const Gap(6),
           QueryaIconButton(
-            icon: material.Icon(material.Icons.alt_route_rounded),
+            icon: const material.Icon(material.Icons.alt_route_rounded),
             tooltip: 'Copy JSON Path ($jsonPath)',
             size: QueryaControlSize.sm,
             onPressed: () => _copyText(jsonPath, 'JSON Path: $jsonPath'),
           ),
           const Gap(4),
           QueryaIconButton(
-            icon: material.Icon(material.Icons.copy_rounded),
+            icon: const material.Icon(material.Icons.copy_rounded),
             tooltip: 'Copy Value',
             size: QueryaControlSize.sm,
             onPressed: () => _copyText(valueDisplay, 'Value'),
@@ -664,7 +664,7 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
           if (canEdit) ...[
             const Gap(4),
             QueryaIconButton(
-            icon: material.Icon(material.Icons.edit_note_rounded),
+            icon: const material.Icon(material.Icons.edit_note_rounded),
             tooltip: 'Edit Field',
             size: QueryaControlSize.sm,
             onPressed: () => widget.onInspectField!(rootDoc, keyOrIndex),
