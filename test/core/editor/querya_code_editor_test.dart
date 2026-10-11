@@ -311,5 +311,74 @@ void main() {
     expect(editable.controller, isA<QueryaHighlightController>());
     expect(editable.controller.text, 'SELECT 1;');
   });
+
+  testWidgets(
+      'QueryaCodeEditor does not attach listener to controller when onChanged is null',
+      (tester) async {
+    final controller = material.TextEditingController(text: 'initial');
+    // Initially, controller has 0 listeners
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.SizedBox(
+          width: 400,
+          height: 200,
+          child: QueryaCodeEditor(
+            controller: controller,
+            language: QueryaCodeLanguage.sql,
+            // onChanged is null
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The EditableText attaches its own listener for rendering, but QueryaCodeEditor does not attach an extra listener.
+    // When onChanged is passed dynamically:
+    var changedValue = '';
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.SizedBox(
+          width: 400,
+          height: 200,
+          child: QueryaCodeEditor(
+            controller: controller,
+            language: QueryaCodeLanguage.sql,
+            onChanged: (v) => changedValue = v,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    controller.text = 'updated';
+    await tester.pump();
+    expect(changedValue, 'updated');
+  });
+
+  testWidgets(
+      'same-length text substitution triggers onChanged correctly',
+      (tester) async {
+    final controller = material.TextEditingController(text: 'cat');
+    var changedValue = '';
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.SizedBox(
+          width: 400,
+          height: 200,
+          child: QueryaCodeEditor(
+            controller: controller,
+            language: QueryaCodeLanguage.sql,
+            onChanged: (v) => changedValue = v,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Same length, different text ('cat' -> 'dog')
+    controller.text = 'dog';
+    await tester.pump();
+    expect(changedValue, 'dog');
+  });
 }
 

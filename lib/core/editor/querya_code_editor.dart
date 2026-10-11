@@ -94,19 +94,28 @@ class _QueryaCodeEditorState extends State<QueryaCodeEditor> {
   }
 
   void _attachListener() {
+    if (widget.onChanged == null) return;
     _lastText = _effectiveController.text;
     _effectiveController.addListener(_onTextChanged);
   }
 
   void _detachListener([material.TextEditingController? target]) {
     (target ?? _effectiveController).removeListener(_onTextChanged);
+    _lastText = null;
   }
 
   void _onTextChanged() {
+    if (widget.onChanged == null) return;
     final currentText = _effectiveController.text;
+    if (identical(currentText, _lastText)) return;
+    if (_lastText != null && currentText.length != _lastText!.length) {
+      _lastText = currentText;
+      widget.onChanged!(currentText);
+      return;
+    }
     if (currentText == _lastText) return;
     _lastText = currentText;
-    widget.onChanged?.call(currentText);
+    widget.onChanged!(currentText);
   }
 
   void _syncThemeIfNeeded(
@@ -160,6 +169,7 @@ class _QueryaCodeEditorState extends State<QueryaCodeEditor> {
     final languageChanged = oldWidget.language != widget.language;
     final highlightingChanged =
         oldWidget.enableHighlighting != widget.enableHighlighting;
+    final onChangedChanged = oldWidget.onChanged != widget.onChanged;
 
     if (controllerChanged) {
       _detachListener(oldWidget.controller ?? _internalController);
@@ -193,6 +203,9 @@ class _QueryaCodeEditorState extends State<QueryaCodeEditor> {
         context.queryaTheme,
         transitioning: QueryaThemeScope.isTransitioning(context),
       );
+    } else if (onChangedChanged) {
+      _detachListener();
+      _attachListener();
     }
   }
 
