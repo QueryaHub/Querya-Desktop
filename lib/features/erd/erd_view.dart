@@ -1,14 +1,12 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math' show max, min;
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart'
-    show Clipboard, ClipboardData, HardwareKeyboard, LogicalKeyboardKey;
+    show HardwareKeyboard, LogicalKeyboardKey;
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/erd/erd_canvas_controls.dart';
 import 'package:querya_desktop/features/erd/erd_card_measure.dart';
@@ -16,6 +14,7 @@ import 'package:querya_desktop/core/erd/erd_catalog.dart';
 import 'package:querya_desktop/features/erd/erd_source.dart';
 import 'package:querya_desktop/features/erd/erd_export.dart';
 import 'package:querya_desktop/features/erd/erd_export_data.dart';
+import 'package:querya_desktop/features/erd/erd_exporter.dart';
 import 'package:querya_desktop/core/erd/erd_geometry.dart';
 import 'package:querya_desktop/features/erd/erd_group_dialog.dart';
 import 'package:querya_desktop/features/erd/erd_note_dialog.dart';
@@ -37,9 +36,6 @@ import 'package:querya_desktop/features/erd/widgets/erd_status_body.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_table_menu.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_views_menu.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_table_card.dart';
-import 'package:querya_desktop/core/export/image_pdf.dart';
-import 'package:querya_desktop/core/export/svg_png.dart';
-import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 import 'package:querya_desktop/shared/widgets/app_toast.dart';
 import 'package:querya_desktop/features/workspace/sql_editor_chrome.dart';
@@ -121,7 +117,10 @@ class ErdView extends material.StatefulWidget {
   material.State<ErdView> createState() => _ErdViewState();
 }
 
-class _ErdViewState extends material.State<ErdView> {
+class _ErdViewState extends material.State<ErdView>
+    implements ErdExportSource {
+  late final ErdExporter _exporter = ErdExporter(this);
+
   final _boundaryKey = material.GlobalKey();
   ErdSchema? _schema;
   ErdLayout? _layout;
@@ -1125,155 +1124,6 @@ class _ErdViewState extends material.State<ErdView> {
   /// the SVG export saves, so the two match. With the current theme it is a
   /// screenshot of the canvas: a picked table, the hover highlight and the edge
   /// label are cleared for the capture, and the pick comes back afterwards.
-  Future<void> _exportPng(ErdSchema schema, ErdLayout layout) async {
-    final currentTheme = await AppSettings.instance.getExportCurrentTheme();
-    if (!mounted) return;
-    if (!currentTheme) {
-      final scale = ErdExport.pngPixelRatio(_canvasSize(layout));
-      final svg = ErdExport.toSvg(schema, layout,
-          routes: _routes,
-          headerFills: _headerFills(schema, const ErdSvgColors().card),
-          groups: _svgGroups(layout, const ErdSvgColors().background),
-          notes: _svgNotes(const ErdSvgColors()));
-      await _save('$_fileStem.png', await svgToPng(svg, scale: scale));
-      return;
-    }
-    final boundary = _boundaryKey.currentContext?.findRenderObject()
-        as RenderRepaintBoundary?;
-    if (boundary == null) return;
-    // The pick, a picked relation and the marks for a group are screen
-    // state: none of them belongs in the image, and all come back after it.
-    final picked = _selected;
-    final pickedRelation = _pickedRelation;
-    final marked = Set.of(_marked);
-    final needsFrame = picked != null ||
-        pickedRelation != null ||
-        marked.isNotEmpty ||
-        _hovered.value != null ||
-        _edgeTipNotifier.value != null;
-    _hovered.value = null;
-    _edgeTipNotifier.value = null;
-    if (picked != null || pickedRelation != null || marked.isNotEmpty) {
-      setState(() {
-        _selected = null;
-        _pickedRelation = null;
-        _marked.clear();
-      });
-      _syncFocus();
-    }
-    try {
-      if (needsFrame) await material.WidgetsBinding.instance.endOfFrame;
-      if (!mounted) return;
-      final ratio = ErdExport.pngPixelRatio(boundary.size);
-      if (ratio < 1) {
-        showAppToast(
-          context: context,
-          message: 'The diagram is larger than '
-              '${ErdExport.pngMaxSide} px per side, so the PNG is at '
-              '${(ratio * 100).round()}% resolution. The SVG export keeps full detail.',
-        );
-      }
-      final image = await boundary.toImage(pixelRatio: ratio);
-      final data = await image.toByteData(format: ui.ImageByteFormat.png);
-      image.dispose();
-      if (data == null) throw StateError('no image data');
-      await _save('$_fileStem.png', data.buffer.asUint8List());
-    } catch (e) {
-      if (mounted) {
-        showAppToast(
-          context: context,
-          variant: AppToastVariant.error,
-          message: 'Could not render the PNG ($e). '
-              'Export SVG instead: it has no size limit.',
-        );
-      }
-    } finally {
-      if (mounted &&
-          (picked != null || pickedRelation != null || marked.isNotEmpty)) {
-        setState(() {
-          // What the user did during the capture wins.
-          if (_selected == null && _pickedRelation == null) {
-            _selected = picked;
-            _pickedRelation = pickedRelation;
-          }
-          if (_marked.isEmpty) _marked.addAll(marked);
-        });
-        _syncFocus();
-      }
-    }
-  }
-
-  /// The diagram as SVG text, in the export palette: light for documents,
-  /// unless the setting asks for the current theme.
-  Future<String?> _svgText(ErdSchema schema, ErdLayout layout) async {
-    final currentTheme = await AppSettings.instance.getExportCurrentTheme();
-    if (!mounted) return null;
-    final colors = currentTheme ? _svgColors() : const ErdSvgColors();
-    return ErdExport.toSvg(schema, layout,
-        routes: _routes,
-        colors: colors,
-        headerFills: _headerFills(schema, colors.card),
-        groups: _svgGroups(layout, colors.background),
-        notes: _svgNotes(colors));
-  }
-
-  /// The SVG export.
-  Future<void> _exportSvg(ErdSchema schema, ErdLayout layout) async {
-    final svg = await _svgText(schema, layout);
-    if (svg == null) return;
-    await _save('$_fileStem.svg', Uint8List.fromList(utf8.encode(svg)));
-  }
-
-  /// The PDF export: the SVG fitted on one page of [paper].
-  Future<void> _exportPdf(
-      ErdSchema schema, ErdLayout layout, PdfPaper paper) async {
-    final svg = await _svgText(schema, layout);
-    if (svg == null) return;
-    try {
-      await _save('$_fileStem.pdf', await svgToPdf(svg, paper: paper));
-    } catch (e) {
-      if (mounted) {
-        showAppToast(
-          context: context,
-          variant: AppToastVariant.error,
-          message: 'Could not render the PDF ($e). Export SVG instead.',
-        );
-      }
-    }
-  }
-
-  /// The DBML of what the diagram shows: its groups and notes, and the
-  /// header colours it draws.
-  String _dbml(ErdSchema schema) {
-    final shown = {for (final t in schema.tables) t.name};
-    return ErdExport.toDbml(
-      schema,
-      groups: [
-        for (final g in _groups)
-          if (g.tables.any(shown.contains)) g,
-      ],
-      notes: List.of(_notes),
-      headerColors: {
-        for (final t in schema.tables)
-          if (erdHeaderSlot(t.name, _headerColors) case final slot?)
-            t.name: ErdSvgColors.hex(_slotColor(slot).toARGB32()),
-      },
-    );
-  }
-
-  /// Flips between the light export palette and the current theme.
-  Future<void> _toggleExportTheme() async {
-    final now = !await AppSettings.instance.getExportCurrentTheme();
-    await AppSettings.instance.setExportCurrentTheme(now);
-    if (!mounted) return;
-    showAppToast(
-      context: context,
-      message: now
-          ? 'Exports use the current theme'
-          : 'Exports use the light palette for documents',
-    );
-  }
-
   /// Header colour of [table] on screen: the picked slot, the schema's slot,
   /// or the accent for a table of the current schema.
   material.Color _headerColor(String table) {
@@ -1403,43 +1253,102 @@ class _ErdViewState extends material.State<ErdView> {
   /// cards and edges.
   ErdSvgColors _svgColors() => ErdExportData.themeColors(context);
 
+  // ---- ErdExportSource (the export flows live in erd_exporter.dart) -------
+
+  @override
+  material.BuildContext get exportContext => context;
+
+  @override
+  bool get exportMounted => mounted;
+
   /// `<database>-erd`, or `erd` when the database name is unknown.
-  String get _fileStem =>
+  @override
+  String get fileStem =>
       widget.databaseName.isEmpty ? 'erd' : '${widget.databaseName}-erd';
 
-  void _export(ErdExportAction action, ErdSchema schema, ErdLayout layout) {
-    switch (action) {
-      case ErdExportAction.mermaid:
-        _save(
-            '$_fileStem.mmd',
-            Uint8List.fromList(utf8.encode(ErdExport.toMermaid(schema))));
-      case ErdExportAction.svg:
-        unawaited(_exportSvg(schema, layout));
-      case ErdExportAction.png:
-        unawaited(_exportPng(schema, layout));
-      case ErdExportAction.pdfA4:
-        unawaited(_exportPdf(schema, layout, PdfPaper.a4));
-      case ErdExportAction.pdfA3:
-        unawaited(_exportPdf(schema, layout, PdfPaper.a3));
-      case ErdExportAction.dbml:
-        _save('$_fileStem.dbml',
-            Uint8List.fromList(utf8.encode(_dbml(schema))));
-      case ErdExportAction.copyDbml:
-        Clipboard.setData(ClipboardData(text: _dbml(schema)));
-        showAppToast(
-          context: context,
-          message: 'DBML copied to the clipboard',
-        );
-      case ErdExportAction.toggleTheme:
-        unawaited(_toggleExportTheme());
-      case ErdExportAction.copyMermaid:
-        Clipboard.setData(ClipboardData(text: ErdExport.toMermaid(schema)));
-        showAppToast(
-          context: context,
-          message: 'Mermaid copied to the clipboard',
-        );
+  @override
+  Future<void> saveFile(String name, Uint8List bytes) => _save(name, bytes);
+
+  @override
+  List<ErdRoute> get routes => _routes;
+
+  @override
+  List<ErdGroup> get groups => _groups;
+
+  @override
+  List<ErdNote> get notes => _notes;
+
+  @override
+  Map<String, String> get headerColorSlots => _headerColors;
+
+  @override
+  material.Color slotColor(String slot) => _slotColor(slot);
+
+  @override
+  material.Size canvasSize(ErdLayout layout) => _canvasSize(layout);
+
+  @override
+  ErdSvgColors currentThemeColors() => _svgColors();
+
+  @override
+  Map<String, String> headerFills(ErdSchema schema, String cardHex) =>
+      _headerFills(schema, cardHex);
+
+  @override
+  List<ErdSvgGroup> svgGroups(ErdLayout layout, String backgroundHex) =>
+      _svgGroups(layout, backgroundHex);
+
+  @override
+  List<ErdSvgNote> svgNotes(ErdSvgColors colors) => _svgNotes(colors);
+
+  @override
+  RenderRepaintBoundary? get canvasBoundary =>
+      _boundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+
+  @override
+  Future<void> withCleanCanvas(Future<void> Function() capture) async {
+    // The pick, a picked relation and the marks for a group are screen
+    // state: none of them belongs in the image, and all come back after it.
+    final picked = _selected;
+    final pickedRelation = _pickedRelation;
+    final marked = Set.of(_marked);
+    final hadScreenState = picked != null ||
+        pickedRelation != null ||
+        marked.isNotEmpty;
+    final needsFrame = hadScreenState ||
+        _hovered.value != null ||
+        _edgeTipNotifier.value != null;
+    _hovered.value = null;
+    _edgeTipNotifier.value = null;
+    if (hadScreenState) {
+      setState(() {
+        _selected = null;
+        _pickedRelation = null;
+        _marked.clear();
+      });
+      _syncFocus();
+    }
+    try {
+      if (needsFrame) await material.WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+      await capture();
+    } finally {
+      if (mounted && hadScreenState) {
+        setState(() {
+          // What the user did during the capture wins.
+          if (_selected == null && _pickedRelation == null) {
+            _selected = picked;
+            _pickedRelation = pickedRelation;
+          }
+          if (_marked.isEmpty) _marked.addAll(marked);
+        });
+        _syncFocus();
+      }
     }
   }
+
+  void _export(ErdExportAction action, ErdSchema schema, ErdLayout layout) =>
+      _exporter.export(action, schema, layout);
 
   /// Pointer over the canvas ([p] in canvas space): names the relation within
   /// 6 screen px of it, if any, whatever the zoom.
