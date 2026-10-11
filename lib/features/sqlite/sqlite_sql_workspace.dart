@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/database/compact_result_dataset.dart';
 import 'package:querya_desktop/core/database/sql_limit.dart';
 import 'package:querya_desktop/core/database/sql_table_target_extractor.dart';
 import 'package:querya_desktop/core/database/sqlite_service.dart';
@@ -112,8 +113,10 @@ class SqliteSqlExecutionDelegate extends BaseSqlExecutionDelegate {
       count++;
     }
 
-    final outRows = await convertSqliteResultRowsToStringsAdaptive(
-      SqliteResultConvertJob(rowValues: rawRows),
+    final dataset = CompactResultDataset.fromRawRows(
+      cols,
+      rawRows,
+      cellFormatter: (val, _) => sqliteResultCellToDisplayString(val),
     );
 
     final isTruncated = truncated || (injectedLimit && results.length >= cap);
@@ -124,11 +127,10 @@ class SqliteSqlExecutionDelegate extends BaseSqlExecutionDelegate {
       cap: cap,
     );
 
-    return SqlExecutionResult(
-      columns: cols,
-      rows: outRows,
+    return SqlExecutionResult.fromDataset(
+      dataset: dataset,
       statusMessage: statusMsg,
-      isTruncated: truncated || (injectedLimit && results.length >= cap),
+      isTruncated: isTruncated,
     );
   }
 

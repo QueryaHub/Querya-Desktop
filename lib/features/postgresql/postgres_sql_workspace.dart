@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/database/compact_result_dataset.dart';
+import 'package:querya_desktop/core/database/postgres_result_cells.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/postgres_sql.dart';
 import 'package:querya_desktop/core/database/sql_table_target_extractor.dart';
@@ -8,7 +10,6 @@ import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
-import 'package:querya_desktop/features/postgresql/postgres_result_utils.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_utils.dart';
 import 'package:querya_desktop/features/workspace/workspace.dart';
 import 'package:querya_desktop/features/workspace/query_plan.dart';
@@ -129,28 +130,29 @@ class PostgresSqlExecutionDelegate extends BaseSqlExecutionDelegate {
       n++;
     }
 
-    final outRows = await convertPostgresResultRowsToStringsAdaptive(
-      PostgresResultConvertJob(
-        rowValues: rawRows,
-        columnTypeOids: [
-          for (final c in schema.columns) c.typeOid,
-        ],
-      ),
+    final dataset = CompactResultDataset.fromRawRows(
+      cols,
+      rawRows,
+      cellFormatter: (val, colIndex) {
+        final typeOid = colIndex < schema.columns.length
+            ? schema.columns[colIndex].typeOid
+            : null;
+        return postgresResultCellToDisplayString(val, typeOid: typeOid);
+      },
     );
 
     final isTruncated = result.length >= cap;
     final statusMsg = formatStatusMessage(
       columnCount: cols.length,
-      rowCount: outRows.length,
+      rowCount: dataset.rowCount,
       affectedRows: result.affectedRows,
       isTruncated: isTruncated,
       cap: cap,
       successPrefix: 'Command completed.',
     );
 
-    return SqlExecutionResult(
-      columns: cols,
-      rows: outRows,
+    return SqlExecutionResult.fromDataset(
+      dataset: dataset,
       affectedRows: result.affectedRows,
       statusMessage: statusMsg,
       isTruncated: isTruncated,

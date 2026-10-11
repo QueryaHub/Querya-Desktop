@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/database/compact_result_dataset.dart';
 import 'package:querya_desktop/core/database/mysql_result_cells.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
 import 'package:querya_desktop/core/database/result_row_string_convert.dart';
@@ -107,34 +108,29 @@ class MysqlSqlExecutionDelegate extends BaseSqlExecutionDelegate {
       },
     );
     final colList = rs.cols.toList();
-    final pool = StringInternPool();
-    final outRows = <List<String>>[];
+    final rawRows = <List<Object?>>[];
     for (var r = 0; r < taken.items.length; r++) {
       final row = taken.items[r];
-      outRows.add(
-        List.generate(
-          row.numOfColumns,
-          (i) {
-            final col = i < colList.length ? colList[i] : null;
-            return mysqlResultCellToDisplayString(
-              row.colAt(i),
-              column: col,
-              pool: pool,
-            );
-          },
-        ),
-      );
-      if (kResultStringConvertYieldEvery > 0 &&
-          (r + 1) % kResultStringConvertYieldEvery == 0) {
-        await Future<void>.delayed(Duration.zero);
-      }
+      rawRows.add([
+        for (var i = 0; i < row.numOfColumns; i++) row.colAt(i),
+      ]);
     }
+
+    final dataset = CompactResultDataset.fromRawRows(
+      cols,
+      rawRows,
+      cellFormatter: (val, colIndex) {
+        final col = colIndex < colList.length ? colList[colIndex] : null;
+        return mysqlResultCellToDisplayString(val, column: col);
+      },
+    );
+
     final truncated =
-        taken.truncated || (effectiveSql != sql && outRows.length >= cap);
-    final n = outRows.length;
+        taken.truncated || (effectiveSql != sql && dataset.rowCount >= cap);
+    final n = dataset.rowCount;
 
     int? affected;
-    if (cols.isEmpty && outRows.isEmpty) {
+    if (cols.isEmpty && dataset.rowCount == 0) {
       affected = _affectedInt(rs.affectedRows);
     }
 
@@ -146,9 +142,8 @@ class MysqlSqlExecutionDelegate extends BaseSqlExecutionDelegate {
       cap: cap,
     );
 
-    return SqlExecutionResult(
-      columns: cols,
-      rows: outRows,
+    return SqlExecutionResult.fromDataset(
+      dataset: dataset,
       affectedRows: affected,
       statusMessage: statusMsg,
       isTruncated: truncated,

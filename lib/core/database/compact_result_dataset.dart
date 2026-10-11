@@ -131,11 +131,13 @@ class GenericCompactColumn implements CompactColumn {
   GenericCompactColumn({
     required this.values,
     required this.length,
+    this.formatter,
   });
 
   final List<Object?> values;
   @override
   final int length;
+  final String Function(Object?)? formatter;
 
   @override
   CompactColumnKind get kind => CompactColumnKind.generic;
@@ -150,6 +152,10 @@ class GenericCompactColumn implements CompactColumn {
   String stringValueAt(int index, [StringInternPool? pool]) {
     final val = values[index];
     if (val == null) return 'NULL';
+    if (formatter != null) {
+      final str = formatter!(val);
+      return pool != null ? pool.intern(str) : str;
+    }
     return pool != null ? pool.internObject(val) : val.toString();
   }
 }
@@ -208,9 +214,13 @@ class CompactResultDataset {
 
   /// Constructs a [CompactResultDataset] from raw rows, detecting column types
   /// and packing numeric columns into [Int64List] / [Float64List].
+  ///
+  /// An optional [cellFormatter] callback can be provided to customize display string
+  /// formatting for driver-specific types (e.g. blobs, timestamps, boolean tinyints).
   static CompactResultDataset fromRawRows(
     List<String> columnNames,
     List<List<Object?>> rawRows, {
+    String Function(Object? value, int colIndex)? cellFormatter,
     StringInternPool? pool,
   }) {
     final rowCount = rawRows.length;
@@ -239,14 +249,27 @@ class CompactResultDataset {
         if (val == null) continue;
         sampleCount++;
 
-        if (val is! int) {
-          allInt = false;
-        }
-        if (val is! num) {
-          allFloat = false;
-        }
-        if (val is! String) {
-          allString = false;
+        if (cellFormatter != null) {
+          final formatted = cellFormatter(val, col);
+          if (allInt && (val is! int || formatted != val.toString())) {
+            allInt = false;
+          }
+          if (allFloat && (val is! num || formatted != val.toString())) {
+            allFloat = false;
+          }
+          if (allString && (val is! String || formatted != val)) {
+            allString = false;
+          }
+        } else {
+          if (val is! int) {
+            allInt = false;
+          }
+          if (val is! num) {
+            allFloat = false;
+          }
+          if (val is! String) {
+            allString = false;
+          }
         }
 
         if (sampleCount >= 60 && !allInt && !allFloat && !allString) {
@@ -340,6 +363,7 @@ class CompactResultDataset {
           compactColumns.add(GenericCompactColumn(
             values: values,
             length: rowCount,
+            formatter: cellFormatter != null ? (v) => cellFormatter(v, col) : null,
           ));
       }
     }

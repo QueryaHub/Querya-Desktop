@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/compact_result_dataset.dart';
+import 'package:querya_desktop/core/database/sql_query_runner.dart';
 
 void main() {
   group('CompactResultDataset', () {
@@ -162,5 +163,75 @@ void main() {
       expect(column.stringValueAt(2), '0.0');
       expect(column.stringValueAt(3), '100.0');
     });
+
+    test('fromRawRows with cellFormatter customizes generic column formatting and overrides primitives', () {
+      final columns = ['id', 'is_active', 'raw_bytes'];
+      final rows = <List<Object?>>[
+        [101, 1, [0xde, 0xad]],
+        [102, 0, [0xbe, 0xef]],
+        [103, null, null],
+      ];
+
+      final dataset = CompactResultDataset.fromRawRows(
+        columns,
+        rows,
+        cellFormatter: (val, colIndex) {
+          if (colIndex == 1) {
+            return val == 1 ? 'true' : (val == 0 ? 'false' : 'NULL');
+          }
+          if (colIndex == 2 && val is List<int>) {
+            return '0x${val.map((b) => b.toRadixString(16).padLeft(2, '0')).join()}';
+          }
+          return val.toString();
+        },
+      );
+
+      expect(dataset.columns[0].kind, CompactColumnKind.int64);
+      // is_active was 1 and 0, but cellFormatter returned 'true' / 'false' != '1' / '0',
+      // so it was correctly recognized as generic with formatter
+      expect(dataset.columns[1].kind, CompactColumnKind.generic);
+      expect(dataset.columns[2].kind, CompactColumnKind.generic);
+
+      expect(dataset.cellAt(0, 0), '101');
+      expect(dataset.cellAt(0, 1), 'true');
+      expect(dataset.cellAt(0, 2), '0xdead');
+
+      expect(dataset.cellAt(1, 0), '102');
+      expect(dataset.cellAt(1, 1), 'false');
+      expect(dataset.cellAt(1, 2), '0xbeef');
+
+      expect(dataset.cellAt(2, 0), '103');
+      expect(dataset.cellAt(2, 1), 'NULL');
+      expect(dataset.cellAt(2, 2), 'NULL');
+    });
+
+    test('SqlExecutionResult.fromDataset provides transparent lazy rows and backwards compatibility', () {
+      final columns = ['title', 'views'];
+      final rows = <List<Object?>>[
+        ['First Post', 42],
+        ['Second Post', 100],
+      ];
+
+      final dataset = CompactResultDataset.fromRawRows(columns, rows);
+      final result = SqlExecutionResult.fromDataset(
+        dataset: dataset,
+        affectedRows: null,
+        statusMessage: '2 rows fetched',
+        isTruncated: false,
+      );
+
+      expect(result.dataset, same(dataset));
+      expect(result.columns, ['title', 'views']);
+      expect(result.statusMessage, '2 rows fetched');
+      expect(result.isTruncated, isFalse);
+
+      // rows is lazy and fully matches List<List<String>> contract
+      expect(result.rows.length, 2);
+      expect(result.rows[0], ['First Post', '42']);
+      expect(result.rows[1], ['Second Post', '100']);
+      expect(result.rows[0][0], 'First Post');
+      expect(result.rows[1][1], '100');
+    });
   });
 }
+
