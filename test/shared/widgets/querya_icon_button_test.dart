@@ -30,9 +30,11 @@ void main() {
     testWidgets('respects sm size (28px)', (tester) async {
       await tester.pumpWidget(
         queryaThemeTestShell(
-          child: const QueryaIconButton(
-            icon: material.Icon(material.Icons.refresh),
-            size: QueryaControlSize.sm,
+          child: const material.Center(
+            child: QueryaIconButton(
+              icon: material.Icon(material.Icons.refresh),
+              size: QueryaControlSize.sm,
+            ),
           ),
         ),
       );
@@ -46,9 +48,11 @@ void main() {
     testWidgets('respects md size (32px)', (tester) async {
       await tester.pumpWidget(
         queryaThemeTestShell(
-          child: const QueryaIconButton(
-            icon: material.Icon(material.Icons.refresh),
-            size: QueryaControlSize.md,
+          child: const material.Center(
+            child: QueryaIconButton(
+              icon: material.Icon(material.Icons.refresh),
+              size: QueryaControlSize.md,
+            ),
           ),
         ),
       );
