@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/features/settings/sql_statement_timeout_dropdown.dart';
 import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
@@ -149,7 +150,11 @@ class SqlWorkspaceToolbar extends StatelessWidget {
     return material.LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < compactWidthBreakpoint;
-        return material.SingleChildScrollView(
+        // One size for the whole row: the run split button, the buttons, the
+        // icon buttons and the session menu are all `md` (#1439).
+        return QueryaControlScope(
+          size: QueryaControlSize.md,
+          child: material.SingleChildScrollView(
           scrollDirection: material.Axis.horizontal,
           child: material.Row(
             children: [
@@ -274,6 +279,7 @@ class SqlWorkspaceToolbar extends StatelessWidget {
                 extraTrailing!,
               ],
             ],
+          ),
           ),
         );
       },

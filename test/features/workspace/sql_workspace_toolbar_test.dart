@@ -125,5 +125,55 @@ void main() {
       await tester.tap(find.byKey(const material.ValueKey('run_script')));
       expect(executeCalled, isTrue);
     });
+
+    testWidgets('every control of the row has the md height (#1439)',
+        (tester) async {
+      final session = SqlQueryTabSession(
+        id: '1',
+        title: 'Query 1',
+        initialSql: 'SELECT 1;',
+      );
+
+      await tester.pumpWidget(
+        buildApp(
+          SqlWorkspaceToolbar(
+            session: session,
+            delegate: _FakeSqlExecutionDelegate(),
+            effectiveDatabase: 'test_db',
+            autocommit: false,
+            supportsAutocommit: true,
+            supportsStmtTimeout: true,
+            txOpen: true,
+            queryTimeoutSeconds: null,
+            historyEnabled: true,
+            onExecute: (_) {},
+            onExplain: () {},
+            onCancel: () {},
+            onOpenHistory: () {},
+            onOpenFile: () {},
+            onSaveFile: () {},
+            onRunTxCommand: (_) {},
+            onToggleAutocommit: () {},
+            onTimeoutChanged: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      for (final key in [
+        'run_script',
+        'run_menu',
+        'explain_query',
+        'history_button',
+        'format_button',
+        'open_sql_button',
+        'save_sql_button',
+        'session_menu',
+      ]) {
+        final finder = find.byKey(material.ValueKey(key));
+        expect(finder, findsOneWidget, reason: key);
+        expect(tester.getSize(finder).height, 32, reason: key);
+      }
+    });
   });
 }
