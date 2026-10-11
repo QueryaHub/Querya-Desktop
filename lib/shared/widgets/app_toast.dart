@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
@@ -23,8 +25,12 @@ void showAppToast({
   AppToastVariant variant = AppToastVariant.info,
   Duration showDuration = const Duration(seconds: 5),
 }) {
+  // The context may be the navigator itself (above its own overlay).
+  final overlay = material.Overlay.maybeOf(context, rootOverlay: true) ??
+      material.Navigator.maybeOf(context, rootNavigator: true)?.overlay;
+  if (overlay == null) return;
   _ToastHost.show(
-    material.Overlay.of(context, rootOverlay: true),
+    overlay,
     _ToastData(
       message: message,
       variant: variant,
@@ -56,14 +62,16 @@ abstract final class _ToastHost {
   static final material.ValueNotifier<List<_ToastData>> _items =
       material.ValueNotifier(const []);
   static material.OverlayEntry? _entry;
+  static material.OverlayState? _overlay;
 
   static void show(material.OverlayState overlay, _ToastData toast) {
     // A previous overlay that is gone (window rebuilt, tests) leaves its entry
     // behind: start over instead of adding to a dead one.
-    if (_entry != null && !_entry!.mounted) {
+    if (_entry != null && (_overlay != overlay || !overlay.mounted)) {
       _entry = null;
       _items.value = const [];
     }
+    _overlay = overlay;
     _items.value = [..._items.value, toast];
     if (_entry != null) return;
     _entry = material.OverlayEntry(
@@ -114,35 +122,24 @@ class _ToastViewState extends material.State<_ToastView>
     with material.SingleTickerProviderStateMixin {
   late final material.AnimationController _controller;
   late final material.Animation<double> _in;
+  late final Timer _timer;
   var _closed = false;
 
   @override
   void initState() {
     super.initState();
     final d = widget.data;
-    // One controller drives the whole life: enter, stay, then done.
+    // The controller only plays the entry; a timer ends the toast, so a test
+    // that settles frames does not run its whole lifetime.
     _controller = material.AnimationController(
       vsync: this,
-      duration: d.enter + d.show,
+      duration: d.enter == Duration.zero ? const Duration(milliseconds: 1) : d.enter,
     );
-    if (d.enter == Duration.zero) {
-      _in = const material.AlwaysStoppedAnimation(1);
-    } else {
-      final total = (d.enter + d.show).inMicroseconds;
-      _in = material.CurvedAnimation(
-        parent: _controller,
-        curve: material.Interval(
-          0,
-          (d.enter.inMicroseconds / total).clamp(0.0, 1.0).toDouble(),
-          curve: d.curve,
-        ),
-      );
-    }
-    _controller
-      ..addStatusListener((status) {
-        if (status == material.AnimationStatus.completed) _close();
-      })
-      ..forward();
+    _in = d.enter == Duration.zero
+        ? const material.AlwaysStoppedAnimation(1)
+        : material.CurvedAnimation(parent: _controller, curve: d.curve);
+    _controller.forward();
+    _timer = Timer(d.show, _close);
   }
 
   void _close() {
@@ -153,6 +150,7 @@ class _ToastViewState extends material.State<_ToastView>
 
   @override
   void dispose() {
+    _timer.cancel();
     _controller.dispose();
     super.dispose();
   }
