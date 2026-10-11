@@ -11,7 +11,6 @@ import 'package:flutter_test/flutter_test.dart';
 /// until the migration is done; it goes last.
 void main() {
   const allowed = <String>{
-    'lib/shared/widgets/app_toast.dart',
     'lib/shared/widgets/widgets.dart',
   };
 
