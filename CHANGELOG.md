@@ -68,6 +68,11 @@ Everything merged to `dev` since 0.4.18: the NoSQL workbench, SSH tunnelling and
 - **One-row toolbar (#1150)** — Run with a menu, Cancel while running, Explain, History / Format / Open / Save, a database badge, a transaction badge with Commit / Rollback only while a transaction is open, and a Session menu (autocommit, statement timeout, Begin, Preferences). Diagram sits on the tab strip. Labels hide on a narrow window.
 - **Format SQL on Shift+Alt+F**, **Preferences on Ctrl/Cmd+,** on Linux and Windows too.
 
+**UI kit**
+
+- **One control scale and one button family (#1331–#1335, #1337, #1338)** — heights `sm` 28 / `md` 32 / `lg` 36 shared by buttons, dropdowns, search fields and tab strips, set once per toolbar with `QueryaControlScope`. `QueryaButton` (primary / secondary / ghost / destructive and icon-only) replaces every shadcn button in the app; `QueryaMenuButton`, `QueryaSplitButton` (Execute), `QueryaButtonGroup` and `QueryaDialogActions` (Cancel, secondary, one main action; Esc cancels) build the compositions. Hover, pressed, keyboard-only focus ring, disabled and loading states are the same everywhere; the standard is in `docs/ui-kit.md`.
+- **Own toast, own text styles (#1465)** — toasts draw in the app's overlay and stack; `small()` / `muted()` / `semiBold()` and the other text modifiers are the kit's, not shadcn's. The UI kit in `lib/shared` no longer imports `shadcn_flutter` except through the `widgets.dart` barrel (#1365).
+
 **Platform, packaging and tooling**
 
 - **Portable mode out of the box** through a `.portable` marker (#1056).
@@ -87,6 +92,11 @@ Everything merged to `dev` since 0.4.18: the NoSQL workbench, SSH tunnelling and
 - **Lint** — `unawaited_futures`, `cancel_subscriptions`, `close_sinks` and `avoid_void_async` are on (#1241).
 - **Motion** — Redis CLI auto-scroll and key folder chevrons use `QueryaMotion` tokens (#1240).
 - **Flutter is pinned to 3.47.1**, the version the 120 Hz Linux engine is built for.
+- **Dialog footers** — About, Driver manager, Preferences, the connection forms and the small name dialogs use `QueryaDialogActions`: Cancel / Close is ghost, Test connection sits between Cancel and the main action, spacing is 8 px, one divider (#1441).
+- **One height per toolbar row** — the SQL, ERD, chart and results toolbars set one control size, and an icon button is the same control as every other button (#1439, #1440).
+- **ERD view split into parts (#1362)** — layout, routing and geometry moved to `core/erd` (`ErdLayoutEngine`, unit-tested without widgets); cards, relation painter, notes, groups, export data, menus and status bodies are their own files.
+- **SQL workspace toolbar, connection forms and the editor's highlighter lifecycle** are separate, tested units (`SqlWorkspaceToolbar`, form sections for network, credentials and SSL, a highlight controller managed per session).
+- **`QueryaApp.build` has no side effects** — the async loads and one-time work moved out of it.
 
 ### Fixed
 
@@ -108,18 +118,38 @@ Everything merged to `dev` since 0.4.18: the NoSQL workbench, SSH tunnelling and
 - **SQLite** — columns with the same name stay separate in query results (#1144).
 - **Updater and Windows** — the Linux bundle replace preserves `QueryaData` and `.portable` (#1055); file associations and registry writes are optional (#1054).
 - **Packaging** — desktop and icon caches are refreshed after install and removal.
+- **Removing a connection** asks first and leaves its workspace; *Remove connection* is a destructive menu item.
+- **SQL workspace** — the status bar no longer keeps *Running query…* after a failed run; a long query error scrolls instead of overflowing the results pane; a code editor that fills its space starts its text at the top.
+- **Editor** — no duplicate `onChanged`, no false cursor jumps, default highlighting on (#1430); MongoDB documents in JSON mode are highlighted (#1432).
+- **Data grid** — the WHERE clause of an edit uses the column's real type and tells the string `'NULL'` from SQL `NULL`; the value panel no longer validates twice (#1431).
+- **UI** — export and copy menu buttons have one chevron; the tab strip draws its focus ring only for keyboard focus (#1438); dropdown menus are at least as wide as their trigger (#1444); form rules use the theme's border colour, not black, in the light theme (#1443); the new-connection wizard search is the standard search field (#1442).
+- **Startup recovery** — when the local database cannot be opened, the app shows a recovery screen instead of failing silently.
+- **Updater (Windows)** — an in-place update mirrors the new bundle, so obsolete DLLs and assets are removed.
+- **SSH** — a failed tunnel closes its sockets and the jump socket, a missing key file is reported, concurrent callers share one dial, and a local forwarder that survived a failed keep-alive is closed; a dropped socket marks the session closed (`isConnected`).
+- **PostgreSQL** — the SSL mode dropdown no longer overflows in the form.
+- **Packaging** — `bubblewrap` is a recommended package of the Linux `.deb` and `.rpm` (extension sandbox).
+- **Accessibility** — tabs close from the keyboard (Delete / Backspace) with a 24 px close target; the dropdown trigger and items are exposed to screen readers; the selected row stays visible in the Command Palette and Quick Switcher; icon buttons expose their focus ring and state.
+
+### Security
+
+- **PostgreSQL TLS** — the SSL mode is a setting of the connection; with a root CA the connection verifies the server (`verify-full`) instead of encrypting without checking.
+- **Extension sandbox** — the host's credentials are no longer reachable from inside the bubblewrap and Seatbelt sandboxes.
 
 ### Performance
 
 - **ERD** — rasterized router obstacles and one route per frame while dragging (#1168); route search in flat generation-stamped arrays; hover rebuilds only the cards it changes (#1169).
 - **Charts** — memoized chart points and LTTB downsampling (#1170).
 - **SQL workspace** — rows show before the table schema lookup; schema lookups cached per table (#1171); the transaction state is probed only when unknown (#1172).
+- **Result grid** — filtering runs in a background isolate and is debounced (#1347); the context menu and tooltips are handled once for the grid, not per cell (#1346); drag selection and column-width sampling no longer allocate per pointer move.
+- **Editor** — no full-string comparisons or redundant listeners on every keystroke (#1352); linear statement splitting and line counting (#1350); no highlight flicker on documents over 8 KB (#1351); highlighters sync once when a theme transition ends.
+- **Drivers** — `CompactResultDataset` in the SQL drivers avoids three copies of every result (#1355); MySQL interns repeated strings; SQLite converts rows once.
+- **UI** — the dialog backdrop no longer animates a blur sigma every frame (#1341); the tab strip drops speculative `IntrinsicWidth` layout (#1342); the Command Palette and Quick Switcher do not search twice (#1343); the SDUI tree caches its visible rows; driver icons do not block the build on `File.existsSync`; the theme's token colour hash is cached and JSONC strings are scanned once.
 
 ### Testing and CI
 
 - **E2E suite** (`test/e2e`, run in CI and gating `release`): connection lifecycle and forms of every type, folders, SSH bastion tunnel, credential scrubbing, SQL workspaces and export, command palette, extensions sandbox, Redis CLI and key tree, Mongo viewer, index manager, aggregations, CRUD, theme import, shutdown.
 - **Test sections** run as parallel jobs; self-hosted runners; a MySQL server and bubblewrap for the live database and sandbox tests.
-- **Guards** — UI kit usage, and `core/` and `shared/` free of `features/` and `app/` imports.
+- **Guards** — UI kit usage, and `core/` and `shared/` free of `features/` and `app/` imports; `lib/shared` must not import `shadcn_flutter` (a ratchet); no raw `Divider` outside the kit.
 - **Benchmarks** compare build time over interleaved runs and cover ERD, charts and multi-tab SQL scenarios.
 
 ### Planned
