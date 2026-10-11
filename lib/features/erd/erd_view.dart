@@ -46,7 +46,7 @@ import 'package:querya_desktop/features/workspace/sql_editor_chrome.dart';
 import 'package:querya_desktop/shared/widgets/querya_button.dart';
 import 'package:querya_desktop/shared/widgets/querya_spinner.dart';
 import 'package:querya_desktop/shared/widgets/querya_tab_strip.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 // Moved out of this file (#1362); re-exported for existing importers.
 export 'package:querya_desktop/features/erd/widgets/erd_relation_painter.dart'

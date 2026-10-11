@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 /// Coordinate of a cell in [VirtualResultGrid].
 @immutable

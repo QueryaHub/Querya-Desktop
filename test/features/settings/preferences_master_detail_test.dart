@@ -8,7 +8,7 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/features/settings/preferences_controls.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 class _FakePathProvider extends PathProviderPlatform {
   _FakePathProvider(this._root);

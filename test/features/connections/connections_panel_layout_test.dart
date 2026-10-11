@@ -8,7 +8,7 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/core/ui/querya_tree_tokens.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 import '../../support/layout_overflow.dart';
 

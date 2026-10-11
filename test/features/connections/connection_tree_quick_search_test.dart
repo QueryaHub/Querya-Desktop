@@ -7,7 +7,7 @@ import 'package:querya_desktop/core/storage/folders_storage.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 String _isoNow() => DateTime.now().toUtc().toIso8601String();
 

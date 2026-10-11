@@ -5,7 +5,7 @@ import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
 import 'package:querya_desktop/features/workspace/sql_query_tab_session.dart';
 import 'package:querya_desktop/features/workspace/sql_workspace_toolbar.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 class _FakeSqlExecutionDelegate extends BaseSqlExecutionDelegate {
   @override

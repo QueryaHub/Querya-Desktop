@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/features/workspace/result_grid_view.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 material.Widget _testShell({required material.Widget child}) {
   final td = QueryaTheme.darkDefault

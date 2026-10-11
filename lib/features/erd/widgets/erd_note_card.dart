@@ -3,7 +3,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/erd/erd_note_text.dart';
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 /// A sticky note on the canvas: draggable by its body, resizable by its
 /// corner, with an edit / colour / attach / delete menu (#1283).

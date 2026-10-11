@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 void main() {
   testWidgets('QueryaThemeScope provides workbench tokens', (tester) async {

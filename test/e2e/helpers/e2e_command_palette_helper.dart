@@ -1,5 +1,5 @@
 import 'package:flutter/services.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 import 'package:flutter_test/flutter_test.dart';
 
 /// Drives the Command Palette (`Ctrl+P`) the way a user does.

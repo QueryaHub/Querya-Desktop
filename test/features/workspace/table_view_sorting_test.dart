@@ -4,7 +4,7 @@ import 'package:querya_desktop/core/database/mysql_connection.dart';
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_utils.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 void main() {
   group('Table Views SQL Sorting Clause Generation', () {

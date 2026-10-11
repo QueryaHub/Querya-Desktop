@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/features/connections/new_connection_url_dialog.dart';
 import 'package:querya_desktop/features/postgresql/postgresql_connection_form.dart';
 import 'package:querya_desktop/shared/widgets/ssl_certificate_fields.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 import '../../support/querya_theme_test_shell.dart';
 

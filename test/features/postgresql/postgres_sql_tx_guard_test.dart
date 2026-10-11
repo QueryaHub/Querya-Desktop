@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
 import 'package:querya_desktop/features/postgresql/postgres_sql_tx_guard.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 void main() {
   test('postgresObjectOpensTableBrowser covers grid kinds only', () {

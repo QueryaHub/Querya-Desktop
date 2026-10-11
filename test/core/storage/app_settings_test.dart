@@ -6,7 +6,7 @@ import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme_preset.dart';
 import 'package:querya_desktop/core/updater/update_manifest.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 /// path_provider has no implementation in plain `flutter test`; LocalDb needs a path.
 class _FakePathProvider extends PathProviderPlatform {

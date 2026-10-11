@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 /// The entries of a table card's context menu.
 abstract final class ErdTableMenu {

@@ -4,7 +4,7 @@ import 'package:querya_desktop/core/theme/querya_colors.dart';
 import 'package:querya_desktop/core/theme/querya_editor_theme.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/core/theme/querya_workbench_theme.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 void main() {
   group('QueryaWorkbenchTheme', () {

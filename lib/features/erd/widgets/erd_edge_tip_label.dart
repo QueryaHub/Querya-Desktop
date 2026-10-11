@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/erd/erd_model.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 /// "orders.customer_id → customers.id" next to the pointer.
 class ErdEdgeTipLabel extends material.StatelessWidget {

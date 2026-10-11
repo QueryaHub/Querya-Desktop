@@ -6,7 +6,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/onboarding/welcome_tour_dialog.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 import '../../support/querya_theme_test_shell.dart';
 

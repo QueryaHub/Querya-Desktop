@@ -12,7 +12,7 @@ import 'package:querya_desktop/features/connections/connections_panel.dart';
 import 'package:querya_desktop/features/main_screen/main_screen.dart';
 import 'package:querya_desktop/features/main_screen/querya_window_title_bar.dart';
 import 'package:querya_desktop/features/main_screen/workspace_panel.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 import '../../support/querya_theme_test_shell.dart';
 

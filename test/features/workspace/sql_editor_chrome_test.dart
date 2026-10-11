@@ -5,7 +5,7 @@ import 'package:querya_desktop/core/theme/querya_editor_theme.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/core/theme/querya_workbench_theme.dart';
 import 'package:querya_desktop/features/workspace/sql_editor_chrome.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 import '../../support/querya_theme_test_shell.dart';
 

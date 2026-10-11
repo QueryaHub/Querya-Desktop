@@ -9,7 +9,7 @@ import 'package:querya_desktop/core/theme/parser/querya_theme_from_vscode.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/features/results/charts/chart_data.dart';
 import 'package:querya_desktop/features/results/charts/quick_chart_view.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 import '../../../support/querya_theme_test_shell.dart';
 

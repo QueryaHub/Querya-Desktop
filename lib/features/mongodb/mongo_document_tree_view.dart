@@ -6,10 +6,11 @@ import 'package:mongo_dart/mongo_dart.dart' show ObjectId;
 import 'package:querya_desktop/features/mongodb/mongo_ejson.dart';
 import 'package:querya_desktop/features/mongodb/mongo_field_codec.dart';
 import 'package:querya_desktop/shared/widgets/app_toast.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 import 'package:querya_desktop/shared/widgets/querya_button.dart';
 import 'package:querya_desktop/shared/widgets/querya_divider.dart';
+import 'package:querya_desktop/shared/widgets/querya_text.dart';
 
 /// Appends a key or list index to a JavaScript / JSON Path expression.
 ///

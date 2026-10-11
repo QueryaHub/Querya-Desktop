@@ -4,7 +4,7 @@ import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/core/unsaved_work_guard.dart';
 import 'package:querya_desktop/core/unsaved_work_registry.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 void main() {
   tearDown(UnsavedWorkRegistry.instance.resetForTest);

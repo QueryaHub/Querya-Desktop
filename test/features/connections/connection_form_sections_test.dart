@@ -4,7 +4,7 @@ import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/features/connections/forms/connection_auth_section.dart';
 import 'package:querya_desktop/features/connections/forms/connection_database_section.dart';
 import 'package:querya_desktop/features/connections/forms/connection_host_port_section.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 void main() {
   Widget buildApp(Widget child) {

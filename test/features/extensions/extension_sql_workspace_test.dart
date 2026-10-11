@@ -9,7 +9,7 @@ import 'package:querya_desktop/core/extensions/extension_driver_session.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/extensions/extension_sql_workspace.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 import 'package:querya_desktop/shared/widgets/querya_button.dart';
 
 import '../../support/querya_theme_test_shell.dart';

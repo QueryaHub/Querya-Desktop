@@ -5,9 +5,10 @@ import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/core/editor/syntax_highlight_service.dart';
 import 'package:querya_desktop/features/mongodb/mongo_ejson.dart';
 import 'package:querya_desktop/shared/widgets/app_toast.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 import 'package:querya_desktop/shared/widgets/querya_button.dart';
+import 'package:querya_desktop/shared/widgets/querya_text.dart';
 
 /// Full-page formatted Extended JSON viewer using [QueryaCodeEditor].
 class MongoDocumentsJsonView extends StatefulWidget {

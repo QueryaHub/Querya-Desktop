@@ -10,7 +10,7 @@ import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/features/connections/driver_manager_dialog.dart';
 import 'package:querya_desktop/features/mysql/mysql_workspace_home.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 import '../../support/querya_theme_test_shell.dart';
 

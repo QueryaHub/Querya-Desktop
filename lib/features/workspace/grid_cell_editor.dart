@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/features/workspace/grid_data_type_validator.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 /// Active inline editor widget for a data grid cell.
 class GridCellEditor extends material.StatefulWidget {

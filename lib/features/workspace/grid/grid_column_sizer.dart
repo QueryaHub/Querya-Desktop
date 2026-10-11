@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 /// Layout metrics for [VirtualResultGrid].
 abstract final class ResultGridMetrics {

@@ -8,7 +8,7 @@ import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/core/theme/theme_definition.dart';
 import 'package:querya_desktop/features/settings/theme_preview_card.dart';
 import 'package:querya_desktop/shared/widgets/querya_dropdown_tokens.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 /// Debounce delay before requesting a hover preview load.
 const Duration themePreviewDebounce = Duration(milliseconds: 120);

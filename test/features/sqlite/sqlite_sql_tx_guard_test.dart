@@ -4,7 +4,7 @@ import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart'
     show SqliteObjectKind;
 import 'package:querya_desktop/features/sqlite/sqlite_sql_tx_guard.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 void main() {
   test('sqliteObjectOpensTableBrowser covers table and view', () {
