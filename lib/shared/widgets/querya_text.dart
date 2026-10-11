@@ -37,33 +37,33 @@ extension QueryaTextStyles on material.Widget {
 
   /// One line, cut with an ellipsis.
   material.Widget ellipsis() => _QueryaStyledText(
-        child: this,
         overflow: material.TextOverflow.ellipsis,
         maxLines: 1,
+        child: this,
       );
 
   /// The muted foreground colour.
   material.Widget muted() => _QueryaStyledText(
-        child: this,
         style: (context) =>
             material.TextStyle(color: context.colors.mutedForeground),
+        child: this,
       );
 
   /// The standard foreground colour.
   material.Widget foreground() => _QueryaStyledText(
-        child: this,
         style: (context) =>
             material.TextStyle(color: context.colors.foreground),
+        child: this,
       );
 
   material.Widget _fontSize(double size) => _QueryaStyledText(
-        child: this,
         style: (_) => material.TextStyle(fontSize: size),
+        child: this,
       );
 
   material.Widget _weight(material.FontWeight weight) => _QueryaStyledText(
-        child: this,
         style: (_) => material.TextStyle(fontWeight: weight),
+        child: this,
       );
 }
 
