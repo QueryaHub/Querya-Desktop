@@ -56,7 +56,7 @@ void main() {
     await ws.pump(tester, delegate);
     await E2eSqlWorkspace.settle(tester);
     // Unknown until the first command refreshes the state.
-    expect(find.text('Transaction —'), findsOneWidget);
+    expect(find.text('Auto-commit'), findsOneWidget);
 
     await beginFromSessionMenu(tester);
     expect(find.text('Transaction open'), findsOneWidget);
