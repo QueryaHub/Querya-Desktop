@@ -10,6 +10,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 import 'package:querya_desktop/shared/widgets/querya_button.dart';
 import 'package:querya_desktop/shared/widgets/querya_divider.dart';
+import 'package:querya_desktop/shared/widgets/querya_icon_button.dart';
 import 'package:querya_desktop/shared/widgets/querya_text.dart';
 
 /// Appends a key or list index to a JavaScript / JSON Path expression.
@@ -312,30 +313,33 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
                   Text('$fieldsCount fields').muted().small(),
                   const Spacer(),
                   // Actions
-                  _TreeIconButton(
-                    icon: material.Icons.copy_rounded,
-                    tooltip: 'Copy Document JSON',
-                    onTap: () => _copyText(
+                  QueryaIconButton(
+            icon: material.Icon(material.Icons.copy_rounded),
+            tooltip: 'Copy Document JSON',
+            size: QueryaControlSize.sm,
+            onPressed: () => _copyText(
                       mongoDocumentToEjson(doc),
                       'Document JSON',
                     ),
-                  ),
+          ),
                   if (widget.onDocumentTap != null) ...[
                     const Gap(4),
-                    _TreeIconButton(
-                      icon: material.Icons.open_in_new_rounded,
-                      tooltip: 'View / Edit Document',
-                      onTap: () => widget.onDocumentTap!(doc),
-                    ),
+                    QueryaIconButton(
+            icon: material.Icon(material.Icons.open_in_new_rounded),
+            tooltip: 'View / Edit Document',
+            size: QueryaControlSize.sm,
+            onPressed: () => widget.onDocumentTap!(doc),
+          ),
                   ],
                   if (widget.onDeleteDocument != null) ...[
                     const Gap(4),
-                    _TreeIconButton(
-                      icon: material.Icons.delete_outline_rounded,
-                      tooltip: 'Delete Document',
-                      color: cs.destructive,
-                      onTap: () => widget.onDeleteDocument!(doc),
-                    ),
+                    QueryaIconButton(
+            icon: material.Icon(material.Icons.delete_outline_rounded),
+            tooltip: 'Delete Document',
+            size: QueryaControlSize.sm,
+            isDestructive: true,
+            onPressed: () => widget.onDeleteDocument!(doc),
+          ),
                   ],
                 ],
               ),
@@ -540,16 +544,18 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
             ),
           ),
           const Spacer(),
-          _TreeIconButton(
-            icon: material.Icons.alt_route_rounded,
+          QueryaIconButton(
+            icon: material.Icon(material.Icons.alt_route_rounded),
             tooltip: 'Copy JSON Path ($jsonPath)',
-            onTap: () => _copyText(jsonPath, 'JSON Path: $jsonPath'),
+            size: QueryaControlSize.sm,
+            onPressed: () => _copyText(jsonPath, 'JSON Path: $jsonPath'),
           ),
           const Gap(4),
-          _TreeIconButton(
-            icon: material.Icons.copy_rounded,
+          QueryaIconButton(
+            icon: material.Icon(material.Icons.copy_rounded),
             tooltip: 'Copy JSON',
-            onTap: () {
+            size: QueryaControlSize.sm,
+            onPressed: () {
               try {
                 final encoded = const JsonEncoder.withIndent('  ')
                     .convert(rawSubtree);
@@ -642,24 +648,27 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
             ),
           ),
           const Gap(6),
-          _TreeIconButton(
-            icon: material.Icons.alt_route_rounded,
+          QueryaIconButton(
+            icon: material.Icon(material.Icons.alt_route_rounded),
             tooltip: 'Copy JSON Path ($jsonPath)',
-            onTap: () => _copyText(jsonPath, 'JSON Path: $jsonPath'),
+            size: QueryaControlSize.sm,
+            onPressed: () => _copyText(jsonPath, 'JSON Path: $jsonPath'),
           ),
           const Gap(4),
-          _TreeIconButton(
-            icon: material.Icons.copy_rounded,
+          QueryaIconButton(
+            icon: material.Icon(material.Icons.copy_rounded),
             tooltip: 'Copy Value',
-            onTap: () => _copyText(valueDisplay, 'Value'),
+            size: QueryaControlSize.sm,
+            onPressed: () => _copyText(valueDisplay, 'Value'),
           ),
           if (canEdit) ...[
             const Gap(4),
-            _TreeIconButton(
-              icon: material.Icons.edit_note_rounded,
-              tooltip: 'Edit Field',
-              onTap: () => widget.onInspectField!(rootDoc, keyOrIndex),
-            ),
+            QueryaIconButton(
+            icon: material.Icon(material.Icons.edit_note_rounded),
+            tooltip: 'Edit Field',
+            size: QueryaControlSize.sm,
+            onPressed: () => widget.onInspectField!(rootDoc, keyOrIndex),
+          ),
           ],
         ],
       ),
@@ -696,36 +705,3 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
   }
 }
 
-class _TreeIconButton extends StatelessWidget {
-  const _TreeIconButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-    this.color,
-  });
-
-  final material.IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return material.Tooltip(
-      message: tooltip,
-      child: material.InkWell(
-        onTap: onTap,
-        borderRadius: material.BorderRadius.circular(4),
-        child: material.Padding(
-          padding: const material.EdgeInsets.all(3),
-          child: material.Icon(
-            icon,
-            size: 14,
-            color: color ?? cs.mutedForeground,
-          ),
-        ),
-      ),
-    );
-  }
-}

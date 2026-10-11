@@ -390,11 +390,11 @@ class _DatabaseRow extends StatelessWidget {
               const material.EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           child: Row(
             children: [
-              _ActionButton(
+              QueryaButton.secondary(
                 label: 'View',
                 icon: material.Icons.visibility_rounded,
-                color: context.semanticPalette.success,
-                onTap: onView,
+                size: QueryaControlSize.sm,
+                onPressed: onView,
               ),
               const Gap(16),
               Expanded(
@@ -413,11 +413,12 @@ class _DatabaseRow extends StatelessWidget {
                 width: 120,
                 child: Text(_formatSize(database.sizeOnDisk)).muted().small(),
               ),
-              _ActionButton(
+              QueryaButton.secondary(
                 label: 'Del',
                 icon: material.Icons.delete_rounded,
-                color: context.semanticPalette.destructive,
-                onTap: onDrop,
+                size: QueryaControlSize.sm,
+                tone: QueryaButtonTone.destructive,
+                onPressed: onDrop,
               ),
             ],
           ),
@@ -436,54 +437,6 @@ class _DatabaseRow extends StatelessWidget {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
     }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
-
-  final String label;
-  final material.IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return material.Material(
-      color: Colors.transparent,
-      child: material.InkWell(
-        onTap: onTap,
-        borderRadius: material.BorderRadius.circular(6),
-        child: material.Container(
-          padding:
-              const material.EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: material.BoxDecoration(
-            color: color.withValues(alpha: 0.14),
-            borderRadius: material.BorderRadius.circular(6),
-          ),
-          child: Row(
-            mainAxisSize: material.MainAxisSize.min,
-            children: [
-              material.Icon(icon, size: 14, color: color),
-              const Gap(5),
-              Text(
-                label,
-                style: material.TextStyle(
-                  color: color,
-                  fontSize: 12,
-                  fontWeight: material.FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 

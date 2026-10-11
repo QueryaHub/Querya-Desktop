@@ -61,25 +61,26 @@ class DataGridStagingToolbar extends StatelessWidget {
                       child: material.Row(
                         mainAxisSize: material.MainAxisSize.min,
                         children: [
-                          _ToolbarButton(
+                          QueryaButton.ghost(
                             label: 'Add Row',
                             icon: material.Icons.add_rounded,
                             compact: compact,
+                            size: QueryaControlSize.sm,
+                            tone: QueryaButtonTone.normal,
                             tooltip: 'Add new row (Ctrl+Insert / Cmd+N)',
-                            onPressed:
-                                isSaving ? null : () => stagingBuffer.addRow(),
+                            onPressed: isSaving ? null : () => stagingBuffer.addRow(),
                           ),
                           const Gap(2),
-                          _ToolbarButton(
-                            label:
-                                isSelectedDeleted ? 'Restore Row' : 'Delete Row',
+                          QueryaButton.ghost(
+                            label: isSelectedDeleted ? 'Restore Row' : 'Delete Row',
                             icon: isSelectedDeleted
                                 ? material.Icons.restore_from_trash_rounded
                                 : material.Icons.remove_circle_outline_rounded,
                             compact: compact,
-                            color: isSelectedDeleted
-                                ? cs.primary
-                                : (hasSelectedRow ? cs.destructive : null),
+                            size: QueryaControlSize.sm,
+                            tone: isSelectedDeleted || !hasSelectedRow
+                                ? QueryaButtonTone.normal
+                                : QueryaButtonTone.destructive,
                             tooltip: isSelectedDeleted
                                 ? 'Restore marked row'
                                 : hasSelectedRow
@@ -197,99 +198,5 @@ class _PendingBadge extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _ToolbarButton extends material.StatefulWidget {
-  const _ToolbarButton({
-    required this.label,
-    required this.icon,
-    this.onPressed,
-    this.color,
-    this.tooltip,
-    this.compact = false,
-  });
-
-  /// Icon only; the label moves into the tooltip.
-  final bool compact;
-  final String label;
-  final material.IconData icon;
-  final material.VoidCallback? onPressed;
-  final material.Color? color;
-  final String? tooltip;
-
-  @override
-  material.State<_ToolbarButton> createState() => _ToolbarButtonState();
-}
-
-class _ToolbarButtonState extends material.State<_ToolbarButton> {
-  bool _isHovered = false;
-
-  @override
-  material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final enabled = widget.onPressed != null;
-    final fg = widget.color ?? cs.foreground;
-
-    material.Widget button = material.MouseRegion(
-      cursor: enabled
-          ? material.SystemMouseCursors.click
-          : material.SystemMouseCursors.basic,
-      onEnter: enabled ? (_) => setState(() => _isHovered = true) : null,
-      onExit: enabled ? (_) => setState(() => _isHovered = false) : null,
-      child: material.GestureDetector(
-        onTap: widget.onPressed,
-        behavior: material.HitTestBehavior.opaque,
-        child: material.Opacity(
-          opacity: enabled ? 1.0 : 0.4,
-          child: material.AnimatedContainer(
-            duration: context.motionDuration(QueryaMotion.fast),
-            curve: context.motionCurve(QueryaMotion.enter),
-            padding: const material.EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: 4,
-            ),
-            decoration: material.BoxDecoration(
-              color: enabled && _isHovered
-                  ? (widget.color != null
-                      ? widget.color!.withValues(alpha: 0.12)
-                      : cs.muted.withValues(alpha: 0.5))
-                  : material.Colors.transparent,
-              borderRadius: material.BorderRadius.circular(4),
-            ),
-            child: material.Row(
-              mainAxisSize: material.MainAxisSize.min,
-              children: [
-                material.Icon(widget.icon, size: 14, color: fg),
-                if (!widget.compact) ...[
-                  const material.SizedBox(width: 4),
-                  material.Text(
-                    widget.label,
-                    style: material.TextStyle(
-                      fontSize: 12,
-                      fontWeight: material.FontWeight.w500,
-                      color: fg,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-
-    final tooltip = widget.compact
-        ? '${widget.label}${widget.tooltip != null ? ' — ${widget.tooltip}' : ''}'
-        : widget.tooltip;
-    if (tooltip != null) {
-      button = material.Tooltip(
-        message: tooltip,
-        waitDuration: const Duration(milliseconds: 400),
-        child: button,
-      );
-    }
-
-    return button;
   }
 }

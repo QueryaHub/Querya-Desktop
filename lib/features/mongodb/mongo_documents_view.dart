@@ -762,16 +762,19 @@ class _DocumentCardState extends State<_DocumentCard> {
                         ),
                       ),
                       const Gap(8),
-                      _SmallActionButton(
-                        icon: material.Icons.edit_rounded,
-                        color: context.semanticPalette.action,
-                        onTap: widget.onView,
+                      QueryaIconButton(
+                        icon: material.Icon(material.Icons.edit_rounded),
+                        tooltip: 'Open document',
+                        size: QueryaControlSize.sm,
+                        onPressed: widget.onView,
                       ),
                       const Gap(4),
-                      _SmallActionButton(
-                        icon: material.Icons.delete_rounded,
-                        color: context.semanticPalette.destructive,
-                        onTap: widget.onDelete,
+                      QueryaIconButton(
+                        icon: material.Icon(material.Icons.delete_rounded),
+                        tooltip: 'Delete document',
+                        size: QueryaControlSize.sm,
+                        isDestructive: true,
+                        onPressed: widget.onDelete,
                       ),
                     ],
                   ),
@@ -932,25 +935,3 @@ class MongoFieldList extends StatelessWidget {
 
 // ─── Small icon-only action button ──────────────────────────────────────────
 
-class _SmallActionButton extends StatelessWidget {
-  const _SmallActionButton({
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
-
-  final material.IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return material.IconButton(
-      onPressed: onTap,
-      icon: material.Icon(icon, size: 15, color: color),
-      padding: const material.EdgeInsets.all(5),
-      constraints: const material.BoxConstraints(minWidth: 28, minHeight: 28),
-      splashRadius: 18,
-    );
-  }
-}
