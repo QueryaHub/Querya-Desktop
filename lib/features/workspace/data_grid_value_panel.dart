@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/editor/querya_code_editor.dart';
 import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
+import 'package:querya_desktop/shared/widgets/querya_button.dart';
 import 'package:querya_desktop/shared/widgets/querya_dropdown.dart';
 import 'package:querya_desktop/shared/widgets/querya_icon_button.dart';
 import 'package:querya_desktop/shared/widgets/querya_text.dart';
@@ -357,25 +358,17 @@ class _DataGridValuePanelState extends material.State<DataGridValuePanel> {
                 ),
                 const Gap(6),
                 if (activeLang == ValuePanelLanguage.json || activeLang == ValuePanelLanguage.xml) ...[
-                  material.TextButton(
-                    onPressed: _formatCode,
-                    style: material.TextButton.styleFrom(
-                      padding: const material.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      minimumSize: material.Size.zero,
-                      tapTargetSize: material.MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: const Text('Format').small(),
-                  ),
+                  QueryaButton.ghost(
+ label: 'Format',
+ size: QueryaControlSize.sm,
+ onPressed: _formatCode,
+ ),
                   const Gap(4),
-                  material.TextButton(
-                    onPressed: _minifyCode,
-                    style: material.TextButton.styleFrom(
-                      padding: const material.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      minimumSize: material.Size.zero,
-                      tapTargetSize: material.MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: const Text('Minify').small(),
-                  ),
+                  QueryaButton.ghost(
+ label: 'Minify',
+ size: QueryaControlSize.sm,
+ onPressed: _minifyCode,
+ ),
                 ],
                 const material.Spacer(),
                 QueryaIconButton(
@@ -490,16 +483,11 @@ class _DataGridValuePanelState extends material.State<DataGridValuePanel> {
                       ),
                     ),
                   ],
-                  material.ElevatedButton(
-                    onPressed: _validationError != null ? null : _handleUpdateValue,
-                    style: material.ElevatedButton.styleFrom(
-                      backgroundColor: cs.primary,
-                      foregroundColor: cs.primaryForeground,
-                      padding: const material.EdgeInsets.symmetric(vertical: 8),
-                      minimumSize: material.Size.zero,
-                    ),
-                    child: const Text('Update Cell Value').small().bold(),
-                  ),
+                  QueryaButton.primary(
+ label: 'Update Cell Value',
+ size: QueryaControlSize.sm,
+ onPressed: _validationError != null ? null : _handleUpdateValue,
+ ),
                 ],
               ),
             ),

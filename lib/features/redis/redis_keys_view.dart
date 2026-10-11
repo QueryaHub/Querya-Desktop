@@ -775,19 +775,13 @@ class _FolderTile extends material.StatelessWidget {
               ),
               const material.Spacer(),
               if (onDelete != null)
-                material.IconButton(
-                  onPressed: onDelete,
-                  icon: material.Icon(
-                    material.Icons.delete_outline_rounded,
-                    size: 16,
-                    color: palette.destructive,
-                  ),
-                  padding: const material.EdgeInsets.all(4),
-                  constraints: const material.BoxConstraints(
-                      minWidth: 28, minHeight: 28),
-                  splashRadius: 18,
-                  tooltip: 'Delete folder (${folder.totalKeyCount} keys)',
-                ),
+                QueryaIconButton(
+icon: material.Icon(material.Icons.delete_outline_rounded),
+tooltip: 'Delete folder (${folder.totalKeyCount} keys)',
+size: QueryaControlSize.sm,
+isDestructive: true,
+onPressed: onDelete,
+),
             ],
           ),
         ),
@@ -939,19 +933,13 @@ class _KeyTile extends material.StatelessWidget {
                 ),
               const Gap(4),
               if (onDelete != null)
-                material.IconButton(
-                  onPressed: onDelete,
-                  icon: material.Icon(
-                    material.Icons.delete_rounded,
-                    size: 15,
-                    color: palette.destructive,
-                  ),
-                  padding: const material.EdgeInsets.all(4),
-                  constraints: const material.BoxConstraints(
-                      minWidth: 28, minHeight: 28),
-                  splashRadius: 18,
-                  tooltip: 'Delete key',
-                ),
+                QueryaIconButton(
+icon: material.Icon(material.Icons.delete_rounded),
+tooltip: 'Delete key',
+size: QueryaControlSize.sm,
+isDestructive: true,
+onPressed: onDelete,
+),
               material.Icon(material.Icons.chevron_right_rounded,
                   size: 18, color: shadcnCs.mutedForeground),
             ],

@@ -271,15 +271,12 @@ class _WelcomeTourDialogState extends State<WelcomeTourDialog> {
                       ),
                       const material.SizedBox(width: 4),
                     ],
-                    material.IconButton(
-                      icon: const material.Icon(
-                        material.Icons.close_rounded,
-                        size: 18,
-                      ),
-                      tooltip: 'Close',
-                      splashRadius: 16,
-                      onPressed: _finish,
-                    ),
+                    QueryaIconButton(
+icon: material.Icon(material.Icons.close_rounded),
+tooltip: 'Close',
+size: QueryaControlSize.sm,
+onPressed: _finish,
+),
                   ],
                 ),
                 const material.SizedBox(height: 18),

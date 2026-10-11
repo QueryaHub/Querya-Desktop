@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/ui/querya_tooltip.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
@@ -102,7 +103,7 @@ class DataGridStagingToolbar extends StatelessWidget {
                     const Gap(6),
                     material.Tooltip(
                       message: 'Discard all pending edits (Ctrl+Z / Cmd+Z)',
-                      waitDuration: const Duration(milliseconds: 400),
+                      waitDuration: kQueryaTooltipWait,
                       child: compact
                           ? QueryaButton.icon(
                             icon: material.Icons.undo_rounded,
@@ -137,7 +138,7 @@ class DataGridStagingToolbar extends StatelessWidget {
                     message: isDirty
                         ? 'Review and save pending changes (Ctrl+S / Cmd+S)'
                         : 'No pending changes to save',
-                    waitDuration: const Duration(milliseconds: 400),
+                    waitDuration: kQueryaTooltipWait,
                     child: QueryaButton.primary(
                       label: isSaving ? 'Saving…' : (compact ? 'Save' : 'Save Changes'),
                       icon: material.Icons.save_rounded,
@@ -170,7 +171,7 @@ class _PendingBadge extends StatelessWidget {
         : '$count pending ${count == 1 ? 'change' : 'changes'}';
     return material.Tooltip(
       message: '$count pending ${count == 1 ? 'change' : 'changes'} not saved yet',
-      waitDuration: const Duration(milliseconds: 400),
+      waitDuration: kQueryaTooltipWait,
       child: material.Container(
         padding: const material.EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: material.BoxDecoration(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
+import 'package:querya_desktop/core/ui/querya_tooltip.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/features/workspace/dml_preview_dialog.dart';
 import 'package:querya_desktop/features/workspace/save_error_description.dart';
@@ -223,7 +224,7 @@ class TableEditModeButton extends material.StatelessWidget {
     if (editMode) {
       return material.Tooltip(
         message: 'Stop editing (Ctrl+E)',
-        waitDuration: const Duration(milliseconds: 400),
+        waitDuration: kQueryaTooltipWait,
         child: QueryaButton.primary(
           label: 'Done',
           icon: material.Icons.check_rounded,
@@ -237,7 +238,7 @@ class TableEditModeButton extends material.StatelessWidget {
       message: canEdit
           ? 'Edit rows (Ctrl+E)'
           : (disabledReason ?? 'This table cannot be edited'),
-      waitDuration: const Duration(milliseconds: 400),
+      waitDuration: kQueryaTooltipWait,
       child: QueryaButton.secondary(
         label: 'Edit',
         icon: material.Icons.edit_rounded,

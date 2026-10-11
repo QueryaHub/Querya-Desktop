@@ -207,17 +207,19 @@ Canonical labels and roles from the review:
 | several related buttons side by side with gaps | `QueryaButtonGroup` |
 | shadcn / material `IconButton`, private `_TreeIconButton` | `QueryaIconButton` (with tooltip) |
 | `InkWell` / `GestureDetector` around an icon or text | `QueryaButton` or `QueryaIconButton` |
-| private `_ActionButton`, `_SmallActionButton`, `_ToolbarButton` | `QueryaButton` |
-| show-password eye pasted in forms | one password field widget |
+| private `_ActionButton`, `_SmallActionButton`, `_ToolbarButton` (gone) | `QueryaButton` |
+| show-password eye pasted in forms | `QueryaIconButton` (one password field widget stays open in #1445) |
 
-### Guards (landing with #1339)
+### Guards
 
-| Test | Forbids |
-|------|---------|
-| `no_shadcn_buttons_test.dart` | `PrimaryButton`, `OutlineButton`, `GhostButton`, `DestructiveButton`, `SecondaryButton`, `LinkButton`, `ButtonSize`, `ButtonDensity` outside an allow-list |
-| `no_raw_material_buttons_test.dart` | `IconButton`, `TextButton`, `ElevatedButton`, `OutlinedButton`, `FilledButton` |
-| `no_ad_hoc_button_classes_test.dart` | a `*Button` class outside `lib/shared/widgets/`; a button-like `InkWell` / `GestureDetector` outside the kit |
-| `button_literals_test.dart` | `waitDuration: Duration(...)` literals, `BorderRadius.circular(n)` on a kit control |
+All four live in `test/guards/button_standard_guards_test.dart`:
+
+| Guard | Forbids |
+|-------|---------|
+| shadcn button types | `PrimaryButton`, `OutlineButton`, `GhostButton`, `DestructiveButton`, `SecondaryButton`, `LinkButton`, `ButtonSize`, `ButtonDensity` in `lib/` |
+| raw Material buttons | `IconButton`, `TextButton`, `ElevatedButton`, `OutlinedButton`, `FilledButton` in `lib/` |
+| button classes | a `*Button` class outside `lib/shared/widgets/` (allow-list: `ThemePickerButton`, `TableEditModeButton`, follow-up #1445) |
+| tooltip delay | `waitDuration: Duration(...)` literals; use `kQueryaTooltipWait` |
 
 ## Design tokens
 

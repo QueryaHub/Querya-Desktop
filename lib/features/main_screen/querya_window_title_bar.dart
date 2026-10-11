@@ -5,6 +5,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
+import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 import 'package:querya_desktop/features/connections/driver_manager_dialog.dart';
 import 'package:querya_desktop/core/actions/querya_command_host.dart';
 import 'package:querya_desktop/features/command_palette/command_palette_dialog.dart';
@@ -17,6 +18,7 @@ import 'package:querya_desktop/features/updater/update_available_badge.dart';
 import 'package:querya_desktop/features/updater/update_controller.dart';
 import 'package:querya_desktop/features/updater/update_dialog.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
+import 'package:querya_desktop/shared/widgets/querya_icon_button.dart';
 import 'package:querya_desktop/shared/widgets/querya_text.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
@@ -126,28 +128,17 @@ class QueryaWindowTitleBar extends StatelessWidget {
                     const Text('Querya').semiBold().small(),
                     const Gap(12),
                     if (onToggleSidebar != null) ...[
-                      material.Tooltip(
-                        message:
-                            'Toggle Sidebar (${Platform.isMacOS ? "Cmd+B" : "Ctrl+B"})',
-                        child: material.IconButton(
-                          key: const Key('title_bar_toggle_sidebar_button'),
-                          icon: material.Icon(
-                            isSidebarVisible
-                                ? material.Icons.view_sidebar_rounded
-                                : material.Icons.view_sidebar_outlined,
-                            size: 16,
-                            color: isSidebarVisible
-                                ? Theme.of(context).colorScheme.foreground
-                                : wb.mutedForeground,
-                          ),
-                          splashRadius: 14,
-                          padding: const material.EdgeInsets.all(4),
-                          constraints: const material.BoxConstraints(
-                            minWidth: 26,
-                            minHeight: 26,
-                          ),
-                          onPressed: onToggleSidebar,
+                      QueryaIconButton(
+                        key: const Key('title_bar_toggle_sidebar_button'),
+                        icon: material.Icon(
+                          isSidebarVisible
+                              ? material.Icons.view_sidebar_rounded
+                              : material.Icons.view_sidebar_outlined,
                         ),
+                        tooltip:
+                            'Toggle Sidebar (${Platform.isMacOS ? "Cmd+B" : "Ctrl+B"})',
+                        size: QueryaControlSize.sm,
+                        onPressed: onToggleSidebar,
                       ),
                       const Gap(12),
                     ] else

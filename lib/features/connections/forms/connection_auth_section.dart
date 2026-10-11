@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 import 'package:querya_desktop/features/connections/remove_saved_password_option.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -77,17 +78,14 @@ class _ConnectionAuthSectionState extends material.State<ConnectionAuthSection> 
               top: 0,
               bottom: 0,
               child: material.Center(
-                child: material.IconButton(
-                  icon: material.Icon(
-                    _showPassword
+                child: QueryaIconButton(
+icon: material.Icon(_showPassword
                         ? material.Icons.visibility_off
-                        : material.Icons.visibility,
-                    size: 20,
-                  ),
-                  onPressed: () => setState(() => _showPassword = !_showPassword),
-                  padding: material.EdgeInsets.zero,
-                  constraints: const material.BoxConstraints(),
-                ),
+                        : material.Icons.visibility),
+tooltip: _showPassword ? 'Hide password' : 'Show password',
+size: QueryaControlSize.sm,
+onPressed: () => setState(() => _showPassword = !_showPassword),
+),
               ),
             ),
           ],

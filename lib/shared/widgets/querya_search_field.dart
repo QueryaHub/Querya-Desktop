@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
+import 'package:querya_desktop/shared/widgets/querya_button.dart';
 
 /// Standard search and filter input field with debounce, clear button, and shortcut support.
 class QueryaSearchField extends material.StatefulWidget {
@@ -210,17 +211,10 @@ class _QueryaSearchFieldState extends material.State<QueryaSearchField> {
           if (_hasText)
             material.Padding(
               padding: const material.EdgeInsets.only(right: 4),
-              child: material.IconButton(
-                icon: const material.Icon(material.Icons.close_rounded, size: 14),
-                splashRadius: 12,
-                padding: material.EdgeInsets.zero,
-                constraints: const material.BoxConstraints(
-                  minWidth: 20,
-                  minHeight: 20,
-                ),
-                color: cs.mutedForeground,
-                hoverColor: cs.muted.withValues(alpha: 0.3),
+              child: QueryaButton.icon(
+                icon: material.Icons.close_rounded,
                 tooltip: 'Clear search (Esc)',
+                size: QueryaControlSize.sm,
                 onPressed: _clear,
               ),
             )

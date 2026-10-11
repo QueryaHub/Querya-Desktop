@@ -439,18 +439,15 @@ class _RedisConnectionFormContentState
                           top: 0,
                           bottom: 0,
                           child: material.Center(
-                            child: material.IconButton(
-                              icon: material.Icon(
-                                _showPassword
+                            child: QueryaIconButton(
+icon: material.Icon(_showPassword
                                     ? material.Icons.visibility_off
-                                    : material.Icons.visibility,
-                                size: 20,
-                              ),
-                              onPressed: () => setState(
+                                    : material.Icons.visibility),
+tooltip: _showPassword ? 'Hide password' : 'Show password',
+size: QueryaControlSize.sm,
+onPressed: () => setState(
                                   () => _showPassword = !_showPassword),
-                              padding: material.EdgeInsets.zero,
-                              constraints: const material.BoxConstraints(),
-                            ),
+),
                           ),
                         ),
                       ],
@@ -543,18 +540,12 @@ class _RedisConnectionFormContentState
                               ),
                             ).small(),
                           ),
-                          material.IconButton(
-                            icon: material.Icon(
-                              material.Icons.close,
-                              size: 18,
-                              color: theme.mutedForeground,
-                            ),
-                            onPressed: _dismissResult,
-                            style: material.IconButton.styleFrom(
-                              minimumSize: const material.Size(28, 28),
-                              padding: material.EdgeInsets.zero,
-                            ),
-                          ),
+                          QueryaIconButton(
+icon: material.Icon(material.Icons.close),
+tooltip: 'Dismiss',
+size: QueryaControlSize.sm,
+onPressed: _dismissResult,
+),
                         ],
                       ),
                     ),

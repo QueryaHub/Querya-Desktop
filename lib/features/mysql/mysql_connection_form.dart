@@ -529,18 +529,12 @@ class _MysqlConnectionFormContentState
                               ),
                             ).small(),
                           ),
-                          material.IconButton(
-                            icon: material.Icon(
-                              material.Icons.close,
-                              size: 18,
-                              color: theme.mutedForeground,
-                            ),
-                            onPressed: _dismissResult,
-                            style: material.IconButton.styleFrom(
-                              minimumSize: const material.Size(28, 28),
-                              padding: material.EdgeInsets.zero,
-                            ),
-                          ),
+                          QueryaIconButton(
+icon: material.Icon(material.Icons.close),
+tooltip: 'Dismiss',
+size: QueryaControlSize.sm,
+onPressed: _dismissResult,
+),
                         ],
                       ),
                     ),
