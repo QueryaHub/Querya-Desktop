@@ -122,40 +122,41 @@ Whether you are navigating multi-million row datasets, authoring complex analyti
 ## Installation
 
 ### Linux
-**Debian / Ubuntu (APT repository, updates with `apt upgrade`):**
-
-```bash
-curl -fsSL https://repo.querya.app/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/querya.gpg
-echo "deb [signed-by=/etc/apt/keyrings/querya.gpg] https://repo.querya.app/apt stable main" | sudo tee /etc/apt/sources.list.d/querya.list
-sudo apt update && sudo apt install querya-desktop
-```
-
-**Fedora / RHEL (DNF repository):**
-
-```bash
-sudo dnf config-manager --add-repo https://repo.querya.app/rpm/querya.repo
-sudo dnf install querya-desktop
-```
-
-Or download the latest `.deb`, `.AppImage`, or `.tar.gz` from [Releases](https://github.com/QueryaHub/Querya-Desktop/releases):
+Download the latest `.deb`, `.AppImage`, `.rpm`, or `.flatpak` from [Releases](https://github.com/QueryaHub/Querya-Desktop/releases):
 
 ```bash
 # Debian / Ubuntu (.deb)
-sudo dpkg -i querya-desktop-linux-amd64.deb
-sudo apt-get install -f
+sudo apt install ./Querya-Desktop-*-linux.deb
 
-# AppImage (Standalone executable)
-chmod +x querya-desktop-*.AppImage
-./querya-desktop-*.AppImage
+# Fedora / RHEL (.rpm)
+sudo rpm -i Querya-Desktop-*-linux.rpm
+
+# AppImage (standalone executable; Ubuntu 22.04+ requires libfuse2)
+# Ubuntu 22.04+: sudo apt install libfuse2   # or libfuse2t64
+chmod +x Querya-Desktop-*-linux.AppImage
+./Querya-Desktop-*-linux.AppImage
+
+# Arch Linux (AUR)
+yay -S querya-desktop
+
+# Flatpak (local bundle)
+flatpak install --user ./Querya-Desktop-*-linux.flatpak
 ```
 
 > **Note:** Linux builds utilize `libsecret-1` for OS-level credential protection. Ensure `libsecret-1-0` is installed on your system.
+
+> **APT/DNF repositories:** A hosted repository (`repo.querya.app`) is planned — see [#1059](https://github.com/QueryaHub/Querya-Desktop/issues/1059). Until then, use the GitHub Release assets above.
 
 ### Windows
 Download the Windows installer (`.exe`) or portable archive (`.zip`) from [Releases](https://github.com/QueryaHub/Querya-Desktop/releases). Run the setup to automatically register `.sql` and `.sqlite` file associations.
 
 ### macOS
 Download the universal `.dmg` from [Releases](https://github.com/QueryaHub/Querya-Desktop/releases), mount the disk image, and drag **Querya** into your `Applications` folder.
+
+> **Unsigned builds:** If Gatekeeper blocks the app after installation, run:
+> ```bash
+> xattr -cr /Applications/Querya.app
+> ```
 
 ---
 
