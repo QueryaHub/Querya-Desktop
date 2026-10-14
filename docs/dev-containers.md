@@ -13,6 +13,13 @@ list of seeded data see the header of [`docker/docker-compose.yml`](../docker/do
 | [`.devcontainer/Dockerfile`](../.devcontainer/Dockerfile) | `ghcr.io/cirruslabs/flutter` plus the Linux desktop toolchain (clang, cmake, ninja, GTK 3, libsecret, SQLite headers, Xvfb) and the Docker CLI with the Compose plugin. `DISPLAY` is `:99`. |
 | [`docker/docker-compose.yml`](../docker/docker-compose.yml) | The database stack (project `querya-dev`): PostgreSQL 16, MySQL 8.4, Redis 7, MongoDB 7, ClickHouse 24.8 and a seeded SQLite file. |
 
+The image is also published to GitHub Packages as
+`ghcr.io/queryahub/querya-devcontainer` (`:latest` and `:flutter-<version>`) by the
+[Dev container image](../.github/workflows/devcontainer-image.yml) workflow, rebuilt when the
+Dockerfile changes and weekly for security updates. `devcontainer.json` uses it as a layer
+cache (`build.cacheFrom`), so the first build pulls the toolchain layers instead of compiling
+them; if the package is unreachable the build simply falls back to building from the Dockerfile.
+
 When the container is created it runs `flutter config --enable-linux-desktop`
 and `flutter pub get`; every time it starts it tries
 `docker compose -f docker/docker-compose.yml up -d` and prints a hint if Docker

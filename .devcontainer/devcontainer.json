@@ -1,6 +1,9 @@
 {
   "name": "Querya Desktop",
-  "build": { "dockerfile": "Dockerfile" },
+  "build": {
+    "dockerfile": "Dockerfile",
+    "cacheFrom": "ghcr.io/queryahub/querya-devcontainer:latest"
+  },
   "features": {
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
   },
