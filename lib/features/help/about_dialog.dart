@@ -48,10 +48,16 @@ class _AboutDialogContentState extends material.State<_AboutDialogContent> {
             padding: const material.EdgeInsets.fromLTRB(24, 28, 24, 8),
             child: material.Column(
               children: [
-                material.Icon(
-                  QueryaIcons.database,
-                  size: 48,
-                  color: wb.accent,
+                material.Image.asset(
+                  'assets/images/querya_logo.png',
+                  width: 56,
+                  height: 56,
+                  filterQuality: material.FilterQuality.medium,
+                  errorBuilder: (_, __, ___) => material.Icon(
+                    QueryaIcons.database,
+                    size: 48,
+                    color: wb.accent,
+                  ),
                 ),
                 const material.SizedBox(height: 16),
                 const Text('Querya').large().semiBold(),
