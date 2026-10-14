@@ -1,0 +1,21 @@
+name: Community
+
+on:
+  issues:
+    types: [opened]
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  triage:
+    if: github.event_name == 'issues'
+    uses: QueryaHub/.github/.github/workflows/reusable-triage.yml@main
+
+  stale:
+    if: github.event_name != 'issues'
+    uses: QueryaHub/.github/.github/workflows/reusable-stale.yml@main

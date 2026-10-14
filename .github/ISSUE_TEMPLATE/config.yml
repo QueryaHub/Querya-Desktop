@@ -3,6 +3,9 @@ contact_links:
   - name: Security vulnerability
     url: https://github.com/QueryaHub/Querya-Desktop/security/advisories/new
     about: Please report security problems privately, not as a public issue.
+  - name: Questions and ideas
+    url: https://github.com/QueryaHub/Querya-Desktop/discussions
+    about: Ask a question or discuss an idea before opening an issue.
   - name: Documentation
     url: https://github.com/QueryaHub/Querya-Desktop/tree/main/docs
     about: Getting started, architecture, extensions and packaging guides.
