@@ -42,6 +42,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "openwith"; Description: "Show Querya in the ""Open with"" menu for .sql and SQLite files"; GroupDescription: "File associations:"; Flags: unchecked
 Name: "assoc_sql"; Description: "Register Querya as an editor for .sql files"; GroupDescription: "File associations:"; Flags: unchecked
 Name: "assoc_sqlite"; Description: "Associate Querya with SQLite database files (.sqlite, .db)"; GroupDescription: "File associations:"; Flags: unchecked
 
@@ -76,12 +77,12 @@ Root: HKCR; Subkey: "Querya.SQLite"; ValueType: string; ValueName: ""; ValueData
 Root: HKCR; Subkey: "Querya.SQLite\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: assoc_sqlite
 Root: HKCR; Subkey: "Querya.SQLite\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: assoc_sqlite
 
-; Windows Applications registry (ensures presence in modern Open With menu)
-Root: HKCR; Subkey: "Applications\{#MyAppExeName}"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "{#MyAppName}"; Flags: uninsdeletekey
-Root: HKCR; Subkey: "Applications\{#MyAppExeName}\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"
-Root: HKCR; Subkey: "Applications\{#MyAppExeName}\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
-Root: HKCR; Subkey: "Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".sql"; ValueData: ""
-Root: HKCR; Subkey: "Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".sqlite"; ValueData: ""
-Root: HKCR; Subkey: "Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".sqlite3"; ValueData: ""
-Root: HKCR; Subkey: "Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".db"; ValueData: ""
-Root: HKCR; Subkey: "Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".db3"; ValueData: ""
+; Windows Applications registry (optional via task: presence in the Open With menu)
+Root: HKCR; Subkey: "Applications\{#MyAppExeName}"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "{#MyAppName}"; Flags: uninsdeletekey; Tasks: openwith
+Root: HKCR; Subkey: "Applications\{#MyAppExeName}\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: openwith
+Root: HKCR; Subkey: "Applications\{#MyAppExeName}\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: openwith
+Root: HKCR; Subkey: "Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".sql"; ValueData: ""; Tasks: openwith
+Root: HKCR; Subkey: "Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".sqlite"; ValueData: ""; Tasks: openwith
+Root: HKCR; Subkey: "Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".sqlite3"; ValueData: ""; Tasks: openwith
+Root: HKCR; Subkey: "Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".db"; ValueData: ""; Tasks: openwith
+Root: HKCR; Subkey: "Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".db3"; ValueData: ""; Tasks: openwith
