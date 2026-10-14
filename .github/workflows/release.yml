@@ -470,6 +470,10 @@ jobs:
     name: Publish GitHub Release
     needs: [e2e, build-windows, build-linux, build-macos, build-ext-tester]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     outputs:
       version: ${{ needs.build-windows.outputs.version }}
       release_tag: ${{ steps.rel.outputs.tag }}
@@ -512,6 +516,20 @@ jobs:
           cd dist
           sha256sum *.* | tee SHA256SUMS.txt
 
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            dist/*.zip
+            dist/*.dmg
+            dist/*.deb
+            dist/*.rpm
+            dist/*.flatpak
+            dist/*.AppImage
+            dist/*-windows-setup.exe
+            dist/querya-ext-tester-*
+            dist/querya-mcp-*
+
       - name: Build release notes from CHANGELOG.md
         run: |
           set -euo pipefail
@@ -546,7 +564,7 @@ jobs:
             echo "#### MCP (AI clients)"
             echo "- **querya-mcp** (stdio bridge for Claude Desktop, Cursor, VS Code and other MCP clients; also bundled with the Linux and Windows builds): \`querya-mcp-v${VERSION}-linux-x64.tar.gz\`, \`-macos-arm64.tar.gz\`, \`-macos-x64.tar.gz\`, \`-windows-x64.zip\`"
             echo ""
-            echo "Verify checksums: \`SHA256SUMS.txt\`"
+            echo "Verify checksums: \`SHA256SUMS.txt\`. Build provenance: \`gh attestation verify <file> --repo QueryaHub/Querya-Desktop\`"
             echo ""
             echo "### Build info"
             echo "- **pubspec**: ${{ needs.build-windows.outputs.full_version }}"
