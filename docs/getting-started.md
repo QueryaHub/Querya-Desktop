@@ -86,4 +86,5 @@ cd docker && docker compose up -d
 
 Default credentials: user/password **`querya`**, database **`querya`**
 (MongoDB auth source: **`admin`**; ClickHouse HTTP **`8123`**, native **`9000`**).
-Stop with `docker compose down`.
+Stop with `docker compose down`. Connecting from inside the dev container, MySQL
+TLS and the live-database test are in [dev-containers.md](dev-containers.md).

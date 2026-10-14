@@ -1,10 +1,25 @@
-# Pre-release checklist (release **0.4.18**)
+# Pre-release checklist (release **0.4.19**)
 
-Use this before tagging **`0.4.18`** or running the **Release** workflow.
+Use this before tagging **`0.4.19`** or running the **Release** workflow.
 See [tags-and-releases.md](tags-and-releases.md), [CHANGELOG.md](../CHANGELOG.md).
 Manual 120 Hz DevTools QA: issue [#739](https://github.com/QueryaHub/Querya-Desktop/issues/739) (does not block this cut).
 
-## Product smoke (manual) — 0.4.18
+## Product smoke (manual) — 0.4.19
+
+- [ ] **Buttons and controls (#1331)** — in the SQL toolbar, results bar, ERD toolbar and Preferences every control of a row has one height; hover, pressed, keyboard focus ring (Tab, not mouse click) and disabled states look the same on primary / secondary / ghost / destructive; icon buttons show a tooltip.
+- [ ] **Dialog footers (#1441)** — Cancel / Close is ghost, the main action is the only filled button; Esc cancels, Enter confirms (About, Driver manager, Preferences, a connection form, new folder).
+- [ ] **Toast (#1466)** — an export, a copy and an error show a toast that stacks, closes by itself and by its button; Motion Off shows it at once.
+- [ ] **Light theme** — rules in connection forms and dialogs are visible (not black); dropdown menus are not narrower than their field.
+- [ ] **Run modes (#1148)** — Ctrl+Enter runs the statement at the caret, F5 the script statement by statement; Run on an empty editor says *Nothing to run*; the status bar follows the active tab.
+- [ ] **SQL toolbar (#1150)** — one row at 1000 px and at 800 px; the transaction badge and Commit / Rollback only while a transaction is open.
+- [ ] **ER diagram** — open from a SQLite and a PostgreSQL connection; group, note, saved view; Export → SVG, PNG, PDF, DBML; the toolbar stays on one row at ~1000 px.
+- [ ] **Connections** — removing a connection asks first; *Test connection* of an edited connection uses the saved password; an SSH tunnel failure names the bastion.
+- [ ] **PostgreSQL TLS** — with a root CA set, the connection verifies the server (`verify-full`).
+- [ ] **Startup recovery** — with an unreadable local database the app opens the recovery screen instead of crashing.
+- [ ] **MCP server** — enable it, copy a client config, one `list_tables` call from a client; the activity log shows it.
+- [ ] **Packaging** — `.deb` / `.rpm` install, `bubblewrap` is recommended; the Flathub manifest in `packaging/linux/flatpak/` is updated with the release zip's URL and `sha256` after the tag (see below).
+
+## Product smoke (manual) — 0.4.18 (regression)
 
 - [ ] **Sidebar toggle layout isolation (#984)** — Ctrl+B toggles sidebar smoothly with zero LayoutBuilder rebuilds in workspace; build time < 0.5ms.
 - [ ] **LazyOffstage (#1004)** — inactive workspace layers stay offstage and skip redundant layouts.
@@ -70,14 +85,15 @@ Verify the 0.4.4 motion tokens, smooth animations, and high refresh rate support
 
 ## Versioning and release
 
-- [x] `pubspec.yaml` on the 0.4.18 track is **`0.4.18+1`**.
-- [ ] After merge to `main`, confirm **Auto Version Bump** yields a **0.4.19+…** placeholder.
-- [ ] **Tag** `0.4.18` is placed on the **main merge commit that includes `0.4.18+1`** (not the auto-bump commit).
+- [x] `pubspec.yaml` on the 0.4.19 track is **`0.4.19+2`** (the same as `main` after the bump that followed 0.4.18, so the merge has no version conflict).
+- [ ] After merge to `main`, confirm **Auto Version Bump** yields a **0.4.20+…** placeholder.
+- [ ] **Tag** `0.4.19` is placed on the **main merge commit that includes `0.4.19+2`** (not the auto-bump commit).
 - [ ] Run the **Release** workflow via that tag (see [tags-and-releases.md](tags-and-releases.md)).
 - [ ] Verify **portable** zips (`*-linux.zip`, `*-windows.zip`, `*-macos.zip`), **installable** artifacts (`*.AppImage`, `*.deb`, `*.rpm`, `*.flatpak`, `*-windows-setup.exe`), and `SHA256SUMS.txt` on the GitHub Release.
+- [ ] After the release, set the release zip's URL and `sha256` in `packaging/linux/flatpak/com.queryahub.querya_desktop.flathub.yml` (and the `metainfo.xml` release entry is already `0.4.19`); the Flathub submission (flathub/flathub#10606) is separate and has open lint errors (HTTPS on `queryahub.com` or another app id, no `--filesystem=home`, a supported GNOME runtime).
 
 ## Docs
 
-- [x] [CHANGELOG.md](../CHANGELOG.md) has a dated **`## [0.4.18]`** section for the release (CI copies it into the GitHub Release body).
+- [x] [CHANGELOG.md](../CHANGELOG.md) has a dated **`## [0.4.19]`** section for the release (CI copies it into the GitHub Release body); `scripts/extract-changelog-section.sh 0.4.19` finds it.
 - [x] [security.md](security.md) still matches behavior if storage changed.
-- [x] [roadmap.md](roadmap.md) marks 0.4.18 as this cut and 0.5.0 as next.
+- [x] [roadmap.md](roadmap.md) marks 0.4.19 as this cut and 0.5.0 as next.

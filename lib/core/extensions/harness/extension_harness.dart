@@ -194,6 +194,7 @@ class QueryaExtensionHarness {
     final total = Stopwatch()..start();
     final profile = ExtensionProtocolProfile.forTarget(targetVersion);
     final checks = <HarnessCheck>[];
+    final rpc = <HarnessRpcCall>[];
     var extensionId = p.basename(extensionRoot);
     var abort = false;
 
@@ -328,15 +329,35 @@ class QueryaExtensionHarness {
     Future<Object?> call(String method, [Map<String, Object?>? params]) async {
       final c = client;
       if (c == null) throw StateError('plugin is not running');
+      final started = Stopwatch()..start();
+      final requestBytes = params == null ? 0 : utf8.encode(jsonEncode(params)).length;
+      void record({Object? result, String? error}) {
+        rpc.add(HarnessRpcCall(
+          method: method,
+          duration: started.elapsed,
+          requestBytes: requestBytes,
+          ok: error == null,
+          responseBytes:
+              error == null ? utf8.encode(jsonEncode(result)).length : null,
+          error: error,
+          request: params == null ? null : redactRpcValue(params),
+          response: error == null ? boundRpcValue(result) : null,
+        ));
+      }
+
       try {
-        return await c.sendRequest(method, params);
+        final result = await c.sendRequest(method, params);
+        record(result: result);
+        return result;
       } on JsonRpcException catch (e) {
+        record(error: '${e.message}${e.code == null ? '' : ' (code ${e.code})'}');
         if (e.code == -32601) {
           throw StateError('method "$method" is not implemented (-32601)');
         }
         throw StateError('"$method" returned an error: ${e.message}'
             '${e.code == null ? '' : ' (code ${e.code})'}');
       } on TimeoutException {
+        record(error: 'no answer within $requestTimeout');
         throw StateError('"$method" did not answer within $requestTimeout'
             '${_crashHint(exitCode, stderrTail)}');
       } on StateError catch (e) {
@@ -451,6 +472,7 @@ class QueryaExtensionHarness {
       checks: checks,
       totalDuration: total.elapsed,
       peakRssKb: peakRss > 0 ? peakRss : null,
+      rpc: rpc,
     );
   }
 }

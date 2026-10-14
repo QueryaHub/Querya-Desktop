@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:querya_desktop/core/extensions/harness/extension_protocol_profile.dart';
 
 enum HarnessCheckStatus { passed, warning, failed, skipped }
@@ -19,6 +21,103 @@ final class HarnessCheck {
   final String? message;
 }
 
+/// One JSON-RPC round trip as the harness saw it: what was sent, how long the
+/// plugin took, and a bounded, redacted view of the answer (the trace of
+/// `--trace`).
+final class HarnessRpcCall {
+  const HarnessRpcCall({
+    required this.method,
+    required this.duration,
+    required this.requestBytes,
+    required this.ok,
+    this.responseBytes,
+    this.error,
+    this.request,
+    this.response,
+  });
+
+  final String method;
+  final Duration duration;
+  final int requestBytes;
+  final bool ok;
+  final int? responseBytes;
+  final String? error;
+
+  /// The request params with secrets replaced by `***`.
+  final Object? request;
+
+  /// The result, cut to a few rows and short strings.
+  final Object? response;
+
+  Map<String, Object?> toJson() => {
+        'method': method,
+        'ms': duration.inMilliseconds,
+        'ok': ok,
+        'requestBytes': requestBytes,
+        if (responseBytes != null) 'responseBytes': responseBytes,
+        if (error != null) 'error': error,
+        if (request != null) 'request': request,
+        if (response != null) 'response': response,
+      };
+}
+
+/// Replaces the values of keys that look like secrets with `***`.
+Object? redactRpcValue(Object? value) {
+  if (value is Map) {
+    return {
+      for (final e in value.entries)
+        '${e.key}': _isSecretKey('${e.key}') ? '***' : redactRpcValue(e.value),
+    };
+  }
+  if (value is List) return [for (final v in value) redactRpcValue(v)];
+  return value;
+}
+
+bool _isSecretKey(String key) {
+  final k = key.toLowerCase();
+  return k.contains('password') ||
+      k.contains('passwd') ||
+      k.contains('secret') ||
+      k.contains('token') ||
+      k.contains('passphrase') ||
+      k == 'pwd' ||
+      k == 'apikey' ||
+      k == 'api_key' ||
+      k == 'privatekey' ||
+      k == 'private_key';
+}
+
+/// Cuts [value] for a trace: at most [maxItems] list items, strings of at most
+/// [maxString] characters, nesting of at most 5 levels.
+Object? boundRpcValue(
+  Object? value, {
+  int maxItems = 5,
+  int maxString = 120,
+  int depth = 0,
+}) {
+  if (value is String) {
+    return value.length <= maxString
+        ? value
+        : '${value.substring(0, maxString)}… (${value.length} chars)';
+  }
+  if (depth >= 5) return value is Map || value is List ? '…' : value;
+  if (value is List) {
+    return [
+      for (final v in value.take(maxItems))
+        boundRpcValue(v, maxItems: maxItems, maxString: maxString, depth: depth + 1),
+      if (value.length > maxItems) '… (+${value.length - maxItems} more)',
+    ];
+  }
+  if (value is Map) {
+    return {
+      for (final e in value.entries)
+        '${e.key}': boundRpcValue(e.value,
+            maxItems: maxItems, maxString: maxString, depth: depth + 1),
+    };
+  }
+  return value;
+}
+
 /// Results of one harness run, renderable as console text, JUnit XML or TAP.
 final class HarnessReport {
   HarnessReport({
@@ -27,7 +126,11 @@ final class HarnessReport {
     required this.checks,
     required this.totalDuration,
     this.peakRssKb,
+    this.rpc = const [],
   });
+
+  /// Every RPC round trip of the run, in order.
+  final List<HarnessRpcCall> rpc;
 
   final String extensionId;
   final HostVersion targetVersion;
@@ -76,6 +179,28 @@ final class HarnessReport {
         '${peakRssKb == null ? '' : ', plugin peak RSS ${peakRssKb! ~/ 1024} MiB'}');
     return b.toString();
   }
+
+  /// The checks and every RPC round trip as JSON (the `--trace` file): what
+  /// was asked, how long it took and a bounded view of the data that came
+  /// back. Secrets in the requests are redacted.
+  String toTraceJson() => const JsonEncoder.withIndent('  ').convert({
+        'extension': extensionId,
+        'targetVersion': '$targetVersion',
+        'success': isSuccess,
+        'totalMs': totalDuration.inMilliseconds,
+        if (peakRssKb != null) 'pluginPeakRssKb': peakRssKb,
+        'checks': [
+          for (final c in checks)
+            {
+              'name': c.name,
+              'status': c.status.name,
+              'ms': c.duration.inMilliseconds,
+              if (c.message != null && c.message!.isNotEmpty)
+                'message': c.message,
+            },
+        ],
+        'rpc': [for (final r in rpc) r.toJson()],
+      });
 
   /// JUnit XML for GitHub Actions / GitLab CI test reporters.
   String toJUnitXml() {

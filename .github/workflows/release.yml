@@ -404,7 +404,9 @@ jobs:
           mkdir -p build/ext-tester
           EXE=querya-ext-tester
           if [ "${{ runner.os }}" = "Windows" ]; then EXE=querya-ext-tester.exe; fi
-          dart compile exe bin/querya_ext_tester.dart -o "build/ext-tester/$EXE"
+          # Pure Dart in a throwaway package: `dart compile exe` rejects the
+          # app's graph (build hooks in sqlite3 and objective_c).
+          scripts/ci/build_ext_tester.sh "build/ext-tester/$EXE"
           MCP=querya-mcp
           if [ "${{ runner.os }}" = "Windows" ]; then MCP=querya-mcp.exe; fi
           mkdir -p build/mcp

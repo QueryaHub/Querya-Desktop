@@ -13,6 +13,7 @@ Index of Querya Desktop documentation, grouped by audience.
 ## For contributors
 
 - [Contributing](../CONTRIBUTING.md) — workflow, CI, pre-PR checklist.
+- [Dev container and local databases](dev-containers.md) — open the dev container, start the database stack, connect Querya, run the tests.
 - [Architecture](architecture.md) — `lib/` layout and module responsibilities.
 - [Theme system](theme.md) — runtime theming and VS Code theme tokens.
 - [UI Kit](ui-kit.md) — shared widgets, design tokens and guard tests.

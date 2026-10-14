@@ -11,7 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **In-app update of a package install (AUR, `.deb`, `.rpm`)** — the updater no longer downloads a zip and quits when the app lives in `/opt/querya-desktop` (owned by root): the update dialog says how to update it (`yay -Syu querya-desktop`, `apt`, `dnf`) with a *Copy update command* button, or offers the release page for any other folder the user cannot write. If an in-place replace fails anyway, the app is started again and the reason is logged to `~/.local/state/querya-update.log`, instead of staying closed.
 
-Everything merged to `dev` since 0.4.18: the NoSQL workbench, SSH tunnelling and Production safeguards, the ER diagram, charts and plans, the MCP server, a rebuilt SQL workspace toolbar, a UI kit, and a round of session and connection correctness fixes.
+### Planned
+
+- Planned 0.5.0 — live Marketplace download and install
+- MCP v2: MongoDB and Redis, extension drivers, Streamable HTTP, writes with confirmation
+- Server-side statement timeouts for editor and browse sessions
+- High-refresh Linux compositor investigations (#980)
+
+## [0.4.19] - 2026-10-11
+
+The NoSQL workbench, SSH tunnelling and Production safeguards, the ER diagram (layout, groups, notes, saved views, DBML and PDF export), charts and plans, the read-only MCP server, a rebuilt SQL workspace toolbar and run modes, one control scale and button family across the UI kit, a first round of leaving `shadcn_flutter`, security fixes (PostgreSQL TLS, the extension sandbox), and a round of session and connection correctness fixes.
 
 ### Added
 
@@ -80,6 +89,7 @@ Everything merged to `dev` since 0.4.18: the NoSQL workbench, SSH tunnelling and
 **Platform, packaging and tooling**
 
 - **Portable mode out of the box** through a `.portable` marker (#1056).
+- **Standalone Flathub manifest and bundle icon (#1060)** in `packaging/linux/flatpak/`.
 - **macOS .dmg** in the release pipeline; **AppStream metainfo** for Flatpak; **signed APT and DNF repositories** from the release workflow.
 - **Team connection profile export / import.**
 - **Extension test harness and CLI runner** (`querya-ext-tester`), published with releases; CI recipes for extension authors.
@@ -98,7 +108,7 @@ Everything merged to `dev` since 0.4.18: the NoSQL workbench, SSH tunnelling and
 - **Flutter is pinned to 3.47.1**, the version the 120 Hz Linux engine is built for.
 - **Dialog footers** — About, Driver manager, Preferences, the connection forms and the small name dialogs use `QueryaDialogActions`: Cancel / Close is ghost, Test connection sits between Cancel and the main action, spacing is 8 px, one divider (#1441).
 - **One height per toolbar row** — the SQL, ERD, chart and results toolbars set one control size, and an icon button is the same control as every other button (#1439, #1440).
-- **ERD view split into parts (#1362)** — layout, routing and geometry moved to `core/erd` (`ErdLayoutEngine`, unit-tested without widgets); cards, relation painter, notes, groups, export data, menus and status bodies are their own files.
+- **ERD view split into parts (#1362)** — layout, routing and geometry moved to `core/erd` (`ErdLayoutEngine`, unit-tested without widgets); cards, relation painter, notes, groups, export data, the export flows (`ErdExporter`: Mermaid, DBML, SVG, PNG, PDF), menus and status bodies are their own files.
 - **SQL workspace toolbar, connection forms and the editor's highlighter lifecycle** are separate, tested units (`SqlWorkspaceToolbar`, form sections for network, credentials and SSL, a highlight controller managed per session).
 - **`QueryaApp.build` has no side effects** — the async loads and one-time work moved out of it.
 
@@ -122,11 +132,13 @@ Everything merged to `dev` since 0.4.18: the NoSQL workbench, SSH tunnelling and
 - **SQLite** — columns with the same name stay separate in query results (#1144).
 - **Updater and Windows** — the Linux bundle replace preserves `QueryaData` and `.portable` (#1055); file associations and registry writes are optional (#1054).
 - **Packaging** — desktop and icon caches are refreshed after install and removal.
+- **Run on an empty editor says so (#1478)** — *Nothing to run* instead of silence; the status bar follows the active tab and no longer shows another tab's rows and time or repeats the row count (#1479).
 - **Removing a connection** asks first and leaves its workspace; *Remove connection* is a destructive menu item.
 - **SQL workspace** — the status bar no longer keeps *Running query…* after a failed run; a long query error scrolls instead of overflowing the results pane; a code editor that fills its space starts its text at the top.
 - **Editor** — no duplicate `onChanged`, no false cursor jumps, default highlighting on (#1430); MongoDB documents in JSON mode are highlighted (#1432).
 - **Data grid** — the WHERE clause of an edit uses the column's real type and tells the string `'NULL'` from SQL `NULL`; the value panel no longer validates twice (#1431).
 - **UI** — export and copy menu buttons have one chevron; the tab strip draws its focus ring only for keyboard focus (#1438); dropdown menus are at least as wide as their trigger (#1444); form rules use the theme's border colour, not black, in the light theme (#1443); the new-connection wizard search is the standard search field (#1442).
+- **Look and feel** — a disabled primary button is a grey chip with a readable label; the SQL toolbar badge reads *Auto-commit* / *Manual commit* before the first run; below 1100 px the ERD toolbar shows *Note*, *Auto layout* and the group buttons as icons so *Export* does not wrap alone; Preferences MCP buttons are the same size as the rest.
 - **Startup recovery** — when the local database cannot be opened, the app shows a recovery screen instead of failing silently.
 - **Updater (Windows)** — an in-place update mirrors the new bundle, so obsolete DLLs and assets are removed.
 - **SSH** — a failed tunnel closes its sockets and the jump socket, a missing key file is reported, concurrent callers share one dial, and a local forwarder that survived a failed keep-alive is closed; a dropped socket marks the session closed (`isConnected`).
@@ -153,15 +165,8 @@ Everything merged to `dev` since 0.4.18: the NoSQL workbench, SSH tunnelling and
 
 - **E2E suite** (`test/e2e`, run in CI and gating `release`): connection lifecycle and forms of every type, folders, SSH bastion tunnel, credential scrubbing, SQL workspaces and export, command palette, extensions sandbox, Redis CLI and key tree, Mongo viewer, index manager, aggregations, CRUD, theme import, shutdown.
 - **Test sections** run as parallel jobs; self-hosted runners; a MySQL server and bubblewrap for the live database and sandbox tests.
-- **Guards** — UI kit usage, and `core/` and `shared/` free of `features/` and `app/` imports; `lib/shared` must not import `shadcn_flutter` (a ratchet); no raw `Divider` outside the kit.
+- **Guards** — UI kit usage, and `core/` and `shared/` free of `features/` and `app/` imports; `lib/shared` must not import `shadcn_flutter` (a ratchet); no raw `Divider`, no shadcn or raw Material buttons, no `*Button` class outside the kit (two allowed) and no literal tooltip delay (`test/guards/`).
 - **Benchmarks** compare build time over interleaved runs and cover ERD, charts and multi-tab SQL scenarios.
-
-### Planned
-
-- Planned 0.5.0 — live Marketplace download and install
-- MCP v2: MongoDB and Redis, extension drivers, Streamable HTTP, writes with confirmation
-- Server-side statement timeouts for editor and browse sessions
-- High-refresh Linux compositor investigations (#980)
 
 ## [0.4.18] - 2026-09-28
 

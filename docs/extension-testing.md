@@ -71,6 +71,7 @@ querya-ext-tester ./my-extension \
 | `--sandbox` | run the plugin in the OS sandbox (`bwrap` on Linux, `sandbox-exec` on macOS) when available |
 | `--timeout-ms <n>` | per-request timeout (default 5000) |
 | `--junit <path>` / `--tap <path>` | write a JUnit XML / TAP report |
+| `--trace <path>` | write every RPC round trip as JSON: method, time, request and response size and a bounded view of the data (see *Following the data*) |
 | `--no-color` | plain output |
 
 Exit codes: `0` all checks passed (warnings and skips do not fail), `1` a
@@ -79,6 +80,102 @@ check failed, `2` bad command line.
 Credentials only travel inside the `db.connect` payload over the plugin's
 stdio; they are never put on the command line of the plugin or into its
 environment. Use a throwaway database in CI.
+
+## Following the data: `--trace`
+
+A green run says the lifecycle works. `--trace trace.json` shows *what* went
+over the wire, so you can see whether the data of your driver arrives as the
+host expects:
+
+```json
+{
+  "extension": "acme.clickhouse-driver",
+  "targetVersion": "0.5.0",
+  "success": true,
+  "totalMs": 41,
+  "checks": [{ "name": "db.query", "status": "passed", "ms": 3 }],
+  "rpc": [
+    { "method": "db.connect", "ms": 12, "ok": true, "requestBytes": 76,
+      "responseBytes": 28, "request": { "host": "db", "password": "***" } },
+    { "method": "db.query", "ms": 3, "ok": true, "requestBytes": 47,
+      "responseBytes": 1760,
+      "response": { "columns": ["id", "name"], "rows": [[0, "user0"], "… (+7 more)"] } }
+  ]
+}
+```
+
+- Values of keys that look like secrets (`password`, `secret`, `token`,
+  `passphrase`, ...) are written as `***`.
+- Responses are cut: at most 5 items per list, strings of at most 120
+  characters. The file shows the shape and a sample, not a copy of your data;
+  still, use a throwaway database and do not publish traces of real data.
+- A failing call is recorded with its `error`, so a CI artifact is enough to
+  see which call broke and after how long.
+
+## Docker image
+
+`ghcr.io/queryahub/querya-headless:<version>` (and `:latest`) is the tester of
+that Querya Desktop release in a pinned environment: Debian (glibc), the
+tester checked against the release's `SHA256SUMS.txt`, `bubblewrap` for
+`--sandbox`, a non-root user, entry point `querya-ext-tester`. Nothing else is
+needed on the machine: no Flutter, no display, no Querya install.
+
+```bash
+docker pull ghcr.io/queryahub/querya-headless:latest
+
+docker run --rm \
+  -v "$PWD/dist:/ext:ro" -v "$PWD/out:/out" \
+  ghcr.io/queryahub/querya-headless:0.4.19 /ext \
+  --connect '{"host":"db","port":5432}' \
+  --junit /out/junit.xml --trace /out/trace.json
+```
+
+The extension's `main` is a native executable and runs **inside** the image, so
+build it for Linux x86-64 against glibc. To reach a database from the image,
+put both on one Docker network and use the database's service name as the host.
+
+### In CI, next to a test database
+
+```yaml
+jobs:
+  rpc:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:16-alpine
+        env: { POSTGRES_PASSWORD: querya, POSTGRES_USER: querya, POSTGRES_DB: querya }
+        options: >-
+          --health-cmd "pg_isready -U querya" --health-interval 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./build.sh                        # writes ./dist with manifest.json
+      - name: RPC and data check
+        run: |
+          mkdir -p out && chmod 777 out
+          docker run --rm --network "${{ job.services.db.network }}" \
+            -v "$PWD/dist:/ext:ro" -v "$PWD/out:/out" \
+            ghcr.io/queryahub/querya-headless:0.4.19 /ext \
+            --target-version 0.5.0 \
+            --connect '{"host":"db","port":5432,"username":"querya","password":"querya","database":"querya"}' \
+            --query 'SELECT 1' --junit /out/junit.xml --trace /out/trace.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: rpc-trace, path: out/ }
+```
+
+Use the same `docker run` locally with `--network querya-dev_default` against
+the stack from [dev-containers.md](dev-containers.md) (`host` is the service
+name, for example `postgres`).
+
+### `--sandbox` in a container
+
+The OS sandbox is `bubblewrap`, which needs unprivileged user namespaces. Many
+container runtimes block them by default; the tester then runs the plugin
+without the sandbox and says so in the report. To test the sandboxed run, start
+the container with `--security-opt seccomp=unconfined` (and, on hosts that
+restrict namespaces with AppArmor, `--security-opt apparmor=unconfined`), or
+run the tester directly on the CI runner with the action below.
 
 ## GitHub Actions
 

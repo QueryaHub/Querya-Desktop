@@ -1,7 +1,7 @@
 name: querya_desktop
 description: Lightweight desktop SQL/NoSQL client. Flutter (Dart).
 publish_to: 'none' # app, never published to pub.dev (allows path dependencies)
-version: 0.4.18+1
+version: 0.4.22+5
 
 
 
@@ -60,6 +60,11 @@ dependency_overrides:
 
 flutter:
   uses-material-design: true
+  config:
+    # The vendored refresh_rate plugin's Package.swift points its target at
+    # ../Classes, outside the package root, so Swift Package Manager (on by
+    # default since Flutter 3.47) cannot resolve it; macOS builds use CocoaPods.
+    enable-swift-package-manager: false
   assets:
     - assets/images/
     - assets/themes/

@@ -1,0 +1,101 @@
+name: Headless image
+
+# Publishes ghcr.io/queryahub/querya-headless:<version> (and :latest) after a
+# Release succeeds, or on demand for an existing release.
+#
+# `workflow_run`, not `release`: the release is created with GITHUB_TOKEN, and
+# events made by that token do not start other workflows.
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Querya Desktop release to build the image for (e.g. 0.4.19)
+        required: true
+      latest:
+        description: Also tag the image as latest
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    name: Build and push querya-headless
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve the version
+        id: v
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+            LATEST="${{ inputs.latest }}"
+          else
+            # A tag push has the tag as head_branch.
+            VERSION="${{ github.event.workflow_run.head_branch }}"
+            LATEST=true
+          fi
+          VERSION="${VERSION#v}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::notice::'$VERSION' is not a release tag, nothing to build"
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "build=true" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+        if: steps.v.outputs.build == 'true'
+
+      - uses: docker/login-action@v3
+        if: steps.v.outputs.build == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build (loaded locally for the smoke test)
+        if: steps.v.outputs.build == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/headless
+          file: docker/headless/Dockerfile
+          build-args: QUERYA_VERSION=${{ steps.v.outputs.version }}
+          load: true
+          tags: querya-headless:test
+
+      - name: Smoke test
+        if: steps.v.outputs.build == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm querya-headless:test --help | grep -q "Usage: querya-ext-tester"
+          mkdir -p empty
+          set +e
+          docker run --rm -v "$PWD/empty:/ext:ro" querya-headless:test /ext --no-color
+          code=$?
+          set -e
+          # No manifest.json: the run must fail with exit code 1.
+          test "$code" -eq 1
+
+      - name: Push
+        if: steps.v.outputs.build == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/headless
+          file: docker/headless/Dockerfile
+          build-args: QUERYA_VERSION=${{ steps.v.outputs.version }}
+          push: true
+          tags: |
+            ghcr.io/queryahub/querya-headless:${{ steps.v.outputs.version }}
+            ${{ steps.v.outputs.latest == 'true' && 'ghcr.io/queryahub/querya-headless:latest' || '' }}

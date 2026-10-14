@@ -341,4 +341,64 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  group('RPC trace', () {
+    test('records every call with timing, sizes and a bounded view of the data',
+        () async {
+      writeExtension(manifest());
+      final handlers = _healthy()
+        ..['db.query'] = (_) => {
+              'columns': ['id', 'note'],
+              'rows': [
+                for (var i = 0; i < 12; i++) [i, 'x' * 300],
+              ],
+            };
+
+      final (report, _) = await run(handlers);
+
+      final methods = [for (final c in report.rpc) c.method];
+      expect(methods, contains('system.handshake'));
+      expect(methods, contains('db.query'));
+      expect(report.rpc.every((c) => c.ok), isTrue);
+
+      final query = report.rpc.firstWhere((c) => c.method == 'db.query');
+      final rows = (query.response! as Map)['rows'] as List;
+      // 5 rows and a marker for the other 7; long strings are cut.
+      expect(rows, hasLength(6));
+      expect(rows.last, '… (+7 more)');
+      expect(((rows.first as List)[1] as String).length, lessThan(200));
+      expect(query.responseBytes, greaterThan(3000));
+    });
+
+    test('redacts secrets in the request params', () async {
+      writeExtension(manifest());
+
+      final (report, _) = await run(
+        _healthy(),
+        connection: const HarnessConnectionOptions(
+          params: {'host': 'db', 'password': 's3cret', 'ssh': {'passphrase': 'p'}},
+        ),
+      );
+
+      final connect = report.rpc.firstWhere((c) => c.method == 'db.connect');
+      final request = connect.request! as Map;
+      expect(request['password'], '***');
+      expect((request['ssh'] as Map)['passphrase'], '***');
+      expect(request['host'], 'db');
+      expect(report.toTraceJson(), isNot(contains('s3cret')));
+    });
+
+    test('a failing call is recorded with its error', () async {
+      writeExtension(manifest());
+      final handlers = _healthy()
+        ..['db.query'] = (_) => throw _RpcError(-32000, 'table missing');
+
+      final (report, _) = await run(handlers);
+
+      final query = report.rpc.firstWhere((c) => c.method == 'db.query');
+      expect(query.ok, isFalse);
+      expect(query.error, contains('table missing'));
+      expect(report.toTraceJson(), contains('"success": false'));
+    });
+  });
 }

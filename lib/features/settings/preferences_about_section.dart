@@ -45,10 +45,16 @@ class PreferencesAboutSection extends StatelessWidget {
                   ),
                 ),
                 child: material.Center(
-                  child: material.Icon(
-                    QueryaIcons.database,
-                    size: 24,
-                    color: theme.colorScheme.primary,
+                  child: material.Image.asset(
+                    'assets/images/querya_logo.png',
+                    width: 28,
+                    height: 28,
+                    filterQuality: material.FilterQuality.medium,
+                    errorBuilder: (_, __, ___) => material.Icon(
+                      QueryaIcons.database,
+                      size: 24,
+                      color: theme.colorScheme.primary,
+                    ),
                   ),
                 ),
               ),

@@ -2,8 +2,8 @@
 
 Living document for planned work. Not a commitment order; adjust as priorities change.
 
-**GitHub Latest Release:** [0.4.17](https://github.com/QueryaHub/Querya-Desktop/releases/tag/0.4.17) (2026-09-20).  
-**This cut:** **0.4.18** — shell/motion perf (<0.5ms build), data-loss guards, driver session correctness, and high-refresh grid reliability — [CHANGELOG.md](../CHANGELOG.md) `[0.4.18]`.  
+**GitHub Latest Release:** [0.4.18](https://github.com/QueryaHub/Querya-Desktop/releases/tag/0.4.18) (2026-09-28).  
+**This cut:** **0.4.19** — NoSQL workbench, SSH and Production safeguards, ER diagram, MCP server, SQL run modes and toolbar, one control scale and button family (UI kit), security fixes — [CHANGELOG.md](../CHANGELOG.md) `[0.4.19]`.  
 **Next product release:** **0.5.0** — live Marketplace download and install — see below.
 
 ## Theme system
@@ -31,7 +31,8 @@ Living document for planned work. Not a commitment order; adjust as priorities c
 - **Shipped in 0.4.13–0.4.15:** interactive Data Grid, fluid motion, multi-tab SQL, preferences/keymap — [CHANGELOG.md](../CHANGELOG.md).
 - **Shipped in 0.4.16:** Table Browser in-place DML, Command Palette + Quick Switcher, workspace chrome / connections-tree parity, Mongo per-field Save to DB, updater hardening — [CHANGELOG.md](../CHANGELOG.md) `[0.4.16]`.
 - **Shipped in 0.4.17:** driver/grid correctness after 0.4.16 — schema vs PK (#772), SQLite `rowid` (#774), Mongo writes/filter/discard (#776/#778/#782/#783), Postgres/MySQL/SQLite/Redis session and type round-trips — [CHANGELOG.md](../CHANGELOG.md) `[0.4.17]`.
-- **0.4.18 (this cut):** shell/motion perf (<0.5ms build, #984/#1004), data-loss guard rails (#867–#873, #910, #912, #1007), driver correctness, and grid reliability (#1005–#1011) — [CHANGELOG.md](../CHANGELOG.md) `[0.4.18]`.
+- **Shipped in 0.4.18:** shell/motion perf (<0.5ms build, #984/#1004), data-loss guard rails (#867–#873, #910, #912, #1007), driver correctness, and grid reliability (#1005–#1011) — [CHANGELOG.md](../CHANGELOG.md) `[0.4.18]`.
+- **0.4.19 (this cut):** NoSQL workbench (Mongo viewer, aggregations, indexes, Redis CLI), SSH tunnelling and Production safeguards, ER diagram (groups, notes, saved views, DBML / PDF export), read-only MCP server, SQL run modes and one-row toolbar, UI kit (control scale, `QueryaButton` family, own toast and text styles), PostgreSQL TLS and sandbox fixes — [CHANGELOG.md](../CHANGELOG.md) `[0.4.19]`.
 - **Planned 0.5.0:** Marketplace Launch — live download, `sha256` validation, install themes (and later DB drivers) from the network.
 
 ## Query history and favorites

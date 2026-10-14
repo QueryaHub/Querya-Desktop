@@ -27,11 +27,18 @@ Options:
   --timeout-ms <n>          per-request timeout (default 5000)
   --junit <path>            write a JUnit XML report
   --tap <path>              write a TAP report
+  --trace <path>            write every RPC call and a bounded view of the data as JSON
   --no-color                disable ANSI colors
   -h, --help                show this help
 ''';
 
-Future<int> main(List<String> args) async {
+/// The exit code is set through `exitCode`: a Dart `main` cannot return one
+/// (the `Future<int>` it used to return was ignored, so a failed run exited 0).
+Future<void> main(List<String> args) async {
+  exitCode = await _run(args);
+}
+
+Future<int> _run(List<String> args) async {
   String? dir;
   var target = '0.5.0';
   String? connect;
@@ -42,6 +49,7 @@ Future<int> main(List<String> args) async {
   var timeoutMs = 5000;
   String? junit;
   String? tap;
+  String? trace;
   var color = stdout.hasTerminal;
 
   String? value(int i, String flag) {
@@ -69,7 +77,8 @@ Future<int> main(List<String> args) async {
             '--database' ||
             '--timeout-ms' ||
             '--junit' ||
-            '--tap':
+            '--tap' ||
+            '--trace':
         final v = value(i, a);
         if (v == null) return 2;
         i++;
@@ -95,6 +104,8 @@ Future<int> main(List<String> args) async {
             junit = v;
           case '--tap':
             tap = v;
+          case '--trace':
+            trace = v;
         }
       default:
         if (a.startsWith('-') || dir != null) {
@@ -153,5 +164,9 @@ Future<int> main(List<String> args) async {
   stdout.write(report.toConsole(color: color));
   if (junit != null) File(junit).writeAsStringSync(report.toJUnitXml());
   if (tap != null) File(tap).writeAsStringSync(report.toTap());
+  if (trace != null) {
+    File(trace).writeAsStringSync(report.toTraceJson());
+    stdout.writeln('RPC trace of ${report.rpc.length} calls written to $trace');
+  }
   return report.isSuccess ? 0 : 1;
 }
