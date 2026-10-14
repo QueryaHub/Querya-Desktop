@@ -160,6 +160,18 @@ Download the universal `.dmg` from [Releases](https://github.com/QueryaHub/Query
 
 ---
 
+### Verify your download
+
+Every release ships `SHA256SUMS.txt` and a signed build provenance attestation:
+
+```bash
+# checksums (Linux / macOS)
+sha256sum --check --ignore-missing SHA256SUMS.txt
+
+# provenance: proves the file was built by this repository's release workflow
+gh attestation verify Querya-Desktop-*-linux.AppImage --repo QueryaHub/Querya-Desktop
+```
+
 ## Building from Source
 
 ### Prerequisites
