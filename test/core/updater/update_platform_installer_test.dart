@@ -47,6 +47,80 @@ void main() {
       expect(docker.packageManagerUpdateCommand, isNull);
     });
 
+    test('an AUR / pacman install under /opt is updated outside the app',
+        () {
+      final ctx = UpdateInstallContext(
+        environment: const {},
+        resolvedExecutable: '/opt/querya-desktop/querya_desktop',
+        listDirectory: (dir) => dir == '/var/lib/pacman/local'
+            ? const ['glibc-2.40-1', 'querya-desktop-0.4.19-1']
+            : const [],
+        fileExists: (_) => false,
+        isDirectoryWritable: (_) => false,
+      );
+      expect(ctx.linuxSystemPackageManager, 'pacman');
+      expect(ctx.isManagedPackage, isTrue);
+      expect(ctx.packageManagerUpdateCommand, 'yay -Syu querya-desktop');
+      expect(ctx.managedUpdateHint, contains('AUR'));
+    }, skip: !Platform.isLinux);
+
+    test('a .deb install is detected from the dpkg database', () {
+      final ctx = UpdateInstallContext(
+        environment: const {},
+        resolvedExecutable: '/opt/querya-desktop/querya_desktop',
+        listDirectory: (_) => const [],
+        fileExists: (path) => path == '/var/lib/dpkg/info/querya-desktop.list',
+        isDirectoryWritable: (_) => false,
+      );
+      expect(ctx.linuxSystemPackageManager, 'dpkg');
+      expect(ctx.packageManagerUpdateCommand, contains('apt'));
+    }, skip: !Platform.isLinux);
+
+    test('a portable bundle elsewhere is not blocked by an installed package',
+        () {
+      final ctx = UpdateInstallContext(
+        environment: const {},
+        resolvedExecutable: '/home/me/Querya/querya_desktop',
+        listDirectory: (_) => const ['querya-desktop-0.4.19-1'],
+        fileExists: (_) => true,
+        isDirectoryWritable: (_) => true,
+      );
+      expect(ctx.linuxSystemPackageManager, isNull);
+      expect(ctx.isManagedPackage, isFalse);
+    }, skip: !Platform.isLinux);
+
+    test('a bundle the user cannot write is blocked, with a hint and no command',
+        () {
+      final ctx = UpdateInstallContext(
+        environment: const {},
+        resolvedExecutable: '/srv/apps/querya/querya_desktop',
+        listDirectory: (_) => const [],
+        fileExists: (_) => false,
+        isDirectoryWritable: (dir) => dir != '/srv/apps/querya',
+      );
+      expect(ctx.isLinuxBundleReadOnly, isTrue);
+      expect(ctx.isManagedPackage, isTrue);
+      expect(ctx.packageManagerUpdateCommand, isNull);
+      expect(ctx.managedUpdateHint, contains('/srv/apps/querya'));
+    }, skip: !Platform.isLinux);
+
+    test('the installer refuses a system install before the app quits',
+        () async {
+      final ctx = UpdateInstallContext(
+        environment: const {},
+        resolvedExecutable: '/opt/querya-desktop/querya_desktop',
+        listDirectory: (_) => const ['querya-desktop-0.4.19-1'],
+        fileExists: (_) => false,
+        isDirectoryWritable: (_) => false,
+      );
+      final installer = UpdatePlatformInstaller.forCurrentPlatform(context: ctx);
+      await expectLater(
+        installer.install(File('/tmp/Querya-Desktop-0.4.20-linux.zip')),
+        throwsA(isA<PackageManagerUpdateRequiredException>()
+            .having((e) => e.manager, 'manager', 'pacman')),
+      );
+    }, skip: !Platform.isLinux);
+
     test('finds macOS .app bundle from executable path', () {
       expect(
         UpdateInstallContext.macAppBundlePathFromExecutable(
@@ -73,6 +147,9 @@ void main() {
       expect(script, contains("! -name 'QueryaData'"));
       expect(script, contains("! -name '.portable'"));
       expect(script, contains('exec "\$EXE"'));
+      // A replace that cannot write relaunches the old app and logs why.
+      expect(script, contains('[ ! -w "\$DST" ]'));
+      expect(script, contains('querya-update.log'));
     });
 
     test('resolves nested Flutter zip layout and refuses garbage', () async {

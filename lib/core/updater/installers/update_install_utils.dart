@@ -153,20 +153,33 @@ SRC='${_shellQuote(sourceDir)}'
 DST='${_shellQuote(targetDir)}'
 EXE='${_shellQuote(executable)}'
 EXE_NAME=\$(basename "\$EXE")
+LOG="\${XDG_STATE_HOME:-\$HOME/.local/state}/querya-update.log"
+# Any failure is logged and the app is started again (the old bundle when the
+# replace did not happen), instead of leaving it closed.
+fail() {
+  mkdir -p "\$(dirname "\$LOG")" 2>/dev/null || true
+  echo "\$(date) querya-update: \$1" >> "\$LOG" 2>/dev/null || true
+  echo "querya-update: \$1" >&2
+  if [ -x "\$EXE" ]; then exec "\$EXE"; fi
+  exit 1
+}
 while kill -0 "\$PID" 2>/dev/null; do sleep 0.2; done
 if [ ! -f "\$SRC/\$EXE_NAME" ]; then
-  echo "querya-update: refusing replace, \$SRC is not a Flutter bundle" >&2
-  exit 1
+  fail "refusing replace, \$SRC is not a Flutter bundle"
 fi
 if [ ! -d "\$SRC/lib" ] && [ ! -d "\$SRC/data" ]; then
-  echo "querya-update: refusing replace, missing lib/ or data/" >&2
-  exit 1
+  fail "refusing replace, missing lib/ or data/"
+fi
+if [ ! -w "\$DST" ]; then
+  fail "refusing replace, \$DST is not writable (installed by a package manager?)"
 fi
 if command -v rsync >/dev/null 2>&1; then
-  rsync -a --delete --exclude='QueryaData' --exclude='.portable' "\$SRC"/ "\$DST"/
+  rsync -a --delete --exclude='QueryaData' --exclude='.portable' "\$SRC"/ "\$DST"/ \\
+    || fail "rsync into \$DST failed"
 else
-  find "\$DST" -mindepth 1 -maxdepth 1 ! -name 'QueryaData' ! -name '.portable' -exec rm -rf {} +
-  cp -a "\$SRC"/. "\$DST"/
+  find "\$DST" -mindepth 1 -maxdepth 1 ! -name 'QueryaData' ! -name '.portable' -exec rm -rf {} + \\
+    || fail "could not remove the old bundle in \$DST"
+  cp -a "\$SRC"/. "\$DST"/ || fail "could not copy the new bundle into \$DST"
 fi
 chmod +x "\$EXE" 2>/dev/null || true
 rm -f "\$0"

@@ -202,6 +202,10 @@ class AppUpdaterService {
     return UpdateInstallContext.current().packageManagerUpdateCommand;
   }
 
+  /// Why in-app install is blocked and what to run instead.
+  String get packageManagerUpdateHint =>
+      UpdateInstallContext.current().managedUpdateHint;
+
   /// Picks the best Release asset for the current packaging context.
   UpdateAsset? platformAssetFor(
     UpdateManifest manifest, {

@@ -55,6 +55,14 @@ class LinuxAppImageInstaller {
           'Could not determine the Linux install directory for in-place update',
         );
       }
+      // Checked before the app quits: a replace that cannot write leaves the
+      // user with no running app.
+      if (context.isManagedPackage) {
+        throw PackageManagerUpdateRequiredException(
+          manager: context.linuxSystemPackageManager ?? 'system',
+          hint: context.managedUpdateHint,
+        );
+      }
 
       final executable = context.resolvedExecutable;
       final sourceDir = resolveLinuxFlutterBundleRoot(

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **In-app update of a package install (AUR, `.deb`, `.rpm`)** — the updater no longer downloads a zip and quits when the app lives in `/opt/querya-desktop` (owned by root): the update dialog says how to update it (`yay -Syu querya-desktop`, `apt`, `dnf`) with a *Copy update command* button, or offers the release page for any other folder the user cannot write. If an in-place replace fails anyway, the app is started again and the reason is logged to `~/.local/state/querya-update.log`, instead of staying closed.
+
 ### Planned
 
 - Planned 0.5.0 — live Marketplace download and install

@@ -24,10 +24,12 @@ class UpdatePlatformInstaller {
     if (ctx.isManagedPackage) {
       return UpdatePlatformInstaller._((file) async {
         throw PackageManagerUpdateRequiredException(
-          manager: ctx.isSnap ? 'snap' : 'flatpak',
-          hint: ctx.isSnap
-              ? 'Updates for the Snap build must be installed with: snap refresh'
-              : 'Updates for the Flatpak build must be installed with: flatpak update',
+          manager: ctx.isSnap
+              ? 'snap'
+              : ctx.isFlatpak
+                  ? 'flatpak'
+                  : ctx.linuxSystemPackageManager ?? 'system',
+          hint: ctx.managedUpdateHint,
         );
       });
     }

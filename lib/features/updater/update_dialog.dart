@@ -2,6 +2,7 @@ import 'dart:async' show unawaited;
 import 'dart:io';
 
 import 'package:flutter/material.dart' as material;
+import 'package:url_launcher/url_launcher_string.dart';
 import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/unsaved_work_registry.dart';
@@ -437,7 +438,8 @@ class UpdateDialogContentState extends material.State<UpdateDialogContent> {
       UpdateDialogPhase.upToDate =>
         'You are running the latest version of Querya Desktop (v$_currentVersion).',
       UpdateDialogPhase.available => _installBlocked
-          ? 'This build is managed by ${_packageCommand ?? 'the package manager'}.'
+          ? 'Querya Desktop v${_manifest?.version ?? ''} is available; '
+              'this install is updated outside the app.'
           : 'Querya Desktop v${_manifest?.version ?? ''} is available!',
       UpdateDialogPhase.downloading => 'Downloading update…',
       UpdateDialogPhase.readyToInstall => 'Update ready to install.',
@@ -480,8 +482,10 @@ class UpdateDialogContentState extends material.State<UpdateDialogContent> {
       children: [
         if (_installBlocked && _phase == UpdateDialogPhase.available) ...[
           Text(
-            'Install updates with ${_packageCommand ?? 'the system package manager'} '
-            'instead of downloading a GitHub package.',
+            _packageCommand != null
+                ? 'Install updates with $_packageCommand '
+                    'instead of downloading a GitHub package.'
+                : _updater.packageManagerUpdateHint,
           ).muted().small(),
           const material.SizedBox(height: 12),
         ],
@@ -549,10 +553,20 @@ class UpdateDialogContentState extends material.State<UpdateDialogContent> {
                 size: QueryaControlSize.lg,
               ),
               const material.SizedBox(width: 8),
-              if (_installBlocked)
+              if (_installBlocked && _packageCommand != null)
                 QueryaButton.primary(
                   label: 'Copy update command',
                   onPressed: () => unawaited(_copyPackageCommand()),
+                  size: QueryaControlSize.lg,
+                )
+              else if (_installBlocked)
+                QueryaButton.primary(
+                  label: 'Open release page',
+                  onPressed: () => unawaited(launchUrlString(
+                    'https://github.com/QueryaHub/Querya-Desktop/releases/tag/'
+                    '${_manifest?.version ?? ''}',
+                    mode: LaunchMode.externalApplication,
+                  )),
                   size: QueryaControlSize.lg,
                 )
               else
