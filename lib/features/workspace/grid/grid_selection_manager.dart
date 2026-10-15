@@ -66,23 +66,22 @@ class ResultGridSelection {
   String toTsv(List<List<String>> rows, {List<String>? columns}) {
     if (rows.isEmpty) return '';
     final buffer = StringBuffer();
+    // Cells go straight into the buffer: no per-row list and join (#1524).
     if (columns != null && columns.isNotEmpty) {
-      final headerCells = <String>[];
       for (var c = startColumn; c <= endColumn; c++) {
-        final col = c < columns.length ? columns[c] : '';
-        headerCells.add(_escapeTsv(col));
+        if (c > startColumn) buffer.write('\t');
+        buffer.write(_escapeTsv(c < columns.length ? columns[c] : ''));
       }
-      buffer.writeln(headerCells.join('\t'));
+      buffer.writeln();
     }
     for (var r = startRow; r <= endRow; r++) {
       if (r < 0 || r >= rows.length) continue;
       final rowData = rows[r];
-      final cells = <String>[];
       for (var c = startColumn; c <= endColumn; c++) {
-        final val = c < rowData.length ? rowData[c] : '';
-        cells.add(_escapeTsv(val));
+        if (c > startColumn) buffer.write('\t');
+        buffer.write(_escapeTsv(c < rowData.length ? rowData[c] : ''));
       }
-      buffer.writeln(cells.join('\t'));
+      buffer.writeln();
     }
     return buffer.toString().trimRight();
   }
@@ -93,22 +92,20 @@ class ResultGridSelection {
     if (rows.isEmpty) return '';
     final buffer = StringBuffer();
     if (columns != null && columns.isNotEmpty) {
-      final headerCells = <String>[];
       for (var c = startColumn; c <= endColumn; c++) {
-        final col = c < columns.length ? columns[c] : '';
-        headerCells.add(_escapeCsv(col));
+        if (c > startColumn) buffer.write(',');
+        buffer.write(_escapeCsv(c < columns.length ? columns[c] : ''));
       }
-      buffer.writeln(headerCells.join(','));
+      buffer.writeln();
     }
     for (var r = startRow; r <= endRow; r++) {
       if (r < 0 || r >= rows.length) continue;
       final rowData = rows[r];
-      final cells = <String>[];
       for (var c = startColumn; c <= endColumn; c++) {
-        final val = c < rowData.length ? rowData[c] : '';
-        cells.add(_escapeCsv(val));
+        if (c > startColumn) buffer.write(',');
+        buffer.write(_escapeCsv(c < rowData.length ? rowData[c] : ''));
       }
-      buffer.writeln(cells.join(','));
+      buffer.writeln();
     }
     return buffer.toString().trimRight();
   }
@@ -127,13 +124,13 @@ class ResultGridSelection {
         final val = c < rowData.length ? rowData[c] : '';
         if (val == 'NULL') {
           map[colName] = null;
-        } else if (RegExp(r'^0\d+$').hasMatch(val.trim())) {
+        } else if (_hasLeadingZeroDigits(val.trim())) {
           // Preserve numeric strings with leading zeros (e.g. '01234', '007')
           map[colName] = val;
-        } else if (int.tryParse(val) != null) {
-          map[colName] = int.parse(val);
-        } else if (double.tryParse(val) != null) {
-          map[colName] = double.parse(val);
+        } else if (int.tryParse(val) case final asInt?) {
+          map[colName] = asInt;
+        } else if (double.tryParse(val) case final asDouble?) {
+          map[colName] = asDouble;
         } else if (val.toLowerCase() == 'true') {
           map[colName] = true;
         } else if (val.toLowerCase() == 'false') {
@@ -148,6 +145,16 @@ class ResultGridSelection {
       return const JsonEncoder.withIndent('  ').convert(result.first);
     }
     return const JsonEncoder.withIndent('  ').convert(result);
+  }
+
+  /// `^0\d+$`: a zero followed by one or more ASCII digits and nothing else.
+  static bool _hasLeadingZeroDigits(String s) {
+    if (s.length < 2 || s.codeUnitAt(0) != 0x30) return false;
+    for (var i = 1; i < s.length; i++) {
+      final c = s.codeUnitAt(i);
+      if (c < 0x30 || c > 0x39) return false;
+    }
+    return true;
   }
 
   static String _escapeTsv(String val) {
