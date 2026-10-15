@@ -85,13 +85,7 @@ class _SqlQueryHistoryDialogContentState
     });
   }
 
-  static final _whitespacePattern = RegExp(r'\s+');
-
-  static String _previewOneLine(String sql) {
-    final collapsed = sql.replaceAll(_whitespacePattern, ' ').trim();
-    if (collapsed.length <= 96) return collapsed;
-    return '${collapsed.substring(0, 93)}…';
-  }
+  static String _previewOneLine(String sql) => previewSqlOneLine(sql);
 
   static String? _formatWhen(String iso) {
     final t = DateTime.tryParse(iso)?.toLocal();
@@ -404,4 +398,53 @@ class _SqlQueryHistoryDialogContentState
         ),
     );
   }
+}
+
+/// Longest one-line preview kept whole; longer text is cut to
+/// [_previewKeep] characters plus an ellipsis.
+const int _previewMax = 96;
+const int _previewKeep = 93;
+
+/// Same set as the regex `\s` (what the old `replaceAll(RegExp(r'\s+'), ' ')`
+/// collapsed).
+bool _isPreviewWhitespace(int c) =>
+    (c >= 0x09 && c <= 0x0D) ||
+    c == 0x20 ||
+    c == 0xA0 ||
+    c == 0x1680 ||
+    (c >= 0x2000 && c <= 0x200A) ||
+    c == 0x2028 ||
+    c == 0x2029 ||
+    c == 0x202F ||
+    c == 0x205F ||
+    c == 0x3000 ||
+    c == 0xFEFF;
+
+/// One-line, whitespace-collapsed, trimmed preview of [sql] for a list row.
+///
+/// Reads only as far as it needs: a 100 KB migration is cut after about a
+/// hundred characters instead of being copied whole by a regex replace (#1545).
+@visibleForTesting
+String previewSqlOneLine(String sql) {
+  final out = StringBuffer();
+  var length = 0;
+  var pendingSpace = false;
+  for (var i = 0; i < sql.length; i++) {
+    if (_isPreviewWhitespace(sql.codeUnitAt(i))) {
+      pendingSpace = length > 0;
+      continue;
+    }
+    if (pendingSpace) {
+      out.writeCharCode(0x20);
+      length++;
+      pendingSpace = false;
+      if (length > _previewMax) break;
+    }
+    out.writeCharCode(sql.codeUnitAt(i));
+    length++;
+    if (length > _previewMax) break;
+  }
+  final text = out.toString();
+  if (length <= _previewMax) return text;
+  return '${text.substring(0, _previewKeep)}…';
 }
