@@ -128,6 +128,22 @@ class _MutableFolder {
   final List<RedisKeyLeafNode> leaves = [];
 }
 
+/// Sorts [items] by [nameOf], case-insensitively, lower-casing every name once.
+///
+/// `toLowerCase()` inside the comparator ran twice per comparison, so a folder
+/// with tens of thousands of keys paid O(n log n) string allocations (#1551).
+/// The comparisons give the same results on the same order, so the permutation
+/// (ties included) is the one the comparator version produced.
+void _sortByLowerName<T>(List<T> items, String Function(T item) nameOf) {
+  if (items.length < 2) return;
+  final keyed = [
+    for (final item in items) (lower: nameOf(item).toLowerCase(), item: item),
+  ]..sort((a, b) => a.lower.compareTo(b.lower));
+  for (var i = 0; i < keyed.length; i++) {
+    items[i] = keyed[i].item;
+  }
+}
+
 /// Engine to partition and build a folder hierarchy of Redis keys by a delimiter.
 class RedisKeyTreeEngine {
   const RedisKeyTreeEngine._();
@@ -142,7 +158,8 @@ class RedisKeyTreeEngine {
     if (delimiter.isEmpty) {
       final leaves = [
         for (final k in keys) RedisKeyLeafNode(name: k.name.label, keyInfo: k),
-      ]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      ];
+      _sortByLowerName(leaves, (l) => l.name);
       return RedisKeyTree(
         rootFolders: const [],
         rootLeaves: leaves,
@@ -152,51 +169,55 @@ class RedisKeyTreeEngine {
 
     final rootFolderMap = <String, _MutableFolder>{};
     final rootLeaves = <RedisKeyLeafNode>[];
+    final delimiterLength = delimiter.length;
 
     for (final key in keys) {
       final label = key.name.label;
-      if (!label.contains(delimiter)) {
+      var next = label.indexOf(delimiter);
+      if (next < 0) {
         rootLeaves.add(RedisKeyLeafNode(name: label, keyInfo: key));
         continue;
       }
 
-      final parts = label.split(delimiter);
-      // Example: 'user:100:profile' with ':' -> parts: ['user', '100', 'profile']
-      // Folder segments: ['user', '100']
-      // Leaf segment: 'profile'
-      final folderSegments = parts.sublist(0, parts.length - 1);
-      final rawLeaf = parts.last;
-      final leafSegment = rawLeaf.isEmpty ? '(empty)' : rawLeaf;
-
+      // Example: 'user:100:profile' with ':' -> folders 'user' and '100', leaf
+      // 'profile'. The segments are cut out by index, one at a time, with no
+      // split() list and no sublist (#1523); a folder's full prefix is the
+      // label up to and including its delimiter.
       var currentMap = rootFolderMap;
       _MutableFolder? currentFolder;
-      var currentPrefix = '';
+      var start = 0;
 
-      for (final seg in folderSegments) {
-        currentPrefix = '$currentPrefix$seg$delimiter';
+      while (next >= 0) {
+        final seg = label.substring(start, next);
+        final prefixEnd = next + delimiterLength;
         currentFolder = currentMap.putIfAbsent(
           seg,
-          () => _MutableFolder(name: seg, fullPrefix: currentPrefix),
+          () => _MutableFolder(
+            name: seg,
+            fullPrefix: label.substring(0, prefixEnd),
+          ),
         );
         currentMap = currentFolder.subfolders;
+        start = prefixEnd;
+        next = label.indexOf(delimiter, start);
       }
 
+      final rawLeaf = label.substring(start);
+      final leafSegment = rawLeaf.isEmpty ? '(empty)' : rawLeaf;
       currentFolder!.leaves.add(
         RedisKeyLeafNode(name: leafSegment, keyInfo: key),
       );
     }
 
-    rootLeaves.sort(
-        (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    _sortByLowerName(rootLeaves, (l) => l.name);
 
     List<RedisKeyFolderNode> convertFolders(Map<String, _MutableFolder> map) {
-      final sortedKeys = map.keys.toList()
-        ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+      final sortedKeys = map.keys.toList();
+      _sortByLowerName(sortedKeys, (k) => k);
       final result = <RedisKeyFolderNode>[];
       for (final key in sortedKeys) {
         final mf = map[key]!;
-        mf.leaves.sort(
-            (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        _sortByLowerName(mf.leaves, (l) => l.name);
         result.add(
           RedisKeyFolderNode(
             name: mf.name,
