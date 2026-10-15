@@ -63,49 +63,29 @@ bool isAllowedPostgresSelectQuery(String sql) {
   return _postgresStatementIsReadOnlySelect(statements.first);
 }
 
+/// Splits [sql] on the semicolons that PostgreSQL itself would treat as
+/// statement ends.
+///
+/// This is the gate that keeps writes out of the Table Browser, so it follows
+/// PostgreSQL's lexical rules and not the editor's script splitter
+/// (`SqlStatementSplitter`): there a backslash escapes a quote (MySQL style)
+/// and a backtick quotes, so `SELECT 'a\'; DELETE FROM t; --'` would look like
+/// one statement; PostgreSQL (standard strings) ends the literal at the second
+/// quote and runs the DELETE. Block comments nest here, as in PostgreSQL.
+/// [maskSqlLiteralsForLimitScan] already blanks comments, strings, quoted
+/// identifiers and dollar quotes, so one masked copy is enough (#1517).
 List<String> _splitPostgresStatements(String sql) {
-  final masked = _maskPostgresComments(maskSqlLiteralsForLimitScan(sql));
+  final masked = maskSqlLiteralsForLimitScan(sql);
   final statements = <String>[];
   var start = 0;
   for (var i = 0; i < masked.length; i++) {
-    if (masked[i] == ';') {
+    if (masked.codeUnitAt(i) == 0x3B /* ; */) {
       statements.add(sql.substring(start, i));
       start = i + 1;
     }
   }
   statements.add(sql.substring(start));
   return statements;
-}
-
-String _maskPostgresComments(String sql) {
-  final out = StringBuffer();
-  var i = 0;
-  while (i < sql.length) {
-    if (i + 1 < sql.length && sql[i] == '-' && sql[i + 1] == '-') {
-      while (i < sql.length && sql[i] != '\n') {
-        out.write(' ');
-        i++;
-      }
-      continue;
-    }
-    if (i + 1 < sql.length && sql[i] == '/' && sql[i + 1] == '*') {
-      out.write('  ');
-      i += 2;
-      while (i < sql.length) {
-        if (i + 1 < sql.length && sql[i] == '*' && sql[i + 1] == '/') {
-          out.write('  ');
-          i += 2;
-          break;
-        }
-        out.write(' ');
-        i++;
-      }
-      continue;
-    }
-    out.write(sql[i]);
-    i++;
-  }
-  return out.toString();
 }
 
 bool _postgresFragmentIsOnlyComments(String sql) {
