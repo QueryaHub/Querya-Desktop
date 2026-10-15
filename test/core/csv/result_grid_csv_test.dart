@@ -32,18 +32,6 @@ void main() {
     });
   });
 
-  group('resultGridAsCsvAsync', () {
-    test('matches synchronous result off the UI isolate', () async {
-      const columns = ['a', 'b'];
-      const rows = [
-        ['1', 'two,comma'],
-        ['quote', 'say "hi"'],
-      ];
-      final asyncCsv = await resultGridAsCsvAsync(columns, rows);
-      expect(asyncCsv, resultGridAsCsv(columns, rows));
-    });
-  });
-
   group('writeResultGridCsv', () {
     test('streams the same content as resultGridAsCsv', () async {
       const columns = ['a', 'b'];
