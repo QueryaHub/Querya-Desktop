@@ -2,7 +2,6 @@
 library;
 
 import 'dart:io';
-import 'dart:isolate';
 
 String escapeCsvField(String s) {
   final needsQuotes = s.contains(',') ||
@@ -27,8 +26,9 @@ String formatCsvDataRow(List<String> row, int columnCount) {
 
 /// One line per row; pads short rows with empty cells to [columns.length].
 ///
-/// Prefer [resultGridAsCsvAsync] for large grids on the UI isolate, and
-/// [writeResultGridCsv] when writing to a file.
+/// For large grids use [writeResultGridCsv] when writing to a file;
+/// `DataExportService.formatAsync` runs this off the UI isolate for the
+/// clipboard.
 String resultGridAsCsv(List<String> columns, List<List<String>> rows) {
   final buf = StringBuffer();
   buf.write(columns.map(escapeCsvField).join(','));
@@ -37,14 +37,6 @@ String resultGridAsCsv(List<String> columns, List<List<String>> rows) {
     buf.write(formatCsvDataRow(row, columns.length));
   }
   return buf.toString();
-}
-
-/// Builds CSV off the UI isolate so large grids do not freeze the main thread.
-Future<String> resultGridAsCsvAsync(
-  List<String> columns,
-  List<List<String>> rows,
-) {
-  return Isolate.run(() => resultGridAsCsv(columns, rows));
 }
 
 /// Streams CSV to [sink] without assembling the full document in memory.
