@@ -20,23 +20,53 @@ int _blockCommentEnd(String sql, int start) {
   return sql.length;
 }
 
+/// The characters `String.trimLeft` removes: Unicode White_Space and the BOM.
+bool _isTrimWhitespace(int c) =>
+    (c >= 0x09 && c <= 0x0D) ||
+    c == 0x20 ||
+    c == 0x85 ||
+    c == 0xA0 ||
+    c == 0x1680 ||
+    (c >= 0x2000 && c <= 0x200A) ||
+    c == 0x2028 ||
+    c == 0x2029 ||
+    c == 0x202F ||
+    c == 0x205F ||
+    c == 0x3000 ||
+    c == 0xFEFF;
+
+/// Offset of the first character of [sql] that is not whitespace, a `--` line
+/// comment or a `/* */` block comment; `sql.length` when nothing else is there.
+///
+/// Walks an index, so a header of many comment lines in front of a large script
+/// costs one pass and no copies (#1515).
+int _skipLeadingCommentsOffset(String sql) {
+  final length = sql.length;
+  var i = 0;
+  while (true) {
+    while (i < length && _isTrimWhitespace(sql.codeUnitAt(i))) {
+      i++;
+    }
+    if (i >= length) return length;
+    if (sql.startsWith('--', i)) {
+      final nl = sql.indexOf('\n', i);
+      if (nl == -1) return length;
+      i = nl + 1;
+      continue;
+    }
+    if (sql.startsWith('/*', i)) {
+      i = _blockCommentEnd(sql, i);
+      continue;
+    }
+    return i;
+  }
+}
+
 /// Removes leading whitespace, `--` line comments and `/* */` block comments.
 String stripLeadingWhitespaceAndLineComments(String sql) {
-  var s = sql.trimLeft();
-  while (true) {
-    if (s.isEmpty) return s;
-    if (s.startsWith('--')) {
-      final nl = s.indexOf('\n');
-      if (nl == -1) return '';
-      s = s.substring(nl + 1).trimLeft();
-      continue;
-    }
-    if (s.startsWith('/*')) {
-      s = s.substring(_blockCommentEnd(s, 0)).trimLeft();
-      continue;
-    }
-    return s;
-  }
+  final start = _skipLeadingCommentsOffset(sql);
+  if (start >= sql.length) return '';
+  return start == 0 ? sql : sql.substring(start);
 }
 
 final _limitAll = RegExp(r'\bLIMIT\s+ALL\b', caseSensitive: false);
