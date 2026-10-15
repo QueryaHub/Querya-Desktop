@@ -121,4 +121,53 @@ void main() {
       Duration(microseconds: kUpdateBadgePulsePeriod.inMicroseconds ~/ 2),
     );
   });
+
+  testWidgets('pulse is finite: settles and stays idle (#1554)',
+      (tester) async {
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: QueryaMotionScope(
+          level: QueryaMotionLevel.full,
+          child: material.Scaffold(
+            body: UpdateAvailableBadge(controller: controller),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    const manifest = UpdateManifest(
+      version: '3.0.0',
+      changelog: '',
+      assets: [],
+    );
+    controller.setPendingUpdate(manifest);
+    await tester.pump();
+
+    final state = tester.state<UpdateAvailableBadgeState>(
+      find.byType(UpdateAvailableBadge),
+    );
+    expect(state.isPulseAnimating, isTrue);
+
+    await tester.pump(
+      kUpdateBadgePulsePeriod * kUpdateBadgePulseLegs +
+          const Duration(milliseconds: 100),
+    );
+    await tester.pump();
+    expect(state.isPulseAnimating, isFalse);
+    expect(find.textContaining('v3.0.0 available'), findsOneWidget);
+
+    // Another sync (controller notification, dependency change) must not
+    // start the pulse again for the same pending update.
+    controller.setPendingUpdate(manifest);
+    await tester.pump();
+    expect(state.isPulseAnimating, isFalse);
+
+    // A later update pulses again once the badge went away in between.
+    controller.setPendingUpdate(null);
+    await tester.pump();
+    controller.setPendingUpdate(manifest);
+    await tester.pump();
+    expect(state.isPulseAnimating, isTrue);
+  });
 }

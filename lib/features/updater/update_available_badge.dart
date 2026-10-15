@@ -16,7 +16,14 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 /// [QueryaMotion.effectiveDuration]; Off / OS `disableAnimations` stop the pulse.
 const Duration kUpdateBadgePulsePeriod = Duration(milliseconds: 1400);
 
-/// Pulsing title-bar chip when a background update check finds a newer release.
+/// How many [kUpdateBadgePulsePeriod] legs the chip pulses for when it appears
+/// (forward and back count as one leg each, so 6 is three full breaths), after
+/// which it settles to the static chip colors. An endless pulse keeps the
+/// engine producing a frame at the display rate and costs an idle app ~30% of
+/// a CPU core (#1554).
+const int kUpdateBadgePulseLegs = 6;
+
+/// Title-bar chip that pulses a few times when a background update check finds a newer release.
 class UpdateAvailableBadge extends material.StatefulWidget {
   const UpdateAvailableBadge({super.key, required this.controller});
 
@@ -29,6 +36,10 @@ class UpdateAvailableBadge extends material.StatefulWidget {
 class UpdateAvailableBadgeState extends material.State<UpdateAvailableBadge>
     with material.SingleTickerProviderStateMixin {
   late final material.AnimationController _pulse;
+
+  /// The finite pulse already ran for the update that is pending now; it is
+  /// cleared when the badge goes away so the next update pulses again.
+  bool _pulsed = false;
 
   @visibleForTesting
   bool get isPulseAnimating => _pulse.isAnimating;
@@ -77,6 +88,7 @@ class UpdateAvailableBadgeState extends material.State<UpdateAvailableBadge>
         _pulse.stop();
       }
       _pulse.value = 0;
+      if (!show) _pulsed = false;
       return;
     }
 
@@ -86,8 +98,18 @@ class UpdateAvailableBadgeState extends material.State<UpdateAvailableBadge>
     if (periodChanged) {
       _pulse.duration = period;
     }
-    if (!_pulse.isAnimating || periodChanged) {
-      _pulse.repeat(reverse: true);
+    final running = _pulse.isAnimating;
+    if (_pulsed && !running) return; // settled: stay static, stay idle
+
+    if (!running || periodChanged) {
+      _pulsed = true;
+      unawaited(
+        _pulse
+            .repeat(reverse: true, count: kUpdateBadgePulseLegs)
+            .whenComplete(() {
+          if (mounted) _pulse.value = 0;
+        }),
+      );
     }
   }
 
