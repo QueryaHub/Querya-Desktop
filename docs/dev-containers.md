@@ -121,27 +121,45 @@ The **Demo Playground** (a bundled SQLite database) needs none of this.
 
 ## Headless modes
 
-"Headless" means no display and no window. There are three levels; the first
-two work today, the third is a recipe that is not wrapped in a script yet
+"Headless" means no display and no window. There are three levels, each one
+command and each runnable in a container or on a CI runner
 (tracked in [#1487](https://github.com/QueryaHub/Querya-Desktop/issues/1487)).
 
 | Level | What | Command |
 |-------|------|---------|
 | L0 | unit, widget, e2e and guard tests | `flutter test --exclude-tags=golden` |
 | L1 | an extension against a real database, no GUI | `querya-ext-tester ./ext --connect '{...}' --sandbox` (see *Testing an extension*) |
-| L2 | the real app under a virtual display, in portable mode | see below |
+| L2 | the real app under a virtual display, in portable mode | `scripts/dev/headless_app.sh` |
 
 L1 needs a tester built from 0.4.19 or newer: older ones exited 0 whatever the
 result.
 
-L2, by hand (untested in the container, it is the same recipe as a normal
-Linux run):
+### L2: `scripts/dev/headless_app.sh`
+
+Starts Xvfb on a free display, runs a **copy** of a built bundle with
+`QUERYA_PORTABLE=1` (so its `QueryaData` is a throw-away profile and the bundle
+stays untouched), waits for the window, keeps watching for a few seconds, and
+stops everything.
 
 ```bash
-Xvfb :99 -screen 0 1280x800x24 &            # DISPLAY=:99 is already set
-QUERYA_PORTABLE=1 flutter run -d linux       # data goes to ./QueryaData of the bundle
-import -window root shot.png                # ImageMagick, if installed
+flutter build linux --release                  # or --debug
+scripts/dev/headless_app.sh                    # picks build/linux/x64/release/bundle
+scripts/dev/headless_app.sh --bundle path/to/bundle --screenshot out/shot.png --log out/app.log
 ```
+
+Exit code 0: the app started, showed a window and stayed up; 1: it died or no
+window appeared (the last lines of its output are printed); 2: a missing bundle
+or tool. It needs `xvfb`, plus `xdotool` or `xwininfo` to see the window and
+ImageMagick (`import`) for `--screenshot`; all of them are in the CI job below,
+the dev container image has Xvfb.
+
+The [Headless smoke (L2)](../.github/workflows/headless-smoke.yml) workflow builds
+the Linux bundle and runs the script (on changes to it, weekly, and on demand),
+keeping the screenshot and the log as an artifact.
+
+Whether L2 should grow a real "headless Querya" (core services without a window,
+so that `querya-mcp` does not need a running Desktop) is left open until this
+exists.
 
 ## Run the app in the container
 
@@ -229,8 +247,8 @@ a usage error.
 
 ## Known gaps
 
-- **Headless L2** (the app under Xvfb in a script and a CI job) and the
-  extension-author container are not done yet; both are tracked in
+- **The extension-author container** (Dev Container Feature, test database
+  images, template repository, registry CI) is not done yet; it is tracked in
   [#1487](https://github.com/QueryaHub/Querya-Desktop/issues/1487).
 
 ## Troubleshooting
