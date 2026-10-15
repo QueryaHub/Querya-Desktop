@@ -30,6 +30,17 @@ void main() {
       expect(appendJsonPath('address.geo', 0), 'address.geo[0]');
       expect(appendJsonPath('address.geo[0]', 'lat'), 'address.geo[0].lat');
       expect(appendJsonPath('user', 'first-name'), 'user["first-name"]');
+      // Identifier characters (#1525): `_`, `$`, digits after the first.
+      expect(appendJsonPath('doc', r'$id'), r'doc.$id');
+      expect(appendJsonPath('doc', '_x9'), 'doc._x9');
+      expect(appendJsonPath('doc', 'A'), 'doc.A');
+      // Not identifiers: leading digit, empty, space, dot, non-ASCII, quote.
+      expect(appendJsonPath('doc', '9x'), 'doc["9x"]');
+      expect(appendJsonPath('doc', ''), 'doc[""]');
+      expect(appendJsonPath('doc', 'a b'), 'doc["a b"]');
+      expect(appendJsonPath('doc', 'a.b'), 'doc["a.b"]');
+      expect(appendJsonPath('doc', 'caf\u00e9'), 'doc["caf\u00e9"]');
+      expect(appendJsonPath('doc', 'say"hi'), r'doc["say\"hi"]');
       expect(appendJsonPath('data', 'space key'), 'data["space key"]');
     });
   });
