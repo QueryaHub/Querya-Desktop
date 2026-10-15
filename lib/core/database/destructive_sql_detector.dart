@@ -190,6 +190,9 @@ abstract final class DestructiveSqlDetector {
     caseSensitive: false,
   );
 
+  static final _whereRegex = RegExp(r'\bWHERE\b', caseSensitive: false);
+  static final _setRegex = RegExp(r'\bSET\b', caseSensitive: false);
+
   /// True when [sanitized] has a WHERE outside any parentheses, so a WHERE
   /// inside a subquery (`SET x = (SELECT ... WHERE ...)`) does not count.
   static bool _hasTopLevelWhere(String sanitized) {
@@ -205,84 +208,133 @@ abstract final class DestructiveSqlDetector {
         top.write(ch);
       }
     }
-    return RegExp(r'\bWHERE\b', caseSensitive: false).hasMatch(top.toString());
+    return _whereRegex.hasMatch(top.toString());
+  }
+
+  static const int _chLf = 0x0A;
+  static const int _chCr = 0x0D;
+  static const int _chQuote = 0x27; // '
+  static const int _chDollar = 0x24; // $
+  static const int _chStar = 0x2A; // *
+  static const int _chSlash = 0x2F; // /
+  static const int _chDash = 0x2D; // -
+  static const int _chBackslash = 0x5C; // \
+
+  static bool _isTagChar(int c) =>
+      (c >= 0x30 && c <= 0x39) || // 0-9
+      (c >= 0x41 && c <= 0x5A) || // A-Z
+      (c >= 0x61 && c <= 0x7A) || // a-z
+      c == 0x5F; // _
+
+  /// Offset of the end of the line comment whose body starts at [start]: the
+  /// line break itself is not consumed.
+  static int _skipLineComment(String sql, int start, int len) {
+    var i = start;
+    while (i < len) {
+      final c = sql.codeUnitAt(i);
+      if (c == _chLf || c == _chCr) break;
+      i++;
+    }
+    return i;
+  }
+
+  /// Offset after the `*/` that closes the block comment whose body starts at
+  /// [start]; [len] when it is never closed.
+  static int _skipBlockComment(String sql, int start, int len) {
+    var i = start;
+    while (i + 1 < len) {
+      if (sql.codeUnitAt(i) == _chStar && sql.codeUnitAt(i + 1) == _chSlash) {
+        return i + 2;
+      }
+      i++;
+    }
+    return len;
+  }
+
+  /// Offset after the dollar-quoted string (`$$...$$`, `$tag$...$tag$`) that
+  /// opens at [start], [len] when it is never closed, or [start] when there is
+  /// no opening tag at [start] (`$1`, a lone `$`).
+  static int _skipDollarQuote(String sql, int start, int len) {
+    var j = start + 1;
+    while (j < len && _isTagChar(sql.codeUnitAt(j))) {
+      j++;
+    }
+    if (j >= len || sql.codeUnitAt(j) != _chDollar) return start;
+    final bodyStart = j + 1;
+    final close = sql.indexOf(sql.substring(start, bodyStart), bodyStart);
+    return close == -1 ? len : close + (bodyStart - start);
+  }
+
+  /// Offset after the single-quoted literal whose body starts at [start]
+  /// (`''` and backslash escapes); [len] when it is never closed.
+  static int _skipStringLiteral(String sql, int start, int len) {
+    var i = start;
+    while (i < len) {
+      final c = sql.codeUnitAt(i);
+      if (c == _chQuote) {
+        if (i + 1 < len && sql.codeUnitAt(i + 1) == _chQuote) {
+          i += 2; // escaped quote
+        } else {
+          return i + 1; // closing quote
+        }
+      } else if (c == _chBackslash && i + 1 < len) {
+        i += 2; // escaped char
+      } else {
+        i++;
+      }
+    }
+    return len;
   }
 
   /// Strips comments and string literals to prevent false positives when keywords
   /// appear inside strings or comments.
+  ///
+  /// Scans code units with the `_skip*` helpers (no per-character strings, no
+  /// regex, no copy of the rest of the script at every `$`), and appends the
+  /// text between tokens in runs (#1511).
   static String stripCommentsAndStrings(String sql) {
     final buffer = StringBuffer();
     final len = sql.length;
     var i = 0;
+    var runStart = 0;
+
+    void flushRun(int end) {
+      if (end > runStart) buffer.write(sql.substring(runStart, end));
+    }
 
     while (i < len) {
-      // 1. Line comment: --
-      if (i + 1 < len && sql[i] == '-' && sql[i + 1] == '-') {
-        i += 2;
-        while (i < len && sql[i] != '\n' && sql[i] != '\r') {
-          i++;
-        }
-        buffer.write(' ');
-        continue;
-      }
+      final c = sql.codeUnitAt(i);
+      final next = i + 1 < len ? sql.codeUnitAt(i + 1) : -1;
+      int after;
+      String? replacement;
 
-      // 2. Block comment: /* ... */
-      if (i + 1 < len && sql[i] == '/' && sql[i + 1] == '*') {
-        i += 2;
-        while (i + 1 < len && !(sql[i] == '*' && sql[i + 1] == '/')) {
+      if (c == _chDash && next == _chDash) {
+        after = _skipLineComment(sql, i + 2, len);
+        replacement = ' ';
+      } else if (c == _chSlash && next == _chStar) {
+        after = _skipBlockComment(sql, i + 2, len);
+        replacement = ' ';
+      } else if (c == _chDollar) {
+        after = _skipDollarQuote(sql, i, len);
+        if (after == i) {
           i++;
-        }
-        if (i + 1 < len) {
-          i += 2; // skip */
-        } else {
-          i = len;
-        }
-        buffer.write(' ');
-        continue;
-      }
-
-      // 3. Dollar quotes in PostgreSQL: $$ or $tag$
-      if (sql[i] == '\$') {
-        final match =
-            RegExp(r'^\$([a-zA-Z0-9_]*)\$').matchAsPrefix(sql.substring(i));
-        if (match != null) {
-          final tag = match.group(0)!;
-          i += tag.length;
-          final closeIdx = sql.indexOf(tag, i);
-          if (closeIdx != -1) {
-            i = closeIdx + tag.length;
-          } else {
-            i = len;
-          }
-          buffer.write("''");
           continue;
         }
-      }
-
-      // 4. Standard string literal: '...' (supporting '' escaping)
-      if (sql[i] == "'") {
+        replacement = "''";
+      } else if (c == _chQuote) {
+        after = _skipStringLiteral(sql, i + 1, len);
+        replacement = "''";
+      } else {
         i++;
-        while (i < len) {
-          if (sql[i] == "'") {
-            if (i + 1 < len && sql[i + 1] == "'") {
-              i += 2; // escaped quote
-            } else {
-              i++; // closing quote
-              break;
-            }
-          } else if (sql[i] == '\\' && i + 1 < len) {
-            i += 2; // escaped char
-          } else {
-            i++;
-          }
-        }
-        buffer.write("''");
         continue;
       }
 
-      buffer.write(sql[i]);
-      i++;
+      flushRun(i);
+      buffer.write(replacement);
+      i = after;
+      runStart = i;
     }
+    flushRun(len);
 
     return buffer.toString();
   }
@@ -420,7 +472,7 @@ abstract final class DestructiveSqlDetector {
       // 8. UPDATE table SET ... without WHERE
       final updateMatch = _updateRegex.firstMatch(sanitized);
       if (updateMatch != null &&
-          RegExp(r'\bSET\b', caseSensitive: false).hasMatch(sanitized) &&
+          _setRegex.hasMatch(sanitized) &&
           !_hasTopLevelWhere(sanitized)) {
         final schema = updateMatch.group(1);
         final table = updateMatch.group(2) ?? 'table';
