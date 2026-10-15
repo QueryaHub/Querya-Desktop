@@ -176,7 +176,10 @@ class _NotNode extends _FilterAstNode {
 }
 
 class _PredicateNode extends _FilterAstNode {
-  const _PredicateNode({
+  /// Everything that depends only on the query text is worked out here, once:
+  /// the operator, the lower-cased target, its number, the normalised `IN` set
+  /// and the `BETWEEN` bounds. [evaluate] runs once per row (#1550).
+  _PredicateNode({
     required this.colIndex,
     required this.op,
     required this.targetValue,
@@ -184,7 +187,12 @@ class _PredicateNode extends _FilterAstNode {
     this.betweenMin,
     this.betweenMax,
     this.likeRegex,
-  });
+  })  : _upperOp = op.toUpperCase().trim(),
+        _lowerTarget = targetValue.toLowerCase(),
+        _numTarget = double.tryParse(targetValue.trim()),
+        _inSet = {for (final v in inValues) v.toLowerCase().trim()},
+        _numMin = betweenMin == null ? null : double.tryParse(betweenMin.trim()),
+        _numMax = betweenMax == null ? null : double.tryParse(betweenMax.trim());
 
   final int colIndex;
   final String op;
@@ -197,72 +205,56 @@ class _PredicateNode extends _FilterAstNode {
   /// per-row scan does not rebuild the same RegExp for every row.
   final RegExp? likeRegex;
 
+  final String _upperOp;
+  final String _lowerTarget;
+  final double? _numTarget;
+  final Set<String> _inSet;
+  final double? _numMin;
+  final double? _numMax;
+
   @override
   bool evaluate(List<String> row, List<String> lowerColumns) {
     if (colIndex < 0 || colIndex >= row.length) return false;
     final cellValue = row[colIndex];
-    final isNull = cellValue == 'NULL' || cellValue == 'null' || cellValue.isEmpty;
-    final upperOp = op.toUpperCase().trim();
 
-    // IS NULL / IS NOT NULL
-    if (upperOp == 'IS NULL') {
-      return isNull;
+    switch (_upperOp) {
+      case 'IS NULL':
+        return _isNull(cellValue);
+      case 'IS NOT NULL':
+        return !_isNull(cellValue);
+      case 'IN':
+        return _inSet.contains(cellValue.toLowerCase().trim());
+      case 'NOT IN':
+        return !_inSet.contains(cellValue.toLowerCase().trim());
+      case 'BETWEEN':
+        final min = betweenMin;
+        final max = betweenMax;
+        if (min != null && max != null) {
+          final numCell = double.tryParse(cellValue.trim());
+          final numMin = _numMin;
+          final numMax = _numMax;
+          if (numCell != null && numMin != null && numMax != null) {
+            return numCell >= numMin && numCell <= numMax;
+          }
+          return cellValue.compareTo(min) >= 0 && cellValue.compareTo(max) <= 0;
+        }
+      case 'LIKE':
+        return (likeRegex ?? _likeToRegExp(targetValue, caseSensitive: true))
+            .hasMatch(cellValue);
+      case 'NOT LIKE':
+        return !(likeRegex ?? _likeToRegExp(targetValue, caseSensitive: true))
+            .hasMatch(cellValue);
+      case 'ILIKE':
+        return (likeRegex ?? _likeToRegExp(targetValue, caseSensitive: false))
+            .hasMatch(cellValue);
+      case 'NOT ILIKE':
+        return !(likeRegex ?? _likeToRegExp(targetValue, caseSensitive: false))
+            .hasMatch(cellValue);
     }
-    if (upperOp == 'IS NOT NULL') {
-      return !isNull;
-    }
-
-    // IN / NOT IN
-    if (upperOp == 'IN') {
-      final lowerCell = cellValue.toLowerCase().trim();
-      return inValues.any((v) => v.toLowerCase().trim() == lowerCell);
-    }
-    if (upperOp == 'NOT IN') {
-      final lowerCell = cellValue.toLowerCase().trim();
-      return !inValues.any((v) => v.toLowerCase().trim() == lowerCell);
-    }
-
-    // BETWEEN x AND y
-    if (upperOp == 'BETWEEN' && betweenMin != null && betweenMax != null) {
-      final numCell = double.tryParse(cellValue.trim());
-      final numMin = double.tryParse(betweenMin!.trim());
-      final numMax = double.tryParse(betweenMax!.trim());
-      if (numCell != null && numMin != null && numMax != null) {
-        return numCell >= numMin && numCell <= numMax;
-      }
-      return cellValue.compareTo(betweenMin!) >= 0 && cellValue.compareTo(betweenMax!) <= 0;
-    }
-
-    // LIKE / NOT LIKE
-    if (upperOp == 'LIKE') {
-      final regex =
-          likeRegex ?? _likeToRegExp(targetValue, caseSensitive: true);
-      return regex.hasMatch(cellValue);
-    }
-    if (upperOp == 'NOT LIKE') {
-      final regex =
-          likeRegex ?? _likeToRegExp(targetValue, caseSensitive: true);
-      return !regex.hasMatch(cellValue);
-    }
-
-    // ILIKE / NOT ILIKE
-    if (upperOp == 'ILIKE') {
-      final regex =
-          likeRegex ?? _likeToRegExp(targetValue, caseSensitive: false);
-      return regex.hasMatch(cellValue);
-    }
-    if (upperOp == 'NOT ILIKE') {
-      final regex =
-          likeRegex ?? _likeToRegExp(targetValue, caseSensitive: false);
-      return !regex.hasMatch(cellValue);
-    }
-
-    final lowerCell = cellValue.toLowerCase();
-    final lowerTarget = targetValue.toLowerCase();
 
     // Numeric comparison if both values can be parsed as numbers
     final numCell = double.tryParse(cellValue.trim());
-    final numTarget = double.tryParse(targetValue.trim());
+    final numTarget = _numTarget;
 
     if (numCell != null && numTarget != null) {
       switch (op) {
@@ -285,6 +277,8 @@ class _PredicateNode extends _FilterAstNode {
     }
 
     // String / Lexicographic comparison
+    final lowerCell = cellValue.toLowerCase();
+    final lowerTarget = _lowerTarget;
     switch (op) {
       case '=':
       case '==':
@@ -306,6 +300,9 @@ class _PredicateNode extends _FilterAstNode {
         return lowerCell.contains(lowerTarget);
     }
   }
+
+  static bool _isNull(String cellValue) =>
+      cellValue == 'NULL' || cellValue == 'null' || cellValue.isEmpty;
 
   static RegExp _likeToRegExp(String pattern, {required bool caseSensitive}) {
     final buffer = StringBuffer('^');
