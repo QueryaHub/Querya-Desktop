@@ -124,6 +124,14 @@ class QueryaSchemaObject {
   String get searchHaystack =>
       '$name $qualifiedName ${kind.name} $kindLabel ${database ?? ''} ${schema ?? ''}';
 
+  static final Expando<String> _lowerHaystacks =
+      Expando<String>('QueryaSchemaObject');
+
+  /// [searchHaystack] lower-cased, built once per object: the switcher filters
+  /// thousands of objects on every keystroke (#1528).
+  String get searchHaystackLower =>
+      _lowerHaystacks[this] ??= searchHaystack.toLowerCase();
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) || other is QueryaSchemaObject && other.id == id;
@@ -149,7 +157,7 @@ List<QueryaSchemaObject> filterSchemaObjects(
   final parts = q.split(RegExp(r'\s+'));
   final hits = <QueryaSchemaObject>[];
   for (final object in objects) {
-    final hay = object.searchHaystack.toLowerCase();
+    final hay = object.searchHaystackLower;
     if (parts.every(hay.contains)) {
       hits.add(object);
       if (hits.length >= limit) break;
