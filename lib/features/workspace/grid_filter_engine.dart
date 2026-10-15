@@ -362,6 +362,21 @@ class _FilterToken {
 }
 
 abstract final class _FilterLexer {
+  // Compiled once. They have no `^`: they are tried with `matchAsPrefix` at an
+  // offset, so the rest of the input is never copied (#1527, #1512).
+  static final _andRe = RegExp(r'AND\b|&&', caseSensitive: false);
+  static final _orRe = RegExp(r'OR\b|\|\|', caseSensitive: false);
+  static final _notRe = RegExp(r'NOT\b|!', caseSensitive: false);
+  static final _isNullRe =
+      RegExp(r'IS\s+(NOT\s+)?NULL\b', caseSensitive: false);
+  static final _inRe = RegExp(r'(NOT\s+)?IN\s*\(', caseSensitive: false);
+  static final _betweenRe = RegExp(r'BETWEEN\s+', caseSensitive: false);
+  static final _andKeywordRe = RegExp(r'AND\s+', caseSensitive: false);
+  static final _likeRe =
+      RegExp(r'(NOT\s+)?(ILIKE|LIKE)\s+', caseSensitive: false);
+  static final _comparisonRe = RegExp(r'>=|<=|!=|<>|==|=|>|<|:');
+  static final _identifierRe = RegExp(r'[a-zA-Z_]\w*');
+
   static List<_FilterToken> tokenize(String input, List<String> lowerColumns) {
     final tokens = <_FilterToken>[];
     var i = 0;
@@ -386,25 +401,21 @@ abstract final class _FilterLexer {
       }
 
       // Check logical operators: AND, &&, OR, ||, NOT, !
-      final rem = input.substring(i);
-      final andMatch =
-          RegExp(r'^(AND\b|&&)', caseSensitive: false).firstMatch(rem);
+      final andMatch = _andRe.matchAsPrefix(input, i);
       if (andMatch != null) {
         tokens.add(const _FilterToken(_TokenType.and, value: 'AND'));
         i += andMatch.group(0)!.length;
         continue;
       }
 
-      final orMatch =
-          RegExp(r'^(OR\b|\|\|)', caseSensitive: false).firstMatch(rem);
+      final orMatch = _orRe.matchAsPrefix(input, i);
       if (orMatch != null) {
         tokens.add(const _FilterToken(_TokenType.or, value: 'OR'));
         i += orMatch.group(0)!.length;
         continue;
       }
 
-      final notMatch =
-          RegExp(r'^(NOT\b|!)', caseSensitive: false).firstMatch(rem);
+      final notMatch = _notRe.matchAsPrefix(input, i);
       if (notMatch != null) {
         tokens.add(const _FilterToken(_TokenType.not, value: 'NOT'));
         i += notMatch.group(0)!.length;
@@ -455,12 +466,10 @@ abstract final class _FilterLexer {
 
     final hadSpace = p > spaceStart;
     final canMatchKeyword = hadSpace || isQuotedCol;
-    final rem = input.substring(p);
 
     // 1. IS NULL / IS NOT NULL
     if (canMatchKeyword) {
-      final isNullMatch =
-          RegExp(r'^IS\s+(NOT\s+)?NULL\b', caseSensitive: false).firstMatch(rem);
+      final isNullMatch = _isNullRe.matchAsPrefix(input, p);
       if (isNullMatch != null) {
         final isNot = isNullMatch.group(1) != null;
         return (
@@ -476,8 +485,7 @@ abstract final class _FilterLexer {
 
     // 2. IN / NOT IN
     if (canMatchKeyword) {
-      final inMatch =
-          RegExp(r'^(NOT\s+)?IN\s*\(', caseSensitive: false).firstMatch(rem);
+      final inMatch = _inRe.matchAsPrefix(input, p);
       if (inMatch != null) {
         final isNot = inMatch.group(1) != null;
         var inPos = p + inMatch.group(0)!.length;
@@ -512,8 +520,7 @@ abstract final class _FilterLexer {
 
     // 3. BETWEEN x AND y
     if (canMatchKeyword) {
-      final betweenMatch =
-          RegExp(r'^BETWEEN\s+', caseSensitive: false).firstMatch(rem);
+      final betweenMatch = _betweenRe.matchAsPrefix(input, p);
       if (betweenMatch != null) {
         var bPos = p + betweenMatch.group(0)!.length;
         final minVal = _parseValue(input, bPos);
@@ -523,9 +530,7 @@ abstract final class _FilterLexer {
           while (andPos < input.length && input[andPos].trim().isEmpty) {
             andPos++;
           }
-          final andRem = input.substring(andPos);
-          final andMatch =
-              RegExp(r'^AND\s+', caseSensitive: false).firstMatch(andRem);
+          final andMatch = _andKeywordRe.matchAsPrefix(input, andPos);
           if (andMatch != null) {
             var maxPos = andPos + andMatch.group(0)!.length;
             final maxVal = _parseValue(input, maxPos);
@@ -549,9 +554,7 @@ abstract final class _FilterLexer {
 
     // 4. LIKE / ILIKE / NOT LIKE / NOT ILIKE
     if (canMatchKeyword) {
-      final likeMatch =
-          RegExp(r'^(NOT\s+)?(ILIKE|LIKE)\s+', caseSensitive: false)
-              .firstMatch(rem);
+      final likeMatch = _likeRe.matchAsPrefix(input, p);
       if (likeMatch != null) {
         final isNot = likeMatch.group(1) != null;
         final likeType = likeMatch.group(2)!.toUpperCase();
@@ -576,10 +579,9 @@ abstract final class _FilterLexer {
     }
 
     // 5. Comparison operators: >=, <=, !=, <>, ==, =, >, <, :
-    final opMatch =
-        RegExp(r'^(>=|<=|!=|<>|==|=|>|<|:)').firstMatch(rem);
+    final opMatch = _comparisonRe.matchAsPrefix(input, p);
     if (opMatch != null) {
-      final op = opMatch.group(1)!;
+      final op = opMatch.group(0)!;
       final oPos = p + opMatch.group(0)!.length;
       final valParsed = _parseValue(input, oPos);
       if (valParsed != null) {
@@ -638,8 +640,7 @@ abstract final class _FilterLexer {
     }
 
     // Unquoted column: [a-zA-Z_]\w*
-    final rem = input.substring(i);
-    final match = RegExp(r'^[a-zA-Z_]\w*').firstMatch(rem);
+    final match = _identifierRe.matchAsPrefix(input, i);
     if (match != null) {
       final name = match.group(0)!;
       final colIdx = lowerColumns.indexOf(name.toLowerCase());
