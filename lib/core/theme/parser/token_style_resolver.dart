@@ -22,21 +22,19 @@ class TokenStyleResolver {
       _cache.putIfAbsent(scope, () => _resolveUncached(scope));
 
   TextStyle _resolveUncached(String scope) {
-    for (final prefix in _scopePrefixes(scope)) {
+    // `a.b.c` -> `a.b` -> `a`: cut at the last dot instead of splitting into a
+    // list and joining sublists (#1530).
+    var prefix = scope;
+    while (true) {
       for (final rule in _rules) {
         if (rule.scopes.contains(prefix)) {
           return _styleFromRule(rule);
         }
       }
+      final dot = prefix.lastIndexOf('.');
+      if (dot < 0) return _defaultStyle;
+      prefix = prefix.substring(0, dot);
     }
-    return _defaultStyle;
-  }
-
-  List<String> _scopePrefixes(String scope) {
-    final parts = scope.split('.');
-    return [
-      for (var i = parts.length; i >= 1; i--) parts.sublist(0, i).join('.'),
-    ];
   }
 
   TextStyle _styleFromRule(TokenColorRule rule) {
