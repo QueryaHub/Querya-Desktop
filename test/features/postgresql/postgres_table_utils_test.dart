@@ -76,6 +76,36 @@ void main() {
       );
     });
 
+    test('splits like PostgreSQL, not like the script splitter (#1517)', () {
+      // Standard strings: a backslash is an ordinary character, so the literal
+      // ends at the second quote and the DELETE is a second statement.
+      expect(
+        isAllowedPostgresSelectQuery("SELECT 'a\\'; DELETE FROM t; --'"),
+        isFalse,
+      );
+      // A backtick is an operator character in PostgreSQL, not a quote.
+      expect(
+        isAllowedPostgresSelectQuery('SELECT 1 ` 2; DELETE FROM t; SELECT 1 ` 3'),
+        isFalse,
+      );
+      // Block comments nest: the whole tail is one comment.
+      expect(
+        isAllowedPostgresSelectQuery(
+          'SELECT 1 /* a /* b */ ; DELETE FROM t; */',
+        ),
+        isTrue,
+      );
+      // Semicolons in quoted identifiers and dollar quotes do not split.
+      expect(
+        isAllowedPostgresSelectQuery('SELECT "a;b" FROM t'),
+        isTrue,
+      );
+      expect(
+        isAllowedPostgresSelectQuery(r'SELECT $$ x; y $$'),
+        isTrue,
+      );
+    });
+
     test('rejects empty', () {
       expect(isAllowedPostgresSelectQuery(''), isFalse);
     });
