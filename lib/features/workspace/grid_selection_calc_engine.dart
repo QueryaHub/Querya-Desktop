@@ -131,9 +131,11 @@ abstract final class GridSelectionCalcEngine {
 
       distinctSet.add(trimmed);
 
-      // Try parsing numeric values (stripping commas if present)
-      final normalized = trimmed.replaceAll(',', '');
-      final parsed = double.tryParse(normalized);
+      // Try parsing numeric values (stripping commas if present). Most cells
+      // have none, so the stripped copy is only made when there is one.
+      final parsed = double.tryParse(
+        trimmed.contains(',') ? trimmed.replaceAll(',', '') : trimmed,
+      );
       if (parsed != null && !parsed.isNaN && !parsed.isInfinite) {
         numericList.add(parsed);
         sum += parsed;
@@ -260,6 +262,13 @@ abstract final class GridSelectionCalcEngine {
     }
     // Limit decimal precision to 4 decimal places
     final formatted = val.toStringAsFixed(4);
-    return formatted.replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
+    // Drop the trailing zeros, then one trailing dot (`3.1400` -> `3.14`,
+    // `10.0000` -> `10`): an index walk, no regex (#1531).
+    var end = formatted.length;
+    while (end > 0 && formatted.codeUnitAt(end - 1) == 0x30) {
+      end--;
+    }
+    if (end > 0 && formatted.codeUnitAt(end - 1) == 0x2E) end--;
+    return end == formatted.length ? formatted : formatted.substring(0, end);
   }
 }
