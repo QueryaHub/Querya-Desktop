@@ -10,7 +10,8 @@ list of seeded data see the header of [`docker/docker-compose.yml`](../docker/do
 | File | What it does |
 |------|--------------|
 | [`.devcontainer/devcontainer.json`](../.devcontainer/devcontainer.json) | The dev container definition: build, features, post-create / post-start commands, forwarded ports, VS Code extensions, host requirements (4 CPUs, 8 GB). |
-| [`.devcontainer/Dockerfile`](../.devcontainer/Dockerfile) | `ghcr.io/cirruslabs/flutter` plus the Linux desktop toolchain (clang, cmake, ninja, GTK 3, libsecret, SQLite headers, Xvfb) and the Docker CLI with the Compose plugin. `DISPLAY` is `:99`. |
+| [`.devcontainer/Dockerfile`](../.devcontainer/Dockerfile) | Ubuntu 24.04 with Flutter pinned to the version CI uses (`ARG FLUTTER_VERSION`, checked against `ci.yml` by a guard test), the Linux desktop toolchain (clang, cmake, ninja, GTK 3, libsecret, SQLite headers, Xvfb), `bubblewrap` for the extension sandbox tests, `socat`, and the Docker CLI with the Compose plugin. `DISPLAY` is `:99`. |
+| [`scripts/dev/devcontainer_start.sh`](../scripts/dev/devcontainer_start.sh) | Runs on every start: brings the stack up, waits for the databases to be healthy, joins the stack's network and forwards `localhost:<port>` to the services. |
 | [`docker/docker-compose.yml`](../docker/docker-compose.yml) | The database stack (project `querya-dev`): PostgreSQL 16, MySQL 8.4, Redis 7, MongoDB 7, ClickHouse 24.8 and a seeded SQLite file. |
 
 The image is also published to GitHub Packages as
@@ -21,9 +22,11 @@ cache (`build.cacheFrom`), so the first build pulls the toolchain layers instead
 them; if the package is unreachable the build simply falls back to building from the Dockerfile.
 
 When the container is created it runs `flutter config --enable-linux-desktop`
-and `flutter pub get`; every time it starts it tries
-`docker compose -f docker/docker-compose.yml up -d` and prints a hint if Docker
-is not reachable.
+and `flutter pub get`; every time it starts it runs
+[`scripts/dev/devcontainer_start.sh`](../scripts/dev/devcontainer_start.sh): it brings the
+stack up, waits (up to `QUERYA_STACK_TIMEOUT`, 180 s) for PostgreSQL, MySQL, Redis, MongoDB
+and ClickHouse to be healthy, prints which are not, and does not fail the container start
+when Docker is unreachable.
 
 ## Open the dev container
 
@@ -83,23 +86,25 @@ the ports above.
 
 ### From inside the dev container
 
-`localhost` inside the container is the container itself, **not** the host, so
-`localhost:5432` finds nothing even though the port is "forwarded" (the forward
-goes from the container to your machine, and the databases do not listen in the
-container). Pick one:
+The databases run on the host's daemon next to the dev container, so nothing
+listens on the container's own loopback. The start script therefore does two
+things for you:
 
-1. **Join the stack's network** (works on Linux Docker Engine and Docker Desktop):
+- joins the container to the stack's network (`querya-dev_default`), so the
+  service names `postgres`, `mysql`, `redis`, `mongo`, `clickhouse` (and
+  `mysql-live`) resolve, with the container-side ports 5432, 3306, 6379, 27017,
+  8123 / 9000;
+- forwards `127.0.0.1:<port>` to those services with `socat`, so `localhost` and
+  the usual ports work too (`psql -h localhost -U querya querya`,
+  `redis-cli -h localhost ping`, the connection form with `localhost`). A port
+  something already listens on is left alone.
 
-   ```bash
-   docker network connect querya-dev_default "$(hostname)"
-   ```
+The forwards live as long as the container does; after `docker compose down` /
+`up` re-run `bash scripts/dev/devcontainer_start.sh`. If you start the
+container with host networking, `localhost` already reaches the published ports
+and nothing is forwarded.
 
-   Then use the service names as hosts: `postgres`, `mysql`, `redis`, `mongo`,
-   `clickhouse` (with the container-side ports 5432, 3306, 6379, 27017, 8123).
-2. **Docker Desktop only:** `host.docker.internal` with the host ports.
-3. **Share the network namespace** of a database with the dev container, so
-   that `127.0.0.1` works for tests that hard-code it (see the live MySQL test
-   below): start that one container with `--network container:$(hostname)`.
+On Docker Desktop `host.docker.internal` with the host ports works as well.
 
 ### Per database
 
@@ -182,10 +187,11 @@ scripts/ci/test_sections.sh check                        # every test is in a se
   ([`test/e2e/README.md`](../test/e2e/README.md)).
 - **Goldens** are tagged `golden` and excluded in CI; run them only when you
   change the UI they cover.
-- **Extension sandbox tests** need `bubblewrap` (`sudo apt-get install bubblewrap`)
-  and unprivileged user namespaces; without them they skip. Inside a container
-  they may also skip because nested namespaces are restricted: CI runs them on a
-  VM.
+- **Extension sandbox tests** need `bubblewrap` (installed in the image) and
+  unprivileged user namespaces; without them they skip. Inside a container they
+  may still skip because nested namespaces are restricted (run it with
+  `--security-opt seccomp=unconfined` or add `"runArgs": ["--privileged"]` to
+  your own `devcontainer.json` if you need them locally): CI runs them on a VM.
 - **Analysis:** `flutter analyze`; CI runs it on every PR.
 
 ### The live MySQL test
@@ -193,20 +199,20 @@ scripts/ci/test_sections.sh check                        # every test is in a se
 `test/core/database/stream_take_drain_test.dart` talks to a real MySQL on
 `127.0.0.1` and **skips** when there is none or when it cannot log in. It reads
 `MYSQL_PORT` (default 3306), `MYSQL_USER`, `MYSQL_PASSWORD` and `MYSQL_DATABASE`
-(defaults `querya`) and connects **without TLS**, so the stack's MySQL 8.4 does
-not work for it. Use a server like the one CI starts:
+(defaults `querya`) and connects **without TLS**, so the stack's MySQL 8.4
+(`caching_sha2_password`) does not work for it. The `live-tests` compose profile
+starts the server CI uses, MySQL 8.0 with `mysql_native_password`, on its own
+port:
 
 ```bash
-docker run -d --name mysql-live -p 3307:3306 \
-  -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=querya \
-  -e MYSQL_USER=querya -e MYSQL_PASSWORD=querya \
-  mysql:8.0 --default-authentication-plugin=mysql_native_password
-
+cd docker
+docker compose --profile live-tests up -d --wait mysql-live     # host port 3307, MYSQL_LIVE_PORT to change
+cd ..
 MYSQL_PORT=3307 flutter test test/core/database/stream_take_drain_test.dart
 ```
 
-Inside the dev container add `--network container:$(hostname)` (and drop
-`-p`) so that `127.0.0.1:3306` is that server, and leave `MYSQL_PORT` unset.
+Inside the dev container the start script forwards `localhost:3307` to it when
+the service is running (re-run the script after starting the profile).
 
 ### Testing an extension
 
@@ -223,26 +229,18 @@ a usage error.
 
 ## Known gaps
 
-- **Flutter version.** CI pins Flutter **3.47.1**; the dev container image is
-  `ghcr.io/cirruslabs/flutter:3.41.6` and the image registry has no 3.47.x tag
-  yet. To match CI inside the container:
-
-  ```bash
-  FLUTTER_ROOT="$(dirname "$(dirname "$(readlink -f "$(which flutter)")")")"
-  git -C "$FLUTTER_ROOT" fetch --tags
-  git -C "$FLUTTER_ROOT" checkout 3.47.1
-  flutter precache --linux && flutter pub get
-  ```
-
-  This changes the image's SDK for that container only.
+- **Headless L2** (the app under Xvfb in a script and a CI job) and the
+  extension-author container are not done yet; both are tracked in
+  [#1487](https://github.com/QueryaHub/Querya-Desktop/issues/1487).
 
 ## Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
-| `Docker stack not started` on start | Docker is not reachable from the container: check that the host daemon runs and the `docker-outside-of-docker` feature is installed, then `cd docker && docker compose up -d`. |
+| `Docker is not reachable from the container` on start | Check that the host daemon runs and the `docker-outside-of-docker` feature is installed, then `bash scripts/dev/devcontainer_start.sh`. |
+| `not healthy after 180s: ...` on start | A service is still starting or failed: `docker compose -f docker/docker-compose.yml ps` and `logs <service>`; raise `QUERYA_STACK_TIMEOUT` for a slow machine. |
 | `port is already allocated` | A local PostgreSQL / MySQL / Redis uses the port. Set another one in `docker/.env` (`POSTGRES_PORT`, `MYSQL_PORT`, ...). |
-| Connection refused to `localhost` from inside the container | See *From inside the dev container* above: use the service names after `docker network connect`. |
+| Connection refused to `localhost` from inside the container | The forwards are started by the start script: run `bash scripts/dev/devcontainer_start.sh` again (after a `docker compose down` / `up`), or use the service names (`postgres`, `mysql`, ...). |
 | MySQL: connection refused or *requires a secure connection* | Tick **Use SSL/TLS** in the form (MySQL 8.4 uses `caching_sha2_password`). |
 | MongoDB: authentication failed | The authentication database is `admin`, not `querya`. |
 | Seeds missing or outdated | `docker compose down -v && docker compose up -d`. |

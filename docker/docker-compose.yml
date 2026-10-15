@@ -16,6 +16,8 @@
 #              auth source: admin        collections: users, products, orders
 # ClickHouse  HTTP 8123 / native 9000    db querya  user querya  password querya
 #              tables: customers, products, orders, order_lines, events
+# MySQL 8.0  port 3307 (profile live-tests: docker compose --profile live-tests up -d)
+#              mysql_native_password, no TLS: for test/core/database/stream_take_drain_test.dart
 # SQLite      local file ./sqlite/data/querya.db
 #              tables: users, products, orders
 # ─────────────────────────────────────────────────────────────────────────
@@ -61,6 +63,44 @@ services:
       - mysql_data:/var/lib/mysql
       - ./mysql/init:/docker-entrypoint-initdb.d:ro
     command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "127.0.0.1",
+          "-u${MYSQL_USER:-querya}",
+          "-p${MYSQL_PASSWORD:-querya}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  # MySQL for the live database tests (profile `live-tests`, not started by a
+  # plain `docker compose up`): 8.0 with mysql_native_password, because the
+  # client in those tests connects without TLS and 8.4's default
+  # caching_sha2_password needs a secure connection. Same server CI starts.
+  #   docker compose --profile live-tests up -d --wait mysql-live
+  #   MYSQL_PORT=3307 flutter test test/core/database/stream_take_drain_test.dart
+  mysql-live:
+    profiles: ["live-tests"]
+    image: mysql:8.0
+    container_name: querya-mysql-live
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-querya}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-querya}
+      MYSQL_USER: ${MYSQL_USER:-querya}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-querya}
+    ports:
+      - "${MYSQL_LIVE_PORT:-3307}:3306"
+    command:
+      - --default-authentication-plugin=mysql_native_password
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
     healthcheck:
