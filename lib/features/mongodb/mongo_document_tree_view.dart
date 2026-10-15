@@ -20,6 +20,20 @@ import 'package:querya_desktop/shared/widgets/querya_text.dart';
 /// - parent = 'address', key = 'geo' => 'address.geo'
 /// - parent = 'address.geo', index = 0 => 'address.geo[0]'
 /// - parent = 'address.geo[0]', key = 'lat' => 'address.geo[0].lat'
+/// `[a-zA-Z_$][a-zA-Z0-9_$]*`, read from the code units: this runs for every
+/// node of every document in the tree, so no RegExp is built per call (#1525).
+bool _isPlainJsIdentifier(String s) {
+  if (s.isEmpty) return false;
+  for (var i = 0; i < s.length; i++) {
+    final c = s.codeUnitAt(i);
+    final letter = (c >= 0x41 && c <= 0x5A) || (c >= 0x61 && c <= 0x7A);
+    final extra = c == 0x5F || c == 0x24; // _ $
+    final digit = c >= 0x30 && c <= 0x39;
+    if (!(letter || extra || (i > 0 && digit))) return false;
+  }
+  return true;
+}
+
 String appendJsonPath(String parentPath, Object keyOrIndex) {
   if (keyOrIndex is int) {
     return '$parentPath[$keyOrIndex]';
@@ -28,7 +42,7 @@ String appendJsonPath(String parentPath, Object keyOrIndex) {
   if (parentPath.isEmpty) {
     return keyStr;
   }
-  if (RegExp(r'^[a-zA-Z_$][a-zA-Z0-9_$]*$').hasMatch(keyStr)) {
+  if (_isPlainJsIdentifier(keyStr)) {
     return '$parentPath.$keyStr';
   }
   final escaped = keyStr.replaceAll('"', r'\"');
