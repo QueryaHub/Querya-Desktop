@@ -90,7 +90,11 @@ class QueryaCommandRegistry extends ChangeNotifier {
     if (query.trim().isEmpty) {
       return List<QueryaCommand>.from(pool);
     }
-    return [for (final command in pool) if (command.matches(query)) command];
+    final parts = QueryaCommand.queryParts(query);
+    return [
+      for (final command in pool)
+        if (command.matchesParts(parts)) command,
+    ];
   }
 
   @visibleForTesting
