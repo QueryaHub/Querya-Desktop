@@ -35,9 +35,13 @@ void main() {
       }
     }
 
+    // Comments may quote the pattern they warn about.
+    final commentLine = RegExp(r'^\s*//.*$', multiLine: true);
+
     final offenders = <String>[];
     for (final f in files) {
-      for (final m in listenerArg.allMatches(f.readAsStringSync())) {
+      final code = f.readAsStringSync().replaceAll(commentLine, '');
+      for (final m in listenerArg.allMatches(code)) {
         final name = m.group(1)!;
         if (extensionMethods.contains(name)) offenders.add('${f.path}: $name');
       }
