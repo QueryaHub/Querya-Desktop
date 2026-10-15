@@ -51,10 +51,14 @@ String postgresResultCellToDisplayString(
   }
 
   if (value is DateTime) {
+    final iso = value.toIso8601String();
     if (_isDateOnly(typeOid, dataTypeName)) {
-      return value.toIso8601String().split('T').first;
+      // The text before `T` (also right for years outside 0..9999, which
+      // carry a sign and six digits), without a split() list (#1529).
+      final t = iso.indexOf('T');
+      return t < 0 ? iso : iso.substring(0, t);
     }
-    return value.toIso8601String();
+    return iso;
   }
 
   if (value is bool) return value ? 'true' : 'false';
@@ -77,11 +81,18 @@ String postgresResultCellToDisplayString(
 
 /// PostgreSQL bytea text `\xdeadbeef`.
 String postgresByteaHexDisplay(Uint8List bytes) {
-  final out = StringBuffer(r'\x');
+  // Two lower-case hex digits per byte, written as code units into one buffer:
+  // no toRadixString / padLeft string per byte (#1529, #1521).
+  const hexDigits = '0123456789abcdef';
+  final out = Uint8List(2 + bytes.length * 2);
+  out[0] = 0x5C; // \
+  out[1] = 0x78; // x
+  var k = 2;
   for (final b in bytes) {
-    out.write(b.toRadixString(16).padLeft(2, '0'));
+    out[k++] = hexDigits.codeUnitAt(b >> 4);
+    out[k++] = hexDigits.codeUnitAt(b & 0x0F);
   }
-  return out.toString();
+  return String.fromCharCodes(out);
 }
 
 String postgresByteaHexDisplayFromCell(Object value) {
