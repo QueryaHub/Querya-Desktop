@@ -159,12 +159,20 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   ResultGridColumnWindow? _currentWindow;
   double _currentRowsViewportHeight = 0.0;
 
+  /// Handlers that live in `extension _Grid* on _VirtualResultGridState`. Tearing
+  /// off an extension method makes a new closure each time and two of them are
+  /// never equal, so `removeListener(_onPiiMaskingChanged)` would not find what
+  /// `addListener(_onPiiMaskingChanged)` stored (#1555). Keep one closure and
+  /// pass that to both.
+  late final void Function() _piiMaskingListener = _onPiiMaskingChanged;
+  late final void Function() _horizontalScrollListener = _onHorizontalScroll;
+
   @override
   void initState() {
     super.initState();
-    _horizontalController.addListener(_onHorizontalScroll);
+    _horizontalController.addListener(_horizontalScrollListener);
     _verticalController.addListener(_onVerticalScroll);
-    PiiMaskingController.instance.addListener(_onPiiMaskingChanged);
+    PiiMaskingController.instance.addListener(_piiMaskingListener);
     widget.stagingBuffer?.addListener(_onStagingBufferChanged);
     _lastKnownStagedRowCount = _baseRows.length;
     _updateSortedRows();
@@ -389,11 +397,11 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
   void dispose() {
     _hideCellTooltip();
     _selectionValuesDebounce?.cancel();
-    PiiMaskingController.instance.removeListener(_onPiiMaskingChanged);
+    PiiMaskingController.instance.removeListener(_piiMaskingListener);
     _stopAutoScroll();
     _rowWidgets.clear();
     widget.stagingBuffer?.removeListener(_onStagingBufferChanged);
-    _horizontalController.removeListener(_onHorizontalScroll);
+    _horizontalController.removeListener(_horizontalScrollListener);
     _horizontalController.dispose();
     _verticalController.removeListener(_onVerticalScroll);
     _verticalController.dispose();
