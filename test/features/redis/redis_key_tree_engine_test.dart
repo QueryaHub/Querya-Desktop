@@ -122,5 +122,87 @@ void main() {
       expect(tree.rootFolders.first.name, 'trailing');
       expect(tree.rootFolders.first.leaves.first.name, '(empty)');
     });
+
+    test('empty segments and uneven nesting keep their folders and prefixes (#1523)',
+        () {
+      final tree = RedisKeyTreeEngine.buildTree(
+        keys: [
+          makeKey('user:100:profile'),
+          makeKey('user:100:Avatar'),
+          makeKey('user::x'),
+          makeKey(':root'),
+          makeKey('trail:'),
+          makeKey('plain'),
+        ],
+        delimiter: ':',
+      );
+
+      expect(tree.rootLeaves.map((l) => l.name), ['plain']);
+      // '' sorts before 'trail' and 'user'.
+      expect(tree.rootFolders.map((f) => f.name), ['', 'trail', 'user']);
+      expect(tree.rootFolders.map((f) => f.fullPrefix), [':', 'trail:', 'user:']);
+
+      final empty = tree.rootFolders[0];
+      expect(empty.leaves.map((l) => l.name), ['root']);
+
+      final trail = tree.rootFolders[1];
+      expect(trail.leaves.map((l) => l.name), ['(empty)']);
+
+      final user = tree.rootFolders[2];
+      expect(user.folders.map((f) => f.name), ['', '100']);
+      expect(user.folders.map((f) => f.fullPrefix), ['user::', 'user:100:']);
+      expect(user.folders[0].leaves.map((l) => l.name), ['x']);
+      expect(
+        user.folders[1].leaves.map((l) => l.name),
+        ['Avatar', 'profile'],
+      );
+      expect(tree.totalKeyCount, 6);
+    });
+
+    test('a multi-character delimiter cuts at every occurrence (#1523)', () {
+      final tree = RedisKeyTreeEngine.buildTree(
+        keys: [makeKey('a::b::c'), makeKey('a::d')],
+        delimiter: '::',
+      );
+      expect(tree.rootFolders.map((f) => f.name), ['a']);
+      final a = tree.rootFolders.single;
+      expect(a.fullPrefix, 'a::');
+      expect(a.folders.single.name, 'b');
+      expect(a.folders.single.fullPrefix, 'a::b::');
+      expect(a.folders.single.leaves.map((l) => l.name), ['c']);
+      expect(a.leaves.map((l) => l.name), ['d']);
+    });
+
+    test('names are ordered case-insensitively, ties keep their input order (#1551)',
+        () {
+      final flat = RedisKeyTreeEngine.buildTree(
+        keys: [
+          makeKey('b'),
+          makeKey('B'),
+          makeKey('a'),
+          makeKey('A'),
+          makeKey('c'),
+        ],
+        delimiter: '',
+      );
+      expect(flat.rootLeaves.map((l) => l.name), ['a', 'A', 'b', 'B', 'c']);
+
+      final nested = RedisKeyTreeEngine.buildTree(
+        keys: [
+          makeKey('f:Zeta'),
+          makeKey('f:alpha'),
+          makeKey('f:Beta'),
+          makeKey('F:x'),
+          makeKey('e:y'),
+        ],
+        delimiter: ':',
+      );
+      // 'e' < 'f' / 'F' (equal lower-case: input order, 'f' came first).
+      expect(nested.rootFolders.map((f) => f.name), ['e', 'f', 'F']);
+      expect(
+        nested.rootFolders[1].leaves.map((l) => l.name),
+        ['alpha', 'Beta', 'Zeta'],
+      );
+    });
   });
 }
