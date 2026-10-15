@@ -40,7 +40,7 @@ jobs:
       - name: Flutter version from the Dockerfile
         id: flutter
         run: |
-          v=$(sed -n 's#^FROM ghcr.io/cirruslabs/flutter:\(.*\)$#\1#p' .devcontainer/Dockerfile | head -n1)
+          v=$(sed -n 's#^ARG FLUTTER_VERSION=\(.*\)$#\1#p' .devcontainer/Dockerfile | head -n1)
           test -n "$v"
           echo "version=$v" >> "$GITHUB_OUTPUT"
 
@@ -70,7 +70,9 @@ jobs:
       - name: Smoke test
         run: |
           set -euo pipefail
-          docker run --rm querya-devcontainer:test flutter --version
+          docker run --rm querya-devcontainer:test flutter --version | tee /dev/stderr | grep -q "Flutter ${{ steps.flutter.outputs.version }}"
+          docker run --rm querya-devcontainer:test bwrap --version
+          docker run --rm querya-devcontainer:test socat -V
           docker run --rm querya-devcontainer:test docker --version
           docker run --rm querya-devcontainer:test docker compose version
           docker run --rm querya-devcontainer:test bash -c 'clang --version && cmake --version && ninja --version && pkg-config --exists gtk+-3.0 libsecret-1'

@@ -8,14 +8,16 @@
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
   },
   "postCreateCommand": "flutter config --enable-linux-desktop && flutter pub get",
-  "postStartCommand": "docker compose -f docker/docker-compose.yml up -d || echo 'Docker stack not started (run it manually: cd docker && docker compose up -d)'",
-  "forwardPorts": [5432, 3306, 6379, 27017, 8123, 9000],
+  "postStartCommand": "bash scripts/dev/devcontainer_start.sh",
+  "forwardPorts": [5432, 3306, 6379, 27017, 8123, 9000, 3307],
   "portsAttributes": {
     "5432": { "label": "PostgreSQL" },
     "3306": { "label": "MySQL" },
     "6379": { "label": "Redis" },
     "27017": { "label": "MongoDB" },
-    "8123": { "label": "ClickHouse HTTP" }
+    "8123": { "label": "ClickHouse HTTP" },
+    "9000": { "label": "ClickHouse native" },
+    "3307": { "label": "MySQL 8.0 (profile live-tests)" }
   },
   "customizations": {
     "vscode": {
