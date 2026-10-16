@@ -2,13 +2,19 @@ name: Headless smoke (L2)
 
 # Builds the Linux bundle and runs the real app under Xvfb in portable mode with
 # scripts/dev/headless_app.sh: it has to start, show a window and stay up. The
-# screenshot is kept as an artifact. Not part of ci.yml: a Linux build takes
+# screenshot is kept as an artifact. Then the MCP path end to end
+# (scripts/dev/headless_mcp_check.sh): the app with its MCP server on, a shared
+# fixture connection, and a client reading it through the real querya-mcp. Not part of ci.yml: a Linux build takes
 # minutes, so this runs when the script or this file changes, weekly, and on
 # demand.
 on:
   pull_request:
     paths:
       - scripts/dev/headless_app.sh
+      - scripts/dev/headless_mcp_check.sh
+      - scripts/dev/mcp_stdio_check.py
+      - lib/core/mcp/**
+      - packages/querya_mcp_bridge/**
       - .github/workflows/headless-smoke.yml
   schedule:
     - cron: "0 4 * * 2"
@@ -33,7 +39,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev \
-            libsecret-1-dev xvfb xdotool imagemagick
+            libsecret-1-dev xvfb xdotool imagemagick sqlite3
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -56,6 +62,20 @@ jobs:
             --screenshot build/headless/screenshot.png \
             --log build/headless/app.log \
             --wait 90 --keep 5
+
+      - name: Build querya-mcp
+        run: |
+          cd packages/querya_mcp_bridge
+          dart pub get
+          dart compile exe bin/querya_mcp.dart -o "$RUNNER_TEMP/querya-mcp"
+
+      - name: MCP end to end under Xvfb
+        run: |
+          mkdir -p build/headless
+          scripts/dev/headless_mcp_check.sh \
+            --mcp "$RUNNER_TEMP/querya-mcp" \
+            --bundle build/linux/x64/release/bundle \
+            --log build/headless/mcp-app.log
 
       - name: Keep the screenshot and the log
         if: always()

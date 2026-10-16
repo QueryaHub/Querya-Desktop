@@ -130,6 +130,15 @@ command and each runnable in a container or on a CI runner
 | L0 | unit, widget, e2e and guard tests | `flutter test --exclude-tags=golden` |
 | L1 | an extension against a real database, no GUI | `querya-ext-tester ./ext --connect '{...}' --sandbox` (see *Testing an extension*) |
 | L2 | the real app under a virtual display, in portable mode | `scripts/dev/headless_app.sh` |
+| L2 + MCP | the same, with the MCP server on and a client reading a fixture through `querya-mcp` | `scripts/dev/headless_mcp_check.sh --mcp PATH` |
+
+What each level needs from the database stack (start only that, by service name):
+
+| Level | Containers |
+|-------|------------|
+| L0 | none; the live MySQL test needs `docker compose --profile live-tests up -d --wait mysql-live` |
+| L1 | the database the extension talks to, e.g. `docker compose up -d --wait postgres` (or `clickhouse`, `redis`, `mongo`) |
+| L2, L2 + MCP | none: the fixture is a throw-away SQLite file |
 
 L1 needs a tester built from 0.4.19 or newer: older ones exited 0 whatever the
 result.
@@ -157,9 +166,36 @@ The [Headless smoke (L2)](../.github/workflows/headless-smoke.yml) workflow buil
 the Linux bundle and runs the script (on changes to it, weekly, and on demand),
 keeping the screenshot and the log as an artifact.
 
-Whether L2 should grow a real "headless Querya" (core services without a window,
-so that `querya-mcp` does not need a running Desktop) is left open until this
-exists.
+Two more options let a script drive the running app:
+
+- `--seed-sql FILE` applies SQL to the profile database (`querya.db`). The app
+  starts once to create and migrate it, is stopped, `sqlite3` applies the file,
+  and the app starts again. Use the same `app_settings` keys and tables the UI
+  writes, so a test needs no code in the app.
+- `--run COMMAND` runs a command once the window is up and keeps the app alive
+  meanwhile; its exit code becomes the script's. The command gets
+  `QUERYA_MCP_ENDPOINT` (this run's own endpoint file, so no other instance can
+  answer), `QUERYA_HEADLESS_DB` and `QUERYA_HEADLESS_DATA`.
+
+### L2 + MCP: `scripts/dev/headless_mcp_check.sh`
+
+```bash
+dart compile exe packages/querya_mcp_bridge/bin/querya_mcp.dart -o build/querya-mcp
+scripts/dev/headless_mcp_check.sh --mcp build/querya-mcp --bundle build/linux/x64/release/bundle
+```
+
+It creates a fixture SQLite database with two connections, turns the MCP server
+on and shares only one of them (the same settings keys the Preferences page
+writes), starts the app under Xvfb and runs `scripts/dev/mcp_stdio_check.py`: a
+small MCP client that talks to the real `querya-mcp` and checks `initialize`,
+`tools/list`, that only the shared connection is listed, the table, its columns
+and data, that a `DELETE` is refused and changes nothing, and that the unshared
+connection is refused. It needs `sqlite3` and `python3` besides what L2 needs.
+The same step runs in the Headless smoke workflow.
+
+A window under Xvfb is all the MCP server needs, so there is no separate
+"headless Querya" mode: `querya-mcp` still needs a running Desktop, and the
+virtual display provides it.
 
 ## Run the app in the container
 
@@ -245,11 +281,27 @@ See [extension-testing.md](extension-testing.md) for the options, reports and
 the GitHub Action. The exit code is 0 on success, 1 when a check failed and 2 on
 a usage error.
 
+## For extension authors
+
+You do not need this repository to write a database-driver extension. Start from
+[QueryaHub/extension-template](https://github.com/QueryaHub/extension-template)
+(a Rust driver with a dev container, a test database and CI). The pieces it uses:
+
+- the **Dev Container Feature** `ghcr.io/queryahub/features/querya-ext-tester`
+  installs `querya-ext-tester` from a release, checked against `SHA256SUMS.txt`
+  (see [extension-testing.md](extension-testing.md#dev-container-feature));
+- **test database images** `ghcr.io/queryahub/querya-testdb-{postgres,mysql,mongo,clickhouse,redis}:<version>`
+  are the `docker/<db>` seeds baked into the official images, no bind mounts.
+  Built from `docker/<db>/Dockerfile.testdb`; a new `Dockerfile.testdb` adds a
+  database to the build by itself.
+
 ## Known gaps
 
-- **The extension-author container** (Dev Container Feature, test database
-  images, template repository, registry CI) is not done yet; it is tracked in
-  [#1487](https://github.com/QueryaHub/Querya-Desktop/issues/1487).
+- **The extension registry** (registry CI and `StaticRegistryRepository`) and the
+  release hooks that publish the Feature and the images are not done yet; they
+  are tracked in [#1487](https://github.com/QueryaHub/Querya-Desktop/issues/1487).
+  Until then the images are published by hand with the *Test database images*
+  workflow.
 
 ## Troubleshooting
 
