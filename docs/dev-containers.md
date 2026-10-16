@@ -300,8 +300,8 @@ The whole path from the template to the Marketplace is in
 
 ## Known gaps
 
-- **The Marketplace page still uses the mock repository.** The registry and
-  `StaticRegistryRepository` exist; wiring the page to them is the 0.5.0 work.
+- **The registry has no extensions yet**, so the Marketplace tab is empty until
+  authors add records (see [extension-registry.md](extension-registry.md)).
 
 ## Troubleshooting
 

@@ -265,7 +265,7 @@ class MockMarketplaceRepository implements MarketplaceRepository {
 }''';
     }
     return '''{
-  "name": "\${manifest.name}",
+  "name": ${jsonEncode(manifest.name)},
   "type": "dark",
   "colors": {
     "activityBar.background": "#050508",

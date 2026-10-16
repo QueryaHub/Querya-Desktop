@@ -141,6 +141,53 @@ void main() {
       expect(find.textContaining('Marketplace API'), findsOneWidget);
     });
 
+    group('marketplace catalog states', () {
+      Future<void> openMarketplaceTab(
+        WidgetTester tester,
+        MarketplaceRepository repo,
+      ) async {
+        MarketplaceRepository.instance = repo;
+        await tester.pumpWidget(
+          queryaThemeTestShell(
+            child: material.Builder(
+              builder: (ctx) => material.Scaffold(
+                body: material.Center(
+                  child: PrimaryButton(
+                    onPressed: () => showExtensionManagerDialog(ctx),
+                    child: const Text('Open Dialog'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('Open Dialog'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Marketplace'));
+        await tester.pumpAndSettle();
+      }
+
+      testWidgets('an empty registry says so', (tester) async {
+        await openMarketplaceTab(tester, MockMarketplaceRepository(seed: const []));
+        expect(find.text('No extensions in the registry yet'), findsOneWidget);
+        expect(find.text('Retry'), findsNothing);
+      });
+
+      testWidgets('an unreachable registry shows the reason and retries',
+          (tester) async {
+        final repo = _FailingMarketplace();
+        await openMarketplaceTab(tester, repo);
+        expect(find.text('Could not load the Marketplace'), findsOneWidget);
+        expect(find.text('registry is down'), findsOneWidget);
+
+        repo.failing = false;
+        await tester.tap(find.text('Retry'));
+        await tester.pumpAndSettle();
+        expect(find.text('Could not load the Marketplace'), findsNothing);
+        expect(find.text('Back Again'), findsOneWidget);
+      });
+    });
+
     group('marketplace search', () {
       Future<_ControlledMarketplace> openMarketplace(
         WidgetTester tester,
@@ -258,4 +305,16 @@ class _ControlledMarketplace extends MockMarketplaceRepository {
 
   void complete(String query, List<ExtensionManifest> result) =>
       _pending[query]!.complete(result);
+}
+
+class _FailingMarketplace extends MockMarketplaceRepository {
+  _FailingMarketplace() : super(seed: const []);
+
+  bool failing = true;
+
+  @override
+  Future<List<ExtensionManifest>> getTrending({ExtensionType? type}) async {
+    if (failing) throw MarketplaceException('registry is down');
+    return [_manifest('back.ext', 'Back Again')];
+  }
 }

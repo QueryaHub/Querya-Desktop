@@ -10,6 +10,7 @@ import 'core/actions/querya_command_registry.dart';
 import 'core/editor/syntax_highlight_service.dart';
 import 'core/extensions/local_extension_registry.dart';
 import 'core/layout/ui_scale_controller.dart';
+import 'core/market/marketplace_selection.dart';
 import 'core/mcp/mcp_server_controller.dart';
 import 'core/motion/display_refresh_service.dart';
 import 'core/motion/querya_motion_controller.dart';
@@ -42,6 +43,7 @@ void main([List<String> args = const []]) async {
       await QueryaMotionController.instance.load();
       QueryaCommandRegistry.instance.ensureCoreDefaults();
       unawaited(LocalExtensionRegistry.instance.load());
+      await installMarketplaceRepository();
       unawaited(UpdateController.instance.initialize());
       unawaited(cleanupStaleMongoTlsTempFiles());
       unawaited(McpServerController.instance.startIfEnabled());
