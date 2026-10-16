@@ -8,7 +8,8 @@ server, Flutter or the Querya Desktop source tree.
 ## What it checks
 
 1. **`manifest.json`** — `id`, `name`, `version`, `type: "database_driver"`,
-   `main`, `engines.querya_desktop` (against the emulated host version),
+   `main`, `engines.querya_desktop` and `manifestVersion` (both against the
+   emulated host version; see [extension-registry.md](extension-registry.md#versions-what-is-checked-against-what)),
    `contributions.drivers[]` (`driverId`, `displayName`). Every problem is
    reported with its JSON path.
 2. **Launch** — the `main` entry point exists and starts.
