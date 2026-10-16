@@ -481,9 +481,9 @@ class _ExtensionManagerContentState
                   .small(),
               if (retry) ...[
                 const material.SizedBox(height: 16),
-                PrimaryButton(
+                QueryaButton.secondary(
+                  label: 'Retry',
                   onPressed: () => unawaited(_loadData()),
-                  child: const Text('Retry'),
                 ),
               ],
             ],
