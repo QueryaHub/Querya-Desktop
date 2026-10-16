@@ -41,6 +41,29 @@ void main() {
     expect(r.isSuccess, isFalse);
   });
 
+  test('strict turns warnings into failures, never the other way', () {
+    HarnessReport with_(List<HarnessCheckStatus> statuses) => HarnessReport(
+          extensionId: 'acme.db',
+          targetVersion: const HostVersion(0, 4, 18),
+          totalDuration: Duration.zero,
+          checks: [
+            for (var i = 0; i < statuses.length; i++)
+              HarnessCheck(name: 'c$i', status: statuses[i]),
+          ],
+        );
+
+    final clean = with_([HarnessCheckStatus.passed, HarnessCheckStatus.skipped]);
+    final warned = with_([HarnessCheckStatus.passed, HarnessCheckStatus.warning]);
+    final failed = with_([HarnessCheckStatus.failed]);
+
+    expect(clean.passes(), isTrue);
+    expect(clean.passes(strict: true), isTrue);
+    expect(warned.passes(), isTrue);
+    expect(warned.passes(strict: true), isFalse);
+    expect(failed.passes(), isFalse);
+    expect(failed.passes(strict: true), isFalse);
+  });
+
   test('console output lists every check and a summary', () {
     final text = _report().toConsole();
     expect(text, contains('PASS system.handshake (12 ms)'));
