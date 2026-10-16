@@ -51,6 +51,20 @@ List<HarnessDiagnostic> validateExtensionManifest(
   requireString('id');
   requireString('name');
 
+  final format = manifest['manifestVersion'];
+  if (format != null) {
+    if (format is! int || format < 1) {
+      error('manifestVersion', 'must be a whole number, 1 or more, got "$format"');
+    } else if (format > profile.manifestVersion) {
+      error(
+        'manifestVersion',
+        'format $format is newer than Querya Desktop ${profile.targetVersion} '
+            'reads (formats up to ${profile.manifestVersion}); an older host '
+            'would not understand this manifest',
+      );
+    }
+  }
+
   final version = manifest['version'];
   if (version == null) {
     warning('version', 'missing; the host falls back to 0.0.0');

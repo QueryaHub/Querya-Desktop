@@ -101,4 +101,42 @@ void main() {
     expect(d.single.path, 'contributions.commands');
     expect(_check(m, '0.4.16'), isEmpty);
   });
+
+  group('manifestVersion', () {
+    List<HarnessDiagnostic> errors(Object? manifest, [String target = '0.5.0']) =>
+        _check(manifest, target).where((d) => d.isError).toList();
+
+    test('absent means format 1 and is fine', () {
+      expect(_check(_valid()), isEmpty);
+    });
+
+    test('format 1 is fine on every host that has the protocol', () {
+      final m = _valid()..['manifestVersion'] = 1;
+      for (final host in ['0.4.11', '0.4.18', '0.5.0']) {
+        expect(_check(m, host), isEmpty, reason: host);
+      }
+    });
+
+    test('a format newer than the host reads is an error naming the path', () {
+      final d = errors(_valid()..['manifestVersion'] = 2);
+      expect(d, hasLength(1));
+      expect(d.single.path, 'manifestVersion');
+      expect(d.single.message, contains('newer than Querya Desktop 0.5.0'));
+    });
+
+    test('a value that is not a whole number >= 1 is an error', () {
+      for (final bad in [0, -1, 1.5, '1', true, <String>[]]) {
+        final d = errors(_valid()..['manifestVersion'] = bad);
+        expect(d.map((e) => e.path), ['manifestVersion'], reason: '$bad');
+      }
+    });
+  });
+
+  group('protocol profile manifest formats', () {
+    test('every host with the protocol reads format 1', () {
+      for (final host in ['0.4.11', '0.4.19', '0.5.0']) {
+        expect(ExtensionProtocolProfile.forTarget(host).manifestVersion, 1);
+      }
+    });
+  });
 }

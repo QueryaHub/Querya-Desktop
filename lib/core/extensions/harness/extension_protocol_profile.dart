@@ -68,7 +68,11 @@ final class HarnessProtocolMethod {
 /// `since` values come from the first release tag whose sources contain the
 /// method. The protocol did not exist before 0.4.11.
 final class ExtensionProtocolProfile {
-  ExtensionProtocolProfile._(this.targetVersion, this.methods);
+  ExtensionProtocolProfile._(
+    this.targetVersion,
+    this.methods,
+    this.manifestVersion,
+  );
 
   /// Oldest host version with the extension RPC protocol.
   static const minSupported = HostVersion(0, 4, 11);
@@ -98,8 +102,19 @@ final class ExtensionProtocolProfile {
         'commands.execute', HostVersion(0, 4, 16), HarnessMethodLevel.recommended),
   ];
 
+  /// `manifest.json` formats and the first Querya Desktop release that reads
+  /// each. Format 1 is the original; a manifest without `manifestVersion` is
+  /// format 1. Add an entry here when a release starts reading a new format, and
+  /// raise `ExtensionManifest.currentManifestVersion` in the same change.
+  static const _manifestFormats = <(int, HostVersion)>[
+    (1, minSupported),
+  ];
+
   /// Host version this profile emulates.
   final HostVersion targetVersion;
+
+  /// Newest `manifestVersion` that host reads.
+  final int manifestVersion;
 
   /// Methods that host version may send.
   final List<HarnessProtocolMethod> methods;
@@ -115,10 +130,17 @@ final class ExtensionProtocolProfile {
         'Extensions are not supported before Querya Desktop $minSupported',
       );
     }
-    return ExtensionProtocolProfile._(version, [
-      for (final m in _all)
-        if (version >= m.since) m,
-    ]);
+    return ExtensionProtocolProfile._(
+      version,
+      [
+        for (final m in _all)
+          if (version >= m.since) m,
+      ],
+      [
+        for (final (format, since) in _manifestFormats)
+          if (version >= since) format,
+      ].fold(1, (a, b) => b > a ? b : a),
+    );
   }
 
   bool supports(String method) => methods.any((m) => m.name == method);

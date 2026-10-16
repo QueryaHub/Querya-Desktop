@@ -10,6 +10,16 @@ import 'sandbox_capabilities.dart';
 class ExtensionManifest {
   static const typeTheme = ExtensionType.theme;
 
+  /// The newest `manifest.json` format this build reads. A manifest without
+  /// `manifestVersion` is format 1. Raise it only together with
+  /// `ExtensionProtocolProfile` (which host version first reads the new format)
+  /// and docs/extension-registry.md.
+  static const currentManifestVersion = 1;
+
+  /// `manifestVersion` of `manifest.json`: the format of the file itself, apart
+  /// from the extension's own [version] and the host range in [engines].
+  final int manifestVersion;
+
   final String id;
   final String name;
   final String version;
@@ -39,6 +49,7 @@ class ExtensionManifest {
   final ExtensionContributions? contributions;
 
   const ExtensionManifest({
+    this.manifestVersion = 1,
     required this.id,
     required this.name,
     required this.version,
@@ -110,7 +121,10 @@ class ExtensionManifest {
 
   factory ExtensionManifest.fromJson(Map<String, dynamic> json,
       {String? installPath}) {
+    final rawFormat = json['manifestVersion'];
     return ExtensionManifest(
+      // Not a whole number >= 1: the validator reports it; here it reads as 1.
+      manifestVersion: rawFormat is int && rawFormat >= 1 ? rawFormat : 1,
       id: json['id'] as String,
       name: json['name'] as String,
       version: json['version'] as String? ?? '0.0.0',
@@ -180,6 +194,7 @@ class ExtensionManifest {
 
   Map<String, dynamic> toJson() {
     return {
+      if (manifestVersion != 1) 'manifestVersion': manifestVersion,
       'id': id,
       'name': name,
       'version': version,

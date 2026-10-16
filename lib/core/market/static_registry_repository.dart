@@ -4,6 +4,7 @@ import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:querya_desktop/core/extensions/extension_support.dart';
 import 'package:querya_desktop/core/extensions/harness/extension_manifest_validator.dart';
 import 'package:querya_desktop/core/extensions/harness/extension_protocol_profile.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
@@ -156,6 +157,7 @@ class StaticRegistryRepository extends HttpMarketplaceRepository {
         final url = Uri.tryParse(manifest.downloadUrl ?? '');
         if (url == null || !isReleaseAssetUrl(url)) continue;
         if ((manifest.sha256Checksum ?? '').trim().isEmpty) continue;
+        if (ExtensionSupport.manifestFormatProblem(manifest) != null) continue;
         final range = manifest.engines['querya_desktop'];
         if (range != null && engineRangeAllows(host, range) == false) continue;
         out.add(manifest);

@@ -25,6 +25,18 @@ class ExtensionSupport {
   static const databaseDriverMissingEntryMessage =
       'Driver package is missing its main entry file. Installation aborted.';
 
+  /// Why this build cannot read [manifest], or null when it can: the manifest
+  /// is in a newer format than [ExtensionManifest.currentManifestVersion].
+  static String? manifestFormatProblem(ExtensionManifest manifest) {
+    if (manifest.manifestVersion <= ExtensionManifest.currentManifestVersion) {
+      return null;
+    }
+    return 'Extension "${manifest.id}" uses manifest format '
+        '${manifest.manifestVersion}; this Querya Desktop reads format '
+        '${ExtensionManifest.currentManifestVersion} or older. '
+        'Update Querya Desktop to use it.';
+  }
+
   /// Type-level preview heuristic (drivers default to preview).
   /// Prefer [isPreviewOnlyManifest] when a full manifest is available.
   static bool isPreviewOnly(ExtensionType type) =>

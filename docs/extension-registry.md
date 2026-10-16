@@ -40,6 +40,32 @@ The extension's binary runs in the registry's CI, inside the OS sandbox, in a jo
 with no secrets and a read-only token. Only the Linux x86-64 build is exercised; the other platforms' archives are
 checked (hash, archive, manifest) but not run.
 
+## Versions: what is checked against what
+
+Three different versions meet in `manifest.json`:
+
+| Field | What it versions | Checked |
+|-------|------------------|---------|
+| `version` | the extension itself | the registry record and the archive must agree |
+| `engines.querya_desktop` | the Querya Desktop versions the author says it runs on | the app hides the extension outside the range (`>=x.y.z` or `^x.y.z`) |
+| `manifestVersion` | the **format of `manifest.json`** (apart from the other two) | see below |
+
+`manifestVersion` is a whole number, **1 when absent** (every manifest written so
+far). It exists so the format can change later without guessing from the host
+version: a release that starts reading a new format raises
+`ExtensionManifest.currentManifestVersion` and lists the first host version that
+reads it in `ExtensionProtocolProfile`. Until a format 2 exists there is nothing
+to opt into; new manifests may set `"manifestVersion": 1` explicitly (the
+template does).
+
+- **The tester** checks `manifestVersion` against the host it emulates
+  (`--target-version`): a format newer than that host reads is an error, a value
+  that is not a whole number >= 1 is an error.
+- **The app** does not offer, install or load an extension in a format newer than
+  it reads, and says to update Querya Desktop.
+- **The registry** refuses a record whose archive uses a format Querya does not
+  define yet, and copies the format into the index entry.
+
 ## What the app trusts
 
 `StaticRegistryRepository` reads `https://queryahub.github.io/extensions/index.json`:
@@ -64,11 +90,12 @@ checked (hash, archive, manifest) but not run.
   `macos-x64`, `windows-x64`), each with its own `downloadUrl`, `sha256` and
   `main`. The app resolves the map to the build for the platform it runs on and
   does not offer the extension where there is none.
-- An index with another `schema` is refused, not half read.
+- An index with another `schema` is refused, not half read. (`schema` is the
+  index's own format; `manifestVersion` of an entry is its manifest's.)
 - Hidden from the list: `yanked` entries, entries without a checksum, a
   `downloadUrl` that is not `https://github.com/<owner>/<repo>/releases/download/<tag>/<asset>`,
-  and extensions whose `engines.querya_desktop` range excludes the running
-  version. One malformed entry does not hide the others.
+  extensions whose `engines.querya_desktop` range excludes the running
+  version, and extensions whose `manifestVersion` is newer than the app reads. One malformed entry does not hide the others.
 - The index is cached for ten minutes; if a refresh fails the last good copy is
   served.
 - Installing is the same pipeline as any marketplace install: the archive's

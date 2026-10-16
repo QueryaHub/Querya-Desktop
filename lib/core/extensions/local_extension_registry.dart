@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 
 import 'extension_command_sync.dart';
 import 'extension_paths.dart';
+import 'extension_support.dart';
 import 'models/extension_manifest.dart';
 import 'sandbox/sandbox_policy.dart';
 
@@ -59,6 +60,12 @@ class LocalExtensionRegistry {
                 json, 
                 installPath: entity.path,
               );
+              final formatProblem =
+                  ExtensionSupport.manifestFormatProblem(manifest);
+              if (formatProblem != null) {
+                debugPrint('LocalExtensionRegistry: skipped — $formatProblem');
+                continue;
+              }
               final violations = SandboxPolicy.validate(manifest);
               if (violations.isNotEmpty) {
                 debugPrint(
