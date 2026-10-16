@@ -54,7 +54,7 @@ test it is in [extension-testing.md](extension-testing.md).
 | `publisher` | no | Shown as the author (`author` is read when `publisher` is missing) |
 | `type` | yes | `database_driver`, `theme` or `script`. Only `database_driver` can use the OS process sandbox, and only it is run by the tester |
 | `main` | drivers | The executable, relative to the root. Must be a file in the archive |
-| `engines.querya_desktop` | yes | The Querya Desktop versions it runs on: `>=x.y.z` or `^x.y.z`. The app hides the extension outside the range; the tester warns when the emulated host is outside it |
+| `engines.querya_desktop` | yes | The Querya Desktop versions it runs on: `^x.y.z`, `*`, or comparators that must all hold, such as `>=0.4.0 <3.0.0` (`>=`, `>`, `<=`, `<`, `=`). The app hides the extension outside the range; the tester warns when the emulated host is outside it, and the registry refuses a range it cannot read |
 | `description`, `icon`, `homepage`, `license`, `tags`, `preview` | no | Marketplace listing. `icon` is a path inside the archive |
 | `capabilities` | no | `databaseDriver`, `sduiForms` flags |
 | `sandbox` | drivers | What the driver is allowed to do; see below |
