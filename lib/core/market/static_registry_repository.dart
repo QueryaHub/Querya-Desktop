@@ -9,7 +9,6 @@ import 'package:querya_desktop/core/extensions/harness/extension_protocol_profil
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/extensions/models/extension_type.dart';
 
-import 'http_marketplace_repository.dart';
 import 'marketplace_repository.dart';
 
 /// The marketplace as a static file: `index.json` published by the extension

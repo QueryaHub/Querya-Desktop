@@ -13,13 +13,14 @@ import 'package:querya_desktop/core/extensions/models/extension_type.dart';
 import 'package:querya_desktop/core/market/marketplace_repository.dart';
 import 'package:querya_desktop/core/market/static_registry_repository.dart';
 
+const _sha = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const _asset = 'https://github.com/acme/ext/releases/download/v1.0.0/ext.zip';
 
 Map<String, Object?> _entry(
   String id, {
   String type = 'theme',
   String url = _asset,
-  Object? sha = 'a' * 64,
+  Object? sha = _sha,
   String engines = '>=0.4.19',
   bool yanked = false,
   List<String> tags = const [],
