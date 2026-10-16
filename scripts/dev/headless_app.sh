@@ -12,10 +12,19 @@
 #                       (default 3); catches crashes right after start
 #   --log FILE          copy the app's stdout / stderr there
 #   --keep-data         do not delete the temporary data directory
+#   --seed-sql FILE     SQL applied to the profile database (querya.db) before
+#                       the app under test starts: the app runs once to create
+#                       and migrate the database, is stopped, FILE is applied
+#                       with sqlite3, and the app starts again
+#   --run COMMAND       shell command to run once the window is up (the app
+#                       stays up meanwhile); the exit code is its exit code.
+#                       Gets QUERYA_MCP_ENDPOINT (this run's own endpoint file),
+#                       QUERYA_HEADLESS_DB and QUERYA_HEADLESS_DATA
 #   -h, --help          this text
 #
-# Exit codes: 0 the app started, showed a window and stayed up; 1 it died, or no
-# window appeared in time; 2 usage error, missing bundle or missing tool.
+# Exit codes: 0 the app started, showed a window and stayed up (and --run
+# succeeded); 1 it died, no window appeared in time, or --run failed; 2 usage
+# error, missing bundle or missing tool.
 #
 # Needs: Xvfb; xdotool or xwininfo to see the window (without them the check is
 # "the process is still alive after --wait"); ImageMagick `import` for
@@ -28,6 +37,8 @@ wait_s=60
 keep_s=3
 log_out=""
 keep_data=0
+seed_sql=""
+run_cmd=""
 
 usage() { sed -n '2,/^set -u/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'; }
 die() { printf 'headless_app: %s\n' "$*" >&2; exit 2; }
@@ -41,6 +52,8 @@ while [ $# -gt 0 ]; do
     --keep) keep_s="${2:-}"; shift 2 ;;
     --log) log_out="${2:-}"; shift 2 ;;
     --keep-data) keep_data=1; shift ;;
+    --seed-sql) seed_sql="${2:-}"; shift 2 ;;
+    --run) run_cmd="${2:-}"; shift 2 ;;
     -h | --help) usage; exit 0 ;;
     *) die "unknown option: $1 (see --help)" ;;
   esac
@@ -54,6 +67,10 @@ fi
 [ -n "$bundle" ] || die "no bundle found; build one (flutter build linux) or pass --bundle DIR"
 [ -x "$bundle/querya_desktop" ] || die "$bundle/querya_desktop is missing or not executable"
 command -v Xvfb >/dev/null 2>&1 || die "Xvfb is not installed (apt-get install xvfb)"
+if [ -n "$seed_sql" ]; then
+  [ -f "$seed_sql" ] || die "--seed-sql: $seed_sql is not a file"
+  command -v sqlite3 >/dev/null 2>&1 || die "--seed-sql needs the sqlite3 command (apt-get install sqlite3)"
+fi
 if [ -n "$screenshot" ] && ! command -v import >/dev/null 2>&1; then
   die "--screenshot needs ImageMagick's 'import' (apt-get install imagemagick)"
 fi
@@ -125,13 +142,32 @@ cp -a "$bundle" "$work/bundle" || die "could not copy $bundle"
 export QUERYA_PORTABLE=1
 export NO_AT_BRIDGE=1
 
+# Own endpoint file, so that a second app on the machine (or a leftover one)
+# can never be the one querya-mcp talks to.
+export QUERYA_MCP_ENDPOINT="$work/mcp-endpoint.json"
+
 runner=()
 if command -v dbus-run-session >/dev/null 2>&1; then
   runner=(dbus-run-session --)
 fi
-${runner[@]+"${runner[@]}"} "$work/bundle/querya_desktop" >"$work/app.log" 2>&1 &
-app_pid=$!
-say "started querya_desktop (pid $app_pid)"
+
+start_app() {
+  ${runner[@]+"${runner[@]}"} "$work/bundle/querya_desktop" >>"$work/app.log" 2>&1 &
+  app_pid=$!
+  say "started querya_desktop (pid $app_pid)"
+}
+
+stop_app() {
+  [ -n "$app_pid" ] || return 0
+  kill -TERM "$app_pid" 2>/dev/null
+  for _ in $(seq 1 20); do
+    kill -0 "$app_pid" 2>/dev/null || break
+    sleep 0.5
+  done
+  kill -KILL "$app_pid" 2>/dev/null
+  wait "$app_pid" 2>/dev/null
+  app_pid=""
+}
 
 have_window_tool=0
 if command -v xdotool >/dev/null 2>&1 || command -v xwininfo >/dev/null 2>&1; then
@@ -147,21 +183,37 @@ window_up() {
   fi
 }
 
-deadline=$((SECONDS + wait_s))
-shown=0
-while [ "$SECONDS" -lt "$deadline" ]; do
-  kill -0 "$app_pid" 2>/dev/null || fail_with_log "the app exited before showing a window"
+wait_for_window() {
+  local deadline=$((SECONDS + wait_s)) shown=0
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    kill -0 "$app_pid" 2>/dev/null || fail_with_log "the app exited before showing a window"
+    if [ "$have_window_tool" -eq 1 ]; then
+      if window_up; then shown=1; break; fi
+    fi
+    sleep 1
+  done
   if [ "$have_window_tool" -eq 1 ]; then
-    if window_up; then shown=1; break; fi
+    [ "$shown" -eq 1 ] || fail_with_log "no window after ${wait_s}s"
+    say "window is up"
+  else
+    say "no xdotool / xwininfo: only checking that the process stays alive"
   fi
-  sleep 1
-done
+}
 
-if [ "$have_window_tool" -eq 1 ]; then
-  [ "$shown" -eq 1 ] || fail_with_log "no window after ${wait_s}s"
-  say "window is up"
-else
-  say "no xdotool / xwininfo: only checking that the process stays alive"
+start_app
+wait_for_window
+
+if [ -n "$seed_sql" ]; then
+  # The first start created and migrated the profile database. Let it settle,
+  # stop the app (it holds the file open), seed, and start again.
+  sleep 2
+  stop_app
+  db="$(find "$work/bundle" -name querya.db -print -quit 2>/dev/null)"
+  [ -n "$db" ] || fail_with_log "the profile database querya.db was not created"
+  sqlite3 "$db" <"$seed_sql" || fail_with_log "could not apply $seed_sql to $db"
+  say "seeded $(basename "$seed_sql") into $db"
+  start_app
+  wait_for_window
 fi
 
 end=$((SECONDS + keep_s))
@@ -178,6 +230,17 @@ if [ -n "$screenshot" ]; then
     cat "$work/import.log" >&2
     fail_with_log "could not take the screenshot"
   fi
+fi
+
+if [ -n "$run_cmd" ]; then
+  export QUERYA_HEADLESS_DB
+  QUERYA_HEADLESS_DB="$(find "$work/bundle" -name querya.db -print -quit 2>/dev/null)"
+  export QUERYA_HEADLESS_DATA="$work/bundle/QueryaData"
+  say "running: $run_cmd"
+  if ! bash -c "$run_cmd"; then
+    fail_with_log "--run command failed"
+  fi
+  kill -0 "$app_pid" 2>/dev/null || fail_with_log "the app died while the command ran"
 fi
 
 say "ok"
