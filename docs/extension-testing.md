@@ -177,6 +177,25 @@ the container with `--security-opt seccomp=unconfined` (and, on hosts that
 restrict namespaces with AppArmor, `--security-opt apparmor=unconfined`), or
 run the tester directly on the CI runner with the action below.
 
+## Dev Container Feature
+
+In a dev container the tester can be installed as a Feature. It downloads the
+release archive, checks it against `SHA256SUMS.txt` and puts `querya-ext-tester`
+in `PATH` (Linux x86_64, Debian-family images):
+
+```json
+{
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/queryahub/features/querya-ext-tester:1": { "version": "latest" }
+  }
+}
+```
+
+`version` is a Querya Desktop release (`0.4.19`) or `latest`. Releases before
+0.4.19 are refused: their exit codes were not reliable. The source is in
+`devcontainer-features/src/querya-ext-tester`.
+
 ## GitHub Actions
 
 This repository contains a composite action in
