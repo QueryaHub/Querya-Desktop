@@ -9,6 +9,7 @@ Index of Querya Desktop documentation, grouped by audience.
 - [Security / local data](security.md) — where metadata and secrets are stored.
 - [MCP server](mcp-server.md) — let Claude Desktop, Cursor, VS Code and other AI clients read shared connections (read-only).
 - [Testing extensions in CI](extension-testing.md) — `querya-ext-tester`, release binaries and the GitHub Action.
+- [Extension manifest](extension-manifest.md) — every field of `manifest.json`, the sandbox policy, what checks it, and how the manifest format is versioned (`manifestVersion`).
 - [Extension registry](extension-registry.md) — from an author's machine to the Marketplace: the template, test databases, the registry's CI and index, and how it follows Querya releases.
 
 ## For contributors

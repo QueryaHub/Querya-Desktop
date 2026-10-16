@@ -179,6 +179,8 @@ the container with `--security-opt seccomp=unconfined` (and, on hosts that
 restrict namespaces with AppArmor, `--security-opt apparmor=unconfined`), or
 run the tester directly on the CI runner with the action below.
 
+The fields of `manifest.json` are in [extension-manifest.md](extension-manifest.md).
+
 Starting a new extension? The [extension template](https://github.com/QueryaHub/extension-template)
 has all of this wired up, and [extension-registry.md](extension-registry.md)
 shows how a tested extension gets into the Marketplace.

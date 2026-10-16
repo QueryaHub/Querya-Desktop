@@ -42,6 +42,8 @@ checked (hash, archive, manifest) but not run.
 
 ## Versions: what is checked against what
 
+The whole manifest is described in [extension-manifest.md](extension-manifest.md); this is the part about versions.
+
 Three different versions meet in `manifest.json`:
 
 | Field | What it versions | Checked |
