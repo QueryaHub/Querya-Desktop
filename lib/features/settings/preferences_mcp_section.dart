@@ -8,6 +8,7 @@ import 'package:querya_desktop/core/mcp/mcp_query_service.dart';
 import 'package:querya_desktop/core/mcp/mcp_server_controller.dart';
 import 'package:querya_desktop/core/security/connection_environment.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/settings/preferences_controls.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
@@ -298,7 +299,10 @@ class PreferencesMcpSectionState extends material.State<PreferencesMcpSection> {
             maxLines: 1,
             overflow: material.TextOverflow.ellipsis,
             style: material.TextStyle(
-              fontFamily: 'monospace',
+              // The editor's font stack: already resolved when a workspace is
+              // open, while the generic 'monospace' costs a fontconfig lookup.
+              fontFamily: QueryaTypography.mono,
+              fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
               fontSize: 12,
               color: wb.mutedForeground,
             ),
@@ -466,7 +470,11 @@ class _ActivityRow extends material.StatelessWidget {
                     maxLines: 2,
                     overflow: material.TextOverflow.ellipsis,
                     style: material.TextStyle(
-                      fontFamily: 'monospace',
+                      // The editor's font stack: already resolved when a workspace is
+                      // open, while the generic 'monospace' costs a fontconfig lookup.
+                      fontFamily: QueryaTypography.mono,
+                      fontFamilyFallback:
+                          QueryaTypography.monoFontFamilyFallback,
                       color: wb.mutedForeground,
                     ),
                   ).xSmall(),

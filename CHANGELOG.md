@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Demo Marketplace themes were named `${manifest.name}`** — the generated theme.json now carries the real name (the demo catalog is only used with `--dart-define=QUERYA_MARKETPLACE_MOCK=true`).
 - **In-app update of a package install (AUR, `.deb`, `.rpm`)** — the updater no longer downloads a zip and quits when the app lives in `/opt/querya-desktop` (owned by root): the update dialog says how to update it (`yay -Syu querya-desktop`, `apt`, `dnf`) with a *Copy update command* button, or offers the release page for any other folder the user cannot write. If an in-place replace fails anyway, the app is started again and the reason is logged to `~/.local/state/querya-update.log`, instead of staying closed.
 
+- **Preferences no longer flash a wrong state** — the MCP Server pane showed the server switch off, "No SQL connections" and "No calls yet" for a moment on every visit before the real values jumped in; it now draws them only once loaded. Panes you visited stay as they were (no reload, their own scroll position: Shortcuts no longer opens half-scrolled after another pane), and settings load in one parallel read.
+- **Data Grid preferences: removed "Confirm DML staging applications"** — it changed the SQL destructive-query confirmation (DROP / TRUNCATE / DELETE) and controlled nothing else.
+- **About shows the real version** instead of a hardcoded 0.4.17.
+- **MCP Server pane** — MongoDB connections can be shared (the server already had MongoDB tools), type badges use product names, the `querya-mcp` path is on its own line, copying configs and regenerating the token are separate, and recent calls are rows with a status icon.
+
 ### Planned
 
 - Planned 0.5.0 — live Marketplace download and install
