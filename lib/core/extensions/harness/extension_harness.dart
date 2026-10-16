@@ -153,7 +153,8 @@ final class HarnessConnectionOptions {
     this.database,
   });
 
-  /// Extra `db.connect` fields (`host`, `port`, `username`, `password`, ...).
+  /// Extra `db.connect` fields (`host`, `port`, `username`, ...). A `password`
+  /// is sent with `system.injectCredentials` instead, as the app does.
   final Map<String, Object?> params;
 
   /// Statement for the `db.query` step.
@@ -168,6 +169,7 @@ final class HarnessConnectionOptions {
 /// Querya Desktop does, without a GUI.
 ///
 /// Sequence: manifest check, launch, `system.handshake`, `system.ping`,
+/// `system.injectCredentials` (only when the connection has a password),
 /// `db.connect`, `db.getCapabilities`, `db.getServerStats`,
 /// `db.getSchemaTree`, `db.query`, `db.getTableSchema` (when a table is
 /// given), `db.disconnect`, `system.shutdown`. Methods the emulated host
@@ -381,10 +383,15 @@ class QueryaExtensionHarness {
       await step(name, body, level: level);
     }
 
+    // Like the app: the password goes to the plugin in memory with
+    // system.injectCredentials and is not part of the db.connect payload.
+    final password = connection.params['password'];
+    final injectPassword = password is String && password.isNotEmpty;
     final connectParams = <String, Object?>{
       'connectionId': _connectionId,
       if (connection.database != null) 'database': connection.database,
-      ...connection.params,
+      for (final e in connection.params.entries)
+        if (e.key != 'password') e.key: e.value,
     };
     final idOnly = <String, Object?>{'connectionId': _connectionId};
 
@@ -394,6 +401,14 @@ class QueryaExtensionHarness {
     await method('system.ping', () async {
       await call('system.ping');
     });
+    if (injectPassword) {
+      await method('system.injectCredentials', () async {
+        await call('system.injectCredentials', {
+          'connectionId': _connectionId,
+          'password': password,
+        });
+      });
+    }
     await method('db.connect', () async {
       await call('db.connect', connectParams);
     });

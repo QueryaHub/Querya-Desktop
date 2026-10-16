@@ -13,6 +13,7 @@ server, Flutter or the Querya Desktop source tree.
    reported with its JSON path.
 2. **Launch** — the `main` entry point exists and starts.
 3. **RPC lifecycle**, in this order: `system.handshake`, `system.ping`,
+   `system.injectCredentials` (only when `--connect` has a `password`),
    `db.connect`, `db.getCapabilities`, `db.getServerStats`,
    `db.getSchemaTree`, `db.query` (must return `{"columns": [...], "rows":
    [...]}`), `db.getTableSchema` (only with `--table`), `db.disconnect`,
@@ -20,8 +21,8 @@ server, Flutter or the Querya Desktop source tree.
 
 `system.handshake`, `system.shutdown` and the `db.connect` / `db.disconnect` /
 `db.query` / `db.getSchemaTree` calls are **required**: a failure fails the
-run. `system.ping`, `db.getCapabilities`, `db.getServerStats` and
-`db.getTableSchema` are **recommended**: the host falls back gracefully, so
+run. `system.ping`, `system.injectCredentials`, `db.getCapabilities`,
+`db.getServerStats` and `db.getTableSchema` are **recommended**: the host falls back gracefully, so
 the runner only warns. Methods the emulated host version does not send are
 skipped.
 
@@ -78,9 +79,12 @@ querya-ext-tester ./my-extension \
 Exit codes: `0` all checks passed (warnings and skips do not fail, unless
 `--strict`), `1` a check failed, `2` bad command line.
 
-Credentials only travel inside the `db.connect` payload over the plugin's
-stdio; they are never put on the command line of the plugin or into its
-environment. Use a throwaway database in CI.
+A `password` in `--connect` is sent the way the app sends it: with
+`system.injectCredentials` before `db.connect`, and left out of the `db.connect`
+payload. A driver that reads its password only from the injected secret (as the
+ClickHouse driver does) therefore works with the tester. Credentials travel over
+the plugin's stdio only; they are never put on the command line of the plugin or
+into its environment. Use a throwaway database in CI.
 
 ## Following the data: `--trace`
 

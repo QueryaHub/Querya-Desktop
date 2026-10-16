@@ -81,6 +81,8 @@ final class ExtensionProtocolProfile {
     HarnessProtocolMethod(
         'system.ping', minSupported, HarnessMethodLevel.recommended),
     HarnessProtocolMethod(
+        'system.injectCredentials', minSupported, HarnessMethodLevel.recommended),
+    HarnessProtocolMethod(
         'db.connect', minSupported, HarnessMethodLevel.required),
     HarnessProtocolMethod(
         'db.disconnect', minSupported, HarnessMethodLevel.required),
