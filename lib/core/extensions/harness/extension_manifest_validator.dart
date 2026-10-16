@@ -82,7 +82,7 @@ List<HarnessDiagnostic> validateExtensionManifest(
     if (range is! String) {
       warning('engines.querya_desktop', 'no Querya Desktop constraint declared');
     } else {
-      final ok = _satisfies(profile.targetVersion, range);
+      final ok = engineRangeAllows(profile.targetVersion, range);
       if (ok == null) {
         warning('engines.querya_desktop',
             'unsupported range "$range"; use ^x.y.z or >=x.y.z');
@@ -147,7 +147,7 @@ final _semver = RegExp(r'^\d+\.\d+\.\d+(?:[+-][0-9A-Za-z.+-]+)?$');
 
 /// `true` / `false` when [range] (`^x.y.z` or `>=x.y.z`) can be evaluated,
 /// `null` when its syntax is not understood.
-bool? _satisfies(HostVersion host, String range) {
+bool? engineRangeAllows(HostVersion host, String range) {
   final r = range.trim();
   try {
     if (r.startsWith('>=')) {
