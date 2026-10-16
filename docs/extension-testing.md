@@ -71,6 +71,7 @@ querya-ext-tester ./my-extension \
 | `--table <name>` | also check `db.getTableSchema` |
 | `--database <name>` | database passed to `db.connect` |
 | `--sandbox` | run the plugin in the OS sandbox (`bwrap` on Linux, `sandbox-exec` on macOS) when available |
+| `--manifest-only` | check `manifest.json` against `--target-version` and stop: the extension is not started, so no database and no executable are needed. For a quick lint, or a CI step with no database. Not in 0.4.19 or earlier |
 | `--strict` | warnings fail the run too (exit `1`): a recommended method that errors, or a sandbox that could not be applied. Not in 0.4.19 or earlier |
 | `--timeout-ms <n>` | per-request timeout (default 5000) |
 | `--junit <path>` / `--tap <path>` | write a JUnit XML / TAP report |

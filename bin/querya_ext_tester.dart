@@ -25,6 +25,9 @@ Options:
   --table <name>            also check db.getTableSchema for this table
   --database <name>         database passed to db.connect
   --sandbox                 run the plugin in the OS sandbox when available
+  --manifest-only           check manifest.json against --target-version and
+                            stop: the extension is not started (no database,
+                            no executable needed)
   --strict                  treat warnings as failures (exit 1), for example a
                             recommended method that errors or a sandbox that
                             could not be applied
@@ -51,6 +54,7 @@ Future<int> _run(List<String> args) async {
   String? database;
   var sandbox = false;
   var strict = false;
+  var manifestOnly = false;
   var timeoutMs = 5000;
   String? junit;
   String? tap;
@@ -75,6 +79,8 @@ Future<int> _run(List<String> args) async {
         sandbox = true;
       case '--strict':
         strict = true;
+      case '--manifest-only':
+        manifestOnly = true;
       case '--no-color':
         color = false;
       case '--target-version' ||
@@ -167,6 +173,7 @@ Future<int> _run(List<String> args) async {
       database: database,
     ),
     sandbox: sandbox,
+    manifestOnly: manifestOnly,
   );
   stdout.write(report.toConsole(color: color));
   if (junit != null) File(junit).writeAsStringSync(report.toJUnitXml());

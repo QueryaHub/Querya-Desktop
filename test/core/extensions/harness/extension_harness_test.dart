@@ -295,6 +295,45 @@ void main() {
     expect(plugin!.calls, isNot(contains('db.getTableSchema')));
   });
 
+  group('manifest only', () {
+    Future<HarnessReport> manifestOnly(String target) {
+      var launched = false;
+      final harness = QueryaExtensionHarness(
+        launcher: (request) async {
+          launched = true;
+          throw StateError('must not start the plugin');
+        },
+      );
+      return harness
+          .run(
+            extensionRoot: root.path,
+            targetVersion: target,
+            manifestOnly: true,
+          )
+          .whenComplete(() => expect(launched, isFalse));
+    }
+
+    test('checks the manifest and starts nothing', () async {
+      writeExtension(manifest(), entry: false); // no executable at all
+      final report = await manifestOnly('0.5.0');
+      expect(report.checks.map((c) => c.name), ['manifest']);
+      expect(report.isSuccess, isTrue, reason: report.toConsole());
+    });
+
+    test('still fails on a manifest the emulated host cannot read', () async {
+      writeExtension(manifest()..['manifestVersion'] = 2, entry: false);
+      final report = await manifestOnly('0.5.0');
+      expect(report.isSuccess, isFalse);
+      expect(check(report, 'manifest').message, contains('manifestVersion'));
+    });
+
+    test('a missing manifest.json is a failure', () async {
+      final report = await manifestOnly('0.5.0');
+      expect(report.isSuccess, isFalse);
+      expect(check(report, 'manifest').status, HarnessCheckStatus.failed);
+    });
+  });
+
   test('a missing recommended method is only a warning', () async {
     writeExtension(manifest());
     final (report, _) = await run(_healthy()..remove('db.getCapabilities'));

@@ -187,11 +187,14 @@ class QueryaExtensionHarness {
 
   static const _connectionId = 1;
 
+  /// With [manifestOnly] the run ends after the `manifest` check: the
+  /// extension is not launched, so no database and no executable are needed.
   Future<HarnessReport> run({
     required String extensionRoot,
     required String targetVersion,
     HarnessConnectionOptions connection = const HarnessConnectionOptions(),
     bool sandbox = false,
+    bool manifestOnly = false,
   }) async {
     final total = Stopwatch()..start();
     final profile = ExtensionProtocolProfile.forTarget(targetVersion);
@@ -284,6 +287,17 @@ class QueryaExtensionHarness {
         ));
         abort = true;
       }
+    }
+
+    // Only the manifest was asked for: nothing is started or connected.
+    if (manifestOnly) {
+      total.stop();
+      return HarnessReport(
+        extensionId: extensionId,
+        targetVersion: profile.targetVersion,
+        checks: checks,
+        totalDuration: total.elapsed,
+      );
     }
 
     // 2. Launch.
