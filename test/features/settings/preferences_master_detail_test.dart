@@ -126,6 +126,53 @@ void main() {
       expect(find.text('PostgreSQL timeout'), findsOneWidget);
     });
 
+    testWidgets('Data Grid has no staging switch bound to the SQL confirmation',
+        (tester) async {
+      // It wrote confirm_destructive_operations: turning it off in Data Grid
+      // silently turned off the DROP / TRUNCATE / DELETE confirmation.
+      await tester.pumpWidget(
+        buildTestApp(initialCategory: PreferencesCategory.dataGrid),
+      );
+      await openDialog(tester);
+
+      expect(find.text('Max rows in results'), findsOneWidget);
+      expect(find.text('Confirm DML staging applications'), findsNothing);
+      expect(find.byType(material.Switch), findsNothing);
+    });
+
+    testWidgets('each pane keeps its own scroll position', (tester) async {
+      await tester.pumpWidget(
+        buildTestApp(initialCategory: PreferencesCategory.shortcuts),
+      );
+      await openDialog(tester);
+
+      material.ScrollPosition position(PreferencesCategory cat) => tester
+          .state<material.ScrollableState>(find
+              .descendant(
+                of: find
+                    .byKey(material.ValueKey('preferences_pane_${cat.name}')),
+                matching: find.byType(material.Scrollable),
+                skipOffstage: false,
+              )
+              .first)
+          .position;
+
+      final shortcuts = position(PreferencesCategory.shortcuts);
+      expect(shortcuts.maxScrollExtent, greaterThan(100));
+      shortcuts.jumpTo(100);
+      await tester.pump();
+
+      await tester.tap(find.text('About & Storage'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(position(PreferencesCategory.about).pixels, 0);
+
+      await tester.tap(find.text('Shortcuts'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(position(PreferencesCategory.shortcuts).pixels, 100);
+    });
+
     testWidgets('search bar filters preferences and updates matches',
         (tester) async {
       await tester.pumpWidget(buildTestApp());

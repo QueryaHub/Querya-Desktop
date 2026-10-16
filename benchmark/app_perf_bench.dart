@@ -31,6 +31,7 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
 import 'package:querya_desktop/features/erd/erd_view.dart';
+import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:querya_desktop/features/workspace/result_grid_view.dart';
 import 'package:vm_service/vm_service.dart' as vms;
@@ -107,6 +108,12 @@ Future<void> _runAll() async {
   await _waitFor(() => SqlEditorCommandBridge.instance.canExecute, 'SQL workspace');
   await _wait(1500);
   await _scenario('idle_workspace', () => _wait(1500));
+
+  await _preferencesScenarios();
+  if (only.isNotEmpty &&
+      only.split(',').every((id) => id.trim().startsWith('prefs_'))) {
+    return; // nothing after this point was asked for
+  }
 
   await _scenario('sidebar_toggle', () async {
     for (var i = 0; i < 8; i++) {
@@ -267,6 +274,68 @@ Future<void> _runAll() async {
 /// The SQL workspace of the open connection.
 dynamic _workspace() =>
     _findState((s) => s.runtimeType.toString() == 'GenericSqlWorkspaceState')!;
+
+/// Preferences over the workspace: the dialog sits on a full-window frosted
+/// backdrop, so these show what one repaint inside it costs.
+Future<void> _preferencesScenarios() async {
+  Element dialog() => _find((e) =>
+      e.widget.runtimeType.toString() == '_PreferencesDialogContent')!;
+
+  await _scenario('prefs_open', () async {
+    showPreferencesDialog(_find((e) => e.widget is ConnectionsPanel)!);
+    await _waitFor(() => _findText('General Settings') != null, 'Preferences');
+    await _wait(600);
+  });
+  await _scenario('prefs_idle', () => _wait(1500));
+  await _scenario('prefs_hover', () => _hoverOver(dialog(), 3000));
+  // One scenario per category: switching to it builds its pane from scratch.
+  for (final label in const [
+    'Appearance', 'SQL & Editor', 'Data Grid', 'Extensions',
+    'MCP Server', 'Shortcuts', 'About & Storage', 'General',
+  ]) {
+    final id = 'prefs_cat_${label.split(' ').first.toLowerCase()}';
+    await _scenario(id, () => _tap(_byText(label)));
+  }
+  await _scenario('prefs_reopen', () async {
+    await _tap(_byText('Close'));
+    await _wait(500);
+    showPreferencesDialog(_find((e) => e.widget is ConnectionsPanel)!);
+    await _waitFor(() => _findText('General Settings') != null, 'Preferences');
+    await _wait(600);
+  });
+  await _tap(_byText('Shortcuts'));
+  await _scenario('prefs_scroll', () => _scrollLoop(
+        dialog, Axis.vertical, 10, 3000, minExtent: 100));
+  await _scenario('prefs_typing', () async {
+    final search = _findState((s) =>
+        s is EditableTextState &&
+        s.widget.controller.runtimeType == TextEditingController) as EditableTextState;
+    var text = '';
+    for (final ch in 'mcp server token'.split('')) {
+      text += ch;
+      search.updateEditingValue(TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+      ));
+      await _wait(90);
+    }
+    search.updateEditingValue(TextEditingValue.empty);
+    await _wait(300);
+  });
+  await _tap(_byText('MCP Server'));
+  await _scenario('prefs_toggle', () async {
+    final share = _find((e) => '${e.widget.key}'.contains('mcp_share_'));
+    if (share == null) {
+      stdout.writeln('BENCH skip: no shareable connection');
+      return;
+    }
+    for (var i = 0; i < 6; i++) {
+      await _tap(share);
+    }
+  });
+  await _tap(_byText('Close'));
+  await _wait(600);
+}
 
 /// Puts [sql] into the active query tab, runs it and waits for the run to end.
 Future<void> _runInActiveTab(String sql) async {
