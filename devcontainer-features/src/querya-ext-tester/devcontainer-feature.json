@@ -1,0 +1,18 @@
+{
+  "id": "querya-ext-tester",
+  "version": "1.0.0",
+  "name": "Querya extension tester",
+  "description": "Installs querya-ext-tester, the headless test runner for Querya database-driver extensions, from a Querya Desktop release (SHA-256 checked).",
+  "documentationURL": "https://github.com/QueryaHub/Querya-Desktop/blob/main/docs/extension-testing.md",
+  "options": {
+    "version": {
+      "type": "string",
+      "default": "latest",
+      "proposals": ["latest", "0.4.19"],
+      "description": "Querya Desktop release to take the tester from (for example 0.4.19), or latest. Must be 0.4.19 or newer."
+    }
+  },
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/common-utils"
+  ]
+}
