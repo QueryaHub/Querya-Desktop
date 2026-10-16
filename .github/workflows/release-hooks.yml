@@ -1,0 +1,77 @@
+name: Release hooks
+
+# After a Release succeeds, tells the repositories that follow Querya's
+# releases:
+#
+#   QueryaHub/extensions          re-tests every registered extension against the
+#                                 new version and refreshes compat.json
+#   QueryaHub/extension-template  opens a pull request that raises the test
+#                                 database image tag and adds the version to the
+#                                 CI matrix
+#
+# The querya-testdb-* images and querya-headless are published by their own
+# workflows on the same Release. The dev container Feature does not follow
+# releases: it downloads the newest tester when it is installed.
+#
+# `workflow_run`, not `release`: the release is created with GITHUB_TOKEN, and
+# events made by that token do not start other workflows. A repository_dispatch
+# into another repository needs a token that can write there, so this needs the
+# secret QUERYA_DISPATCH_TOKEN (see docs/extension-registry.md); without it the
+# job only says so.
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Querya Desktop release to announce (e.g. 0.5.0)
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    name: Tell the registry and the template
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Resolve the version
+        id: v
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            # A tag push has the tag as head_branch.
+            VERSION="${{ github.event.workflow_run.head_branch }}"
+          fi
+          VERSION="${VERSION#v}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::notice::'$VERSION' is not a release tag, nothing to announce"
+            echo "announce=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "announce=true" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch
+        if: steps.v.outputs.announce == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.QUERYA_DISPATCH_TOKEN }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::QUERYA_DISPATCH_TOKEN is not set, so the registry and the template were not told about $VERSION"
+            exit 0
+          fi
+          for repo in QueryaHub/extensions QueryaHub/extension-template; do
+            gh api "repos/${repo}/dispatches" -X POST \
+              -f event_type=querya-release \
+              -f "client_payload[version]=${VERSION}"
+            echo "told ${repo} about ${VERSION}"
+          done

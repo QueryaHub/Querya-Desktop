@@ -178,6 +178,10 @@ the container with `--security-opt seccomp=unconfined` (and, on hosts that
 restrict namespaces with AppArmor, `--security-opt apparmor=unconfined`), or
 run the tester directly on the CI runner with the action below.
 
+Starting a new extension? The [extension template](https://github.com/QueryaHub/extension-template)
+has all of this wired up, and [extension-registry.md](extension-registry.md)
+shows how a tested extension gets into the Marketplace.
+
 ## Dev Container Feature
 
 In a dev container the tester can be installed as a Feature. It downloads the

@@ -295,13 +295,13 @@ You do not need this repository to write a database-driver extension. Start from
   Built from `docker/<db>/Dockerfile.testdb`; a new `Dockerfile.testdb` adds a
   database to the build by itself.
 
+The whole path from the template to the Marketplace is in
+[extension-registry.md](extension-registry.md).
+
 ## Known gaps
 
-- **The extension registry** (registry CI and `StaticRegistryRepository`) and the
-  release hooks that publish the Feature and the images are not done yet; they
-  are tracked in [#1487](https://github.com/QueryaHub/Querya-Desktop/issues/1487).
-  Until then the images are published by hand with the *Test database images*
-  workflow.
+- **The Marketplace page still uses the mock repository.** The registry and
+  `StaticRegistryRepository` exist; wiring the page to them is the 0.5.0 work.
 
 ## Troubleshooting
 
