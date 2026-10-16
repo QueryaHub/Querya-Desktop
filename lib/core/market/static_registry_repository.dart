@@ -23,11 +23,13 @@ class StaticRegistryRepository extends HttpMarketplaceRepository {
   StaticRegistryRepository({
     this.indexUrl = defaultIndexUrl,
     required this.hostVersion,
+    String? platform,
     super.client,
     super.allowLocalhostInDebug,
     this.cacheTtl = const Duration(minutes: 10),
     DateTime Function()? now,
-  })  : _http = client ?? http.Client(),
+  })  : platform = platform ?? currentPlatformKey(),
+        _http = client ?? http.Client(),
         _now = now ?? DateTime.now,
         super(
           baseUrl: indexUrl,
@@ -52,6 +54,11 @@ class StaticRegistryRepository extends HttpMarketplaceRepository {
   /// Querya Desktop version, to hide extensions whose `engines.querya_desktop`
   /// range does not include it.
   final String hostVersion;
+
+  /// Build target of this app (`linux-x64`, `macos-arm64`, `macos-x64`,
+  /// `windows-x64`): an extension that ships one archive per platform is offered
+  /// only when it has a build for it.
+  final String platform;
   final String indexUrl;
   final Duration cacheTtl;
   final http.Client _http;
@@ -59,6 +66,14 @@ class StaticRegistryRepository extends HttpMarketplaceRepository {
 
   List<ExtensionManifest>? _cache;
   DateTime? _cachedAt;
+
+  /// The registry's name for the platform this process runs on, from the Dart
+  /// VM's own description (`... on "linux_x64"`). Empty when it cannot be read,
+  /// which matches no build.
+  static String currentPlatformKey() {
+    final m = RegExp(r'on "([a-z]+)_([a-z0-9]+)"').firstMatch(Platform.version);
+    return m == null ? '' : '${m.group(1)}-${m.group(2)}';
+  }
 
   static final _releasePath = RegExp(r'^/[^/]+/[^/]+/releases/download/[^/]+/[^/]+$');
 
@@ -86,7 +101,8 @@ class StaticRegistryRepository extends HttpMarketplaceRepository {
       }
       final body = response.body;
       final decoded = await Isolate.run(() => jsonDecode(body));
-      _cache = parseIndex(decoded, hostVersion: hostVersion);
+      _cache = parseIndex(decoded,
+          hostVersion: hostVersion, platform: platform);
       _cachedAt = _now();
       return _cache!;
     } catch (e) {
@@ -100,11 +116,15 @@ class StaticRegistryRepository extends HttpMarketplaceRepository {
   }
 
   /// Entries of a decoded `index.json` that can be shown: not yanked, with a
-  /// release-asset URL and a checksum, and compatible with [hostVersion].
+  /// release-asset URL and a checksum, compatible with [hostVersion], and
+  /// installable on [platform]. An entry with a `platforms` map is resolved to
+  /// the build for [platform] (its `downloadUrl`, `sha256` and `main`) and
+  /// dropped when there is none.
   @visibleForTesting
   static List<ExtensionManifest> parseIndex(
     Object? decoded, {
     required String hostVersion,
+    required String platform,
   }) {
     if (decoded is! Map) {
       throw MarketplaceException('The registry index is not a JSON object');
@@ -121,6 +141,16 @@ class StaticRegistryRepository extends HttpMarketplaceRepository {
       if (raw is! Map) continue;
       final json = Map<String, dynamic>.from(raw);
       if (json['yanked'] == true) continue;
+      final builds = json['platforms'];
+      if (builds != null) {
+        final build = builds is Map ? builds[platform] : null;
+        if (build is! Map) continue;
+        json
+          ..remove('platforms')
+          ..['downloadUrl'] = build['downloadUrl']
+          ..['sha256'] = build['sha256']
+          ..['main'] = build['main'] ?? json['main'];
+      }
       try {
         final manifest = ExtensionManifest.fromJson(json);
         final url = Uri.tryParse(manifest.downloadUrl ?? '');
