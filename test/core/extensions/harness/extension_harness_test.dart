@@ -435,9 +435,14 @@ void main() {
         ),
       );
 
+      // The password travels in system.injectCredentials, not in db.connect.
+      final inject =
+          report.rpc.firstWhere((c) => c.method == 'system.injectCredentials');
+      expect((inject.request! as Map)['password'], '***');
+
       final connect = report.rpc.firstWhere((c) => c.method == 'db.connect');
       final request = connect.request! as Map;
-      expect(request['password'], '***');
+      expect(request, isNot(contains('password')));
       expect((request['ssh'] as Map)['passphrase'], '***');
       expect(request['host'], 'db');
       expect(report.toTraceJson(), isNot(contains('s3cret')));
