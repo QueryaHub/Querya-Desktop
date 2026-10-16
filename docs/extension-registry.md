@@ -68,8 +68,17 @@ with no secrets and a read-only token. Only a Linux x86-64 build is exercised.
   SHA-256 must equal the index's, the archive is unpacked with path-traversal and
   zip-bomb limits, and the sandbox policy must accept the manifest.
 
-It is **not wired into the Marketplace page yet** (that still uses the mock
-repository): the live Marketplace is the 0.5.0 work.
+The app picks it at startup (`lib/core/market/marketplace_selection.dart`), with
+the running version as `hostVersion`, so the Extensions → Marketplace tab lists
+what the registry publishes. While the registry is empty the tab says so; when
+the registry cannot be reached it shows the reason and a *Retry* button.
+
+Two build-time switches, for people working on the app or on a registry:
+
+| `--dart-define` | Effect |
+|-----------------|--------|
+| `QUERYA_MARKETPLACE_INDEX=<url>` | read another `index.json` (a fork, a test registry); `http://localhost` is accepted in debug builds |
+| `QUERYA_MARKETPLACE_MOCK=true` | the built-in demo catalog, for working on the Marketplace page; for debug and profile builds only |
 
 `compat.json` lists, per extension and per Querya version in the registry's
 `hosts.json`, `pass`, `fail` or `untested`. The app does not read it yet.

@@ -41,6 +41,11 @@ class _ExtensionManagerContentState
   int _tabIndex = 0;
   List<ExtensionManifest> _installed = [];
   List<ExtensionManifest> _marketplace = [];
+
+  /// Why the catalog could not be loaded (offline, registry down); null when it
+  /// loaded, even if it is empty.
+  String? _marketplaceError;
+  String _query = '';
   bool _loading = true;
   final Map<String, double> _installingProgress = {};
   bool _sideloading = false;
@@ -68,17 +73,27 @@ class _ExtensionManagerContentState
     setState(() => _loading = true);
     await LocalExtensionRegistry.instance.load();
     final installed = LocalExtensionRegistry.instance.manifests;
-    final market = await MarketplaceRepository.instance.getTrending();
+    var market = const <ExtensionManifest>[];
+    String? error;
+    try {
+      market = await MarketplaceRepository.instance.getTrending();
+    } catch (e) {
+      error = e is MarketplaceException
+          ? e.message
+          : 'Could not load the Marketplace.';
+    }
     if (mounted) {
       setState(() {
         _installed = installed;
         _marketplace = market;
+        _marketplaceError = error;
         _loading = false;
       });
     }
   }
 
   void _onSearchChanged(String query) {
+    _query = query.trim();
     _searchDebounce?.cancel();
     final seq = ++_searchSeq;
     _searchDebounce = Timer(
@@ -93,7 +108,10 @@ class _ExtensionManagerContentState
           ? await MarketplaceRepository.instance.getTrending()
           : await MarketplaceRepository.instance.search(query);
       if (!mounted || seq != _searchSeq) return;
-      setState(() => _marketplace = market);
+      setState(() {
+        _marketplace = market;
+        _marketplaceError = null;
+      });
     } catch (e) {
       if (!mounted || seq != _searchSeq) return;
       showAppToast(
@@ -395,13 +413,27 @@ class _ExtensionManagerContentState
           ),
         ),
         material.Expanded(
-          child: _marketplace.isEmpty
-              ? const material.Center(
-                  child: material.Padding(
-                    padding: material.EdgeInsets.all(32.0),
-                    child: Text('No extensions found matching your search.'),
-                  ),
+          child: _marketplaceError != null && _marketplace.isEmpty
+              ? _buildMarketplaceMessage(
+                  'Could not load the Marketplace',
+                  '$_marketplaceError',
+                  retry: true,
                 )
+              : _marketplace.isEmpty
+              ? (_query.isEmpty
+                  ? _buildMarketplaceMessage(
+                      'No extensions in the registry yet',
+                      'Authors publish by adding a record to the extension '
+                          'registry. You can still install an extension from a '
+                          'file.',
+                    )
+                  : const material.Center(
+                      child: material.Padding(
+                        padding: material.EdgeInsets.all(32.0),
+                        child:
+                            Text('No extensions found matching your search.'),
+                      ),
+                    ))
               : material.ListView.separated(
                   padding: const material.EdgeInsets.all(24),
                   itemCount: _marketplace.length,
@@ -426,6 +458,38 @@ class _ExtensionManagerContentState
                 ),
         ),
       ],
+    );
+  }
+
+  material.Widget _buildMarketplaceMessage(
+    String title,
+    String detail, {
+    bool retry = false,
+  }) {
+    return material.Center(
+      child: material.Padding(
+        padding: const material.EdgeInsets.all(32.0),
+        child: material.ConstrainedBox(
+          constraints: const material.BoxConstraints(maxWidth: 420),
+          child: material.Column(
+            mainAxisSize: material.MainAxisSize.min,
+            children: [
+              Text(title).semiBold(),
+              const material.SizedBox(height: 8),
+              Text(detail, textAlign: material.TextAlign.center)
+                  .muted()
+                  .small(),
+              if (retry) ...[
+                const material.SizedBox(height: 16),
+                QueryaButton.secondary(
+                  label: 'Retry',
+                  onPressed: () => unawaited(_loadData()),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 
