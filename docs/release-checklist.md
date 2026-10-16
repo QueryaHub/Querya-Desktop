@@ -89,6 +89,7 @@ Verify the 0.4.4 motion tokens, smooth animations, and high refresh rate support
 - [ ] After merge to `main`, confirm **Auto Version Bump** yields a **0.4.20+…** placeholder.
 - [ ] **Tag** `0.4.19` is placed on the **main merge commit that includes `0.4.19+2`** (not the auto-bump commit).
 - [ ] Run the **Release** workflow via that tag (see [tags-and-releases.md](tags-and-releases.md)).
+- [ ] After the Release workflow: the **Release hooks** run told the registry and the template (`QUERYA_DISPATCH_TOKEN` must be set, see [extension-registry.md](extension-registry.md#one-time-setup)), the `querya-testdb-*` and `querya-headless` images are published for the new version, and the template's *Move to Querya …* pull request or issue exists.
 - [ ] Verify **portable** zips (`*-linux.zip`, `*-windows.zip`, `*-macos.zip`), **installable** artifacts (`*.AppImage`, `*.deb`, `*.rpm`, `*.flatpak`, `*-windows-setup.exe`), and `SHA256SUMS.txt` on the GitHub Release.
 - [ ] After the release, set the release zip's URL and `sha256` in `packaging/linux/flatpak/com.queryahub.querya_desktop.flathub.yml` (and the `metainfo.xml` release entry is already `0.4.19`); the Flathub submission (flathub/flathub#10606) is separate and has open lint errors (HTTPS on `queryahub.com` or another app id, no `--filesystem=home`, a supported GNOME runtime).
 

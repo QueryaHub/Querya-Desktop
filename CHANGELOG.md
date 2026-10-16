@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`querya-ext-tester --strict`** — warnings fail the run (exit 1), for example a recommended method that errors or an OS sandbox that could not be applied; with `--sandbox` in CI a green run now means the plugin really ran isolated. The `test-extension` action has a matching `strict` input.
 
+- **Extension registry** — `StaticRegistryRepository` reads a static `index.json` published by [QueryaHub/extensions](https://github.com/QueryaHub/extensions) (GitHub Pages): yanked entries, non-GitHub-release URLs and extensions the running version is too old for are hidden, the index is cached, installs keep the SHA-256 / archive / sandbox checks. Not wired into the Marketplace page yet. Also new for extension authors: the `ghcr.io/queryahub/features/querya-ext-tester` Dev Container Feature, `querya-testdb-*` test database images, and the [extension template](https://github.com/QueryaHub/extension-template). See [docs/extension-registry.md](docs/extension-registry.md).
+- **Release hooks** — after a Release the registry and the template are told about the new version (`repository_dispatch`); needs the `QUERYA_DISPATCH_TOKEN` secret.
+
 ### Fixed
 
 - **In-app update of a package install (AUR, `.deb`, `.rpm`)** — the updater no longer downloads a zip and quits when the app lives in `/opt/querya-desktop` (owned by root): the update dialog says how to update it (`yay -Syu querya-desktop`, `apt`, `dnf`) with a *Copy update command* button, or offers the release page for any other folder the user cannot write. If an in-place replace fails anyway, the app is started again and the reason is logged to `~/.local/state/querya-update.log`, instead of staying closed.
