@@ -25,6 +25,7 @@ void main() {
       final p = ExtensionProtocolProfile.forTarget('0.4.11');
       expect(p.supports('system.handshake'), isTrue);
       expect(p.supports('db.query'), isTrue);
+      expect(p.supports('system.injectCredentials'), isTrue);
       expect(p.supports('db.getTableSchema'), isFalse);
       expect(p.supports('commands.execute'), isFalse);
     });
@@ -37,7 +38,8 @@ void main() {
 
     test('0.5.0 speaks everything the current host sends', () {
       final p = ExtensionProtocolProfile.forTarget('0.5.0');
-      expect(p.methods.length, 11);
+      expect(p.methods.length, 12);
+      expect(p.supports('system.injectCredentials'), isTrue);
     });
 
     test('levels distinguish required from recommended methods', () {
