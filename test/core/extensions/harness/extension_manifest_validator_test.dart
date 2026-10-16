@@ -113,7 +113,13 @@ void main() {
     test('format 1 is fine on every host that has the protocol', () {
       final m = _valid()..['manifestVersion'] = 1;
       for (final host in ['0.4.11', '0.4.18', '0.5.0']) {
-        expect(_check(m, host), isEmpty, reason: host);
+        // Other diagnostics are fine here (the engines range of _valid() is
+        // ^0.4.11, which warns on 0.5.0); only manifestVersion must be clean.
+        expect(
+          _check(m, host).where((d) => d.path == 'manifestVersion'),
+          isEmpty,
+          reason: host,
+        );
       }
     });
 
