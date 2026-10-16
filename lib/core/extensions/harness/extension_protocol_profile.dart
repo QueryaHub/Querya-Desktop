@@ -31,6 +31,7 @@ final class HostVersion implements Comparable<HostVersion> {
 
   bool operator >=(HostVersion other) => compareTo(other) >= 0;
   bool operator <(HostVersion other) => compareTo(other) < 0;
+  bool operator <=(HostVersion other) => compareTo(other) <= 0;
 
   @override
   bool operator ==(Object other) =>
