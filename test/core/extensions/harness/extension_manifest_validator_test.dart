@@ -92,6 +92,59 @@ void main() {
         isFalse);
   });
 
+  group('engine ranges', () {
+    bool? allows(String host, String range) =>
+        engineRangeAllows(HostVersion.parse(host), range);
+
+    test('comparators', () {
+      expect(allows('0.5.0', '>=0.4.0'), isTrue);
+      expect(allows('0.3.9', '>=0.4.0'), isFalse);
+      expect(allows('0.4.0', '>0.4.0'), isFalse);
+      expect(allows('0.4.1', '>0.4.0'), isTrue);
+      expect(allows('0.4.0', '<=0.4.0'), isTrue);
+      expect(allows('0.4.1', '<=0.4.0'), isFalse);
+      expect(allows('0.4.19', '<0.5.0'), isTrue);
+      expect(allows('0.5.0', '<0.5.0'), isFalse);
+      expect(allows('0.4.19', '=0.4.19'), isTrue);
+      expect(allows('0.4.20', '=0.4.19'), isFalse);
+    });
+
+    test('caret keeps its meaning', () {
+      expect(allows('0.4.19', '^0.4.11'), isTrue);
+      expect(allows('0.5.0', '^0.4.11'), isFalse);
+      expect(allows('1.9.0', '^1.2.0'), isTrue);
+      expect(allows('2.0.0', '^1.2.0'), isFalse);
+    });
+
+    test('several comparators must all hold (the ClickHouse driver)', () {
+      const range = '>=0.4.0 <3.0.0';
+      expect(allows('0.4.19', range), isTrue);
+      expect(allows('2.9.9', range), isTrue);
+      expect(allows('3.0.0', range), isFalse);
+      expect(allows('0.3.0', range), isFalse);
+      expect(allows('0.5.0', '  >=0.4.0   <3.0.0 '), isTrue);
+    });
+
+    test('* means any version; a range it cannot read is null, not a guess', () {
+      expect(allows('0.5.0', '*'), isTrue);
+      for (final bad in ['~0.4', '>=0.4.0 || ^1.0.0', '>=x', '', '0.4.19', '* <3.0.0']) {
+        expect(allows('0.5.0', bad), isNull, reason: bad);
+      }
+    });
+
+    test('an unreadable range in a manifest is a warning, a readable one that '
+        'excludes the host is a warning with a different message', () {
+      final unreadable = _check(
+          _valid()..['engines'] = {'querya_desktop': '>=0.4.0 || ^1.0.0'}).single;
+      expect(unreadable.isError, isFalse);
+      expect(unreadable.message, contains('unsupported range'));
+      final excluded = _check(
+          _valid()..['engines'] = {'querya_desktop': '>=0.4.0 <0.5.0'}, '0.5.0')
+          .single;
+      expect(excluded.message, contains('does not include'));
+    });
+  });
+
   test('commands on a host older than 0.4.16 warn', () {
     final m = _valid();
     (m['contributions']! as Map)['commands'] = [

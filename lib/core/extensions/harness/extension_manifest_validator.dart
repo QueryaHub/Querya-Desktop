@@ -99,7 +99,8 @@ List<HarnessDiagnostic> validateExtensionManifest(
       final ok = engineRangeAllows(profile.targetVersion, range);
       if (ok == null) {
         warning('engines.querya_desktop',
-            'unsupported range "$range"; use ^x.y.z or >=x.y.z');
+            'unsupported range "$range"; use ^x.y.z, or comparators such as '
+            '">=x.y.z <y.0.0" (>=, >, <=, <, =, all must hold)');
       } else if (!ok) {
         warning(
           'engines.querya_desktop',
@@ -159,16 +160,34 @@ List<HarnessDiagnostic> validateExtensionManifest(
 
 final _semver = RegExp(r'^\d+\.\d+\.\d+(?:[+-][0-9A-Za-z.+-]+)?$');
 
-/// `true` / `false` when [range] (`^x.y.z` or `>=x.y.z`) can be evaluated,
-/// `null` when its syntax is not understood.
+/// `true` / `false` when [range] can be evaluated, `null` when its syntax is
+/// not understood (the caller then shows the extension and warns, it does not
+/// guess).
+///
+/// A range is one or more space-separated comparators that must all hold, such
+/// as `>=0.4.0 <3.0.0`: `>=x.y.z`, `>x.y.z`, `<=x.y.z`, `<x.y.z`, `=x.y.z`,
+/// `^x.y.z` (same major, or the same minor while major is 0), or `*` alone.
 bool? engineRangeAllows(HostVersion host, String range) {
-  final r = range.trim();
+  final parts = range.trim().split(RegExp(r'\s+'));
+  if (parts.length == 1 && parts.single == '*') return true;
+  var allowed = true;
+  for (final part in parts) {
+    final ok = _comparatorAllows(host, part);
+    if (ok == null) return null;
+    if (!ok) allowed = false;
+  }
+  return allowed;
+}
+
+bool? _comparatorAllows(HostVersion host, String c) {
   try {
-    if (r.startsWith('>=')) {
-      return host >= HostVersion.parse(r.substring(2));
-    }
-    if (r.startsWith('^')) {
-      final base = HostVersion.parse(r.substring(1));
+    if (c.startsWith('>=')) return host >= HostVersion.parse(c.substring(2));
+    if (c.startsWith('<=')) return !(HostVersion.parse(c.substring(2)) < host);
+    if (c.startsWith('>')) return !(host <= HostVersion.parse(c.substring(1)));
+    if (c.startsWith('<')) return host < HostVersion.parse(c.substring(1));
+    if (c.startsWith('=')) return host == HostVersion.parse(c.substring(1));
+    if (c.startsWith('^')) {
+      final base = HostVersion.parse(c.substring(1));
       if (host < base) return false;
       // Caret: same major, or same minor while major is 0.
       return base.major == 0
