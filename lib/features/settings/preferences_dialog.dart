@@ -100,26 +100,20 @@ class PreferencesDialogContentState
     setState(() => _searchQuery = query.trim());
   }
 
-  /// Reads every value in parallel: one round trip to the settings database
-  /// instead of nine in a row, so the panes show real values sooner.
+  // One after another on purpose: sqflite serializes queries on one database
+  // anyway, and concurrent ones each start a lock-wait timer.
   Future<void> _load() async {
     final s = AppSettings.instance;
     try {
-      final (startup, channel, destructive) = await (
-        s.getCheckForUpdatesOnStartup(),
-        s.getUpdateChannel(),
-        s.getConfirmDestructiveOperations(),
-      ).wait;
-      final (pg, my, sqlite) = await (
-        s.getPostgresSqlStmtTimeoutSeconds(),
-        s.getMysqlSqlStmtTimeoutSeconds(),
-        s.getSqliteSqlStmtTimeoutSeconds(),
-      ).wait;
-      final (rows, hist, font) = await (
-        s.getSqlResultMaxRows(),
-        s.getSqlHistoryMaxEntries(),
-        s.getSqlEditorFontSize(),
-      ).wait;
+      final startup = await s.getCheckForUpdatesOnStartup();
+      final channel = await s.getUpdateChannel();
+      final destructive = await s.getConfirmDestructiveOperations();
+      final pg = await s.getPostgresSqlStmtTimeoutSeconds();
+      final my = await s.getMysqlSqlStmtTimeoutSeconds();
+      final sqlite = await s.getSqliteSqlStmtTimeoutSeconds();
+      final rows = await s.getSqlResultMaxRows();
+      final hist = await s.getSqlHistoryMaxEntries();
+      final font = await s.getSqlEditorFontSize();
       if (!mounted) return;
       setState(() {
         _checkUpdatesOnStartup = startup;
