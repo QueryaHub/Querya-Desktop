@@ -1,0 +1,11 @@
+# querya-testdb-mysql: MySQL 8.0 with mysql_native_password (what CI runs), so
+# a client without TLS can connect. The init scripts run on the first start.
+FROM mysql:8.0
+ENV MYSQL_ROOT_PASSWORD=querya \
+    MYSQL_DATABASE=querya \
+    MYSQL_USER=querya \
+    MYSQL_PASSWORD=querya
+COPY init/ /docker-entrypoint-initdb.d/
+CMD ["--default-authentication-plugin=mysql_native_password", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+HEALTHCHECK --interval=5s --timeout=5s --retries=20 --start-period=30s \
+  CMD mysqladmin ping -h 127.0.0.1 -uquerya -pquerya

@@ -1,0 +1,8 @@
+# querya-testdb-mongo: MongoDB with the Querya seeds, no bind mounts.
+# Auth source is admin; the init script runs on the first start.
+FROM mongo:7
+ENV MONGO_INITDB_ROOT_USERNAME=querya \
+    MONGO_INITDB_ROOT_PASSWORD=querya
+COPY init/ /docker-entrypoint-initdb.d/
+HEALTHCHECK --interval=5s --timeout=5s --retries=20 --start-period=30s \
+  CMD mongosh --quiet -u querya -p querya --authenticationDatabase admin --eval "db.adminCommand('ping').ok"
