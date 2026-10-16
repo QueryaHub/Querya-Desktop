@@ -190,6 +190,9 @@ class MockMarketplaceRepository implements MarketplaceRepository {
       throw MarketplaceException(ExtensionSupport.databaseDriverPreviewNotice);
     }
 
+    final formatProblem = ExtensionSupport.manifestFormatProblem(manifest);
+    if (formatProblem != null) throw MarketplaceException(formatProblem);
+
     final sandboxViolations = SandboxPolicy.validate(manifest);
     if (sandboxViolations.isNotEmpty) {
       throw MarketplaceException(

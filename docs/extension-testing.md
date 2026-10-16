@@ -8,7 +8,8 @@ server, Flutter or the Querya Desktop source tree.
 ## What it checks
 
 1. **`manifest.json`** — `id`, `name`, `version`, `type: "database_driver"`,
-   `main`, `engines.querya_desktop` (against the emulated host version),
+   `main`, `engines.querya_desktop` and `manifestVersion` (both against the
+   emulated host version; see [extension-registry.md](extension-registry.md#versions-what-is-checked-against-what)),
    `contributions.drivers[]` (`driverId`, `displayName`). Every problem is
    reported with its JSON path.
 2. **Launch** — the `main` entry point exists and starts.
@@ -181,6 +182,8 @@ without the sandbox and says so in the report. To test the sandboxed run, start
 the container with `--security-opt seccomp=unconfined` (and, on hosts that
 restrict namespaces with AppArmor, `--security-opt apparmor=unconfined`), or
 run the tester directly on the CI runner with the action below.
+
+The fields of `manifest.json` are in [extension-manifest.md](extension-manifest.md).
 
 Starting a new extension? The [extension template](https://github.com/QueryaHub/extension-template)
 has all of this wired up, and [extension-registry.md](extension-registry.md)

@@ -79,6 +79,18 @@ void main() {
       expect(ids(decoded, host: '0.5.0'), ['new.only', 'any']);
     });
 
+    test('hides an extension in a manifest format this Querya cannot read', () {
+      final decoded = {
+        'schema': 1,
+        'extensions': [
+          _entry('fmt.current')..['manifestVersion'] = 1,
+          _entry('fmt.absent'),
+          _entry('fmt.future')..['manifestVersion'] = 99,
+        ],
+      };
+      expect(ids(decoded), ['fmt.current', 'fmt.absent']);
+    });
+
     test('keeps an engines range it cannot read (the host does not enforce it)', () {
       expect(ids({'schema': 1, 'extensions': [_entry('x', engines: '*')]}), ['x']);
     });

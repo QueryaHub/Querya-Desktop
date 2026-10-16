@@ -29,6 +29,31 @@ void main() {
       }
     });
 
+    test('skips an extension whose manifest format is newer than this build reads',
+        () async {
+      Future<void> write(String dir, int? format) async {
+        final d = Directory(p.join(tempDir.path, dir))..createSync();
+        File(p.join(d.path, 'manifest.json')).writeAsStringSync(jsonEncode({
+          'id': 'test.$dir',
+          'name': dir,
+          'version': '1.0.0',
+          'publisher': 'Test',
+          'type': 'theme',
+          'engines': {'querya_desktop': '*'},
+          if (format != null) 'manifestVersion': format,
+        }));
+      }
+
+      await write('plain', null);
+      await write('current', 1);
+      await write('future', 99);
+
+      await LocalExtensionRegistry.instance.reload();
+      final ids = LocalExtensionRegistry.instance.manifests.map((m) => m.id);
+      expect(ids, containsAll(['test.plain', 'test.current']));
+      expect(ids, isNot(contains('test.future')));
+    });
+
     test('loads extensions from manifest files', () async {
       // Create a valid extension folder
       final ext1Dir = Directory(p.join(tempDir.path, 'ext1'));

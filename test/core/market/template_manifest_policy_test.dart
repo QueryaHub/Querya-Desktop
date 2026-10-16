@@ -10,6 +10,7 @@ import 'package:querya_desktop/core/extensions/sandbox/sandbox_policy.dart';
 /// it, so this pins the template to the app's sandbox policy.
 const _templateManifest = '''
 {
+  "manifestVersion": 1,
   "id": "example.redis-template",
   "name": "Example driver (template)",
   "version": "0.1.0",
@@ -44,6 +45,8 @@ void main() {
     final manifest = ExtensionManifest.fromJson(
       jsonDecode(_templateManifest) as Map<String, dynamic>,
     );
+    expect(manifest.manifestVersion, 1);
+    expect(ExtensionSupport.manifestFormatProblem(manifest), isNull);
     expect(SandboxPolicy.validate(manifest), isEmpty);
     expect(ExtensionSupport.isPreviewOnlyManifest(manifest), isFalse);
   });
