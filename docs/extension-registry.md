@@ -29,14 +29,16 @@ Querya Desktop ◄── index.json (GitHub Pages) ◄── publish (on merge, 
    `querya-testdb-*` container.
 3. Publish a GitHub release with the zip as an asset.
 4. Add `extensions/<id>.json` to the registry in a pull request (the format and
-   what CI checks are in the registry's README). Everything the Marketplace
+   what CI checks are in the registry's README). An extension that ships a native
+   binary lists one archive per platform under `platforms`. Everything the Marketplace
    shows is read from `manifest.json` **inside the archive**; the record only
    holds `id`, `version`, `downloadUrl`, `sha256` and an optional `testEnv`.
 5. A new version is a change to `version`, `downloadUrl` and `sha256` in the same
    file. `"yanked": true` hides an extension without deleting its record.
 
 The extension's binary runs in the registry's CI, inside the OS sandbox, in a job
-with no secrets and a read-only token. Only a Linux x86-64 build is exercised.
+with no secrets and a read-only token. Only the Linux x86-64 build is exercised; the other platforms' archives are
+checked (hash, archive, manifest) but not run.
 
 ## What the app trusts
 
@@ -57,6 +59,11 @@ with no secrets and a read-only token. Only a Linux x86-64 build is exercised.
 }
 ```
 
+- An entry can carry one archive for every platform (`downloadUrl`, `sha256`) or a
+  `platforms` map with one build per target (`linux-x64`, `macos-arm64`,
+  `macos-x64`, `windows-x64`), each with its own `downloadUrl`, `sha256` and
+  `main`. The app resolves the map to the build for the platform it runs on and
+  does not offer the extension where there is none.
 - An index with another `schema` is refused, not half read.
 - Hidden from the list: `yanked` entries, entries without a checksum, a
   `downloadUrl` that is not `https://github.com/<owner>/<repo>/releases/download/<tag>/<asset>`,

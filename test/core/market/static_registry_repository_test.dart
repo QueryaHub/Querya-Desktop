@@ -43,9 +43,11 @@ String _index(List<Map<String, Object?>> entries, {Object schema = 1}) =>
 
 void main() {
   group('StaticRegistryRepository.parseIndex', () {
-    List<String> ids(Object decoded, {String host = '0.5.0'}) => [
+    List<String> ids(Object decoded,
+            {String host = '0.5.0', String platform = 'linux-x64'}) => [
           for (final m
-              in StaticRegistryRepository.parseIndex(decoded, hostVersion: host))
+              in StaticRegistryRepository.parseIndex(decoded,
+                  hostVersion: host, platform: platform))
             m.id,
         ];
 
@@ -82,10 +84,77 @@ void main() {
     });
 
     test('refuses an index of another format or shape', () {
-      expect(() => StaticRegistryRepository.parseIndex({'schema': 2, 'extensions': []}, hostVersion: '0.5.0'),
+      expect(() => StaticRegistryRepository.parseIndex({'schema': 2, 'extensions': []},
+              hostVersion: '0.5.0', platform: 'linux-x64'),
           throwsA(isA<MarketplaceException>()));
-      expect(() => StaticRegistryRepository.parseIndex([], hostVersion: '0.5.0'),
+      expect(() => StaticRegistryRepository.parseIndex([],
+              hostVersion: '0.5.0', platform: 'linux-x64'),
           throwsA(isA<MarketplaceException>()));
+    });
+  });
+
+  group('StaticRegistryRepository platform builds', () {
+    Map<String, Object?> perPlatform(String id) => {
+          ...(_entry(id)
+            ..remove('downloadUrl')
+            ..remove('sha256')),
+          'main': 'bin/driver',
+          'platforms': {
+            'linux-x64': {
+              'downloadUrl': 'https://github.com/acme/ext/releases/download/v1/linux.zip',
+              'sha256': _sha,
+              'main': 'bin/driver',
+            },
+            'windows-x64': {
+              'downloadUrl': 'https://github.com/acme/ext/releases/download/v1/win.zip',
+              'sha256': 'b' * 64,
+              'main': 'bin/driver.exe',
+            },
+          },
+        };
+
+    test('the entry becomes the build for this platform', () {
+      final decoded = {'schema': 1, 'extensions': [perPlatform('acme.native')]};
+      final linux = StaticRegistryRepository.parseIndex(decoded,
+          hostVersion: '0.5.0', platform: 'linux-x64').single;
+      expect(linux.downloadUrl, endsWith('/linux.zip'));
+      expect(linux.sha256Checksum, _sha);
+      expect(linux.main, 'bin/driver');
+
+      final win = StaticRegistryRepository.parseIndex(decoded,
+          hostVersion: '0.5.0', platform: 'windows-x64').single;
+      expect(win.downloadUrl, endsWith('/win.zip'));
+      expect(win.sha256Checksum, 'b' * 64);
+      expect(win.main, 'bin/driver.exe');
+    });
+
+    test('an extension with no build for this platform is not offered', () {
+      final decoded = {'schema': 1, 'extensions': [perPlatform('acme.native'), _entry('acme.any')]};
+      final macos = StaticRegistryRepository.parseIndex(decoded,
+          hostVersion: '0.5.0', platform: 'macos-arm64');
+      expect(macos.map((m) => m.id), ['acme.any']);
+      expect(
+          StaticRegistryRepository.parseIndex(decoded,
+              hostVersion: '0.5.0', platform: ''),
+          hasLength(1));
+    });
+
+    test('a build whose URL is not a release asset is dropped', () {
+      final entry = perPlatform('acme.native');
+      (entry['platforms'] as Map)['linux-x64'] = {
+        'downloadUrl': 'https://example.com/linux.zip',
+        'sha256': _sha,
+      };
+      final decoded = {'schema': 1, 'extensions': [entry]};
+      expect(
+          StaticRegistryRepository.parseIndex(decoded,
+              hostVersion: '0.5.0', platform: 'linux-x64'),
+          isEmpty);
+    });
+
+    test('this machine has a platform key', () {
+      expect(StaticRegistryRepository.currentPlatformKey(),
+          matches(RegExp(r'^(linux|macos|windows)-[a-z0-9]+$')));
     });
   });
 
@@ -114,6 +183,7 @@ void main() {
     }) =>
         StaticRegistryRepository(
           hostVersion: host,
+          platform: 'linux-x64',
           client: client,
           now: () => now,
         );
