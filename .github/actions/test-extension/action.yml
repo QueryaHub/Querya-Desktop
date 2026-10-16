@@ -34,6 +34,13 @@ inputs:
     description: Run the plugin inside the OS sandbox when available ("true" / "false").
     required: false
     default: 'false'
+  strict:
+    description: >-
+      Fail on warnings too ("true" / "false"), for example when the OS sandbox
+      could not be applied. Needs a tester newer than 0.4.19; with an older
+      one the run fails because it does not know --strict.
+    required: false
+    default: 'false'
   junit-path:
     description: Where to write the JUnit XML report.
     required: false
@@ -111,6 +118,7 @@ runs:
         QUERY: ${{ inputs.query }}
         TABLE: ${{ inputs.table }}
         SANDBOX: ${{ inputs.sandbox }}
+        STRICT: ${{ inputs.strict }}
         JUNIT_PATH: ${{ inputs.junit-path }}
         TAP_PATH: ${{ inputs.tap-path }}
       run: |
@@ -122,6 +130,7 @@ runs:
         if [ -n "$CONNECT" ]; then ARGS+=(--connect "$CONNECT"); fi
         if [ -n "$TABLE" ]; then ARGS+=(--table "$TABLE"); fi
         if [ "$SANDBOX" = "true" ]; then ARGS+=(--sandbox); fi
+        if [ "$STRICT" = "true" ]; then ARGS+=(--strict); fi
         if [ -n "$JUNIT_PATH" ]; then ARGS+=(--junit "$JUNIT_PATH"); fi
         if [ -n "$TAP_PATH" ]; then ARGS+=(--tap "$TAP_PATH"); fi
 

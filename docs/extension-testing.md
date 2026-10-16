@@ -69,13 +69,14 @@ querya-ext-tester ./my-extension \
 | `--table <name>` | also check `db.getTableSchema` |
 | `--database <name>` | database passed to `db.connect` |
 | `--sandbox` | run the plugin in the OS sandbox (`bwrap` on Linux, `sandbox-exec` on macOS) when available |
+| `--strict` | warnings fail the run too (exit `1`): a recommended method that errors, or a sandbox that could not be applied. Not in 0.4.19 or earlier |
 | `--timeout-ms <n>` | per-request timeout (default 5000) |
 | `--junit <path>` / `--tap <path>` | write a JUnit XML / TAP report |
 | `--trace <path>` | write every RPC round trip as JSON: method, time, request and response size and a bounded view of the data (see *Following the data*) |
 | `--no-color` | plain output |
 
-Exit codes: `0` all checks passed (warnings and skips do not fail), `1` a
-check failed, `2` bad command line.
+Exit codes: `0` all checks passed (warnings and skips do not fail, unless
+`--strict`), `1` a check failed, `2` bad command line.
 
 Credentials only travel inside the `db.connect` payload over the plugin's
 stdio; they are never put on the command line of the plugin or into its
@@ -346,8 +347,9 @@ test-extension:
    the plugin in the same OS sandbox.
 5. Capture machine-readable results with `--junit report.xml` or `--tap report.tap`.
 
-There is no `--strict` mode: recommended methods only warn, and exit code `1`
-means a required check failed.
+Recommended methods only warn, and exit code `1` means a required check failed.
+Add `--strict` (with `--sandbox` in CI) so a warning, in particular "OS sandbox
+is not available", fails the run instead of passing as green.
 
 ## Running from source
 

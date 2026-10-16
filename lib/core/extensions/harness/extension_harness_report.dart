@@ -151,6 +151,11 @@ final class HarnessReport {
   /// `true` when nothing failed (warnings and skips do not fail a run).
   bool get isSuccess => failedCount == 0;
 
+  /// Like [isSuccess], and with [strict] a warning fails the run as well
+  /// (a recommended method that errors, a sandbox that could not be applied).
+  bool passes({bool strict = false}) =>
+      isSuccess && (!strict || warningCount == 0);
+
   /// Human-readable summary, one line per check plus indented details.
   String toConsole({bool color = false}) {
     String paint(String code, String text) =>

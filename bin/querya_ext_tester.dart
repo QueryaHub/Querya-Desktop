@@ -4,7 +4,8 @@
 //
 //   dart run bin/querya_ext_tester.dart <extension-dir> [options]
 //
-// Exit codes: 0 all checks passed, 1 a check failed, 2 bad usage.
+// Exit codes: 0 all checks passed, 1 a check failed (with --strict, or warned),
+// 2 bad usage.
 import 'dart:convert';
 import 'dart:io';
 
@@ -24,6 +25,9 @@ Options:
   --table <name>            also check db.getTableSchema for this table
   --database <name>         database passed to db.connect
   --sandbox                 run the plugin in the OS sandbox when available
+  --strict                  treat warnings as failures (exit 1), for example a
+                            recommended method that errors or a sandbox that
+                            could not be applied
   --timeout-ms <n>          per-request timeout (default 5000)
   --junit <path>            write a JUnit XML report
   --tap <path>              write a TAP report
@@ -46,6 +50,7 @@ Future<int> _run(List<String> args) async {
   String? table;
   String? database;
   var sandbox = false;
+  var strict = false;
   var timeoutMs = 5000;
   String? junit;
   String? tap;
@@ -68,6 +73,8 @@ Future<int> _run(List<String> args) async {
         return 0;
       case '--sandbox':
         sandbox = true;
+      case '--strict':
+        strict = true;
       case '--no-color':
         color = false;
       case '--target-version' ||
@@ -168,5 +175,9 @@ Future<int> _run(List<String> args) async {
     File(trace).writeAsStringSync(report.toTraceJson());
     stdout.writeln('RPC trace of ${report.rpc.length} calls written to $trace');
   }
-  return report.isSuccess ? 0 : 1;
+  if (report.isSuccess && strict && report.warningCount > 0) {
+    stdout.writeln('--strict: ${report.warningCount} warning(s) count as '
+        'failures');
+  }
+  return report.passes(strict: strict) ? 0 : 1;
 }
