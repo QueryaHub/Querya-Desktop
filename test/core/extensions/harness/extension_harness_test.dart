@@ -227,6 +227,61 @@ void main() {
     expect(tableParams, containsPair('tableName', 'orders'));
   });
 
+  group('credentials', () {
+    test('a password is injected before connect and is not in its payload',
+        () async {
+      writeExtension(manifest());
+      Map<String, dynamic>? injected;
+      Map<String, dynamic>? connectParams;
+      final handlers = _healthy()
+        ..['system.injectCredentials'] = (p) {
+          injected = p;
+          return {'ok': true};
+        }
+        ..['db.connect'] = (p) {
+          connectParams = p;
+          return {'serverVersion': '1'};
+        };
+      final (report, plugin) = await run(
+        handlers,
+        connection: const HarnessConnectionOptions(
+          params: {'host': 'db', 'username': 'u', 'password': 's3cret'},
+        ),
+      );
+      expect(report.isSuccess, isTrue, reason: report.toConsole());
+      expect(injected, {'connectionId': 1, 'password': 's3cret'});
+      expect(connectParams, containsPair('username', 'u'));
+      expect(connectParams, isNot(contains('password')));
+      expect(plugin!.calls.indexOf('system.injectCredentials'),
+          lessThan(plugin.calls.indexOf('db.connect')));
+      expect(check(report, 'system.injectCredentials').status,
+          HarnessCheckStatus.passed);
+    });
+
+    test('without a password nothing is injected', () async {
+      writeExtension(manifest());
+      final (report, plugin) = await run(
+        _healthy(),
+        connection: const HarnessConnectionOptions(params: {'host': 'db'}),
+      );
+      expect(report.isSuccess, isTrue, reason: report.toConsole());
+      expect(plugin!.calls, isNot(contains('system.injectCredentials')));
+      expect(report.checks.any((c) => c.name == 'system.injectCredentials'),
+          isFalse);
+    });
+
+    test('a plugin without injectCredentials only warns', () async {
+      writeExtension(manifest());
+      final (report, _) = await run(
+        _healthy(),
+        connection: const HarnessConnectionOptions(params: {'password': 'p'}),
+      );
+      expect(check(report, 'system.injectCredentials').status,
+          HarnessCheckStatus.warning);
+      expect(check(report, 'db.connect').status, HarnessCheckStatus.passed);
+    });
+  });
+
   test('methods newer than the target host are skipped', () async {
     writeExtension(manifest());
     final (report, plugin) = await run(
