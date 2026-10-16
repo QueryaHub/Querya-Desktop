@@ -1,0 +1,10 @@
+# querya-testdb-redis: Redis seeded with the Querya keys on every start.
+# Redis has no init directory, so the entrypoint starts the server, runs
+# seed.sh against it and then keeps serving.
+FROM redis:7-alpine
+COPY seed.sh /seed.sh
+COPY testdb-entrypoint.sh /testdb-entrypoint.sh
+RUN chmod +x /testdb-entrypoint.sh
+ENTRYPOINT ["/testdb-entrypoint.sh"]
+HEALTHCHECK --interval=5s --timeout=3s --retries=12 \
+  CMD redis-cli ping | grep -q PONG

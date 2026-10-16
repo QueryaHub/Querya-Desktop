@@ -1,0 +1,145 @@
+name: Test database images
+
+# Publishes ghcr.io/queryahub/querya-testdb-<db>:<version> (and :latest): the
+# docker/<db> seeds baked into the official database images, for extension
+# authors (no bind mounts). A database is built when docker/<db>/Dockerfile.testdb
+# exists, so adding one appears here without editing this file.
+#
+# Pull requests only build and smoke-test. `workflow_run`, not `release`: the
+# release is created with GITHUB_TOKEN, and events made by that token do not
+# start other workflows.
+on:
+  pull_request:
+    paths:
+      - docker/**
+      - .github/workflows/testdb-images.yml
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Querya Desktop release the images are tagged with (e.g. 0.4.19)
+        required: true
+      latest:
+        description: Also tag the images as latest
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    outputs:
+      databases: ${{ steps.dbs.outputs.databases }}
+      push: ${{ steps.v.outputs.push }}
+      version: ${{ steps.v.outputs.version }}
+      latest: ${{ steps.v.outputs.latest }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Databases with a Dockerfile.testdb
+        id: dbs
+        shell: bash
+        run: |
+          set -euo pipefail
+          list=$(for f in docker/*/Dockerfile.testdb; do basename "$(dirname "$f")"; done | jq -R . | jq -sc .)
+          echo "databases=$list" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve the version
+        id: v
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ github.event_name }}" in
+            workflow_dispatch) VERSION="${{ inputs.version }}"; LATEST="${{ inputs.latest }}" ;;
+            workflow_run)      VERSION="${{ github.event.workflow_run.head_branch }}"; LATEST=true ;;
+            *)                 VERSION=""; LATEST=false ;;
+          esac
+          VERSION="${VERSION#v}"
+          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "push=true" >> "$GITHUB_OUTPUT"
+          else
+            [ -z "$VERSION" ] || echo "::notice::'$VERSION' is not a release tag, images are only built"
+            echo "push=false" >> "$GITHUB_OUTPUT"
+            VERSION=dev
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
+
+  image:
+    name: querya-testdb-${{ matrix.db }}
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        db: ${{ fromJson(needs.plan.outputs.databases) }}
+    env:
+      IMAGE: ghcr.io/queryahub/querya-testdb-${{ matrix.db }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        if: needs.plan.outputs.push == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build (loaded locally for the smoke test)
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/${{ matrix.db }}
+          file: docker/${{ matrix.db }}/Dockerfile.testdb
+          load: true
+          tags: querya-testdb:test
+          cache-from: type=gha,scope=testdb-${{ matrix.db }}
+          cache-to: type=gha,mode=max,scope=testdb-${{ matrix.db }}
+
+      - name: Smoke test (seeds are in, no bind mounts)
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --name testdb querya-testdb:test
+          for i in $(seq 1 60); do
+            s=$(docker inspect -f '{{.State.Health.Status}}' testdb)
+            [ "$s" = healthy ] && break
+            sleep 3
+          done
+          [ "$s" = healthy ] || { docker logs testdb; echo "::error::not healthy: $s"; exit 1; }
+
+          case "${{ matrix.db }}" in
+            postgres)   out=$(docker exec testdb psql -U querya -d querya -Atc "SELECT count(*) FROM shop.customers") ;;
+            mysql)      out=$(docker exec testdb mysql -uquerya -pquerya querya -Nse "SELECT count(*) FROM customers") ;;
+            mongo)      out=$(docker exec testdb mongosh --quiet -u querya -p querya --authenticationDatabase admin querya --eval "db.users.countDocuments()") ;;
+            clickhouse) out=$(docker exec testdb clickhouse-client --user querya --password querya --query "SELECT count() FROM querya.customers") ;;
+            redis)      out=$(docker exec testdb redis-cli GET querya:seed:marker) ;;
+            *) echo "::error::no smoke test for ${{ matrix.db }}"; exit 1 ;;
+          esac
+          echo "seed check: $out"
+          # A seeded table or key is a positive number; an empty database is 0 or empty.
+          [[ "$out" =~ ^[1-9][0-9]*$ ]] || { docker logs testdb; echo "::error::seed missing"; exit 1; }
+
+      - name: Push
+        if: needs.plan.outputs.push == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/${{ matrix.db }}
+          file: docker/${{ matrix.db }}/Dockerfile.testdb
+          push: true
+          cache-from: type=gha,scope=testdb-${{ matrix.db }}
+          tags: |
+            ${{ env.IMAGE }}:${{ needs.plan.outputs.version }}
+            ${{ needs.plan.outputs.latest == 'true' && format('{0}:latest', env.IMAGE) || '' }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.description=Querya test database (${{ matrix.db }}) with the Querya seeds baked in
+            org.opencontainers.image.licenses=MIT

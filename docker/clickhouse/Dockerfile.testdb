@@ -1,0 +1,9 @@
+# querya-testdb-clickhouse: ClickHouse with the Querya seeds, no bind mounts.
+FROM clickhouse/clickhouse-server:24.8
+ENV CLICKHOUSE_DB=querya \
+    CLICKHOUSE_USER=querya \
+    CLICKHOUSE_PASSWORD=querya \
+    CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+COPY init/ /docker-entrypoint-initdb.d/
+HEALTHCHECK --interval=5s --timeout=5s --retries=20 --start-period=40s \
+  CMD clickhouse-client --user querya --password querya --query 'SELECT 1'

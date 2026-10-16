@@ -1,0 +1,9 @@
+# querya-testdb-postgres: PostgreSQL with the Querya seeds, no bind mounts.
+# The init scripts run on the first start of an empty data directory.
+FROM postgres:16-alpine
+ENV POSTGRES_USER=querya \
+    POSTGRES_PASSWORD=querya \
+    POSTGRES_DB=querya
+COPY init/ /docker-entrypoint-initdb.d/
+HEALTHCHECK --interval=5s --timeout=5s --retries=12 \
+  CMD pg_isready -U querya -d querya
