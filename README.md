@@ -151,12 +151,20 @@ flatpak install --user ./Querya-Desktop-*-linux.flatpak
 Download the Windows installer (`.exe`) or portable archive (`.zip`) from [Releases](https://github.com/QueryaHub/Querya-Desktop/releases). Run the setup to automatically register `.sql` and `.sqlite` file associations.
 
 ### macOS
-Download the universal `.dmg` from [Releases](https://github.com/QueryaHub/Querya-Desktop/releases), mount the disk image, and drag **Querya Desktop** into your `Applications` folder.
+Requires **macOS 10.15 (Catalina) or later**; the app is a universal build (Apple silicon and Intel).
 
-> **Unsigned builds:** If Gatekeeper blocks the app after installation, run:
-> ```bash
-> xattr -cr "/Applications/Querya Desktop.app"
-> ```
+1. Download `Querya-Desktop-<version>-macos.dmg` from [Releases](https://github.com/QueryaHub/Querya-Desktop/releases), open it and drag **Querya Desktop** into `Applications`.
+2. Start it from `Applications`, not from the disk image or `Downloads`: there macOS runs a temporary read-only copy, and the in-app update cannot replace it.
+
+> **Unsigned builds.** A release built without the Developer ID secrets is ad-hoc signed, and Gatekeeper blocks its first launch:
+> - **macOS 14 and earlier:** Control-click (right-click) the app → **Open** → **Open**.
+> - **macOS 15 and later:** that no longer works. Try to open the app once, then go to **System Settings → Privacy & Security**, find "Querya Desktop was blocked…" and click **Open Anyway**.
+> - Or clear the quarantine flag in Terminal:
+>   ```bash
+>   xattr -dr com.apple.quarantine "/Applications/Querya Desktop.app"
+>   ```
+>
+> The unsigned build is not sandboxed and behaves like the signed one (connections, SSH keys, extensions, MCP, in-app updates); only this first-launch step differs. See [macOS signing](docs/macos-signing.md).
 
 ---
 

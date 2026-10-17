@@ -141,6 +141,28 @@ If you later add plugins that require microphone, camera, or other protected res
 
 ---
 
+## Running an unsigned build
+
+Without the signing secrets the release ships an ad-hoc signed app. It has no App Sandbox (see Entitlements above), so it can reach `~/.querya`, `~/.ssh`, saved SQLite paths, run extensions under `sandbox-exec`, serve MCP and update itself, like the signed build. What differs is Gatekeeper:
+
+| macOS | First launch |
+|---|---|
+| 14 and earlier | Control-click the app → **Open** → **Open**. |
+| 15 and later | Control-click → Open no longer bypasses Gatekeeper. Open the app once, then **System Settings → Privacy & Security → Open Anyway**. |
+| any | `xattr -dr com.apple.quarantine "/Applications/Querya Desktop.app"` |
+
+Move the app to `/Applications` before the first launch. Started from `~/Downloads` or the disk image, macOS runs it through App Translocation (a read-only copy at a random path): the in-app update refuses to run there and points to the release page instead (#1587).
+
+Related: secrets are stored in the login keychain, so they work without `keychain-access-groups` and without a provisioning profile (#1586); an update must carry the same Team ID as the installed app when the installed app is signed (#1588).
+
+## Minimum macOS version
+
+`MACOSX_DEPLOYMENT_TARGET` is **10.15** in every Xcode configuration, and `LSMinimumSystemVersion` follows it. That is also the highest minimum among the macOS plugins in use (`file_selector_macos` and `url_launcher_macos` need 10.15; `package_info_plus`, `device_info_plus` and the vendored `refresh_rate` need 10.14). Raising it needs no plugin change, lowering it is not possible.
+
+Rendering above 60 Hz on a ProMotion display needs **macOS 14** or later (`refresh_rate`, see [motion and high refresh](motion-and-high-refresh.md)); on older versions the app runs at 60 Hz.
+
+---
+
 ## References
 
 - Flutter: [Build and release a macOS app](https://docs.flutter.dev/deployment/macos)
