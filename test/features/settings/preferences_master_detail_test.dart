@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/features/settings/preferences_controls.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
@@ -225,6 +226,28 @@ void main() {
       await tester.pump();
 
       expect(currentValue, isTrue);
+    });
+
+    testWidgets('adapts category rail width to UI scale (#1653)', (tester) async {
+      await tester.pumpWidget(
+        QueryaUiScaleScope(
+          scale: 1.5,
+          child: buildTestApp(),
+        ),
+      );
+      await openDialog(tester);
+
+      final railScrollView = find.ancestor(
+        of: find.text('General').first,
+        matching: find.byType(material.SingleChildScrollView),
+      );
+      final railContainer = find.ancestor(
+        of: railScrollView,
+        matching: find.byType(material.Container),
+      ).first;
+
+      final containerWidget = tester.widget<material.Container>(railContainer);
+      expect(containerWidget.constraints?.maxWidth, 184 * 1.5);
     });
   });
 }

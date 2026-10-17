@@ -10,6 +10,7 @@ import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:querya_desktop/core/theme/theme_editor_draft.dart';
 import 'package:querya_desktop/core/theme/theme_registry_service.dart';
 import 'package:querya_desktop/features/settings/theme_editor_dialog.dart';
+import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 import '../../support/querya_theme_test_shell.dart';
 
@@ -115,6 +116,37 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Theme Studio'), findsNothing);
+    });
+
+    testWidgets('applies WindowLayout.dialogConstraints to Theme Studio modal (#1653)',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const material.Size(1280, 900));
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          uiScale: 1.25,
+          child: material.Scaffold(
+            body: material.Builder(
+              builder: (context) => material.ElevatedButton(
+                onPressed: () => showThemeEditorDialog(context),
+                child: const material.Text('Open'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      final modalFinder = find.byType(QueryaModalDialog);
+      expect(modalFinder, findsOneWidget);
+      final modalWidget = tester.widget<QueryaModalDialog>(modalFinder);
+      expect(modalWidget.constraints.maxWidth, 580 * 1.25);
+      expect(modalWidget.constraints.maxHeight, 600 * 1.25);
+
+      await tester.tap(find.text('Done'));
+      await tester.pumpAndSettle();
     });
   });
 }

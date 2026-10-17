@@ -8,6 +8,7 @@ Widget queryaThemeTestShell({
   required Widget child,
   QueryaTheme data = QueryaTheme.darkDefault,
   ThemeData? theme,
+  double uiScale = 1.0,
 }) {
   final td = theme ?? data.toShadcnThemeData();
   return ShadcnApp(
@@ -18,7 +19,7 @@ Widget queryaThemeTestShell({
     // binding reports, and a sheet needs a DrawerOverlay the app does not have.
     menuHandler: const PopoverOverlayHandler(),
     builder: (context, appChild) => QueryaUiScaleScope(
-      scale: 1.0,
+      scale: uiScale,
       child: QueryaThemeScope(
         data: data,
         child: appChild ?? const SizedBox.shrink(),
