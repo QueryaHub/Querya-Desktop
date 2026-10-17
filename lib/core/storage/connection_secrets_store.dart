@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Backend for reading/writing per-connection secrets (password, connection string).
@@ -9,8 +10,9 @@ abstract class SecretsStorageBackend {
 }
 
 class _FlutterSecureStorageBackend implements SecretsStorageBackend {
-  /// Desktop targets use the default platform options from the plugin.
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  final FlutterSecureStorage _storage = const FlutterSecureStorage(
+    mOptions: ConnectionSecretsStore.macOsOptions,
+  );
 
   @override
   Future<String?> read(String key) => _storage.read(key: key);
@@ -59,6 +61,15 @@ class ConnectionSecretsStore {
 
   /// Production uses OS-backed storage; tests override [backend] (see `test/flutter_test_config.dart`).
   static SecretsStorageBackend backend = _FlutterSecureStorageBackend();
+
+  /// macOS: the file-based login keychain. The plugin's default, the data
+  /// protection keychain, needs the `keychain-access-groups` entitlement,
+  /// which none of the builds carry (a restricted entitlement: a Developer ID
+  /// build with it needs a provisioning profile or does not launch), so every
+  /// read and write failed with errSecMissingEntitlement (#1586).
+  @visibleForTesting
+  static const MacOsOptions macOsOptions =
+      MacOsOptions(usesDataProtectionKeychain: false);
 
   /// Identifies the current profile's local database (installed / portable /
   /// migrated-legacy — see `AppDataRoot`), so that two independent profile
