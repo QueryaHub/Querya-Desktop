@@ -197,7 +197,7 @@ void main() {
       final conn = connection(database: 3);
       await conn.connect();
       await conn.disconnect();
-      expect(server.commands, contains(['SELECT', '3']));
+      expect(server.commands, contains(equals(['SELECT', '3'])));
     });
 
     test('a reconnect comes back to the database, not db 0', () async {
@@ -211,7 +211,7 @@ void main() {
 
       await conn.connect();
       await conn.disconnect();
-      expect(server.commands, contains(['SELECT', '4']));
+      expect(server.commands, contains(equals(['SELECT', '4'])));
     });
   });
 
