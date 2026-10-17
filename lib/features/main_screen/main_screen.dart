@@ -74,6 +74,9 @@ class _MainScreenState extends State<MainScreen> {
       return showUnsandboxedDriverConsentDialog(context, details);
     };
 
+    // Files Finder opens while the window is up (#1589).
+    FileLaunchService.instance.pendingRevision.addListener(_onFilesQueued);
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final completed = await AppSettings.instance.getHasCompletedWelcomeTour();
       if (!completed && mounted) {
@@ -90,8 +93,13 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
+  void _onFilesQueued() {
+    if (mounted) unawaited(_handlePendingFileLaunch());
+  }
+
   @override
   void dispose() {
+    FileLaunchService.instance.pendingRevision.removeListener(_onFilesQueued);
     HardwareKeyboard.instance.removeHandler(_handleGlobalKeyEvent);
     UnsandboxedLaunchConsentGate.instance.handler = null;
     _safeModeRelockTimer?.cancel();

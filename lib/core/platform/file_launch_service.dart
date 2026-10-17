@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:path/path.dart' as p;
 import 'package:querya_desktop/core/storage/local_db.dart';
 
@@ -121,9 +122,14 @@ class FileLaunchService {
     }
   }
 
+  /// Bumped by [addPendingTarget], so a running window can open files that
+  /// arrive after it started (Finder "Open With" on macOS, #1589).
+  final ValueNotifier<int> pendingRevision = ValueNotifier<int>(0);
+
   /// Adds a target to the pending launch list (e.g. for testing or runtime open events).
   void addPendingTarget(FileLaunchTarget target) {
     _pendingTargets.add(target);
+    pendingRevision.value++;
   }
 
   /// Consumes and returns the first pending launch target, or `null` if none.
