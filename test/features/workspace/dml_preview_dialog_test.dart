@@ -164,5 +164,25 @@ void main() {
         QueryaTheme.lightDefault.colorScheme.foreground,
       );
     });
+
+    testWidgets(
+        'breakdown pills and warning banner use workbench status colors (#1643)',
+        (tester) async {
+      await tester.pumpWidget(buildTestDialog(
+        plan: samplePlan,
+        data: QueryaTheme.darkDefault,
+      ));
+      await tester.tap(find.text('Open Dialog'));
+      await tester.pumpAndSettle();
+
+      final updateText = tester.widget<Text>(find.text('1 UPDATE'));
+      expect(updateText.style?.color, QueryaTheme.darkDefault.workbench.warning);
+
+      final insertText = tester.widget<Text>(find.text('1 INSERT'));
+      expect(insertText.style?.color, QueryaTheme.darkDefault.workbench.success);
+
+      final deleteText = tester.widget<Text>(find.text('1 DELETE'));
+      expect(deleteText.style?.color, QueryaTheme.darkDefault.workbench.destructive);
+    });
   });
 }
