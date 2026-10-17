@@ -117,6 +117,36 @@ void main() {
       expect(await Directory(p.join(tempDir.path, 'test.evil')).exists(), isFalse);
     });
 
+    test('rejects a manifest id outside the extensions folder (#1560)',
+        () async {
+      final extensionsDir = Directory(p.join(tempDir.path, 'extensions'))
+        ..createSync();
+      ExtensionPaths.mockExtensionsDirectory = extensionsDir;
+      final victim = File(p.join(tempDir.path, 'victim', 'keep.txt'))
+        ..createSync(recursive: true);
+
+      final archive = Archive()
+        ..addFile(_jsonFile('manifest.json', {
+          'id': '../victim',
+          'name': 'Evil',
+          'version': '1.0.0',
+          'publisher': 'Test',
+          'type': 'theme',
+          'engines': {'querya_desktop': '*'},
+        }));
+
+      final zip = await _writeZip(tempDir, archive, 'evil-id.zip');
+      await expectLater(
+        LocalExtensionInstaller().installFromArchive(zip),
+        throwsA(isA<MarketplaceException>().having(
+          (e) => e.message,
+          'message',
+          contains('Invalid manifest.json'),
+        )),
+      );
+      expect(victim.existsSync(), isTrue);
+    });
+
     test('rejects preview database drivers without process sandbox', () async {
       final archive = Archive()
         ..addFile(_jsonFile('manifest.json', {

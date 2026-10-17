@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import '../../security/archive_path_guard.dart';
 import '../../theme/theme_definition.dart';
 import 'extension_contributions.dart';
 import 'extension_type.dart';
@@ -15,6 +16,16 @@ class ExtensionManifest {
   /// `ExtensionProtocolProfile` (which host version first reads the new format)
   /// and docs/extension-registry.md.
   static const currentManifestVersion = 1;
+
+  static final _idPattern = RegExp(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$');
+
+  /// Whether [id] can name the extension's folder: letters, digits, `.`, `_`
+  /// and `-`, starting with a letter or digit, no `..` and no device names.
+  /// Installs and uninstalls delete that folder recursively (#1560).
+  static bool isValidId(String id) =>
+      _idPattern.hasMatch(id) &&
+      !id.contains('..') &&
+      isArchiveEntryNameSafe(id);
 
   /// `manifestVersion` of `manifest.json`: the format of the file itself, apart
   /// from the extension's own [version] and the host range in [engines].
@@ -122,10 +133,17 @@ class ExtensionManifest {
   factory ExtensionManifest.fromJson(Map<String, dynamic> json,
       {String? installPath}) {
     final rawFormat = json['manifestVersion'];
+    final id = json['id'];
+    if (id is! String || !isValidId(id)) {
+      throw FormatException(
+        '"id" must be letters, digits, ".", "_" or "-" '
+        '(starting with a letter or digit): $id',
+      );
+    }
     return ExtensionManifest(
       // Not a whole number >= 1: the validator reports it; here it reads as 1.
       manifestVersion: rawFormat is int && rawFormat >= 1 ? rawFormat : 1,
-      id: json['id'] as String,
+      id: id,
       name: json['name'] as String,
       version: json['version'] as String? ?? '0.0.0',
       publisher: json['publisher'] as String? ??
