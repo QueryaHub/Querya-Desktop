@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 
 /// Shows a modal dialog with a frosted, dimmed backdrop over the app.
 ///
@@ -153,7 +154,8 @@ class _DialogBackdrop extends StatelessWidget {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
         child: ColoredBox(
-          color: const Color(0xFF000000).withValues(alpha: tintAlpha * t),
+          color: context.workbenchOrDefault.shadow
+              .withValues(alpha: tintAlpha * t),
         ),
       ),
     );

@@ -59,7 +59,7 @@ extension QueryaThemeContext on BuildContext {
 
   QueryaTheme get queryaTheme => QueryaThemeScope.of(this);
 
-  QueryaWorkbenchTheme get workbench => queryaTheme.workbench;
+  QueryaWorkbenchTheme get workbench => workbenchOrDefault;
 
   /// The workbench tokens of the nearest [QueryaThemeScope], or the defaults
   /// for the ambient brightness when there is none (a widget under a bare app,
@@ -71,8 +71,17 @@ extension QueryaThemeContext on BuildContext {
           ? QueryaWorkbenchTheme.lightDefault
           : QueryaWorkbenchTheme.darkDefault);
 
-  QueryaEditorTheme get editorTheme => queryaTheme.editor;
+  QueryaEditorTheme get editorTheme =>
+      QueryaThemeScope.maybeOf(this)?.editor ??
+      (colors.brightness == Brightness.light
+          ? QueryaEditorTheme.lightDefault
+          : QueryaEditorTheme.darkDefault);
 
   QueryaSemanticPalette get semanticPalette =>
-      QueryaSemanticPalette.fromTheme(queryaTheme);
+      QueryaSemanticPalette.fromTheme(
+        QueryaThemeScope.maybeOf(this) ??
+            (colors.brightness == Brightness.light
+                ? QueryaTheme.lightDefault
+                : QueryaTheme.darkDefault),
+      );
 }

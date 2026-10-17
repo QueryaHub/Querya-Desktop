@@ -106,6 +106,7 @@ class QueryaConnectionTreeRow extends material.StatelessWidget {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
     final muted = theme.colorScheme.mutedForeground;
+    final wb = context.workbench;
     final row = material.CallbackShortcuts(
       bindings: {
         if (expanded == false && onTap != null)
@@ -157,7 +158,7 @@ class QueryaConnectionTreeRow extends material.StatelessWidget {
                     material.Icon(
                       material.Icons.star_rounded,
                       size: 13,
-                      color: material.Colors.amber.shade600,
+                      color: wb.warning,
                     ),
                     const Gap(4),
                   ],
@@ -205,7 +206,7 @@ class QueryaConnectionTreeRow extends material.StatelessWidget {
                     : material.Icons.star_border_rounded,
                 size: 18,
                 color: isPinned
-                    ? material.Colors.amber.shade600
+                    ? wb.warning
                     : theme.colorScheme.mutedForeground,
               ),
               onPressed: (_) => onTogglePin!(),

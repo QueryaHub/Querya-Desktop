@@ -168,7 +168,7 @@ class _GridCellEditorState extends material.State<GridCellEditor> {
       decoration: material.BoxDecoration(
         color: cs.card,
         border: material.Border.all(
-          color: hasError ? material.Colors.red.shade500 : cs.primary,
+          color: hasError ? cs.destructive : cs.primary,
           width: 1.5,
         ),
       ),
@@ -208,7 +208,7 @@ class _GridCellEditorState extends material.State<GridCellEditor> {
                 child: material.Icon(
                   material.Icons.error_outline_rounded,
                   size: 14,
-                  color: material.Colors.red.shade500,
+                  color: cs.destructive,
                 ),
               ),
             ),

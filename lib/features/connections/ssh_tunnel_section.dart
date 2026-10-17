@@ -196,6 +196,7 @@ class _SshTunnelSectionState extends material.State<SshTunnelSection> {
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final wb = context.workbench;
 
     return material.Container(
       margin: const material.EdgeInsets.only(top: 16),
@@ -458,7 +459,7 @@ class _SshTunnelSectionState extends material.State<SshTunnelSection> {
                 style: material.TextStyle(
                   fontSize: 12,
                   color: _testSuccess
-                      ? material.Colors.green
+                      ? wb.success
                       : cs.destructive,
                 ),
               ),
