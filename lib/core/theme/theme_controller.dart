@@ -471,8 +471,13 @@ class ThemeController extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> setThemeMode(ThemeMode mode) async {
     _themeMode = mode;
+    final effectiveBrightness = _effectiveBrightness();
+    if (_registryTheme != null &&
+        _registryTheme!.brightness != effectiveBrightness) {
+      await _clearRegistrySelection();
+    }
     if (_registryTheme == null && _preset != QueryaThemePreset.imported) {
-      _preset = mode == ThemeMode.light
+      _preset = effectiveBrightness == Brightness.light
           ? QueryaThemePreset.queryaLight
           : QueryaThemePreset.queryaDark;
       await AppSettings.instance.setThemePreset(_preset);
