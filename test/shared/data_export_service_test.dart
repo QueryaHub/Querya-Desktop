@@ -133,4 +133,60 @@ void main() {
       expect(md, DataExportService.formatMarkdownTable(columns, rows));
     });
   });
+
+  group('formatAsync in chunks (#1537)', () {
+    const columns = ['id', 'name | pipe', 'note'];
+    List<List<String>> table(int n) => [
+          for (var r = 0; r < n; r++)
+            [
+              '$r',
+              r % 7 == 0 ? 'NULL' : 'n"a,me\n$r',
+              if (r % 5 != 0) "it's | $r",
+            ],
+        ];
+
+    String whole(DataExportFormat format, List<List<String>> rows) =>
+        switch (format) {
+          DataExportFormat.csv => DataExportService.formatCsv(columns, rows),
+          DataExportFormat.json => DataExportService.formatJson(columns, rows),
+          DataExportFormat.markdown =>
+            DataExportService.formatMarkdownTable(columns, rows),
+          DataExportFormat.sqlDump =>
+            DataExportService.formatSqlInsertDump('t', columns, rows),
+        };
+
+    for (final format in DataExportFormat.values) {
+      test('${format.name}: chunks joined give the whole document', () {
+        final rows = table(23);
+        for (final size in [1, 3, 7, 22, 23]) {
+          final parts = <String>[];
+          for (var start = 0; start < rows.length; start += size) {
+            final end =
+                start + size < rows.length ? start + size : rows.length;
+            parts.add(DataExportService.formatChunk(
+              format,
+              columns,
+              rows.sublist(start, end),
+              't',
+              first: start == 0,
+              last: end == rows.length,
+            ));
+          }
+          expect(parts.join(), whole(format, rows), reason: 'size $size');
+        }
+      });
+
+      test('${format.name}: formatAsync over the hand-off size', () async {
+        final rows =
+            table(DataExportService.handOffCells ~/ columns.length * 2 + 5);
+        final text = await DataExportService.formatAsync(
+          format,
+          columns: columns,
+          rows: rows,
+          tableName: 't',
+        );
+        expect(text, whole(format, rows));
+      });
+    }
+  });
 }
