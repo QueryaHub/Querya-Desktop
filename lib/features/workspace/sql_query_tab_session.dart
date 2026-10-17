@@ -99,11 +99,13 @@ class SqlQueryTabSession {
   /// the database fills in, same as Table Browser.
   Map<String, TableColumnMeta>? resultGridColumnMeta;
 
+  /// Formats the script in place. The text keeps its length, so the caret
+  /// and selection stay where they were (#1566).
   void formatSql() {
-    final next = formatSqlScript(controller.text);
-    controller.value = material.TextEditingValue(
-      text: next,
-      selection: material.TextSelection.collapsed(offset: next.length),
+    final value = controller.value;
+    controller.value = value.copyWith(
+      text: formatSqlScript(value.text),
+      composing: material.TextRange.empty,
     );
   }
 
