@@ -169,26 +169,39 @@ class _GridCellInspectorDialogState
     });
   }
 
-  bool _isJson() {
-    final text = _controller.text.trim();
+  // build() asks for both on every rebuild. Parsing a large cell each time
+  // janks, so the answer is kept for the text it was computed for (the
+  // controller hands out the same String until the text changes).
+  String? _kindText;
+  var _kindIsJson = false;
+  var _kindIsXml = false;
+
+  void _refreshKind() {
+    final raw = _controller.text;
+    if (identical(raw, _kindText)) return;
+    _kindText = raw;
+    final text = raw.trim();
+    _kindIsJson = false;
+    _kindIsXml = false;
     if ((text.startsWith('{') && text.endsWith('}')) ||
         (text.startsWith('[') && text.endsWith(']'))) {
       try {
         jsonDecode(text);
-        return true;
-      } catch (_) {
-        return false;
-      }
+        _kindIsJson = true;
+      } catch (_) {}
+    } else if (text.startsWith('<') && text.endsWith('>')) {
+      _kindIsXml = XmlHtmlFormatter.validate(text) == null;
     }
-    return false;
+  }
+
+  bool _isJson() {
+    _refreshKind();
+    return _kindIsJson;
   }
 
   bool _isXml() {
-    final text = _controller.text.trim();
-    if (text.startsWith('<') && text.endsWith('>')) {
-      return XmlHtmlFormatter.validate(text) == null;
-    }
-    return false;
+    _refreshKind();
+    return _kindIsXml;
   }
 
   bool _isHex() {

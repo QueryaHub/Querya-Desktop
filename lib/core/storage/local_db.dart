@@ -583,8 +583,9 @@ class LocalDb {
           [kMutationAuditCap],
         );
       }
-    } catch (_) {
-      // Best effort.
+    } catch (e) {
+      // Best effort, but a missing audit trail should not be invisible.
+      debugPrint('LocalDb: could not record a mutation audit entry: $e');
     }
   }
 
@@ -624,8 +625,8 @@ class LocalDb {
         'SELECT id FROM mcp_activity ORDER BY id DESC LIMIT 1 OFFSET ?)',
         [kMcpActivityCap],
       );
-    } catch (_) {
-      // Best effort.
+    } catch (e) {
+      debugPrint('LocalDb: could not record MCP activity: $e');
     }
   }
 

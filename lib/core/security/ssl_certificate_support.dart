@@ -174,9 +174,21 @@ Future<String?> resolveMongoTlsCertificateKeyFile({
   final merged = File('${dir.path}/client.pem');
   await merged.writeAsString('$certBytes\n$keyBytes\n', flush: true);
   if (!Platform.isWindows) {
+    // `Process.run` does not throw on a non-zero exit, so check it: a key
+    // file that stayed at the default mode must not be handed out silently.
     try {
-      await Process.run('chmod', ['600', merged.path]);
-    } catch (_) {}
+      final result = await Process.run('chmod', ['600', merged.path]);
+      if (result.exitCode != 0) {
+        throw FileSystemException(
+          'Could not restrict permissions of the TLS client key file: '
+          '${result.stderr}'.trim(),
+          merged.path,
+        );
+      }
+    } catch (_) {
+      await cleanupMongoTlsTempFile(merged.path);
+      rethrow;
+    }
   }
   return merged.path;
 }
