@@ -1,5 +1,6 @@
 import 'dart:async' show unawaited;
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show compute, visibleForTesting;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/editor/querya_code_editor.dart';
@@ -7,6 +8,42 @@ import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/features/workspace/xml_html_formatter.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
+
+/// Text of at least this many UTF-16 units (about 256 KB) is parsed, formatted
+/// and minified on a worker isolate: `jsonDecode` and the XML formatter on a
+/// multi-megabyte cell would hold the UI thread for whole frames.
+@visibleForTesting
+int inspectorIsolateThreshold = 256 * 1024;
+
+String _prettyJson(String text) =>
+    const JsonEncoder.withIndent('  ').convert(jsonDecode(text));
+
+String _compactJson(String text) => jsonEncode(jsonDecode(text));
+
+String _prettyXml(String text) => XmlHtmlFormatter.format(text);
+
+bool _looksLikeJson(String trimmed) =>
+    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+    (trimmed.startsWith('[') && trimmed.endsWith(']'));
+
+bool _looksLikeXml(String trimmed) =>
+    trimmed.startsWith('<') && trimmed.endsWith('>');
+
+/// Whether [trimmed] is valid JSON or valid XML (top-level so [compute] can run it).
+({bool json, bool xml}) _detectKind(String trimmed) {
+  if (_looksLikeJson(trimmed)) {
+    try {
+      jsonDecode(trimmed);
+      return (json: true, xml: false);
+    } catch (_) {
+      return (json: false, xml: false);
+    }
+  }
+  if (_looksLikeXml(trimmed)) {
+    return (json: false, xml: XmlHtmlFormatter.validate(trimmed) == null);
+  }
+  return (json: false, xml: false);
+}
 
 /// Opens a rich modal inspector for viewing and editing large text, JSON, XML, or BLOB values.
 ///
@@ -100,41 +137,48 @@ class _GridCellInspectorDialogState
     super.dispose();
   }
 
-  void _formatJson() {
-    try {
-      final parsed = jsonDecode(_controller.text);
-      final pretty = const JsonEncoder.withIndent('  ').convert(parsed);
-      setState(() {
-        _isNull = false;
-        _controller.text = pretty;
-      });
-    } catch (_) {
-      // Not valid JSON, keep as is
+  bool _busy = false;
+
+  /// Replaces the text with `transform(text)`; a text that does not parse is
+  /// left as it is. Past [inspectorIsolateThreshold] the work runs on a worker
+  /// isolate, with the buttons held back meanwhile; an edit made while it ran
+  /// wins over the result.
+  Future<void> _rewrite(String Function(String) transform) async {
+    if (_busy) return;
+    final text = _controller.text;
+    String result;
+    if (text.length < inspectorIsolateThreshold) {
+      try {
+        result = transform(text);
+      } catch (_) {
+        return;
+      }
+    } else {
+      setState(() => _busy = true);
+      try {
+        result = await compute(transform, text);
+      } catch (_) {
+        if (mounted) setState(() => _busy = false);
+        return;
+      }
+      if (!mounted) return;
+      _busy = false;
+      if (!identical(text, _controller.text) && text != _controller.text) {
+        setState(() {});
+        return;
+      }
     }
+    setState(() {
+      _isNull = false;
+      _controller.text = result;
+    });
   }
 
-  void _minifyJson() {
-    try {
-      final parsed = jsonDecode(_controller.text);
-      final compact = jsonEncode(parsed);
-      setState(() {
-        _isNull = false;
-        _controller.text = compact;
-      });
-    } catch (_) {
-      // Not valid JSON, keep as is
-    }
-  }
+  void _formatJson() => unawaited(_rewrite(_prettyJson));
 
-  void _formatXml() {
-    try {
-      final pretty = XmlHtmlFormatter.format(_controller.text);
-      setState(() {
-        _isNull = false;
-        _controller.text = pretty;
-      });
-    } catch (_) {}
-  }
+  void _minifyJson() => unawaited(_rewrite(_compactJson));
+
+  void _formatXml() => unawaited(_rewrite(_prettyXml));
 
   void _formatHex() {
     var raw = _controller.text.trim();
@@ -171,27 +215,53 @@ class _GridCellInspectorDialogState
 
   // build() asks for both on every rebuild. Parsing a large cell each time
   // janks, so the answer is kept for the text it was computed for (the
-  // controller hands out the same String until the text changes).
+  // controller hands out the same String until the text changes). Text past
+  // [inspectorIsolateThreshold] is checked on a worker isolate: the buttons
+  // appear when it answers.
   String? _kindText;
   var _kindIsJson = false;
   var _kindIsXml = false;
+  var _detecting = false;
 
   void _refreshKind() {
     final raw = _controller.text;
     if (identical(raw, _kindText)) return;
     _kindText = raw;
-    final text = raw.trim();
     _kindIsJson = false;
     _kindIsXml = false;
-    if ((text.startsWith('{') && text.endsWith('}')) ||
-        (text.startsWith('[') && text.endsWith(']'))) {
-      try {
-        jsonDecode(text);
-        _kindIsJson = true;
-      } catch (_) {}
-    } else if (text.startsWith('<') && text.endsWith('>')) {
-      _kindIsXml = XmlHtmlFormatter.validate(text) == null;
+    final text = raw.trim();
+    if (!_looksLikeJson(text) && !_looksLikeXml(text)) return;
+    if (raw.length >= inspectorIsolateThreshold) {
+      _detectInBackground();
+      return;
     }
+    final kind = _detectKind(text);
+    _kindIsJson = kind.json;
+    _kindIsXml = kind.xml;
+  }
+
+  void _detectInBackground() {
+    if (_detecting) return; // the running check re-reads the latest text
+    final raw = _kindText;
+    if (raw == null) return;
+    _detecting = true;
+    unawaited(compute(_detectKind, raw.trim()).then((kind) {
+      _detecting = false;
+      if (!mounted) return;
+      if (identical(raw, _kindText)) {
+        if (kind.json != _kindIsJson || kind.xml != _kindIsXml) {
+          setState(() {
+            _kindIsJson = kind.json;
+            _kindIsXml = kind.xml;
+          });
+        }
+      } else if (_kindText != null &&
+          _kindText!.length >= inspectorIsolateThreshold) {
+        _detectInBackground(); // edited meanwhile: check the new text
+      }
+    }, onError: (Object _) {
+      _detecting = false;
+    }));
   }
 
   bool _isJson() {
@@ -312,14 +382,15 @@ class _GridCellInspectorDialogState
                     QueryaButton.ghost(
                       label: 'Format JSON',
                       icon: material.Icons.format_align_left_rounded,
-                      onPressed: _formatJson,
+                      loading: _busy,
+                      onPressed: _busy ? null : _formatJson,
                       size: QueryaControlSize.sm,
                     ),
                     const Gap(6),
                     QueryaButton.ghost(
                       label: 'Minify',
                       icon: material.Icons.compress_rounded,
-                      onPressed: _minifyJson,
+                      onPressed: _busy ? null : _minifyJson,
                       size: QueryaControlSize.sm,
                     ),
                     const Gap(6),
@@ -328,7 +399,8 @@ class _GridCellInspectorDialogState
                     QueryaButton.ghost(
                       label: 'Format XML',
                       icon: material.Icons.code_rounded,
-                      onPressed: _formatXml,
+                      loading: _busy,
+                      onPressed: _busy ? null : _formatXml,
                       size: QueryaControlSize.sm,
                     ),
                     const Gap(6),

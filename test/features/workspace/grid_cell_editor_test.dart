@@ -6,6 +6,7 @@ import 'package:querya_desktop/features/workspace/grid_cell_editor.dart';
 import 'package:querya_desktop/features/workspace/grid_cell_popover_inspector.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/features/workspace/result_grid_view.dart';
+import 'package:querya_desktop/shared/widgets/querya_spinner.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 import '../../support/querya_theme_test_shell.dart';
@@ -194,6 +195,89 @@ void main() {
       expect(result, isNotNull);
       expect(result!.contains('\n'), isTrue);
       expect(result!.contains('"name": "querya"'), isTrue);
+    });
+
+    group('text past the isolate threshold', () {
+      final saved = inspectorIsolateThreshold;
+      setUp(() => inspectorIsolateThreshold = 64);
+      tearDown(() => inspectorIsolateThreshold = saved);
+
+      // `compute` runs on a real isolate, which the fake-async test zone does
+      // not wait for: give it real time between pumps.
+      Future<void> waitUntil(
+        WidgetTester tester,
+        bool Function() done,
+      ) async {
+        for (var i = 0; i < 100 && !done(); i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 50)),
+          );
+          await tester.pump();
+        }
+      }
+
+      testWidgets('JSON is detected and formatted off the UI thread',
+          (tester) async {
+        final big =
+            '[${List.generate(12, (i) => '{"id":$i,"v":"xxxxxxxxxx"}').join(',')}]';
+        expect(big.length, greaterThan(inspectorIsolateThreshold));
+        String? result;
+
+        await tester.pumpWidget(
+          queryaThemeTestShell(
+            child: material.Builder(
+              builder: (context) => material.ElevatedButton(
+                onPressed: () async {
+                  result = await showGridCellInspectorDialog(
+                    context: context,
+                    columnName: 'metadata',
+                    initialValue: big,
+                    rowIndex: 0,
+                  );
+                },
+                child: const Text('Open Dialog'),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('Open Dialog'));
+        await tester.pumpAndSettle();
+
+        // The check runs on the worker; the button shows when it answers.
+        await waitUntil(tester, () => find.text('Format JSON').evaluate().isNotEmpty);
+        expect(find.text('Format JSON'), findsOneWidget);
+
+        await tester.tap(find.text('Format JSON'));
+        await tester.pump();
+        await waitUntil(tester, () => find.byType(QueryaSpinner).evaluate().isEmpty);
+
+        await tester.tap(find.text('Apply'));
+        await tester.pumpAndSettle();
+        expect(result, isNotNull);
+        expect(result!.contains('\n'), isTrue);
+        expect(result!.contains('"id": 11'), isTrue);
+      });
+
+      testWidgets('plain large text does not get JSON buttons', (tester) async {
+        await tester.pumpWidget(
+          queryaThemeTestShell(
+            child: material.Builder(
+              builder: (context) => material.ElevatedButton(
+                onPressed: () => showGridCellInspectorDialog(
+                  context: context,
+                  columnName: 'notes',
+                  initialValue: 'x' * 200,
+                ),
+                child: const Text('Open Dialog'),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('Open Dialog'));
+        await tester.pumpAndSettle();
+        expect(find.text('Format JSON'), findsNothing);
+        expect(find.text('Format XML'), findsNothing);
+      });
     });
 
     testWidgets('allows setting value to NULL in dialog', (tester) async {
