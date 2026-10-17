@@ -381,30 +381,40 @@ class _PreferencesShortcutsSectionState
             ),
           ),
           const material.SizedBox(width: 12),
-          material.Row(
-            mainAxisSize: material.MainAxisSize.min,
-            children: [
-              for (var c = 0; c < item.allKeys.length; c++) ...[
-                if (c > 0)
-                  material.Padding(
-                    padding: const material.EdgeInsets.symmetric(horizontal: 6),
-                    child: const Text('or').muted().xSmall(),
-                  ),
-                ..._keycaps(item.allKeys[c], theme),
+          material.Flexible(
+            child: material.Wrap(
+              alignment: material.WrapAlignment.end,
+              crossAxisAlignment: material.WrapCrossAlignment.center,
+              spacing: 4,
+              runSpacing: 4,
+              children: [
+                for (var c = 0; c < item.allKeys.length; c++) ...[
+                  if (c > 0)
+                    material.Padding(
+                      padding: const material.EdgeInsets.symmetric(horizontal: 4),
+                      child: const Text('or').muted().xSmall(),
+                    ),
+                  ..._keycaps(context, item.allKeys[c], theme),
+                ],
               ],
-            ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  List<material.Widget> _keycaps(List<String> keys, ThemeData theme) {
+  List<material.Widget> _keycaps(
+    BuildContext context,
+    List<String> keys,
+    ThemeData theme,
+  ) {
+    final wb = context.workbenchOrDefault;
     return [
       for (var j = 0; j < keys.length; j++) ...[
         if (j > 0)
           material.Padding(
-            padding: const material.EdgeInsets.symmetric(horizontal: 3),
+            padding: const material.EdgeInsets.symmetric(horizontal: 2),
             child: const Text('+').muted().xSmall(),
           ),
         material.Container(
@@ -413,14 +423,14 @@ class _PreferencesShortcutsSectionState
             vertical: 3,
           ),
           decoration: material.BoxDecoration(
-            color: theme.colorScheme.background,
+            color: wb.surface,
             borderRadius: material.BorderRadius.circular(4),
             border: material.Border.all(
               color: theme.colorScheme.border.withValues(alpha: 0.4),
             ),
             boxShadow: [
               material.BoxShadow(
-                color: material.Colors.black.withValues(alpha: 0.08),
+                color: wb.shadow.withValues(alpha: 0.12),
                 offset: const material.Offset(0, 1),
                 blurRadius: 1,
               ),
@@ -430,6 +440,7 @@ class _PreferencesShortcutsSectionState
             keys[j],
             style: material.TextStyle(
               fontFamily: QueryaTypography.mono,
+              fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
               fontSize: 11,
               fontWeight: material.FontWeight.w600,
               color: theme.colorScheme.foreground,
