@@ -1,0 +1,73 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/database/query_error_text.dart';
+
+void main() {
+  group('QueryErrorText (#1557)', () {
+    // The example from the issue, as sqflite_common_ffi prints it.
+    const sqlite =
+        'SqliteFfiException(sqlite_error: 1, , SqliteException(1): while preparing '
+        'statement, no such column: u.name, SQL logic error (code 1)\n'
+        '  Causing statement (at position 29): SELECT * FROM (\n'
+        'SELECT o.id, u.name FROM orders o JOIN users u ON u.id = o.user_id '
+        'ORDER BY o.id LIMIT 200\n'
+        ')\n'
+        'LIMIT 5000}) DatabaseException(SqliteException(1): while preparing '
+        'statement, no such column: u.name, SQL logic error (code 1)\n'
+        '  Causing statement (at position 29): SELECT * FROM (\n'
+        'SELECT o.id, u.name FROM orders o JOIN users u ON u.id = o.user_id '
+        'ORDER BY o.id LIMIT 200\n'
+        ')';
+
+    test('SQLite: the message alone, without the wrapper or its position', () {
+      final e = QueryErrorText.parse(sqlite);
+      expect(e.summary, 'no such column: u.name');
+      expect(e.hasDetail, isTrue);
+      expect(e.detail, isNot(contains('SELECT * FROM (')));
+      expect(e.detail, isNot(contains('LIMIT 5000')));
+      expect(e.detail, isNot(contains('at position')));
+      expect(e.detail, contains('ORDER BY o.id LIMIT 200'));
+      expect(e.detail, contains('no such column: u.name'));
+    });
+
+    test('PostgreSQL: the server message, without detail and hint', () {
+      final e = QueryErrorText.parse(
+        'Severity.error 42703: column "nme" does not exist hint: Perhaps you meant "name".',
+      );
+      expect(e.summary, 'column "nme" does not exist');
+      expect(e.detail, contains('hint: Perhaps'));
+    });
+
+    test('MySQL: the server message after the error code', () {
+      final e = QueryErrorText.parse(
+        "MySQLServerException [1054]: Unknown column 'nme' in 'field list'",
+      );
+      expect(e.summary, "Unknown column 'nme' in 'field list'");
+    });
+
+    test('anything else: its first line; one line has no extra detail', () {
+      final one = QueryErrorText.parse('connection refused');
+      expect(one.summary, 'connection refused');
+      expect(one.hasDetail, isFalse);
+
+      final two = QueryErrorText.parse('Exception: socket closed\nat line 3');
+      expect(two.summary, 'socket closed');
+      expect(two.hasDetail, isTrue);
+    });
+
+    test('text without the wrapper is left as it is', () {
+      const raw = 'SqliteException(1): while preparing statement, near "SELEC": '
+          'syntax error, SQL logic error (code 1)\n'
+          '  Causing statement (at position 0): SELEC 1';
+      final e = QueryErrorText.parse(raw);
+      expect(e.summary, 'near "SELEC": syntax error');
+      expect(e.detail, raw);
+    });
+
+    test('a very long message is cut in the summary only', () {
+      final long = 'x' * 1000;
+      final e = QueryErrorText.parse(long);
+      expect(e.summary.length, lessThan(320));
+      expect(e.detail, long);
+    });
+  });
+}

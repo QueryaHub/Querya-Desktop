@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/security/pii_masking_controller.dart';
 import 'package:querya_desktop/core/actions/data_grid_command_bridge.dart';
+import 'package:querya_desktop/core/database/query_error_text.dart';
 import 'package:querya_desktop/core/widgets/virtual_selectable_text_view.dart';
 import 'package:querya_desktop/features/results/charts/quick_chart_view.dart';
 import 'package:querya_desktop/features/workspace/data_grid_calc_bar.dart';
@@ -84,6 +85,10 @@ class ResultsTab extends material.StatefulWidget {
 }
 
 class _ResultsTabState extends material.State<ResultsTab> {
+  /// The driver text of a query error is folded away until asked for (#1557).
+  bool _showErrorDetails = false;
+  bool _errorCopied = false;
+
   /// Selection / focus state lives in notifiers so a navigation step rebuilds
   /// only the widgets that show it (toolbar, value panel, calc bar), not the
   /// whole tab and its grid.
@@ -249,6 +254,10 @@ class _ResultsTabState extends material.State<ResultsTab> {
 
   @override
   void didUpdateWidget(covariant ResultsTab oldWidget) {
+    if (oldWidget.errorMessage != widget.errorMessage) {
+      _showErrorDetails = false;
+      _errorCopied = false;
+    }
     super.didUpdateWidget(oldWidget);
     _syncGridBridge();
     if (!identical(oldWidget.rows, widget.rows) ||
@@ -379,6 +388,93 @@ class _ResultsTabState extends material.State<ResultsTab> {
     super.dispose();
   }
 
+  /// The driver's message as the headline, the rest (without the app's own
+  /// statement wrapping) behind "Show details", and a Copy button (#1557).
+  material.Widget _buildError(
+    material.BuildContext context,
+    QueryErrorText error,
+  ) {
+    final cs = Theme.of(context).colorScheme;
+    return material.Center(
+      key: const material.ValueKey('results_mode_error'),
+      child: material.Padding(
+        padding: const material.EdgeInsets.all(32),
+        child: material.Column(
+          mainAxisAlignment: material.MainAxisAlignment.center,
+          mainAxisSize: material.MainAxisSize.min,
+          children: [
+            material.Icon(
+              material.Icons.error_outline_rounded,
+              size: 48,
+              color: cs.destructive,
+            ),
+            const Gap(16),
+            const Text('Query Error').large().semiBold(),
+            const Gap(8),
+            material.SelectableText(
+              error.summary,
+              textAlign: material.TextAlign.center,
+              style: material.TextStyle(color: cs.foreground, fontSize: 14),
+            ),
+            if (error.hasDetail) ...[
+              const Gap(12),
+              material.Row(
+                mainAxisSize: material.MainAxisSize.min,
+                children: [
+                  QueryaButton.ghost(
+                    label: _showErrorDetails ? 'Hide details' : 'Show details',
+                    icon: _showErrorDetails
+                        ? material.Icons.expand_less_rounded
+                        : material.Icons.expand_more_rounded,
+                    size: QueryaControlSize.sm,
+                    onPressed: () => setState(
+                      () => _showErrorDetails = !_showErrorDetails,
+                    ),
+                  ),
+                  const Gap(6),
+                  QueryaButton.ghost(
+                    label: _errorCopied ? 'Copied' : 'Copy error',
+                    icon: _errorCopied
+                        ? material.Icons.check_rounded
+                        : material.Icons.copy_rounded,
+                    size: QueryaControlSize.sm,
+                    onPressed: () => unawaited(_copyError(error.detail)),
+                  ),
+                ],
+              ),
+            ],
+            if (error.hasDetail && _showErrorDetails) ...[
+              const Gap(8),
+              // A long driver message scrolls inside the space left, instead
+              // of pushing the column past the pane.
+              material.Flexible(
+                child: VirtualSelectableTextView(
+                  text: error.detail,
+                  style: material.TextStyle(
+                    color: cs.mutedForeground,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+            if (widget.errorAction != null) ...[
+              const Gap(16),
+              widget.errorAction!,
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _copyError(String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    setState(() => _errorCopied = true);
+    await Future<void>.delayed(const Duration(seconds: 2));
+    if (mounted) setState(() => _errorCopied = false);
+  }
+
   @override
   material.Widget build(material.BuildContext context) {
     if (widget.isLoading) {
@@ -392,41 +488,7 @@ class _ResultsTabState extends material.State<ResultsTab> {
     }
 
     if (widget.errorMessage != null) {
-      return material.Center(
-        key: const material.ValueKey('results_mode_error'),
-        child: material.Padding(
-          padding: const material.EdgeInsets.all(32),
-          child: material.Column(
-            mainAxisAlignment: material.MainAxisAlignment.center,
-            mainAxisSize: material.MainAxisSize.min,
-            children: [
-              material.Icon(
-                material.Icons.error_outline_rounded,
-                size: 48,
-                color: Theme.of(context).colorScheme.destructive,
-              ),
-              const Gap(16),
-              const Text('Query Error').large().semiBold(),
-              const Gap(8),
-              // A long driver message scrolls inside the space left, instead
-              // of pushing the column past the pane.
-              material.Flexible(
-                child: VirtualSelectableTextView(
-                  text: widget.errorMessage!,
-                  style: material.TextStyle(
-                    color: Theme.of(context).colorScheme.mutedForeground,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-              if (widget.errorAction != null) ...[
-                const Gap(16),
-                widget.errorAction!,
-              ],
-            ],
-          ),
-        ),
-      );
+      return _buildError(context, QueryErrorText.parse(widget.errorMessage!));
     }
 
     if (widget.columns.isEmpty && widget.rows.isEmpty && widget.stagingBuffer == null) {
