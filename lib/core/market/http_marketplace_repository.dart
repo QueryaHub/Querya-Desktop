@@ -225,7 +225,12 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
         if (file.isFile) {
           final outFile = File(targetPath);
           await outFile.create(recursive: true);
-          final bytes = file.content;
+          final Uint8List bytes;
+          try {
+            bytes = SafeZipExtractor.readEntry(file);
+          } on SafeZipException catch (error) {
+            throw MarketplaceException(error.message);
+          }
           await outFile.writeAsBytes(bytes);
           file.clear();
         } else {

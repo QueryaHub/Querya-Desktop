@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 
@@ -119,6 +120,24 @@ abstract final class SafeZipExtractor {
       return archive;
     } finally {
       await input.close();
+    }
+  }
+
+  /// The decoded bytes of [entry], from an archive returned by [decodeBytes]
+  /// or [readAndDecodeFile].
+  ///
+  /// The limits are checked against the sizes the zip headers declare. That
+  /// holds because the archive package (4.5.0+) refuses to decode an entry
+  /// past its declared size, so a header that understates it cannot inflate
+  /// to more than was checked (#1561). That refusal is a [SafeZipException].
+  static Uint8List readEntry(ArchiveFile entry) {
+    try {
+      return entry.content;
+    } on ArchiveException catch (error) {
+      throw SafeZipException(
+        'Archive entry "${entry.name}" is larger than its header declares '
+        '(${error.message}).',
+      );
     }
   }
 
