@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
+import 'package:querya_desktop/shared/widgets/querya_dialog_card.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 import '../../support/querya_theme_test_shell.dart';
@@ -329,6 +330,37 @@ void main() {
         selectableText.style?.color,
         QueryaTheme.lightDefault.colorScheme.foreground,
       );
+    });
+
+    testWidgets('fits a small window instead of running off it (#1642)',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(520, 420));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Builder(
+            builder: (context) => material.ElevatedButton(
+              onPressed: () => showDestructiveQueryDialog(
+                context: context,
+                result: DestructiveSqlDetector.inspect('DROP TABLE legacy_users;'),
+                sql: 'DROP TABLE legacy_users;',
+              ),
+              child: const material.Text('Open'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      final card = tester.getRect(find.byType(QueryaDialogCard));
+      expect(card.left, greaterThanOrEqualTo(0));
+      expect(card.top, greaterThanOrEqualTo(0));
+      expect(card.right, lessThanOrEqualTo(520));
+      expect(card.bottom, lessThanOrEqualTo(420));
+      expect(find.text('Execute Destructive Statement'), findsOneWidget);
     });
   });
 }

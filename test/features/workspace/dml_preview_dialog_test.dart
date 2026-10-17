@@ -184,5 +184,31 @@ void main() {
       final deleteText = tester.widget<Text>(find.text('1 DELETE'));
       expect(deleteText.style?.color, QueryaTheme.darkDefault.workbench.destructive);
     });
+
+    testWidgets('a long schema.table name is cut instead of overflowing (#1642)',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(640, 700));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final longName = 'very_long_table_name_' * 8;
+      final plan = TableMutationPlan(
+        dialect: SqlDialect.postgres,
+        tableName: longName,
+        schema: 'reporting_archive_schema',
+        statements: const [
+          TableMutationStatement(
+            type: MutationType.delete,
+            sql: 'DELETE FROM t WHERE "id" = 3',
+            description: 'Delete row 3',
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(buildTestDialog(plan: plan));
+      await tester.tap(find.text('Open Dialog'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('reporting_archive_schema.$longName'), findsOneWidget);
+    });
   });
 }
