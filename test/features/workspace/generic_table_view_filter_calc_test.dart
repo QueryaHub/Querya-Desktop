@@ -152,14 +152,26 @@ void main() {
   });
 
   group('calc bar', () {
-    testWidgets('shows aggregates for the selected cell', (tester) async {
+    testWidgets('shows aggregates for a numeric cell', (tester) async {
+      await pumpGenericTableView(tester, FakeTableDataDelegate());
+
+      await tester.tap(find.text('1').first);
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Count: '), findsOneWidget);
+    });
+
+    testWidgets('stays collapsed for a single text cell', (tester) async {
       await pumpGenericTableView(tester, FakeTableDataDelegate());
 
       await tester.tap(find.text('Alice'));
       await tester.pump(const Duration(milliseconds: 500));
       await tester.pumpAndSettle();
 
-      expect(find.text('Count: '), findsOneWidget);
+      // One non-numeric value has nothing to aggregate: the bar is collapsed
+      // and, since #1674, its content is not built at all.
+      expect(find.text('Count: '), findsNothing);
     });
   });
 }
