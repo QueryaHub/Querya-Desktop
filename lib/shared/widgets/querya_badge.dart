@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 
 /// Semantic status variant for [QueryaBadge.status].
 enum QueryaBadgeStatus {
@@ -203,7 +204,9 @@ class QueryaBadge extends material.StatelessWidget {
             style: material.TextStyle(
               fontSize: 10,
               fontWeight: material.FontWeight.w600,
-              fontFamily: isMonospace ? 'monospace' : null,
+              fontFamily: isMonospace ? QueryaTypography.mono : null,
+              fontFamilyFallback:
+                  isMonospace ? QueryaTypography.monoFontFamilyFallback : null,
               color: fg,
               letterSpacing: 0.3,
             ),

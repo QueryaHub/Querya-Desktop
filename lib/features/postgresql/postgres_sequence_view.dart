@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
@@ -214,7 +215,9 @@ class _PostgresSequenceViewState extends material.State<PostgresSequenceView> {
                     material.SelectableText(
                       d.lastValue,
                       style: material.TextStyle(
-                        fontFamily: 'monospace',
+                        fontFamily: QueryaTypography.mono,
+                        fontFamilyFallback:
+                            QueryaTypography.monoFontFamilyFallback,
                         fontSize: 16,
                         color: cs.foreground,
                       ),
@@ -245,7 +248,9 @@ class _PostgresSequenceViewState extends material.State<PostgresSequenceView> {
                       child: material.SelectableText(
                         d.ddl,
                         style: material.TextStyle(
-                          fontFamily: 'monospace',
+                          fontFamily: QueryaTypography.mono,
+                          fontFamilyFallback:
+                              QueryaTypography.monoFontFamilyFallback,
                           fontSize: 12,
                           height: 1.45,
                           color: cs.foreground,
@@ -276,7 +281,8 @@ class _PostgresSequenceViewState extends material.State<PostgresSequenceView> {
             child: material.SelectableText(
               v,
               style: material.TextStyle(
-                fontFamily: 'monospace',
+                fontFamily: QueryaTypography.mono,
+                fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
                 fontSize: 12,
                 color: cs.foreground,
               ),

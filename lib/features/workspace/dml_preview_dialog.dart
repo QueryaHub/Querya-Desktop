@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
@@ -270,7 +271,9 @@ class _DmlPreviewDialogState extends material.State<_DmlPreviewDialog> {
                     child: material.SelectableText(
                       sql,
                       style: material.TextStyle(
-                        fontFamily: 'monospace',
+                        fontFamily: QueryaTypography.mono,
+                        fontFamilyFallback:
+                            QueryaTypography.monoFontFamilyFallback,
                         fontSize: 12.5,
                         height: 1.45,
                         color: isDark

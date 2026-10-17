@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/redis_bulk.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
@@ -41,7 +42,8 @@ class RedisStringEditor extends material.StatelessWidget {
             bulk.toHex(),
             style: const material.TextStyle(
               fontSize: 13,
-              fontFamily: 'monospace',
+              fontFamily: QueryaTypography.mono,
+              fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
             ),
           ),
           const Gap(12),
@@ -51,7 +53,8 @@ class RedisStringEditor extends material.StatelessWidget {
             bulk.toBase64(),
             style: const material.TextStyle(
               fontSize: 13,
-              fontFamily: 'monospace',
+              fontFamily: QueryaTypography.mono,
+              fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
             ),
           ),
         ],
@@ -88,7 +91,8 @@ class RedisStringEditor extends material.StatelessWidget {
             maxLines: null,
             style: const material.TextStyle(
               fontSize: 13,
-              fontFamily: 'monospace',
+              fontFamily: QueryaTypography.mono,
+              fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
             ),
             decoration: const material.InputDecoration(
               border: material.InputBorder.none,

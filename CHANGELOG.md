@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Data Grid preferences: removed "Confirm DML staging applications"** — it changed the SQL destructive-query confirmation (DROP / TRUNCATE / DELETE) and controlled nothing else.
 - **About shows the real version** instead of a hardcoded 0.4.17.
 - **MCP Server pane** — MongoDB connections can be shared (the server already had MongoDB tools), type badges use product names, the `querya-mcp` path is on its own line, copying configs and regenerating the token are separate, and recent calls are rows with a status icon.
+- **One monospace font outside the result grid** — PostgreSQL, Redis and MongoDB views, the DML and destructive-query dialogs, the recovery screen, the welcome tour and monospace badges used the system's generic `monospace` family and looked different from the SQL editor; they now use the editor's font stack (#1633).
 
 ### Planned
 

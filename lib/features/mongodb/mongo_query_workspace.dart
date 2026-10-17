@@ -6,6 +6,7 @@ import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/editor/querya_code_editor.dart';
 import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/mongodb/mongo_documents_json_view.dart';
 import 'package:querya_desktop/features/mongodb/mongo_documents_table_view.dart';
 import 'package:querya_desktop/features/mongodb/mongo_query_executor.dart';
@@ -242,7 +243,9 @@ class _MongoQueryWorkspaceState extends material.State<MongoQueryWorkspace> {
                         maxLines: 2,
                         overflow: material.TextOverflow.ellipsis,
                         style: const material.TextStyle(
-                          fontFamily: 'monospace',
+                          fontFamily: QueryaTypography.mono,
+                          fontFamilyFallback:
+                              QueryaTypography.monoFontFamilyFallback,
                           fontSize: 12,
                         ),
                       ),
@@ -500,7 +503,8 @@ class _MongoQueryWorkspaceState extends material.State<MongoQueryWorkspace> {
               tab.error!,
               style: material.TextStyle(
                 color: cs.destructive,
-                fontFamily: 'monospace',
+                fontFamily: QueryaTypography.mono,
+                fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
                 fontSize: 12.5,
               ),
             ),

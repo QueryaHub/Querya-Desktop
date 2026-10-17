@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
@@ -273,7 +274,9 @@ class _DestructiveQueryDialogState
                       child: material.SelectableText(
                         widget.sql,
                         style: material.TextStyle(
-                          fontFamily: 'monospace',
+                          fontFamily: QueryaTypography.mono,
+                          fontFamilyFallback:
+                              QueryaTypography.monoFontFamilyFallback,
                           fontSize: 12.5,
                           height: 1.45,
                           color: isDark

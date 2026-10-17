@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/redis_bulk.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
     hide TextExtension;
@@ -161,7 +162,8 @@ class RedisScoredMemberRow extends StatelessWidget {
               member,
               style: material.TextStyle(
                 fontSize: 12,
-                fontFamily: 'monospace',
+                fontFamily: QueryaTypography.mono,
+                fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
                 color: colorScheme.foreground,
               ),
             ),

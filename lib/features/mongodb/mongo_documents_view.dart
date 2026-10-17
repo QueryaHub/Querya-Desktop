@@ -5,6 +5,7 @@ import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/mongodb/mongo_add_document_dialog.dart';
 import 'package:querya_desktop/features/mongodb/mongo_document_tree_view.dart';
 import 'package:querya_desktop/features/mongodb/mongo_documents_json_view.dart';
@@ -797,7 +798,9 @@ class _DocumentCardState extends State<_DocumentCard> {
                       maxLines: 1,
                       style: material.TextStyle(
                         fontSize: 12,
-                        fontFamily: 'monospace',
+                        fontFamily: QueryaTypography.mono,
+                        fontFamilyFallback:
+                            QueryaTypography.monoFontFamilyFallback,
                         color: scs.mutedForeground,
                       ),
                     ),
@@ -850,7 +853,8 @@ class MongoFieldList extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: material.TextStyle(
                   fontSize: 12,
-                  fontFamily: 'monospace',
+                  fontFamily: QueryaTypography.mono,
+                  fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
                   fontWeight: material.FontWeight.w600,
                   color: colorScheme.foreground,
                 ),
@@ -864,7 +868,8 @@ class MongoFieldList extends StatelessWidget {
                 maxLines: 1,
                 style: material.TextStyle(
                   fontSize: 12,
-                  fontFamily: 'monospace',
+                  fontFamily: QueryaTypography.mono,
+                  fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
                   color: shadcnCs.mutedForeground,
                 ),
               ),

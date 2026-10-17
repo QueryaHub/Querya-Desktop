@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/app/app.dart';
 import 'package:querya_desktop/core/storage/app_data_root.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:querya_desktop/core/ui/querya_icons.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -182,7 +183,9 @@ class _QueryaStartupRecoveryAppState
                         child: material.SelectableText(
                           widget.error.toString(),
                           style: const material.TextStyle(
-                            fontFamily: 'monospace',
+                            fontFamily: QueryaTypography.mono,
+                            fontFamilyFallback:
+                                QueryaTypography.monoFontFamilyFallback,
                             fontSize: 12,
                           ),
                         ),
