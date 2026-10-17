@@ -223,7 +223,7 @@ class _Swatch extends material.StatelessWidget {
             color: color,
             borderRadius: material.BorderRadius.circular(radius),
             border: material.Border.all(
-              color: material.Colors.black.withValues(alpha: 0.12),
+              color: Theme.of(context).colorScheme.border.withValues(alpha: 0.6),
             ),
           ),
         ),

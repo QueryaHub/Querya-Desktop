@@ -40,6 +40,25 @@ void main() {
       expect(find.text('Surface'), findsOneWidget);
       expect(find.text('Primary'), findsOneWidget);
       expect(find.text('Accent'), findsOneWidget);
+
+      // Verify swatch border uses theme border token with alpha
+      final containers = tester
+          .widgetList<material.Container>(find.byType(material.Container))
+          .where((c) {
+        final dec = c.decoration;
+        return dec is material.BoxDecoration && dec.border is material.Border;
+      }).toList();
+
+      final swatchBox = containers.firstWhere((c) {
+        final dec = c.decoration as material.BoxDecoration;
+        return dec.borderRadius == material.BorderRadius.circular(4);
+      });
+      final border =
+          (swatchBox.decoration as material.BoxDecoration).border as material.Border;
+      expect(
+        border.top.color,
+        QueryaTheme.darkDefault.colorScheme.border.withValues(alpha: 0.6),
+      );
     });
 
     testWidgets('shows loading state', (tester) async {
