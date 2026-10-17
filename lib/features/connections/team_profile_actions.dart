@@ -38,16 +38,21 @@ Future<void> importTeamProfile(BuildContext context) async {
   final file = await openFile(acceptedTypeGroups: const [_typeGroup]);
   if (file == null || !context.mounted) return;
   try {
-    final rows = TeamProfileCodec.decode(utf8.decode(await file.readAsBytes()));
-    final added = await TeamProfileCodec.importInto(LocalDb.instance, rows);
+    final read = TeamProfileCodec.read(utf8.decode(await file.readAsBytes()));
+    final added = await TeamProfileCodec.importInto(LocalDb.instance, read.rows);
     if (!context.mounted) return;
     QueryaCommandHost.maybeOf(context)?.onReloadConnections?.call();
     showAppToast(
       context: context,
-      message: added == 0
-          ? 'Nothing new to import'
-          : 'Imported $added connection(s). Enter passwords when connecting.',
-      variant: AppToastVariant.success,
+      message: [
+        added == 0
+            ? 'Nothing new to import'
+            : 'Imported $added connection(s). Enter passwords when connecting.',
+        if (read.skipped > 0)
+          '${read.skipped} entr${read.skipped == 1 ? 'y was' : 'ies were'} '
+              'unreadable and skipped.',
+      ].join(' '),
+      variant: read.skipped > 0 ? AppToastVariant.info : AppToastVariant.success,
     );
   } on TeamProfileFormatException catch (e) {
     if (!context.mounted) return;

@@ -22,8 +22,14 @@ class TeamProfileCodec {
   static const format = 'querya-team-profile';
   static const version = 1;
 
-  static final _secretKey =
-      RegExp(r'pass(word|phrase)?|secret|token|api_?key', caseSensitive: false);
+  /// Option and query-parameter names whose value is a secret (#1564). The
+  /// match is a substring of the key, case-insensitive: `privateKey`,
+  /// `private_key`, `accessKey`, `db_pwd`, `credentials`, `sig` are all caught.
+  static final _secretKey = RegExp(
+    r'pass(word|phrase)?|pwd|secret|token|api_?key|private_?key|access_?key|'
+    r'credential|signature',
+    caseSensitive: false,
+  );
 
   /// Serializes [connections] to profile JSON without any secret.
   static String encode(List<ConnectionRow> connections) {
@@ -95,7 +101,16 @@ class TeamProfileCodec {
   }
 
   /// Parses profile JSON into connection rows (no ids, no secrets).
-  static List<ConnectionRow> decode(String source, {DateTime? now}) {
+  static List<ConnectionRow> decode(String source, {DateTime? now}) =>
+      read(source, now: now).rows;
+
+  /// Like [decode], and says how many entries were left out because they were
+  /// not objects, had no type or name, or had a field of the wrong type (a
+  /// hand-edited or newer file), so the import can report it.
+  static ({List<ConnectionRow> rows, int skipped}) read(
+    String source, {
+    DateTime? now,
+  }) {
     final Object? doc;
     try {
       doc = jsonDecode(source);
@@ -116,30 +131,59 @@ class TeamProfileCodec {
     }
     final stamp = (now ?? DateTime.now()).toIso8601String();
     final rows = <ConnectionRow>[];
+    var skipped = 0;
     for (final item in list) {
-      if (item is! Map) continue;
+      if (item is! Map) {
+        skipped++;
+        continue;
+      }
       final type = item['type'];
       final name = item['name'];
-      if (type is! String || name is! String || name.trim().isEmpty) continue;
-      final options = item['driverOptions'];
-      final url = item['connectionString'];
+      if (type is! String || name is! String || name.trim().isEmpty) {
+        skipped++;
+        continue;
+      }
+      // A field that is present with the wrong type makes the whole entry
+      // unreadable: dropping just that field would import a connection that
+      // points somewhere else.
+      var unreadable = false;
+      T? field<T>(String key) {
+        final v = item[key];
+        if (v == null) return null;
+        if (v is T) return v;
+        unreadable = true;
+        return null;
+      }
+
+      final host = field<String>('host');
+      final port = field<int>('port');
+      final username = field<String>('username');
+      final databaseName = field<String>('databaseName');
+      final authSource = field<String>('authSource');
+      final extensionId = field<String>('extensionId');
+      final url = field<String>('connectionString');
+      final options = field<String>('driverOptions');
+      if (unreadable) {
+        skipped++;
+        continue;
+      }
       rows.add(ConnectionRow(
         type: type,
         name: name,
-        host: item['host'] as String?,
-        port: item['port'] as int?,
-        username: item['username'] as String?,
-        databaseName: item['databaseName'] as String?,
-        authSource: item['authSource'] as String?,
+        host: host,
+        port: port,
+        username: username,
+        databaseName: databaseName,
+        authSource: authSource,
         useSSL: item['useSSL'] == true,
         // Re-check on import: a hand-edited file must not smuggle secrets in.
-        connectionString: url is String ? _stripUrlCredentials(url) : null,
-        extensionId: item['extensionId'] as String?,
-        driverOptions: options is String ? _sanitizeOptions(options) : null,
+        connectionString: url == null ? null : _stripUrlCredentials(url),
+        extensionId: extensionId,
+        driverOptions: options == null ? null : _sanitizeOptions(options),
         createdAt: stamp,
       ));
     }
-    return rows;
+    return (rows: rows, skipped: skipped);
   }
 
   /// Imports [rows] into [db], skipping ones that already exist
