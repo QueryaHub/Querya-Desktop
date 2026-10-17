@@ -55,6 +55,12 @@ ConnectionRow _row(int id, String type, {String? env}) {
 }
 
 SqlExecutionResult _catalog(String sql) {
+  if (sql.contains('object_name')) {
+    return const SqlExecutionResult(columns: ['n'], rows: [
+      ['orders'],
+      ['users'],
+    ]);
+  }
   if (sql.contains('pg_indexes')) {
     return const SqlExecutionResult(columns: ['n', 'd'], rows: [
       ['users_pkey', 'CREATE UNIQUE INDEX users_pkey ON users (id)'],
@@ -226,7 +232,14 @@ void main() {
     group('views', () {
       setUp(() {
         db.onExecute = (sql) {
-          if (sql == ErdCatalog.viewColumnsSql(SqlDialect.postgres)) {
+          if (sql.contains('object_name')) {
+            return const SqlExecutionResult(columns: ['n'], rows: [
+              ['active_users'],
+              ['orders'],
+              ['users'],
+            ]);
+          }
+          if (sql.contains("relkind IN ('v', 'm')")) {
             return const SqlExecutionResult(columns: ['t', 'c', 'ty', 'pk'], rows: [
               ['active_users', 'id', 'integer', '0'],
               ['active_users', 'name', 'text', '0'],
@@ -270,6 +283,22 @@ void main() {
       final orders = await service().describeTable(1, 'ORDERS');
       expect(orders.name, 'orders');
       expect(orders.columns.last.references, 'users.id');
+    });
+
+    test('describeTable and sampleRows read only the table asked for (#1572)',
+        () async {
+      await service().describeTable(1, 'users');
+      final columnQueries =
+          db.executed.where((s) => s.contains('pg_attribute')).toList();
+      expect(columnQueries, isNotEmpty);
+      for (final q in columnQueries) {
+        expect(q, contains("AND c.relname IN ('users')"));
+      }
+
+      db.executed.clear();
+      await service().sampleRows(1, 'USERS', rows: 3);
+      expect(db.executed.where((s) => s.contains('pg_attribute')), isEmpty);
+      expect(db.executed.last, 'SELECT * FROM "users"');
     });
 
     test('an unknown table is an error and runs no table query', () async {

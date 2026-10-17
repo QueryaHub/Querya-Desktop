@@ -107,9 +107,10 @@ class McpQueryService {
     String table,
   ) {
     return _withDelegate(connectionId, (delegate, dialect) async {
-      final cat = await _loadCatalog(delegate, dialect);
+      final name = await _resolveTable(delegate, dialect, table);
+      final cat = await _loadCatalog(delegate, dialect, tables: [name]);
       final schema = cat.schema;
-      final t = _findTable(schema, table);
+      final t = _findTable(schema, name);
       if (cat.views.contains(t.name)) return _describe(schema, t, const []);
       final indexes = await _run(
         () => delegate.executeQuery(
@@ -162,11 +163,10 @@ class McpQueryService {
   }) {
     final n = rows.clamp(1, maxSampleRows);
     return _withDelegate(connectionId, (delegate, dialect) async {
-      final t =
-          _findTable((await _loadCatalog(delegate, dialect)).schema, table);
+      final name = await _resolveTable(delegate, dialect, table);
       final result = await _run(
         () => delegate.executeQuery(
-          'SELECT * FROM ${quoteIdentifier(t.name, dialect)}',
+          'SELECT * FROM ${quoteIdentifier(name, dialect)}',
           limit: n,
           timeout: timeout,
         ),
@@ -242,14 +242,19 @@ class McpQueryService {
 
   /// Tables and keys, then the views: a name that is already a table stays a
   /// table. Views have no keys and no indexes.
+  /// The catalog of the current schema or database; with [tables], of those
+  /// tables only (#1572).
   Future<({ErdSchema schema, Set<String> views})> _loadCatalog(
     SqlQueryRunner delegate,
-    SqlDialect dialect,
-  ) async {
-    final base = await _loadSchema(delegate, dialect);
+    SqlDialect dialect, {
+    Iterable<String>? tables,
+  }) async {
+    final base = await _loadSchema(delegate, dialect, tables: tables);
     final viewRows = await _run(
-      () => delegate.executeQuery(ErdCatalog.viewColumnsSql(dialect),
-          limit: _catalogRows, timeout: timeout),
+      () => delegate.executeQuery(
+          ErdCatalog.viewColumnsSql(dialect, tables: tables),
+          limit: _catalogRows,
+          timeout: timeout),
       dialect,
     );
     final known = {for (final t in base.tables) t.name};
@@ -271,11 +276,14 @@ class McpQueryService {
 
   Future<ErdSchema> _loadSchema(
     SqlQueryRunner delegate,
-    SqlDialect dialect,
-  ) async {
+    SqlDialect dialect, {
+    Iterable<String>? tables,
+  }) async {
     final cols = await _run(
-      () => delegate.executeQuery(ErdCatalog.columnsSql(dialect),
-          limit: _catalogRows, timeout: timeout),
+      () => delegate.executeQuery(
+          ErdCatalog.columnsSql(dialect, tables: tables),
+          limit: _catalogRows,
+          timeout: timeout),
       dialect,
     );
     final fks = await _run(
@@ -288,6 +296,31 @@ class McpQueryService {
 
   /// Exact name first, then a unique case-insensitive match. The table must
   /// exist in the catalog, so model input never reaches SQL unchecked.
+  /// The catalog's name for [name]: the exact one, else the only one that
+  /// matches ignoring case. Reads the names only, not the whole catalog: one
+  /// table's description or sample no longer loads every column (#1572).
+  Future<String> _resolveTable(
+    SqlQueryRunner delegate,
+    SqlDialect dialect,
+    String name,
+  ) async {
+    final result = await _run(
+      () => delegate.executeQuery(ErdCatalog.tableNamesSql(dialect),
+          limit: _catalogRows, timeout: timeout),
+      dialect,
+    );
+    final names = [
+      for (final r in result.rows)
+        if (r.isNotEmpty) r.first,
+    ];
+    if (names.contains(name)) return name;
+    final lower = name.toLowerCase();
+    final loose = names.where((n) => n.toLowerCase() == lower).toList();
+    if (loose.length == 1) return loose.single;
+    throw McpToolException(
+        'Table "$name" not found. Call list_tables to see the available tables.');
+  }
+
   ErdTable _findTable(ErdSchema schema, String name) {
     final exact = schema.tables.where((t) => t.name == name);
     if (exact.isNotEmpty) return exact.first;

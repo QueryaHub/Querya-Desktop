@@ -33,6 +33,11 @@ ErdSchema sample() => ErdSchema.fromCatalog(
       ],
     );
 
+/// [sql] without the table-name filter `columnsSql(tables: ...)` adds, so a
+/// fake can recognise the catalog query whatever tables it asks for.
+String _unfiltered(String sql) => sql.replaceAll(
+    RegExp(r"\n  AND (c\.relname|c\.table_name|m\.name) IN \([^)]*\)"), '');
+
 void main() {
   group('ErdSchema.fromCatalog', () {
     test('marks PK/FK and drops relations to unknown tables', () {
@@ -148,7 +153,7 @@ void main() {
     test('loadNeighbourhood loads only the tables around the one asked for',
         () async {
       final delegate = FakeSqlExecutionDelegate(onExecute: (sql) {
-        if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+        if (_unfiltered(sql) == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
           return const SqlExecutionResult(rows: [
             ['a', 'id', 'INTEGER', '1'],
             ['b', 'id', 'INTEGER', '1'],
@@ -181,7 +186,7 @@ void main() {
             ['users', 'org_id', 'orgs', 'id'],
           ]);
         }
-        if (sql == ErdCatalog.columnsSql(SqlDialect.postgres)) {
+        if (_unfiltered(sql) == ErdCatalog.columnsSql(SqlDialect.postgres)) {
           return const SqlExecutionResult(rows: [
             ['users', 'id', 'integer', '1'],
             ['users', 'org_id', 'integer', '0'],
@@ -205,7 +210,7 @@ void main() {
 
     test('a PostgreSQL table with no keys is found by its columns', () async {
       final delegate = FakeSqlExecutionDelegate(onExecute: (sql) {
-        if (sql == ErdCatalog.columnsSql(SqlDialect.postgres, schema: 'public')) {
+        if (_unfiltered(sql) == ErdCatalog.columnsSql(SqlDialect.postgres, schema: 'public')) {
           return const SqlExecutionResult(rows: [
             ['lonely', 'id', 'integer', '1'],
             ['other', 'id', 'integer', '1'],
@@ -230,13 +235,13 @@ void main() {
             ['sales.orders', 'customer_id', 'customers', 'id'],
           ]);
         }
-        if (sql == ErdCatalog.columnsSql(SqlDialect.postgres, schema: 'sales')) {
+        if (_unfiltered(sql) == ErdCatalog.columnsSql(SqlDialect.postgres, schema: 'sales')) {
           return const SqlExecutionResult(rows: [
             ['sales.orders', 'id', 'integer', '1'],
             ['sales.orders', 'customer_id', 'integer', '0'],
           ]);
         }
-        if (sql == ErdCatalog.columnsSql(SqlDialect.postgres)) {
+        if (_unfiltered(sql) == ErdCatalog.columnsSql(SqlDialect.postgres)) {
           return const SqlExecutionResult(rows: [
             ['customers', 'id', 'integer', '1'],
             ['users', 'id', 'integer', '1'],
@@ -253,9 +258,66 @@ void main() {
       expect(s.relations, hasLength(1));
     });
 
+    test('the neighbourhood asks only for its tables (#1572)', () async {
+      final asked = <String>[];
+      final delegate = FakeSqlExecutionDelegate(onExecute: (sql) {
+        if (sql == ErdCatalog.foreignKeysSql(SqlDialect.sqlite)) {
+          return const SqlExecutionResult(rows: [
+            ['b', 'a_id', 'a', 'id'],
+          ]);
+        }
+        asked.add(sql);
+        return const SqlExecutionResult();
+      });
+      await ErdCatalog.loadNeighbourhood(delegate, SqlDialect.sqlite, table: 'a');
+      expect(asked.single, contains("AND m.name IN ('a', 'b')"));
+    });
+
+    test('a schema larger than the row limit does not lose the tables asked for',
+        () async {
+      // The whole-schema query is cut at the row limit before `target`; the
+      // filtered one returns it.
+      final delegate = FakeSqlExecutionDelegate(onExecute: (sql) {
+        if (sql.contains("m.name IN ('target')")) {
+          return const SqlExecutionResult(rows: [
+            ['target', 'id', 'INTEGER', '1'],
+            ['target', 'name', 'TEXT', '0'],
+          ]);
+        }
+        if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+          return SqlExecutionResult(
+            isTruncated: true,
+            rows: [for (var i = 0; i < 100; i++) ['t$i', 'id', 'INTEGER', '1']],
+          );
+        }
+        return const SqlExecutionResult();
+      });
+      final s = await ErdCatalog.loadNeighbourhood(
+        delegate,
+        SqlDialect.sqlite,
+        table: 'target',
+      );
+      expect(s.tables.single.columns.map((c) => c.name), ['id', 'name']);
+      expect(s.truncated, isFalse);
+    });
+
+    test('columnsSql filters by table name in every dialect', () {
+      expect(
+        ErdCatalog.columnsSql(SqlDialect.postgres, schema: 'sales', tables: ["o'rders"]),
+        allOf(contains("nspname = 'sales'"), contains("AND c.relname IN ('o''rders')")),
+      );
+      expect(ErdCatalog.columnsSql(SqlDialect.mysql, tables: ['a', 'b']),
+          contains("AND c.table_name IN ('a', 'b')"));
+      expect(ErdCatalog.viewColumnsSql(SqlDialect.sqlite, tables: ['v']),
+          contains("AND m.name IN ('v')"));
+      expect(ErdCatalog.columnsSql(SqlDialect.sqlite, tables: const []),
+          contains('AND 1 = 0'));
+      expect(ErdCatalog.columnsSql(SqlDialect.sqlite), isNot(contains(' IN (')));
+    });
+
     test('load runs both queries through the delegate', () async {
       final delegate = FakeSqlExecutionDelegate(onExecute: (sql) {
-        if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+        if (_unfiltered(sql) == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
           return const SqlExecutionResult(rows: [
             ['a', 'id', 'INTEGER', '1'],
           ]);
@@ -655,7 +717,7 @@ void main() {
   group('ErdView', () {
     FakeSqlExecutionDelegate delegate() =>
         FakeSqlExecutionDelegate(onExecute: (sql) {
-          if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+          if (_unfiltered(sql) == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
             return const SqlExecutionResult(rows: [
               ['users', 'id', 'INTEGER', '1'],
               ['orders', 'user_id', 'INTEGER', '0'],
@@ -902,7 +964,7 @@ void main() {
         (t) async {
       await t.binding.setSurfaceSize(const material.Size(1200, 800));
       final wide = FakeSqlExecutionDelegate(onExecute: (sql) {
-        if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+        if (_unfiltered(sql) == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
           return SqlExecutionResult(rows: [
             for (var i = 0; i < 20; i++) ['t$i', 'id', 'INTEGER', '1'],
             ['child', 'id', 'INTEGER', '1'],
@@ -1051,7 +1113,7 @@ void main() {
         (t) async {
       await t.binding.setSurfaceSize(const material.Size(1200, 800));
       final junction = FakeSqlExecutionDelegate(onExecute: (sql) {
-        if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+        if (_unfiltered(sql) == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
           return const SqlExecutionResult(rows: [
             ['orders', 'id', 'INTEGER', '1'],
             ['order_items', 'order_id', 'INTEGER', '1'],
@@ -1087,7 +1149,7 @@ void main() {
     /// users <- orders; lonely has no relation.
     FakeSqlExecutionDelegate threeTables() =>
         FakeSqlExecutionDelegate(onExecute: (sql) {
-          if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+          if (_unfiltered(sql) == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
             return const SqlExecutionResult(rows: [
               ['users', 'id', 'INTEGER', '1'],
               ['orders', 'id', 'INTEGER', '1'],
@@ -1180,7 +1242,7 @@ void main() {
     testWidgets('a large diagram fits the viewport on first load', (t) async {
       await t.binding.setSurfaceSize(const material.Size(1200, 800));
       final tall = FakeSqlExecutionDelegate(onExecute: (sql) {
-        if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+        if (_unfiltered(sql) == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
           return SqlExecutionResult(rows: [
             for (final table in ['a', 'b', 'c'])
               for (var i = 0; i < 400; i++) [table, 'col$i', 'INTEGER', '0'],
@@ -1244,7 +1306,7 @@ void main() {
       await t.binding.setSurfaceSize(const material.Size(1200, 800));
       String? opened;
       final sales = FakeSqlExecutionDelegate(onExecute: (sql) {
-        if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+        if (_unfiltered(sql) == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
           return const SqlExecutionResult(rows: [
             ['sales.orders', 'id', 'INTEGER', '1'],
           ]);
@@ -1335,7 +1397,7 @@ void main() {
         (t) async {
       await t.binding.setSurfaceSize(const material.Size(1200, 800));
       final wide = FakeSqlExecutionDelegate(onExecute: (sql) {
-        if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+        if (_unfiltered(sql) == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
           return const SqlExecutionResult(rows: [
             ['users', 'id', 'INTEGER', '1'],
             ['orders', 'id', 'INTEGER', '1'],
@@ -1414,7 +1476,7 @@ void main() {
 
     test('a cut catalog is reported as truncated', () async {
       final delegate = FakeSqlExecutionDelegate(onExecute: (sql) {
-        if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+        if (_unfiltered(sql) == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
           return const SqlExecutionResult(
             rows: [
               ['users', 'id', 'INTEGER', '1'],
