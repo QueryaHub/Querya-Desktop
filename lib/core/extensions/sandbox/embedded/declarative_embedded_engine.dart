@@ -138,8 +138,9 @@ class DeclarativeEmbeddedEngine implements EmbeddedSandboxEngine {
     // Blanks and `;` are laid out in code only: a literal, quoted identifier
     // or comment keeps every character it was written with (#1567).
     final out = StringBuffer();
-    for (final segment in SqlLexicalScanner.segments(sql)) {
-      final text = sql.substring(segment.start, segment.end);
+    final source = sql.trim();
+    for (final segment in SqlLexicalScanner.segments(source)) {
+      final text = source.substring(segment.start, segment.end);
       out.write(
         segment.kind == SqlSegmentKind.code
             ? text
@@ -148,7 +149,7 @@ class DeclarativeEmbeddedEngine implements EmbeddedSandboxEngine {
             : text,
       );
     }
-    final laidOut = out.toString().trim();
+    final laidOut = out.toString();
     return EmbeddedInvokeResult.success(
       module['uppercaseKeywords'] != false
           ? formatSqlScript(laidOut)

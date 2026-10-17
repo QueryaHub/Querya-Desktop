@@ -59,6 +59,37 @@ void main() {
       expect(result.value, 'SELECT * FROM users WHERE id=1;\n');
     });
 
+    test('sql.format leaves literals, quoted identifiers and comments alone (#1567)',
+        () async {
+      final result = await engine.invoke(
+        const EmbeddedInvokeRequest(
+          method: EmbeddedInvokeMethod.sqlFormat,
+          source: '{"kind":"sql.format"}',
+          args: {
+            'sql': "select  'a  b; order by',  \"select\"  from t -- from  x\n"
+                'where  id=1;',
+          },
+        ),
+      );
+      expect(result.ok, isTrue);
+      expect(
+        result.value,
+        "SELECT 'a  b; order by', \"select\" FROM t -- from  x\n"
+        'WHERE id=1;\n',
+      );
+    });
+
+    test('sql.format can leave keyword case alone', () async {
+      final result = await engine.invoke(
+        const EmbeddedInvokeRequest(
+          method: EmbeddedInvokeMethod.sqlFormat,
+          source: '{"kind":"sql.format","uppercaseKeywords":false}',
+          args: {'sql': 'select  1'},
+        ),
+      );
+      expect(result.value, 'select 1');
+    });
+
     test('generates hints filtered by prefix', () async {
       const source = '''
 {
@@ -94,6 +125,37 @@ void main() {
       final ast = result.value! as Map;
       expect(ast['statement'], 'UPDATE');
       expect(ast['dialect'], 'postgresql');
+    });
+
+    test('sql.parse reads the statement after leading comments (#1567)',
+        () async {
+      final result = await engine.invoke(
+        const EmbeddedInvokeRequest(
+          method: EmbeddedInvokeMethod.sqlParse,
+          source: '{"kind":"sql.parse"}',
+          args: {'sql': '-- note\n/* more */ select 1'},
+        ),
+      );
+      expect((result.value! as Map)['statement'], 'SELECT');
+    });
+
+    test('JSONC modules keep // and /* inside strings, allow trailing commas (#1567)',
+        () async {
+      final result = await engine.invoke(
+        const EmbeddedInvokeRequest(
+          method: EmbeddedInvokeMethod.sqlParse,
+          source: '''
+{
+  // comment
+  "kind": "sql.parse",
+  "homepage": "https://example.com/*not a comment*/",
+  "dialect": "pg", /* block */
+}''',
+          args: {'sql': 'select 1'},
+        ),
+      );
+      expect(result.ok, isTrue);
+      expect((result.value! as Map)['dialect'], 'pg');
     });
   });
 
