@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/workspace/grid_data_type_validator.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
@@ -188,6 +189,7 @@ class _GridCellEditorState extends material.State<GridCellEditor> {
                 style: const material.TextStyle(
                   fontSize: 12,
                   fontFamily: 'monospace',
+                  fontFamilyFallback: QueryaTypography.cjkFontFamilyFallback,
                 ),
                 decoration: const material.InputDecoration(
                   border: material.InputBorder.none,

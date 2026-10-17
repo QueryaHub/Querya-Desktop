@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 import 'package:querya_desktop/features/workspace/grid_groupings_engine.dart';
 import 'package:querya_desktop/features/workspace/result_grid_view.dart';
@@ -320,6 +321,8 @@ class _DataGridGroupingsViewState
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
                                 fontFamily: 'monospace',
+                                fontFamilyFallback:
+                                    QueryaTypography.cjkFontFamilyFallback,
                               ),
                             ),
                           ),
