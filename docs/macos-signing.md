@@ -102,12 +102,12 @@ Go to **Settings → Secrets and variables → Actions → New repository secret
 - Creates a temporary keychain in the runner.
 - Imports the Developer ID certificate.
 - Signs nested frameworks, dylibs, and the main `.app` bundle with the **Hardened Runtime**.
-- Applies entitlements from `macos/Runner/Release.entitlements`.
+- Applies entitlements from `macos/Runner/ReleaseSigned.entitlements`.
 - Submits the app to Apple **notarytool**, waits for approval.
 - **Staples** the notarization ticket to the `.app` so it works offline.
-- The final zip is then produced from the signed/stapled bundle. The signing step uses `macos/Runner/ReleaseSigned.entitlements` (hardened runtime, no sandbox), while the default `macos/Runner/Release.entitlements` is left untouched for unsigned builds.
+- The final zip is then produced from the signed/stapled bundle.
 
-If the secrets are **not** set, the step is skipped and the zip is built exactly as before (unsigned). This keeps the release workflow safe for forks and local testing.
+If the secrets are **not** set, the step is skipped and the zip ships the build as Xcode made it: ad-hoc signed with `macos/Runner/ReleaseUnsigned.entitlements`. That build has no App Sandbox either, so it behaves like the signed one and only Gatekeeper treats it differently. A step after the build fails the release if the App Sandbox entitlement ever comes back.
 
 ---
 
@@ -130,10 +130,12 @@ If all three commands report success, the app should open with a normal double-c
 
 ## Entitlements
 
-Two entitlement files are kept side by side:
+Two entitlement files are kept side by side; neither enables the **App Sandbox** (#1592):
 
-- `macos/Runner/Release.entitlements` — the original Flutter default, kept as-is for **unsigned** builds.
-- `macos/Runner/ReleaseSigned.entitlements` — used only when the CI signs the app. It disables the **App Sandbox** (the app needs arbitrary network, file picker, and `~/.querya` access) and enables **Hardened Runtime** exceptions for Flutter/Dart (`allow-jit`, `allow-unsigned-executable-memory`, `disable-library-validation`).
+- `macos/Runner/ReleaseUnsigned.entitlements` — the Xcode Release configuration: local release builds and releases built without the signing secrets (ad-hoc signed). Inside the sandbox `HOME` would be the app's container, so `~/.querya`, `~/.ssh`, saved SQLite paths, `sandbox-exec` for extensions, the MCP endpoint file and the in-app updater would not work.
+- `macos/Runner/ReleaseSigned.entitlements` — used only when the CI signs the app with Developer ID. It enables **Hardened Runtime** exceptions for Flutter/Dart (`allow-jit`, `allow-unsigned-executable-memory`, `disable-library-validation`).
+
+Debug and Profile builds still use `DebugProfile.entitlements`, the Flutter default with the sandbox.
 
 If you later add plugins that require microphone, camera, or other protected resources, add the corresponding hardened-runtime and/or sandbox entitlements to `ReleaseSigned.entitlements` and re-sign.
 

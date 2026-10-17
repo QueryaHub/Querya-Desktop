@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+		Release builds as Xcode makes them: ad-hoc signed, which is what ships
+		when the CI has no Developer ID secrets (forks, unsigned releases) and
+		what a local Flutter release build produces. The CI's signed
+		path re-signs with ReleaseSigned.entitlements instead.
+
+		No App Sandbox, like the signed build, so the two differ only in
+		Gatekeeper (#1592). Sandboxed, HOME is the app's container: ~/.querya,
+		~/.ssh and saved SQLite paths are out of reach, extensions cannot be
+		run under sandbox-exec, querya-mcp does not find the endpoint file and
+		the updater cannot replace the app.
+	-->
+</dict>
+</plist>
