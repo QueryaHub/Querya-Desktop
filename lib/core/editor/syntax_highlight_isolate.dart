@@ -212,17 +212,38 @@ FontWeight? _fontWeightFromValue(int? value) {
   return null;
 }
 
+/// Token styles built for [_cachedBase] (#1543). A theme has a handful of
+/// distinct token looks, but a document has hundreds of tokens, and the spans
+/// are rebuilt on every keystroke: the styles are made once per base style and
+/// shared by every segment that looks the same.
+const Object _noBase = Object();
+Object? _cachedBase = _noBase;
+final Map<int, TextStyle> _tokenStyles = <int, TextStyle>{};
+const int _maxTokenStyles = 256;
+
 TextStyle? _styleFromSegment(HighlightSegment s, TextStyle? base) {
-  if (s.colorArgb == null &&
-      s.fontWeightValue == null &&
-      s.fontStyleIndex == null) {
+  final argb = s.colorArgb;
+  final weight = s.fontWeightValue;
+  final fontStyle = s.fontStyleIndex;
+  if (argb == null && weight == null && fontStyle == null) {
     return null;
   }
-  return (base ?? const TextStyle()).copyWith(
-    color: s.colorArgb != null ? Color(s.colorArgb!) : null,
-    fontWeight: _fontWeightFromValue(s.fontWeightValue),
-    fontStyle:
-        s.fontStyleIndex != null ? FontStyle.values[s.fontStyleIndex!] : null,
+  if (!identical(_cachedBase, base)) {
+    _cachedBase = base;
+    _tokenStyles.clear();
+  } else if (_tokenStyles.length >= _maxTokenStyles) {
+    _tokenStyles.clear();
+  }
+  // Colour 32 bits, +1 bit "has a colour", weight 100..900 as 0..9, style as
+  // 0 (none) or index + 1.
+  final key = (argb ?? 0) |
+      ((argb != null ? 1 : 0) << 32) |
+      (((weight ?? 0) ~/ 100) << 33) |
+      ((fontStyle != null ? fontStyle + 1 : 0) << 37);
+  return _tokenStyles[key] ??= (base ?? const TextStyle()).copyWith(
+    color: argb != null ? Color(argb) : null,
+    fontWeight: _fontWeightFromValue(weight),
+    fontStyle: fontStyle != null ? FontStyle.values[fontStyle] : null,
   );
 }
 
