@@ -354,6 +354,27 @@ void main() {
       expect(await AppSettings.instance.getSelectedThemeId(), isNull);
     });
 
+    test(
+        'setThemeMode clears conflicting registry selection and aligns preset (#1577)',
+        () async {
+      final c = ThemeController.instance;
+      await _copyFixture(
+        'querya_custom_dark.json',
+        File(p.join(themesDir.path, 'querya_custom_dark.json')),
+      );
+      await c.load();
+      await c.setThemeById('fixture-custom-dark');
+      expect(c.selectedThemeId, 'fixture-custom-dark');
+      expect(c.activeTheme.brightness, Brightness.dark);
+
+      await c.setThemeMode(ThemeMode.light);
+
+      expect(c.selectedThemeId, isNull);
+      expect(c.activeTheme, QueryaTheme.lightDefault);
+      expect(c.preset, QueryaThemePreset.queryaLight);
+      expect(await AppSettings.instance.getSelectedThemeId(), isNull);
+    });
+
     test('setThemeById applies built-in asset theme from registry', () async {
       final c = ThemeController.instance;
       await c.load();

@@ -6,7 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/features/workspace/generic_sql_workspace.dart';
+import 'package:querya_desktop/features/workspace/sql_workspace_toolbar.dart';
 
 import '../../support/fake_sql_execution_delegate.dart';
 import '../../support/local_db_test_support.dart';
@@ -252,6 +254,60 @@ void main() {
     delegate.gate!.complete();
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 100)),
+    );
+  });
+
+  testWidgets(
+      'updates toolbar background when theme switches between dark and light (#1577)',
+      timeout: _timeout, (tester) async {
+    final delegate = FakeSqlExecutionDelegate();
+    await tester.binding.setSurfaceSize(const material.Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    material.Widget buildWithTheme(QueryaTheme theme) {
+      return queryaThemeTestShell(
+        data: theme,
+        child: material.SizedBox.expand(
+          child: GenericSqlWorkspace(
+            connectionRow: connection,
+            delegate: delegate,
+            dialect: SqlDialect.sqlite,
+          ),
+        ),
+      );
+    }
+
+    // 1. Initial dark theme mount
+    await tester.pumpWidget(buildWithTheme(QueryaTheme.darkDefault));
+    await tester.pumpAndSettle();
+
+    final toolbarFinder = find.byType(SqlWorkspaceToolbar);
+    expect(toolbarFinder, findsOneWidget);
+
+    material.BoxDecoration getToolbarDecoration() {
+      final container = tester.widget<material.Container>(
+        find
+            .ancestor(
+              of: toolbarFinder,
+              matching: find.byType(material.Container),
+            )
+            .first,
+      );
+      return container.decoration! as material.BoxDecoration;
+    }
+
+    expect(
+      getToolbarDecoration().color,
+      QueryaTheme.darkDefault.workbench.surface,
+    );
+
+    // 2. Switch to light theme
+    await tester.pumpWidget(buildWithTheme(QueryaTheme.lightDefault));
+    await tester.pumpAndSettle();
+
+    expect(
+      getToolbarDecoration().color,
+      QueryaTheme.lightDefault.workbench.surface,
     );
   });
 }

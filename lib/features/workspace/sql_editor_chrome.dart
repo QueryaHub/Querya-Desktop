@@ -26,7 +26,7 @@ class SqlEditorChrome extends StatelessWidget {
   ) {
     final workbench = context.workbench;
     return material.BoxDecoration(
-      color: workbench.surface.withValues(alpha: 0.85),
+      color: workbench.surface,
       border: material.Border(
         bottom: material.BorderSide(
           color: workbench.borderSubtle.withValues(alpha: 0.35),

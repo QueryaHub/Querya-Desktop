@@ -37,6 +37,8 @@ import 'package:querya_desktop/features/workspace/sql_query_tab_session.dart';
 import 'package:querya_desktop/features/workspace/sql_result_grid_schema.dart';
 import 'package:querya_desktop/features/workspace/table_view_staging.dart';
 import 'package:querya_desktop/features/workspace/sql_workspace_toolbar.dart';
+import 'package:querya_desktop/core/theme/querya_theme.dart';
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Reusable base SQL workspace supporting multi-tab editing, statement execution,
@@ -168,6 +170,18 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
     if (oldWidget.isReadOnly != widget.isReadOnly) {
       invalidateAllPanes();
     }
+  }
+
+  QueryaTheme? _lastTheme;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final theme = QueryaThemeScope.maybeOf(context);
+    if (_lastTheme != null && _lastTheme != theme) {
+      invalidateAllPanes();
+    }
+    _lastTheme = theme;
   }
 
   SqlExecutionDelegate? _catalogDelegate;
@@ -1271,9 +1285,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       top: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          material.Container(
-            padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: SqlEditorChrome.sqlToolbarDecoration(context),
+          _SqlWorkspaceToolbarContainer(
             child: SqlWorkspaceToolbar(
               session: session,
               delegate: widget.delegate,
@@ -1355,6 +1367,21 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SqlWorkspaceToolbarContainer extends StatelessWidget {
+  const _SqlWorkspaceToolbarContainer({required this.child});
+
+  final material.Widget child;
+
+  @override
+  material.Widget build(material.BuildContext context) {
+    return material.Container(
+      padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: SqlEditorChrome.sqlToolbarDecoration(context),
+      child: child,
     );
   }
 }

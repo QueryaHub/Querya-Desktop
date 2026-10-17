@@ -139,4 +139,52 @@ void main() {
       expect(outerGlow, const Color(0xFF00FFEE).withValues(alpha: 0.1));
     });
   });
+
+  group('SqlEditorChrome.sqlToolbarDecoration', () {
+    testWidgets('uses solid surface and subtle border in dark theme',
+        (tester) async {
+      late material.BoxDecoration deco;
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          data: QueryaTheme.darkDefault,
+          child: material.Builder(
+            builder: (context) {
+              deco = SqlEditorChrome.sqlToolbarDecoration(context);
+              return const material.SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+      expect(deco.color, QueryaTheme.darkDefault.workbench.surface);
+      final border = deco.border as Border?;
+      expect(
+        border?.bottom.color,
+        QueryaTheme.darkDefault.workbench.borderSubtle
+            .withValues(alpha: 0.35),
+      );
+    });
+
+    testWidgets('uses solid surface and subtle border in light theme',
+        (tester) async {
+      late material.BoxDecoration deco;
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          data: QueryaTheme.lightDefault,
+          child: material.Builder(
+            builder: (context) {
+              deco = SqlEditorChrome.sqlToolbarDecoration(context);
+              return const material.SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+      expect(deco.color, QueryaTheme.lightDefault.workbench.surface);
+      final border = deco.border as Border?;
+      expect(
+        border?.bottom.color,
+        QueryaTheme.lightDefault.workbench.borderSubtle
+            .withValues(alpha: 0.35),
+      );
+    });
+  });
 }
