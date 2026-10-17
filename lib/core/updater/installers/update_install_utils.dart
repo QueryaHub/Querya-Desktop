@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
@@ -43,7 +44,13 @@ Future<void> extractZipSecurely({
     if (entry.isFile) {
       final out = File(targetPath);
       await out.parent.create(recursive: true);
-      await out.writeAsBytes(entry.content as List<int>);
+      final Uint8List bytes;
+      try {
+        bytes = SafeZipExtractor.readEntry(entry);
+      } on SafeZipException catch (error) {
+        throw AppUpdaterException(error.message);
+      }
+      await out.writeAsBytes(bytes);
     } else {
       await Directory(targetPath).create(recursive: true);
     }
