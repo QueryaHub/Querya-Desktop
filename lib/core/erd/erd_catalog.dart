@@ -26,7 +26,17 @@ class ErdCatalog {
 
   /// Columns of [schema] (PostgreSQL) or of the connected database. [schema]
   /// `null` means the current schema.
-  static String columnsSql(SqlDialect d, {String? schema}) => switch (d) {
+  ///
+  /// [tables] limits it to those bare table names (of [schema]): a diagram
+  /// around one table or an MCP lookup of one table then reads those tables
+  /// and not the whole schema, which also kept the row limit from cutting a
+  /// large schema before the tables that were wanted (#1572).
+  static String columnsSql(
+    SqlDialect d, {
+    String? schema,
+    Iterable<String>? tables,
+  }) =>
+      switch (d) {
         // pg_catalog is readable by every role, unlike information_schema,
         // which hides keys of tables the current role has only SELECT on.
         SqlDialect.postgres => '''
@@ -61,7 +71,7 @@ LEFT JOIN pg_catalog.pg_constraint pk
 LEFT JOIN pg_catalog.pg_attrdef df
   ON df.adrelid = c.oid AND df.adnum = a.attnum
 WHERE ns.nspname = ${schema == null ? 'current_schema()' : "'${_lit(schema)}'"}
-  AND c.relkind IN ('r', 'p')
+  AND c.relkind IN ('r', 'p')${_nameFilter('c.relname', tables)}
   AND a.attnum > 0 AND NOT a.attisdropped
 ORDER BY table_name, a.attnum''',
         SqlDialect.mysql => '''
@@ -77,7 +87,7 @@ FROM information_schema.columns c
 JOIN information_schema.tables t
   ON t.table_schema = c.table_schema AND t.table_name = c.table_name
   AND t.table_type = 'BASE TABLE'
-WHERE c.table_schema = DATABASE()
+WHERE c.table_schema = DATABASE()${_nameFilter('c.table_name', tables)}
 ORDER BY c.table_name, c.ordinal_position''',
         SqlDialect.sqlite => '''
 SELECT m.name AS table_name, p.name AS column_name, p.type AS data_type,
@@ -96,14 +106,16 @@ SELECT m.name AS table_name, p.name AS column_name, p.type AS data_type,
   NULL AS column_comment,
   NULL AS table_comment
 FROM sqlite_master m JOIN pragma_table_info(m.name) p
-WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
+WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'${_nameFilter('m.name', tables)}
 ORDER BY m.name, p.cid''',
       };
 
   /// Columns of the views (and PostgreSQL materialized views) of the current
   /// schema or database, in the shape of [columnsSql]: no primary key, every
-  /// column nullable. MCP lists them next to the tables.
-  static String viewColumnsSql(SqlDialect d) => switch (d) {
+  /// column nullable. MCP lists them next to the tables. [tables] limits it
+  /// to those names, as in [columnsSql].
+  static String viewColumnsSql(SqlDialect d, {Iterable<String>? tables}) =>
+      switch (d) {
         SqlDialect.postgres => '''
 SELECT ${_pgQualified('c', 'ns')} AS table_name, a.attname AS column_name,
   format_type(a.atttypid, a.atttypmod) AS data_type,
@@ -112,7 +124,7 @@ FROM pg_catalog.pg_attribute a
 JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
 JOIN pg_catalog.pg_namespace ns ON ns.oid = c.relnamespace
 WHERE ns.nspname = current_schema()
-  AND c.relkind IN ('v', 'm')
+  AND c.relkind IN ('v', 'm')${_nameFilter('c.relname', tables)}
   AND a.attnum > 0 AND NOT a.attisdropped
 ORDER BY table_name, a.attnum''',
         SqlDialect.mysql => '''
@@ -121,13 +133,13 @@ FROM information_schema.columns c
 JOIN information_schema.tables t
   ON t.table_schema = c.table_schema AND t.table_name = c.table_name
   AND t.table_type = 'VIEW'
-WHERE c.table_schema = DATABASE()
+WHERE c.table_schema = DATABASE()${_nameFilter('c.table_name', tables)}
 ORDER BY c.table_name, c.ordinal_position''',
         SqlDialect.sqlite => '''
 SELECT m.name AS table_name, p.name AS column_name, p.type AS data_type,
   0 AS is_pk, 1 AS is_nullable
 FROM sqlite_master m JOIN pragma_table_info(m.name) p
-WHERE m.type = 'view' AND m.name NOT LIKE 'sqlite_%'
+WHERE m.type = 'view' AND m.name NOT LIKE 'sqlite_%'${_nameFilter('m.name', tables)}
 ORDER BY m.name, p.cid''',
       };
 
@@ -165,7 +177,36 @@ WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
 ''',
       };
 
+  /// Names of the tables and views of the current schema or database, and
+  /// nothing else: what a lookup by name needs, without reading columns.
+  static String tableNamesSql(SqlDialect d) => switch (d) {
+        SqlDialect.postgres => '''
+SELECT c.relname AS object_name
+FROM pg_catalog.pg_class c
+JOIN pg_catalog.pg_namespace ns ON ns.oid = c.relnamespace
+WHERE ns.nspname = current_schema() AND c.relkind IN ('r', 'p', 'v', 'm')
+ORDER BY 1''',
+        SqlDialect.mysql => '''
+SELECT table_name AS object_name
+FROM information_schema.tables
+WHERE table_schema = DATABASE() AND table_type IN ('BASE TABLE', 'VIEW')
+ORDER BY 1''',
+        SqlDialect.sqlite => '''
+SELECT name AS object_name
+FROM sqlite_master
+WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%'
+ORDER BY 1''',
+      };
+
   static String _lit(String s) => s.replaceAll("'", "''");
+
+  /// `AND [column] IN ('a', 'b')` for [names], or nothing when [names] is
+  /// null; an empty list matches no row.
+  static String _nameFilter(String column, Iterable<String>? names) {
+    if (names == null) return '';
+    if (names.isEmpty) return '\n  AND 1 = 0';
+    return "\n  AND $column IN (${names.map((n) => "'${_lit(n)}'").join(', ')})";
+  }
 
   /// Schema part of a diagram name: `sales` for `sales.orders`, `null` for a
   /// table of the current schema.
@@ -217,11 +258,18 @@ WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
     }
     var names = neighbourhood(fks, focus, depth);
 
+    // Only the columns of these tables, grouped by PostgreSQL schema (#1572).
+    // `schema.table` asks its schema for `table`, which also brings the bare
+    // name the fallback below looks for when that schema is the current one.
+    final wanted = <String?, Set<String>>{};
+    for (final n in names) {
+      final s = dialect == SqlDialect.postgres ? schemaOf(n) : null;
+      (wanted[s] ??= <String>{}).add(s == null ? n : n.substring(s.length + 1));
+    }
     final fetched = <List<String>>[];
-    final schemas = {for (final n in names) schemaOf(n)};
-    for (final s in schemas) {
+    for (final MapEntry(key: s, value: tables) in wanted.entries) {
       final rows = await delegate.executeQuery(
-        columnsSql(dialect, schema: dialect == SqlDialect.postgres ? s : null),
+        columnsSql(dialect, schema: s, tables: tables),
         limit: catalogRowLimit,
       );
       truncated = truncated || rows.isTruncated;
