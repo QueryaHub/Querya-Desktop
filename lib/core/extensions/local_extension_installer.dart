@@ -124,7 +124,7 @@ class LocalExtensionInstaller {
     await _stopSessionsForExtension(manifest.id);
 
     final root = await _extensionsDirectory();
-    final extDir = Directory(p.join(root.path, manifest.id));
+    final extDir = ExtensionPaths.extensionDirectory(root, manifest.id);
     if (await extDir.exists()) {
       await extDir.delete(recursive: true);
     }
