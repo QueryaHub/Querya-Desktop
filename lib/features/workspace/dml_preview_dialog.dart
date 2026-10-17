@@ -63,6 +63,7 @@ class _DmlPreviewDialogState extends material.State<_DmlPreviewDialog> {
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final wb = context.workbench;
     final isDark = theme.brightness == Brightness.dark;
     final sql = widget.plan.toTransactionSql();
 
@@ -160,19 +161,19 @@ class _DmlPreviewDialogState extends material.State<_DmlPreviewDialog> {
                   if (_updateCount > 0)
                     _buildCountPill(
                       label: '$_updateCount UPDATE',
-                      color: material.Colors.amber.shade700,
+                      color: wb.warning,
                       isDark: isDark,
                     ),
                   if (_insertCount > 0)
                     _buildCountPill(
                       label: '$_insertCount INSERT',
-                      color: material.Colors.green.shade600,
+                      color: wb.success,
                       isDark: isDark,
                     ),
                   if (_deleteCount > 0)
                     _buildCountPill(
                       label: '$_deleteCount DELETE',
-                      color: material.Colors.red.shade600,
+                      color: wb.destructive,
                       isDark: isDark,
                     ),
                 ],
@@ -192,12 +193,12 @@ class _DmlPreviewDialogState extends material.State<_DmlPreviewDialog> {
                     vertical: 6,
                   ),
                   decoration: material.BoxDecoration(
-                    color: material.Colors.amber.withValues(
+                    color: wb.warning.withValues(
                       alpha: isDark ? 0.15 : 0.08,
                     ),
                     borderRadius: material.BorderRadius.circular(6),
                     border: material.Border.all(
-                      color: material.Colors.amber.withValues(alpha: 0.4),
+                      color: wb.warning.withValues(alpha: 0.4),
                     ),
                   ),
                   child: material.Row(
@@ -205,7 +206,7 @@ class _DmlPreviewDialogState extends material.State<_DmlPreviewDialog> {
                       material.Icon(
                         material.Icons.warning_amber_rounded,
                         size: 15,
-                        color: material.Colors.amber.shade700,
+                        color: wb.warning,
                       ),
                       const Gap(8),
                       material.Expanded(
@@ -241,7 +242,7 @@ class _DmlPreviewDialogState extends material.State<_DmlPreviewDialog> {
                                 : material.Icons.copy_rounded,
                             size: 13,
                             color: _copied
-                                ? material.Colors.green
+                                ? wb.success
                                 : cs.mutedForeground,
                           ),
                           const Gap(4),
@@ -259,9 +260,7 @@ class _DmlPreviewDialogState extends material.State<_DmlPreviewDialog> {
                 child: material.Container(
                   padding: const material.EdgeInsets.all(12),
                   decoration: material.BoxDecoration(
-                    color: isDark
-                        ? const material.Color(0xFF141416)
-                        : const material.Color(0xFFF4F4F6),
+                    color: context.workbench.editorBackground,
                     borderRadius: material.BorderRadius.circular(8),
                     border: material.Border.all(
                       color: cs.border.withValues(alpha: 0.6),
@@ -276,9 +275,7 @@ class _DmlPreviewDialogState extends material.State<_DmlPreviewDialog> {
                             QueryaTypography.monoFontFamilyFallback,
                         fontSize: 12.5,
                         height: 1.45,
-                        color: isDark
-                            ? const material.Color(0xFFE2E8F0)
-                            : const material.Color(0xFF1E293B),
+                        color: cs.foreground,
                       ),
                     ),
                   ),

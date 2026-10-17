@@ -60,16 +60,14 @@ class KbdBadge extends StatelessWidget {
               vertical: 2,
             ),
             decoration: material.BoxDecoration(
-              color: isDark
-                  ? const material.Color(0xFF1E2024)
-                  : const material.Color(0xFFF1F5F9),
+              color: wb.surface,
               borderRadius: material.BorderRadius.circular(4),
               border: material.Border.all(
                 color: wb.borderSubtle.withValues(alpha: 0.8),
               ),
               boxShadow: [
                 material.BoxShadow(
-                  color: material.Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
+                  color: wb.shadow.withValues(alpha: isDark ? 0.3 : 0.08),
                   offset: const material.Offset(0, 1),
                   blurRadius: 1,
                 ),
@@ -389,7 +387,7 @@ onPressed: _finish,
         return _TourSlideView(
           key: const ValueKey(0),
           icon: material.Icons.hub_rounded,
-          iconColor: const material.Color(0xFF06B6D4), // Cyan
+          iconColor: wb.accent,
           title: 'Connect in Seconds',
           description:
               'Connect directly to PostgreSQL, MySQL, SQLite, Redis, MongoDB or custom extension drivers. Paste a connection URL or use our visual form with real-time field validation.',
@@ -401,7 +399,7 @@ onPressed: _finish,
         return _TourSlideView(
           key: const ValueKey(1),
           icon: material.Icons.view_sidebar_rounded,
-          iconColor: const material.Color(0xFF8B5CF6), // Purple
+          iconColor: cs.chart4,
           title: 'Fluid Sidebar & Navigation',
           description:
               'Browse database schemas, tables, and views with full keyboard navigation. Right-click any object for instant SELECT queries and DDL copy.',
@@ -414,7 +412,7 @@ onPressed: _finish,
         return _TourSlideView(
           key: const ValueKey(2),
           icon: material.Icons.code_rounded,
-          iconColor: const material.Color(0xFF3B82F6), // Blue
+          iconColor: cs.chart1,
           title: 'Pro SQL Editor & Workspaces',
           description:
               'Execute scripts with $cmdCtrl+Enter or F5. Open multiple query tabs, format SQL with $cmdCtrl+Shift+F, and access persistent query history.',
@@ -427,7 +425,7 @@ onPressed: _finish,
         return _TourSlideView(
           key: const ValueKey(3),
           icon: material.Icons.table_chart_rounded,
-          iconColor: const material.Color(0xFF10B981), // Emerald
+          iconColor: cs.chart2,
           title: 'Interactive 2D Grid & DML Staging',
           description:
               'Edit cells in-place, select ranges with Shift+Click, and copy TSV data with $cmdCtrl+C. Staged changes are safely previewed with DML inspection before committing.',
@@ -440,7 +438,7 @@ onPressed: _finish,
         return _TourSlideView(
           key: const ValueKey(4),
           icon: material.Icons.filter_alt_rounded,
-          iconColor: const material.Color(0xFFF59E0B), // Amber
+          iconColor: cs.chart3,
           title: 'Compound Filter Bar & Quick Calc',
           description:
               'Filter grid results with live autocomplete expressions. Toggle Groupings & Pivot panels with $cmdCtrl+G and inspect instant stats (Sum, Avg, Median) in the status bar.',
@@ -634,13 +632,13 @@ class _HotkeysMatrixSlideView extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: material.BoxDecoration(
-                  color: const material.Color(0xFFEC4899).withValues(alpha: 0.15),
+                  color: context.colors.chart5.withValues(alpha: 0.15),
                   shape: material.BoxShape.circle,
                 ),
-                child: const material.Icon(
+                child: material.Icon(
                   material.Icons.keyboard_rounded,
                   size: 20,
-                  color: material.Color(0xFFEC4899),
+                  color: context.colors.chart5,
                 ),
               ),
               const material.SizedBox(width: 12),

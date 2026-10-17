@@ -15,20 +15,13 @@ material.Color environmentAccentColor(
       ConnectionEnvironment.production => wb.destructive,
     };
 
-/// Like [environmentAccentColor], but falls back to fixed colors when no
-/// [QueryaThemeScope] is mounted (isolated form / dialog tests).
+/// Like [environmentAccentColor], but resolves from ambient theme or defaults
+/// when no [QueryaThemeScope] is mounted (isolated form / dialog tests).
 material.Color environmentAccentColorOf(
   material.BuildContext context,
   ConnectionEnvironment environment,
-) {
-  final wb = QueryaThemeScope.maybeOf(context)?.workbench;
-  if (wb != null) return environmentAccentColor(wb, environment);
-  return switch (environment) {
-    ConnectionEnvironment.development => const material.Color(0xFF4CAF50),
-    ConnectionEnvironment.staging => const material.Color(0xFFF59E0B),
-    ConnectionEnvironment.production => const material.Color(0xFFEF4444),
-  };
-}
+) =>
+    environmentAccentColor(context.workbenchOrDefault, environment);
 
 /// Background for window chrome (title / status bar) of a connection in
 /// [environment]: [base] untouched for Development, tinted for the others.

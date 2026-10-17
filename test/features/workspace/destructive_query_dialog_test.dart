@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
+import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
@@ -274,6 +275,60 @@ void main() {
       await tester.tap(find.text('Execute Destructive Statement'));
       await tester.pumpAndSettle();
       expect(confirmed, isTrue);
+    });
+
+    testWidgets(
+        'SQL preview uses workbench editorBackground and foreground (#1644)',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 700));
+      final inspection =
+          DestructiveSqlDetector.inspect('DROP TABLE legacy_users;');
+
+      material.Widget buildDialog(QueryaTheme theme) => queryaThemeTestShell(
+            data: theme,
+            child: material.Builder(
+              builder: (context) => material.ElevatedButton(
+                onPressed: () => showDestructiveQueryDialog(
+                  context: context,
+                  result: inspection,
+                  sql: 'DROP TABLE legacy_users;',
+                ),
+                child: const material.Text('Open'),
+              ),
+            ),
+          );
+
+      // Light theme verification
+      await tester.pumpWidget(buildDialog(QueryaTheme.lightDefault));
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      final selectableTextFinder = find.widgetWithText(
+        material.SelectableText,
+        'DROP TABLE legacy_users;',
+      );
+      expect(selectableTextFinder, findsOneWidget);
+
+      final container = tester.widget<material.Container>(
+        find
+            .ancestor(
+              of: selectableTextFinder,
+              matching: find.byType(material.Container),
+            )
+            .first,
+      );
+      final deco = container.decoration! as material.BoxDecoration;
+      expect(
+        deco.color,
+        QueryaTheme.lightDefault.workbench.editorBackground,
+      );
+
+      final selectableText =
+          tester.widget<material.SelectableText>(selectableTextFinder);
+      expect(
+        selectableText.style?.color,
+        QueryaTheme.lightDefault.colorScheme.foreground,
+      );
     });
   });
 }
