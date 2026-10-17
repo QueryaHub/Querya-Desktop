@@ -115,4 +115,50 @@ void main() {
     await tester.pump(const Duration(seconds: 6));
     await tester.pumpAndSettle();
   });
+
+  testWidgets('closing fades the toast out before it is removed (#1645)',
+      (tester) async {
+    await tester.pumpWidget(
+      _app(
+        onShow: (context) => showAppToast(context: context, message: 'Leaving'),
+      ),
+    );
+    await tester.tap(find.text('Show'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    await tester.tap(find.byIcon(material.Icons.close_rounded));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 40));
+
+    expect(find.text('Leaving'), findsOneWidget);
+    final opacity = tester.widget<material.Opacity>(
+      find
+          .ancestor(
+            of: find.text('Leaving'),
+            matching: find.byType(material.Opacity),
+          )
+          .first,
+    );
+    expect(opacity.opacity, lessThan(1));
+
+    await tester.pumpAndSettle();
+    expect(find.text('Leaving'), findsNothing);
+  });
+
+  testWidgets('under reduced motion a closed toast goes at once', (tester) async {
+    await tester.pumpWidget(
+      _app(
+        disableAnimations: true,
+        onShow: (context) => showAppToast(context: context, message: 'Quick'),
+      ),
+    );
+    await tester.tap(find.text('Show'));
+    await tester.pump();
+
+    await tester.tap(find.byIcon(material.Icons.close_rounded));
+    await tester.pump();
+
+    expect(find.text('Quick'), findsNothing);
+  });
 }

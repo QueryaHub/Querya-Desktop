@@ -109,6 +109,46 @@ void main() {
     expect(find.text('Compound Filter Bar & Quick Calc'), findsOneWidget);
   });
 
+  testWidgets('Back slides the earlier step in from the left (#1645)',
+      (tester) async {
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: const material.Scaffold(body: WelcomeTourDialog()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    double dxOf(int step) => tester
+        .widget<material.SlideTransition>(
+          find
+              .ancestor(
+                of: find.byKey(ValueKey(step)),
+                matching: find.byType(material.SlideTransition),
+              )
+              .first,
+        )
+        .position
+        .value
+        .dx;
+
+    // Forward: the new step comes from the right, the old one leaves left.
+    await tester.tap(find.byKey(const Key('welcome_tour_next_button')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 40));
+    expect(dxOf(1), greaterThan(0));
+    expect(dxOf(0), lessThan(0));
+    await tester.pumpAndSettle();
+
+    // Back: mirrored.
+    await tester.tap(find.byKey(const Key('welcome_tour_prev_button')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 40));
+    expect(dxOf(0), lessThan(0));
+    expect(dxOf(1), greaterThan(0));
+    await tester.pumpAndSettle();
+    expect(find.text('Step 1 of 6'), findsOneWidget);
+  });
+
   testWidgets('WelcomeTourDialog launches demo playground on action button tap',
       (tester) async {
     var demoLaunched = false;

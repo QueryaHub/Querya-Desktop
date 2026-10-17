@@ -18,7 +18,8 @@ enum AppToastVariant {
 /// Toasts share one entry in the root overlay and stack upwards. Each one
 /// fades and slides in over [QueryaMotion.standard] (instantly under reduced
 /// motion), stays for [showDuration] and closes itself, or earlier through its
-/// close button.
+/// close button. Closing plays the entry backwards and gives its height back
+/// gradually, so the toasts above it slide down instead of jumping.
 void showAppToast({
   required material.BuildContext context,
   required String message,
@@ -129,8 +130,8 @@ class _ToastViewState extends material.State<_ToastView>
   void initState() {
     super.initState();
     final d = widget.data;
-    // The controller only plays the entry; a timer ends the toast, so a test
-    // that settles frames does not run its whole lifetime.
+    // The controller plays the entry and the exit; a timer starts the exit,
+    // so a test that settles frames does not run the toast's whole lifetime.
     _controller = material.AnimationController(
       vsync: this,
       duration: d.enter == Duration.zero ? const Duration(milliseconds: 1) : d.enter,
@@ -145,7 +146,15 @@ class _ToastViewState extends material.State<_ToastView>
   void _close() {
     if (_closed) return;
     _closed = true;
-    widget.onClosed();
+    _timer.cancel();
+    if (widget.data.enter == Duration.zero) {
+      widget.onClosed(); // reduced motion: gone at once
+      return;
+    }
+    // Out the way it came in (#1645); the list drops it when that is done.
+    _controller.reverse().whenCompleteOrCancel(() {
+      if (mounted) widget.onClosed();
+    });
   }
 
   @override
@@ -170,11 +179,17 @@ class _ToastViewState extends material.State<_ToastView>
 
     return material.AnimatedBuilder(
       animation: _in,
-      builder: (context, child) => material.Opacity(
-        opacity: _in.value,
-        child: material.Transform.translate(
-          offset: material.Offset(0, (1 - _in.value) * 12),
-          child: child,
+      // The height follows the same animation, so neighbours move smoothly
+      // when a toast arrives or leaves.
+      builder: (context, child) => material.SizeTransition(
+        sizeFactor: _in,
+        axisAlignment: -1,
+        child: material.Opacity(
+          opacity: _in.value,
+          child: material.Transform.translate(
+            offset: material.Offset(0, (1 - _in.value) * 12),
+            child: child,
+          ),
         ),
       ),
       child: material.Padding(
