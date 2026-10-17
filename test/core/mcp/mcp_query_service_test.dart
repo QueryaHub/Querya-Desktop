@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
-import 'package:querya_desktop/core/erd/erd_catalog.dart';
 import 'package:querya_desktop/core/mcp/mcp_access_store.dart';
 import 'package:querya_desktop/core/mcp/mcp_query_service.dart';
 import 'package:querya_desktop/core/security/connection_environment.dart';
@@ -288,8 +287,9 @@ void main() {
     test('describeTable and sampleRows read only the table asked for (#1572)',
         () async {
       await service().describeTable(1, 'users');
+      // Column and view-column queries (the key query has no format_type).
       final columnQueries =
-          db.executed.where((s) => s.contains('pg_attribute')).toList();
+          db.executed.where((s) => s.contains('format_type')).toList();
       expect(columnQueries, isNotEmpty);
       for (final q in columnQueries) {
         expect(q, contains("AND c.relname IN ('users')"));
@@ -297,7 +297,7 @@ void main() {
 
       db.executed.clear();
       await service().sampleRows(1, 'USERS', rows: 3);
-      expect(db.executed.where((s) => s.contains('pg_attribute')), isEmpty);
+      expect(db.executed.where((s) => s.contains('format_type')), isEmpty);
       expect(db.executed.last, 'SELECT * FROM "users"');
     });
 

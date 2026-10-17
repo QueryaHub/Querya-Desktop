@@ -30,7 +30,7 @@ const _key = ErdLayoutKey(connectionId: 1, scope: 'shop');
 
 FakeSqlExecutionDelegate _catalog({bool withPayments = false}) =>
     FakeSqlExecutionDelegate(onExecute: (sql) {
-      if (sql == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+      if (_unfiltered(sql) == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
         return SqlExecutionResult(rows: [
           const ['users', 'id', 'INTEGER', '1'],
           const ['orders', 'user_id', 'INTEGER', '0'],
@@ -44,6 +44,10 @@ FakeSqlExecutionDelegate _catalog({bool withPayments = false}) =>
 
 Finder _card(String table) =>
     find.byKey(material.ValueKey('erd_table_$table'));
+
+/// [sql] without the table-name filter `columnsSql(tables: ...)` adds (#1572).
+String _unfiltered(String sql) => sql.replaceAll(
+    RegExp(r"\n  AND (c\.relname|c\.table_name|m\.name) IN \([^)]*\)"), '');
 
 void main() {
   Future<void> pumpDiagram(

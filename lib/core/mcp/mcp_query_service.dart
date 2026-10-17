@@ -279,23 +279,31 @@ class McpQueryService {
     SqlDialect dialect, {
     Iterable<String>? tables,
   }) async {
-    final cols = await _run(
-      () => delegate.executeQuery(
-          ErdCatalog.columnsSql(dialect, tables: tables),
-          limit: _catalogRows,
-          timeout: timeout),
-      dialect,
-    );
     final fks = await _run(
       () => delegate.executeQuery(ErdCatalog.foreignKeysSql(dialect),
           limit: _catalogRows, timeout: timeout),
       dialect,
     );
+    // With [tables], also the tables their keys point to: ErdSchema drops a
+    // relation to a table it has no columns for, and a description lists
+    // each column's reference.
+    final wanted = tables == null
+        ? null
+        : {
+            ...tables,
+            for (final r in fks.rows)
+              if (r.length >= 4 && tables.contains(r[0])) r[2],
+          };
+    final cols = await _run(
+      () => delegate.executeQuery(
+          ErdCatalog.columnsSql(dialect, tables: wanted),
+          limit: _catalogRows,
+          timeout: timeout),
+      dialect,
+    );
     return ErdSchema.fromCatalog(columnRows: cols.rows, fkRows: fks.rows);
   }
 
-  /// Exact name first, then a unique case-insensitive match. The table must
-  /// exist in the catalog, so model input never reaches SQL unchecked.
   /// The catalog's name for [name]: the exact one, else the only one that
   /// matches ignoring case. Reads the names only, not the whole catalog: one
   /// table's description or sample no longer loads every column (#1572).
@@ -321,6 +329,8 @@ class McpQueryService {
         'Table "$name" not found. Call list_tables to see the available tables.');
   }
 
+  /// Exact name first, then a unique case-insensitive match. The table must
+  /// exist in the catalog, so model input never reaches SQL unchecked.
   ErdTable _findTable(ErdSchema schema, String name) {
     final exact = schema.tables.where((t) => t.name == name);
     if (exact.isNotEmpty) return exact.first;
