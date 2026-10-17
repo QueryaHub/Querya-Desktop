@@ -195,6 +195,7 @@ class _ExtensionConnectionFormContentState
   @override
   material.Widget build(material.BuildContext context) {
     final theme = context.colors;
+    final wb = context.workbench;
     final title = _isEditing
         ? 'Edit ${widget.driver.displayName}'
         : widget.driver.displayName;
@@ -267,7 +268,7 @@ class _ExtensionConnectionFormContentState
                           style: material.TextStyle(
                             fontSize: 12,
                             color: _testSucceeded
-                                ? material.Colors.green
+                                ? wb.success
                                 : theme.destructive,
                           ),
                         ),

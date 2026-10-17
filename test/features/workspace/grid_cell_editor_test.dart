@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/features/workspace/grid_cell_editor.dart';
 import 'package:querya_desktop/features/workspace/grid_cell_popover_inspector.dart';
+import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/features/workspace/result_grid_view.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
@@ -143,6 +144,13 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byIcon(material.Icons.error_outline_rounded), findsOneWidget);
+      final errorIcon = tester.widget<material.Icon>(
+        find.byIcon(material.Icons.error_outline_rounded),
+      );
+      expect(
+        errorIcon.color,
+        QueryaTheme.darkDefault.colorScheme.destructive,
+      );
     });
   });
 
