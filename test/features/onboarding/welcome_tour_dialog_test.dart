@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/features/onboarding/welcome_tour_dialog.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
@@ -199,5 +200,43 @@ void main() {
           .duration,
       Duration.zero,
     );
+  });
+
+  testWidgets('slide icons and shortcut badges adapt to theme tokens (#1509)',
+      (tester) async {
+    const lightTheme = QueryaTheme.lightDefault;
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        data: lightTheme,
+        child: const material.Scaffold(
+          body: WelcomeTourDialog(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Slide 1: Connect in Seconds icon uses lightTheme.workbench.accent
+    final hubIconFinder = find.byIcon(material.Icons.hub_rounded);
+    expect(hubIconFinder, findsOneWidget);
+    final hubIcon = tester.widget<material.Icon>(hubIconFinder);
+    expect(hubIcon.color, lightTheme.workbench.accent);
+
+    // KbdBadge uses lightTheme.workbench.surface
+    final containerFinder = find.ancestor(
+      of: find.text('N'),
+      matching: find.byType(material.Container),
+    );
+    final keycapContainer = tester.widget<material.Container>(containerFinder.first);
+    final boxDecoration = keycapContainer.decoration! as material.BoxDecoration;
+    expect(boxDecoration.color, lightTheme.workbench.surface);
+
+    // Next -> Slide 2: Fluid Sidebar uses lightTheme.colorScheme.chart4
+    await tester.tap(find.byKey(const Key('welcome_tour_next_button')));
+    await tester.pumpAndSettle();
+
+    final sidebarIconFinder = find.byIcon(material.Icons.view_sidebar_rounded);
+    expect(sidebarIconFinder, findsOneWidget);
+    final sidebarIcon = tester.widget<material.Icon>(sidebarIconFinder);
+    expect(sidebarIcon.color, lightTheme.colorScheme.chart4);
   });
 }
