@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **macOS: saved passwords use the login keychain** — the secure storage plugin defaults to the data protection keychain, which needs an entitlement no Querya build has, so saving or reading a connection password failed with "Could not read the saved credentials from the system keyring". macOS may ask once to allow Querya Desktop to use its keychain items, and again after an update of an unsigned build (#1586).
 - **`querya-ext-tester` sends a `--connect` password with `system.injectCredentials`, like the app** — a driver that reads its password only from the injected secret (the ClickHouse driver) failed authentication under the tester because the password was in the `db.connect` payload only.
 - **Demo Marketplace themes were named `${manifest.name}`** — the generated theme.json now carries the real name (the demo catalog is only used with `--dart-define=QUERYA_MARKETPLACE_MOCK=true`).
 - **In-app update of a package install (AUR, `.deb`, `.rpm`)** — the updater no longer downloads a zip and quits when the app lives in `/opt/querya-desktop` (owned by root): the update dialog says how to update it (`yay -Syu querya-desktop`, `apt`, `dnf`) with a *Copy update command* button, or offers the release page for any other folder the user cannot write. If an in-place replace fails anyway, the app is started again and the reason is logged to `~/.local/state/querya-update.log`, instead of staying closed.
