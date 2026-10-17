@@ -233,5 +233,51 @@ void main() {
       expect(result.rows[1][1], '100');
     });
   });
+
+  group('kind detection with a cell formatter (#1548)', () {
+    // Formats every cell; counts how many it was asked for.
+    var formatted = 0;
+    String fmt(Object? v, int col) {
+      formatted++;
+      if (v is String && col == 2) return 'hex:$v'; // a bytea-typed column
+      return v.toString();
+    }
+
+    setUp(() => formatted = 0);
+
+    test('the formatter decides from samples; the rest is type-tested', () {
+      final rows = [
+        for (var i = 0; i < 5000; i++) [i, i * 1.5, 'b$i', 's$i'],
+      ];
+      final ds = CompactResultDataset.fromRawRows(
+        ['i', 'd', 'bytes', 's'],
+        rows,
+        cellFormatter: fmt,
+      );
+      expect(ds.columns.map((c) => c.kind), [
+        CompactColumnKind.int64,
+        CompactColumnKind.float64,
+        CompactColumnKind.generic, // printed differently from its value
+        CompactColumnKind.string,
+      ]);
+      // Detection formats at most 60 cells per column (the bytea column
+      // stops at its first); packing the generic column formats its cells.
+      expect(formatted, lessThan(4 * 60 + 5000 + 1));
+    });
+
+    test('a late value of another type still makes the column generic', () {
+      final rows = [
+        for (var i = 0; i < 1000; i++) [i == 900 ? 'n/a' : i],
+      ];
+      final ds = CompactResultDataset.fromRawRows(
+        ['v'],
+        rows,
+        cellFormatter: fmt,
+      );
+      expect(ds.columns.single.kind, CompactColumnKind.generic);
+      expect(ds.cellAt(900, 0), 'n/a');
+      expect(ds.cellAt(899, 0), '899');
+    });
+  });
 }
 
