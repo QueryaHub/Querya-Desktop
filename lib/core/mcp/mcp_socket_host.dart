@@ -16,6 +16,8 @@ class McpSocketHost {
     required this.version,
     required this.onSession,
     this.handshakeTimeout = const Duration(seconds: 5),
+    this.maxUnauthenticated = 16,
+    this.maxHandshakeBytes = 4096,
   });
 
   final File endpointFile;
@@ -23,9 +25,16 @@ class McpSocketHost {
   final Future<void> Function(StreamChannel<String> channel) onSession;
   final Duration handshakeTimeout;
 
+  /// Sockets that may wait for their token at once; more are turned away.
+  final int maxUnauthenticated;
+
+  /// Bytes accepted before the token line is complete (a token is ~44).
+  final int maxHandshakeBytes;
+
   ServerSocket? _server;
   String? _token;
   final _sockets = <Socket>{};
+  var _unauthenticated = 0;
 
   bool get isRunning => _server != null;
   int? get port => _server?.port;
@@ -77,19 +86,46 @@ class McpSocketHost {
   }
 
   void _accept(Socket socket) {
+    if (_unauthenticated >= maxUnauthenticated) {
+      socket.destroy();
+      return;
+    }
     _sockets.add(socket);
+    _unauthenticated++;
     // A client that disappears mid-write must not surface as an uncaught error.
     unawaited(socket.done.then((_) {}, onError: (Object _) {}));
     final incoming = StreamController<String>();
     final outgoing = StreamController<String>();
     var authed = false;
+    var waiting = true;
+    var handshakeBytes = 0;
+    void stopWaiting() {
+      if (!waiting) return;
+      waiting = false;
+      _unauthenticated--;
+    }
+
     final timer = Timer(handshakeTimeout, () {
-      if (!authed) _reject(socket, 'Handshake timed out.');
+      if (!authed) {
+        stopWaiting();
+        _reject(socket, 'Handshake timed out.');
+      }
     });
 
     late final StreamSubscription<String> sub;
     sub = socket
         .cast<List<int>>()
+        .map((chunk) {
+          // Without a newline the line splitter would buffer without bound.
+          if (!authed && (handshakeBytes += chunk.length) > maxHandshakeBytes) {
+            timer.cancel();
+            sub.cancel();
+            stopWaiting();
+            _reject(socket, 'Handshake too long.');
+            return const <int>[];
+          }
+          return chunk;
+        })
         .transform(utf8.decoder)
         .transform(const LineSplitter())
         .listen(
@@ -102,10 +138,12 @@ class McpSocketHost {
         if (token == null || !McpEndpoint.tokensEqual(line.trim(), token)) {
           timer.cancel();
           sub.cancel();
+          stopWaiting();
           _reject(socket, 'Invalid Querya MCP token. Restart the MCP client.');
           return;
         }
         authed = true;
+        stopWaiting();
         timer.cancel();
         _sessions++;
         _changes.add(null);
@@ -116,8 +154,14 @@ class McpSocketHost {
         unawaited(onSession(StreamChannel.withCloseGuarantee(
             incoming.stream, outgoing.sink)));
       },
-      onDone: () => _closed(socket, incoming, outgoing, authed),
-      onError: (_) => _closed(socket, incoming, outgoing, authed),
+      onDone: () {
+        stopWaiting();
+        _closed(socket, incoming, outgoing, authed);
+      },
+      onError: (_) {
+        stopWaiting();
+        _closed(socket, incoming, outgoing, authed);
+      },
       cancelOnError: true,
     );
   }

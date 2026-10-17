@@ -38,14 +38,16 @@ abstract final class McpSqlGuard {
 
   /// `EXPLAIN ANALYZE` executes the statement; the rest would explain a write.
   static final _explainForbidden = RegExp(
-    r'\b(ANALYZE|ANALYSE|INSERT|UPDATE|DELETE|MERGE|REPLACE|CREATE|DROP|ALTER|TRUNCATE|GRANT|REVOKE|CALL|DO|COPY)\b',
+    r'\b(ANALYZE|ANALYSE|INSERT|UPDATE|DELETE|MERGE|REPLACE\s+INTO|CREATE|DROP|ALTER|TRUNCATE|GRANT|REVOKE|CALL|DO|COPY)\b',
   );
 
   /// Functions that act on the server even inside a read-only transaction.
   static final _forbiddenFunctions = RegExp(
     r'\b(PG_TERMINATE_BACKEND|PG_CANCEL_BACKEND|PG_RELOAD_CONF|PG_ROTATE_LOGFILE|'
-    r'PG_READ_FILE|PG_READ_BINARY_FILE|PG_LS_DIR|PG_STAT_FILE|LO_IMPORT|LO_EXPORT|'
-    r'DBLINK\w*|SET_CONFIG|LOAD_FILE|LOAD_EXTENSION|WRITEFILE|READFILE|FSDIR)\s*\(',
+    r'PG_READ_FILE|PG_READ_BINARY_FILE|PG_LS_DIR|PG_STAT_FILE|LO_\w*|'
+    r'QUERY_TO_XML\w*|CURSOR_TO_XML|TABLE_TO_XML\w*|PG_ADVISORY_\w*|PG_SLEEP\w*|'
+    r'NEXTVAL|SETVAL|DBLINK\w*|SET_CONFIG|LOAD_FILE|LOAD_EXTENSION|WRITEFILE|'
+    r'READFILE|FSDIR)\s*\(',
   );
 
   /// SQLite pragmas that only read the schema.

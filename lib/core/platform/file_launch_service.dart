@@ -54,9 +54,6 @@ class FileLaunchService {
   FileLaunchTarget? get pendingTarget =>
       _pendingTargets.isNotEmpty ? _pendingTargets.first : null;
 
-  /// Whether there is at least one pending launch target.
-  bool get hasPendingTarget => _pendingTargets.isNotEmpty;
-
   /// Sets or clears the pending launch target (useful for testing or single-target flows).
   void setPendingTarget(FileLaunchTarget? target) {
     _pendingTargets.clear();
@@ -153,7 +150,7 @@ class FileLaunchService {
     for (final conn in connections) {
       if (conn.type == 'sqlite' && conn.host != null) {
         final existingNormalized = p.normalize(p.absolute(conn.host!));
-        if (existingNormalized == target.path) {
+        if (_samePath(existingNormalized, target.path)) {
           return conn;
         }
       }
@@ -173,6 +170,13 @@ class FileLaunchService {
     final id = await LocalDb.instance.addConnection(newRow);
     return newRow.copyWith(id: id);
   }
+
+  /// Windows and macOS volumes are case-insensitive by default, so
+  /// `C:\Data\A.db` and `c:\data\a.db` are one database there.
+  static bool _samePath(String a, String b) =>
+      Platform.isWindows || Platform.isMacOS
+          ? a.toLowerCase() == b.toLowerCase()
+          : a == b;
 
   /// Reads the full text of an SQL script for [target].
   Future<String> readSqlContent(FileLaunchTarget target) async {

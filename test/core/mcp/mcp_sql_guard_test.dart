@@ -86,6 +86,24 @@ void main() {
     refused("SELECT load_extension('evil')", SqlDialect.sqlite);
   });
 
+  test('functions with side effects beyond the transaction are refused (#1565)',
+      () {
+    refused("SELECT query_to_xml('DELETE FROM y', true, true, '')");
+    refused("SELECT cursor_to_xml('c', 1, true, true, '')");
+    refused("SELECT table_to_xml('t', true, true, '')");
+    refused('SELECT pg_advisory_lock(1)');
+    refused('SELECT pg_try_advisory_xact_lock(1)');
+    refused('SELECT pg_sleep(60)');
+    refused("SELECT lo_get(1234)");
+    refused("SELECT nextval('s')");
+    refused("SELECT setval('s', 10)");
+  });
+
+  test('EXPLAIN of a SELECT that calls REPLACE() is allowed (#1565)', () {
+    allowed("EXPLAIN SELECT REPLACE(name, 'a', 'b') FROM users");
+    refused("EXPLAIN REPLACE INTO users VALUES (1)", SqlDialect.mysql);
+  });
+
   test('SQLite schema pragmas are allowed, others are refused', () {
     allowed('PRAGMA table_info(users)', SqlDialect.sqlite);
     allowed('PRAGMA index_list(users)', SqlDialect.sqlite);
