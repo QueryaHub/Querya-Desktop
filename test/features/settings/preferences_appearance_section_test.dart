@@ -170,5 +170,18 @@ void main() {
 
       expect(ThemeController.instance.themeAnimationEnabled, isTrue);
     });
+
+    testWidgets('does not wrap body in inner SingleChildScrollView (#1650)',
+        (tester) async {
+      await pumpSection(tester);
+
+      expect(
+        find.descendant(
+          of: find.byType(PreferencesAppearanceSection),
+          matching: find.byType(material.SingleChildScrollView),
+        ),
+        findsNothing,
+      );
+    });
   });
 }
