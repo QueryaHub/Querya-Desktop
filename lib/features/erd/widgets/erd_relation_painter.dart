@@ -33,34 +33,58 @@ class ErdRelationPainter extends material.CustomPainter {
         (r.relation.fromTable == focus || r.relation.toTable == focus);
   }
 
-  void _label(material.Canvas canvas, String text, material.Offset at,
-      material.Color c) {
-    final tp = material.TextPainter(
+  /// The markers are only ever `1` and `*`, in at most three colours (others,
+  /// others while something is focused, highlight), so each is laid out once
+  /// and reused by every relation and every repaint (#1518). A theme change
+  /// brings new colours; past a handful of entries the cache starts over.
+  static final _labels = <(String, int), material.TextPainter>{};
+  static const _maxLabels = 16;
+
+  static material.TextPainter _labelPainter(String text, material.Color c) {
+    final key = (text, c.toARGB32());
+    final cached = _labels[key];
+    if (cached != null) return cached;
+    if (_labels.length >= _maxLabels) {
+      for (final old in _labels.values) {
+        old.dispose();
+      }
+      _labels.clear();
+    }
+    return _labels[key] = material.TextPainter(
       text: material.TextSpan(
           text: text,
           style: material.TextStyle(
               fontSize: 10, color: c, fontWeight: material.FontWeight.w600)),
       textDirection: material.TextDirection.ltr,
     )..layout();
+  }
+
+  /// Rounded outline of a route, built once per [ErdRoute]: a repaint that
+  /// only changes the focus or the picked relation reuses the same routes.
+  static final _paths = Expando<material.Path>('erdRoundedPath');
+
+  void _label(material.Canvas canvas, String text, material.Offset at,
+      material.Color c) {
+    final tp = _labelPainter(text, c);
     tp.paint(canvas, at - material.Offset(tp.width / 2, tp.height / 2));
-    tp.dispose();
   }
 
   @override
   void paint(material.Canvas canvas, material.Size size) {
+    // One Paint for every route; only its colour and width change per pass.
+    final paint = material.Paint()
+      ..style = material.PaintingStyle.stroke
+      ..strokeCap = material.StrokeCap.round
+      ..strokeJoin = material.StrokeJoin.round;
+    final dimmed = color.withValues(alpha: _anyFocus ? 0.35 : 0.85);
     // Others first, focused on top.
-    for (final pass in [false, true]) {
+    for (final pass in const [false, true]) {
+      paint
+        ..color = pass ? highlight : dimmed
+        ..strokeWidth = pass ? 2 : 1.4;
       for (final r in routes) {
         if (_focused(r) != pass || r.points.length < 2) continue;
-        final paint = material.Paint()
-          ..color = pass
-              ? highlight
-              : color.withValues(alpha: _anyFocus ? 0.35 : 0.85)
-          ..style = material.PaintingStyle.stroke
-          ..strokeWidth = pass ? 2 : 1.4
-          ..strokeCap = material.StrokeCap.round
-          ..strokeJoin = material.StrokeJoin.round;
-        canvas.drawPath(roundedPath(r.points), paint);
+        canvas.drawPath(_paths[r] ??= roundedPath(r.points), paint);
         // FK end: a crow's foot ("many"), or a bar when the FK column is
         // unique on its own ("one", #1281).
         if (r.relation.oneToOne) {
