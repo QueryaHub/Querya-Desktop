@@ -293,11 +293,18 @@ class _QueryaButtonState extends material.State<QueryaButton> {
   }
 
 
-  /// The label on one line with an ellipsis. With [showWhenCut] it is
-  /// measured against the width it gets, and only a label that does not fit
-  /// gets a tooltip with its full text, so a button that fits shows none.
-  static material.Widget _label(
-    material.BuildContext context,
+  /// Whether the label was cut short at the last layout (#1689).
+  bool _labelCut = false;
+
+  void _onLabelCut(bool cut) {
+    if (mounted && cut != _labelCut) setState(() => _labelCut = cut);
+  }
+
+  /// The label on one line with an ellipsis. With [showWhenCut] it reports
+  /// after each layout whether it fit, and a label that did not gets a tooltip
+  /// with its full text, so a button that fits shows none. No
+  /// [material.LayoutBuilder]: buttons sit in intrinsic-size layouts.
+  material.Widget _label(
     String label,
     material.TextStyle style, {
     required bool showWhenCut,
@@ -310,28 +317,13 @@ class _QueryaButtonState extends material.State<QueryaButton> {
       style: style,
     );
     if (!showWhenCut) return text;
-    return material.LayoutBuilder(
-      builder: (context, constraints) {
-        if (!constraints.hasBoundedWidth) return text;
-        final painter = material.TextPainter(
-          text: material.TextSpan(
-            text: label,
-            style: material.DefaultTextStyle.of(context).style.merge(style),
-          ),
-          maxLines: 1,
-          textDirection: material.Directionality.of(context),
-          textScaler: material.MediaQuery.textScalerOf(context),
-        )..layout();
-        final cut = painter.width > constraints.maxWidth + 0.5;
-        painter.dispose();
-        if (!cut) return text;
-        return material.Tooltip(
-          message: label,
-          waitDuration: kQueryaTooltipWait,
-          excludeFromSemantics: true,
-          child: text,
-        );
-      },
+    final reported = _CutReport(onChanged: _onLabelCut, child: text);
+    if (!_labelCut) return reported;
+    return material.Tooltip(
+      message: label,
+      waitDuration: kQueryaTooltipWait,
+      excludeFromSemantics: true,
+      child: reported,
     );
   }
 
@@ -413,7 +405,6 @@ class _QueryaButtonState extends material.State<QueryaButton> {
         if (leading != null) material.SizedBox(width: gap),
         material.Flexible(
           child: _label(
-            context,
             w.label!,
             material.TextStyle(
               fontSize: fontSize,
@@ -576,5 +567,45 @@ class _QueryaButtonState extends material.State<QueryaButton> {
       excludeSemantics: true,
       child: button,
     );
+  }
+}
+
+/// Lays its text child out as usual and reports, after the frame, whether the
+/// text was cut: its full one-line width is more than the width it got.
+class _CutReport extends material.SingleChildRenderObjectWidget {
+  const _CutReport({required this.onChanged, required super.child});
+
+  final void Function(bool cut) onChanged;
+
+  @override
+  material.RenderObject createRenderObject(material.BuildContext context) =>
+      _RenderCutReport(onChanged);
+
+  @override
+  void updateRenderObject(
+    material.BuildContext context,
+    _RenderCutReport renderObject,
+  ) {
+    renderObject.onChanged = onChanged;
+  }
+}
+
+class _RenderCutReport extends material.RenderProxyBox {
+  _RenderCutReport(this.onChanged);
+
+  void Function(bool cut) onChanged;
+  bool? _reported;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    final text = child;
+    if (text == null) return;
+    final cut = text.getMaxIntrinsicWidth(double.infinity) > size.width + 0.5;
+    if (cut == _reported) return;
+    _reported = cut;
+    // Not during layout: the owner rebuilds with or without a tooltip.
+    final report = onChanged;
+    material.WidgetsBinding.instance.addPostFrameCallback((_) => report(cut));
   }
 }
