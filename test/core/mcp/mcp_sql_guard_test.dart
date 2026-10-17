@@ -151,4 +151,23 @@ void main() {
           'The query is empty.');
     });
   });
+
+  // A backslash before the closing quote is an escape in MySQL only; reading it
+  // as one in PostgreSQL or SQLite hid the statements after the literal.
+  test('a trailing backslash in a literal does not hide statements (PostgreSQL, SQLite)',
+      () {
+    const smuggled = r"SELECT 'a\'; SELECT pg_terminate_backend(1); --'";
+    refused(smuggled, SqlDialect.postgres);
+    refused(smuggled, SqlDialect.sqlite);
+    const write = r"SELECT 'a\'; DELETE FROM users; --'";
+    refused(write, SqlDialect.postgres);
+    refused(write, SqlDialect.sqlite);
+    expect(McpSqlGuard.refusal(write, SqlDialect.postgres)!.rule, 'single_statement');
+  });
+
+  test('the same text is one literal in MySQL, and an E string in PostgreSQL',
+      () {
+    allowed(r"SELECT 'a\'; SELECT pg_terminate_backend(1); --'", SqlDialect.mysql);
+    allowed(r"SELECT E'a\'; SELECT 1'", SqlDialect.postgres);
+  });
 }

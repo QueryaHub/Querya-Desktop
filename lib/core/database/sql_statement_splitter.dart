@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:querya_desktop/core/database/sql_lexical_scanner.dart';
 
 /// One statement of a script, as offsets into the script.
 class SqlStatementSpan {
@@ -24,21 +25,8 @@ class SqlStatementSpan {
 /// literals, quoted identifiers, comments and PostgreSQL dollar quotes do not
 /// end a statement.
 abstract final class SqlStatementSplitter {
-  /// `$tag$` or `$$`, matched at an offset (no `^`: it would only match at the
-  /// start of the script). One compiled instance for every dollar sign.
-  static final RegExp _dollarTag = RegExp(r'\$([a-zA-Z0-9_]*)\$');
-
-  static const int _chDash = 0x2D;
-  static const int _chSlash = 0x2F;
-  static const int _chAsterisk = 0x2A;
-  static const int _chDollar = 0x24;
-  static const int _chSingleQuote = 0x27;
-  static const int _chDoubleQuote = 0x22;
-  static const int _chBacktick = 0x60;
   static const int _chSemicolon = 0x3B;
-  static const int _chBackslash = 0x5C;
   static const int _chLf = 0x0A;
-  static const int _chCr = 0x0D;
 
   /// Default script size threshold (64 KB) above which [spansAsync] offloads
   /// parsing to a background isolate via [compute].
@@ -50,17 +38,28 @@ abstract final class SqlStatementSplitter {
   static Future<List<SqlStatementSpan>> spansAsync(
     String sql, {
     int isolateThreshold = defaultIsolateThreshold,
+    bool backslashEscapes = true,
   }) async {
     if (sql.length <= isolateThreshold) {
-      return spans(sql);
+      return spans(sql, backslashEscapes: backslashEscapes);
     }
-    return compute(spans, sql);
+    return compute(_spansInIsolate, (sql, backslashEscapes));
   }
 
-  static List<SqlStatementSpan> spans(String sql) {
+  static List<SqlStatementSpan> _spansInIsolate((String, bool) args) =>
+      spans(args.$1, backslashEscapes: args.$2);
+
+  /// [backslashEscapes] says whether `\'` escapes a quote inside `'...'`, as
+  /// it does in MySQL (the default, and what an unknown dialect gets). Pass
+  /// `dialect.backslashEscapesQuotes` when the dialect is known: reading
+  /// `'a\'` as an unfinished literal in PostgreSQL or SQLite hides the `;`
+  /// after it, and the statement the server then runs.
+  static List<SqlStatementSpan> spans(
+    String sql, {
+    bool backslashEscapes = true,
+  }) {
     final out = <SqlStatementSpan>[];
     final len = sql.length;
-    var i = 0;
     var segmentStart = 0;
 
     // Statement starts only move forward, so the line of each one is found by
@@ -90,93 +89,19 @@ abstract final class SqlStatementSplitter {
       }
     }
 
-    while (i < len) {
-      final code = sql.codeUnitAt(i);
-
-      // Line comment: runs to the end of the line.
-      if (code == _chDash && i + 1 < len && sql.codeUnitAt(i + 1) == _chDash) {
-        while (i < len &&
-            sql.codeUnitAt(i) != _chLf &&
-            sql.codeUnitAt(i) != _chCr) {
-          i++;
-        }
-        continue;
-      }
-
-      // Block comment.
-      if (code == _chSlash &&
-          i + 1 < len &&
-          sql.codeUnitAt(i + 1) == _chAsterisk) {
-        i += 2;
-        while (i + 1 < len &&
-            !(sql.codeUnitAt(i) == _chAsterisk &&
-                sql.codeUnitAt(i + 1) == _chSlash)) {
-          i++;
-        }
-        i = i + 1 < len ? i + 2 : len;
-        continue;
-      }
-
-      // Dollar quote: $tag$ ... $tag$.
-      if (code == _chDollar) {
-        final match = _dollarTag.matchAsPrefix(sql, i);
-        if (match != null) {
-          final tag = match.group(0)!;
-          final close = sql.indexOf(tag, i + tag.length);
-          i = close == -1 ? len : close + tag.length;
-          continue;
+    // A `;` ends a statement only in code: literals, quoted identifiers,
+    // comments and dollar quotes are the scanner's other segments.
+    for (final segment in SqlLexicalScanner.segments(
+      sql,
+      backslashEscapes: backslashEscapes,
+    )) {
+      if (segment.kind != SqlSegmentKind.code) continue;
+      for (var i = segment.start; i < segment.end; i++) {
+        if (sql.codeUnitAt(i) == _chSemicolon) {
+          close(i);
+          segmentStart = i + 1;
         }
       }
-
-      // String literal, with doubled quotes and backslash escapes.
-      if (code == _chSingleQuote) {
-        i++;
-        while (i < len) {
-          final curr = sql.codeUnitAt(i);
-          if (curr == _chSingleQuote) {
-            if (i + 1 < len && sql.codeUnitAt(i + 1) == _chSingleQuote) {
-              i += 2;
-            } else {
-              i++;
-              break;
-            }
-          } else if (curr == _chBackslash && i + 1 < len) {
-            i += 2;
-          } else {
-            i++;
-          }
-        }
-        continue;
-      }
-
-      // Quoted identifier: "name" (PostgreSQL) or `name` (MySQL).
-      if (code == _chDoubleQuote || code == _chBacktick) {
-        final quoteChar = code;
-        i++;
-        while (i < len) {
-          final curr = sql.codeUnitAt(i);
-          if (curr == quoteChar) {
-            if (i + 1 < len && sql.codeUnitAt(i + 1) == quoteChar) {
-              i += 2;
-            } else {
-              i++;
-              break;
-            }
-          } else {
-            i++;
-          }
-        }
-        continue;
-      }
-
-      if (code == _chSemicolon) {
-        close(i);
-        i++;
-        segmentStart = i;
-        continue;
-      }
-
-      i++;
     }
     close(len);
     return out;

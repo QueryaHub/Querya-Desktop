@@ -1,3 +1,4 @@
+import 'package:querya_desktop/core/database/sql_lexical_scanner.dart';
 import 'package:querya_desktop/core/database/sql_statement_splitter.dart';
 
 /// Categorization of destructive SQL / Mongo / Redis operations that can
@@ -267,7 +268,12 @@ abstract final class DestructiveSqlDetector {
 
   /// Offset after the single-quoted literal whose body starts at [start]
   /// (`''` and backslash escapes); [len] when it is never closed.
-  static int _skipStringLiteral(String sql, int start, int len) {
+  static int _skipStringLiteral(
+    String sql,
+    int start,
+    int len, {
+    required bool backslashEscapes,
+  }) {
     var i = start;
     while (i < len) {
       final c = sql.codeUnitAt(i);
@@ -277,7 +283,7 @@ abstract final class DestructiveSqlDetector {
         } else {
           return i + 1; // closing quote
         }
-      } else if (c == _chBackslash && i + 1 < len) {
+      } else if (backslashEscapes && c == _chBackslash && i + 1 < len) {
         i += 2; // escaped char
       } else {
         i++;
@@ -292,7 +298,14 @@ abstract final class DestructiveSqlDetector {
   /// Scans code units with the `_skip*` helpers (no per-character strings, no
   /// regex, no copy of the rest of the script at every `$`), and appends the
   /// text between tokens in runs (#1511).
-  static String stripCommentsAndStrings(String sql) {
+  ///
+  /// [backslashEscapes] is whether `\'` escapes a quote (MySQL; the default).
+  /// With `false` (PostgreSQL, SQLite) a backslash is an ordinary character,
+  /// except inside an `E'...'` string, as the server reads it.
+  static String stripCommentsAndStrings(
+    String sql, {
+    bool backslashEscapes = true,
+  }) {
     final buffer = StringBuffer();
     final len = sql.length;
     var i = 0;
@@ -322,7 +335,13 @@ abstract final class DestructiveSqlDetector {
         }
         replacement = "''";
       } else if (c == _chQuote) {
-        after = _skipStringLiteral(sql, i + 1, len);
+        after = _skipStringLiteral(
+          sql,
+          i + 1,
+          len,
+          backslashEscapes:
+              backslashEscapes || SqlLexicalScanner.isEscapeStringPrefix(sql, i),
+        );
         replacement = "''";
       } else {
         i++;
@@ -341,17 +360,33 @@ abstract final class DestructiveSqlDetector {
 
   /// Splits an SQL query into individual statements on `;`, taking into account
   /// comments and string literals.
-  static List<String> splitStatements(String sql) => [
-        for (final span in SqlStatementSplitter.spans(sql)) span.textIn(sql),
+  ///
+  /// [backslashEscapes]: see [stripCommentsAndStrings].
+  static List<String> splitStatements(
+    String sql, {
+    bool backslashEscapes = true,
+  }) =>
+      [
+        for (final span
+            in SqlStatementSplitter.spans(sql, backslashEscapes: backslashEscapes))
+          span.textIn(sql),
       ];
 
   /// Inspects [sql] and returns any detected destructive operations.
-  static DestructiveSqlInspectionResult inspect(String sql) {
-    final statements = splitStatements(sql);
+  ///
+  /// [backslashEscapes]: see [stripCommentsAndStrings].
+  static DestructiveSqlInspectionResult inspect(
+    String sql, {
+    bool backslashEscapes = true,
+  }) {
+    final statements = splitStatements(sql, backslashEscapes: backslashEscapes);
     final operations = <DestructiveSqlOperation>[];
 
     for (final rawStmt in statements) {
-      final sanitized = stripCommentsAndStrings(rawStmt).trim();
+      final sanitized = stripCommentsAndStrings(
+        rawStmt,
+        backslashEscapes: backslashEscapes,
+      ).trim();
       if (sanitized.isEmpty) continue;
 
       // 1. DROP DATABASE

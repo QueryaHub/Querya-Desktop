@@ -69,4 +69,14 @@ void main() {
       expect(containsMutatingSql("SELECT 'a;DELETE FROM t'"), isFalse);
     });
   });
+
+  group('containsMutatingSql backslash escapes', () {
+    const sql = r"SELECT 'a\'; DELETE FROM t; --'";
+
+    test('the dialect decides whether the DELETE is code or part of a literal',
+        () {
+      expect(containsMutatingSql(sql), isFalse); // MySQL reading, the default
+      expect(containsMutatingSql(sql, backslashEscapes: false), isTrue);
+    });
+  });
 }

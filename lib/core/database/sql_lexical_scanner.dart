@@ -118,7 +118,7 @@ abstract final class SqlLexicalScanner {
       }
 
       if (code == _chSingleQuote) {
-        final escapes = backslashEscapes || _isEscapeStringPrefix(sql, i);
+        final escapes = backslashEscapes || isEscapeStringPrefix(sql, i);
         var j = i + 1;
         while (j < len) {
           final curr = sql.codeUnitAt(j);
@@ -169,7 +169,7 @@ abstract final class SqlLexicalScanner {
 
   /// Whether the quote at [quote] opens a PostgreSQL escape string: `E'` or
   /// `e'`, the `E` not being the end of a longer word (`TYPE'...'`).
-  static bool _isEscapeStringPrefix(String sql, int quote) {
+  static bool isEscapeStringPrefix(String sql, int quote) {
     if (quote < 1) return false;
     final e = sql.codeUnitAt(quote - 1);
     if (e != 0x45 && e != 0x65) return false;

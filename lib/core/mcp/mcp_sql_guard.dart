@@ -74,10 +74,17 @@ abstract final class McpSqlGuard {
   /// Returns `null` when [sql] may run, or why it may not: the rule that
   /// refused it (stable, for the audit log) and the message for the model.
   static McpSqlRefusal? refusal(String sql, SqlDialect dialect) {
-    final statements = DestructiveSqlDetector.splitStatements(sql)
-        .where((s) => DestructiveSqlDetector.stripCommentsAndStrings(s)
-            .trim()
-            .isNotEmpty)
+    // Read the text the way the server does: in PostgreSQL and SQLite `'a\'`
+    // is a whole literal, so a `;` after it ends the statement.
+    final escapes = dialect.backslashEscapesQuotes;
+    final statements = DestructiveSqlDetector.splitStatements(
+      sql,
+      backslashEscapes: escapes,
+    )
+        .where((s) => DestructiveSqlDetector.stripCommentsAndStrings(
+              s,
+              backslashEscapes: escapes,
+            ).trim().isNotEmpty)
         .toList();
     if (statements.isEmpty) return const McpSqlRefusal('empty_query', 'The query is empty.');
     if (statements.length > 1) {
@@ -90,7 +97,10 @@ abstract final class McpSqlGuard {
         RegExp(r'/\*M?!').hasMatch(statement)) {
       return const McpSqlRefusal('mysql_executable_comment', 'MySQL executable comments (/*! ... */) are not allowed.');
     }
-    final upper = DestructiveSqlDetector.stripCommentsAndStrings(statement)
+    final upper = DestructiveSqlDetector.stripCommentsAndStrings(
+      statement,
+      backslashEscapes: escapes,
+    )
         .trim()
         .replaceAll(RegExp(r';\s*$'), '')
         .toUpperCase();
@@ -113,7 +123,7 @@ abstract final class McpSqlGuard {
       }
       return null;
     }
-    if (isMutatingSqlStatement(statement)) {
+    if (isMutatingSqlStatement(statement, backslashEscapes: escapes)) {
       return const McpSqlRefusal('data_modifying', 'Data-modifying statements are not allowed over MCP.');
     }
     if (_selectSideEffects.hasMatch(upper)) {
