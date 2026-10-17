@@ -287,6 +287,14 @@ class LocalExtensionInstaller {
     for (final file in archive) {
       var filename = file.name.replaceAll('\\', '/');
       if (filename.startsWith('__MACOSX/')) continue;
+      // Judge the name as the archive wrote it: a shared `../` root would
+      // otherwise be stripped away together with the prefix.
+      if (!isArchiveEntryNameSafe(filename)) {
+        throw MarketplaceException(
+          'Security violation: Path traversal detected in archive entry '
+          '"${file.name}"',
+        );
+      }
       if (stripPrefix.isNotEmpty && filename.startsWith(stripPrefix)) {
         filename = filename.substring(stripPrefix.length);
       }
