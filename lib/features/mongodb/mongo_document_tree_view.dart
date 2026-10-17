@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:mongo_dart/mongo_dart.dart' show ObjectId;
+import 'package:querya_desktop/core/theme/querya_semantic_palette.dart';
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/mongodb/mongo_ejson.dart';
 import 'package:querya_desktop/features/mongodb/mongo_field_codec.dart';
@@ -599,7 +601,8 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
   }) {
     final keyLabel = keyOrIndex is int ? '[$keyOrIndex]' : keyOrIndex.toString();
     final valueDisplay = _formatLeafDisplay(value);
-    final valueColor = _leafValueColor(value, cs);
+    final palette = context.semanticPalette;
+    final valueColor = _leafValueColor(value, cs, palette);
     final typeName = _leafTypeName(value);
 
     final isMatch = _searchQuery.isNotEmpty &&
@@ -705,13 +708,17 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
     return value.toString();
   }
 
-  Color _leafValueColor(Object? value, ColorScheme cs) {
-    if (value == null) return cs.mutedForeground;
-    if (value is String) return const Color(0xFF22C55E); // Green
-    if (value is num) return const Color(0xFF3B82F6); // Blue
-    if (value is bool) return const Color(0xFFF97316); // Orange
-    if (value is ObjectId) return cs.primary; // Primary / Purple
-    if (value is DateTime) return const Color(0xFF06B6D4); // Cyan
+  Color _leafValueColor(
+    Object? value,
+    ColorScheme cs,
+    QueryaSemanticPalette palette,
+  ) {
+    if (value == null) return palette.muted;
+    if (value is String) return palette.type1;
+    if (value is num) return palette.type2;
+    if (value is bool) return palette.type3;
+    if (value is ObjectId) return cs.primary;
+    if (value is DateTime) return palette.type4;
     return cs.foreground;
   }
 

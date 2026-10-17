@@ -262,9 +262,7 @@ class _DestructiveQueryDialogState
                   child: material.Container(
                     padding: const material.EdgeInsets.all(12),
                     decoration: material.BoxDecoration(
-                      color: isDark
-                          ? const material.Color(0xFF141416)
-                          : const material.Color(0xFFF4F4F6),
+                      color: context.workbench.editorBackground,
                       borderRadius: material.BorderRadius.circular(8),
                       border: material.Border.all(
                         color: cs.border.withValues(alpha: 0.6),
@@ -279,9 +277,7 @@ class _DestructiveQueryDialogState
                               QueryaTypography.monoFontFamilyFallback,
                           fontSize: 12.5,
                           height: 1.45,
-                          color: isDark
-                              ? const material.Color(0xFFE2E8F0)
-                              : const material.Color(0xFF1E293B),
+                          color: cs.foreground,
                         ),
                       ),
                     ),

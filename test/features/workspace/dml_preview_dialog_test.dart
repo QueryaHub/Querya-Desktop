@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
+import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/features/workspace/dml_preview_dialog.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 import '../../support/querya_theme_test_shell.dart';
 
 void main() {
-  material.Widget buildTestDialog({required TableMutationPlan plan, void Function(bool?)? onResult}) {
+  material.Widget buildTestDialog({
+    required TableMutationPlan plan,
+    void Function(bool?)? onResult,
+    QueryaTheme data = QueryaTheme.darkDefault,
+  }) {
     return queryaThemeTestShell(
+      data: data,
       child: material.Material(
         child: material.Builder(
           builder: (context) {
@@ -122,6 +128,41 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('No Primary Key detected'), findsOneWidget);
+    });
+
+    testWidgets(
+        'SQL preview uses workbench editorBackground and foreground (#1644)',
+        (tester) async {
+      await tester.pumpWidget(buildTestDialog(
+        plan: samplePlan,
+        data: QueryaTheme.lightDefault,
+      ));
+      await tester.tap(find.text('Open Dialog'));
+      await tester.pumpAndSettle();
+
+      final selectableTextFinder = find.byType(material.SelectableText);
+      expect(selectableTextFinder, findsOneWidget);
+
+      final container = tester.widget<material.Container>(
+        find
+            .ancestor(
+              of: selectableTextFinder,
+              matching: find.byType(material.Container),
+            )
+            .first,
+      );
+      final deco = container.decoration! as material.BoxDecoration;
+      expect(
+        deco.color,
+        QueryaTheme.lightDefault.workbench.editorBackground,
+      );
+
+      final selectableText =
+          tester.widget<material.SelectableText>(selectableTextFinder);
+      expect(
+        selectableText.style?.color,
+        QueryaTheme.lightDefault.colorScheme.foreground,
+      );
     });
   });
 }
