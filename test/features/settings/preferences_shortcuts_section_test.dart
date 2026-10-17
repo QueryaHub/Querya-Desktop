@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/theme/querya_theme.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/settings/preferences_shortcuts_section.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
+
+import '../../support/querya_theme_test_shell.dart';
 
 void main() {
   Widget buildTestWidget({String searchQuery = ''}) {
@@ -103,6 +107,37 @@ void main() {
 
       expect(find.text('No shortcuts match "xyzunknown"'), findsOneWidget);
       expect(find.text('Execute query / selection'), findsNothing);
+    });
+
+    testWidgets('uses mono font fallback and does not overflow under narrow constraints (#1652)',
+        (tester) async {
+      tester.view.physicalSize = const material.Size(320, 600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          data: QueryaTheme.darkDefault,
+          child: const material.Scaffold(
+            body: material.SingleChildScrollView(
+              child: PreferencesShortcutsSection(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // No RenderFlex overflow should occur.
+      expect(tester.takeException(), isNull);
+
+      // Verify mono font and fallback stack on keycaps.
+      final f5Key = tester.widget<material.Text>(find.text('F5').first);
+      expect(f5Key.style?.fontFamily, QueryaTypography.mono);
+      expect(
+        f5Key.style?.fontFamilyFallback,
+        QueryaTypography.monoFontFamilyFallback,
+      );
     });
   });
 }

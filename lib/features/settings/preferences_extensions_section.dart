@@ -96,6 +96,7 @@ class PreferencesExtensionsSectionState
   @override
   material.Widget build(material.BuildContext context) {
     final busy = _installing || _openingFolder;
+    final wb = context.workbench;
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.start,
       children: [
@@ -126,11 +127,47 @@ class PreferencesExtensionsSectionState
         ),
         if (_error != null) ...[
           const material.SizedBox(height: 10),
-          Text(_error!).small().foreground(),
+          material.Row(
+            children: [
+              material.Icon(
+                material.Icons.error_outline_rounded,
+                size: 14,
+                color: wb.destructive,
+              ),
+              const Gap(6),
+              material.Expanded(
+                child: material.Text(
+                  _error!,
+                  style: material.TextStyle(
+                    fontSize: 12,
+                    color: wb.destructive,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
         if (_success != null) ...[
           const material.SizedBox(height: 10),
-          Text(_success!).muted().small(),
+          material.Row(
+            children: [
+              material.Icon(
+                material.Icons.check_circle_outline_rounded,
+                size: 14,
+                color: wb.success,
+              ),
+              const Gap(6),
+              material.Expanded(
+                child: material.Text(
+                  _success!,
+                  style: material.TextStyle(
+                    fontSize: 12,
+                    color: wb.success,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ],
     );
