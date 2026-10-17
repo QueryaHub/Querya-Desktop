@@ -232,12 +232,21 @@ class QueryaPlatformMenuBar extends StatelessWidget {
                     );
                   },
                 ),
-                const PlatformMenuItem(
+                // Without onSelected the item is drawn disabled (#1590).
+                PlatformMenuItem(
                   label: 'Copy',
-                  shortcut: SingleActivator(
+                  shortcut: const SingleActivator(
                     LogicalKeyboardKey.keyC,
                     meta: true,
                   ),
+                  onSelected: () {
+                    final focusCtx =
+                        FocusManager.instance.primaryFocus?.context ?? context;
+                    Actions.maybeInvoke(
+                      focusCtx,
+                      CopySelectionTextIntent.copy,
+                    );
+                  },
                 ),
                 PlatformMenuItem(
                   label: 'Paste',

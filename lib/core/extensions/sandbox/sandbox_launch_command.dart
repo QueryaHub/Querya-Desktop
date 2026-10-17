@@ -140,8 +140,8 @@ class SandboxLaunchCommand {
     String? extensionRoot,
   }) {
     final profile = buildMacOsSeatbeltProfile(
-      scratchPath: scratchPath,
-      extensionRoot: extensionRoot,
+      scratchPath: realPathOrSelf(scratchPath),
+      extensionRoot: extensionRoot == null ? null : realPathOrSelf(extensionRoot),
     );
     return SandboxLaunchCommand(
       executable: 'sandbox-exec',
@@ -155,6 +155,26 @@ class SandboxLaunchCommand {
     );
   }
 }
+
+/// [path] with its symbolic links resolved, or [path] itself when it does not
+/// exist or cannot be resolved.
+///
+/// Seatbelt matches `subpath` against the real path. The macOS temporary
+/// folder is under `/var`, a link to `/private/var`, so a profile that names
+/// `/var/folders/...` never matched and the extension could not write its
+/// scratch directory (#1590).
+String realPathOrSelf(String path) {
+  try {
+    return Directory(path).resolveSymbolicLinksSync();
+  } on FileSystemException {
+    return path;
+  }
+}
+
+/// [value] as a Seatbelt (SBPL) string literal: a quote or a backslash in a
+/// path must not end the string and change the rule (#1590).
+String seatbeltString(String value) =>
+    '"${value.replaceAll(r'\', r'\\').replaceAll('"', r'\"')}"';
 
 /// Seatbelt (sandbox-exec) profile allowing network + scratch RW only,
 /// explicitly denying access to host user credentials and home directories (/Users).
@@ -171,10 +191,12 @@ String buildMacOsSeatbeltProfile({
     ..writeln('(allow network*)')
     ..writeln('(allow file-read*)')
     ..writeln('(deny file-read* (subpath "/Users"))')
-    ..writeln('(allow file-write* (subpath "$scratchPath"))')
-    ..writeln('(allow file-read* (subpath "$scratchPath"))');
+    ..writeln('(allow file-write* (subpath ${seatbeltString(scratchPath)}))')
+    ..writeln('(allow file-read* (subpath ${seatbeltString(scratchPath)}))');
   if (extensionRoot != null && extensionRoot.isNotEmpty) {
-    buffer.writeln('(allow file-read* (subpath "$extensionRoot"))');
+    buffer.writeln(
+      '(allow file-read* (subpath ${seatbeltString(extensionRoot)}))',
+    );
   }
   return buffer.toString().trimRight();
 }
