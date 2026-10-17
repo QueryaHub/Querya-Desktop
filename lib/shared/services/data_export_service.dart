@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:math' as math;
 
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:querya_desktop/core/csv/result_grid_csv.dart';
 
@@ -74,27 +76,37 @@ class DataExportService {
   ) {
     if (columns.isEmpty) return '';
     final buf = StringBuffer();
+    _writeMarkdownHeader(buf, columns);
+    _writeMarkdownRows(buf, columns, rows);
+    return buf.toString();
+  }
 
-    String escapeMd(String s) {
-      if (s == 'NULL') return '`NULL`';
-      return s
-          .replaceAll('|', '\\|')
-          .replaceAll('\r\n', ' ')
-          .replaceAll('\n', ' ');
-    }
+  static String _escapeMd(String s) {
+    if (s == 'NULL') return '`NULL`';
+    return s
+        .replaceAll('|', '\\|')
+        .replaceAll('\r\n', ' ')
+        .replaceAll('\n', ' ');
+  }
 
-    buf.write('| ${columns.map(escapeMd).join(' | ')} |\n');
+  static void _writeMarkdownHeader(StringBuffer buf, List<String> columns) {
+    buf.write('| ${columns.map(_escapeMd).join(' | ')} |\n');
     buf.write('| ${columns.map((_) => '---').join(' | ')} |\n');
+  }
 
+  static void _writeMarkdownRows(
+    StringBuffer buf,
+    List<String> columns,
+    List<List<String>> rows,
+  ) {
     for (final row in rows) {
       final padded = List<String>.generate(
         columns.length,
-        (i) => i < row.length ? escapeMd(row[i]) : '`NULL`',
+        (i) => i < row.length ? _escapeMd(row[i]) : '`NULL`',
         growable: false,
       );
       buf.write('| ${padded.join(' | ')} |\n');
     }
-    return buf.toString();
   }
 
   /// Formats rows as SQL INSERT statements (`INSERT INTO table (...) VALUES (...);`).
@@ -147,13 +159,52 @@ class DataExportService {
     await Clipboard.setData(ClipboardData(text: text));
   }
 
-  /// Formats data on a background isolate to prevent UI stutter on large datasets.
+  /// About how many cells one isolate hand-off in [formatAsync] carries.
+  ///
+  /// The rows a closure captures are copied on the calling isolate before the
+  /// worker starts: 50,000 x 20 cells in one closure stopped the UI for
+  /// ~20-30 ms; 20,000 cells take a few ms, and the event loop runs between
+  /// chunks (#1537).
+  @visibleForTesting
+  static const int handOffCells = 20000;
+
+  /// Formats data on background isolates to prevent UI stutter on large
+  /// datasets. Large inputs go over in chunks of about [handOffCells] cells;
+  /// the result is the same text as the `format*` functions produce.
   static Future<String> formatAsync(
     DataExportFormat format, {
     required List<String> columns,
     required List<List<String>> rows,
     String tableName = 'export_table',
-  }) {
+  }) async {
+    final width = math.max(1, columns.length);
+    if (columns.isEmpty || rows.length * width <= handOffCells) {
+      return _formatInIsolate(format, columns, rows, tableName);
+    }
+    final chunkRows = math.max(1, handOffCells ~/ width);
+    final parts = <String>[];
+    for (var start = 0; start < rows.length; start += chunkRows) {
+      final end = math.min(start + chunkRows, rows.length);
+      parts.add(await _formatChunkInIsolate(
+        format,
+        columns,
+        rows.sublist(start, end),
+        tableName,
+        first: start == 0,
+        last: end == rows.length,
+      ));
+    }
+    return parts.join();
+  }
+
+  // Separate functions so each closure captures only its own arguments: a
+  // closure created inside [formatAsync] would carry the whole `rows` along.
+  static Future<String> _formatInIsolate(
+    DataExportFormat format,
+    List<String> columns,
+    List<List<String>> rows,
+    String tableName,
+  ) {
     return Isolate.run(() {
       switch (format) {
         case DataExportFormat.csv:
@@ -166,6 +217,61 @@ class DataExportService {
           return formatSqlInsertDump(tableName, columns, rows);
       }
     });
+  }
+
+  static Future<String> _formatChunkInIsolate(
+    DataExportFormat format,
+    List<String> columns,
+    List<List<String>> rows,
+    String tableName, {
+    required bool first,
+    required bool last,
+  }) {
+    return Isolate.run(() => formatChunk(
+          format,
+          columns,
+          rows,
+          tableName,
+          first: first,
+          last: last,
+        ));
+  }
+
+  /// The part of the whole document that the non-empty [rows] make, when
+  /// they are a chunk of a larger table: joined in order, the chunks give
+  /// exactly what the `format*` function gives for all the rows. [first]
+  /// adds the header (and JSON's `[`), [last] JSON's `]`.
+  @visibleForTesting
+  static String formatChunk(
+    DataExportFormat format,
+    List<String> columns,
+    List<List<String>> rows,
+    String tableName, {
+    required bool first,
+    required bool last,
+  }) {
+    switch (format) {
+      case DataExportFormat.csv:
+        if (first) return resultGridAsCsv(columns, rows);
+        final buf = StringBuffer();
+        for (final row in rows) {
+          buf.write('\n');
+          buf.write(formatCsvDataRow(row, columns.length));
+        }
+        return buf.toString();
+      case DataExportFormat.json:
+        // An indented array is `[\n`, the items joined by `,\n`, `\n]`.
+        final whole = formatJson(columns, rows);
+        final items = whole.substring(2, whole.length - 2);
+        return '${first ? '[\n' : ',\n'}$items${last ? '\n]' : ''}';
+      case DataExportFormat.markdown:
+        final buf = StringBuffer();
+        if (first) _writeMarkdownHeader(buf, columns);
+        _writeMarkdownRows(buf, columns, rows);
+        return buf.toString();
+      case DataExportFormat.sqlDump:
+        return formatSqlInsertDump(tableName, columns, rows);
+    }
   }
 
   /// Streams formatted output to [sink] without assembling one giant [String].
