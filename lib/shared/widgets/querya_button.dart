@@ -293,6 +293,48 @@ class _QueryaButtonState extends material.State<QueryaButton> {
   }
 
 
+  /// The label on one line with an ellipsis. With [showWhenCut] it is
+  /// measured against the width it gets, and only a label that does not fit
+  /// gets a tooltip with its full text, so a button that fits shows none.
+  static material.Widget _label(
+    material.BuildContext context,
+    String label,
+    material.TextStyle style, {
+    required bool showWhenCut,
+  }) {
+    final text = material.Text(
+      label,
+      maxLines: 1,
+      overflow: material.TextOverflow.ellipsis,
+      softWrap: false,
+      style: style,
+    );
+    if (!showWhenCut) return text;
+    return material.LayoutBuilder(
+      builder: (context, constraints) {
+        if (!constraints.hasBoundedWidth) return text;
+        final painter = material.TextPainter(
+          text: material.TextSpan(
+            text: label,
+            style: material.DefaultTextStyle.of(context).style.merge(style),
+          ),
+          maxLines: 1,
+          textDirection: material.Directionality.of(context),
+          textScaler: material.MediaQuery.textScalerOf(context),
+        )..layout();
+        final cut = painter.width > constraints.maxWidth + 0.5;
+        painter.dispose();
+        if (!cut) return text;
+        return material.Tooltip(
+          message: label,
+          waitDuration: kQueryaTooltipWait,
+          excludeFromSemantics: true,
+          child: text,
+        );
+      },
+    );
+  }
+
   @override
   material.Widget build(material.BuildContext context) {
     final w = widget;
@@ -370,17 +412,18 @@ class _QueryaButtonState extends material.State<QueryaButton> {
       if (!iconOnly) ...[
         if (leading != null) material.SizedBox(width: gap),
         material.Flexible(
-          child: material.Text(
+          child: _label(
+            context,
             w.label!,
-            maxLines: 1,
-            overflow: material.TextOverflow.ellipsis,
-            softWrap: false,
-            style: material.TextStyle(
+            material.TextStyle(
               fontSize: fontSize,
               fontWeight: material.FontWeight.w500,
               height: 1.2,
               color: foreground,
             ),
+            // An explicit tooltip wins; otherwise a label cut short by a
+            // narrow toolbar shows in full on hover (#1689).
+            showWhenCut: w.tooltip == null || w.tooltip!.isEmpty,
           ),
         ),
         if (w.shortcutHint != null) ...[

@@ -277,4 +277,44 @@ void main() {
       isFalse,
     );
   });
+
+  group('QueryaButton truncated label (#1689)', () {
+    const long = 'Export the current result set as CSV';
+    Finder tooltipWith(String message) => find.byWidgetPredicate(
+          (w) => w is material.Tooltip && w.message == message,
+        );
+
+    testWidgets('a label cut short shows its full text as a tooltip',
+        (tester) async {
+      await tester.pumpWidget(_shell(material.SizedBox(
+        width: 90,
+        child: QueryaButton.secondary(label: long, onPressed: () {}),
+      )));
+
+      expect(tooltipWith(long), findsOneWidget);
+    });
+
+    testWidgets('a label that fits gets no tooltip', (tester) async {
+      await tester.pumpWidget(_shell(material.SizedBox(
+        width: 240,
+        child: QueryaButton.secondary(label: 'Save', onPressed: () {}),
+      )));
+
+      expect(find.byType(material.Tooltip), findsNothing);
+    });
+
+    testWidgets('an explicit tooltip wins over the cut label', (tester) async {
+      await tester.pumpWidget(_shell(material.SizedBox(
+        width: 90,
+        child: QueryaButton.secondary(
+          label: long,
+          tooltip: 'Export as CSV',
+          onPressed: () {},
+        ),
+      )));
+
+      expect(tooltipWith(long), findsNothing);
+      expect(tooltipWith('Export as CSV'), findsOneWidget);
+    });
+  });
 }
