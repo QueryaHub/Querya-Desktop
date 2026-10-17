@@ -23,8 +23,9 @@ TableDataPage _catalog(String sql) {
         ['orgs', 'region_id', 'regions', 'id'],
       ]);
     }
-    if (sql == ErdCatalog.columnsSql(d) ||
-        sql == ErdCatalog.columnsSql(d, schema: 'public')) {
+    final columns = _unfiltered(sql);
+    if (columns == ErdCatalog.columnsSql(d) ||
+        columns == ErdCatalog.columnsSql(d, schema: 'public')) {
       return const TableDataPage(columns: ['t', 'c', 'ty', 'pk'], rows: [
         ['users', 'id', 'integer', '1'],
         ['users', 'org_id', 'integer', '0'],
@@ -54,6 +55,10 @@ Iterable<double> _opacityOf(WidgetTester t, String table) =>
       of: _card(table),
       matching: find.byType(material.Opacity),
     )).map((o) => o.opacity);
+
+/// [sql] without the table-name filter `columnsSql(tables: ...)` adds (#1572).
+String _unfiltered(String sql) => sql.replaceAll(
+    RegExp(r"\n  AND (c\.relname|c\.table_name|m\.name) IN \([^)]*\)"), '');
 
 void main() {
   setUp(() => TableViewCommandBridge.instance.resetForTest());
