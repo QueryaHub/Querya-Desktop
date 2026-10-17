@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:querya_desktop/core/platform/macos_sandbox.dart';
 
 import '../app_updater_service.dart';
 
@@ -92,6 +93,12 @@ class UpdateInstallContext {
   /// translocated copy, or a folder this user cannot write (`/Applications`
   /// for a standard user, a mounted disk image).
   String? macAppBundleReplaceProblemFor(String bundle) {
+    // The sandbox cannot write outside its container, so the replace script
+    // would quit the app and fail (#1593).
+    if (MacOsSandbox.detect(environment)) {
+      return 'Querya Desktop is running in the macOS App Sandbox and cannot '
+          'replace itself. Download the new version from the release page.';
+    }
     if (bundle.contains('/AppTranslocation/')) {
       return 'macOS is running Querya Desktop from a temporary copy, because '
           'it was opened where it was downloaded. Move Querya Desktop to the '

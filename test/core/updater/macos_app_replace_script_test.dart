@@ -162,6 +162,18 @@ void main() {
       );
     });
 
+    test('a sandboxed app cannot replace itself (#1593)', () {
+      final sandboxed = UpdateInstallContext(
+        environment: const {'APP_SANDBOX_CONTAINER_ID': 'com.queryahub.querya'},
+        resolvedExecutable: '/Applications/Querya.app/Contents/MacOS/q',
+        isDirectoryWritable: (_) => true,
+      );
+      expect(
+        sandboxed.macAppBundleReplaceProblemFor('/Applications/Querya.app'),
+        contains('App Sandbox'),
+      );
+    });
+
     test('a folder this user cannot write, such as a disk image', () {
       expect(
         context(writable: false)

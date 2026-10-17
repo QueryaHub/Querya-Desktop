@@ -5,6 +5,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/extensions/extension_paths.dart';
 import 'package:querya_desktop/core/extensions/local_extension_installer.dart';
 import 'package:querya_desktop/core/market/marketplace_repository.dart';
+import 'package:querya_desktop/core/platform/macos_sandbox.dart';
 import 'package:querya_desktop/core/platform/open_directory.dart';
 import 'package:querya_desktop/features/settings/preferences_controls.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -106,6 +107,13 @@ class PreferencesExtensionsSectionState
           'Install a local .zip or .qext package without the Marketplace. '
           'Useful for development and offline environments.',
         ),
+        if (MacOsSandbox.isActive) ...[
+          const material.SizedBox(height: 8),
+          PreferencesHint(
+            key: const material.ValueKey('extensions_sandbox_notice'),
+            MacOsSandbox.unavailable('Running extensions'),
+          ),
+        ],
         const material.SizedBox(height: 12),
         material.Wrap(
           spacing: 8,

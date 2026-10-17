@@ -5,6 +5,7 @@ import 'package:querya_desktop/core/extensions/local_extension_installer.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/extensions/models/extension_type.dart';
 import 'package:querya_desktop/core/market/marketplace_repository.dart';
+import 'package:querya_desktop/core/platform/macos_sandbox.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/features/settings/preferences_extensions_section.dart';
 
@@ -45,6 +46,37 @@ void main() {
       expect(find.text('Extensions'), findsOneWidget);
       expect(find.text('Install from file…'), findsOneWidget);
       expect(find.text('Open extensions folder'), findsOneWidget);
+    });
+
+    testWidgets('says extensions cannot run in the macOS sandbox (#1593)',
+        (tester) async {
+      MacOsSandbox.debugOverride = true;
+      addTearDown(() => MacOsSandbox.debugOverride = null);
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: const material.Scaffold(body: PreferencesExtensionsSection()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const material.ValueKey('extensions_sandbox_notice')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('outside the sandbox there is no notice', (tester) async {
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: const material.Scaffold(body: PreferencesExtensionsSection()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const material.ValueKey('extensions_sandbox_notice')),
+        findsNothing,
+      );
     });
 
     testWidgets('renders installation error with wb.destructive and error icon (#1651)',
