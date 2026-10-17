@@ -15,6 +15,7 @@ import 'core/mcp/mcp_server_controller.dart';
 import 'core/motion/display_refresh_service.dart';
 import 'core/motion/querya_motion_controller.dart';
 import 'core/platform/file_launch_service.dart';
+import 'core/platform/macos_file_open_channel.dart';
 import 'core/security/ssl_certificate_support.dart';
 import 'core/storage/local_db.dart';
 import 'core/theme/theme_controller.dart';
@@ -26,6 +27,7 @@ void main([List<String> args = const []]) async {
     WidgetsFlutterBinding.ensureInitialized();
     installAppWiring();
     FileLaunchService.instance.processLaunchArguments(args);
+    await MacOsFileOpenChannel.install();
 
     FlutterError.onError = (details) {
       FlutterError.presentError(details);

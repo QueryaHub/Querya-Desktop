@@ -1,0 +1,39 @@
+name: macOS build
+
+# The PR checks run on Linux, so Swift in macos/Runner was first compiled by
+# the release workflow on a tag. This builds the macOS app on pull requests
+# that touch the native side (#1589).
+on:
+  pull_request:
+    branches: [ main, dev ]
+    paths:
+      - 'macos/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.github/workflows/macos-build.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: macos-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build macOS (release, unsigned)
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.1'
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build macOS (release)
+        run: flutter build macos --release
