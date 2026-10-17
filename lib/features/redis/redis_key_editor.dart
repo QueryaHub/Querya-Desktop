@@ -183,7 +183,6 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       _success = null;
     });
     try {
-      await widget.connection.selectDatabase(widget.database);
       _ttl = await widget.connection.ttl(_cmdKey);
       _effectiveType = await _resolveType();
 
@@ -257,7 +256,6 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     if (_loadingMore) return;
     if (!reset && mounted) setState(() => _loadingMore = true);
     try {
-      await widget.connection.selectDatabase(widget.database);
       switch (_effectiveType) {
         case 'hash':
           if (reset) {
@@ -330,7 +328,6 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     if (widget.isReadOnly) return;
     if (_effectiveType != 'string' || _stringIsBinary) return;
     try {
-      await widget.connection.selectDatabase(widget.database);
       await widget.connection.set(
         _cmdKey,
         _stringController.text,
@@ -358,7 +355,6 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     if (trimmedNew == _currentKeyName) return;
 
     try {
-      await widget.connection.selectDatabase(widget.database);
       final exists = (await widget.connection.exists(trimmedNew)) > 0;
       if (exists && mounted) {
         final confirmed = await confirmDestructiveAction(
@@ -399,7 +395,6 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     );
     if (!mounted || !confirmed) return;
     try {
-      await widget.connection.selectDatabase(widget.database);
       await widget.connection.del(_cmdKey);
       widget.onKeyDeleted?.call();
     } catch (e) {
@@ -411,7 +406,6 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   Future<void> _setTtl(int seconds) async {
     if (widget.isReadOnly) return;
     try {
-      await widget.connection.selectDatabase(widget.database);
       if (seconds > 0) {
         await widget.connection.expire(_cmdKey, seconds);
       } else {
@@ -433,7 +427,6 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   Future<void> _hashSet(String field, String value) async {
     if (widget.isReadOnly) return;
     try {
-      await widget.connection.selectDatabase(widget.database);
       await widget.connection.hset(_cmdKey, field, value);
       await _load();
     } catch (e) {
@@ -453,7 +446,6 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     );
     if (!mounted || !confirmed) return;
     try {
-      await widget.connection.selectDatabase(widget.database);
       await widget.connection.hdel(_cmdKey, field);
       await _load();
     } catch (e) {
@@ -466,7 +458,6 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   Future<void> _listPush(String value) async {
     if (widget.isReadOnly) return;
     try {
-      await widget.connection.selectDatabase(widget.database);
       await widget.connection.rpush(_cmdKey, value);
       await _load();
     } catch (e) {
@@ -482,7 +473,6 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   }) async {
     if (widget.isReadOnly) return;
     try {
-      await widget.connection.selectDatabase(widget.database);
       if (expectedCurrent != null) {
         final current = await widget.connection.lindex(_cmdKey, index);
         if (current == null || current != expectedCurrent) {
@@ -512,7 +502,6 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     );
     if (!mounted || !confirmed) return;
     try {
-      await widget.connection.selectDatabase(widget.database);
       final current = await widget.connection.lindex(_cmdKey, index);
       if (current == null || current != item) {
         await _load();
@@ -550,7 +539,6 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   Future<void> _setAdd(String member) async {
     if (widget.isReadOnly) return;
     try {
-      await widget.connection.selectDatabase(widget.database);
       await widget.connection.sadd(_cmdKey, member);
       await _load();
     } catch (e) {
@@ -570,7 +558,6 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     );
     if (!mounted || !confirmed) return;
     try {
-      await widget.connection.selectDatabase(widget.database);
       await widget.connection.srem(_cmdKey, member);
       await _load();
     } catch (e) {
@@ -583,7 +570,6 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
   Future<void> _zsetAdd(String member, double score) async {
     if (widget.isReadOnly) return;
     try {
-      await widget.connection.selectDatabase(widget.database);
       await widget.connection.zadd(_cmdKey, score, member);
       await _load();
     } catch (e) {
@@ -603,7 +589,6 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     );
     if (!mounted || !confirmed) return;
     try {
-      await widget.connection.selectDatabase(widget.database);
       await widget.connection.zrem(_cmdKey, member);
       await _load();
     } catch (e) {

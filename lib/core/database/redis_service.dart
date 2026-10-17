@@ -12,8 +12,12 @@ enum RedisSessionRole {
   /// Overview INFO polling (kept alive under Explorer).
   stats,
 
-  /// Keys/editor SCAN/GET/SET plus `SELECT`.
+  /// Keys view and key editor of one database: SCAN/GET/SET/DEL.
   explorer,
+
+  /// The CLI console. Its own socket, so a `SELECT` typed there moves only
+  /// the console and not the explorer next to it (#1569).
+  cli,
 }
 
 /// Service for Redis connections (Dart redis package, no Java).
@@ -23,22 +27,27 @@ class RedisService {
 
   final Map<String, RedisConnection> _connections = {};
 
-  String _key(int id, RedisSessionRole role) => '$id::${role.name}';
+  /// One socket per connection, role and database. A socket never switches
+  /// database for a view, so a command cannot land in another view's database
+  /// between a `SELECT` and the command (#1569).
+  String _key(int id, RedisSessionRole role, int database) =>
+      '$id::${role.name}::$database';
 
-  /// Returns the existing socket for [role], or creates one without touching
-  /// the other role.
+  /// Returns the existing socket for [role] and [database], or creates one
+  /// without touching the others.
   RedisConnection acquire(
     ConnectionRow row, {
     required RedisSessionRole role,
+    int database = 0,
   }) {
     if (row.type != 'redis') {
       throw ArgumentError('Connection type must be redis');
     }
     final id = row.id ?? 0;
-    final k = _key(id, role);
+    final k = _key(id, role, database);
     final existing = _connections[k];
     if (existing != null) return existing;
-    final conn = RedisConnection.fromConnectionRow(row);
+    final conn = RedisConnection.fromConnectionRow(row)..database = database;
     _connections[k] = conn;
     return conn;
   }
@@ -54,7 +63,7 @@ class RedisService {
     }
 
     final id = row.id ?? 0;
-    final k = _key(id, role);
+    final k = _key(id, role, 0);
 
     final existing = _connections.remove(k);
     if (existing != null) {
@@ -69,8 +78,9 @@ class RedisService {
   RedisConnection? getConnection(
     int id, {
     RedisSessionRole role = RedisSessionRole.stats,
+    int database = 0,
   }) =>
-      _connections[_key(id, role)];
+      _connections[_key(id, role, database)];
 
   Future<void> connect(RedisConnection connection) async {
     await connection.connect();
@@ -82,10 +92,15 @@ class RedisService {
     await connection.disconnect();
   }
 
-  /// Awaits close of every role for [id] (user Disconnect).
+  /// Awaits close of every role and database for [id] (user Disconnect).
   Future<void> disconnectByConnectionId(int id) async {
-    for (final role in RedisSessionRole.values) {
-      final conn = _connections.remove(_key(id, role));
+    final prefix = '$id::';
+    final keys = [
+      for (final k in _connections.keys)
+        if (k.startsWith(prefix)) k,
+    ];
+    for (final k in keys) {
+      final conn = _connections.remove(k);
       if (conn != null) await conn.disconnect();
     }
   }
