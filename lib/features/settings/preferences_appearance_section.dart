@@ -152,12 +152,10 @@ class _PreferencesAppearanceSectionState
         final themes = c.availableThemes;
         final refreshingThemes = c.isLoadingAvailableThemes;
 
-    return material.SingleChildScrollView(
-      primary: false,
-      child: material.Column(
-        crossAxisAlignment: material.CrossAxisAlignment.start,
-        children: [
-          const Text('Appearance').semiBold().small().foreground(),
+        return material.Column(
+          crossAxisAlignment: material.CrossAxisAlignment.start,
+          children: [
+            const Text('Appearance').semiBold().small().foreground(),
           const material.SizedBox(height: 8),
           PreferencesFieldRow(
             label: 'Theme mode',
@@ -365,10 +363,9 @@ class _PreferencesAppearanceSectionState
             'Install from URL requires HTTPS and optional SHA-256 verification. '
             'VS Code JSON/JSONC (.colors subset) and Querya custom JSON are supported.',
           ),
-        ],
-      ),
+          ],
+        );
+      },
     );
-  },
-);
   }
 }

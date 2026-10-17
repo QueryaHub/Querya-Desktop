@@ -4,6 +4,7 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
 import 'package:querya_desktop/shared/widgets/app_dialog.dart';
@@ -180,7 +181,11 @@ void main() {
 
       final filter = tester.widget<BackdropFilter>(find.byType(BackdropFilter));
       expect(filter.filter, fullFilter);
-      expect(tintOf(tester), fullTint);
+      // The tint is the theme's shadow colour (#1509), at full alpha here.
+      expect(
+        tintOf(tester),
+        ctx.workbenchOrDefault.shadow.withValues(alpha: fullTint.a),
+      );
       expect(
         find.ancestor(
           of: find.byType(BackdropFilter),
