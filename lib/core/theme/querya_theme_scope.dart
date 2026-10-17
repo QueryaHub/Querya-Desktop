@@ -59,6 +59,17 @@ extension QueryaThemeContext on BuildContext {
 
   QueryaTheme get queryaTheme => QueryaThemeScope.of(this);
 
+  /// The brightness the defaults below follow when there is no
+  /// [QueryaThemeScope]: the shadcn theme's, else Material's. [colors] asserts
+  /// without a shadcn theme, and these defaults exist for exactly that case
+  /// (a widget under a bare app, as in tests).
+  Brightness get _ambientBrightness =>
+      dependOnInheritedWidgetOfExactType<shadcn.Theme>()
+          ?.data
+          .colorScheme
+          .brightness ??
+      material.Theme.of(this).brightness;
+
   QueryaWorkbenchTheme get workbench => workbenchOrDefault;
 
   /// The workbench tokens of the nearest [QueryaThemeScope], or the defaults
@@ -67,20 +78,20 @@ extension QueryaThemeContext on BuildContext {
   /// scope.
   QueryaWorkbenchTheme get workbenchOrDefault =>
       QueryaThemeScope.maybeOf(this)?.workbench ??
-      (colors.brightness == Brightness.light
+      (_ambientBrightness == Brightness.light
           ? QueryaWorkbenchTheme.lightDefault
           : QueryaWorkbenchTheme.darkDefault);
 
   QueryaEditorTheme get editorTheme =>
       QueryaThemeScope.maybeOf(this)?.editor ??
-      (colors.brightness == Brightness.light
+      (_ambientBrightness == Brightness.light
           ? QueryaEditorTheme.lightDefault
           : QueryaEditorTheme.darkDefault);
 
   QueryaSemanticPalette get semanticPalette =>
       QueryaSemanticPalette.fromTheme(
         QueryaThemeScope.maybeOf(this) ??
-            (colors.brightness == Brightness.light
+            (_ambientBrightness == Brightness.light
                 ? QueryaTheme.lightDefault
                 : QueryaTheme.darkDefault),
       );
