@@ -580,98 +580,205 @@ class MqlParser {
     return json.decode(normalized);
   }
 
-  /// Normalizes JavaScript object literal syntax into valid JSON:
-  /// - Quote unquoted keys: `{ foo: "bar" }` -> `{ "foo": "bar" }`
-  /// - Single quotes to double quotes: `'foo'` -> `"foo"`
-  /// - Constructor function handling inside objects/arrays
+  /// Normalizes a mongosh object literal into JSON, in one pass over [input]
+  /// (#1513, #1539):
+  /// - unquoted keys after `{`, `[` or `,` are quoted: `{ foo: 1 }`;
+  /// - `'single'` and `"double"` strings become JSON strings, with their
+  ///   JavaScript escapes (`\n`, `\'`, `\"`, `\\`, `\xXX`, `\uXXXX`) decoded;
+  /// - outside strings only: `ObjectId("hex")` -> `{"$oid":"hex"}`,
+  ///   `ISODate("...")` -> `{"$date":"..."}`, `NumberLong(n)` / `NumberInt(n)`
+  ///   -> `n`.
+  ///
+  /// It used to swap strings for `@@@STR_n@@@` markers and put them back with
+  /// one `replaceAll` over the whole query per string: quadratic (an
+  /// `insertMany` of 1,000 documents took over a second), and a string that
+  /// contained a marker, a constructor call or an escape came out changed.
   static String _normalizeJsObject(String input) {
-    var s = input;
-
-    // Replace ObjectId("hex") with {"$oid": "hex"}
-    s = s.replaceAllMapped(
-      RegExp(r'ObjectId\s*\(\s*["\x27]([0-9a-fA-F]{24})["\x27]\s*\)'),
-      (m) => '{"\$oid":"${m[1]}"}',
-    );
-
-    // Replace ISODate("...") with {"$date": "..."}
-    s = s.replaceAllMapped(
-      RegExp(r'ISODate\s*\(\s*["\x27]([^"\x27]+)["\x27]\s*\)'),
-      (m) => '{"\$date":"${m[1]}"}',
-    );
-
-    // Replace NumberLong(...) / NumberInt(...) with numeric literal
-    s = s.replaceAllMapped(
-      RegExp(r'(?:NumberLong|NumberInt)\s*\(\s*["\x27]?(\d+)["\x27]?\s*\)'),
-      (m) => '${m[1]}',
-    );
-
-    // Tokenize strings to preserve quotes and contents
-    final strings = <String>[];
-    final tokenized = StringBuffer();
-    var inSingle = false;
-    var inDouble = false;
-    var escaped = false;
-    var currentStr = StringBuffer();
-
-    for (var i = 0; i < s.length; i++) {
-      final char = s[i];
-      if (escaped) {
-        currentStr.write(char);
-        escaped = false;
-        continue;
-      }
-      if (char == r'\') {
-        currentStr.write(char);
-        escaped = true;
-        continue;
-      }
-      if (char == "'" && !inDouble) {
-        if (inSingle) {
-          inSingle = false;
-          final placeholder = '@@@STR_${strings.length}@@@';
-          strings.add(json.encode(currentStr.toString()));
-          tokenized.write(placeholder);
-          currentStr.clear();
-        } else {
-          inSingle = true;
+    final out = StringBuffer();
+    final n = input.length;
+    var i = 0;
+    var prev = -1; // the last non-blank code unit written
+    while (i < n) {
+      final c = input.codeUnitAt(i);
+      if (c == 0x22 || c == 0x27) {
+        final str = _scanJsString(input, i);
+        if (str == null) {
+          // Unterminated: left as typed, for json.decode to report.
+          out.write(input.substring(i));
+          break;
         }
+        out.write(json.encode(str.value));
+        prev = 0x22;
+        i = str.end;
         continue;
       }
-      if (char == '"' && !inSingle) {
-        if (inDouble) {
-          inDouble = false;
-          final placeholder = '@@@STR_${strings.length}@@@';
-          strings.add(json.encode(currentStr.toString()));
-          tokenized.write(placeholder);
-          currentStr.clear();
-        } else {
-          inDouble = true;
+      if (_isWordChar(c)) {
+        var j = i + 1;
+        while (j < n && _isWordChar(input.codeUnitAt(j))) {
+          j++;
         }
+        final word = input.substring(i, j);
+        final call = _scanBsonCall(input, word, j);
+        if (call != null) {
+          out.write(call.json);
+          prev = 0x7D;
+          i = call.end;
+          continue;
+        }
+        final next = _skipBlanks(input, j);
+        final isKey = (prev == 0x7B || prev == 0x5B || prev == 0x2C) &&
+            next < n &&
+            input.codeUnitAt(next) == 0x3A;
+        if (isKey) {
+          out
+            ..write('"')
+            ..write(word)
+            ..write('"');
+        } else {
+          out.write(word);
+        }
+        prev = word.codeUnitAt(word.length - 1);
+        i = j;
         continue;
       }
-
-      if (inSingle || inDouble) {
-        currentStr.write(char);
-      } else {
-        tokenized.write(char);
-      }
+      out.writeCharCode(c);
+      if (!_isBlank(c)) prev = c;
+      i++;
     }
-
-    var processed = tokenized.toString();
-
-    // Quote unquoted object keys: e.g. `{ key: ` or `, key: `
-    processed = processed.replaceAllMapped(
-      RegExp(r'([{\[,]\s*)([a-zA-Z0-9_\$]+)\s*:'),
-      (m) => '${m[1]}"${m[2]}":',
-    );
-
-    // Restore strings
-    for (var i = 0; i < strings.length; i++) {
-      processed = processed.replaceAll('@@@STR_$i@@@', strings[i]);
-    }
-
-    return processed;
+    return out.toString();
   }
+
+  /// `[A-Za-z0-9_$]`: what an unquoted key, `true` / `null` or a number's
+  /// digits are made of.
+  static bool _isWordChar(int c) =>
+      (c >= 0x30 && c <= 0x39) ||
+      (c >= 0x41 && c <= 0x5A) ||
+      (c >= 0x61 && c <= 0x7A) ||
+      c == 0x5F ||
+      c == 0x24;
+
+  static bool _isBlank(int c) =>
+      c == 0x20 || c == 0x09 || c == 0x0A || c == 0x0D;
+
+  static int _skipBlanks(String s, int i) {
+    while (i < s.length && _isBlank(s.codeUnitAt(i))) {
+      i++;
+    }
+    return i;
+  }
+
+  /// The JavaScript string literal that opens at [start] (`'` or `"`): its
+  /// value with the escapes decoded, and the offset after the closing quote.
+  /// Null when it is never closed.
+  static ({String value, int end})? _scanJsString(String s, int start) {
+    final quote = s.codeUnitAt(start);
+    final value = StringBuffer();
+    var i = start + 1;
+    while (i < s.length) {
+      final c = s.codeUnitAt(i);
+      if (c == quote) return (value: value.toString(), end: i + 1);
+      if (c != 0x5C || i + 1 >= s.length) {
+        value.writeCharCode(c);
+        i++;
+        continue;
+      }
+      final e = s.codeUnitAt(i + 1);
+      i += 2;
+      switch (e) {
+        case 0x6E: // n
+          value.writeCharCode(0x0A);
+        case 0x74: // t
+          value.writeCharCode(0x09);
+        case 0x72: // r
+          value.writeCharCode(0x0D);
+        case 0x62: // b
+          value.writeCharCode(0x08);
+        case 0x66: // f
+          value.writeCharCode(0x0C);
+        case 0x76: // v
+          value.writeCharCode(0x0B);
+        case 0x30 when i >= s.length || !_isDigit(s.codeUnitAt(i)): // \0
+          value.writeCharCode(0x00);
+        case 0x78 || 0x75: // x, u
+          final braced = e == 0x75 && i < s.length && s.codeUnitAt(i) == 0x7B;
+          final close = braced ? s.indexOf('}', i) : -1;
+          final from = braced ? i + 1 : i;
+          final to = braced ? close : i + (e == 0x78 ? 2 : 4);
+          final code = to > from && to <= s.length
+              ? int.tryParse(s.substring(from, to), radix: 16)
+              : null;
+          if (code == null) {
+            value.writeCharCode(e); // not a valid escape: the letter itself
+          } else {
+            value.writeCharCode(code);
+            i = braced ? close + 1 : to;
+          }
+        case 0x0D: // line continuation, \r\n or \r
+          if (i < s.length && s.codeUnitAt(i) == 0x0A) i++;
+        case 0x0A: // line continuation
+          break;
+        default: // \' \" \\ \/ and any other character stand for themselves
+          value.writeCharCode(e);
+      }
+    }
+    return null;
+  }
+
+  static bool _isDigit(int c) => c >= 0x30 && c <= 0x39;
+
+  /// `ObjectId(...)`, `ISODate(...)`, `NumberLong(...)` or `NumberInt(...)`
+  /// right after [word] (which ends at [at]), as JSON, and the offset after
+  /// its `)`. Null when [word] is not one of them or the call does not have
+  /// the expected argument; the text is then kept as typed, as before.
+  static ({String json, int end})? _scanBsonCall(
+    String s,
+    String word,
+    int at,
+  ) {
+    if (word != 'ObjectId' &&
+        word != 'ISODate' &&
+        word != 'NumberLong' &&
+        word != 'NumberInt') {
+      return null;
+    }
+    var i = _skipBlanks(s, at);
+    if (i >= s.length || s.codeUnitAt(i) != 0x28) return null; // (
+    i = _skipBlanks(s, i + 1);
+    if (i >= s.length) return null;
+    String? arg;
+    final c = s.codeUnitAt(i);
+    if (c == 0x22 || c == 0x27) {
+      final str = _scanJsString(s, i);
+      if (str == null) return null;
+      arg = str.value;
+      i = str.end;
+    } else if (word.startsWith('Number')) {
+      final from = i;
+      if (s.codeUnitAt(i) == 0x2D) i++; // -
+      while (i < s.length && _isDigit(s.codeUnitAt(i))) {
+        i++;
+      }
+      arg = s.substring(from, i);
+    }
+    if (arg == null) return null;
+    i = _skipBlanks(s, i);
+    if (i >= s.length || s.codeUnitAt(i) != 0x29) return null; // )
+    final end = i + 1;
+    switch (word) {
+      case 'ObjectId':
+        if (!_objectIdHex.hasMatch(arg)) return null;
+        return (json: '{"\$oid":${json.encode(arg)}}', end: end);
+      case 'ISODate':
+        if (arg.isEmpty) return null;
+        return (json: '{"\$date":${json.encode(arg)}}', end: end);
+      default:
+        if (!_integer.hasMatch(arg)) return null;
+        return (json: arg, end: end);
+    }
+  }
+
+  static final RegExp _objectIdHex = RegExp(r'^[0-9a-fA-F]{24}$');
+  static final RegExp _integer = RegExp(r'^-?\d+$');
 }
 
 class _CallInfo {
