@@ -113,7 +113,7 @@ class _DataRow extends material.StatefulWidget {
         sel != null && rowIndex >= sel.startRow && rowIndex <= sel.endRow;
 
     _GridCell cellFor(int c) {
-      final inSelection = rowSelected && c >= sel!.startColumn && c <= sel.endColumn;
+      final inSelection = rowSelected && c >= sel.startColumn && c <= sel.endColumn;
       final columnName = c < columns.length ? columns[c] : '';
       return _GridCell(
         key: material.ValueKey<int>(c),
@@ -129,10 +129,10 @@ class _DataRow extends material.StatefulWidget {
             StagedCellStatus.clean,
         isSelected: inSelection,
         isEditing: editingCell?.row == rowIndex && editingCell?.column == c,
-        isSelectionTop: inSelection && rowIndex == sel!.startRow,
-        isSelectionBottom: inSelection && rowIndex == sel!.endRow,
-        isSelectionLeft: inSelection && c == sel!.startColumn,
-        isSelectionRight: inSelection && c == sel!.endColumn,
+        isSelectionTop: inSelection && rowIndex == sel.startRow,
+        isSelectionBottom: inSelection && rowIndex == sel.endRow,
+        isSelectionLeft: inSelection && c == sel.startColumn,
+        isSelectionRight: inSelection && c == sel.endColumn,
         dataTypeName: columnDataTypes?[columnName],
         onCommitEdit: onCommitEdit,
         onCancelEdit: onCancelEdit,

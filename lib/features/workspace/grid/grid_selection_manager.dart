@@ -127,10 +127,11 @@ class ResultGridSelection {
         } else if (_hasLeadingZeroDigits(val.trim())) {
           // Preserve numeric strings with leading zeros (e.g. '01234', '007')
           map[colName] = val;
-        } else if (_mayBeNumber(val) && int.tryParse(val) case final asInt?) {
+        } else if ((_mayBeNumber(val) ? int.tryParse(val) : null)
+            case final asInt?) {
           map[colName] = asInt;
-        } else if (_mayBeNumber(val) &&
-            double.tryParse(val) case final asDouble?) {
+        } else if ((_mayBeNumber(val) ? double.tryParse(val) : null)
+            case final asDouble?) {
           map[colName] = asDouble;
         } else if (_equalsAsciiIgnoreCase(val, 'true')) {
           map[colName] = true;
