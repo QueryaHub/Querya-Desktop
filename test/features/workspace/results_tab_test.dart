@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
-import 'package:flutter/services.dart' show LogicalKeyboardKey;
+import 'package:flutter/services.dart'
+    show LogicalKeyboardKey, MethodCall, SystemChannels;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/motion/querya_fade_slide.dart';
 import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
@@ -1455,6 +1456,86 @@ void main() {
         // box that is shorter than them.
         expect(tester.takeException(), isNull, reason: 'x$scale');
       }
+    });
+  });
+
+  group('ResultsTab query errors (#1557)', () {
+    const raw =
+        'SqliteFfiException(sqlite_error: 1, , SqliteException(1): while preparing '
+        'statement, no such column: u.name, SQL logic error (code 1)\n'
+        '  Causing statement (at position 29): SELECT * FROM (\n'
+        'SELECT o.id, u.name FROM orders o JOIN users u ON u.id = o.user_id\n'
+        ')\n'
+        'LIMIT 5000})';
+
+    Future<void> pumpError(WidgetTester tester) async {
+      await tester.pumpWidget(
+        resultsShell(
+          child: const material.Scaffold(
+            body: ResultsTab(isLoading: false, errorMessage: raw),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('the headline is the driver message; details are folded',
+        (tester) async {
+      await pumpError(tester);
+
+      expect(find.text('no such column: u.name'), findsOneWidget);
+      expect(find.textContaining('SqliteFfiException'), findsNothing);
+      expect(find.textContaining('SELECT * FROM ('), findsNothing);
+
+      await tester.tap(find.text('Show details'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('SqliteFfiException'), findsWidgets);
+      expect(find.textContaining('SELECT * FROM ('), findsNothing);
+      expect(find.textContaining('LIMIT 5000'), findsNothing);
+      expect(find.text('Hide details'), findsOneWidget);
+    });
+
+    testWidgets('Copy error puts the unwrapped text on the clipboard',
+        (tester) async {
+      String? copied;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (MethodCall call) async {
+          if (call.method == 'Clipboard.setData') {
+            copied = (call.arguments as Map)['text'] as String?;
+          }
+          return null;
+        },
+      );
+      addTearDown(() => tester.binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null));
+
+      await pumpError(tester);
+      await tester.tap(find.text('Copy error'));
+      await tester.pump();
+
+      expect(copied, contains('no such column: u.name'));
+      expect(copied, isNot(contains('SELECT * FROM (')));
+      expect(find.text('Copied'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 3));
+      expect(find.text('Copy error'), findsOneWidget);
+    });
+
+    testWidgets('a one-line error has no details to show', (tester) async {
+      await tester.pumpWidget(
+        resultsShell(
+          child: const material.Scaffold(
+            body: ResultsTab(isLoading: false, errorMessage: 'connection refused'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('connection refused'), findsOneWidget);
+      expect(find.text('Show details'), findsNothing);
+      expect(find.text('Copy error'), findsNothing);
     });
   });
 }
