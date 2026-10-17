@@ -1,7 +1,16 @@
 import 'dart:convert';
 
+import 'package:querya_desktop/core/actions/sql_script_format.dart';
+import 'package:querya_desktop/core/database/sql_lexical_scanner.dart';
+import 'package:querya_desktop/core/database/sql_limit.dart'
+    show stripLeadingWhitespaceAndLineComments;
 import 'package:querya_desktop/core/extensions/models/sandbox_capabilities.dart';
 import 'package:querya_desktop/core/extensions/sandbox/embedded/embedded_sandbox_engine.dart';
+import 'package:querya_desktop/core/theme/parser/jsonc_preprocessor.dart';
+
+final _blanks = RegExp(r'[ \t]+');
+final _semicolonWithSpace = RegExp(r'\s*;\s*');
+final _firstWord = RegExp(r'\S+');
 
 /// Pure-Dart Level-1 engine for JSON / JSONC declarative modules.
 ///
@@ -126,41 +135,25 @@ class DeclarativeEmbeddedEngine implements EmbeddedSandboxEngine {
       return EmbeddedInvokeResult.failure('sql.format requires args.sql string.');
     }
 
-    var out = sql.replaceAll(RegExp(r'[ \t]+'), ' ').trim();
-    out = out.replaceAll(RegExp(r'\s*;\s*'), ';\n');
-    final upperKeywords = module['uppercaseKeywords'] != false;
-    if (upperKeywords) {
-      const keywords = [
-        'select',
-        'from',
-        'where',
-        'and',
-        'or',
-        'join',
-        'left',
-        'right',
-        'inner',
-        'outer',
-        'on',
-        'group',
-        'by',
-        'order',
-        'limit',
-        'insert',
-        'into',
-        'values',
-        'update',
-        'set',
-        'delete',
-      ];
-      for (final kw in keywords) {
-        out = out.replaceAllMapped(
-          RegExp('\\b$kw\\b', caseSensitive: false),
-          (m) => kw.toUpperCase(),
-        );
-      }
+    // Blanks and `;` are laid out in code only: a literal, quoted identifier
+    // or comment keeps every character it was written with (#1567).
+    final out = StringBuffer();
+    for (final segment in SqlLexicalScanner.segments(sql)) {
+      final text = sql.substring(segment.start, segment.end);
+      out.write(
+        segment.kind == SqlSegmentKind.code
+            ? text
+                .replaceAll(_blanks, ' ')
+                .replaceAll(_semicolonWithSpace, ';\n')
+            : text,
+      );
     }
-    return EmbeddedInvokeResult.success(out);
+    final laidOut = out.toString().trim();
+    return EmbeddedInvokeResult.success(
+      module['uppercaseKeywords'] != false
+          ? formatSqlScript(laidOut)
+          : laidOut,
+    );
   }
 
   EmbeddedInvokeResult _hintsGenerate(
@@ -216,7 +209,11 @@ class DeclarativeEmbeddedEngine implements EmbeddedSandboxEngine {
       return EmbeddedInvokeResult.failure('sql.parse requires args.sql string.');
     }
     final trimmed = sql.trim();
-    final first = trimmed.split(RegExp(r'\s+')).first.toUpperCase();
+    final first = _firstWord
+            .firstMatch(stripLeadingWhitespaceAndLineComments(trimmed))
+            ?.group(0)
+            ?.toUpperCase() ??
+        '';
     final dialect = module['dialect'] as String? ?? 'generic';
     return EmbeddedInvokeResult.success({
       'dialect': dialect,
@@ -226,11 +223,10 @@ class DeclarativeEmbeddedEngine implements EmbeddedSandboxEngine {
     });
   }
 
-  /// Strips `//` and `/* */` comments then `jsonDecode`s an object.
+  /// Strips comments and trailing commas (string-aware, see [stripJsonc]),
+  /// then `jsonDecode`s an object.
   static Map<String, dynamic> _parseJsoncObject(String source) {
-    final withoutBlock = source.replaceAll(RegExp(r'/\*[\s\S]*?\*/'), '');
-    final withoutLine = withoutBlock.replaceAll(RegExp(r'//[^\n]*'), '');
-    final decoded = jsonDecode(withoutLine);
+    final decoded = jsonDecode(stripJsonc(source));
     if (decoded is! Map<String, dynamic>) {
       throw const FormatException('Module root must be a JSON object.');
     }
