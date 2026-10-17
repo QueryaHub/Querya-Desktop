@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
@@ -260,7 +261,13 @@ class LocalExtensionInstaller {
       if (file.isFile) {
         final outFile = File(targetPath);
         await outFile.parent.create(recursive: true);
-        await outFile.writeAsBytes(file.content);
+        final Uint8List bytes;
+        try {
+          bytes = SafeZipExtractor.readEntry(file);
+        } on SafeZipException catch (error) {
+          throw MarketplaceException(error.message);
+        }
+        await outFile.writeAsBytes(bytes);
         file.clear();
       } else {
         await Directory(targetPath).create(recursive: true);

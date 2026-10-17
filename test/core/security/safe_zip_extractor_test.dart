@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,6 +24,23 @@ Future<File> _writeZip(Directory dir, Archive archive, String name) async {
   final file = File(p.join(dir.path, name));
   await file.writeAsBytes(bytes);
   return file;
+}
+
+/// [zip] with the uncompressed size of every entry rewritten to [size], in
+/// the local headers and the central directory: a zip that lies about how
+/// large its entries are.
+Uint8List _withDeclaredSize(List<int> zip, int size) {
+  final bytes = Uint8List.fromList(zip);
+  final data = ByteData.sublistView(bytes);
+  for (var i = 0; i + 30 <= bytes.length; i++) {
+    switch (data.getUint32(i, Endian.little)) {
+      case 0x04034b50: // local file header
+        data.setUint32(i + 22, size, Endian.little);
+      case 0x02014b50: // central directory header
+        data.setUint32(i + 24, size, Endian.little);
+    }
+  }
+  return bytes;
 }
 
 void main() {
@@ -131,6 +149,57 @@ void main() {
       final decoded =
           await SafeZipExtractor.readAndDecodeFile(zipFile, limits: _tightLimits);
       expect(decoded.first.name, 'ok.txt');
+    });
+
+    group('a header that understates the entry size (#1561)', () {
+      // 64 KiB of zeros deflate to a few hundred bytes; the header claims 100,
+      // so every header-based limit and the ratio check pass.
+      Uint8List lyingZip() => _withDeclaredSize(
+            ZipEncoder().encode(
+              _singleFileArchive('bomb.bin', Uint8List(64 * 1024)),
+            ),
+            100,
+          );
+
+      test('passes the header checks', () {
+        final decoded =
+            SafeZipExtractor.decodeBytes(lyingZip(), limits: _tightLimits);
+        expect(decoded.first.size, 100);
+      });
+
+      test('readEntry stops at the declared size', () {
+        final decoded =
+            SafeZipExtractor.decodeBytes(lyingZip(), limits: _tightLimits);
+        expect(
+          () => SafeZipExtractor.readEntry(decoded.first),
+          throwsA(isA<SafeZipException>().having(
+            (e) => e.message,
+            'message',
+            contains('larger than its header declares'),
+          )),
+        );
+      });
+
+      test('readEntry stops at the declared size when read from a file',
+          () async {
+        final file = File(p.join(tempDir.path, 'lying.zip'));
+        await file.writeAsBytes(lyingZip());
+        final decoded =
+            await SafeZipExtractor.readAndDecodeFile(file, limits: _tightLimits);
+        expect(
+          () => SafeZipExtractor.readEntry(decoded.first),
+          throwsA(isA<SafeZipException>()),
+        );
+      });
+    });
+
+    test('readEntry returns the content of an honest entry', () {
+      final zipBytes = ZipEncoder().encode(
+        _singleFileArchive('hello.txt', utf8.encode('hello')),
+      );
+      final decoded =
+          SafeZipExtractor.decodeBytes(zipBytes, limits: _tightLimits);
+      expect(utf8.decode(SafeZipExtractor.readEntry(decoded.first)), 'hello');
     });
 
     test('ensureCompressedSizeAllowed rejects oversize before decode', () async {
