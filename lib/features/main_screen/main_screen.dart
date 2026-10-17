@@ -80,7 +80,7 @@ class _MainScreenState extends State<MainScreen> {
         final connections = await LocalDb.instance.getConnections();
         if (connections.isEmpty &&
             mounted &&
-            !FileLaunchService.instance.hasPendingTarget) {
+            !FileLaunchService.instance.hasPendingTargets) {
           _onOpenWelcomeTour();
         }
       }

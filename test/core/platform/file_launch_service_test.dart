@@ -90,13 +90,13 @@ void main() {
         '/home/user/queries/reporting.sql',
       ]);
 
-      expect(FileLaunchService.instance.hasPendingTarget, isTrue);
+      expect(FileLaunchService.instance.hasPendingTargets, isTrue);
       expect(FileLaunchService.instance.pendingTarget?.fileName, 'reporting.sql');
       expect(FileLaunchService.instance.pendingTarget?.kind, FileLaunchKind.sql);
 
       final consumed = FileLaunchService.instance.consumePendingTarget();
       expect(consumed?.fileName, 'reporting.sql');
-      expect(FileLaunchService.instance.hasPendingTarget, isFalse);
+      expect(FileLaunchService.instance.hasPendingTargets, isFalse);
     });
   });
 

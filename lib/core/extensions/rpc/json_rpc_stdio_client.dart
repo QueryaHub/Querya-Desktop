@@ -92,8 +92,9 @@ class JsonRpcStdioClient {
       if (params != null) 'params': params,
     };
 
-    _stdin.writeln(jsonEncode(payload));
     try {
+      // A closed sink throws here, before the flush below.
+      _stdin.writeln(jsonEncode(payload));
       await _stdin.flush().timeout(const Duration(seconds: 3));
     } on TimeoutException {
       _pending.remove(id);

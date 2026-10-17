@@ -125,24 +125,31 @@ class SandboxProcessRunner {
       baseDirectory: scratchBaseDirectory,
     );
 
-    final detected = bwrapAvailable ?? await detectBwrapAvailability();
-    final usesBwrap = detected;
-    if (bwrapAvailable == null && !usesBwrap) {
-      debugPrint(
-        'SandboxProcessRunner: bubblewrap unavailable or cannot set up user '
-        'namespaces on this system; $pluginId requires consent to launch '
-        'without OS sandbox.',
+    final SandboxLaunchCommand command;
+    try {
+      final detected = bwrapAvailable ?? await detectBwrapAvailability();
+      final usesBwrap = detected;
+      if (bwrapAvailable == null && !usesBwrap) {
+        debugPrint(
+          'SandboxProcessRunner: bubblewrap unavailable or cannot set up user '
+          'namespaces on this system; $pluginId requires consent to launch '
+          'without OS sandbox.',
+        );
+      }
+      command = SandboxLaunchCommand.build(
+        pluginExecutable: pluginExecutable,
+        pluginArguments: pluginArguments,
+        scratchPath: scratch.path,
+        extensionRoot: extensionRoot,
+        capabilities: capabilities,
+        platformOverride: platformOverride,
+        bwrapAvailable: usesBwrap,
       );
+    } catch (_) {
+      // The scratch directory exists before the command is built.
+      await scratch.delete();
+      rethrow;
     }
-    final command = SandboxLaunchCommand.build(
-      pluginExecutable: pluginExecutable,
-      pluginArguments: pluginArguments,
-      scratchPath: scratch.path,
-      extensionRoot: extensionRoot,
-      capabilities: capabilities,
-      platformOverride: platformOverride,
-      bwrapAvailable: usesBwrap,
-    );
 
     final isolationIssue =
         SandboxOsIsolation.exceptionForLaunchCommand(command);

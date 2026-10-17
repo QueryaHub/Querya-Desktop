@@ -56,7 +56,7 @@ void main() {
       final target = FileLaunchTarget(path: dbFile.path, kind: FileLaunchKind.sqlite);
       FileLaunchService.instance.setPendingTarget(target);
 
-      expect(FileLaunchService.instance.hasPendingTarget, isTrue);
+      expect(FileLaunchService.instance.hasPendingTargets, isTrue);
 
       final consumed = FileLaunchService.instance.consumePendingTarget();
       expect(consumed, isNotNull);
