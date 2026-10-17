@@ -342,5 +342,76 @@ void main() {
       expect(extDirExistedWhenStopped, isTrue);
       expect(await File(p.join(extDir.path, 'stale.txt')).exists(), isFalse);
     });
+
+    Map<String, Object?> themeManifest(String version) => {
+          'id': 'test.upgrade',
+          'name': 'Upgrade',
+          'version': version,
+          'publisher': 'Test',
+          'type': 'theme',
+          'engines': {'querya_desktop': '*'},
+        };
+
+    test('a failed upgrade keeps the working version (#1562)', () async {
+      final v1 = await _writeZip(
+        tempDir,
+        Archive()
+          ..addFile(_jsonFile('manifest.json', themeManifest('1.0.0')))
+          ..addFile(ArchiveFile('old.txt', 3, utf8.encode('old'))),
+        'v1.zip',
+      );
+      await LocalExtensionInstaller().installFromArchive(v1);
+
+      // The new version fails during extraction, after the old one was
+      // already on disk.
+      final broken = await _writeZip(
+        tempDir,
+        Archive()
+          ..addFile(_jsonFile('manifest.json', themeManifest('2.0.0')))
+          ..addFile(ArchiveFile('../evil.txt', 4, utf8.encode('evil'))),
+        'v2.zip',
+      );
+      await expectLater(
+        LocalExtensionInstaller().installFromArchive(broken),
+        throwsA(isA<MarketplaceException>()),
+      );
+
+      final extDir = Directory(p.join(tempDir.path, 'test.upgrade'));
+      expect(await File(p.join(extDir.path, 'old.txt')).exists(), isTrue);
+      final kept = jsonDecode(
+        await File(p.join(extDir.path, 'manifest.json')).readAsString(),
+      ) as Map<String, dynamic>;
+      expect(kept['version'], '1.0.0');
+      final leftovers = tempDir
+          .listSync()
+          .whereType<Directory>()
+          .where((d) => p.basename(d.path).startsWith('.'));
+      expect(leftovers, isEmpty);
+    });
+
+    test('an upgrade replaces the old files instead of mixing versions (#1562)',
+        () async {
+      final v1 = await _writeZip(
+        tempDir,
+        Archive()
+          ..addFile(_jsonFile('manifest.json', themeManifest('1.0.0')))
+          ..addFile(ArchiveFile('old.txt', 3, utf8.encode('old'))),
+        'v1.zip',
+      );
+      await LocalExtensionInstaller().installFromArchive(v1);
+
+      final v2 = await _writeZip(
+        tempDir,
+        Archive()
+          ..addFile(_jsonFile('manifest.json', themeManifest('2.0.0')))
+          ..addFile(ArchiveFile('new.txt', 3, utf8.encode('new'))),
+        'v2.zip',
+      );
+      await LocalExtensionInstaller().installFromArchive(v2);
+
+      final extDir = Directory(p.join(tempDir.path, 'test.upgrade'));
+      expect(await File(p.join(extDir.path, 'new.txt')).exists(), isTrue);
+      expect(await File(p.join(extDir.path, 'old.txt')).exists(), isFalse);
+    });
   });
 }

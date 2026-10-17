@@ -10,10 +10,10 @@ import 'package:querya_desktop/core/extensions/extension_driver_session.dart';
 import 'package:querya_desktop/core/extensions/extension_support.dart';
 import 'package:querya_desktop/core/extensions/extension_paths.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_policy.dart';
+import 'package:querya_desktop/core/extensions/local_extension_installer.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/extensions/models/extension_type.dart';
-import 'package:querya_desktop/core/security/archive_path_guard.dart';
 import 'package:querya_desktop/core/security/safe_zip_extractor.dart';
 import 'package:querya_desktop/core/updater/sha256_checksums.dart';
 import 'marketplace_download_policy.dart';
@@ -202,61 +202,14 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
         throw MarketplaceException(error.message);
       }
 
-      final dir = await ExtensionPaths.extensionsDirectory();
-      final extDir = ExtensionPaths.extensionDirectory(dir, manifest.id);
-      if (!await extDir.exists()) {
-        await extDir.create(recursive: true);
-      }
-
-      final extDirPath = p.normalize(extDir.path);
-
-      for (final file in archive) {
-        final filename = file.name;
-        // Check for Path Traversal attempts
-        if (!isArchiveEntryNameSafe(filename)) {
-          throw MarketplaceException('Security violation: Path traversal detected in archive entry "$filename"');
-        }
-
-        final targetPath = p.normalize(p.join(extDirPath, filename));
-        if (!isArchiveExtractPathWithinRoot(extDirPath, targetPath)) {
-          throw MarketplaceException('Security violation: Extraction path out of bounds "$filename"');
-        }
-
-        if (file.isFile) {
-          final outFile = File(targetPath);
-          await outFile.create(recursive: true);
-          final Uint8List bytes;
-          try {
-            bytes = SafeZipExtractor.readEntry(file);
-          } on SafeZipException catch (error) {
-            throw MarketplaceException(error.message);
-          }
-          await outFile.writeAsBytes(bytes);
-          file.clear();
-        } else {
-          await Directory(targetPath).create(recursive: true);
-        }
-      }
-
-      onProgress?.call(0.95);
-
-      ExtensionSupport.validateDriverPackage(
+      // Steps 4-5: extract aside, validate, swap in, write manifest.json and
+      // reload the registry. Same path as local installs, so a failed upgrade
+      // keeps the working version and removed files do not linger (#1562).
+      await LocalExtensionInstaller().installArchive(
+        archive: archive,
         manifest: manifest,
-        installDir: extDir,
+        onProgress: (value) => onProgress?.call(0.85 + value * 0.15),
       );
-      await ExtensionSupport.ensureDriverExecutables(
-        manifest: manifest,
-        installDir: extDir,
-      );
-
-      // Step 4: Write/Update manifest.json in the extension directory
-      final manifestFile = File(p.join(extDir.path, 'manifest.json'));
-      const encoder = JsonEncoder.withIndent('  ');
-      await manifestFile.writeAsString(encoder.convert(manifest.toJson()));
-
-      // Step 5: Reload local extension registry
-      await LocalExtensionRegistry.instance.reload();
-      onProgress?.call(1.0);
     } finally {
       if (await archiveFile.exists()) {
         await archiveFile.delete();

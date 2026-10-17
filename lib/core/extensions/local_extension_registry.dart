@@ -50,7 +50,7 @@ class LocalExtensionRegistry {
       // Use list() rather than listSync() to prevent blocking the UI
       final entities = await dir.list().toList();
       for (final entity in entities) {
-        if (entity is Directory) {
+        if (entity is Directory && !p.basename(entity.path).startsWith('.')) {
           final manifestFile = File(p.join(entity.path, 'manifest.json'));
           if (await manifestFile.exists()) {
             try {

@@ -119,56 +119,104 @@ class LocalExtensionInstaller {
 
     onProgress?.call(0.4);
 
+    final extDir = await installArchive(
+      archive: archive,
+      manifest: manifest,
+      onProgress: onProgress,
+    );
+    return ExtensionManifest.fromJson(
+      {
+        ...manifest.toJson(),
+        // installPath is not part of toJson; reload will set it.
+      },
+      installPath: extDir.path,
+    );
+  }
+
+  /// Extracts [archive] into a hidden sibling of `extensions/<id>/`, validates
+  /// it there and only then swaps it in, so a failed install or upgrade leaves
+  /// the previous version untouched (#1562). Shared by local and marketplace
+  /// installs; [manifest] is what gets written as `manifest.json`.
+  Future<Directory> installArchive({
+    required Archive archive,
+    required ExtensionManifest manifest,
+    void Function(double progress)? onProgress,
+  }) async {
     // A running driver process for this extension holds its executable/DLL
-    // open; on Windows that mandatory lock makes the overwrite below fail
-    // with Access is denied (#891). Stop every live session first.
+    // open; on Windows that mandatory lock makes the swap below fail with
+    // Access is denied (#891). Stop every live session first.
     await _stopSessionsForExtension(manifest.id);
 
     final root = await _extensionsDirectory();
     final extDir = ExtensionPaths.extensionDirectory(root, manifest.id);
-    if (await extDir.exists()) {
-      await extDir.delete(recursive: true);
-    }
-    await extDir.create(recursive: true);
+    // Dot-prefixed: the registry skips them and an extension id cannot start
+    // with a dot, so they never collide with or shadow a real install.
+    final staging = Directory(p.join(root.path, '.${manifest.id}.installing'));
+    final backup = Directory(p.join(root.path, '.${manifest.id}.backup'));
 
+    var swapped = false;
     try {
+      if (await staging.exists()) await staging.delete(recursive: true);
+      // A backup left by a crashed swap is the last good install: put it back
+      // rather than letting this attempt delete it.
+      if (await backup.exists()) {
+        if (await extDir.exists()) {
+          await backup.delete(recursive: true);
+        } else {
+          await backup.rename(extDir.path);
+        }
+      }
+      await staging.create(recursive: true);
+
       await _extractArchive(
         archive: archive,
-        destDir: extDir,
-        stripPrefix: stripPrefix,
+        destDir: staging,
+        stripPrefix: _commonRootPrefix(archive),
       );
       onProgress?.call(0.85);
 
       ExtensionSupport.validateDriverPackage(
         manifest: manifest,
-        installDir: extDir,
+        installDir: staging,
       );
       await ExtensionSupport.ensureDriverExecutables(
         manifest: manifest,
-        installDir: extDir,
+        installDir: staging,
       );
 
       // Ensure canonical manifest on disk (pretty-printed, with install metadata).
-      final manifestFile = File(p.join(extDir.path, 'manifest.json'));
+      final manifestFile = File(p.join(staging.path, 'manifest.json'));
       const encoder = JsonEncoder.withIndent('  ');
       await manifestFile.writeAsString(
         encoder.convert(manifest.toJson()),
       );
 
+      final hadPrevious = await extDir.exists();
+      if (hadPrevious) await extDir.rename(backup.path);
+      try {
+        await staging.rename(extDir.path);
+        swapped = true;
+      } catch (_) {
+        if (hadPrevious && !await extDir.exists()) {
+          await backup.rename(extDir.path);
+        }
+        rethrow;
+      }
+      if (hadPrevious) {
+        // The new version is in place; a leftover backup is only clutter.
+        try {
+          await backup.delete(recursive: true);
+        } catch (_) {}
+      }
+
       await _reloadRegistry();
       onProgress?.call(1.0);
-      return ExtensionManifest.fromJson(
-        {
-          ...manifest.toJson(),
-          // installPath is not part of toJson; reload will set it.
-        },
-        installPath: extDir.path,
-      );
+      return extDir;
     } catch (e) {
-      // Best-effort rollback so half-installed packages do not linger.
+      // The previous install was never touched; drop only the half-built one.
       try {
-        if (await extDir.exists()) {
-          await extDir.delete(recursive: true);
+        if (!swapped && await staging.exists()) {
+          await staging.delete(recursive: true);
         }
       } catch (_) {}
       if (e is MarketplaceException) rethrow;
@@ -239,6 +287,14 @@ class LocalExtensionInstaller {
     for (final file in archive) {
       var filename = file.name.replaceAll('\\', '/');
       if (filename.startsWith('__MACOSX/')) continue;
+      // Judge the name as the archive wrote it: a shared `../` root would
+      // otherwise be stripped away together with the prefix.
+      if (!isArchiveEntryNameSafe(filename)) {
+        throw MarketplaceException(
+          'Security violation: Path traversal detected in archive entry '
+          '"${file.name}"',
+        );
+      }
       if (stripPrefix.isNotEmpty && filename.startsWith(stripPrefix)) {
         filename = filename.substring(stripPrefix.length);
       }
