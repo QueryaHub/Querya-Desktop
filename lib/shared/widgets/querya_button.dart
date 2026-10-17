@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/rendering.dart' show RenderObject, RenderProxyBox;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
@@ -578,7 +579,7 @@ class _CutReport extends material.SingleChildRenderObjectWidget {
   final void Function(bool cut) onChanged;
 
   @override
-  material.RenderObject createRenderObject(material.BuildContext context) =>
+  RenderObject createRenderObject(material.BuildContext context) =>
       _RenderCutReport(onChanged);
 
   @override
@@ -590,7 +591,7 @@ class _CutReport extends material.SingleChildRenderObjectWidget {
   }
 }
 
-class _RenderCutReport extends material.RenderProxyBox {
+class _RenderCutReport extends RenderProxyBox {
   _RenderCutReport(this.onChanged);
 
   void Function(bool cut) onChanged;
