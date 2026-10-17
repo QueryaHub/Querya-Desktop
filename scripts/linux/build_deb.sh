@@ -24,6 +24,9 @@ if ! command -v dpkg-deb >/dev/null 2>&1; then
 fi
 
 VERSION="$(grep '^version:' "$ROOT/pubspec.yaml" | sed 's/^version: //; s/+.*//')"
+# The file keeps the tag form; the package version sorts a beta before its
+# final release (0.5.0~beta.1, #1494).
+DEB_VERSION="$("$ROOT/scripts/linux/package_version.sh" "$VERSION")"
 OUT="${2:-$ROOT/Querya-Desktop-${VERSION}-linux.deb}"
 ARCH="$(dpkg --print-architecture 2>/dev/null || echo amd64)"
 
@@ -61,7 +64,7 @@ INSTALLED_SIZE="$(du -sk "$PKG" | awk '{print $1}')"
 
 cat > "$PKG/DEBIAN/control" <<EOF
 Package: querya-desktop
-Version: ${VERSION}
+Version: ${DEB_VERSION}
 Section: database
 Priority: optional
 Architecture: ${ARCH}

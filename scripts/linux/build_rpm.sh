@@ -30,9 +30,10 @@ if ! command -v rpmbuild >/dev/null 2>&1; then
 fi
 
 VERSION="$(grep '^version:' "$ROOT/pubspec.yaml" | sed 's/^version: //; s/+.*//')"
-# RPM Version must not contain '-' (it separates Version from Release).
-# Keep artifact filename as the pubspec/marketing version (e.g. 0.4.11-b).
-RPM_VERSION="${VERSION//-/.}"
+# RPM Version must not contain '-' (it separates Version from Release), and a
+# beta must sort before its final release: 0.5.0-beta.1 -> 0.5.0~beta.1 (#1494).
+# The artifact file name keeps the pubspec / tag form.
+RPM_VERSION="$("$ROOT/scripts/linux/package_version.sh" "$VERSION")"
 OUT="${2:-$ROOT/Querya-Desktop-${VERSION}-linux.rpm}"
 
 WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/querya-rpm.XXXXXX")"
