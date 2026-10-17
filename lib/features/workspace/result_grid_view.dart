@@ -16,6 +16,7 @@ import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
 import 'package:querya_desktop/core/security/pii_masker.dart';
 import 'package:querya_desktop/core/security/pii_masking_controller.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/core/ui/querya_tooltip.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/features/workspace/grid_cell_editor.dart';

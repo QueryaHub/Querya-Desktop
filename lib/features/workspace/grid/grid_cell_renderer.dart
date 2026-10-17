@@ -109,30 +109,29 @@ class _GridCell extends material.StatelessWidget {
     final isInserted = rowStatus == StagedRowStatus.inserted;
     final isModified = cellStatus == StagedCellStatus.modified;
 
-    final style = material.TextStyle(
-      fontSize: 12,
-      fontWeight: material.FontWeight.normal,
-      fontFamily: 'monospace',
-      color: isDeleted
-          ? colorScheme.destructive.withValues(alpha: 0.7)
-          : (isNull
-              ? colorScheme.mutedForeground.withValues(alpha: 0.5)
-              : colorScheme.foreground),
-      decoration: isDeleted ? material.TextDecoration.lineThrough : null,
-      fontStyle: isNull ? material.FontStyle.italic : material.FontStyle.normal,
+    final style = _CellLook.style(
+      colorScheme,
+      isNull: isNull,
+      isDeleted: isDeleted,
     );
-
-    final bg = isSelected
-        ? colorScheme.primary.withValues(alpha: 0.18)
-        : (isDeleted
-            ? colorScheme.destructive.withValues(alpha: 0.08)
-            : (isModified
-                ? colorScheme.primary.withValues(alpha: 0.14)
-                : (isInserted
-                    ? colorScheme.primary.withValues(alpha: 0.08)
-                    : (striped
-                        ? colorScheme.muted.withValues(alpha: 0.12)
-                        : material.Colors.transparent))));
+    final decoration = _CellLook.decoration(
+      colorScheme,
+      background: isSelected
+          ? _CellBackground.selected
+          : (isDeleted
+              ? _CellBackground.deleted
+              : (isModified
+                  ? _CellBackground.modified
+                  : (isInserted
+                      ? _CellBackground.inserted
+                      : (striped
+                          ? _CellBackground.striped
+                          : _CellBackground.none)))),
+      right: isSelectionRight,
+      left: isSelectionLeft,
+      top: isSelectionTop,
+      bottom: isSelectionBottom,
+    );
 
     // Primary/secondary gestures and hover tooltips are hoisted to the grid
     // level (#983, #1346). _GridCell is a lightweight leaf widget.
@@ -144,28 +143,7 @@ class _GridCell extends material.StatelessWidget {
       height: double.infinity,
       padding: const material.EdgeInsets.symmetric(horizontal: 10),
       alignment: material.Alignment.centerLeft,
-      decoration: material.BoxDecoration(
-        color: bg,
-        border: material.Border(
-          right: material.BorderSide(
-            color: isSelectionRight
-                ? colorScheme.primary
-                : colorScheme.border.withValues(alpha: 0.3),
-            width: isSelectionRight ? 1.5 : 1.0,
-          ),
-          left: isSelectionLeft
-              ? material.BorderSide(color: colorScheme.primary, width: 1.5)
-              : material.BorderSide.none,
-          top: isSelectionTop
-              ? material.BorderSide(color: colorScheme.primary, width: 1.5)
-              : material.BorderSide.none,
-          bottom: isSelectionBottom
-              ? material.BorderSide(color: colorScheme.primary, width: 1.5)
-              : material.BorderSide(
-                  color: colorScheme.border.withValues(alpha: 0.15),
-                ),
-        ),
-      ),
+      decoration: decoration,
       child: material.Stack(
         clipBehavior: material.Clip.none,
         alignment: material.Alignment.centerLeft,
@@ -188,6 +166,94 @@ class _GridCell extends material.StatelessWidget {
         ],
       ),
     ),
+    );
+  }
+}
+
+enum _CellBackground { selected, deleted, modified, inserted, striped, none }
+
+/// The looks a cell can have are few, so each is built once per colour scheme
+/// and shared (#1519): a scroll that builds a new row reuses them instead of
+/// allocating a style, a decoration, a border and four sides per cell.
+abstract final class _CellLook {
+  static ColorScheme? _scheme;
+  static final _styles = List<material.TextStyle?>.filled(4, null);
+  static final _decorations = <int, material.BoxDecoration>{};
+
+  /// A new colour scheme (theme switch) drops what was built for the old one.
+  static void _forget(ColorScheme scheme) {
+    if (identical(_scheme, scheme)) return;
+    _scheme = scheme;
+    _styles.fillRange(0, _styles.length, null);
+    _decorations.clear();
+  }
+
+  static material.TextStyle style(
+    ColorScheme scheme, {
+    required bool isNull,
+    required bool isDeleted,
+  }) {
+    _forget(scheme);
+    final key = (isNull ? 1 : 0) | (isDeleted ? 2 : 0);
+    return _styles[key] ??= material.TextStyle(
+      fontSize: 12,
+      fontWeight: material.FontWeight.normal,
+      fontFamily: 'monospace',
+      // Without a CJK family the engine searches for a fallback per paragraph
+      // and is ~40x slower on CJK text (#1553).
+      fontFamilyFallback: QueryaTypography.cjkFontFamilyFallback,
+      color: isDeleted
+          ? scheme.destructive.withValues(alpha: 0.7)
+          : (isNull
+              ? scheme.mutedForeground.withValues(alpha: 0.5)
+              : scheme.foreground),
+      decoration: isDeleted ? material.TextDecoration.lineThrough : null,
+      fontStyle: isNull ? material.FontStyle.italic : material.FontStyle.normal,
+    );
+  }
+
+  static material.BoxDecoration decoration(
+    ColorScheme scheme, {
+    required _CellBackground background,
+    required bool right,
+    required bool left,
+    required bool top,
+    required bool bottom,
+  }) {
+    _forget(scheme);
+    final key = background.index |
+        (right ? 1 << 3 : 0) |
+        (left ? 1 << 4 : 0) |
+        (top ? 1 << 5 : 0) |
+        (bottom ? 1 << 6 : 0);
+    return _decorations[key] ??= material.BoxDecoration(
+      color: switch (background) {
+        _CellBackground.selected => scheme.primary.withValues(alpha: 0.18),
+        _CellBackground.deleted => scheme.destructive.withValues(alpha: 0.08),
+        _CellBackground.modified => scheme.primary.withValues(alpha: 0.14),
+        _CellBackground.inserted => scheme.primary.withValues(alpha: 0.08),
+        _CellBackground.striped => scheme.muted.withValues(alpha: 0.12),
+        _CellBackground.none => material.Colors.transparent,
+      },
+      border: material.Border(
+        right: material.BorderSide(
+          color: right
+              ? scheme.primary
+              : scheme.border.withValues(alpha: 0.3),
+          width: right ? 1.5 : 1.0,
+        ),
+        left: left
+            ? material.BorderSide(color: scheme.primary, width: 1.5)
+            : material.BorderSide.none,
+        top: top
+            ? material.BorderSide(color: scheme.primary, width: 1.5)
+            : material.BorderSide.none,
+        bottom: bottom
+            ? material.BorderSide(color: scheme.primary, width: 1.5)
+            : material.BorderSide(
+                color: scheme.border.withValues(alpha: 0.15),
+              ),
+      ),
     );
   }
 }

@@ -17,8 +17,20 @@ void main() {
       expect(stack, contains('DejaVu Sans Mono'));
       expect(stack, contains('monospace'));
 
-      // Ensure fallback ends with generic 'monospace'
-      expect(stack.last, equals('monospace'));
+      // The generic 'monospace' closes the Latin stack; the CJK tail follows it
+      // (#1553), so Latin text keeps rendering in the monospace fonts.
+      const cjk = QueryaTypography.cjkFontFamilyFallback;
+      expect(stack.sublist(stack.length - cjk.length), equals(cjk));
+      expect(stack[stack.length - cjk.length - 1], equals('monospace'));
+    });
+
+    test('CJK fallback names a family for each desktop platform (#1553)', () {
+      const cjk = QueryaTypography.cjkFontFamilyFallback;
+      expect(cjk, contains('Noto Sans CJK SC'));
+      expect(cjk, contains('PingFang SC'));
+      expect(cjk, contains('Microsoft YaHei'));
+      expect(cjk, isNot(contains('monospace')));
+      expect(cjk.toSet().length, cjk.length); // no duplicates
     });
 
     test('QueryaEditorTheme wires monospace typography stack by default', () {
