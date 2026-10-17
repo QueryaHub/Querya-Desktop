@@ -490,6 +490,7 @@ jobs:
     outputs:
       version: ${{ needs.build-windows.outputs.version }}
       release_tag: ${{ steps.rel.outputs.tag }}
+      prerelease: ${{ steps.kind.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -543,11 +544,39 @@ jobs:
             dist/querya-ext-tester-*
             dist/querya-mcp-*
 
+      # A version or tag with a SemVer pre-release part (`0.5.0-beta.1`) is a
+      # Beta release (#1492): published as a GitHub pre-release, never
+      # `latest`, so Stable users (who read `releases/latest`) are not offered
+      # it, and not sent to AUR or the APT / DNF repositories. The pubspec
+      # version decides for a manual run; on a tag either one having a `-`
+      # is enough, so a mismatch can only make it a pre-release.
+      - name: Release kind
+        id: kind
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.build-windows.outputs.version }}"
+          TAG=""
+          if [ "${{ github.ref_type }}" = "tag" ]; then TAG="${{ github.ref_name }}"; fi
+          if [[ "$VERSION" == *-* || "$TAG" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "Pre-release: version $VERSION, tag ${TAG:-none}"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build release notes from CHANGELOG.md
         run: |
           set -euo pipefail
           VERSION="${{ needs.build-windows.outputs.version }}"
-          ./scripts/extract-changelog-section.sh "$VERSION" > release-notes.md
+          if [ "${{ steps.kind.outputs.prerelease }}" = "true" ]; then
+            {
+              echo "> **Pre-release (Beta channel).** Offered in the app only to users on *Beta / Early Access* (Preferences → Release channel), and not published to AUR or the APT / DNF repositories."
+              echo ""
+            } > release-notes.md
+          else
+            : > release-notes.md
+          fi
+          ./scripts/extract-changelog-section.sh "$VERSION" >> release-notes.md
           {
             echo ""
             echo "---"
@@ -599,6 +628,8 @@ jobs:
           tag_name: ${{ steps.rel.outputs.tag }}
           name: Querya Desktop ${{ needs.build-windows.outputs.version }}
           body_path: release-notes.md
+          prerelease: ${{ steps.kind.outputs.prerelease == 'true' }}
+          make_latest: ${{ steps.kind.outputs.prerelease == 'true' && 'false' || 'true' }}
           fail_on_unmatched_files: false
           files: |
             dist/Querya-Desktop-*.zip
@@ -617,6 +648,8 @@ jobs:
   publish-aur:
     name: Publish AUR (querya-desktop)
     needs: [publish]
+    # A beta stays off AUR (#1492).
+    if: needs.publish.outputs.prerelease != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Check AUR secret
@@ -655,6 +688,8 @@ jobs:
   publish-linux-repo:
     name: Publish APT + DNF repository
     needs: [publish]
+    # A beta stays off the APT / DNF repositories (#1492).
+    if: needs.publish.outputs.prerelease != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Check repository secrets
