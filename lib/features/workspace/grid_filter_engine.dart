@@ -109,14 +109,22 @@ abstract final class GridFilterEngine {
       return List<int>.generate(rows.length, (i) => i);
     }
 
+    // Each cell is lower-cased at most once per row, not once per term.
+    var widest = 0;
+    for (final row in rows) {
+      if (row.length > widest) widest = row.length;
+    }
+    final lowered = List<String?>.filled(widest, null);
+
     final result = <int>[];
     for (var r = 0; r < rows.length; r++) {
       final row = rows[r];
+      lowered.fillRange(0, row.length, null);
       var matchAll = true;
       for (final term in terms) {
         var termMatch = false;
         for (var c = 0; c < row.length; c++) {
-          if (row[c].toLowerCase().contains(term)) {
+          if ((lowered[c] ??= row[c].toLowerCase()).contains(term)) {
             termMatch = true;
             break;
           }
@@ -175,6 +183,22 @@ class _NotNode extends _FilterAstNode {
   }
 }
 
+/// What a predicate does, decided once from its operator text.
+enum _PredicateKind {
+  isNull,
+  isNotNull,
+  inList,
+  notInList,
+  between,
+  like,
+  notLike,
+  ilike,
+  notIlike,
+  compare,
+}
+
+enum _Comparison { eq, ne, gt, ge, lt, le, contains }
+
 class _PredicateNode extends _FilterAstNode {
   /// Everything that depends only on the query text is worked out here, once:
   /// the operator, the lower-cased target, its number, the normalised `IN` set
@@ -187,7 +211,8 @@ class _PredicateNode extends _FilterAstNode {
     this.betweenMin,
     this.betweenMax,
     this.likeRegex,
-  })  : _upperOp = op.toUpperCase().trim(),
+  })  : _kind = _kindOf(op.toUpperCase().trim()),
+        _cmp = _cmpOf(op),
         _lowerTarget = targetValue.toLowerCase(),
         _numTarget = double.tryParse(targetValue.trim()),
         _inSet = {for (final v in inValues) v.toLowerCase().trim()},
@@ -205,7 +230,8 @@ class _PredicateNode extends _FilterAstNode {
   /// per-row scan does not rebuild the same RegExp for every row.
   final RegExp? likeRegex;
 
-  final String _upperOp;
+  final _PredicateKind _kind;
+  final _Comparison _cmp;
   final String _lowerTarget;
   final double? _numTarget;
   final Set<String> _inSet;
@@ -217,16 +243,16 @@ class _PredicateNode extends _FilterAstNode {
     if (colIndex < 0 || colIndex >= row.length) return false;
     final cellValue = row[colIndex];
 
-    switch (_upperOp) {
-      case 'IS NULL':
+    switch (_kind) {
+      case _PredicateKind.isNull:
         return _isNull(cellValue);
-      case 'IS NOT NULL':
+      case _PredicateKind.isNotNull:
         return !_isNull(cellValue);
-      case 'IN':
+      case _PredicateKind.inList:
         return _inSet.contains(cellValue.toLowerCase().trim());
-      case 'NOT IN':
+      case _PredicateKind.notInList:
         return !_inSet.contains(cellValue.toLowerCase().trim());
-      case 'BETWEEN':
+      case _PredicateKind.between:
         final min = betweenMin;
         final max = betweenMax;
         if (min != null && max != null) {
@@ -238,68 +264,94 @@ class _PredicateNode extends _FilterAstNode {
           }
           return cellValue.compareTo(min) >= 0 && cellValue.compareTo(max) <= 0;
         }
-      case 'LIKE':
+      case _PredicateKind.like:
         return (likeRegex ?? _likeToRegExp(targetValue, caseSensitive: true))
             .hasMatch(cellValue);
-      case 'NOT LIKE':
+      case _PredicateKind.notLike:
         return !(likeRegex ?? _likeToRegExp(targetValue, caseSensitive: true))
             .hasMatch(cellValue);
-      case 'ILIKE':
+      case _PredicateKind.ilike:
         return (likeRegex ?? _likeToRegExp(targetValue, caseSensitive: false))
             .hasMatch(cellValue);
-      case 'NOT ILIKE':
+      case _PredicateKind.notIlike:
         return !(likeRegex ?? _likeToRegExp(targetValue, caseSensitive: false))
             .hasMatch(cellValue);
+      case _PredicateKind.compare:
+        break;
     }
 
-    // Numeric comparison if both values can be parsed as numbers
-    final numCell = double.tryParse(cellValue.trim());
+    // Numeric comparison if both values can be parsed as numbers. The cell is
+    // only parsed when the target is a number: a text target never needs it.
     final numTarget = _numTarget;
-
-    if (numCell != null && numTarget != null) {
-      switch (op) {
-        case '=':
-        case '==':
-        case ':':
-          return (numCell - numTarget).abs() < 1e-9;
-        case '!=':
-        case '<>':
-          return (numCell - numTarget).abs() >= 1e-9;
-        case '>':
-          return numCell > numTarget;
-        case '>=':
-          return numCell >= numTarget;
-        case '<':
-          return numCell < numTarget;
-        case '<=':
-          return numCell <= numTarget;
+    if (numTarget != null) {
+      final numCell = double.tryParse(cellValue.trim());
+      if (numCell != null) {
+        switch (_cmp) {
+          case _Comparison.eq:
+          case _Comparison.contains:
+            // `:` is equality between two numbers.
+            if (_cmp == _Comparison.eq || op == ':') {
+              return (numCell - numTarget).abs() < 1e-9;
+            }
+          case _Comparison.ne:
+            return (numCell - numTarget).abs() >= 1e-9;
+          case _Comparison.gt:
+            return numCell > numTarget;
+          case _Comparison.ge:
+            return numCell >= numTarget;
+          case _Comparison.lt:
+            return numCell < numTarget;
+          case _Comparison.le:
+            return numCell <= numTarget;
+        }
       }
     }
 
     // String / Lexicographic comparison
     final lowerCell = cellValue.toLowerCase();
     final lowerTarget = _lowerTarget;
-    switch (op) {
-      case '=':
-      case '==':
+    switch (_cmp) {
+      case _Comparison.eq:
         return lowerCell == lowerTarget;
-      case ':':
+      case _Comparison.contains:
         return lowerCell.contains(lowerTarget);
-      case '!=':
-      case '<>':
+      case _Comparison.ne:
         return lowerCell != lowerTarget;
-      case '>':
+      case _Comparison.gt:
         return lowerCell.compareTo(lowerTarget) > 0;
-      case '>=':
+      case _Comparison.ge:
         return lowerCell.compareTo(lowerTarget) >= 0;
-      case '<':
+      case _Comparison.lt:
         return lowerCell.compareTo(lowerTarget) < 0;
-      case '<=':
+      case _Comparison.le:
         return lowerCell.compareTo(lowerTarget) <= 0;
-      default:
-        return lowerCell.contains(lowerTarget);
     }
   }
+
+  static _PredicateKind _kindOf(String upperOp) => switch (upperOp) {
+        'IS NULL' => _PredicateKind.isNull,
+        'IS NOT NULL' => _PredicateKind.isNotNull,
+        'IN' => _PredicateKind.inList,
+        'NOT IN' => _PredicateKind.notInList,
+        'BETWEEN' => _PredicateKind.between,
+        'LIKE' => _PredicateKind.like,
+        'NOT LIKE' => _PredicateKind.notLike,
+        'ILIKE' => _PredicateKind.ilike,
+        'NOT ILIKE' => _PredicateKind.notIlike,
+        _ => _PredicateKind.compare,
+      };
+
+  /// `:` and any operator this engine does not know compare as "contains" on
+  /// text; `:` alone is also numeric equality.
+  static _Comparison _cmpOf(String op) => switch (op) {
+        '=' || '==' => _Comparison.eq,
+        '!=' || '<>' => _Comparison.ne,
+        '>' => _Comparison.gt,
+        '>=' => _Comparison.ge,
+        '<' => _Comparison.lt,
+        '<=' => _Comparison.le,
+        _ => _Comparison.contains,
+      };
 
   static bool _isNull(String cellValue) =>
       cellValue == 'NULL' || cellValue == 'null' || cellValue.isEmpty;
@@ -322,12 +374,13 @@ class _PredicateNode extends _FilterAstNode {
 }
 
 class _FreeTextNode extends _FilterAstNode {
-  const _FreeTextNode(this.term);
+  _FreeTextNode(this.term) : _lowerTerm = term.toLowerCase();
   final String term;
+  final String _lowerTerm;
 
   @override
   bool evaluate(List<String> row, List<String> lowerColumns) {
-    final lowerTerm = term.toLowerCase();
+    final lowerTerm = _lowerTerm;
     for (var c = 0; c < row.length; c++) {
       if (row[c].toLowerCase().contains(lowerTerm)) {
         return true;
@@ -771,7 +824,7 @@ class _FilterParser {
       return _FreeTextNode(token.value);
     }
 
-    return const _FreeTextNode('');
+    return _FreeTextNode('');
   }
 
   bool _match(_TokenType type) {

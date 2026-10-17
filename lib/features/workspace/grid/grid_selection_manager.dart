@@ -127,13 +127,14 @@ class ResultGridSelection {
         } else if (_hasLeadingZeroDigits(val.trim())) {
           // Preserve numeric strings with leading zeros (e.g. '01234', '007')
           map[colName] = val;
-        } else if (int.tryParse(val) case final asInt?) {
+        } else if (_mayBeNumber(val) && int.tryParse(val) case final asInt?) {
           map[colName] = asInt;
-        } else if (double.tryParse(val) case final asDouble?) {
+        } else if (_mayBeNumber(val) &&
+            double.tryParse(val) case final asDouble?) {
           map[colName] = asDouble;
-        } else if (val.toLowerCase() == 'true') {
+        } else if (_equalsAsciiIgnoreCase(val, 'true')) {
           map[colName] = true;
-        } else if (val.toLowerCase() == 'false') {
+        } else if (_equalsAsciiIgnoreCase(val, 'false')) {
           map[colName] = false;
         } else {
           map[colName] = val;
@@ -147,6 +148,34 @@ class ResultGridSelection {
     return const JsonEncoder.withIndent('  ').convert(result);
   }
 
+  /// Cheap pre-check so text cells do not pay for two failed number parses:
+  /// after any leading blanks (the parsers skip them) a number starts with a
+  /// digit, a sign or a dot. A non-ASCII start is left to the parsers.
+  static bool _mayBeNumber(String s) {
+    for (var i = 0; i < s.length; i++) {
+      final c = s.codeUnitAt(i);
+      if (c == 0x20 || (c >= 0x09 && c <= 0x0D)) continue;
+      return (c >= 0x30 && c <= 0x39) ||
+          c == 0x2D ||
+          c == 0x2B ||
+          c == 0x2E ||
+          c > 0x7F;
+    }
+    return false;
+  }
+
+  /// [lower] must be lower-case ASCII. Same answer as
+  /// `s.toLowerCase() == lower`, without the copy.
+  static bool _equalsAsciiIgnoreCase(String s, String lower) {
+    if (s.length != lower.length) return false;
+    for (var i = 0; i < s.length; i++) {
+      var c = s.codeUnitAt(i);
+      if (c >= 0x41 && c <= 0x5A) c += 0x20;
+      if (c != lower.codeUnitAt(i)) return false;
+    }
+    return true;
+  }
+
   /// `^0\d+$`: a zero followed by one or more ASCII digits and nothing else.
   static bool _hasLeadingZeroDigits(String s) {
     if (s.length < 2 || s.codeUnitAt(0) != 0x30) return false;
@@ -157,22 +186,18 @@ class ResultGridSelection {
     return true;
   }
 
-  static String _escapeTsv(String val) {
-    if (val.contains('\t') ||
-        val.contains('\n') ||
-        val.contains('\r') ||
-        val.contains('"')) {
-      return '"${val.replaceAll('"', '""')}"';
-    }
-    return val;
-  }
+  static String _escapeTsv(String val) => _quoteIfAny(val, 0x09);
 
-  static String _escapeCsv(String val) {
-    if (val.contains(',') ||
-        val.contains('"') ||
-        val.contains('\n') ||
-        val.contains('\r')) {
-      return '"${val.replaceAll('"', '""')}"';
+  static String _escapeCsv(String val) => _quoteIfAny(val, 0x2C);
+
+  /// Quotes [val] when it holds a quote, a line break or [separator]: one pass
+  /// over the code units instead of one `contains` scan per character.
+  static String _quoteIfAny(String val, int separator) {
+    for (var i = 0; i < val.length; i++) {
+      final c = val.codeUnitAt(i);
+      if (c == 0x22 || c == 0x0A || c == 0x0D || c == separator) {
+        return '"${val.replaceAll('"', '""')}"';
+      }
     }
     return val;
   }

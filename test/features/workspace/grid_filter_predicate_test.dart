@@ -50,6 +50,20 @@ void main() {
       expect(run('name > Bob'), [3]); // "notebook" > "bob"
     });
 
+    test('a number target compares numerically, a text target as text', () {
+      expect(run('id = 3'), [2]);
+      expect(run('price : 20'), [1]); // `:` is equality between two numbers
+      expect(run('price >= 30'), [2, 3, 4]);
+      expect(run('name = 10'), isEmpty); // text cells against a number
+      expect(run('price = abc'), isEmpty); // number cells against text
+    });
+
+    test('free text is case-insensitive in every column', () {
+      expect(run('ANDROID'), [4]);
+      expect(run('NOTEBOOK x'), isEmpty); // both terms must hit some column
+      expect(run('anna X'), [0]);
+    });
+
     test('IS NULL treats NULL, null and empty as null', () {
       expect(run('note IS NULL'), [1, 2]);
       expect(run('note IS NOT NULL'), [0, 3, 4]);

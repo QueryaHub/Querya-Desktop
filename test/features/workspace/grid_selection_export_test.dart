@@ -91,6 +91,45 @@ void main() {
       });
     });
 
+    test('JSON: text that only looks like a number or a boolean stays text',
+        () {
+      const sel = ResultGridSelection(
+        startRow: 0,
+        startColumn: 0,
+        endRow: 0,
+        endColumn: 6,
+      );
+      final json = sel.toJson(
+        ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
+        const [
+          ['Infinity', 'NaN', 'tRuE', ' 5', '-3', '.5', 'yes'],
+        ],
+      );
+      expect(jsonDecode(json), {
+        'a': 'Infinity',
+        'b': 'NaN',
+        'c': true,
+        'd': 5.0,
+        'e': -3,
+        'f': 0.5,
+        'g': 'yes',
+      });
+    });
+
+    test('CSV and TSV quote only what needs it', () {
+      const sel = ResultGridSelection(
+        startRow: 0,
+        startColumn: 0,
+        endRow: 0,
+        endColumn: 3,
+      );
+      const data = [
+        ['plain', 'a\tb', 'c,d', 'line\nbreak'],
+      ];
+      expect(sel.toCsv(data), 'plain,a\tb,"c,d","line\nbreak"');
+      expect(sel.toTsv(data), 'plain\t"a\tb"\tc,d\t"line\nbreak"');
+    });
+
     test('JSON of several rows is an array', () {
       const sel = ResultGridSelection(
         startRow: 0,
