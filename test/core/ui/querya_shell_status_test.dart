@@ -48,6 +48,42 @@ void main() {
     expect(status.statusMessage, 'Explain failed');
   });
 
+  test('a plain-count result leaves no "Running query…" behind (#1556)', () {
+    status.beginBusy(message: 'Running query…');
+
+    status.reportQueryResult(
+      duration: const Duration(milliseconds: 1),
+      rowCount: 12,
+      columnCount: 8,
+    );
+
+    expect(status.isBusy, isFalse);
+    expect(status.statusMessage, isNull);
+    expect(status.rowCount, 12);
+    expect(status.columnCount, 8);
+
+    status.endBusy();
+    expect(status.statusMessage, isNull);
+  });
+
+  test('a result without a message does not keep the text of an earlier run',
+      () {
+    status.reportQueryResult(rowCount: 3, columnCount: 1, message: 'Script done.');
+    status.beginBusy(message: 'Running query…');
+
+    status.reportQueryResult(rowCount: 12, columnCount: 8);
+
+    expect(status.statusMessage, isNull);
+  });
+
+  test('a result with a message shows it after the busy message', () {
+    status.beginBusy(message: 'Running query…');
+
+    status.reportQueryResult(message: '3 statements, 5 row(s) affected.');
+
+    expect(status.statusMessage, '3 statements, 5 row(s) affected.');
+  });
+
   test('a result message is not cleared by a later endBusy', () {
     status.reportQueryResult(rowCount: 1, columnCount: 1, message: '1 row(s).');
 

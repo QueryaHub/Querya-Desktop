@@ -64,7 +64,10 @@ class QueryaShellStatus extends ChangeNotifier {
     if (duration != null) _lastQueryDuration = duration;
     if (rowCount != null) _rowCount = rowCount;
     if (columnCount != null) _columnCount = columnCount;
-    if (message != null) _statusMessage = message;
+    // The message describes this result. A plain row count passes none (the
+    // counts are shown beside it), and then neither "Running query…" nor the
+    // text of an earlier run may stay (#1556).
+    _statusMessage = message;
     _messageIsBusy = false;
     notifyListeners();
   }
