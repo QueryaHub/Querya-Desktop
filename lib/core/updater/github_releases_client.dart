@@ -49,13 +49,7 @@ class GitHubReleasesClient {
       throw const GitHubReleasesException('Unexpected GitHub Releases list payload');
     }
 
-    for (final entry in decoded) {
-      if (entry is! Map<String, dynamic>) continue;
-      if (entry['draft'] == true) continue;
-      return parseGitHubRelease(entry);
-    }
-
-    throw const GitHubReleasesException('No published releases found');
+    return pickNewestRelease(decoded);
   }
 
   Future<String> downloadText(String url) async {
@@ -69,6 +63,34 @@ class GitHubReleasesClient {
   }
 
   void close() => _httpClient.close();
+}
+
+/// The release with the highest version in a `/releases` list, for the Beta
+/// channel (#1493).
+///
+/// The API lists releases by creation date, not by version: with `0.5.0-beta.2`
+/// followed by a hotfix `0.4.20`, the first entry is the hotfix and the newer
+/// beta would never be offered. Drafts and tags that are not versions are
+/// skipped; a stable release outranks a pre-release of the same version. Only
+/// the first page of the API is read.
+UpdateManifest pickNewestRelease(List<dynamic> releases) {
+  Map<String, dynamic>? best;
+  UpdateVersion? bestVersion;
+  for (final entry in releases) {
+    if (entry is! Map<String, dynamic>) continue;
+    if (entry['draft'] == true) continue;
+    final tag = entry['tag_name']?.toString();
+    final version = tag == null ? null : UpdateVersion.tryParse(tag);
+    if (version == null) continue;
+    if (bestVersion == null || version.compareTo(bestVersion) > 0) {
+      best = entry;
+      bestVersion = version;
+    }
+  }
+  if (best == null) {
+    throw const GitHubReleasesException('No published releases found');
+  }
+  return parseGitHubRelease(best);
 }
 
 /// Parses a single GitHub release object into [UpdateManifest].
