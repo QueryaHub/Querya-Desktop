@@ -330,5 +330,36 @@ void main() {
         QueryaTheme.lightDefault.colorScheme.foreground,
       );
     });
+
+    testWidgets('fits a small window instead of running off it (#1642)',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(520, 420));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Builder(
+            builder: (context) => material.ElevatedButton(
+              onPressed: () => showDestructiveQueryDialog(
+                context: context,
+                result: DestructiveSqlDetector.inspect('DROP TABLE legacy_users;'),
+                sql: 'DROP TABLE legacy_users;',
+              ),
+              child: const material.Text('Open'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      final card = tester.getRect(find.byType(material.FocusTraversalGroup).last);
+      expect(card.left, greaterThanOrEqualTo(0));
+      expect(card.top, greaterThanOrEqualTo(0));
+      expect(card.right, lessThanOrEqualTo(520));
+      expect(card.bottom, lessThanOrEqualTo(420));
+      expect(find.text('Execute Destructive Statement'), findsOneWidget);
+    });
   });
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
+import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
@@ -105,17 +106,32 @@ class _DestructiveQueryDialogState
     final isDark = theme.brightness == Brightness.dark;
     final isCritical = widget.result.maxRiskLevel == 'CRITICAL';
 
-    return QueryaDialogCard(
+    // 680 x 540 at 1x, scaled with the UI scale, and never past the window
+    // minus the usual dialog margins (#1642): on a narrow window or at 1.25x+
+    // the fixed size ran off the screen. The operation list scrolls.
+    final insets = WindowLayout.dialogSymmetricInsets(context);
+    final screen = material.MediaQuery.sizeOf(context);
+    final width = WindowLayout.scaledDialogExtent(
+      context,
+      screenExtent: screen.width,
+      insetTotal: insets.horizontal,
+      baseMax: 680,
+      baseMin: 540,
+    );
+    final height = WindowLayout.scaledDialogExtent(
+      context,
+      screenExtent: screen.height,
+      insetTotal: insets.vertical,
+      baseMax: 540,
+      baseMin: 440,
+    );
+
+    final card = QueryaDialogCard(
       borderColor: cs.destructive.withValues(alpha: isDark ? 0.6 : 0.4),
-      constraints: const material.BoxConstraints(
-        minWidth: 540,
-        maxWidth: 680,
-        minHeight: 440,
-        maxHeight: 580,
-      ),
+      constraints: material.BoxConstraints(maxWidth: width, maxHeight: height),
       child: material.FocusTraversalGroup(
         child: material.SizedBox(
-          height: 540,
+          height: height,
           child: material.Padding(
             padding: const material.EdgeInsets.all(20),
             child: material.Column(
@@ -339,5 +355,6 @@ class _DestructiveQueryDialogState
         ),
       ),
     );
+    return material.Padding(padding: insets, child: card);
   }
 }

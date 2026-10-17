@@ -124,12 +124,17 @@ class _DmlPreviewDialogState extends material.State<_DmlPreviewDialog> {
                           color: cs.foreground,
                         ),
                         const Gap(6),
-                        Text(
-                          widget.plan.schema != null &&
-                                  widget.plan.schema!.isNotEmpty
-                              ? '${widget.plan.schema}.${widget.plan.tableName}'
-                              : widget.plan.tableName,
-                        ).semiBold().small(),
+                        // A long schema.table name is cut, not overflowed (#1642).
+                        material.Flexible(
+                          child: Text(
+                            widget.plan.schema != null &&
+                                    widget.plan.schema!.isNotEmpty
+                                ? '${widget.plan.schema}.${widget.plan.tableName}'
+                                : widget.plan.tableName,
+                            maxLines: 1,
+                            overflow: material.TextOverflow.ellipsis,
+                          ).semiBold().small(),
+                        ),
                       ],
                     ),
                   ),
