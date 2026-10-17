@@ -6,6 +6,7 @@ import 'package:querya_desktop/core/mcp/mcp_access_store.dart';
 import 'package:querya_desktop/core/mcp/mcp_client_config.dart';
 import 'package:querya_desktop/core/mcp/mcp_query_service.dart';
 import 'package:querya_desktop/core/mcp/mcp_server_controller.dart';
+import 'package:querya_desktop/core/platform/macos_sandbox.dart';
 import 'package:querya_desktop/core/security/connection_environment.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
@@ -177,6 +178,13 @@ class PreferencesMcpSectionState extends material.State<PreferencesMcpSection> {
           'read the connections you share below. Read-only: writes are '
           'refused, and no host, user or password is ever sent to the model.',
         ),
+        if (MacOsSandbox.isActive) ...[
+          const material.SizedBox(height: 8),
+          PreferencesHint(
+            key: const material.ValueKey('mcp_sandbox_notice'),
+            MacOsSandbox.unavailable('The MCP server'),
+          ),
+        ],
         const material.SizedBox(height: 14),
         if (!_loaded)
           const material.Padding(
