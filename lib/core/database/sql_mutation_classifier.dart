@@ -12,9 +12,14 @@ final _dataModifyingCte = RegExp(r'\b(INSERT|UPDATE|DELETE|MERGE)\b');
 ///
 /// Comments and string literals are ignored. `WITH ...` statements count when
 /// a data-modifying statement appears inside them.
-bool isMutatingSqlStatement(String statement) {
-  final sanitized =
-      DestructiveSqlDetector.stripCommentsAndStrings(statement).trim();
+///
+/// [backslashEscapes]: whether `\'` escapes a quote (MySQL; the default), see
+/// [DestructiveSqlDetector.stripCommentsAndStrings].
+bool isMutatingSqlStatement(String statement, {bool backslashEscapes = true}) {
+  final sanitized = DestructiveSqlDetector.stripCommentsAndStrings(
+    statement,
+    backslashEscapes: backslashEscapes,
+  ).trim();
   if (sanitized.isEmpty) return false;
   final upper = sanitized.toUpperCase();
   final first = _firstWord.firstMatch(upper)?.group(1);
@@ -25,6 +30,8 @@ bool isMutatingSqlStatement(String statement) {
 }
 
 /// Whether the SQL script [sql] contains at least one mutating statement.
-bool containsMutatingSql(String sql) => DestructiveSqlDetector
-    .splitStatements(sql)
-    .any(isMutatingSqlStatement);
+bool containsMutatingSql(String sql, {bool backslashEscapes = true}) =>
+    DestructiveSqlDetector.splitStatements(
+      sql,
+      backslashEscapes: backslashEscapes,
+    ).any((s) => isMutatingSqlStatement(s, backslashEscapes: backslashEscapes));

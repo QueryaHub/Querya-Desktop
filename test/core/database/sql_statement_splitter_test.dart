@@ -165,4 +165,54 @@ void main() {
       }
     });
   });
+
+  // A backslash before the closing quote: MySQL reads it as an escaped quote,
+  // PostgreSQL and SQLite as an ordinary character.
+  group('SqlStatementSplitter backslash escapes', () {
+    const sql = r"SELECT 'a\'; DELETE FROM t; --'";
+
+    List<String> run(String text, {required bool backslashEscapes}) => [
+          for (final s in SqlStatementSplitter.spans(
+            text,
+            backslashEscapes: backslashEscapes,
+          ))
+            s.textIn(text),
+        ];
+
+    test('the default keeps the MySQL reading: one statement', () {
+      expect(texts(sql), [sql]);
+      expect(run(sql, backslashEscapes: true), [sql]);
+    });
+
+    test('without backslash escapes the ; after the literal ends the statement',
+        () {
+      expect(run(sql, backslashEscapes: false), [
+        r"SELECT 'a\'",
+        'DELETE FROM t',
+        "--'",
+      ]);
+    });
+
+    test('an E string escapes with a backslash whatever the dialect', () {
+      const e = r"SELECT E'a\'; DELETE FROM t'; SELECT 2";
+      expect(run(e, backslashEscapes: false), [
+        r"SELECT E'a\'; DELETE FROM t'",
+        'SELECT 2',
+      ]);
+    });
+
+    test('a script past the isolate threshold splits the same way', () async {
+      final script = List.filled(4000, r"SELECT 'a\'; SELECT 2;").join('\n');
+      expect(script.length, greaterThan(SqlStatementSplitter.defaultIsolateThreshold));
+      for (final escapes in [true, false]) {
+        final inline = SqlStatementSplitter.spans(script, backslashEscapes: escapes);
+        final spread = await SqlStatementSplitter.spansAsync(
+          script,
+          backslashEscapes: escapes,
+        );
+        expect(spread.length, inline.length, reason: 'backslashEscapes: $escapes');
+        expect(spread.last.end, inline.last.end);
+      }
+    });
+  });
 }

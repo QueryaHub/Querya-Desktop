@@ -7,6 +7,13 @@ enum SqlDialect {
   sqlite,
 }
 
+extension SqlDialectLexing on SqlDialect {
+  /// Whether `\'` inside `'...'` is an escaped quote. It is in MySQL; in
+  /// PostgreSQL and SQLite a backslash is an ordinary character and `'C:\'`
+  /// is a whole literal (PostgreSQL's `E'...'` strings are the exception).
+  bool get backslashEscapesQuotes => this == SqlDialect.mysql;
+}
+
 /// Type of DML mutation.
 enum MutationType {
   insert,

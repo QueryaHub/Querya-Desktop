@@ -219,4 +219,29 @@ void main() {
       expect(DestructiveSqlDetector.inspect('UPDATE users SET age = 20 WHERE id = 1;').isDestructive, isFalse);
     });
   });
+
+  group('DestructiveSqlDetector backslash escapes (#1565 review)', () {
+    const sql = r"SELECT 'a\'; DROP TABLE users; --'";
+
+    test('MySQL (the default) reads \\\' as an escaped quote: nothing destructive',
+        () {
+      expect(DestructiveSqlDetector.inspect(sql).isDestructive, isFalse);
+    });
+
+    test('PostgreSQL and SQLite end the literal at the second quote', () {
+      final res = DestructiveSqlDetector.inspect(sql, backslashEscapes: false);
+      expect(res.isDestructive, isTrue);
+      expect(res.operations.single.type, DestructiveSqlType.dropTable);
+    });
+
+    test('an E string keeps its escape in every dialect', () {
+      expect(
+        DestructiveSqlDetector.inspect(
+          r"SELECT E'a\'; DROP TABLE users'",
+          backslashEscapes: false,
+        ).isDestructive,
+        isFalse,
+      );
+    });
+  });
 }

@@ -594,6 +594,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       statementAtCursor: statementAtCursor,
       selected: selected,
       caret: selection.isValid ? selection.baseOffset : scope.length,
+      backslashEscapes: widget.dialect.backslashEscapesQuotes,
     );
     if (spans.isEmpty) {
       // Say so: a silent Run on an empty editor reads as a broken button.
@@ -623,7 +624,10 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
     final confirmDestructive =
         await AppSettings.instance.getConfirmDestructiveOperations();
     if (confirmDestructive) {
-      final inspection = DestructiveSqlDetector.inspect(runSql);
+      final inspection = DestructiveSqlDetector.inspect(
+        runSql,
+        backslashEscapes: widget.dialect.backslashEscapesQuotes,
+      );
       if (inspection.isDestructive) {
         if (!mounted) return;
         final confirmed = await showDestructiveQueryDialog(
@@ -843,6 +847,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
     required bool statementAtCursor,
     required bool selected,
     required int caret,
+    required bool backslashEscapes,
   }) async {
     if (statementAtCursor && selected) {
       final start = scope.length - scope.trimLeft().length;
@@ -851,7 +856,10 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
           ? [SqlStatementSpan(start: start, end: end, line: 1)]
           : const [];
     }
-    final all = await SqlStatementSplitter.spansAsync(scope);
+    final all = await SqlStatementSplitter.spansAsync(
+      scope,
+      backslashEscapes: backslashEscapes,
+    );
     if (!statementAtCursor) return all;
     final at = SqlStatementSplitter.at(all, caret);
     return at == null ? const [] : [at];
