@@ -267,7 +267,6 @@ abstract final class GridSelectionCalcEngine {
   /// exact: an integer below 2^53 times or divided by an exactly represented
   /// power of ten is one correctly rounded operation. Longer numbers, which
   /// do not fit that, take the copy and `double.tryParse`.
-  @foundation.visibleForTesting
   static double? parseThousandsSeparated(String s) {
     final n = s.length;
     var i = 0;
