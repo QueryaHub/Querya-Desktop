@@ -13,19 +13,21 @@ enum _SortKeyType { nullOrEmpty, numeric, dateTime, string }
 class _SortKey implements Comparable<_SortKey> {
   final _SortKeyType type;
   final num? numVal;
-  final DateTime? dtVal;
+
+  /// The instant of a date / timestamp, in microseconds since the epoch.
+  final int dtMicros;
   final String strLower;
   final String strRaw;
 
   _SortKey._({
     required this.type,
     this.numVal,
-    this.dtVal,
+    this.dtMicros = 0,
     this.strLower = '',
     this.strRaw = '',
   });
 
-  factory _SortKey.parse(String val) {
+  factory _SortKey.parse(String val, Map<int, int> localOffsets) {
     if (val == 'NULL' || val.isEmpty) {
       return _SortKey._(type: _SortKeyType.nullOrEmpty);
     }
@@ -33,9 +35,14 @@ class _SortKey implements Comparable<_SortKey> {
     if (n != null) {
       return _SortKey._(type: _SortKeyType.numeric, numVal: n, strRaw: val);
     }
-    final dt = DateTime.tryParse(val);
-    if (dt != null) {
-      return _SortKey._(type: _SortKeyType.dateTime, dtVal: dt, strRaw: val);
+    final micros = isoMicrosSinceEpoch(val, localOffsets: localOffsets) ??
+        DateTime.tryParse(val)?.microsecondsSinceEpoch;
+    if (micros != null) {
+      return _SortKey._(
+        type: _SortKeyType.dateTime,
+        dtMicros: micros,
+        strRaw: val,
+      );
     }
     return _SortKey._(
       type: _SortKeyType.string,
@@ -57,7 +64,7 @@ class _SortKey implements Comparable<_SortKey> {
       return numVal!.compareTo(other.numVal!);
     }
     if (type == _SortKeyType.dateTime && other.type == _SortKeyType.dateTime) {
-      return dtVal!.compareTo(other.dtVal!);
+      return dtMicros.compareTo(other.dtMicros);
     }
 
     final aLower =
@@ -70,6 +77,123 @@ class _SortKey implements Comparable<_SortKey> {
 
     return strRaw.compareTo(other.strRaw);
   }
+}
+
+/// [s] as `DateTime.parse(s).microsecondsSinceEpoch` for the shapes database
+/// drivers print, read from the code units: `YYYY-MM-DD`, then optionally
+/// `[T ]HH:MM`, `:SS`, `.fraction` and `Z` / `±HH[[:]MM]`. Null for any other
+/// shape, which the caller hands to [DateTime.tryParse]: this is only a
+/// shortcut past its regex, with the same result (#1533).
+///
+/// Without a zone the time is local, as in [DateTime.parse]; fields out of
+/// range roll over the same way, because they go through the same
+/// constructors. The fraction keeps its first six digits, as there.
+///
+/// The local constructor asks the system for the zone offset on every call
+/// (~4 µs, nearly all of a timestamp sort). With [localOffsets], one map per
+/// sort, a day whose offset is the same at its start and its end is looked
+/// up once and the time is computed from the UTC fields; a day with a
+/// daylight-saving change still goes through the local constructor.
+@foundation.visibleForTesting
+int? isoMicrosSinceEpoch(String s, {Map<int, int>? localOffsets}) {
+  final n = s.length;
+  int digits(int at, int count) {
+    if (at + count > n) return -1;
+    var v = 0;
+    for (var i = at; i < at + count; i++) {
+      final c = s.codeUnitAt(i) - 0x30;
+      if (c < 0 || c > 9) return -1;
+      v = v * 10 + c;
+    }
+    return v;
+  }
+
+  if (n < 10 || s.codeUnitAt(4) != 0x2D || s.codeUnitAt(7) != 0x2D) {
+    return null;
+  }
+  final year = digits(0, 4);
+  final month = digits(5, 2);
+  final day = digits(8, 2);
+  if (year < 0 || month < 0 || day < 0) return null;
+  var hour = 0, minute = 0, second = 0, milli = 0, micro = 0;
+  var i = 10;
+  if (i < n) {
+    final sep = s.codeUnitAt(i);
+    // `T` or a space, as DateTime.parse takes; a lower-case `t` it does not.
+    if (sep != 0x54 && sep != 0x20) return null;
+    hour = digits(i + 1, 2);
+    if (hour < 0 || i + 3 >= n || s.codeUnitAt(i + 3) != 0x3A) return null;
+    minute = digits(i + 4, 2);
+    if (minute < 0) return null;
+    i += 6;
+    if (i < n && s.codeUnitAt(i) == 0x3A) {
+      second = digits(i + 1, 2);
+      if (second < 0) return null;
+      i += 3;
+      if (i < n && s.codeUnitAt(i) == 0x2E) {
+        i++;
+        final start = i;
+        var fraction = 0;
+        while (i < n) {
+          final c = s.codeUnitAt(i) - 0x30;
+          if (c < 0 || c > 9) break;
+          if (i - start < 6) fraction = fraction * 10 + c;
+          i++;
+        }
+        if (i == start) return null;
+        for (var k = i - start; k < 6; k++) {
+          fraction *= 10;
+        }
+        milli = fraction ~/ 1000;
+        micro = fraction % 1000;
+      }
+    }
+  }
+  if (i == n) {
+    if (localOffsets != null) {
+      final wall = DateTime.utc(
+          year, month, day, hour, minute, second, milli, micro);
+      final key = wall.year * 10000 + wall.month * 100 + wall.day;
+      final offset = localOffsets[key] ??=
+          _dayOffsetMicros(wall.year, wall.month, wall.day);
+      if (offset != _offsetChangesThatDay) {
+        return wall.microsecondsSinceEpoch - offset;
+      }
+    }
+    return DateTime(year, month, day, hour, minute, second, milli, micro)
+        .microsecondsSinceEpoch;
+  }
+  var offsetMinutes = 0;
+  final z = s.codeUnitAt(i);
+  if (z == 0x5A || z == 0x7A) {
+    if (i + 1 != n) return null;
+  } else if (z == 0x2B || z == 0x2D) {
+    final hh = digits(i + 1, 2);
+    if (hh < 0) return null;
+    i += 3;
+    var mm = 0;
+    if (i < n) {
+      if (s.codeUnitAt(i) == 0x3A) i++;
+      mm = digits(i, 2);
+      if (mm < 0 || i + 2 != n) return null;
+    }
+    offsetMinutes = (hh * 60 + mm) * (z == 0x2D ? -1 : 1);
+  } else {
+    return null;
+  }
+  return DateTime.utc(year, month, day, hour, minute, second, milli, micro)
+          .microsecondsSinceEpoch -
+      offsetMinutes * Duration.microsecondsPerMinute;
+}
+
+const int _offsetChangesThatDay = 1 << 62;
+
+/// The local zone's offset (µs) on that day, or [_offsetChangesThatDay] when
+/// it is not the same at the first and the last second of the day.
+int _dayOffsetMicros(int year, int month, int day) {
+  final start = DateTime(year, month, day).timeZoneOffset;
+  final end = DateTime(year, month, day, 23, 59, 59).timeZoneOffset;
+  return start == end ? start.inMicroseconds : _offsetChangesThatDay;
 }
 
 /// Result of sorting rows in [VirtualResultGrid], preserving model indices.
@@ -99,11 +223,12 @@ SortedResultGridData sortResultGridRowsWithIndices({
     );
   }
   final n = rows.length;
+  final localOffsets = <int, int>{};
 
   final keys = List<_SortKey>.generate(n, (i) {
     final row = rows[i];
     final val = columnIndex < row.length ? row[columnIndex] : '';
-    return _SortKey.parse(val);
+    return _SortKey.parse(val, localOffsets);
   }, growable: false);
 
   final indices = List<int>.generate(n, (i) => i, growable: false);
