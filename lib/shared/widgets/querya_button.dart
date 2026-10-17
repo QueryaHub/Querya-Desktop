@@ -292,11 +292,6 @@ class _QueryaButtonState extends material.State<QueryaButton> {
     if (_pressed != value) setState(() => _pressed = value);
   }
 
-  /// Black or white, whichever reads on [background].
-  static material.Color _onColor(material.Color background) =>
-      background.computeLuminance() > 0.5
-          ? const material.Color(0xFF000000)
-          : const material.Color(0xFFFFFFFF);
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -313,7 +308,7 @@ class _QueryaButtonState extends material.State<QueryaButton> {
     // ---- colours -------------------------------------------------------
     final material.Color foreground;
     material.Color background;
-    var outline = const material.Color(0x00000000);
+    var outline = material.Colors.transparent;
     if (filled) {
       final base = w.variant == QueryaButtonVariant.primary
           ? wb.accent
@@ -326,7 +321,7 @@ class _QueryaButtonState extends material.State<QueryaButton> {
       } else {
         foreground = w.variant == QueryaButtonVariant.primary
             ? wb.onAccent
-            : _onColor(base);
+            : scheme.destructiveForeground;
         final tint = _pressed && enabled
             ? 0.22
             : (_hovered && enabled ? 0.12 : 0.0);

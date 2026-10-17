@@ -1,8 +1,11 @@
+import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mongo_dart/mongo_dart.dart' show ObjectId;
 import 'package:querya_desktop/core/editor/querya_code_editor.dart';
 import 'package:querya_desktop/core/editor/querya_highlight_controller.dart';
 import 'package:querya_desktop/core/editor/syntax_highlight_service.dart';
+import 'package:querya_desktop/core/theme/querya_semantic_palette.dart';
+import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/features/mongodb/mongo_document_tree_view.dart';
 import 'package:querya_desktop/features/mongodb/mongo_documents_json_view.dart';
 import 'package:querya_desktop/features/mongodb/mongo_documents_table_view.dart';
@@ -192,6 +195,54 @@ void main() {
       await tester.tap(find.text('Expand All'));
       await tester.pumpAndSettle();
       expect(find.text('address'), findsOneWidget);
+    });
+
+    testWidgets('colors leaf values using semantic palette tokens (#1644)',
+        (tester) async {
+      final id = ObjectId.fromHexString('507f1f77bcf86cd799439011');
+      final date = DateTime.utc(2026, 1, 1);
+      final docs = [
+        {
+          '_id': id,
+          'strField': 'hello',
+          'numField': 42,
+          'boolField': true,
+          'dateField': date,
+          'nullField': null,
+        },
+      ];
+
+      const theme = QueryaTheme.darkDefault;
+      final palette = QueryaSemanticPalette.fromTheme(theme);
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          data: theme,
+          child: MongoDocumentTreeView(
+            documents: docs,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final strText = tester.widget<material.Text>(find.text('"hello"'));
+      expect(strText.style?.color, palette.type1);
+
+      final numText = tester.widget<material.Text>(find.text('42'));
+      expect(numText.style?.color, palette.type2);
+
+      final boolText = tester.widget<material.Text>(find.text('true'));
+      expect(boolText.style?.color, palette.type3);
+
+      final nullText = tester.widget<material.Text>(
+        find.byWidgetPredicate(
+          (w) =>
+              w is material.Text &&
+              w.data == 'null' &&
+              w.style?.fontStyle == material.FontStyle.italic,
+        ),
+      );
+      expect(nullText.style?.color, palette.muted);
     });
   });
 
