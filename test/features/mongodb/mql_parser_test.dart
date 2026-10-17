@@ -120,4 +120,53 @@ void main() {
       expect(() => MqlParser.parse('   ;  '), throwsA(isA<FormatException>()));
     });
   });
+
+  group('relaxed object literals (#1513, #1539)', () {
+    Map<String, dynamic>? filterOf(String args) =>
+        MqlParser.parse('db.c.find($args)').filter;
+
+    test('JavaScript escapes inside strings are decoded', () {
+      expect(filterOf(r'{ name: "a\"b" }'), {'name': 'a"b'});
+      expect(filterOf(r"{ s: 'it\'s' }"), {'s': "it's"});
+      expect(filterOf(r'{ s: "line\nbreak\ttab" }'), {'s': 'line\nbreak\ttab'});
+      expect(filterOf(r'{ path: "C:\\dir" }'), {'path': r'C:\dir'});
+      expect(filterOf(r'{ u: "\u00e9\x41" }'), {'u': 'éA'});
+    });
+
+    test('text inside a string is never rewritten', () {
+      expect(
+        filterOf(r'''{ note: "see ISODate('2020-01-01') and ObjectId('5f1d7f0b9d3e2a0017a1b2c3')" }'''),
+        {'note': "see ISODate('2020-01-01') and ObjectId('5f1d7f0b9d3e2a0017a1b2c3')"},
+      );
+      expect(
+        filterOf('{ a: "@@@STR_1@@@", b: "x", c: "key: value" }'),
+        {'a': '@@@STR_1@@@', 'b': 'x', 'c': 'key: value'},
+      );
+    });
+
+    test('constructor calls outside strings', () {
+      final filter = filterOf(
+        "{ id: ObjectId('5f1d7f0b9d3e2a0017a1b2c3'), at: ISODate(\"2026-01-02\"), "
+        'big: NumberLong(-5), n: NumberInt("7") }',
+      );
+      expect(filter?['big'], -5);
+      expect(filter?['n'], 7);
+      expect(filter?['id'], isNotNull);
+      expect(filter?['at'], isNotNull);
+    });
+
+    test('a large insertMany is parsed in one pass', () {
+      final docs = [
+        for (var i = 0; i < 3000; i++)
+          '{ name: "user $i", email: "u$i@example.com", tags: ["a", "b"], age: $i }',
+      ].join(', ');
+      final sw = Stopwatch()..start();
+      final cmd = MqlParser.parse('db.users.insertMany([$docs])');
+      sw.stop();
+      expect(cmd.documents?.length, 3000);
+      expect(cmd.documents?.last['name'], 'user 2999');
+      // Quadratic before: ~5 s for 1,000 documents; linear now (~20 ms).
+      expect(sw.elapsedMilliseconds, lessThan(2000));
+    });
+  });
 }
