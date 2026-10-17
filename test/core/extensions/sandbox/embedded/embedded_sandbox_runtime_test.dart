@@ -149,7 +149,7 @@ void main() {
   // comment
   "kind": "sql.parse",
   "homepage": "https://example.com/*not a comment*/",
-  "dialect": "pg", /* block */
+  /* block */ "dialect": "pg",
 }''',
           args: {'sql': 'select 1'},
         ),
