@@ -235,24 +235,59 @@ del "%~f0"
 ''';
 }
 
+/// Shell script that waits for [pid], swaps [targetAppBundle] for
+/// [newAppBundle] and opens it, then removes [workDir] (the extracted update).
+///
+/// The old bundle is moved aside to `<target>.old` and restored when the copy
+/// fails, so a failure never leaves a missing or half-copied app; it is
+/// logged to `~/Library/Logs/Querya/querya-update.log` and the app that is
+/// in place is opened again (#1587).
 String buildMacAppReplaceScript({
   required int pid,
   required String newAppBundle,
   required String targetAppBundle,
   required String executable,
+  required String workDir,
 }) {
   return '''
 #!/bin/sh
-set -e
 PID="$pid"
 NEW='${_shellQuote(newAppBundle)}'
 TARGET='${_shellQuote(targetAppBundle)}'
 EXE='${_shellQuote(executable)}'
+WORK='${_shellQuote(workDir)}'
+LOG="\$HOME/Library/Logs/Querya/querya-update.log"
+fail() {
+  mkdir -p "\$(dirname "\$LOG")" 2>/dev/null
+  echo "\$(date) querya-update: \$1" >> "\$LOG" 2>/dev/null
+  echo "querya-update: \$1" >&2
+  rm -rf "\$WORK"
+  rm -f "\$0"
+  if [ -d "\$TARGET" ]; then open "\$TARGET"; fi
+  exit 1
+}
 while kill -0 "\$PID" 2>/dev/null; do sleep 0.2; done
-rm -rf "\$TARGET.old" 2>/dev/null || true
-mv "\$TARGET" "\$TARGET.old" 2>/dev/null || true
-cp -R "\$NEW" "\$TARGET"
-chmod +x "\$EXE" 2>/dev/null || true
+if [ ! -d "\$NEW" ]; then
+  fail "refusing replace, \$NEW is missing"
+fi
+if [ -e "\$TARGET.old" ]; then
+  rm -rf "\$TARGET.old" || fail "could not remove \$TARGET.old"
+fi
+mv "\$TARGET" "\$TARGET.old" \\
+  || fail "could not move \$TARGET aside (is its folder writable?)"
+if command -v ditto >/dev/null 2>&1; then
+  ditto "\$NEW" "\$TARGET"
+else
+  cp -R "\$NEW" "\$TARGET"
+fi
+if [ \$? -ne 0 ]; then
+  rm -rf "\$TARGET"
+  mv "\$TARGET.old" "\$TARGET" \\
+    || fail "could not copy the new app, nor restore \$TARGET.old"
+  fail "could not copy the new app into \$TARGET; the old one is restored"
+fi
+chmod +x "\$EXE" 2>/dev/null
+rm -rf "\$TARGET.old" "\$WORK"
 rm -f "\$0"
 open "\$TARGET"
 ''';
