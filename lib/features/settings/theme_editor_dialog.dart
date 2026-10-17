@@ -344,6 +344,7 @@ class _ThemeEditorColorRow extends material.StatelessWidget {
                 fontSize: 12,
                 color: cs.mutedForeground,
                 fontFamily: QueryaTypography.mono,
+                fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
               ),
             ),
           ),

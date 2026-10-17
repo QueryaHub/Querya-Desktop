@@ -102,6 +102,14 @@ void main() {
         expect(find.text(field.label), findsWidgets);
       }
 
+      // Verify hex label uses mono font and fallback
+      final hexTextFinder = find.byWidgetPredicate((widget) {
+        return widget is material.Text &&
+            widget.style?.fontFamily == 'Cascadia Code' &&
+            widget.style?.fontFamilyFallback?.contains('Consolas') == true;
+      });
+      expect(hexTextFinder, findsWidgets);
+
       // Close modal
       await tester.tap(find.text('Done'));
       await tester.pumpAndSettle();
