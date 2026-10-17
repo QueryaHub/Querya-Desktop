@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Extension manifest `id` is checked before it becomes a folder** — a sideloaded `.qext` with `"id": "../some/dir"` made the installer recursively delete and overwrite a folder outside the extensions directory. The id must now be letters, digits, `.`, `_` or `-` (starting with a letter or digit, no `..`), and every install / uninstall refuses a folder that is not inside the extensions directory (#1560).
 - **Zip limits hold even when an archive lies about its sizes** — the per-entry, total and ratio limits for extension installs, sideloads and updates are checked against the sizes the zip headers declare; the app now requires `archive` 4.5+, which refuses to decode an entry past its declared size, and reports that as an error instead of inflating it (#1561).
 - **`querya-ext-tester` sends a `--connect` password with `system.injectCredentials`, like the app** — a driver that reads its password only from the injected secret (the ClickHouse driver) failed authentication under the tester because the password was in the `db.connect` payload only.
 - **Demo Marketplace themes were named `${manifest.name}`** — the generated theme.json now carries the real name (the demo catalog is only used with `--dart-define=QUERYA_MARKETPLACE_MOCK=true`).

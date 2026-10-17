@@ -209,7 +209,7 @@ class MockMarketplaceRepository implements MarketplaceRepository {
 
     // Persist to local extensions directory so LocalExtensionRegistry discovers it
     final dir = await ExtensionPaths.extensionsDirectory();
-    final extDir = Directory(p.join(dir.path, manifest.id));
+    final extDir = ExtensionPaths.extensionDirectory(dir, manifest.id);
     if (!await extDir.exists()) {
       await extDir.create(recursive: true);
     }
@@ -326,7 +326,7 @@ class MockMarketplaceRepository implements MarketplaceRepository {
     } else {
       // Fallback: check standard extensions directory by ID
       final dir = await ExtensionPaths.extensionsDirectory();
-      final extDir = Directory(p.join(dir.path, extensionId));
+      final extDir = ExtensionPaths.extensionDirectory(dir, extensionId);
       if (await extDir.exists()) {
         await extDir.delete(recursive: true);
       }
