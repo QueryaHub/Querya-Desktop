@@ -139,7 +139,9 @@ class QueryaModalDialog extends material.StatelessWidget {
             // Content
             if (content != null) ...[
               const material.SizedBox(height: 16),
-              content!,
+              constraints.hasBoundedHeight
+                  ? material.Flexible(child: content!)
+                  : content!,
             ],
 
             // Actions

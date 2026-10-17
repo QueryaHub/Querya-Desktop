@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/layout/ui_scale.dart';
+import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/theme/parser/color_parser.dart';
 import 'package:querya_desktop/core/theme/parser/querya_theme_manifest.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
@@ -149,19 +151,22 @@ class _ThemeEditorDialogState extends material.State<ThemeEditorDialog> {
     final cs = theme.colorScheme;
 
     return QueryaModalDialog(
-      constraints: const material.BoxConstraints(maxWidth: 580),
+      constraints: WindowLayout.dialogConstraints(
+        context,
+        maxWidth: 580,
+        maxHeight: 600,
+      ),
       title: const Text('Theme Studio'),
       description: const Text('Customize color tokens with real-time UI preview'),
       icon: const material.Icon(material.Icons.palette_outlined),
       showCloseButton: true,
       content: material.SizedBox(
-        width: 540,
-        height: 480,
+        width: context.scaled(540),
         child: _loading
-            ? const material.Center(
-                child: QueryaSpinner(size: QueryaSpinnerSize.lg),
-              )
-            : material.SingleChildScrollView(
+              ? const material.Center(
+                  child: QueryaSpinner(size: QueryaSpinnerSize.lg),
+                )
+              : material.SingleChildScrollView(
                 child: material.Column(
                   crossAxisAlignment: material.CrossAxisAlignment.start,
                   children: [
@@ -253,7 +258,7 @@ class _ThemeEditorDialogState extends material.State<ThemeEditorDialog> {
                   ],
                 ),
               ),
-      ),
+        ),
       actions: [
         QueryaButton.secondary(
           label: 'Reset from current',

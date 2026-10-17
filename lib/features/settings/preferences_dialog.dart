@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
+import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/updater/update_manifest.dart';
@@ -374,7 +375,7 @@ class PreferencesDialogContentState
                     children: [
                       // Left Category Rail
                       material.Container(
-                        width: 184,
+                        width: context.scaled(184),
                         decoration: material.BoxDecoration(
                           border: material.Border(
                             right: material.BorderSide(
