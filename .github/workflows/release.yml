@@ -251,6 +251,19 @@ jobs:
       - name: Build macOS (release)
         run: flutter build macos --release
 
+      # Shipped as is when there are no signing secrets: it must not be the
+      # sandboxed app, which cannot reach ~/.querya, ~/.ssh or update itself
+      # (#1592).
+      - name: Check the build has no App Sandbox
+        run: |
+          set -euo pipefail
+          APP="build/macos/Build/Products/Release/querya_desktop.app"
+          ENTITLEMENTS="$(codesign -d --entitlements - --xml "$APP" 2>/dev/null || true)"
+          if printf '%s' "$ENTITLEMENTS" | grep -q 'com.apple.security.app-sandbox'; then
+            echo "::error::The release build has the App Sandbox entitlement (see macos/Runner/ReleaseUnsigned.entitlements)."
+            exit 1
+          fi
+
       - name: Sign and notarize macOS app
         env:
           MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
