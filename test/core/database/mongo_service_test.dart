@@ -176,4 +176,18 @@ void main() {
       expect(MongoService.instance.getConnection(302), isNull);
     });
   });
+
+  group('effectiveMongoFindLimit (#1357)', () {
+    test('no limit, or 0 (MongoDB: unlimited), becomes the default cap', () {
+      expect(effectiveMongoFindLimit(null), kMongoDefaultFindLimit);
+      expect(effectiveMongoFindLimit(0), kMongoDefaultFindLimit);
+      expect(effectiveMongoFindLimit(-5), kMongoDefaultFindLimit);
+    });
+
+    test('an explicit positive limit is kept', () {
+      expect(effectiveMongoFindLimit(1), 1);
+      expect(effectiveMongoFindLimit(100), 100);
+      expect(effectiveMongoFindLimit(50000), 50000);
+    });
+  });
 }

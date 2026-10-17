@@ -30,6 +30,16 @@ void _throwIfMongoWriteFailed(
 }
 
 /// Service for managing MongoDB connections.
+/// How many documents `find` returns when the caller gives no limit (or `0`,
+/// which MongoDB reads as "no limit"). Decoding is about 64 us per document on
+/// the UI isolate: 50,000 documents are a three-second wait and a 40-60 ms
+/// stall (#1357).
+const int kMongoDefaultFindLimit = 1000;
+
+/// The limit `find` really applies for a requested [limit].
+int effectiveMongoFindLimit(int? limit) =>
+    limit == null || limit <= 0 ? kMongoDefaultFindLimit : limit;
+
 class MongoService {
   MongoService._();
 
@@ -170,9 +180,8 @@ class MongoService {
       if (skip != null && skip > 0) {
         selector.skip(skip);
       }
-      if (limit != null && limit > 0) {
-        selector.limit(limit);
-      }
+      // Never unbounded: `stream.toList()` below holds every document.
+      selector.limit(effectiveMongoFindLimit(limit));
 
       final stream = coll.find(selector);
       return await stream.toList();
