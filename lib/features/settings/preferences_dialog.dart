@@ -127,7 +127,11 @@ class PreferencesDialogContentState
         _historyMax = hist;
         _fontSize = font;
       });
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      // The dialog stays on its defaults; leave a trace of why (a broken
+      // settings database, an I/O error) for whoever reads the log (#1637).
+      debugPrint('PreferencesDialog: could not load the preferences: $error\n$stackTrace');
+    }
   }
 
   Future<void> _setCheckUpdatesOnStartup(bool enabled) async {
