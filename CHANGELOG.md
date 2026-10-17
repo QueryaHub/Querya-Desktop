@@ -19,7 +19,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **macOS builds without Developer ID signing no longer run in the App Sandbox** — they did, unlike the signed build, so `~/.querya` (extensions, themes), `~/.ssh` keys, saved SQLite files, the MCP endpoint and in-app updates did not work. Unsigned and signed builds now differ only in how Gatekeeper treats them, and the release fails if the sandbox comes back (#1592).
 - **Extension manifest `id` is checked before it becomes a folder** — a sideloaded `.qext` with `"id": "../some/dir"` made the installer recursively delete and overwrite a folder outside the extensions directory. The id must now be letters, digits, `.`, `_` or `-` (starting with a letter or digit, no `..`), and every install / uninstall refuses a folder that is not inside the extensions directory (#1560).
 
 - **Format SQL no longer changes what the query means** — it uppercased keywords inside string literals (`'not null'` → `'NOT NULL'`), quoted identifiers (`"order"` → `"ORDER"`, a different column in PostgreSQL), comments and `$$` function bodies. It now touches code only, and the caret stays where it was instead of jumping to the end (#1566)
