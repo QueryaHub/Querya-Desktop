@@ -539,7 +539,61 @@ class MqlParser {
 
   // ─── Relaxed JSON / JS Object Literal Parser ────────────────────────────────
 
-  static dynamic _parseRelaxedJson(String text) {
+  /// [_parseValue] with the Extended JSON wrappers inside it turned into
+  /// BSON values (#1667): the relaxed syntax writes nested `ObjectId(...)` /
+  /// `ISODate(...)` as `{"$oid": ...}` / `{"$date": ...}`, and users type them
+  /// in JSON; sent as maps they matched nothing or were stored as
+  /// sub-documents.
+  static dynamic _parseRelaxedJson(String text) =>
+      _bsonScalars(_parseValue(text));
+
+  /// `{"$oid": "<24 hex>"}` -> [ObjectId], `{"$date": ...}` -> UTC
+  /// [DateTime], `{"$numberLong": "<n>"}` -> int, at any depth of [value].
+  /// Only single-key maps of exactly these shapes: query operators such as
+  /// `$regex` / `$options` stay as written.
+  static Object? _bsonScalars(Object? value) {
+    if (value is List) return [for (final v in value) _bsonScalars(v)];
+    if (value is! Map) return value;
+    if (value.length == 1) {
+      final MapEntry(:key, value: inner) = value.entries.single;
+      switch (key) {
+        case r'$oid' when inner is String && ObjectId.isValidHexId(inner):
+          return ObjectId.fromHexString(inner);
+        case r'$date':
+          final date = _ejsonDate(inner);
+          if (date != null) return date;
+        case r'$numberLong' when inner is String:
+          final n = int.tryParse(inner);
+          if (n != null) return n;
+      }
+    }
+    return <String, dynamic>{
+      for (final e in value.entries) e.key.toString(): _bsonScalars(e.value),
+    };
+  }
+
+  /// The value of `{"$date": ...}`: an ISO string, milliseconds, or
+  /// `{"$numberLong": "<ms>"}` (canonical Extended JSON).
+  static DateTime? _ejsonDate(Object? v) {
+    if (v is String) return _isoDateUtc(v);
+    if (v is int) return DateTime.fromMillisecondsSinceEpoch(v, isUtc: true);
+    if (v is Map && v.length == 1 && v[r'$numberLong'] is String) {
+      final ms = int.tryParse(v[r'$numberLong'] as String);
+      if (ms != null) return DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true);
+    }
+    return null;
+  }
+
+  /// `ISODate(...)` as mongosh reads it: a time without a zone is UTC, not
+  /// the local time `DateTime.parse` would make of it.
+  static DateTime? _isoDateUtc(String s) {
+    final d = DateTime.tryParse(s.trim());
+    if (d == null || d.isUtc) return d;
+    return DateTime.utc(d.year, d.month, d.day, d.hour, d.minute, d.second,
+        d.millisecond, d.microsecond);
+  }
+
+  static dynamic _parseValue(String text) {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return null;
 
@@ -554,7 +608,8 @@ class MqlParser {
       final iso = trimmed
           .substring(8, trimmed.length - 1)
           .replaceAll(RegExp(r'''['"]'''), '');
-      return DateTime.parse(iso);
+      return _isoDateUtc(iso) ??
+          (throw FormatException('Invalid ISODate: $iso'));
     }
     if ((trimmed.startsWith('NumberLong(') || trimmed.startsWith('NumberInt(')) &&
         trimmed.endsWith(')')) {
