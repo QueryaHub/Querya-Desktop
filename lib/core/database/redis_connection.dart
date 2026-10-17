@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' show min;
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -124,6 +125,12 @@ class RedisConnection {
   bool _isConnected = false;
 
   bool get isConnected => _isConnected && _command != null;
+
+  /// The database index this socket works in. `SELECT`ed on every (re)connect,
+  /// so a socket that drops does not come back in db 0, and moved only by
+  /// [selectDatabase]. A socket serves one database: views never `SELECT`
+  /// before a command, which was not atomic on a shared socket (#1569).
+  int database = 0;
 
   @visibleForTesting
   void setConnectionForTest({
@@ -267,6 +274,9 @@ class RedisConnection {
                 'Redis did not answer within ${limit.inSeconds} s',
               ),
             ));
+      if (database != 0) {
+        await command.send_object(['SELECT', database]);
+      }
       _isConnected = true;
       if (_clientReadOnly) {
         try {
@@ -406,9 +416,10 @@ class RedisConnection {
     }
   }
 
-  /// SELECT database index.
+  /// SELECT database index; later reconnects come back to it too.
   Future<void> selectDatabase(int db) async {
     await sendCommand(['SELECT', db]);
+    database = db;
   }
 
   /// DBSIZE — number of keys in the currently selected database.
@@ -745,20 +756,71 @@ class RedisConnection {
     return redisReplyInt(result);
   }
 
-  /// DEL key [key ...]. Returns total number of keys removed.
+  /// False once the server answered `UNLINK` with an unknown command (< 4.0).
+  bool? _unlinkSupported;
+
+  /// Removes [keys] in chunks of 200 and returns how many were removed.
+  ///
+  /// `UNLINK` frees the values in the background where `DEL` blocks the
+  /// server on a large one; a server without it gets `DEL`. After the first
+  /// chunk the rest are pipelined. When a chunk fails the error is rethrown
+  /// once every chunk has answered, so some keys may be gone: reload (#1569).
   Future<int> delMany(Iterable<Object> keys) async {
     _assertWritable();
     final list = keys.toList();
     if (list.isEmpty) return 0;
-    var total = 0;
     const chunkSize = 200;
-    for (var i = 0; i < list.length; i += chunkSize) {
-      final chunk = list.sublist(i, (i + chunkSize).clamp(0, list.length));
-      final result = await sendCommand(['DEL', ...chunk.map(redisCommandArg)]);
-      total += redisReplyInt(result);
+    final chunks = [
+      for (var i = 0; i < list.length; i += chunkSize)
+        [
+          for (final key in list.sublist(i, min(i + chunkSize, list.length)))
+            redisCommandArg(key),
+        ],
+    ];
+
+    // The first chunk on its own tells whether the server knows UNLINK.
+    var total = 0;
+    var verb = _unlinkSupported == false ? 'DEL' : 'UNLINK';
+    try {
+      total += redisReplyInt(await sendCommand([verb, ...chunks.first]));
+    } catch (e) {
+      if (verb != 'UNLINK' || !_isUnknownCommand(e)) rethrow;
+      verb = 'DEL';
+      total += redisReplyInt(await sendCommand([verb, ...chunks.first]));
+    }
+    _unlinkSupported ??= verb == 'UNLINK';
+    if (chunks.length == 1) return total;
+
+    Object? firstError;
+    StackTrace? firstStack;
+    final cmd = _command;
+    cmd?.pipe_start();
+    try {
+      final replies = await Future.wait([
+        for (final chunk in chunks.skip(1))
+          sendCommand([verb, ...chunk]).then<int>(
+            (reply) => redisReplyInt(reply),
+            onError: (Object e, StackTrace st) {
+              firstError ??= e;
+              firstStack ??= st;
+              return 0;
+            },
+          ),
+      ]);
+      for (final removed in replies) {
+        total += removed;
+      }
+    } finally {
+      cmd?.pipe_end();
+    }
+    if (firstError != null) {
+      Error.throwWithStackTrace(firstError!, firstStack!);
     }
     return total;
   }
+
+  static bool _isUnknownCommand(Object error) =>
+      error.toString().toLowerCase().contains('unknown command');
 
   /// RENAME old new.
   Future<void> rename(Object oldKey, String newKey) async {
@@ -834,6 +896,7 @@ class RedisConnectionTestFake extends RedisConnection {
     this.failType = false,
     this.getBytesResult,
     this.binaryScanKeys = const <List<int>>[],
+    this.unlinkUnsupported = false,
   })  : listItems =
             listItems != null ? List<dynamic>.from(listItems) : <dynamic>[],
         super(
@@ -861,6 +924,9 @@ class RedisConnectionTestFake extends RedisConnection {
   final bool failType;
   final List<int>? getBytesResult;
   final List<List<int>> binaryScanKeys;
+
+  /// Answers `UNLINK` like a server before Redis 4.0.
+  final bool unlinkUnsupported;
   final List<String> sentCommands = [];
 
   bool _firstScanDone = false;
@@ -1035,7 +1101,9 @@ class RedisConnectionTestFake extends RedisConnection {
           }
         }
         return removed;
-      case 'DEL':
+      case 'UNLINK' when unlinkUnsupported:
+        throw Exception("ERR unknown command 'UNLINK'");
+      case 'DEL' || 'UNLINK':
         final allKeys = [...firstScanKeys, ...secondScanKeys];
         var count = 0;
         for (var i = 1; i < args.length; i++) {

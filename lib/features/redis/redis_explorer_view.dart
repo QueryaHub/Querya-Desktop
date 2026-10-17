@@ -51,6 +51,11 @@ class RedisExplorerView extends material.StatefulWidget {
 
 class _RedisExplorerViewState extends material.State<RedisExplorerView> {
   RedisConnection? _connection;
+
+  /// The CLI's own socket for [RedisExplorerView.database], connected on the
+  /// first command: a `SELECT` typed there must not move the keys view and
+  /// key editor, which share [_connection] (#1569).
+  RedisConnection? _cliConnection;
   bool _connecting = true;
   String? _error;
 
@@ -91,6 +96,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
     } else {
       if (oldWidget.isReadOnly != widget.isReadOnly) {
         unawaited(_connection?.applyClientReadOnly(widget.isReadOnly));
+        unawaited(_cliConnection?.applyClientReadOnly(widget.isReadOnly));
       }
       if (widget.initialKey != null &&
           widget.initialKey != _selectedKey?.label) {
@@ -112,6 +118,11 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
     if (conn != null) {
       unawaited(RedisService.instance.disconnect(conn));
     }
+    final cli = _cliConnection;
+    _cliConnection = null;
+    if (cli != null) {
+      unawaited(RedisService.instance.disconnect(cli));
+    }
   }
 
   Future<void> _connect() async {
@@ -119,6 +130,11 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
     _connection = null;
     if (old != null) {
       await RedisService.instance.disconnect(old);
+    }
+    final oldCli = _cliConnection;
+    _cliConnection = null;
+    if (oldCli != null) {
+      await RedisService.instance.disconnect(oldCli);
     }
     if (!mounted) return;
     setState(() {
@@ -134,17 +150,26 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
       final conn = RedisService.instance.acquire(
         widget.connectionRow,
         role: RedisSessionRole.explorer,
+        database: widget.database,
+      );
+      final cli = RedisService.instance.acquire(
+        widget.connectionRow,
+        role: RedisSessionRole.cli,
+        database: widget.database,
       );
       await conn.applyClientReadOnly(widget.isReadOnly);
+      await cli.applyClientReadOnly(widget.isReadOnly);
       if (!conn.isConnected) {
         await conn.connect();
       }
       if (!mounted) {
         unawaited(RedisService.instance.disconnect(conn));
+        unawaited(RedisService.instance.disconnect(cli));
         return;
       }
       setState(() {
         _connection = conn;
+        _cliConnection = cli;
         _connecting = false;
       });
     } catch (e) {
@@ -277,7 +302,8 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
     }
 
     final conn = _connection;
-    if (conn == null) return const material.SizedBox.shrink();
+    final cli = _cliConnection;
+    if (conn == null || cli == null) return const material.SizedBox.shrink();
 
     final int bodyIndex;
     if (_showCli) {
@@ -350,7 +376,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
                   key: ValueKey(
                       'cli_${widget.connectionRow.id}_${widget.database}'),
                   connectionRow: widget.connectionRow,
-                  connection: conn,
+                  connection: cli,
                   database: widget.database,
                   onBack: () => setState(() => _showCli = false),
                 ),

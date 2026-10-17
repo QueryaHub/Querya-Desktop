@@ -77,7 +77,6 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
       _hasMore = true;
     });
     try {
-      await widget.connection.selectDatabase(widget.database);
       _dbSize = await widget.connection.dbSize();
       await _scanBatch();
       if (!mounted) return;
@@ -189,7 +188,6 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
     );
     if (!mounted || !confirmed) return;
     try {
-      await widget.connection.selectDatabase(widget.database);
       await widget.connection.del(keyInfo.name);
       setState(() {
         _keys.removeWhere((k) => k.name == keyInfo.name);
@@ -217,14 +215,17 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
     );
     if (!mounted || !confirmed) return;
     try {
-      await widget.connection.selectDatabase(widget.database);
       await widget.connection.delMany(keys.map((k) => k.name));
+      if (!mounted) return;
       setState(() {
         final toRemove = keys.map((k) => k.name).toSet();
         _keys.removeWhere((k) => toRemove.contains(k.name));
         _dbSize = (_dbSize - count).clamp(0, _dbSize);
       });
     } catch (e) {
+      if (!mounted) return;
+      // Some chunks may have been removed: show what is really left.
+      await _load();
       if (mounted) setState(() => _error = 'Delete folder failed: $e');
     }
   }
