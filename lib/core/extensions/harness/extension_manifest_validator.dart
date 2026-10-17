@@ -168,7 +168,11 @@ final _semver = RegExp(r'^\d+\.\d+\.\d+(?:[+-][0-9A-Za-z.+-]+)?$');
 /// as `>=0.4.0 <3.0.0`: `>=x.y.z`, `>x.y.z`, `<=x.y.z`, `<x.y.z`, `=x.y.z`,
 /// `^x.y.z` (same major, or the same minor while major is 0), or `*` alone.
 bool? engineRangeAllows(HostVersion host, String range) {
-  final parts = range.trim().split(RegExp(r'\s+'));
+  // `>= 0.4.0` reads the same as `>=0.4.0`: glue an operator to its version.
+  final parts = range
+      .trim()
+      .replaceAllMapped(RegExp(r'(>=|<=|>|<|=|\^)\s+'), (m) => m[1]!)
+      .split(RegExp(r'\s+'));
   if (parts.length == 1 && parts.single == '*') return true;
   var allowed = true;
   for (final part in parts) {
@@ -182,8 +186,8 @@ bool? engineRangeAllows(HostVersion host, String range) {
 bool? _comparatorAllows(HostVersion host, String c) {
   try {
     if (c.startsWith('>=')) return host >= HostVersion.parse(c.substring(2));
-    if (c.startsWith('<=')) return !(HostVersion.parse(c.substring(2)) < host);
-    if (c.startsWith('>')) return !(host <= HostVersion.parse(c.substring(1)));
+    if (c.startsWith('<=')) return host <= HostVersion.parse(c.substring(2));
+    if (c.startsWith('>')) return host > HostVersion.parse(c.substring(1));
     if (c.startsWith('<')) return host < HostVersion.parse(c.substring(1));
     if (c.startsWith('=')) return host == HostVersion.parse(c.substring(1));
     if (c.startsWith('^')) {

@@ -125,6 +125,25 @@ void main() {
       expect(allows('0.5.0', '  >=0.4.0   <3.0.0 '), isTrue);
     });
 
+    test('spaces between an operator and its version are tolerated (#1635)',
+        () {
+      const range = '>= 0.4.0 < 3.0.0';
+      expect(allows('0.4.19', range), isTrue);
+      expect(allows('3.0.0', range), isFalse);
+      expect(allows('0.3.0', range), isFalse);
+      expect(allows('0.4.1', '> 0.4.0'), isTrue);
+      expect(allows('0.4.0', '<=  0.4.0'), isTrue);
+      expect(allows('0.4.19', '= 0.4.19'), isTrue);
+      expect(allows('0.4.19', '^ 0.4.11'), isTrue);
+      expect(allows('0.5.0', '>='), isNull);
+    });
+
+    test('HostVersion has a > operator (#1636)', () {
+      expect(HostVersion.parse('0.4.1') > HostVersion.parse('0.4.0'), isTrue);
+      expect(HostVersion.parse('0.4.0') > HostVersion.parse('0.4.0'), isFalse);
+      expect(HostVersion.parse('0.3.9') > HostVersion.parse('0.4.0'), isFalse);
+    });
+
     test('* means any version; a range it cannot read is null, not a guess', () {
       expect(allows('0.5.0', '*'), isTrue);
       for (final bad in ['~0.4', '>=0.4.0 || ^1.0.0', '>=x', '', '0.4.19', '* <3.0.0']) {

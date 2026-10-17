@@ -29,6 +29,7 @@ final class HostVersion implements Comparable<HostVersion> {
     return patch.compareTo(other.patch);
   }
 
+  bool operator >(HostVersion other) => compareTo(other) > 0;
   bool operator >=(HostVersion other) => compareTo(other) >= 0;
   bool operator <(HostVersion other) => compareTo(other) < 0;
   bool operator <=(HostVersion other) => compareTo(other) <= 0;
