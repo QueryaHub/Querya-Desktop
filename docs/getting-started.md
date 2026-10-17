@@ -11,17 +11,19 @@ How to build and run Querya Desktop from source.
   flutter config --enable-linux-desktop   # or --enable-windows-desktop / --enable-macos-desktop
   ```
 
-- **Linux** also needs the desktop headers used by Flutter and its plugins
-  (GTK, etc.). For `flutter_secure_storage` you typically need
-  **`libsecret-1-dev`**:
+- **Linux** also needs a C++ toolchain and the desktop headers used by
+  Flutter and its plugins (GTK, `libsecret` for `flutter_secure_storage`):
 
   ```bash
-  sudo apt install libsecret-1-dev      # Debian / Ubuntu
-  sudo dnf install libsecret-devel      # Fedora
+  # Debian / Ubuntu
+  sudo apt install clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev
+  # Fedora
+  sudo dnf install clang cmake ninja-build pkgconf-pkg-config gtk3-devel libsecret-devel
   ```
 
-  CI pins a specific stable Flutter version; matching it locally avoids
-  "works on my machine" drift (see [Contributing](../CONTRIBUTING.md)).
+- **Flutter version.** CI builds with Flutter **3.47.1** (stable channel, see
+  `.github/workflows/ci.yml`); using the same one locally avoids "works on my
+  machine" drift (see [Contributing](../CONTRIBUTING.md)).
 
 ## Install
 
@@ -31,23 +33,28 @@ From the project root:
 flutter pub get
 ```
 
-If the platform folders are missing:
-
-```bash
-flutter create . --project-name querya_desktop --platforms=linux,windows,macos
-flutter pub get
-```
+The `linux/`, `windows/` and `macos/` folders are part of the repository and
+hold native code of their own (window chrome, refresh-rate handling, runner
+changes, icons, entitlements). **Do not run `flutter create .` here:** it would
+overwrite them with the stock templates. If a platform folder looks broken,
+restore it from Git (`git checkout -- linux/`) instead.
 
 ## Run
 
-```bash
-# Linux
-flutter run -d linux
-# On Wayland, force X11 to avoid Gdk pointer warnings:
-GDK_BACKEND=x11 flutter run -d linux
-# Or use the helper script:
-./run_linux.sh
+**Linux.** Use the helper script:
 
+```bash
+./run_linux.sh            # extra arguments go to `flutter run`
+```
+
+It checks that `libsecret-1` is installed (with install hints for Debian,
+Fedora and Arch if it is not) and sets `GDK_BACKEND=x11`, which avoids Gdk
+pointer warnings on Wayland. Plain `flutter run -d linux` also works, and runs
+natively on Wayland if you prefer that.
+
+**Other platforms:**
+
+```bash
 # Windows
 flutter run -d windows
 
