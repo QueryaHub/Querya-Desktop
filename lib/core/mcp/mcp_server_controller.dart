@@ -99,7 +99,21 @@ class McpServerController {
     }
   }
 
-  Future<void> start() async {
+  /// Runs [op] after every earlier start / stop has finished. `start` awaits
+  /// between its `_host != null` check and the assignment, so two overlapping
+  /// calls (a toggle clicked twice, `startIfEnabled` racing the settings page)
+  /// each built a host and the first one was leaked, still listening (#1563).
+  Future<void> _lifecycle = Future<void>.value();
+
+  Future<T> _serialized<T>(Future<T> Function() op) {
+    final run = _lifecycle.then((_) => op());
+    _lifecycle = run.then<void>((_) {}, onError: (Object _) {});
+    return run;
+  }
+
+  Future<void> start() => _serialized(_start);
+
+  Future<void> _start() async {
     if (_host != null) return;
     final version = await _version();
     final host = McpSocketHost(
@@ -125,7 +139,9 @@ class McpServerController {
   }
 
   /// Disconnects clients and removes the endpoint file.
-  Future<void> stop() async {
+  Future<void> stop() => _serialized(_stop);
+
+  Future<void> _stop() async {
     final host = _host;
     _host = null;
     for (final s in _servers.toList()) {
@@ -166,11 +182,11 @@ class McpServerController {
 
   /// Stops and starts again with a new token; connected clients must
   /// reconnect (their `querya-mcp` reads the new endpoint file).
-  Future<void> regenerateToken() async {
-    if (_host == null) return;
-    await stop();
-    await start();
-  }
+  Future<void> regenerateToken() => _serialized(() async {
+        if (_host == null) return;
+        await _stop();
+        await _start();
+      });
 
   void _publish(McpSocketHost host) {
     if (_host != host && _host != null) return;
