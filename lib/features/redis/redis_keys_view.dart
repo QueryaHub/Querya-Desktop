@@ -3,6 +3,7 @@ import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/redis_bulk.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/theme/querya_semantic_palette.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
@@ -541,7 +542,9 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
                     textAlign: material.TextAlign.center,
                     style: const material.TextStyle(
                       fontSize: 13,
-                      fontFamily: 'monospace',
+                      fontFamily: QueryaTypography.mono,
+                      fontFamilyFallback:
+                          QueryaTypography.monoFontFamilyFallback,
                     ),
                     decoration: material.InputDecoration(
                       contentPadding: material.EdgeInsets.zero,
@@ -750,7 +753,8 @@ class _FolderTile extends material.StatelessWidget {
                 style: material.TextStyle(
                   fontSize: 13,
                   fontWeight: material.FontWeight.w600,
-                  fontFamily: 'monospace',
+                  fontFamily: QueryaTypography.mono,
+                  fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
                   color: cs.foreground,
                 ),
               ),
@@ -908,7 +912,9 @@ class _KeyTile extends material.StatelessWidget {
                     maxLines: 1,
                     style: material.TextStyle(
                       fontSize: 13,
-                      fontFamily: 'monospace',
+                      fontFamily: QueryaTypography.mono,
+                      fontFamilyFallback:
+                          QueryaTypography.monoFontFamilyFallback,
                       color: cs.foreground,
                     ),
                   ),

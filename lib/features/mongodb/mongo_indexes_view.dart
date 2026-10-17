@@ -3,6 +3,7 @@ import 'dart:async' show unawaited;
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/mongodb/mongo_create_index_dialog.dart';
 import 'package:querya_desktop/features/mongodb/mongo_index_info.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -406,7 +407,9 @@ class _IndexCard extends material.StatelessWidget {
                       material.SelectableText(
                         index.keysFormatted,
                         style: const material.TextStyle(
-                          fontFamily: 'monospace',
+                          fontFamily: QueryaTypography.mono,
+                          fontFamilyFallback:
+                              QueryaTypography.monoFontFamilyFallback,
                           fontSize: 12,
                           fontWeight: material.FontWeight.w500,
                         ),

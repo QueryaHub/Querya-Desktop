@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/core/ui/querya_tooltip.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/features/workspace/dml_preview_dialog.dart';
@@ -353,7 +354,9 @@ class _SaveFailedDialogState extends material.State<_SaveFailedDialog> {
                   child: material.SelectableText(
                     info.details,
                     style: material.TextStyle(
-                      fontFamily: 'monospace',
+                      fontFamily: QueryaTypography.mono,
+                      fontFamilyFallback:
+                          QueryaTypography.monoFontFamilyFallback,
                       fontSize: 11,
                       color: cs.mutedForeground,
                     ),

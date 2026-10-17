@@ -7,6 +7,7 @@ import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/redis_bulk.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
@@ -621,7 +622,9 @@ class _RedisCliWorkspaceState extends material.State<RedisCliWorkspace> {
                   child: Text(
                     '${widget.connection.host}:${widget.connection.port} [db$_currentDb]',
                     style: material.TextStyle(
-                      fontFamily: 'monospace',
+                      fontFamily: QueryaTypography.mono,
+                      fontFamilyFallback:
+                          QueryaTypography.monoFontFamilyFallback,
                       fontSize: 11,
                       color: cs.mutedForeground,
                     ),
@@ -699,7 +702,9 @@ class _RedisCliWorkspaceState extends material.State<RedisCliWorkspace> {
                         child: Text(
                           suggestion,
                           style: material.TextStyle(
-                            fontFamily: 'monospace',
+                            fontFamily: QueryaTypography.mono,
+                            fontFamilyFallback:
+                                QueryaTypography.monoFontFamilyFallback,
                             fontSize: 11,
                             fontWeight: material.FontWeight.w600,
                             color: cs.primary,
@@ -730,7 +735,8 @@ class _RedisCliWorkspaceState extends material.State<RedisCliWorkspace> {
                 Text(
                   'db$_currentDb >',
                   style: material.TextStyle(
-                    fontFamily: 'monospace',
+                    fontFamily: QueryaTypography.mono,
+                    fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
                     fontSize: 13,
                     fontWeight: material.FontWeight.w600,
                     color: cs.primary,
@@ -801,7 +807,8 @@ class _RedisCliWorkspaceState extends material.State<RedisCliWorkspace> {
               Text(
                 'db${entry.database} > ',
                 style: material.TextStyle(
-                  fontFamily: 'monospace',
+                  fontFamily: QueryaTypography.mono,
+                  fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
                   fontSize: 12,
                   fontWeight: material.FontWeight.w600,
                   color: cs.primary,
@@ -811,7 +818,8 @@ class _RedisCliWorkspaceState extends material.State<RedisCliWorkspace> {
                 child: Text(
                   entry.command,
                   style: const material.TextStyle(
-                    fontFamily: 'monospace',
+                    fontFamily: QueryaTypography.mono,
+                    fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
                     fontSize: 12,
                     fontWeight: material.FontWeight.w600,
                   ),
@@ -831,7 +839,9 @@ class _RedisCliWorkspaceState extends material.State<RedisCliWorkspace> {
                   child: Text(
                     '${entry.latencyMs} ms',
                     style: material.TextStyle(
-                      fontFamily: 'monospace',
+                      fontFamily: QueryaTypography.mono,
+                      fontFamilyFallback:
+                          QueryaTypography.monoFontFamilyFallback,
                       fontSize: 10,
                       color: cs.mutedForeground,
                     ),
@@ -858,7 +868,8 @@ class _RedisCliWorkspaceState extends material.State<RedisCliWorkspace> {
           material.SelectableText(
             entry.output,
             style: material.TextStyle(
-              fontFamily: 'monospace',
+              fontFamily: QueryaTypography.mono,
+              fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
               fontSize: 12,
               color: entry.isError
                   ? cs.destructive

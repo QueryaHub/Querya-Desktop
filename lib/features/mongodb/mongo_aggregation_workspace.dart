@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/mongodb/mongo_aggregation_stage.dart';
 import 'package:querya_desktop/features/mongodb/mongo_documents_json_view.dart';
 import 'package:querya_desktop/features/mongodb/mongo_documents_table_view.dart';
@@ -652,7 +653,8 @@ class _StageCardState extends material.State<_StageCard> {
                 maxLines: null,
                 minLines: 3,
                 style: const material.TextStyle(
-                  fontFamily: 'monospace',
+                  fontFamily: QueryaTypography.mono,
+                  fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
                   fontSize: 12.5,
                   height: 1.4,
                 ),
@@ -810,7 +812,8 @@ class _ExportDialogState extends material.State<_ExportDialog> {
               child: material.SelectableText(
                 code,
                 style: const material.TextStyle(
-                  fontFamily: 'monospace',
+                  fontFamily: QueryaTypography.mono,
+                  fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
                   fontSize: 12.5,
                   height: 1.45,
                 ),

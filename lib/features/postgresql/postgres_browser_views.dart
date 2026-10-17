@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/postgres_metadata.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
@@ -165,7 +166,9 @@ class _PostgresIndexListViewState
                           material.SelectableText(
                             r.indexDef,
                             style: material.TextStyle(
-                              fontFamily: 'monospace',
+                              fontFamily: QueryaTypography.mono,
+                              fontFamilyFallback:
+                                  QueryaTypography.monoFontFamilyFallback,
                               fontSize: 11,
                               height: 1.4,
                               color: cs.foreground,
@@ -331,7 +334,9 @@ class _PostgresTriggerListViewState
                           material.SelectableText(
                             r.definition,
                             style: material.TextStyle(
-                              fontFamily: 'monospace',
+                              fontFamily: QueryaTypography.mono,
+                              fontFamilyFallback:
+                                  QueryaTypography.monoFontFamilyFallback,
                               fontSize: 11,
                               height: 1.4,
                               color: cs.foreground,
@@ -470,7 +475,9 @@ class _PostgresTypeListViewState extends material.State<PostgresTypeListView> {
                         child: material.Text(
                           r.name,
                           style: material.TextStyle(
-                            fontFamily: 'monospace',
+                            fontFamily: QueryaTypography.mono,
+                            fontFamilyFallback:
+                                QueryaTypography.monoFontFamilyFallback,
                             fontSize: 12,
                             color: cs.foreground,
                           ),
@@ -616,7 +623,9 @@ class _PostgresExtensionListViewState
                         child: material.Text(
                           r.name,
                           style: material.TextStyle(
-                            fontFamily: 'monospace',
+                            fontFamily: QueryaTypography.mono,
+                            fontFamilyFallback:
+                                QueryaTypography.monoFontFamilyFallback,
                             fontSize: 12,
                             fontWeight: material.FontWeight.w600,
                             color: cs.foreground,
@@ -772,7 +781,9 @@ class _PostgresFdwListViewState extends material.State<PostgresFdwListView> {
                     child: material.Text(
                       '${r.name}${r.handler != null ? ' · ${r.handler}' : ''}',
                       style: material.TextStyle(
-                        fontFamily: 'monospace',
+                        fontFamily: QueryaTypography.mono,
+                        fontFamilyFallback:
+                            QueryaTypography.monoFontFamilyFallback,
                         fontSize: 12,
                         color: cs.foreground,
                       ),
@@ -799,7 +810,9 @@ class _PostgresFdwListViewState extends material.State<PostgresFdwListView> {
                   child: material.Text(
                     '${r.serverName} → ${r.fdwName}',
                     style: material.TextStyle(
-                      fontFamily: 'monospace',
+                      fontFamily: QueryaTypography.mono,
+                      fontFamilyFallback:
+                          QueryaTypography.monoFontFamilyFallback,
                       fontSize: 12,
                       color: cs.foreground,
                     ),

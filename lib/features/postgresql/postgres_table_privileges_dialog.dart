@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/database/postgres_metadata.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
@@ -119,7 +120,9 @@ class _PrivilegesDialogBodyState extends material.State<_PrivilegesDialogBody> {
                     material.Text(
                       '${widget.schema}.${widget.tableName}',
                       style: material.TextStyle(
-                        fontFamily: 'monospace',
+                        fontFamily: QueryaTypography.mono,
+                        fontFamilyFallback:
+                            QueryaTypography.monoFontFamilyFallback,
                         fontSize: 12,
                         color: theme.mutedForeground,
                       ),
@@ -214,7 +217,8 @@ class _PrivilegesDialogBodyState extends material.State<_PrivilegesDialogBody> {
                 child: material.Text(
                   r.privilegeType,
                   style: material.TextStyle(
-                    fontFamily: 'monospace',
+                    fontFamily: QueryaTypography.mono,
+                    fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
                     fontSize: 12,
                     color: theme.foreground,
                   ),

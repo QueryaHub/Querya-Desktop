@@ -4,6 +4,7 @@ import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/editor/querya_code_editor.dart';
 import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/workspace/sql_editor_chrome.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
@@ -233,7 +234,9 @@ class _PostgresRoutineViewState extends material.State<PostgresRoutineView> {
                               fontSize: 12,
                               fontWeight: material.FontWeight.w600,
                               color: cs.foreground,
-                              fontFamily: 'monospace',
+                              fontFamily: QueryaTypography.mono,
+                              fontFamilyFallback:
+                                  QueryaTypography.monoFontFamilyFallback,
                             ),
                           ),
                         ),

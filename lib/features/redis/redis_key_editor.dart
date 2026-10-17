@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/redis_bulk.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/redis/editors/redis_hash_editor.dart';
 import 'package:querya_desktop/features/redis/editors/redis_list_editor.dart';
 import 'package:querya_desktop/features/redis/editors/redis_set_editor.dart';
@@ -755,7 +756,8 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
               maxLines: 1,
               style: material.TextStyle(
                 fontSize: 14,
-                fontFamily: 'monospace',
+                fontFamily: QueryaTypography.mono,
+                fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
                 fontWeight: material.FontWeight.w500,
                 color: cs.foreground,
               ),

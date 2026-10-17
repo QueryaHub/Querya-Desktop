@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:mongo_dart/mongo_dart.dart' show ObjectId;
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/mongodb/mongo_ejson.dart';
 import 'package:querya_desktop/features/mongodb/mongo_field_codec.dart';
 import 'package:querya_desktop/shared/widgets/app_toast.dart';
@@ -318,7 +319,9 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
                       '_id: $idString',
                       style: material.TextStyle(
                         fontSize: 11,
-                        fontFamily: 'monospace',
+                        fontFamily: QueryaTypography.mono,
+                        fontFamilyFallback:
+                            QueryaTypography.monoFontFamilyFallback,
                         color: cs.mutedForeground,
                       ),
                     ),
@@ -540,7 +543,8 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
           Text(
             keyLabel,
             style: material.TextStyle(
-              fontFamily: 'monospace',
+              fontFamily: QueryaTypography.mono,
+              fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
               fontSize: 12,
               fontWeight: material.FontWeight.w600,
               color: matchesSearch && _searchQuery.isNotEmpty
@@ -552,7 +556,8 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
           Text(
             badgeLabel,
             style: material.TextStyle(
-              fontFamily: 'monospace',
+              fontFamily: QueryaTypography.mono,
+              fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
               fontSize: 11,
               color: cs.mutedForeground,
             ),
@@ -615,7 +620,8 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
           Text(
             keyLabel,
             style: material.TextStyle(
-              fontFamily: 'monospace',
+              fontFamily: QueryaTypography.mono,
+              fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
               fontSize: 12,
               fontWeight: material.FontWeight.w500,
               color: isMatch ? cs.primary : cs.foreground,
@@ -624,7 +630,8 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
           Text(
             ': ',
             style: material.TextStyle(
-              fontFamily: 'monospace',
+              fontFamily: QueryaTypography.mono,
+              fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
               fontSize: 12,
               color: cs.mutedForeground,
             ),
@@ -634,7 +641,8 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
               valueDisplay,
               overflow: TextOverflow.ellipsis,
               style: material.TextStyle(
-                fontFamily: 'monospace',
+                fontFamily: QueryaTypography.mono,
+                fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
                 fontSize: 12,
                 fontStyle:
                     value == null ? material.FontStyle.italic : material.FontStyle.normal,
