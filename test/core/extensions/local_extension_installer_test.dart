@@ -343,14 +343,13 @@ void main() {
       expect(await File(p.join(extDir.path, 'stale.txt')).exists(), isFalse);
     });
 
-    Map<String, Object?> themeManifest(String version, {String? main}) => {
+    Map<String, Object?> themeManifest(String version) => {
           'id': 'test.upgrade',
           'name': 'Upgrade',
           'version': version,
           'publisher': 'Test',
           'type': 'theme',
           'engines': {'querya_desktop': '*'},
-          if (main != null) 'main': main,
         };
 
     test('a failed upgrade keeps the working version (#1562)', () async {
@@ -363,15 +362,13 @@ void main() {
       );
       await LocalExtensionInstaller().installFromArchive(v1);
 
-      // The new version's `main` file is missing, so validation fails after
-      // extraction.
+      // The new version fails during extraction, after the old one was
+      // already on disk.
       final broken = await _writeZip(
         tempDir,
         Archive()
-          ..addFile(_jsonFile(
-            'manifest.json',
-            themeManifest('2.0.0', main: 'missing.json'),
-          )),
+          ..addFile(_jsonFile('manifest.json', themeManifest('2.0.0')))
+          ..addFile(ArchiveFile('../evil.txt', 4, utf8.encode('evil'))),
         'v2.zip',
       );
       await expectLater(
