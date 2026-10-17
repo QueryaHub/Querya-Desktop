@@ -31,20 +31,37 @@ class MacosSparkleInstaller {
       );
     }
 
+    // Checked again here, right before the app quits for good (#1587).
+    final problem = context.macAppBundleReplaceProblemFor(targetApp);
+    if (problem != null) {
+      throw PackageManagerUpdateRequiredException(
+        manager: 'system',
+        hint: problem,
+      );
+    }
+
     final tempRoot = await getTemporaryDirectory();
     final extractDir = Directory(
       p.join(tempRoot.path, 'querya-update-${DateTime.now().millisecondsSinceEpoch}'),
     );
-    await extractZipSecurely(zipFile: package, destinationDir: extractDir);
-
-    final newApp = await findMacAppBundleInDirectory(extractDir);
-    if (newApp == null) {
-      throw const AppUpdaterException(
-        'Downloaded macOS update zip does not contain a .app bundle',
-      );
+    final Directory newApp;
+    try {
+      await extractZipSecurely(zipFile: package, destinationDir: extractDir);
+      final found = await findMacAppBundleInDirectory(extractDir);
+      if (found == null) {
+        throw const AppUpdaterException(
+          'Downloaded macOS update zip does not contain a .app bundle',
+        );
+      }
+      await _verifyCodesign(found);
+      newApp = found;
+    } catch (_) {
+      // The app keeps running: do not leave the extracted update behind.
+      try {
+        await extractDir.delete(recursive: true);
+      } catch (_) {}
+      rethrow;
     }
-
-    await _verifyCodesign(newApp);
 
     final scriptFile = File(p.join(tempRoot.path, 'querya-macos-update-$pid.sh'));
     await scriptFile.writeAsString(
@@ -53,6 +70,7 @@ class MacosSparkleInstaller {
         newAppBundle: newApp.path,
         targetAppBundle: targetApp,
         executable: context.resolvedExecutable,
+        workDir: extractDir.path,
       ),
     );
     await launchDetachedScript(scriptFile.path, const []);

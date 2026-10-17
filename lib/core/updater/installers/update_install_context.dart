@@ -80,11 +80,39 @@ class UpdateInstallContext {
     return !(isDirectoryWritable ?? _isDirectoryWritable)(root);
   }
 
+  /// Why the running `.app` cannot be replaced in place, or null when it can
+  /// (and off macOS). The replace script quits the app first, so this must be
+  /// known before (#1587).
+  String? get macAppBundleReplaceProblem {
+    final bundle = macAppBundlePath;
+    return bundle == null ? null : macAppBundleReplaceProblemFor(bundle);
+  }
+
+  /// [macAppBundleReplaceProblem] for the bundle at [bundle]: Gatekeeper's
+  /// translocated copy, or a folder this user cannot write (`/Applications`
+  /// for a standard user, a mounted disk image).
+  String? macAppBundleReplaceProblemFor(String bundle) {
+    if (bundle.contains('/AppTranslocation/')) {
+      return 'macOS is running Querya Desktop from a temporary copy, because '
+          'it was opened where it was downloaded. Move Querya Desktop to the '
+          'Applications folder, open it from there and update again, or '
+          'download the new version from the release page.';
+    }
+    final folder = p.dirname(bundle);
+    if (!(isDirectoryWritable ?? _isDirectoryWritable)(folder)) {
+      return 'Querya Desktop is in $folder, which this user cannot write. '
+          'Download the new version from the release page and replace the '
+          'app there.';
+    }
+    return null;
+  }
+
   bool get isManagedPackage =>
       isSnap ||
       isFlatpak ||
       linuxSystemPackageManager != null ||
-      isLinuxBundleReadOnly;
+      isLinuxBundleReadOnly ||
+      macAppBundleReplaceProblem != null;
 
   /// Command the user should run when [isManagedPackage] is true; null when
   /// there is no single command (a read-only bundle of unknown origin).
@@ -117,6 +145,8 @@ class UpdateInstallContext {
     if (manager != null && command != null) {
       return 'Querya Desktop was installed from $manager; update it with: $command';
     }
+    final macProblem = macAppBundleReplaceProblem;
+    if (macProblem != null) return macProblem;
     return 'Querya Desktop is installed in ${linuxBundleRoot ?? 'a folder'}, '
         'which this user cannot write. Update it the way it was installed, '
         'or download the new version from the release page.';
