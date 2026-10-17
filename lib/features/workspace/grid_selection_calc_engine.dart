@@ -131,11 +131,12 @@ abstract final class GridSelectionCalcEngine {
 
       distinctSet.add(trimmed);
 
-      // Try parsing numeric values (stripping commas if present). Most cells
-      // have none, so the stripped copy is only made when there is one.
-      final parsed = double.tryParse(
-        trimmed.contains(',') ? trimmed.replaceAll(',', '') : trimmed,
-      );
+      // `trim()` returns the cell itself when there is nothing to trim, and
+      // neither parse below copies it: a drag over thousands of cells
+      // allocates no strings for the numbers (#1520).
+      final parsed = trimmed.contains(',')
+          ? parseThousandsSeparated(trimmed)
+          : double.tryParse(trimmed);
       if (parsed != null && !parsed.isNaN && !parsed.isInfinite) {
         numericList.add(parsed);
         sum += parsed;
@@ -253,6 +254,91 @@ abstract final class GridSelectionCalcEngine {
     list[i] = list[j];
     list[j] = temp;
   }
+
+  static const List<double> _pow10 = [
+    1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, //
+    1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22,
+  ];
+
+  /// [s] read as a number whose commas are dropped (`1,234.5`), as
+  /// `double.tryParse(s.replaceAll(',', ''))` reads it, without the copy.
+  ///
+  /// Up to 15 significant digits and a power of ten up to 22 the value is
+  /// exact: an integer below 2^53 times or divided by an exactly represented
+  /// power of ten is one correctly rounded operation. Longer numbers, which
+  /// do not fit that, take the copy and `double.tryParse`.
+  @foundation.visibleForTesting
+  static double? parseThousandsSeparated(String s) {
+    final n = s.length;
+    var i = 0;
+    // Commas count for nothing anywhere, as in the copy they are dropped from.
+    void skipCommas() {
+      while (i < n && s.codeUnitAt(i) == 0x2C) {
+        i++;
+      }
+    }
+
+    skipCommas();
+    var negative = false;
+    if (i < n && (s.codeUnitAt(i) == 0x2B || s.codeUnitAt(i) == 0x2D)) {
+      negative = s.codeUnitAt(i) == 0x2D;
+      i++;
+    }
+    var mantissa = 0;
+    var significant = 0;
+    var scale = 0; // decimal exponent of the mantissa's last digit
+    var digits = 0;
+    var inFraction = false;
+    for (; i < n; i++) {
+      final c = s.codeUnitAt(i);
+      if (c == 0x2C) continue; // ,
+      if (c == 0x2E) {
+        if (inFraction) return null;
+        inFraction = true;
+        continue;
+      }
+      if (c < 0x30 || c > 0x39) break;
+      digits++;
+      if (significant == 0 && c == 0x30) {
+        if (inFraction) scale--;
+        continue; // a leading zero adds no precision
+      }
+      significant++;
+      if (significant > 15) return _parseCopy(s);
+      mantissa = mantissa * 10 + (c - 0x30);
+      if (inFraction) scale--;
+    }
+    if (digits == 0) return null;
+    if (i < n) {
+      final e = s.codeUnitAt(i);
+      if (e != 0x45 && e != 0x65) return null; // e / E
+      i++;
+      skipCommas();
+      var expNegative = false;
+      if (i < n && (s.codeUnitAt(i) == 0x2B || s.codeUnitAt(i) == 0x2D)) {
+        expNegative = s.codeUnitAt(i) == 0x2D;
+        i++;
+      }
+      var expDigits = 0;
+      var exp = 0;
+      for (; i < n; i++) {
+        final c = s.codeUnitAt(i);
+        if (c == 0x2C) continue;
+        if (c < 0x30 || c > 0x39) return null;
+        expDigits++;
+        exp = exp * 10 + (c - 0x30);
+        if (exp > 400) return _parseCopy(s);
+      }
+      if (expDigits == 0) return null;
+      scale += expNegative ? -exp : exp;
+    }
+    if (scale.abs() > 22) return _parseCopy(s);
+    final m = mantissa.toDouble();
+    final value = scale >= 0 ? m * _pow10[scale] : m / _pow10[-scale];
+    return negative ? -value : value;
+  }
+
+  static double? _parseCopy(String s) => double.tryParse(s.replaceAll(',', ''));
 
   /// Formats a numeric stat cleanly for UI display.
   static String formatNum(double? val) {
