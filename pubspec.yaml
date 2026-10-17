@@ -30,7 +30,9 @@ dependencies:
   flutter_secure_storage: ^10.3.1
   file_selector: ^1.1.0
   syntax_highlight: ^0.5.0
-  archive: ^4.2.0
+  # 4.5.0+: a zip entry is not decoded past the size its header declares,
+  # which SafeZipExtractor's limits rely on (#1561).
+  archive: ^4.5.2
   url_launcher: ^6.3.1
   package_info_plus: ^9.0.1
   flutter_svg: ^2.3.0
