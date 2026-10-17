@@ -62,6 +62,18 @@ int _skipLeadingCommentsOffset(String sql) {
   }
 }
 
+/// Whether [sql] has [upperKeyword] at [at], ignoring ASCII case. Like the
+/// `startsWith` it replaces, it does not require a word boundary after it.
+bool _hasKeywordAt(String sql, int at, String upperKeyword) {
+  if (at + upperKeyword.length > sql.length) return false;
+  for (var k = 0; k < upperKeyword.length; k++) {
+    var c = sql.codeUnitAt(at + k);
+    if (c >= 0x61 && c <= 0x7A) c -= 0x20;
+    if (c != upperKeyword.codeUnitAt(k)) return false;
+  }
+  return true;
+}
+
 /// Removes leading whitespace, `--` line comments and `/* */` block comments.
 String stripLeadingWhitespaceAndLineComments(String sql) {
   final start = _skipLeadingCommentsOffset(sql);
@@ -207,12 +219,12 @@ Match? _outerMatch(RegExp pattern, String sql) {
 String injectSqlLimit(String sql, int limit) {
   if (limit <= 0) return sql;
 
-  final cleanSql = stripLeadingWhitespaceAndLineComments(sql);
-  final upper = cleanSql.toUpperCase();
-
-  final isSelect = upper.startsWith('SELECT') ||
-      upper.startsWith('WITH') ||
-      upper.startsWith('VALUES');
+  // The keyword is compared in place: neither the comment-free tail nor an
+  // upper-cased copy of a large script is made just to read its first word.
+  final start = _skipLeadingCommentsOffset(sql);
+  final isSelect = _hasKeywordAt(sql, start, 'SELECT') ||
+      _hasKeywordAt(sql, start, 'WITH') ||
+      _hasKeywordAt(sql, start, 'VALUES');
 
   if (!isSelect) {
     return sql;

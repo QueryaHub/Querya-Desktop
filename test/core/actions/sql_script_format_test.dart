@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/actions/sql_script_format.dart';
+import 'package:querya_desktop/core/database/table_mutation_engine.dart'
+    show SqlDialect;
 
 void main() {
   test('uppercases SQL keywords and leaves identifiers', () {
@@ -65,5 +67,31 @@ void main() {
   test('keeps the length of the script', () {
     const sql = "select a, \"b\" from t -- x\nwhere c = 'and' and d is null";
     expect(formatSqlScript(sql).length, sql.length);
+  });
+
+  group('backslashes follow the dialect', () {
+    test(r"PostgreSQL: a literal ending in \ does not swallow the next one", () {
+      expect(
+        formatSqlScript(r"select 'C:\', 'not null' from t",
+            dialect: SqlDialect.postgres),
+        r"SELECT 'C:\', 'not null' FROM t",
+      );
+    });
+
+    test('SQLite: the same', () {
+      expect(
+        formatSqlScript(r"select 'C:\' as p where x = 'and'",
+            dialect: SqlDialect.sqlite),
+        r"SELECT 'C:\' AS p WHERE x = 'and'",
+      );
+    });
+
+    test(r"MySQL: \' is an escaped quote inside the literal", () {
+      expect(
+        formatSqlScript(r"select 'it\'s or not' from t",
+            dialect: SqlDialect.mysql),
+        r"SELECT 'it\'s or not' FROM t",
+      );
+    });
   });
 }

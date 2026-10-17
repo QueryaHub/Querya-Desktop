@@ -239,4 +239,23 @@ void main() {
       });
     });
   });
+
+  group('statement kind after leading comments (#1515)', () {
+    test('a long comment header still finds the SELECT, any case', () {
+      final header = List.filled(200, '-- generated\n').join();
+      expect(
+        injectSqlLimit('$header/* x */\n  sElEcT * FROM t', 10),
+        '$header/* x */\n  sElEcT * FROM t\nLIMIT 10',
+      );
+    });
+
+    test('WITH and VALUES count, other statements are left alone', () {
+      expect(injectSqlLimit('with a as (select 1) select * from a', 5),
+          endsWith('LIMIT 5'));
+      expect(injectSqlLimit('values (1), (2)', 5), endsWith('LIMIT 5'));
+      expect(injectSqlLimit('-- c\nupdate t set a = 1', 5),
+          '-- c\nupdate t set a = 1');
+      expect(injectSqlLimit('-- only a comment', 5), '-- only a comment');
+    });
+  });
 }
