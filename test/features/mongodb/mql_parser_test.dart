@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mongo_dart/mongo_dart.dart' show ObjectId;
 import 'package:querya_desktop/features/mongodb/mql_parser.dart';
 
 void main() {
@@ -167,6 +168,51 @@ void main() {
       expect(cmd.documents?.last['name'], 'user 2999');
       // Quadratic before: ~5 s for 1,000 documents; linear now (~20 ms).
       expect(sw.elapsedMilliseconds, lessThan(2000));
+    });
+  });
+
+  group('Extended JSON wrappers become BSON values (#1667)', () {
+    const hex = '5f1d7f0b9d3e2a0017a1b2c3';
+
+    test('a nested ObjectId(...) in a filter is an ObjectId', () {
+      final cmd = MqlParser.parse('db.users.find({ _id: ObjectId("$hex") })');
+      expect(cmd.filter?['_id'], isA<ObjectId>());
+      expect((cmd.filter?['_id'] as ObjectId).toHexString(), hex);
+    });
+
+    test('ISODate(...) under an operator is a UTC DateTime', () {
+      final cmd = MqlParser.parse(
+          'db.events.find({ at: { \$gte: ISODate("2026-01-01") } })');
+      final at = (cmd.filter?['at'] as Map)['\$gte'];
+      expect(at, DateTime.utc(2026));
+      expect((at as DateTime).isUtc, isTrue);
+    });
+
+    test('insertOne stores an ObjectId, not a {\$oid} sub-document', () {
+      final cmd =
+          MqlParser.parse('db.users.insertOne({ owner: ObjectId(\'$hex\') })');
+      expect(cmd.document?['owner'], isA<ObjectId>());
+    });
+
+    test('Extended JSON typed in strict JSON is converted too', () {
+      final cmd = MqlParser.parse(
+        'db.c.find({ "_id": { "\$oid": "$hex" }, '
+        '"at": { "\$date": { "\$numberLong": "0" } }, '
+        '"n": { "\$numberLong": "9007199254740993" } })',
+      );
+      expect(cmd.filter?['_id'], isA<ObjectId>());
+      expect(cmd.filter?['at'], DateTime.fromMillisecondsSinceEpoch(0, isUtc: true));
+      expect(cmd.filter?['n'], 9007199254740993);
+    });
+
+    test('query operators and look-alikes stay as written', () {
+      final cmd = MqlParser.parse(
+        'db.c.find({ name: { \$regex: "^a", \$options: "i" }, '
+        'o: { \$oid: "not-hex" }, two: { \$date: "2026-01-01", x: 1 } })',
+      );
+      expect(cmd.filter?['name'], {'\$regex': '^a', '\$options': 'i'});
+      expect(cmd.filter?['o'], {'\$oid': 'not-hex'});
+      expect(cmd.filter?['two'], {'\$date': '2026-01-01', 'x': 1});
     });
   });
 }
