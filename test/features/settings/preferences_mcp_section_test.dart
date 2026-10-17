@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart' as material;
@@ -12,7 +13,8 @@ import 'package:querya_desktop/features/settings/preferences_mcp_section.dart';
 import '../../support/querya_theme_test_shell.dart';
 
 class _Controller extends McpServerController {
-  _Controller() : super(endpointFile: File('/nonexistent/mcp.json'), version: 't');
+  _Controller()
+      : super(endpointFile: File('/nonexistent/mcp.json'), version: 't');
 
   var enabled = false;
   final enabledCalls = <bool>[];
@@ -97,7 +99,8 @@ void main() {
           loadConnections: () async => [
             _row(1, 'postgresql', 'Orders DB', prod: true),
             _row(2, 'sqlite', 'Local file'),
-            _row(3, 'mongodb', 'Mongo'), // not SQL: hidden
+            _row(3, 'mongodb', 'Mongo'), // MongoDB tools: listed too
+            _row(4, 'redis', 'Cache'), // nothing MCP can read: hidden
           ],
           loadActivity: () async => activity,
           clearActivity: () async => activity = [],
@@ -108,17 +111,25 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets('lists SQL connections with their shared state', (tester) async {
+  testWidgets('lists SQL and MongoDB connections with their shared state',
+      (tester) async {
     await pump(tester);
 
     expect(find.text('Orders DB'), findsOneWidget);
     expect(find.text('Local file'), findsOneWidget);
-    expect(find.text('Mongo'), findsNothing);
+    expect(find.text('Mongo'), findsOneWidget);
+    expect(find.text('Cache'), findsNothing);
     expect(find.text('PROD'), findsOneWidget);
+    // Type badges use the product names, not the stored type ids.
+    expect(find.text('PostgreSQL'), findsOneWidget);
+    expect(find.text('SQLite'), findsOneWidget);
+    expect(find.text('MongoDB'), findsOneWidget);
+    expect(find.text('postgresql'), findsNothing);
 
-    material.Switch sw(int id) => tester.widget<material.Switch>(find.descendant(
-        of: find.byKey(material.ValueKey('mcp_share_$id')),
-        matching: find.byType(material.Switch)));
+    material.Switch sw(int id) =>
+        tester.widget<material.Switch>(find.descendant(
+            of: find.byKey(material.ValueKey('mcp_share_$id')),
+            matching: find.byType(material.Switch)));
     expect(sw(1).value, isTrue);
     expect(sw(2).value, isFalse);
 
@@ -149,7 +160,8 @@ void main() {
       (tester) async {
     await pump(tester);
 
-    await tester.tap(find.byKey(const material.ValueKey('mcp_copy_claudeDesktop')));
+    await tester
+        .tap(find.byKey(const material.ValueKey('mcp_copy_claudeDesktop')));
     await tester.pump();
     await tester.tap(find.byKey(const material.ValueKey('mcp_copy_vsCode')));
     await tester.pump();
@@ -193,7 +205,7 @@ void main() {
     expect(find.text('1 row(s) · 12 ms'), findsOneWidget);
     expect(find.text('Data-modifying statements are not allowed over MCP.'),
         findsOneWidget);
-    expect(find.text('refused by data_modifying'), findsOneWidget);
+    expect(find.text('refused: data_modifying'), findsOneWidget);
 
     await tester.tap(find.byKey(const material.ValueKey('mcp_clear_log')));
     await tester.pump();
@@ -216,6 +228,48 @@ void main() {
     ));
     await tester.pump();
     await tester.pump();
-    expect(find.text('No SQL connections'), findsOneWidget);
+    expect(find.text('No connections to share'), findsOneWidget);
+  });
+
+  testWidgets('nothing that depends on stored state is drawn before it loads',
+      (tester) async {
+    final connections = Completer<List<ConnectionRow>>();
+    controller.enabled = true;
+    await tester.pumpWidget(queryaThemeTestShell(
+      child: material.SingleChildScrollView(
+        child: PreferencesMcpSection(
+          controller: controller,
+          access: access,
+          shimPath: '/opt/querya-desktop/querya-mcp',
+          loadConnections: () => connections.future,
+          loadActivity: () async => [],
+        ),
+      ),
+    ));
+    await tester.pump();
+    // Still loading: no "off" switch, no "no connections", no "no calls".
+    expect(find.byKey(const material.ValueKey('mcp_enabled')), findsNothing);
+    expect(find.text('No connections to share'), findsNothing);
+    expect(find.text('No calls yet'), findsNothing);
+
+    connections.complete([_row(1, 'postgresql', 'Orders DB')]);
+    await tester.pump();
+    await tester.pump();
+    final sw = tester.widget<material.Switch>(find.descendant(
+        of: find.byKey(const material.ValueKey('mcp_enabled')),
+        matching: find.byType(material.Switch)));
+    expect(sw.value, isTrue);
+    expect(find.text('Orders DB'), findsOneWidget);
+  });
+
+  testWidgets('the querya-mcp path is shown on its own line', (tester) async {
+    await pump(tester);
+    expect(
+      find.descendant(
+        of: find.byKey(const material.ValueKey('mcp_shim_path')),
+        matching: find.text('/opt/querya-desktop/querya-mcp'),
+      ),
+      findsOneWidget,
+    );
   });
 }

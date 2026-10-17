@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' as material;
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:querya_desktop/core/extensions/extension_paths.dart';
 import 'package:querya_desktop/core/platform/open_directory.dart';
 import 'package:querya_desktop/core/storage/app_data_root.dart';
@@ -8,12 +9,27 @@ import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
-class PreferencesAboutSection extends StatelessWidget {
+class PreferencesAboutSection extends material.StatefulWidget {
   const PreferencesAboutSection({super.key});
 
-  static const String appVersion = '0.4.17';
   static const String githubRepoUrl =
       'https://github.com/QueryaHub/Querya-Desktop';
+
+  @override
+  material.State<PreferencesAboutSection> createState() =>
+      _PreferencesAboutSectionState();
+}
+
+class _PreferencesAboutSectionState
+    extends material.State<PreferencesAboutSection> {
+  // Created once: a future made in build() would restart on every rebuild of
+  // the dialog (every keystroke in its search) and make these rows flicker.
+  late final Future<String> _version = PackageInfo.fromPlatform()
+      .then((i) => i.version)
+      .catchError((Object _) => '');
+  late final Future<bool> _portable = AppDataRoot.isPortableMode();
+
+  static const githubRepoUrl = PreferencesAboutSection.githubRepoUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -68,9 +84,14 @@ class PreferencesAboutSection extends StatelessWidget {
                         .large()
                         .foreground(),
                     const material.SizedBox(height: 2),
-                    const Text('Version $appVersion (Desktop Build)')
-                        .muted()
-                        .small(),
+                    FutureBuilder<String>(
+                      future: _version,
+                      builder: (context, snapshot) => Text(
+                        snapshot.data?.isNotEmpty == true
+                            ? 'Version ${snapshot.data} (Desktop Build)'
+                            : 'Desktop Build',
+                      ).muted().small(),
+                    ),
                     const material.SizedBox(height: 4),
                     const Text('Fast, native multi-database management studio.')
                         .muted()
@@ -91,7 +112,7 @@ class PreferencesAboutSection extends StatelessWidget {
         const material.SizedBox(height: 12),
 
         FutureBuilder<bool>(
-          future: AppDataRoot.isPortableMode(),
+          future: _portable,
           builder: (context, snapshot) {
             final isPortable = snapshot.data ?? false;
             if (!isPortable) return const SizedBox.shrink();

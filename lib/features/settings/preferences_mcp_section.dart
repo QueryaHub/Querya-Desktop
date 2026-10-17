@@ -8,6 +8,7 @@ import 'package:querya_desktop/core/mcp/mcp_query_service.dart';
 import 'package:querya_desktop/core/mcp/mcp_server_controller.dart';
 import 'package:querya_desktop/core/security/connection_environment.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/settings/preferences_controls.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
@@ -39,14 +40,18 @@ class PreferencesMcpSection extends material.StatefulWidget {
       PreferencesMcpSectionState();
 }
 
-class PreferencesMcpSectionState
-    extends material.State<PreferencesMcpSection> {
+class PreferencesMcpSectionState extends material.State<PreferencesMcpSection> {
   McpServerController get _controller =>
       widget.controller ?? McpServerController.instance;
   McpAccessSettings get _access => widget.access ?? McpAccessStore.instance;
 
   bool _enabled = false;
   bool _busy = false;
+
+  /// False until the first load ends: nothing that depends on the stored state
+  /// (the switch, the connection list, the log) is drawn before that, so the
+  /// pane never shows "off" / "no connections" and then jumps to the truth.
+  bool _loaded = false;
   List<ConnectionRow> _connections = const [];
   Set<int> _shared = {};
   List<McpActivityEntry> _activity = const [];
@@ -77,16 +82,27 @@ class PreferencesMcpSectionState
         () => LocalDb.instance.getConnections())();
     final shared = await _access.readableIds();
     if (!mounted) return;
+    List<McpActivityEntry> activity = const [];
+    try {
+      activity = await (widget.loadActivity ??
+          () => LocalDb.instance.listMcpActivity(limit: 50))();
+    } catch (_) {}
+    if (!mounted) return;
     setState(() {
       _enabled = enabled;
       _connections = [
         for (final c in all)
-          if (c.id != null && McpQueryService.dialectOf(c.type) != null) c,
+          if (c.id != null && _mcpReadable(c.type)) c,
       ];
       _shared = shared;
+      _activity = activity;
+      _loaded = true;
     });
-    await _loadActivity();
   }
+
+  /// The connection types an MCP client can read: the SQL tools and MongoDB.
+  static bool _mcpReadable(String type) =>
+      McpQueryService.dialectOf(type) != null || type == 'mongodb';
 
   Future<void> _loadActivity() async {
     try {
@@ -129,7 +145,8 @@ class PreferencesMcpSectionState
     if (!mounted) return;
     showAppToast(
       context: context,
-      message: '${kind.label} config copied. Paste it into ${kind.configLocation}.',
+      message:
+          '${kind.label} config copied. Paste it into ${kind.configLocation}.',
       variant: AppToastVariant.success,
     );
   }
@@ -161,27 +178,43 @@ class PreferencesMcpSectionState
           'refused, and no host, user or password is ever sent to the model.',
         ),
         const material.SizedBox(height: 14),
-        PreferencesSwitchRow(
-          key: const material.ValueKey('mcp_enabled'),
-          value: _enabled,
-          enabled: !_busy,
-          title: const Text('Enable MCP server').small(),
-          subtitle: material.ValueListenableBuilder<McpServerStatus>(
-            valueListenable: _controller.status,
-            builder: (context, s, _) =>
-                Text(_statusText(s)).muted().xSmall(),
+        if (!_loaded)
+          const material.Padding(
+            padding: material.EdgeInsets.symmetric(vertical: 24),
+            child: material.Center(
+              child: QueryaSpinner(size: QueryaSpinnerSize.md),
+            ),
+          )
+        else ...[
+          PreferencesSwitchRow(
+            key: const material.ValueKey('mcp_enabled'),
+            value: _enabled,
+            enabled: !_busy,
+            title: const Text('Enable MCP server').small(),
+            subtitle: material.ValueListenableBuilder<McpServerStatus>(
+              valueListenable: _controller.status,
+              builder: (context, s, _) => Text(_statusText(s)).muted().xSmall(),
+            ),
+            onChanged: (v) => unawaited(_setEnabled(v)),
           ),
-          onChanged: (v) => unawaited(_setEnabled(v)),
-        ),
-        const material.SizedBox(height: 18),
-        _connectionsBlock(),
-        const material.SizedBox(height: 18),
-        _clientsBlock(),
-        const material.SizedBox(height: 18),
-        _activityBlock(),
+          const material.SizedBox(height: 18),
+          _connectionsBlock(),
+          const material.SizedBox(height: 18),
+          _clientsBlock(),
+          const material.SizedBox(height: 18),
+          _activityBlock(),
+        ],
       ],
     );
   }
+
+  static String _typeLabel(String type) => switch (type) {
+        'postgresql' => 'PostgreSQL',
+        'mysql' => 'MySQL',
+        'sqlite' => 'SQLite',
+        'mongodb' => 'MongoDB',
+        _ => type,
+      };
 
   String _statusText(McpServerStatus s) {
     if (s.error != null) return 'Not running: ${s.error}';
@@ -198,14 +231,15 @@ class PreferencesMcpSectionState
         const material.SizedBox(height: 4),
         const PreferencesHint(
           'Only switched-on connections are visible to MCP clients. '
-          'PostgreSQL, MySQL and SQLite.',
+          'PostgreSQL, MySQL, SQLite and MongoDB.',
         ),
         const material.SizedBox(height: 8),
         if (_connections.isEmpty)
           const QueryaEmptyState(
             compact: true,
-            title: 'No SQL connections',
-            description: 'Add a PostgreSQL, MySQL or SQLite connection first.',
+            title: 'No connections to share',
+            description:
+                'Add a PostgreSQL, MySQL, SQLite or MongoDB connection first.',
           )
         else
           for (final c in _connections)
@@ -216,7 +250,7 @@ class PreferencesMcpSectionState
                 children: [
                   material.Flexible(child: Text(c.name).small()),
                   const material.SizedBox(width: 8),
-                  QueryaBadge(label: c.type),
+                  QueryaBadge(label: _typeLabel(c.type)),
                   if (c.environment == ConnectionEnvironment.production) ...[
                     const material.SizedBox(width: 6),
                     const QueryaBadge.status('PROD',
@@ -236,18 +270,45 @@ class PreferencesMcpSectionState
   }
 
   material.Widget _clientsBlock() {
+    final wb = context.workbench;
+    final shim = _shimPath;
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.start,
       children: [
         const Text('Connect a client').semiBold().small().foreground(),
         const material.SizedBox(height: 4),
-        PreferencesHint(_shimPath != null
-            ? 'The client starts querya-mcp, which talks to this running app: '
-                '$_shimPath'
+        PreferencesHint(shim != null
+            ? 'Copy the config for your client and paste it where it keeps MCP '
+                'servers. The client starts querya-mcp, which talks to this '
+                'running app:'
             : 'querya-mcp is not bundled with this build. Download it from the '
-                'GitHub release and replace /path/to/querya-mcp in the copied '
-                'config.'),
-        const material.SizedBox(height: 8),
+                'GitHub release, then replace this path in the copied config:'),
+        const material.SizedBox(height: 6),
+        // The path on its own line, unbroken, so it can be read whole.
+        material.Container(
+          key: const material.ValueKey('mcp_shim_path'),
+          width: double.infinity,
+          padding:
+              const material.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: material.BoxDecoration(
+            color: wb.mutedForeground.withValues(alpha: 0.08),
+            borderRadius: material.BorderRadius.circular(6),
+          ),
+          child: material.Text(
+            shim ?? '/path/to/${McpClientConfig.executableName}',
+            maxLines: 1,
+            overflow: material.TextOverflow.ellipsis,
+            style: material.TextStyle(
+              // The editor's font stack: already resolved when a workspace is
+              // open, while the generic 'monospace' costs a fontconfig lookup.
+              fontFamily: QueryaTypography.mono,
+              fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
+              fontSize: 12,
+              color: wb.mutedForeground,
+            ),
+          ),
+        ),
+        const material.SizedBox(height: 10),
         material.Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -255,19 +316,46 @@ class PreferencesMcpSectionState
             for (final kind in McpClientKind.values)
               QueryaButton.secondary(
                 key: material.ValueKey('mcp_copy_${kind.name}'),
-                label: 'Copy ${kind.label} config',
+                label: kind == McpClientKind.generic
+                    ? 'Copy stdio config'
+                    : 'Copy ${kind.label} config',
+                tooltip: kind == McpClientKind.generic
+                    ? 'For any other client that starts MCP servers over stdio'
+                    : null,
                 icon: material.Icons.copy_rounded,
                 size: QueryaControlSize.md,
                 onPressed: () => unawaited(_copy(kind)),
               ),
+          ],
+        ),
+        const material.SizedBox(height: 18),
+        // A different kind of action from copying: it cuts connected clients
+        // off, so it gets its own row with the consequence spelled out.
+        material.Row(
+          children: [
+            material.Expanded(
+              child: material.Column(
+                crossAxisAlignment: material.CrossAxisAlignment.start,
+                children: [
+                  const Text('Access token').small(),
+                  const material.SizedBox(height: 2),
+                  const PreferencesHint(
+                    'Regenerating disconnects the connected clients; they '
+                    'reconnect on their next start.',
+                  ),
+                ],
+              ),
+            ),
+            const material.SizedBox(width: 16),
             QueryaButton.secondary(
               key: const material.ValueKey('mcp_regenerate'),
-              label: 'Regenerate token',
+              label: 'Regenerate',
               icon: material.Icons.key_rounded,
               size: QueryaControlSize.md,
-              tooltip: 'Disconnects connected clients; they reconnect on '
-                  'their next start.',
-              onPressed: _enabled && !_busy ? () => unawaited(_regenerate()) : null,
+              tooltip:
+                  _enabled ? null : 'Turn the MCP server on to regenerate.',
+              onPressed:
+                  _enabled && !_busy ? () => unawaited(_regenerate()) : null,
             ),
           ],
         ),
@@ -283,15 +371,16 @@ class PreferencesMcpSectionState
           children: [
             const Text('Recent calls').semiBold().small().foreground(),
             const material.Spacer(),
-            QueryaButton.secondary(
+            QueryaButton.ghost(
               key: const material.ValueKey('mcp_clear_log'),
               label: 'Clear',
-              size: QueryaControlSize.md,
-              onPressed: _activity.isEmpty ? null : () => unawaited(_clearLog()),
+              size: QueryaControlSize.sm,
+              onPressed:
+                  _activity.isEmpty ? null : () => unawaited(_clearLog()),
             ),
           ],
         ),
-        const material.SizedBox(height: 8),
+        const material.SizedBox(height: 6),
         if (_activity.isEmpty)
           const QueryaEmptyState(
             compact: true,
@@ -299,16 +388,20 @@ class PreferencesMcpSectionState
             description: 'Tool calls from MCP clients appear here.',
           )
         else
-          for (final e in _activity) _ActivityRow(entry: e),
+          for (var i = 0; i < _activity.length; i++)
+            _ActivityRow(entry: _activity[i], first: i == 0),
       ],
     );
   }
 }
 
 class _ActivityRow extends material.StatelessWidget {
-  const _ActivityRow({required this.entry});
+  const _ActivityRow({required this.entry, this.first = false});
 
   final McpActivityEntry entry;
+
+  /// The first row has no divider above it.
+  final bool first;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -319,42 +412,99 @@ class _ActivityRow extends material.StatelessWidget {
         : '${at.hour.toString().padLeft(2, '0')}:'
             '${at.minute.toString().padLeft(2, '0')}:'
             '${at.second.toString().padLeft(2, '0')}';
-    final result = entry.error != null
+    final refused = entry.refusalRule != null;
+    final failed = entry.error != null;
+    final (icon, iconColor) = refused
+        ? (material.Icons.block_rounded, wb.warning)
+        : failed
+            ? (material.Icons.error_outline_rounded, wb.destructive)
+            : (material.Icons.check_circle_outline_rounded, wb.success);
+    final result = failed
         ? entry.error!
         : '${entry.rowCount != null ? '${entry.rowCount} row(s) · ' : ''}'
             '${entry.durationMs} ms';
-    return material.Padding(
-      padding: const material.EdgeInsets.symmetric(vertical: 4),
-      child: material.Column(
+
+    return material.Container(
+      padding: const material.EdgeInsets.symmetric(vertical: 8),
+      decoration: first
+          ? null
+          : material.BoxDecoration(
+              border: material.Border(
+                top: material.BorderSide(color: wb.borderSubtle),
+              ),
+            ),
+      child: material.Row(
         crossAxisAlignment: material.CrossAxisAlignment.start,
         children: [
-          Text([
-            time,
-            entry.client,
-            entry.tool,
-            if (entry.connectionName != null) entry.connectionName!,
-          ].where((s) => s.isNotEmpty).join(' · '))
-              .xSmall(),
-          if (entry.sqlText != null)
-            Text(
-              entry.sqlText!,
-              maxLines: 2,
-              overflow: material.TextOverflow.ellipsis,
-              style: material.TextStyle(
-                  fontFamily: 'monospace', color: wb.mutedForeground),
-            ).xSmall(),
-          Text(
-            result,
-            maxLines: 2,
-            overflow: material.TextOverflow.ellipsis,
-            style: material.TextStyle(
-                color: entry.error != null ? wb.destructive : wb.mutedForeground),
-          ).xSmall(),
-          // The guard rule that refused the call, when one did.
-          if (entry.refusalRule != null)
-            Text('refused by ${entry.refusalRule}')
-                .xSmall()
-                .muted(),
+          material.Padding(
+            padding: const material.EdgeInsets.only(top: 1),
+            child: material.Icon(icon, size: 15, color: iconColor),
+          ),
+          const material.SizedBox(width: 10),
+          material.Expanded(
+            child: material.Column(
+              crossAxisAlignment: material.CrossAxisAlignment.start,
+              children: [
+                material.Row(
+                  children: [
+                    Text(entry.tool).small().semiBold(),
+                    // Takes the free space, so the name is cut only when the
+                    // row really is too narrow, and pushes the time right.
+                    material.Expanded(
+                      child: Text(
+                        entry.connectionName == null
+                            ? ''
+                            : '  ·  ${entry.connectionName}',
+                        maxLines: 1,
+                        overflow: material.TextOverflow.ellipsis,
+                      ).small().muted(),
+                    ),
+                    const material.SizedBox(width: 8),
+                    Text('${entry.client}  $time').xSmall().muted(),
+                  ],
+                ),
+                if (entry.sqlText != null) ...[
+                  const material.SizedBox(height: 3),
+                  Text(
+                    entry.sqlText!,
+                    maxLines: 2,
+                    overflow: material.TextOverflow.ellipsis,
+                    style: material.TextStyle(
+                      // The editor's font stack: already resolved when a workspace is
+                      // open, while the generic 'monospace' costs a fontconfig lookup.
+                      fontFamily: QueryaTypography.mono,
+                      fontFamilyFallback:
+                          QueryaTypography.monoFontFamilyFallback,
+                      color: wb.mutedForeground,
+                    ),
+                  ).xSmall(),
+                ],
+                const material.SizedBox(height: 3),
+                material.Row(
+                  children: [
+                    material.Flexible(
+                      child: Text(
+                        result,
+                        maxLines: 2,
+                        overflow: material.TextOverflow.ellipsis,
+                        style: material.TextStyle(
+                          color: failed ? wb.destructive : wb.mutedForeground,
+                        ),
+                      ).xSmall(),
+                    ),
+                    // The guard rule that refused the call.
+                    if (refused) ...[
+                      const material.SizedBox(width: 8),
+                      QueryaBadge.status(
+                        'refused: ${entry.refusalRule}',
+                        status: QueryaBadgeStatus.warning,
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

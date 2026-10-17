@@ -1,4 +1,4 @@
-import 'dart:async' show unawaited;
+import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
@@ -50,6 +50,16 @@ class _PreferencesDialogContent extends material.StatefulWidget {
 class PreferencesDialogContentState
     extends material.State<_PreferencesDialogContent> {
   late PreferencesCategory _selectedCategory;
+
+  /// Panes opened at least once. They stay mounted (offstage when not
+  /// selected), so going back to one does not reload it or flash its empty
+  /// state, and each keeps its own scroll position.
+  final _visited = <PreferencesCategory>{};
+
+  /// The last widget built for each visited pane. A pane that is not shown
+  /// reuses it, so a rebuild of the dialog (a category tap, a keystroke in
+  /// the search) does not rebuild every hidden pane too.
+  final _paneWidgets = <PreferencesCategory, material.Widget>{};
   final _searchController = material.TextEditingController();
   final _searchFocusNode = material.FocusNode();
   String _searchQuery = '';
@@ -90,19 +100,20 @@ class PreferencesDialogContentState
     setState(() => _searchQuery = query.trim());
   }
 
+  // One after another on purpose: sqflite serializes queries on one database
+  // anyway, and concurrent ones each start a lock-wait timer.
   Future<void> _load() async {
+    final s = AppSettings.instance;
     try {
-      final startup = await AppSettings.instance.getCheckForUpdatesOnStartup();
-      final channel = await AppSettings.instance.getUpdateChannel();
-      final destructive =
-          await AppSettings.instance.getConfirmDestructiveOperations();
-      final pg = await AppSettings.instance.getPostgresSqlStmtTimeoutSeconds();
-      final my = await AppSettings.instance.getMysqlSqlStmtTimeoutSeconds();
-      final sqlite =
-          await AppSettings.instance.getSqliteSqlStmtTimeoutSeconds();
-      final rows = await AppSettings.instance.getSqlResultMaxRows();
-      final hist = await AppSettings.instance.getSqlHistoryMaxEntries();
-      final font = await AppSettings.instance.getSqlEditorFontSize();
+      final startup = await s.getCheckForUpdatesOnStartup();
+      final channel = await s.getUpdateChannel();
+      final destructive = await s.getConfirmDestructiveOperations();
+      final pg = await s.getPostgresSqlStmtTimeoutSeconds();
+      final my = await s.getMysqlSqlStmtTimeoutSeconds();
+      final sqlite = await s.getSqliteSqlStmtTimeoutSeconds();
+      final rows = await s.getSqlResultMaxRows();
+      final hist = await s.getSqlHistoryMaxEntries();
+      final font = await s.getSqlEditorFontSize();
       if (!mounted) return;
       setState(() {
         _checkUpdatesOnStartup = startup;
@@ -210,8 +221,7 @@ class PreferencesDialogContentState
         );
         count += matching.length;
       case PreferencesCategory.about:
-        if ('about version storage directory cache logs sqlite'
-            .contains(q)) {
+        if ('about version storage directory cache logs sqlite'.contains(q)) {
           count++;
         }
     }
@@ -220,6 +230,7 @@ class PreferencesDialogContentState
 
   @override
   material.Widget build(material.BuildContext context) {
+    _visited.add(_selectedCategory);
     final theme = Theme.of(context).colorScheme;
     final onPopover = theme.popoverForeground;
 
@@ -347,11 +358,11 @@ class PreferencesDialogContentState
                       ),
                       const Gap(8),
                       QueryaIconButton(
-icon: const material.Icon(material.Icons.close_rounded),
-tooltip: 'Close',
-size: QueryaControlSize.sm,
-onPressed: () => material.Navigator.of(context).pop(),
-),
+                        icon: const material.Icon(material.Icons.close_rounded),
+                        tooltip: 'Close',
+                        size: QueryaControlSize.sm,
+                        onPressed: () => material.Navigator.of(context).pop(),
+                      ),
                     ],
                   ),
                 ),
@@ -361,45 +372,44 @@ onPressed: () => material.Navigator.of(context).pop(),
                   child: material.Row(
                     crossAxisAlignment: material.CrossAxisAlignment.stretch,
                     children: [
-                            // Left Category Rail
-                            material.Container(
-                              width: 184,
-                              decoration: material.BoxDecoration(
-                                border: material.Border(
-                                  right: material.BorderSide(
-                                    color: theme.border.withValues(alpha: 0.28),
-                                  ),
-                                ),
-                              ),
-                              child: material.SingleChildScrollView(
-                                padding: const material.EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 10,
-                                ),
-                                child: material.Column(
-                                  crossAxisAlignment:
-                                      material.CrossAxisAlignment.stretch,
-                                  children: [
-                                    for (final cat
-                                        in PreferencesCategory.values)
-                                      _buildCategoryRailTile(cat, theme),
-                                  ],
-                                ),
-                              ),
+                      // Left Category Rail
+                      material.Container(
+                        width: 184,
+                        decoration: material.BoxDecoration(
+                          border: material.Border(
+                            right: material.BorderSide(
+                              color: theme.border.withValues(alpha: 0.28),
                             ),
+                          ),
+                        ),
+                        child: material.SingleChildScrollView(
+                          padding: const material.EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 10,
+                          ),
+                          child: material.Column(
+                            crossAxisAlignment:
+                                material.CrossAxisAlignment.stretch,
+                            children: [
+                              for (final cat in PreferencesCategory.values)
+                                _buildCategoryRailTile(cat, theme),
+                            ],
+                          ),
+                        ),
+                      ),
 
-                            // Right Detail Content Area
-                            material.Expanded(
-                              child: material.SingleChildScrollView(
-                                padding: const material.EdgeInsets.symmetric(
-                                  horizontal: 24,
-                                  vertical: 16,
-                                ),
-                                child: _buildSelectedCategoryPane(theme),
-                              ),
-                            ),
+                      // Right Detail Content Area
+                      material.Expanded(
+                        child: material.Stack(
+                          children: [
+                            for (final cat in PreferencesCategory.values)
+                              if (_visited.contains(cat))
+                                _buildPaneHost(cat, theme),
                           ],
                         ),
+                      ),
+                    ],
+                  ),
                 ),
 
                 // Footer Actions
@@ -416,6 +426,27 @@ onPressed: () => material.Navigator.of(context).pop(),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  material.Widget _buildPaneHost(PreferencesCategory cat, ColorScheme theme) {
+    final selected = cat == _selectedCategory;
+    return material.Offstage(
+      key: material.ValueKey('preferences_pane_${cat.name}'),
+      offstage: !selected,
+      child: material.TickerMode(
+        enabled: selected,
+        child: material.SingleChildScrollView(
+          primary: false,
+          padding: const material.EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 16,
+          ),
+          child: selected
+              ? _paneWidgets[cat] = _buildPane(cat, theme)
+              : _paneWidgets[cat] ?? _buildPane(cat, theme),
         ),
       ),
     );
@@ -498,8 +529,8 @@ onPressed: () => material.Navigator.of(context).pop(),
     );
   }
 
-  material.Widget _buildSelectedCategoryPane(ColorScheme theme) {
-    switch (_selectedCategory) {
+  material.Widget _buildPane(PreferencesCategory cat, ColorScheme theme) {
+    switch (cat) {
       case PreferencesCategory.general:
         return _buildGeneralSection(theme);
       case PreferencesCategory.appearance:
@@ -529,16 +560,15 @@ onPressed: () => material.Navigator.of(context).pop(),
           'Application startup behavior and update release channels.',
         ),
         const material.SizedBox(height: 14),
-
         PreferencesSwitchRow(
           value: _checkUpdatesOnStartup,
-          title: const Text('Check for updates automatically on startup').small(),
+          title:
+              const Text('Check for updates automatically on startup').small(),
           subtitle: const Text(
             'Silently checks GitHub Releases when Querya starts to notify you of new features.',
           ).muted().xSmall(),
           onChanged: (v) => unawaited(_setCheckUpdatesOnStartup(v)),
         ),
-
         const material.SizedBox(height: 16),
         PreferencesFieldRow(
           label: 'Release channel',
@@ -575,7 +605,6 @@ onPressed: () => material.Navigator.of(context).pop(),
           'Global statement timeouts, editor formatting, and query history.',
         ),
         const material.SizedBox(height: 16),
-
         PreferencesFieldRow(
           label: 'Editor font size',
           control: PreferencesDropdownMenu<double>(
@@ -593,18 +622,17 @@ onPressed: () => material.Navigator.of(context).pop(),
             ],
           ),
         ),
-
         const material.SizedBox(height: 16),
         PreferencesFieldRow(
           label: 'PostgreSQL timeout',
-          hint: 'Statement timeout applied to queries on PostgreSQL connections.',
+          hint:
+              'Statement timeout applied to queries on PostgreSQL connections.',
           control: SqlStatementTimeoutDropdown(
             value: _pgTimeout,
             expandToParent: true,
             onChanged: (v) => unawaited(_setPg(v)),
           ),
         ),
-
         const material.SizedBox(height: 16),
         PreferencesFieldRow(
           label: 'MySQL timeout',
@@ -616,7 +644,6 @@ onPressed: () => material.Navigator.of(context).pop(),
             onChanged: (v) => unawaited(_setMysql(v)),
           ),
         ),
-
         const material.SizedBox(height: 16),
         PreferencesFieldRow(
           label: 'SQLite timeout',
@@ -628,11 +655,11 @@ onPressed: () => material.Navigator.of(context).pop(),
             onChanged: (v) => unawaited(_setSqlite(v)),
           ),
         ),
-
         const material.SizedBox(height: 16),
         PreferencesFieldRow(
           label: 'Query history limit',
-          hint: 'Per connection and database. Older queries are trimmed automatically.',
+          hint:
+              'Per connection and database. Older queries are trimmed automatically.',
           control: PreferencesDropdownMenu<int>(
             value: _historyMax,
             onSelected: (v) {
@@ -647,7 +674,6 @@ onPressed: () => material.Navigator.of(context).pop(),
             ],
           ),
         ),
-
         const material.SizedBox(height: 16),
         PreferencesSwitchRow(
           value: _confirmDestructive,
@@ -668,10 +694,9 @@ onPressed: () => material.Navigator.of(context).pop(),
         const Text('Data Grid & Results').semiBold().small().foreground(),
         const material.SizedBox(height: 6),
         const PreferencesHint(
-          'Configure virtualization limits, column sizing, and result viewing.',
+          'How many rows a query result loads into the grid.',
         ),
         const material.SizedBox(height: 16),
-
         PreferencesFieldRow(
           label: 'Max rows in results',
           hint:
@@ -689,16 +714,6 @@ onPressed: () => material.Navigator.of(context).pop(),
                 ),
             ],
           ),
-        ),
-
-        const material.SizedBox(height: 16),
-        PreferencesSwitchRow(
-          value: _confirmDestructive,
-          title: const Text('Confirm DML staging applications').small(),
-          subtitle: const Text(
-            'Requests confirmation before applying staged row inserts, deletes, or cell updates.',
-          ).muted().xSmall(),
-          onChanged: (v) => unawaited(_setConfirmDestructive(v)),
         ),
       ],
     );
