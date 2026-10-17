@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
-import 'package:querya_desktop/core/motion/querya_motion.dart';
-import 'package:querya_desktop/core/motion/querya_motion_context.dart';
+import 'package:querya_desktop/core/motion/querya_animated_expand.dart';
+import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/workspace/grid_selection_calc_engine.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
@@ -18,25 +18,23 @@ class DataGridCalcBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final visible = stats.totalCount > 1 || stats.hasNumericStats;
     final cs = Theme.of(context).colorScheme;
-    final duration = context.motionDuration(QueryaMotion.fast);
-    final curve = context.motionCurve(QueryaMotion.enter);
 
-    return AnimatedContainer(
-      duration: duration,
-      curve: curve,
-      height: visible ? 26 : 0,
-      clipBehavior: Clip.hardEdge,
-      padding: const material.EdgeInsets.symmetric(horizontal: 10),
-      decoration: material.BoxDecoration(
-        color: cs.card,
-        border: material.Border(
-          top: material.BorderSide(
-            color: cs.border.withValues(alpha: 0.35),
-            width: 1,
+    return QueryaAnimatedExpand(
+      expanded: visible,
+      alignment: Alignment.topCenter,
+      child: material.Container(
+        height: 26,
+        padding: const material.EdgeInsets.symmetric(horizontal: 10),
+        decoration: material.BoxDecoration(
+          color: cs.card,
+          border: material.Border(
+            top: material.BorderSide(
+              color: cs.border.withValues(alpha: 0.35),
+              width: 1,
+            ),
           ),
         ),
-      ),
-      child: material.Row(
+        child: material.Row(
         children: [
           material.Expanded(
             child: material.SingleChildScrollView(
@@ -120,6 +118,7 @@ class DataGridCalcBar extends StatelessWidget {
           ),
         ],
       ),
+      ),
     );
   }
 }
@@ -162,7 +161,8 @@ class _StatBadge extends StatelessWidget {
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                   color: cs.foreground,
-                  fontFamily: 'monospace',
+                  fontFamily: QueryaTypography.mono,
+                  fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
                 ),
               ),
             ],
