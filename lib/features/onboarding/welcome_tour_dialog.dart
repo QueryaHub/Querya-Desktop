@@ -146,15 +146,26 @@ class _WelcomeTourDialogState extends State<WelcomeTourDialog> {
     super.dispose();
   }
 
+  /// Whether the last move went to a later step: the new slide then comes in
+  /// from the right and the old one leaves to the left, and the other way
+  /// round for Back or an earlier dot (#1645).
+  var _forward = true;
+
   void _goToStep(int step) {
     if (step >= 0 && step < _totalSteps && step != _currentStep) {
-      setState(() => _currentStep = step);
+      setState(() {
+        _forward = step > _currentStep;
+        _currentStep = step;
+      });
     }
   }
 
   void _next() {
     if (_currentStep < _totalSteps - 1) {
-      setState(() => _currentStep++);
+      setState(() {
+        _forward = true;
+        _currentStep++;
+      });
     } else {
       _finish();
     }
@@ -162,7 +173,10 @@ class _WelcomeTourDialogState extends State<WelcomeTourDialog> {
 
   void _previous() {
     if (_currentStep > 0) {
-      setState(() => _currentStep--);
+      setState(() {
+        _forward = false;
+        _currentStep--;
+      });
     }
   }
 
@@ -287,11 +301,17 @@ onPressed: _finish,
                   switchInCurve: context.motionCurve(QueryaMotion.enter),
                   switchOutCurve: context.motionCurve(QueryaMotion.exit),
                   transitionBuilder: (child, animation) {
+                    // The incoming slide starts on the side we move towards;
+                    // the outgoing one (its animation runs back to 0) ends
+                    // on the other side.
+                    final incoming =
+                        child.key == material.ValueKey(_currentStep);
+                    final side = (_forward ? 1.0 : -1.0) * (incoming ? 1 : -1);
                     return material.FadeTransition(
                       opacity: animation,
                       child: material.SlideTransition(
                         position: material.Tween<material.Offset>(
-                          begin: const material.Offset(0.04, 0),
+                          begin: material.Offset(0.04 * side, 0),
                           end: material.Offset.zero,
                         ).animate(animation),
                         child: child,
