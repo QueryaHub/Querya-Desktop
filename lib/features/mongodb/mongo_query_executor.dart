@@ -19,6 +19,18 @@ class MongoQueryResult {
   int get count => documents.length;
 }
 
+/// "Fetched N documents", and a note when `.limit(0)` (no limit in MongoDB)
+/// was cut at [kMongoDefaultFindLimit] so the user knows there may be more.
+String mongoFindSummary(int fetched, int? requestedLimit) {
+  final capped = requestedLimit != null &&
+      requestedLimit <= 0 &&
+      fetched >= kMongoDefaultFindLimit;
+  return capped
+      ? 'Fetched $fetched documents (capped at $kMongoDefaultFindLimit; '
+          'give .limit(n) for more)'
+      : 'Fetched $fetched documents';
+}
+
 /// Abstract contract for executing parsed [MqlCommand]s against MongoDB.
 abstract class MongoQueryExecutor {
   Future<MongoQueryResult> execute({
@@ -66,7 +78,7 @@ class DefaultMongoQueryExecutor implements MongoQueryExecutor {
         return MongoQueryResult(
           documents: docs,
           elapsed: stopwatch.elapsed,
-          summary: 'Fetched ${docs.length} documents',
+          summary: mongoFindSummary(docs.length, command.limit),
         );
 
       case MqlMethod.findOne:
