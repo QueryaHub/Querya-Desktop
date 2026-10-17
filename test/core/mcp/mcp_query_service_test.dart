@@ -212,7 +212,7 @@ void main() {
     test('a timeout becomes a readable error', () async {
       db.onExecute = (_) => throw TimeoutException('slow');
       await expectLater(
-        service().runQuery(1, 'SELECT pg_sleep(60)'),
+        service().runQuery(1, 'SELECT count(*) FROM big_table'),
         throwsA(isA<McpToolException>().having(
             (e) => e.message, 'message', contains('time limit'))),
       );
