@@ -119,7 +119,8 @@ int? isoMicrosSinceEpoch(String s, {Map<int, int>? localOffsets}) {
   var i = 10;
   if (i < n) {
     final sep = s.codeUnitAt(i);
-    if (sep != 0x54 && sep != 0x74 && sep != 0x20) return null; // T t ' '
+    // `T` or a space, as DateTime.parse takes; a lower-case `t` it does not.
+    if (sep != 0x54 && sep != 0x20) return null;
     hour = digits(i + 1, 2);
     if (hour < 0 || i + 3 >= n || s.codeUnitAt(i + 3) != 0x3A) return null;
     minute = digits(i + 4, 2);

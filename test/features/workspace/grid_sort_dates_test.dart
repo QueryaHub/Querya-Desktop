@@ -41,7 +41,14 @@ void main() {
   });
 
   test('shapes it does not read are left to DateTime.tryParse', () {
-    for (final s in ['20260102', '2026-01-02T10', '2026-01-02 Z', 'x', '']) {
+    for (final s in [
+      '20260102',
+      '2026-01-02T10',
+      '2026-01-02 Z',
+      '2026-01-02t03:04:05',
+      'x',
+      '',
+    ]) {
       expect(isoMicrosSinceEpoch(s), isNull, reason: s);
     }
   });
