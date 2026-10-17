@@ -217,6 +217,10 @@ class CompactResultDataset {
   ///
   /// An optional [cellFormatter] callback can be provided to customize display string
   /// formatting for driver-specific types (e.g. blobs, timestamps, boolean tinyints).
+  /// Non-null cells per column that go through the cell formatter while
+  /// [fromRawRows] decides the column's kind; the rest are type-tested.
+  static const int _formattedSamples = 60;
+
   static CompactResultDataset fromRawRows(
     List<String> columnNames,
     List<List<Object?>> rawRows, {
@@ -249,7 +253,12 @@ class CompactResultDataset {
         if (val == null) continue;
         sampleCount++;
 
-        if (cellFormatter != null) {
+        // The driver formatters print a column's ints, numbers and strings
+        // by the column's type (bytea, binary, boolean...), not by the value,
+        // so the first [_formattedSamples] cells show whether the column
+        // prints as its values do. Formatting every cell only to decide the
+        // kind cost more than the packing itself (#1548).
+        if (cellFormatter != null && sampleCount <= _formattedSamples) {
           final formatted = cellFormatter(val, col);
           if (allInt && (val is! int || formatted != val.toString())) {
             allInt = false;
@@ -272,9 +281,8 @@ class CompactResultDataset {
           }
         }
 
-        if (sampleCount >= 60 && !allInt && !allFloat && !allString) {
-          break;
-        }
+        // Nothing left to learn: the column is generic.
+        if (!allInt && !allFloat && !allString) break;
       }
 
       if (sampleCount > 0) {
