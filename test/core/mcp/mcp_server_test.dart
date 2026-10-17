@@ -271,6 +271,47 @@ void main() {
     expect(msg['error']['message'], kMcpAppNotRunning);
   });
 
+  test('overlapping start calls build one host, and stop closes it (#1563)',
+      () async {
+    final ports = <int>{};
+    void note() {
+      final port = controller.status.value.port;
+      if (port != null) ports.add(port);
+    }
+
+    controller.status.addListener(note);
+    addTearDown(() => controller.status.removeListener(note));
+
+    await Future.wait([controller.start(), controller.start(), controller.start()]);
+    note();
+    expect(ports, hasLength(1));
+
+    await controller.stop();
+    for (final port in ports) {
+      await expectLater(
+        Socket.connect(InternetAddress.loopbackIPv4, port,
+            timeout: const Duration(milliseconds: 500)),
+        throwsA(isA<SocketException>()),
+        reason: 'no host may still listen on $port',
+      );
+    }
+  });
+
+  test('stop waits for a start that is still running', () async {
+    final starting = controller.start();
+    await controller.stop();
+    await starting;
+    expect(controller.status.value.running, isFalse);
+    expect(await endpoint.exists(), isFalse);
+  });
+
+  test('a start after a stop works again', () async {
+    await controller.start();
+    await controller.stop();
+    await controller.start();
+    expect(controller.status.value.running, isTrue);
+  });
+
   test('stopping the server disconnects a live client', () async {
     await controller.start();
     final s = await _Session.open(endpoint);
