@@ -402,6 +402,44 @@ void main() {
       // Round-trip through JSON to ensure no control chars.
       expect(jsonEncode(profile), contains(r'/tmp/querya_sandbox/x'));
     });
+
+    test('a quote or backslash in a path cannot end the string (#1590)', () {
+      final profile = buildMacOsSeatbeltProfile(
+        scratchPath: r'/tmp/a"b\c',
+        extensionRoot: r'/ext/x") (allow file-write* (subpath "/',
+      );
+      expect(profile, contains(r'(subpath "/tmp/a\"b\\c")'));
+      expect(profile, isNot(contains('(allow file-write* (subpath "/")')));
+      expect(
+        profile.split('\n').where((l) => l.startsWith('(allow file-write*')),
+        hasLength(1),
+      );
+    });
+
+    test('scratch and extension paths are named by their real path (#1590)',
+        () async {
+      final real = await Directory.systemTemp.createTemp('querya_real_');
+      addTearDown(() => real.delete(recursive: true));
+      final linkDir = await Directory.systemTemp.createTemp('querya_link_');
+      addTearDown(() => linkDir.delete(recursive: true));
+      final link = Link('${linkDir.path}/scratch');
+      await link.create(real.path);
+      final realPath = real.resolveSymbolicLinksSync();
+
+      final command = SandboxLaunchCommand.build(
+        pluginExecutable: '/bin/true',
+        scratchPath: link.path,
+        extensionRoot: link.path,
+        platformOverride: 'macos',
+      );
+      final profile = command.arguments[1];
+      expect(profile, contains('(subpath "$realPath")'));
+      expect(profile, isNot(contains(link.path)));
+    }, skip: Platform.isWindows ? 'symbolic links need privileges' : null);
+
+    test('a path that does not exist is kept as given', () {
+      expect(realPathOrSelf('/no/such/querya/dir'), '/no/such/querya/dir');
+    });
   });
 
   group('SandboxProcessRunner.detectBwrapAvailability', () {
