@@ -128,8 +128,8 @@ Download the latest `.deb`, `.AppImage`, `.rpm`, or `.flatpak` from [Releases](h
 # Debian / Ubuntu (.deb)
 sudo apt install ./Querya-Desktop-*-linux.deb
 
-# Fedora / RHEL (.rpm)
-sudo rpm -i Querya-Desktop-*-linux.rpm
+# Fedora / RHEL (.rpm; dnf also installs its dependencies, such as libsecret)
+sudo dnf install ./Querya-Desktop-*-linux.rpm
 
 # AppImage (standalone executable; Ubuntu 22.04+ requires libfuse2)
 # Ubuntu 22.04+: sudo apt install libfuse2   # or libfuse2t64
@@ -151,11 +151,11 @@ flatpak install --user ./Querya-Desktop-*-linux.flatpak
 Download the Windows installer (`.exe`) or portable archive (`.zip`) from [Releases](https://github.com/QueryaHub/Querya-Desktop/releases). Run the setup to automatically register `.sql` and `.sqlite` file associations.
 
 ### macOS
-Download the universal `.dmg` from [Releases](https://github.com/QueryaHub/Querya-Desktop/releases), mount the disk image, and drag **Querya** into your `Applications` folder.
+Download the universal `.dmg` from [Releases](https://github.com/QueryaHub/Querya-Desktop/releases), mount the disk image, and drag **Querya Desktop** into your `Applications` folder.
 
 > **Unsigned builds:** If Gatekeeper blocks the app after installation, run:
 > ```bash
-> xattr -cr /Applications/Querya.app
+> xattr -cr "/Applications/Querya Desktop.app"
 > ```
 
 ---

@@ -76,4 +76,46 @@ void main() {
       expect(at, sql.length);
     });
   });
+
+  group('backslashes (PostgreSQL / SQLite)', () {
+    List<(SqlSegmentKind, String)> scanStd(String sql) => [
+          for (final s
+              in SqlLexicalScanner.segments(sql, backslashEscapes: false))
+            (s.kind, sql.substring(s.start, s.end)),
+        ];
+
+    test(r"a backslash before the quote does not escape it: 'C:\'", () {
+      expect(scanStd(r"select 'C:\', 'not null'"), [
+        (SqlSegmentKind.code, 'select '),
+        (SqlSegmentKind.string, r"'C:\'"),
+        (SqlSegmentKind.code, ', '),
+        (SqlSegmentKind.string, "'not null'"),
+      ]);
+    });
+
+    test(r"E'...' strings still escape with a backslash", () {
+      expect(scanStd(r"select E'it\'s', e'a\'b'"), [
+        (SqlSegmentKind.code, 'select E'),
+        (SqlSegmentKind.string, r"'it\'s'"),
+        (SqlSegmentKind.code, ', e'),
+        (SqlSegmentKind.string, r"'a\'b'"),
+      ]);
+    });
+
+    test('an E that ends a longer word is not a prefix', () {
+      expect(scanStd(r"select type'x\', 'y'"), [
+        (SqlSegmentKind.code, 'select type'),
+        (SqlSegmentKind.string, r"'x\'"),
+        (SqlSegmentKind.code, ', '),
+        (SqlSegmentKind.string, "'y'"),
+      ]);
+    });
+
+    test('MySQL rules (the default) still escape', () {
+      expect(_scan(r"select 'it\'s'"), [
+        (SqlSegmentKind.code, 'select '),
+        (SqlSegmentKind.string, r"'it\'s'"),
+      ]);
+    });
+  });
 }

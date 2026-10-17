@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/actions/sql_script_format.dart';
+import 'package:querya_desktop/core/database/table_mutation_engine.dart'
+    show SqlDialect;
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/core/editor/syntax_highlight_service.dart';
@@ -19,6 +21,7 @@ class SqlQueryTabSession {
     this.filePath,
     double initialFraction = 0.65,
     this.isDiagram = false,
+    this.dialect,
     material.TextEditingController? customController,
   })  : controller = customController ??
             SyntaxHighlightService.createHighlightController(
@@ -38,6 +41,9 @@ class SqlQueryTabSession {
 
   /// True for the ER diagram tab (no editor / result grid).
   final bool isDiagram;
+
+  /// The connection's SQL dialect, for Format SQL's lexical rules.
+  final SqlDialect? dialect;
   String title;
   String? filePath;
   final material.TextEditingController controller;
@@ -104,7 +110,7 @@ class SqlQueryTabSession {
   void formatSql() {
     final value = controller.value;
     controller.value = value.copyWith(
-      text: formatSqlScript(value.text),
+      text: formatSqlScript(value.text, dialect: dialect),
       composing: material.TextRange.empty,
     );
   }

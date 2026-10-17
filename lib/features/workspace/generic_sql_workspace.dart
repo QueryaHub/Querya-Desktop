@@ -149,6 +149,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
         id: '${widget.sessionPrefix}_tab_1',
         title: widget.initialTabTitle ?? 'Query 1',
         initialSql: widget.initialSql,
+        dialect: widget.dialect,
       ),
     );
     _appSettingsListener = () {
@@ -259,6 +260,7 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
         filePath: filePath,
         initialFraction:
             _sessions.isNotEmpty ? _activeSession.topFraction.value : 0.65,
+        dialect: widget.dialect,
       );
       _sessions.add(session);
       _activeSessionIndex = _sessions.length - 1;
