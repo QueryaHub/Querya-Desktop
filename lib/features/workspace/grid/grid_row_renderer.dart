@@ -107,6 +107,38 @@ class _DataRow extends material.StatefulWidget {
   material.Widget _buildRow(Map<int, _GridCell> cache) {
     final rowStatus =
         stagingBuffer?.getRowStatus(modelRowIndex) ?? StagedRowStatus.unchanged;
+    final sel = selection;
+    // Rows outside the selection skip the column tests for every cell.
+    final rowSelected =
+        sel != null && rowIndex >= sel.startRow && rowIndex <= sel.endRow;
+
+    _GridCell cellFor(int c) {
+      final inSelection = rowSelected && c >= sel.startColumn && c <= sel.endColumn;
+      final columnName = c < columns.length ? columns[c] : '';
+      return _GridCell(
+        key: material.ValueKey<int>(c),
+        row: rowIndex,
+        column: c,
+        columnName: columnName,
+        text: c < row.length ? _maskCellText(piiKinds, c, row[c]) : '',
+        width: columnWidths[c],
+        colorScheme: colorScheme,
+        striped: striped,
+        rowStatus: rowStatus,
+        cellStatus: stagingBuffer?.getCellStatus(modelRowIndex, c) ??
+            StagedCellStatus.clean,
+        isSelected: inSelection,
+        isEditing: editingCell?.row == rowIndex && editingCell?.column == c,
+        isSelectionTop: inSelection && rowIndex == sel.startRow,
+        isSelectionBottom: inSelection && rowIndex == sel.endRow,
+        isSelectionLeft: inSelection && c == sel.startColumn,
+        isSelectionRight: inSelection && c == sel.endColumn,
+        dataTypeName: columnDataTypes?[columnName],
+        onCommitEdit: onCommitEdit,
+        onCancelEdit: onCancelEdit,
+        onOpenInspector: onOpenInspector,
+      );
+    }
 
     return material.Semantics(
       container: true,
@@ -122,46 +154,7 @@ class _DataRow extends material.StatefulWidget {
                   width: window.leadingWidth,
                 ),
               for (var c = window.first; c <= window.last; c++)
-                _reuseCell(
-                  cache,
-                  c,
-                  _GridCell(
-                    key: material.ValueKey<int>(c),
-                    row: rowIndex,
-                    column: c,
-                    columnName: c < columns.length ? columns[c] : '',
-                    text: c < row.length
-                        ? _maskCellText(piiKinds, c, row[c])
-                        : '',
-                    width: columnWidths[c],
-                    colorScheme: colorScheme,
-                    striped: striped,
-                    rowStatus: rowStatus,
-                    cellStatus:
-                        stagingBuffer?.getCellStatus(modelRowIndex, c) ??
-                            StagedCellStatus.clean,
-                    isSelected: selection?.contains(rowIndex, c) ?? false,
-                    isEditing: editingCell?.row == rowIndex &&
-                        editingCell?.column == c,
-                    isSelectionTop: selection != null &&
-                        selection!.contains(rowIndex, c) &&
-                        rowIndex == selection!.startRow,
-                    isSelectionBottom: selection != null &&
-                        selection!.contains(rowIndex, c) &&
-                        rowIndex == selection!.endRow,
-                    isSelectionLeft: selection != null &&
-                        selection!.contains(rowIndex, c) &&
-                        c == selection!.startColumn,
-                    isSelectionRight: selection != null &&
-                        selection!.contains(rowIndex, c) &&
-                        c == selection!.endColumn,
-                    dataTypeName:
-                        columnDataTypes?[c < columns.length ? columns[c] : ''],
-                    onCommitEdit: onCommitEdit,
-                    onCancelEdit: onCancelEdit,
-                    onOpenInspector: onOpenInspector,
-                  ),
-                ),
+                _reuseCell(cache, c, cellFor(c)),
               if (window.trailingWidth > 0)
                 material.SizedBox(
                   key: const material.ValueKey('trail'),
