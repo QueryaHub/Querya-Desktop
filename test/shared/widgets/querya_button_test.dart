@@ -277,4 +277,76 @@ void main() {
       isFalse,
     );
   });
+
+  group('QueryaButton truncated label (#1689)', () {
+    testWidgets('a button inside an intrinsic-width layout still lays out',
+        (tester) async {
+      await tester.pumpWidget(_shell(material.IntrinsicWidth(
+        child: QueryaButton.secondary(label: 'Fits', onPressed: () {}),
+      )));
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Fits'), findsOneWidget);
+    });
+
+    testWidgets('widening the space removes the tooltip again', (tester) async {
+      Future<void> at(double width) async {
+        await tester.pumpWidget(_shell(material.SizedBox(
+          width: width,
+          child: QueryaButton.secondary(
+            label: 'Export the current result set as CSV',
+            onPressed: () {},
+          ),
+        )));
+        await tester.pump();
+      }
+
+      await at(90);
+      expect(find.byType(material.Tooltip), findsOneWidget);
+      await at(600);
+      expect(find.byType(material.Tooltip), findsNothing);
+    });
+
+    const long = 'Export the current result set as CSV';
+    Finder tooltipWith(String message) => find.byWidgetPredicate(
+          (w) => w is material.Tooltip && w.message == message,
+        );
+
+    testWidgets('a label cut short shows its full text as a tooltip',
+        (tester) async {
+      await tester.pumpWidget(_shell(material.SizedBox(
+        width: 90,
+        child: QueryaButton.secondary(label: long, onPressed: () {}),
+      )));
+      await tester.pump(); // the cut is reported after the first frame
+
+      expect(tooltipWith(long), findsOneWidget);
+    });
+
+    testWidgets('a label that fits gets no tooltip', (tester) async {
+      await tester.pumpWidget(_shell(material.SizedBox(
+        width: 240,
+        child: QueryaButton.secondary(label: 'Save', onPressed: () {}),
+      )));
+      await tester.pump();
+
+      expect(find.byType(material.Tooltip), findsNothing);
+    });
+
+    testWidgets('an explicit tooltip wins over the cut label', (tester) async {
+      await tester.pumpWidget(_shell(material.SizedBox(
+        width: 90,
+        child: QueryaButton.secondary(
+          label: long,
+          tooltip: 'Export as CSV',
+          onPressed: () {},
+        ),
+      )));
+      await tester.pump();
+
+      expect(tooltipWith(long), findsNothing);
+      expect(tooltipWith('Export as CSV'), findsOneWidget);
+    });
+  });
 }
