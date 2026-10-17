@@ -50,7 +50,15 @@ class RedisKeyFolderNode {
   final List<RedisKeyLeafNode> leaves;
 
   /// Total count of keys in this subtree (both direct leaves and nested leaves).
-  int get totalKeyCount {
+  ///
+  /// Counted on first use and kept: the folder row asks for it on every
+  /// rebuild, and a walk of the whole subtree each time costs O(keys x depth).
+  /// The tree is not changed once the engine returns it, so the count stays
+  /// right; it is lazy so a node whose lists are filled after construction
+  /// still counts what is in them at first use.
+  late final int totalKeyCount = _countKeys();
+
+  int _countKeys() {
     var count = leaves.length;
     for (final f in folders) {
       count += f.totalKeyCount;

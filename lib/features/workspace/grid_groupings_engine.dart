@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:querya_desktop/features/workspace/grid_selection_calc_engine.dart';
 
 /// Aggregation operation to perform on groups.
 enum GroupingAggType {
@@ -194,8 +195,15 @@ abstract final class GridGroupingsEngine {
 
     for (final row in rows) {
       if (targetCol < row.length) {
-        final val = row[targetCol].replaceAll(',', '').trim();
-        final parsed = double.tryParse(val);
+        // `trim()` hands back the cell itself when there is nothing to trim,
+        // and the comma-aware parse does not copy it either. Anything it
+        // cannot read takes the old copy, so the result is the same as
+        // `double.tryParse(cell.replaceAll(',', '').trim())`.
+        final cell = row[targetCol].trim();
+        final parsed = cell.contains(',')
+            ? GridSelectionCalcEngine.parseThousandsSeparated(cell) ??
+                double.tryParse(cell.replaceAll(',', '').trim())
+            : double.tryParse(cell);
         if (parsed != null && !parsed.isNaN && !parsed.isInfinite) {
           numbers.add(parsed);
         }

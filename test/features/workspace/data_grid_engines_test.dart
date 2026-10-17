@@ -371,6 +371,24 @@ void main() {
       expect(activeAvg.aggValue, equals(200.0));
     });
 
+    test('aggregates numbers written with thousands separators', () {
+      final groups = GridGroupingsEngine.buildGroups(
+        groupColIndices: [0],
+        rows: const [
+          ['a', '1,234.5'],
+          ['a', ' 2,000 '],
+          ['a', '1,2,3'], // commas count for nothing: 123
+          ['a', 'n/a, see note'], // not a number: skipped
+          ['a', '10'],
+        ],
+        aggConfig: const GroupAggregationConfig(
+          aggType: GroupingAggType.sum,
+          targetColIndex: 1,
+        ),
+      );
+      expect(groups.single.aggValue, closeTo(1234.5 + 2000 + 123 + 10, 1e-9));
+    });
+
     test('sorts groups by key or aggregate', () {
       final keySorted = GridGroupingsEngine.buildGroups(
         groupColIndices: [1],
