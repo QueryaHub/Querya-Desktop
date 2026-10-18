@@ -4,6 +4,19 @@ import 'package:querya_desktop/core/security/connection_environment.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/util/log_ignored.dart';
 
+/// Fallback when [recordSqlQueryHistory] is called without `maxEntries`.
+/// Keep in sync with [kDefaultSqlHistoryMaxEntries] in `app_settings.dart`.
+const int kDefaultSqlHistoryCap = 100;
+
+String? normalizeHistoryDatabaseName(String? databaseName) {
+  final t = databaseName?.trim();
+  if (t == null || t.isEmpty) return null;
+  return t;
+}
+
+/// Maximum rows kept in the mutation audit trail.
+const int kMutationAuditCap = 10000;
+
 int? sqliteInt(Object? v) {
   if (v == null) return null;
   if (v is int) return v;
