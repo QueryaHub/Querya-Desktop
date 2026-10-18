@@ -27,6 +27,7 @@ import 'package:querya_desktop/features/workspace/grid/grid_selection_manager.da
 import 'package:querya_desktop/features/workspace/grid/grid_sorting.dart';
 import 'package:gap/gap.dart';
 import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
+import 'package:querya_desktop/shared/widgets/querya_context_menu.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
 
 export 'package:querya_desktop/features/workspace/grid/grid_column_sizer.dart';

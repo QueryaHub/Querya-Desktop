@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'package:flutter/widgets.dart';
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
+import 'package:querya_desktop/shared/widgets/querya_context_menu.dart';
 
 /// The entries of a table card's context menu.
 abstract final class ErdTableMenu {
-  static List<MenuItem> items({
+  static List<QueryaMenuItem> items({
     required String table,
     required void Function(String table)? onOpenData,
     required void Function(String table)? onOpenInSql,
@@ -13,53 +14,53 @@ abstract final class ErdTableMenu {
     required bool collapsed,
     required material.VoidCallback onToggleCollapsed,
     required material.VoidCallback onHide,
-    required List<MenuItem> groupItems,
+    required List<QueryaMenuItem> groupItems,
     required material.Color Function(String slot) slotColor,
     required void Function(String? slot) onHeaderColor,
   }) {
     return [
       if (onOpenData case final open?)
-        MenuButton(
+        QueryaMenuItem(
           key: material.ValueKey('erd_menu_open_$table'),
           onPressed: (_) => open(table),
           child: const Text('Open data'),
         ),
       if (onOpenInSql case final inSql?)
-        MenuButton(
+        QueryaMenuItem(
           key: material.ValueKey('erd_menu_sql_$table'),
           onPressed: (_) => inSql(table),
           child: const Text('Open in SQL'),
         ),
       if (onShowRelations case final relations?)
-        MenuButton(
+        QueryaMenuItem(
           key: material.ValueKey('erd_menu_relations_$table'),
           onPressed: (_) => relations(table),
           child: const Text('Show relations'),
         ),
-      MenuButton(
+      QueryaMenuItem(
         onPressed: (_) {
           Clipboard.setData(ClipboardData(text: table));
         },
         child: const Text('Copy name'),
       ),
-      MenuButton(
+      QueryaMenuItem(
         onPressed: (_) => onToggleCollapsed(),
         child: Text(collapsed ? 'Expand' : 'Collapse'),
       ),
-      MenuButton(
+      QueryaMenuItem(
         onPressed: (_) => onHide(),
         child: const Text('Hide from diagram'),
       ),
       ...groupItems,
-      MenuButton(
+      QueryaMenuItem(
         key: material.ValueKey('erd_menu_colour_$table'),
         subMenu: [
-          MenuButton(
+          QueryaMenuItem(
             onPressed: (_) => onHeaderColor(null),
             child: const Text('Default'),
           ),
           for (var i = 0; i < erdHeaderSlots.length; i++)
-            MenuButton(
+            QueryaMenuItem(
               leading: material.Icon(
                 material.Icons.circle,
                 size: 12,

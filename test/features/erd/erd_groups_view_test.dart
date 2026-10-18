@@ -125,6 +125,7 @@ void main() {
     await t.pump(const Duration(milliseconds: 300));
     await t.tap(find.byKey(const material.ValueKey('erd_group_ungroup_g1')));
     await t.pump(const Duration(milliseconds: 300));
+    await t.pump();
     expect(_frame, findsNothing);
     await t.pump(const Duration(seconds: 1));
     expect(store.layouts[_key]!.groups, isEmpty);
@@ -173,6 +174,7 @@ void main() {
     await t.pump(const Duration(milliseconds: 300));
     await t.tap(find.byKey(const material.ValueKey('erd_menu_ungroup_tags')));
     await t.pump(const Duration(milliseconds: 300));
+    await t.pump();
     expect(_frame, findsNothing);
   });
 

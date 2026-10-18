@@ -21,7 +21,9 @@ import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:querya_desktop/shared/widgets/querya_icon_button.dart';
 import 'package:querya_desktop/shared/widgets/querya_text.dart';
 import 'package:gap/gap.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
+import 'package:flutter/widgets.dart';
+import 'package:querya_desktop/shared/widgets/querya_context_menu.dart';
+import 'package:querya_desktop/shared/widgets/querya_menu_bar.dart';
 
 /// Custom bitsdojo title bar styled from [QueryaThemeScope] workbench tokens.
 class QueryaWindowTitleBar extends StatelessWidget {
@@ -144,13 +146,11 @@ class QueryaWindowTitleBar extends StatelessWidget {
                       const Gap(12),
                     ] else
                       const Gap(12),
-                    Menubar(
-                      border: false,
-                      popoverOffset: const Offset(0, 8),
+                    QueryaMenuBar(
                       children: [
-                        MenuButton(
+                        QueryaMenuItem(
                           subMenu: [
-                            MenuButton(
+                            QueryaMenuItem(
                                 trailing: Text(
                                   Platform.isMacOS
                                       ? 'Cmd+Shift+N'
@@ -165,7 +165,7 @@ class QueryaWindowTitleBar extends StatelessWidget {
                                   );
                                 },
                                 child: const Text('New Query')),
-                            MenuButton(
+                            QueryaMenuItem(
                                 trailing: Text(
                                   Platform.isMacOS ? 'Cmd+O' : 'Ctrl+O',
                                 ).xSmall().muted(),
@@ -178,7 +178,7 @@ class QueryaWindowTitleBar extends StatelessWidget {
                                   );
                                 },
                                 child: const Text('Open...')),
-                            MenuButton(
+                            QueryaMenuItem(
                                 trailing: Text(
                                   Platform.isMacOS ? 'Cmd+S' : 'Ctrl+S',
                                 ).xSmall().muted(),
@@ -192,8 +192,8 @@ class QueryaWindowTitleBar extends StatelessWidget {
                                 },
                                 child: const Text('Save')),
                             if (activeConnection != null && onGoHome != null) ...[
-                              const MenuDivider(),
-                              MenuButton(
+                              const QueryaMenuDivider(),
+                              QueryaMenuItem(
                                 leading: const material.Icon(
                                   material.Icons.home_rounded,
                                   size: 18,
@@ -205,16 +205,16 @@ class QueryaWindowTitleBar extends StatelessWidget {
                                 child: const Text('Close Workspace (Home)'),
                               ),
                             ],
-                            const MenuDivider(),
-                            MenuButton(
+                            const QueryaMenuDivider(),
+                            QueryaMenuItem(
                                 onPressed: (_) => appWindow.close(),
                                 child: const Text('Exit')),
                           ],
                           child: const Text('File'),
                         ),
-                        MenuButton(
+                        QueryaMenuItem(
                           subMenu: [
-                            MenuButton(
+                            QueryaMenuItem(
                               leading: const material.Icon(
                                 material.Icons.search_rounded,
                                 size: 18,
@@ -225,7 +225,7 @@ class QueryaWindowTitleBar extends StatelessWidget {
                               onPressed: (ctx) => showCommandPalette(ctx),
                               child: const Text('Command Palette…'),
                             ),
-                            MenuButton(
+                            QueryaMenuItem(
                               leading: const material.Icon(
                                 material.Icons.swap_horiz_rounded,
                                 size: 18,
@@ -243,7 +243,7 @@ class QueryaWindowTitleBar extends StatelessWidget {
                               },
                               child: const Text('Go to Object…'),
                             ),
-                            MenuButton(
+                            QueryaMenuItem(
                               leading: const material.Icon(
                                 material.Icons.tune_rounded,
                                 size: 18,
@@ -251,8 +251,8 @@ class QueryaWindowTitleBar extends StatelessWidget {
                               onPressed: (ctx) => showPreferencesDialog(ctx),
                               child: const Text('Preferences…'),
                             ),
-                            const MenuDivider(),
-                            MenuButton(
+                            const QueryaMenuDivider(),
+                            QueryaMenuItem(
                               leading: const material.Icon(
                                 material.Icons.extension_rounded,
                                 size: 18,
@@ -264,9 +264,9 @@ class QueryaWindowTitleBar extends StatelessWidget {
                           ],
                           child: const Text('Edit'),
                         ),
-                        MenuButton(
+                        QueryaMenuItem(
                           subMenu: [
-                            MenuButton(
+                            QueryaMenuItem(
                               leading: const material.Icon(
                                 material.Icons.view_sidebar_rounded,
                                 size: 18,
@@ -277,8 +277,8 @@ class QueryaWindowTitleBar extends StatelessWidget {
                               onPressed: (_) => onToggleSidebar?.call(),
                               child: const Text('Toggle Sidebar'),
                             ),
-                            const MenuDivider(),
-                            MenuButton(
+                            const QueryaMenuDivider(),
+                            QueryaMenuItem(
                               leading: const material.Icon(
                                 material.Icons.auto_awesome_rounded,
                                 size: 18,
@@ -290,8 +290,8 @@ class QueryaWindowTitleBar extends StatelessWidget {
                               child: const Text('Welcome & Tutorial…'),
                             ),
                             if (activeConnection != null && onGoHome != null) ...[
-                              const MenuDivider(),
-                              MenuButton(
+                              const QueryaMenuDivider(),
+                              QueryaMenuItem(
                                 leading: const material.Icon(
                                   material.Icons.home_rounded,
                                   size: 18,
@@ -308,9 +308,9 @@ class QueryaWindowTitleBar extends StatelessWidget {
                           ],
                           child: const Text('View'),
                         ),
-                        MenuButton(
+                        QueryaMenuItem(
                           subMenu: [
-                            MenuButton(
+                            QueryaMenuItem(
                               leading: const material.Icon(
                                   material.Icons.add_link_rounded,
                                   size: 18),
@@ -320,7 +320,7 @@ class QueryaWindowTitleBar extends StatelessWidget {
                               onPressed: (_) => onNewDatabaseConnection(),
                               child: const Text('New Database Connection'),
                             ),
-                            MenuButton(
+                            QueryaMenuItem(
                               leading: const material.Icon(
                                   material.Icons.link_rounded,
                                   size: 18),
@@ -328,15 +328,15 @@ class QueryaWindowTitleBar extends StatelessWidget {
                                   onNewDatabaseConnectionFromUrl(),
                               child: const Text('New Connection from URL'),
                             ),
-                            MenuButton(
+                            QueryaMenuItem(
                               leading: const material.Icon(
                                   material.Icons.settings_rounded,
                                   size: 18),
                               onPressed: (ctx) => showDriverManagerDialog(ctx),
                               child: const Text('Driver Manager'),
                             ),
-                            const MenuDivider(),
-                            MenuButton(
+                            const QueryaMenuDivider(),
+                            QueryaMenuItem(
                               enabled: activeConnection != null,
                               leading: const material.Icon(
                                   material.Icons.power_rounded,
@@ -344,7 +344,7 @@ class QueryaWindowTitleBar extends StatelessWidget {
                               onPressed: (_) => onConnect?.call(),
                               child: const Text('Connect'),
                             ),
-                            MenuButton(
+                            QueryaMenuItem(
                               enabled: activeConnection != null,
                               leading: const material.Icon(
                                   material.Icons.refresh_rounded,
@@ -352,7 +352,7 @@ class QueryaWindowTitleBar extends StatelessWidget {
                               onPressed: (_) => onReconnect?.call(),
                               child: const Text('Invalidate/Reconnect'),
                             ),
-                            MenuButton(
+                            QueryaMenuItem(
                               enabled: activeConnection != null,
                               leading: const material.Icon(
                                   material.Icons.power_off_rounded,
@@ -360,15 +360,15 @@ class QueryaWindowTitleBar extends StatelessWidget {
                               onPressed: (_) => onDisconnect?.call(),
                               child: const Text('Disconnect'),
                             ),
-                            MenuButton(
+                            QueryaMenuItem(
                                 onPressed: (_) => onDisconnectAll?.call(),
                                 child: const Text('Disconnect All')),
-                            MenuButton(
+                            QueryaMenuItem(
                                 enabled: activeConnection != null,
                                 onPressed: (_) => onDisconnectOthers?.call(),
                                 child: const Text('Disconnect Others')),
-                            const MenuDivider(),
-                            MenuButton(
+                            const QueryaMenuDivider(),
+                            QueryaMenuItem(
                               enabled: activeConnection != null,
                               leading: const material.Icon(
                                   material.Icons.lock_outline_rounded,
@@ -384,9 +384,9 @@ class QueryaWindowTitleBar extends StatelessWidget {
                           ],
                           child: const Text('Connection'),
                         ),
-                        MenuButton(
+                        QueryaMenuItem(
                           subMenu: [
-                            MenuButton(
+                            QueryaMenuItem(
                               leading: const material.Icon(
                                 material.Icons.auto_awesome_rounded,
                                 size: 18,
@@ -397,15 +397,15 @@ class QueryaWindowTitleBar extends StatelessWidget {
                               onPressed: (_) => onOpenWelcomeTour?.call(),
                               child: const Text('Welcome & Quick Tour…'),
                             ),
-                            const MenuDivider(),
-                            MenuButton(
+                            const QueryaMenuDivider(),
+                            QueryaMenuItem(
                                 onPressed: (ctx) => showAboutDialog(ctx),
                                 child: const Text('About')),
-                            MenuButton(
+                            QueryaMenuItem(
                               onPressed: (ctx) => showUpdateDialog(ctx),
                               child: const Text('Check for Updates…'),
                             ),
-                            MenuButton(
+                            QueryaMenuItem(
                                 onPressed: (_) => openQueryaDocumentation(),
                                 child: const Text('Documentation')),
                           ],

@@ -26,7 +26,7 @@ class _MongoConnectionTile extends StatefulWidget {
   final VoidCallback onEdit;
 
   /// "Move to folder" menu entries; empty when there is nowhere to move.
-  final List<MenuItem> moveItems;
+  final List<QueryaMenuItem> moveItems;
   final VoidCallback? onTap;
   final void Function(String database)? onDatabaseTap;
   final void Function(String database, String collection)? onCollectionTap;
@@ -153,15 +153,15 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
             size: QueryaIconSizes.sidebarConnectionIcon,
             color: colors.primary);
 
-    return ContextMenu(
+    return QueryaContextMenu(
       items: [
-        MenuButton(
+        QueryaMenuItem(
           leading: material.Icon(material.Icons.add_rounded,
               size: 18, color: colors.mutedForeground),
           onPressed: (_) => _createDatabase(),
           child: const Text('Create database'),
         ),
-        MenuButton(
+        QueryaMenuItem(
           leading: material.Icon(material.Icons.refresh_rounded,
               size: 18, color: colors.mutedForeground),
           onPressed: (_) {
@@ -170,14 +170,14 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
           },
           child: const Text('Refresh databases'),
         ),
-        MenuButton(
+        QueryaMenuItem(
           leading: material.Icon(material.Icons.edit_outlined,
               size: 18, color: colors.mutedForeground),
           onPressed: (_) => widget.onEdit(),
           child: const Text('Edit connection…'),
         ),
         ...widget.moveItems,
-        MenuButton(
+        QueryaMenuItem(
           leading: material.Icon(material.Icons.delete_outline_rounded,
               size: 18, color: colors.destructive),
           onPressed: (_) => widget.onRemove(),
@@ -648,9 +648,9 @@ class _MongoCollectionNode extends StatelessWidget {
           sel.selectedMongoDb == database &&
           sel.selectedMongoCollection == name,
       builder: (context, isSelected) {
-        return ContextMenu(
+        return QueryaContextMenu(
           items: [
-            MenuButton(
+            QueryaMenuItem(
               leading: material.Icon(
                 material.Icons.description_outlined,
                 size: 18,
@@ -659,7 +659,7 @@ class _MongoCollectionNode extends StatelessWidget {
               onPressed: (_) => onTap(),
               child: const Text('Open collection'),
             ),
-            MenuButton(
+            QueryaMenuItem(
               leading: material.Icon(
                 material.Icons.copy_rounded,
                 size: 18,
@@ -670,8 +670,8 @@ class _MongoCollectionNode extends StatelessWidget {
               },
               child: const Text('Copy name'),
             ),
-            const MenuDivider(),
-            MenuButton(
+            const QueryaMenuDivider(),
+            QueryaMenuItem(
               leading: material.Icon(
                 material.Icons.refresh_rounded,
                 size: 18,
@@ -680,7 +680,7 @@ class _MongoCollectionNode extends StatelessWidget {
               onPressed: (_) => onRefreshCollections(),
               child: const Text('Refresh'),
             ),
-            MenuButton(
+            QueryaMenuItem(
               leading: material.Icon(
                 material.Icons.delete_outline_rounded,
                 size: 18,

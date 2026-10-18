@@ -1,15 +1,12 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:querya_desktop/core/theme/querya_theme.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
+import 'package:querya_desktop/shared/widgets/querya_context_menu.dart';
 
 material.Widget _testShell({required material.Widget child}) {
-  final td = QueryaTheme.darkDefault
-      .toShadcnThemeData()
-      .copyWith(platform: () => material.TargetPlatform.linux);
-  return ShadcnApp(
-    theme: td,
+  return material.MaterialApp(
+    theme: material.ThemeData.dark(),
     home: material.Scaffold(
       body: child,
     ),
@@ -33,23 +30,23 @@ class _DynamicContextMenuTestHost extends material.StatefulWidget {
     this.initialItemsBuilder,
   });
 
-  final List<MenuItem>? initialItems;
-  final List<MenuItem> Function(material.BuildContext)? initialItemsBuilder;
+  final List<material.Widget>? initialItems;
+  final List<material.Widget> Function(material.BuildContext)? initialItemsBuilder;
 
   @override
-  State<_DynamicContextMenuTestHost> createState() =>
+  material.State<_DynamicContextMenuTestHost> createState() =>
       _DynamicContextMenuTestHostState();
 }
 
 class _DynamicContextMenuTestHostState
     extends material.State<_DynamicContextMenuTestHost> {
-  late List<MenuItem>? items = widget.initialItems;
-  late List<MenuItem> Function(material.BuildContext)? itemsBuilder =
+  late List<material.Widget>? items = widget.initialItems;
+  late List<material.Widget> Function(material.BuildContext)? itemsBuilder =
       widget.initialItemsBuilder;
 
   void update({
-    List<MenuItem>? newItems,
-    List<MenuItem> Function(material.BuildContext)? newItemsBuilder,
+    List<material.Widget>? newItems,
+    List<material.Widget> Function(material.BuildContext)? newItemsBuilder,
   }) {
     setState(() {
       items = newItems;
@@ -60,7 +57,7 @@ class _DynamicContextMenuTestHostState
   @override
   material.Widget build(material.BuildContext context) {
     return material.Center(
-      child: ContextMenu(
+      child: QueryaContextMenu(
         items: items,
         itemsBuilder: itemsBuilder,
         child: const material.Text('Target Box'),
@@ -70,7 +67,7 @@ class _DynamicContextMenuTestHostState
 }
 
 void main() {
-  group('ContextMenu mode switching (#1011)', () {
+  group('QueryaContextMenu mode switching (#1011)', () {
     testWidgets(
         'switches from itemsBuilder to items at runtime without throwing',
         (tester) async {
@@ -83,7 +80,7 @@ void main() {
             key: hostKey,
             initialItems: null,
             initialItemsBuilder: (context) => [
-              const MenuButton(child: Text('Lazy Item 1')),
+              const QueryaMenuItem(child: Text('Lazy Item 1')),
             ],
           ),
         ),
@@ -93,14 +90,14 @@ void main() {
       // Switch to eager items without itemsBuilder
       hostKey.currentState!.update(
         newItems: [
-          const MenuButton(child: Text('Eager Item 1')),
+          const QueryaMenuItem(child: Text('Eager Item 1')),
         ],
         newItemsBuilder: null,
       );
       await tester.pumpAndSettle();
 
       // Right-clicking the target box must resolve eager items and open the menu
-      // without throwing "Null check operator used on a null value".
+      // without throwing.
       await _secondaryClick(tester, find.text('Target Box'));
       await tester.pumpAndSettle();
 
@@ -119,7 +116,7 @@ void main() {
           child: _DynamicContextMenuTestHost(
             key: hostKey,
             initialItems: const [
-              MenuButton(child: Text('Old Eager Item')),
+              QueryaMenuItem(child: Text('Old Eager Item')),
             ],
             initialItemsBuilder: null,
           ),
@@ -135,7 +132,7 @@ void main() {
         newItemsBuilder: (context) {
           builderCallCount++;
           return [
-            const MenuButton(child: Text('New Lazy Item')),
+            const QueryaMenuItem(child: Text('New Lazy Item')),
           ];
         },
       );
@@ -161,7 +158,7 @@ void main() {
           child: _DynamicContextMenuTestHost(
             key: hostKey,
             initialItems: const [
-              MenuButton(child: Text('Version 1 Item')),
+              QueryaMenuItem(child: Text('Version 1 Item')),
             ],
             initialItemsBuilder: null,
           ),
@@ -171,7 +168,7 @@ void main() {
 
       hostKey.currentState!.update(
         newItems: const [
-          MenuButton(child: Text('Version 2 Item')),
+          QueryaMenuItem(child: Text('Version 2 Item')),
         ],
         newItemsBuilder: null,
       );

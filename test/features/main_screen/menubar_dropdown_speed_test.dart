@@ -1,40 +1,35 @@
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
+import 'package:querya_desktop/shared/widgets/querya_context_menu.dart';
+import 'package:querya_desktop/shared/widgets/querya_menu_bar.dart';
 
 void main() {
-  testWidgets('Menubar dropdown opens fast and toggles on repeated tap',
+  testWidgets('QueryaMenuBar dropdown opens and toggles on repeated tap',
       (tester) async {
     await tester.pumpWidget(
-      ShadcnApp(
-        menuHandler: const PopoverOverlayHandler(
-          defaultShowDuration: Duration(milliseconds: 60),
-          defaultDismissDuration: Duration(milliseconds: 50),
-          showCurve: Curves.easeOutCubic,
-          dismissCurve: Curves.easeIn,
-        ),
+      material.MaterialApp(
         home: material.Scaffold(
           body: material.Column(
             children: [
-              Menubar(
-                border: false,
+              QueryaMenuBar(
                 children: [
-                  MenuButton(
+                  QueryaMenuItem(
                     subMenu: [
-                      MenuButton(
+                      QueryaMenuItem(
                         onPressed: (_) {},
                         child: const Text('New File'),
                       ),
-                      MenuButton(
+                      QueryaMenuItem(
                         onPressed: (_) {},
                         child: const Text('Save File'),
                       ),
                     ],
                     child: const Text('File'),
                   ),
-                  MenuButton(
+                  QueryaMenuItem(
                     subMenu: [
-                      MenuButton(
+                      QueryaMenuItem(
                         onPressed: (_) {},
                         child: const Text('Undo Action'),
                       ),
@@ -55,8 +50,7 @@ void main() {
 
     // Tap 'File'
     await tester.tap(find.text('File'));
-    // Advance by 60ms (the fast open duration)
-    await tester.pump(const Duration(milliseconds: 60));
+    await tester.pumpAndSettle();
 
     expect(find.text('New File'), findsOneWidget);
     expect(find.text('Save File'), findsOneWidget);
@@ -69,12 +63,12 @@ void main() {
 
     // Open 'File' again
     await tester.tap(find.text('File'));
-    await tester.pump(const Duration(milliseconds: 60));
+    await tester.pumpAndSettle();
     expect(find.text('New File'), findsOneWidget);
 
-    // Tap 'Edit' while 'File' is open -> closes 'File' immediately and opens 'Edit'
+    // Tap 'Edit' while 'File' is open -> closes 'File' and opens 'Edit'
     await tester.tap(find.text('Edit'));
-    await tester.pump(const Duration(milliseconds: 60));
+    await tester.pumpAndSettle();
 
     expect(find.text('New File'), findsNothing);
     expect(find.text('Undo Action'), findsOneWidget);

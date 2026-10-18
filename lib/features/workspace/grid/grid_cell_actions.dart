@@ -94,14 +94,14 @@ extension _GridCellActions on _VirtualResultGridState {
   }
 
   void _openCellContextMenu(int row, int col, material.Offset globalPosition) {
-    showContextMenuBuilder(
+    showQueryaContextMenuBuilder(
       context: context,
       position: globalPosition,
       itemsBuilder: (ctx) => _buildCellContextMenuItems(ctx, row, col),
     );
   }
 
-  List<MenuItem> _buildCellContextMenuItems(
+  List<material.Widget> _buildCellContextMenuItems(
     material.BuildContext context,
     int row,
     int column,
@@ -126,7 +126,7 @@ extension _GridCellActions on _VirtualResultGridState {
     final cs = context.colors;
 
     return [
-      MenuButton(
+      QueryaMenuItem(
         leading:
             const material.Icon(material.Icons.content_copy_rounded, size: 16),
         trailing: const material.Text('Ctrl+C',
@@ -134,7 +134,7 @@ extension _GridCellActions on _VirtualResultGridState {
         onPressed: (_) => _handleCopyCell(row, column),
         child: const material.Text('Copy Value'),
       ),
-      MenuButton(
+      QueryaMenuItem(
         leading:
             const material.Icon(material.Icons.table_chart_outlined, size: 16),
         trailing: const material.Text('Ctrl+Shift+C',
@@ -142,20 +142,20 @@ extension _GridCellActions on _VirtualResultGridState {
         onPressed: (_) => _handleCopyCell(row, column, withHeaders: true),
         child: const material.Text('Copy with Headers'),
       ),
-      MenuButton(
+      QueryaMenuItem(
         leading:
             const material.Icon(material.Icons.data_object_rounded, size: 16),
         onPressed: (_) => _handleCopyCell(row, column, asJson: true),
         child: const material.Text('Copy as JSON'),
       ),
-      MenuButton(
+      QueryaMenuItem(
         leading: const material.Icon(material.Icons.grid_on_rounded, size: 16),
         onPressed: (_) => _handleCopyCell(row, column, asCsv: true),
         child: const material.Text('Copy as CSV'),
       ),
       if (canFilter && columnName.isNotEmpty) ...[
-        const MenuDivider(),
-        MenuButton(
+        const QueryaMenuDivider(),
+        QueryaMenuItem(
           leading:
               const material.Icon(material.Icons.filter_alt_outlined, size: 16),
           onPressed: (_) => _handleFilterByValue(row, column, invert: false),
@@ -165,7 +165,7 @@ extension _GridCellActions on _VirtualResultGridState {
                 : 'Filter by Value ($columnName = $preview)',
           ),
         ),
-        MenuButton(
+        QueryaMenuItem(
           leading: const material.Icon(material.Icons.filter_alt_off_outlined,
               size: 16),
           onPressed: (_) => _handleFilterByValue(row, column, invert: true),
@@ -176,13 +176,13 @@ extension _GridCellActions on _VirtualResultGridState {
           ),
         ),
         if (numVal != null) ...[
-          MenuButton(
+          QueryaMenuItem(
             leading: const material.Icon(material.Icons.chevron_right_rounded,
                 size: 16),
             onPressed: (_) => _handleFilterComparison(row, column, '>'),
             child: material.Text('Filter > $text ($columnName > $text)'),
           ),
-          MenuButton(
+          QueryaMenuItem(
             leading: const material.Icon(material.Icons.chevron_left_rounded,
                 size: 16),
             onPressed: (_) => _handleFilterComparison(row, column, '<'),
@@ -190,8 +190,8 @@ extension _GridCellActions on _VirtualResultGridState {
           ),
         ],
       ],
-      const MenuDivider(),
-      MenuButton(
+      const QueryaMenuDivider(),
+      QueryaMenuItem(
         leading:
             const material.Icon(material.Icons.visibility_outlined, size: 16),
         trailing: const material.Text('Ctrl+I',
@@ -200,7 +200,7 @@ extension _GridCellActions on _VirtualResultGridState {
         child: const material.Text('Inspect Cell Value…'),
       ),
       if (hasStagingBuffer) ...[
-        MenuButton(
+        QueryaMenuItem(
           leading: const material.Icon(
               material.Icons.remove_circle_outline_rounded,
               size: 16),
@@ -209,20 +209,20 @@ extension _GridCellActions on _VirtualResultGridState {
           onPressed: (_) => _handleSetNull(row, column),
           child: const material.Text('Set NULL'),
         ),
-        MenuButton(
+        QueryaMenuItem(
           leading: const material.Icon(material.Icons.format_clear_rounded,
               size: 16),
           onPressed: (_) => _handleSetEmpty(row, column),
           child: const material.Text('Set to Empty String'),
         ),
         if (cellStatus == StagedCellStatus.modified)
-          MenuButton(
+          QueryaMenuItem(
             leading: const material.Icon(material.Icons.undo_rounded, size: 16),
             onPressed: (_) => _handleRevertCell(row, column),
             child: const material.Text('Revert Cell Changes'),
           ),
-        const MenuDivider(),
-        MenuButton(
+        const QueryaMenuDivider(),
+        QueryaMenuItem(
           leading: const material.Icon(material.Icons.content_paste_go_rounded,
               size: 16),
           trailing: const material.Text('Ctrl+D',
@@ -230,7 +230,7 @@ extension _GridCellActions on _VirtualResultGridState {
           onPressed: (_) => _handleDuplicateRow(row),
           child: const material.Text('Duplicate Row'),
         ),
-        MenuButton(
+        QueryaMenuItem(
           leading: material.Icon(
             rowStatus == StagedRowStatus.deleted
                 ? material.Icons.restore_from_trash_rounded
@@ -254,7 +254,7 @@ extension _GridCellActions on _VirtualResultGridState {
         ),
         if (rowStatus == StagedRowStatus.modified ||
             rowStatus == StagedRowStatus.deleted)
-          MenuButton(
+          QueryaMenuItem(
             leading:
                 const material.Icon(material.Icons.restore_rounded, size: 16),
             onPressed: (_) => _handleRevertRow(row),

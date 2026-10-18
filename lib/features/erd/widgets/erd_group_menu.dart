@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/widgets.dart';
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
+import 'package:querya_desktop/shared/widgets/querya_context_menu.dart';
 
 /// Group entries of a card's menu: group it (with the marked tables), add it
 /// to a group, take it out of its group.
-List<MenuItem> erdGroupMenu({
+List<QueryaMenuItem> erdGroupMenu({
   required String table,
   required Set<String> marked,
   required List<ErdGroup> groups,
@@ -16,7 +17,7 @@ List<MenuItem> erdGroupMenu({
 }) {
   final tables = {...marked, table};
   return [
-    MenuButton(
+    QueryaMenuItem(
       key: material.ValueKey('erd_menu_group_$table'),
       onPressed: (_) => onNewGroup(tables),
       // The way to put more tables in is not obvious: say it here.
@@ -29,11 +30,11 @@ List<MenuItem> erdGroupMenu({
           : 'Group ${tables.length} tables…'),
     ),
     if (groups.any((g) => g.id != current?.id))
-      MenuButton(
+      QueryaMenuItem(
         subMenu: [
           for (final g in groups)
             if (g.id != current?.id)
-              MenuButton(
+              QueryaMenuItem(
                 onPressed: (_) => onAddToGroup(g.id, tables),
                 child: Text(g.name),
               ),
@@ -41,7 +42,7 @@ List<MenuItem> erdGroupMenu({
         child: const Text('Add to group'),
       ),
     if (current != null)
-      MenuButton(
+      QueryaMenuItem(
         key: material.ValueKey('erd_menu_ungroup_$table'),
         onPressed: (_) => onRemoveFromGroup(table),
         child: Text('Remove from ${current.name}'),

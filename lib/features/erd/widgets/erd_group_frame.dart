@@ -4,7 +4,8 @@ import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/erd/erd_layout.dart';
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
+import 'package:flutter/widgets.dart';
+import 'package:querya_desktop/shared/widgets/querya_context_menu.dart';
 
 /// A group's frame on the canvas: a tinted box that takes no pointer, and its
 /// title, which drags the whole group and has the group's menu.
@@ -98,17 +99,17 @@ abstract final class ErdGroupFrame {
           alignment: material.Alignment.centerLeft,
           child: g.isSchema
               ? title
-              : ContextMenu(
+              : QueryaContextMenu(
                   items: [
-                    MenuButton(
+                    QueryaMenuItem(
                       key: material.ValueKey('erd_group_edit_${g.id}'),
                       onPressed: (_) => onEdit(),
                       child: const Text('Rename / note…'),
                     ),
-                    MenuButton(
+                    QueryaMenuItem(
                       subMenu: [
                         for (var i = 0; i < erdHeaderSlots.length; i++)
-                          MenuButton(
+                          QueryaMenuItem(
                             leading: material.Icon(material.Icons.circle,
                                 size: 12, color: slotColor(erdHeaderSlots[i])),
                             onPressed: (_) => onColor(erdHeaderSlots[i]),
@@ -117,7 +118,7 @@ abstract final class ErdGroupFrame {
                       ],
                       child: const Text('Colour'),
                     ),
-                    MenuButton(
+                    QueryaMenuItem(
                       key: material.ValueKey('erd_group_ungroup_${g.id}'),
                       onPressed: (_) => onUngroup(),
                       child: const Text('Ungroup'),

@@ -226,7 +226,8 @@ void main() {
 
     await tester.tap(inSidebar('Team Forms'), buttons: kSecondaryButton);
     await step(tester);
-    await tester.tap(find.text('New connection').last);
+    // ignore: avoid_print
+    await tester.tap(find.text('New connection').first);
     // The handler reads the folder id from disk before the dialog.
     await tester.pump(const Duration(milliseconds: 150));
     await step(tester);
