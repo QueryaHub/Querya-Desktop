@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:refresh_rate/refresh_rate.dart';
 
@@ -7,7 +9,8 @@ import 'package:refresh_rate/refresh_rate.dart';
 /// - **macOS 14+:** ProMotion / high-Hz unlock
 /// - **Windows:** typically follows DWM (enable is effectively a no-op unlock)
 /// - **Linux:** **query-only** — enable is a no-op; [RefreshRate.info] / overlay
-///   report GDK monitor refresh (compositor decides actual pacing)
+///   report GDK monitor refresh (compositor decides actual pacing). An unknown
+///   rate reads 0 Hz (it no longer falls back to 60)
 ///
 /// Debug overlay: `flutter run --dart-define=QUERYA_REFRESH_OVERLAY=true`.
 abstract final class DisplayRefreshService {
@@ -17,7 +20,8 @@ abstract final class DisplayRefreshService {
 
   /// Unlock peak refresh where the platform supports it; log Hz in debug builds.
   static void initialize() {
-    RefreshRate.enable();
+    // 2.x returns the result of the request; nothing here acts on it.
+    unawaited(RefreshRate.enable());
 
     if (!kDebugMode) return;
 
@@ -31,6 +35,7 @@ abstract final class DisplayRefreshService {
   }
 
   static void _logRefreshInfo() {
+    // The first reading can still be 0 Hz: 2.x fills `info` asynchronously.
     final info = RefreshRate.info;
     debugPrint(
       'Display refresh: ${info.currentRate} Hz '
