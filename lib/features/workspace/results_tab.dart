@@ -382,6 +382,27 @@ class _ResultsTabState extends material.State<ResultsTab> {
     super.dispose();
   }
 
+  /// What the mode bar says about the rows, or null when there is nothing to
+  /// add. A plain row count is the status bar's (#1558); here stay the notes
+  /// it does not have: a truncated result, affected rows, a script's outcome,
+  /// and the count of a filtered grid (`3 of 12 rows`).
+  String? _barSummary(int shown, int total) {
+    final line = widget.statusLine;
+    if (_filterText.isNotEmpty) {
+      return line != null && !_plainRowCount.hasMatch(line)
+          ? '$line  ·  $shown of $total rows'
+          : '$shown of $total rows';
+    }
+    if (line != null) return _plainRowCount.hasMatch(line) ? null : line;
+    if (widget.affectedRows != null) {
+      return 'Rows affected: ${widget.affectedRows}';
+    }
+    return '$shown rows';
+  }
+
+  /// `12 row(s).`: the driver workspaces' plain count.
+  static final _plainRowCount = RegExp(r'^\d+ row\(s\)\.$');
+
   @override
   material.Widget build(material.BuildContext context) {
     if (widget.isLoading) {
@@ -519,12 +540,9 @@ class _ResultsTabState extends material.State<ResultsTab> {
                           setState(() => _viewMode = ResultViewMode.values[i]),
                     ),
                     const Gap(10),
-                    Text(
-                      widget.statusLine ??
-                          (widget.affectedRows != null
-                              ? 'Rows affected: ${widget.affectedRows}'
-                              : '${filteredRows.length}${_filterText.isNotEmpty ? ' of ${effectiveRows.length}' : ''} rows'),
-                    ).small().semiBold(),
+                    if (_barSummary(filteredRows.length, effectiveRows.length)
+                        case final summary?)
+                      Text(summary).small().semiBold(),
                     if (widget.elapsed != null) ...[
                       const Gap(8),
                       QueryaBadge(

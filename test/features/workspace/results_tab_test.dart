@@ -779,6 +779,63 @@ void main() {
       expect(find.text('3'), findsOneWidget);
     });
 
+    group('the mode bar says only what the status bar does not (#1558)', () {
+      Future<void> pumpBar(
+        WidgetTester tester, {
+        String? statusLine,
+        int? affectedRows,
+      }) async {
+        await tester.binding.setSurfaceSize(const material.Size(900, 500));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        await tester.pumpWidget(
+          resultsShell(
+            child: material.Scaffold(
+              body: ResultsTab(
+                columns: const ['id', 'name'],
+                rows: const [
+                  ['1', 'a'],
+                  ['2', 'b'],
+                  ['3', 'c'],
+                ],
+                statusLine: statusLine,
+                affectedRows: affectedRows,
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+      }
+
+      testWidgets('a plain row count is left to the status bar', (tester) async {
+        await pumpBar(tester, statusLine: '3 row(s).');
+        expect(find.text('3 row(s).'), findsNothing);
+        expect(find.text('3 rows'), findsNothing);
+      });
+
+      testWidgets('a truncation note is kept', (tester) async {
+        await pumpBar(
+            tester, statusLine: 'Showing first 3 row(s) (result capped).');
+        expect(find.text('Showing first 3 row(s) (result capped).'),
+            findsOneWidget);
+      });
+
+      testWidgets('a count with a hint is kept', (tester) async {
+        await pumpBar(tester, statusLine: '3 row(s). Cannot edit: no key.');
+        expect(find.text('3 row(s). Cannot edit: no key.'), findsOneWidget);
+      });
+
+      testWidgets('without a status line the count is shown, as before',
+          (tester) async {
+        await pumpBar(tester);
+        expect(find.text('3 rows'), findsOneWidget);
+      });
+
+      testWidgets('affected rows are kept', (tester) async {
+        await pumpBar(tester, affectedRows: 4);
+        expect(find.text('Rows affected: 4'), findsOneWidget);
+      });
+    });
+
     testWidgets('shows status and affected empty modes', (tester) async {
       await tester.pumpWidget(
         resultsShell(

@@ -4,18 +4,27 @@ import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/theme/querya_workbench_theme.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
-/// Outer chrome for SQL editors: border, surface, brand accent glow.
-class SqlEditorChrome extends StatelessWidget {
-  const SqlEditorChrome({super.key, required this.child});
+/// Outer chrome for SQL editors and the results under them: one rounded card
+/// with a border.
+class SqlEditorChrome extends StatefulWidget {
+  const SqlEditorChrome({
+    super.key,
+    required this.child,
+    this.background,
+    this.showFocus = true,
+  });
 
   final Widget child;
 
+  /// The card's surface; the editor background by default.
+  final material.Color? background;
+
+  /// Whether the border takes the accent while something inside has the
+  /// keyboard. Off for a card with nothing to type in (the results).
+  final bool showFocus;
+
   static const double outerRadius = 14;
   static const double innerRadius = 10;
-
-  /// Accent glow strength; slightly softer on light themes.
-  static double chromeGlowAlpha(Brightness brightness) =>
-      brightness == Brightness.light ? 0.08 : 0.1;
 
   static double inlineGlowAlpha(Brightness brightness) =>
       brightness == Brightness.light ? 0.05 : 0.07;
@@ -71,37 +80,39 @@ class SqlEditorChrome extends StatelessWidget {
   }
 
   @override
+  State<SqlEditorChrome> createState() => _SqlEditorChromeState();
+}
+
+class _SqlEditorChromeState extends State<SqlEditorChrome> {
+  bool _focused = false;
+
+  @override
   Widget build(BuildContext context) {
     final editor = context.editorTheme;
     final workbench = context.workbench;
-    final brightness = Theme.of(context).brightness;
     final border = editor.widgetBorder ?? workbench.borderSubtle;
-    final glow = workbench.accent.withValues(
-      alpha: chromeGlowAlpha(brightness),
-    );
+    final surface = widget.background ?? editor.background;
 
-    return material.Container(
-      decoration: material.BoxDecoration(
-        borderRadius: material.BorderRadius.circular(outerRadius),
-        boxShadow: [
-          material.BoxShadow(
-            color: glow,
-            blurRadius: 28,
-            spreadRadius: 0,
-            offset: const material.Offset(0, 10),
-          ),
-        ],
-      ),
+    // One framed card, the same for the editor and the results. No glow: the
+    // only accent is the border while the editor has the keyboard (#1558).
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onFocusChange: (v) {
+        if (widget.showFocus) setState(() => _focused = v);
+      },
       child: material.Container(
         decoration: material.BoxDecoration(
-          color: editor.background,
-          borderRadius: material.BorderRadius.circular(outerRadius),
+          color: surface,
+          borderRadius: material.BorderRadius.circular(SqlEditorChrome.outerRadius),
           border: material.Border.all(
-            color: border.withValues(alpha: 0.5),
+            color: widget.showFocus && _focused
+                ? workbench.accent.withValues(alpha: 0.6)
+                : border.withValues(alpha: 0.5),
           ),
         ),
         clipBehavior: material.Clip.antiAlias,
-        child: child,
+        child: widget.child,
       ),
     );
   }
