@@ -67,11 +67,10 @@ class DriverIconImage extends StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = context.theme;
     final fallback = material.Icon(
       fallbackIcon,
       size: size,
-      color: theme.colorScheme.primary,
+      color: context.colors.primary,
     );
 
     final file = File(path);

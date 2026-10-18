@@ -57,9 +57,9 @@ class _ConnectionDatabasesFolderState
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
-    final muted = theme.colorScheme.mutedForeground;
+    final colors = context.colors;
+    final primary = colors.primary;
+    final muted = colors.mutedForeground;
     final label = 'Databases (${widget.databaseCount})';
 
     final row = material.CallbackShortcuts(
@@ -116,7 +116,7 @@ class _ConnectionDatabasesFolderState
                       maxLines: 1,
                       style: material.TextStyle(
                         fontSize: 12,
-                        color: theme.colorScheme.foreground,
+                        color: colors.foreground,
                       ),
                     ),
                   ),

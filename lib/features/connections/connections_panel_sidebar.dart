@@ -36,15 +36,15 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     return material.Container(
       padding:
           const material.EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       decoration: material.BoxDecoration(
-        color: theme.colorScheme.muted.withValues(alpha: 0.25),
+        color: colors.muted.withValues(alpha: 0.25),
         borderRadius: material.BorderRadius.circular(8),
         border: material.Border.all(
-          color: theme.colorScheme.border.withValues(alpha: 0.2),
+          color: colors.border.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
@@ -54,7 +54,7 @@ class _EmptyState extends StatelessWidget {
           material.Icon(
             material.Icons.info_outline_rounded,
             size: 16,
-            color: theme.colorScheme.mutedForeground,
+            color: colors.mutedForeground,
           ),
           const Gap(10),
           material.Expanded(
@@ -93,7 +93,7 @@ class _ConnectionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     final iconWidget = iconAsset != null
         ? material.Image.asset(
             iconAsset!,
@@ -105,30 +105,30 @@ class _ConnectionTile extends StatelessWidget {
             errorBuilder: (_, __, ___) => material.Icon(
               icon,
               size: QueryaIconSizes.sidebarConnectionIcon,
-              color: theme.colorScheme.primary,
+              color: colors.primary,
             ),
           )
         : material.Icon(
             icon,
             size: QueryaIconSizes.sidebarConnectionIcon,
-            color: theme.colorScheme.primary,
+            color: colors.primary,
           );
     return ContextMenu(
       items: [
         MenuButton(
           leading: material.Icon(material.Icons.edit_outlined,
-              size: 18, color: theme.colorScheme.mutedForeground),
+              size: 18, color: colors.mutedForeground),
           onPressed: (_) => onEdit(),
           child: const Text('Edit connection…'),
         ),
         ...moveItems,
         MenuButton(
           leading: material.Icon(material.Icons.delete_outline_rounded,
-              size: 18, color: theme.colorScheme.destructive),
+              size: 18, color: colors.destructive),
           onPressed: (_) => onRemove(),
           child: Text(
             'Remove connection',
-            style: material.TextStyle(color: theme.colorScheme.destructive),
+            style: material.TextStyle(color: colors.destructive),
           ),
         ),
       ],
@@ -156,7 +156,7 @@ class _ConnectionTile extends StatelessWidget {
                         maxLines: 1,
                         style: material.TextStyle(
                           fontSize: 13,
-                          color: theme.colorScheme.foreground,
+                          color: colors.foreground,
                         ),
                       ),
                       if (connection.host != null)
@@ -166,7 +166,7 @@ class _ConnectionTile extends StatelessWidget {
                           maxLines: 1,
                           style: material.TextStyle(
                             fontSize: 11,
-                            color: theme.colorScheme.mutedForeground,
+                            color: colors.mutedForeground,
                           ),
                         ),
                     ],
@@ -249,9 +249,9 @@ class _FolderTileState extends State<_FolderTile> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     final drop = widget.onDrop;
-    final menu = _buildMenu(context, theme);
+    final menu = _buildMenu(context, colors);
     if (drop == null) return menu;
     return material.DragTarget<int>(
       onWillAcceptWithDetails: (d) => widget.acceptsDrop?.call(d.data) ?? true,
@@ -264,7 +264,7 @@ class _FolderTileState extends State<_FolderTile> {
           border: material.Border.all(
             color: candidates.isEmpty
                 ? material.Colors.transparent
-                : theme.colorScheme.primary,
+                : colors.primary,
             width: 1.5,
           ),
         ),
@@ -273,18 +273,18 @@ class _FolderTileState extends State<_FolderTile> {
     );
   }
 
-  Widget _buildMenu(BuildContext context, ThemeData theme) {
+  Widget _buildMenu(BuildContext context, QueryaUiColors colors) {
     return ContextMenu(
       items: [
         MenuButton(
           leading: material.Icon(material.Icons.settings_ethernet_rounded,
-              size: 18, color: theme.colorScheme.mutedForeground),
+              size: 18, color: colors.mutedForeground),
           onPressed: (menuContext) => widget.onNewConnection(widget.name),
           child: const Text('New connection'),
         ),
         MenuButton(
           leading: material.Icon(material.Icons.delete_outline_rounded,
-              size: 18, color: theme.colorScheme.mutedForeground),
+              size: 18, color: colors.mutedForeground),
           onPressed: (_) => widget.onRemove(),
           child: const Text('Remove folder'),
         ),
@@ -317,13 +317,13 @@ class _FolderTileState extends State<_FolderTile> {
                           child: material.Icon(
                             QueryaIcons.expandClosed,
                             size: QueryaIconSizes.sidebarExpand,
-                            color: theme.colorScheme.mutedForeground,
+                            color: colors.mutedForeground,
                           ),
                         ),
                         const Gap(2),
                         material.Icon(QueryaIcons.folder,
                             size: QueryaIconSizes.sidebarConnectionIcon,
-                            color: theme.colorScheme.primary),
+                            color: colors.primary),
                         const Gap(8),
                         material.Expanded(
                           child: material.Text(
@@ -332,7 +332,7 @@ class _FolderTileState extends State<_FolderTile> {
                             maxLines: 1,
                             style: material.TextStyle(
                               fontSize: 13,
-                              color: theme.colorScheme.foreground,
+                              color: colors.foreground,
                             ),
                           ),
                         ),

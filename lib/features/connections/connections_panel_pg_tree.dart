@@ -119,7 +119,7 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     return QueryaTreeIndentGuide(
       depth: 1,
       child: material.Column(
@@ -135,15 +135,15 @@ class _PgDatabaseNodeState extends State<_PgDatabaseNode> {
               child: material.Icon(
                 QueryaIcons.expandClosed,
                 size: QueryaIconSizes.treeExpand,
-                color: theme.colorScheme.mutedForeground,
+                color: colors.mutedForeground,
               ),
             ),
             icon: QueryaIcons.database,
             iconSize: QueryaIconSizes.treeConnection,
-            iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
+            iconColor: colors.primary.withValues(alpha: 0.7),
             textStyle: material.TextStyle(
               fontSize: 12,
-              color: theme.colorScheme.foreground,
+              color: colors.foreground,
             ),
             verticalPadding: 4,
             expanded: _expanded,
@@ -234,8 +234,8 @@ class _PgDbToolRow extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context);
-    final muted = theme.colorScheme.mutedForeground;
+    final colors = context.colors;
+    final muted = colors.mutedForeground;
     return QueryaTreeIndentGuide(
       depth: 1,
       padding: const material.EdgeInsets.only(top: 2, bottom: 2),
@@ -302,7 +302,7 @@ class _PgSchemasNodeState extends State<_PgSchemasNode> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     return QueryaTreeIndentGuide(
       depth: 1,
       child: material.Column(
@@ -318,15 +318,15 @@ class _PgSchemasNodeState extends State<_PgSchemasNode> {
               child: material.Icon(
                 QueryaIcons.expandClosed,
                 size: QueryaIconSizes.treeExpand,
-                color: theme.colorScheme.mutedForeground,
+                color: colors.mutedForeground,
               ),
             ),
             icon: QueryaIcons.schemasFolder,
             iconSize: QueryaIconSizes.treeGroup,
-            iconColor: theme.colorScheme.mutedForeground,
+            iconColor: colors.mutedForeground,
             textStyle: material.TextStyle(
               fontSize: 11,
-              color: theme.colorScheme.mutedForeground,
+              color: colors.mutedForeground,
             ),
             expanded: _expanded,
             onTap: () => setState(() => _expanded = !_expanded),
@@ -490,7 +490,7 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     return QueryaTreeIndentGuide(
       depth: 1,
       child: material.Column(
@@ -506,15 +506,15 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
               child: material.Icon(
                 QueryaIcons.expandClosed,
                 size: QueryaIconSizes.treeExpand,
-                color: theme.colorScheme.mutedForeground,
+                color: colors.mutedForeground,
               ),
             ),
             icon: QueryaIcons.schema,
             iconSize: QueryaIconSizes.treeGroup,
-            iconColor: theme.colorScheme.primary.withValues(alpha: 0.6),
+            iconColor: colors.primary.withValues(alpha: 0.6),
             textStyle: material.TextStyle(
               fontSize: 12,
-              color: theme.colorScheme.foreground,
+              color: colors.foreground,
             ),
             expanded: _expanded,
             onTap: _toggle,
@@ -724,8 +724,8 @@ class _PgSchemaToolRow extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context);
-    final muted = theme.colorScheme.mutedForeground;
+    final colors = context.colors;
+    final muted = colors.mutedForeground;
     return QueryaTreeIndentGuide(
       depth: 1,
       padding: const material.EdgeInsets.only(top: 2, bottom: 2),
@@ -807,7 +807,7 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     final query = _filter.trim().toLowerCase();
     final matching = query.isEmpty
         ? widget.items
@@ -836,15 +836,15 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
               child: material.Icon(
                 QueryaIcons.expandClosed,
                 size: QueryaIconSizes.treeExpand,
-                color: theme.colorScheme.mutedForeground,
+                color: colors.mutedForeground,
               ),
             ),
             icon: widget.icon,
             iconSize: QueryaIconSizes.treeGroup,
-            iconColor: theme.colorScheme.mutedForeground,
+            iconColor: colors.mutedForeground,
             textStyle: material.TextStyle(
               fontSize: 11,
-              color: theme.colorScheme.mutedForeground,
+              color: colors.mutedForeground,
             ),
             expanded: _expanded,
             onTap: () => setState(() => _expanded = !_expanded),
@@ -925,11 +925,11 @@ class _PgObjectGroupState extends State<_PgObjectGroup> {
                             icon: widget.itemIcon,
                             iconSize: QueryaIconSizes.treeLeaf,
                             iconColor: QueryaTreeTokens.leafIconColor(
-                              theme.colorScheme.primary,
+                              colors.primary,
                             ),
                             textStyle: material.TextStyle(
                               fontSize: 11,
-                              color: theme.colorScheme.foreground,
+                              color: colors.foreground,
                             ),
                             verticalPadding: 2,
                             onTap: widget.onItemTap != null

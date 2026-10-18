@@ -83,6 +83,7 @@ import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/folders_storage.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/ui/querya_icon_sizes.dart';
 import 'package:querya_desktop/core/ui/querya_icons.dart';
 import 'package:querya_desktop/core/ui/querya_tree_indent_guide.dart';
@@ -220,7 +221,7 @@ class TreeObjectFilterBar extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     final isFiltered = controller.text.trim().isNotEmpty;
 
     return material.Padding(
@@ -234,12 +235,12 @@ class TreeObjectFilterBar extends material.StatelessWidget {
         height: 24,
         padding: const material.EdgeInsets.symmetric(horizontal: 6),
         decoration: material.BoxDecoration(
-          color: theme.colorScheme.muted.withValues(alpha: 0.22),
+          color: colors.muted.withValues(alpha: 0.22),
           borderRadius: material.BorderRadius.circular(4),
           border: material.Border.all(
             color: isFiltered
-                ? theme.colorScheme.primary.withValues(alpha: 0.5)
-                : theme.colorScheme.border.withValues(alpha: 0.25),
+                ? colors.primary.withValues(alpha: 0.5)
+                : colors.border.withValues(alpha: 0.25),
             width: 1,
           ),
         ),
@@ -249,8 +250,8 @@ class TreeObjectFilterBar extends material.StatelessWidget {
               material.Icons.search_rounded,
               size: 12,
               color: isFiltered
-                ? theme.colorScheme.primary
-                : theme.colorScheme.mutedForeground,
+                ? colors.primary
+                : colors.mutedForeground,
             ),
             const Gap(5),
             material.Expanded(
@@ -259,13 +260,13 @@ class TreeObjectFilterBar extends material.StatelessWidget {
                 onChanged: onChanged,
                 style: material.TextStyle(
                   fontSize: 11,
-                  color: theme.colorScheme.foreground,
+                  color: colors.foreground,
                 ),
                 decoration: material.InputDecoration(
                   hintText: hintText,
                   hintStyle: material.TextStyle(
                     fontSize: 11,
-                    color: theme.colorScheme.mutedForeground.withValues(alpha: 0.6),
+                    color: colors.mutedForeground.withValues(alpha: 0.6),
                   ),
                   border: material.InputBorder.none,
                   isDense: true,
@@ -279,7 +280,7 @@ class TreeObjectFilterBar extends material.StatelessWidget {
                 style: material.TextStyle(
                   fontSize: 10,
                   fontWeight: material.FontWeight.w600,
-                  color: theme.colorScheme.primary,
+                  color: colors.primary,
                 ),
               ),
               const Gap(4),
@@ -289,7 +290,7 @@ class TreeObjectFilterBar extends material.StatelessWidget {
                 child: material.Icon(
                   material.Icons.close_rounded,
                   size: 12,
-                  color: theme.colorScheme.mutedForeground,
+                  color: colors.mutedForeground,
                 ),
               ),
             ],
@@ -763,21 +764,21 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
   /// when the connection is in one, "No folder". Empty when there is nowhere to
   /// move it.
   List<MenuItem> _moveItems(ConnectionRow conn) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     final current = conn.folderId;
     final targets = <MenuItem>[
       for (final name in _folders)
         if (_folderIdByName[name] != current)
           MenuButton(
             leading: material.Icon(material.Icons.folder_outlined,
-                size: 18, color: theme.colorScheme.mutedForeground),
+                size: 18, color: colors.mutedForeground),
             onPressed: (_) => _moveConnection(conn, _folderIdByName[name]),
             child: Text(name),
           ),
       if (current != null)
         MenuButton(
           leading: material.Icon(material.Icons.folder_off_outlined,
-              size: 18, color: theme.colorScheme.mutedForeground),
+              size: 18, color: colors.mutedForeground),
           onPressed: (_) => _moveConnection(conn, null),
           child: const Text('No folder'),
         ),
@@ -786,7 +787,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     return [
       MenuButton(
         leading: material.Icon(material.Icons.drive_file_move_outlined,
-            size: 18, color: theme.colorScheme.mutedForeground),
+            size: 18, color: colors.mutedForeground),
         subMenu: targets,
         child: const Text('Move to folder'),
       ),
@@ -907,7 +908,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     final tile = _connectionTileCore(conn);
     final id = conn.id;
     if (id == null) return tile;
-    final theme = Theme.of(context);
+    final colors = context.colors;
     return material.Draggable<int>(
       data: id,
       maxSimultaneousDrags: 1,
@@ -924,19 +925,19 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
           padding:
               const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: material.BoxDecoration(
-            color: theme.colorScheme.popover,
+            color: colors.popover,
             borderRadius: material.BorderRadius.circular(8),
-            border: material.Border.all(color: theme.colorScheme.primary),
+            border: material.Border.all(color: colors.primary),
           ),
           child: material.Row(
             mainAxisSize: material.MainAxisSize.min,
             children: [
               material.Icon(QueryaIcons.connectionIcon(conn.type),
-                  size: 16, color: theme.colorScheme.primary),
+                  size: 16, color: colors.primary),
               const material.SizedBox(width: 8),
               material.Text(conn.name,
                   style: material.TextStyle(
-                      fontSize: 13, color: theme.colorScheme.foreground)),
+                      fontSize: 13, color: colors.foreground)),
             ],
           ),
         ),
@@ -1092,7 +1093,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     final q = _searchQuery.trim().toLowerCase();
 
     final filteredConnections = q.isEmpty
@@ -1139,10 +1140,10 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
         },
         child: material.Container(
           decoration: material.BoxDecoration(
-            color: theme.colorScheme.background,
+            color: colors.background,
             border: material.Border(
               right: material.BorderSide(
-                color: theme.colorScheme.border.withValues(alpha: 0.28),
+                color: colors.border.withValues(alpha: 0.28),
                 width: 1,
               ),
             ),
@@ -1168,7 +1169,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                           fontSize: 11,
                           letterSpacing: 0.85,
                           fontWeight: material.FontWeight.w600,
-                          color: theme.colorScheme.mutedForeground,
+                          color: colors.mutedForeground,
                         ),
                       ),
                     ),
@@ -1179,7 +1180,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                           vertical: 1,
                         ),
                         decoration: material.BoxDecoration(
-                          color: theme.colorScheme.muted.withValues(alpha: 0.28),
+                          color: colors.muted.withValues(alpha: 0.28),
                           borderRadius: material.BorderRadius.circular(8),
                         ),
                         child: material.Text(
@@ -1189,7 +1190,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                           style: material.TextStyle(
                             fontSize: 10,
                             fontWeight: material.FontWeight.w600,
-                            color: theme.colorScheme.mutedForeground,
+                            color: colors.mutedForeground,
                           ),
                         ),
                       ),
@@ -1202,12 +1203,12 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                   height: 28,
                   padding: const material.EdgeInsets.symmetric(horizontal: 8),
                   decoration: material.BoxDecoration(
-                    color: theme.colorScheme.muted.withValues(alpha: 0.22),
+                    color: colors.muted.withValues(alpha: 0.22),
                     borderRadius: material.BorderRadius.circular(6),
                     border: material.Border.all(
                       color: q.isNotEmpty
-                          ? theme.colorScheme.primary.withValues(alpha: 0.5)
-                          : theme.colorScheme.border.withValues(alpha: 0.25),
+                          ? colors.primary.withValues(alpha: 0.5)
+                          : colors.border.withValues(alpha: 0.25),
                       width: 1,
                     ),
                   ),
@@ -1221,8 +1222,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                           material.Icons.search_rounded,
                           size: 14,
                           color: value.text.trim().isNotEmpty
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.mutedForeground,
+                              ? colors.primary
+                              : colors.mutedForeground,
                         ),
                       ),
                       const Gap(6),
@@ -1235,13 +1236,13 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                           }),
                           style: material.TextStyle(
                             fontSize: 12,
-                            color: theme.colorScheme.foreground,
+                            color: colors.foreground,
                           ),
                           decoration: material.InputDecoration(
                             hintText: 'Filter connections... (Ctrl+F)',
                             hintStyle: material.TextStyle(
                               fontSize: 12,
-                              color: theme.colorScheme.mutedForeground
+                              color: colors.mutedForeground
                                   .withValues(alpha: 0.6),
                             ),
                             border: material.InputBorder.none,
@@ -1265,7 +1266,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                                     child: material.Icon(
                                       material.Icons.close_rounded,
                                       size: 14,
-                                      color: theme.colorScheme.mutedForeground,
+                                      color: colors.mutedForeground,
                                     ),
                                   ),
                       ),
@@ -1275,7 +1276,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
               ),
               QueryaDivider(
                 height: 1,
-                color: theme.colorScheme.border.withValues(alpha: 0.22),
+                color: colors.border.withValues(alpha: 0.22),
               ),
               // While a connection from a folder is dragged, a labelled place
               // to drop it: the empty part of the list works too, but nobody
@@ -1292,11 +1293,11 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                     margin: const material.EdgeInsets.fromLTRB(12, 8, 12, 0),
                     padding: const material.EdgeInsets.symmetric(vertical: 10),
                     decoration: material.BoxDecoration(
-                      color: theme.colorScheme.primary.withValues(
+                      color: colors.primary.withValues(
                           alpha: candidates.isEmpty ? 0.06 : 0.18),
                       borderRadius: material.BorderRadius.circular(8),
                       border: material.Border.all(
-                        color: theme.colorScheme.primary
+                        color: colors.primary
                             .withValues(alpha: candidates.isEmpty ? 0.4 : 1),
                         width: 1.5,
                       ),
@@ -1306,7 +1307,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                         'Drop here to take it out of the folder',
                         style: material.TextStyle(
                           fontSize: 12,
-                          color: theme.colorScheme.primary,
+                          color: colors.primary,
                         ),
                       ),
                     ),
@@ -1389,13 +1390,13 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                         MenuButton(
                           leading: material.Icon(material.Icons.add_rounded,
                               size: 18,
-                              color: theme.colorScheme.mutedForeground),
+                              color: colors.mutedForeground),
                           subMenu: [
                             MenuButton(
                               leading: material.Icon(
                                   material.Icons.settings_ethernet_rounded,
                                   size: 18,
-                                  color: theme.colorScheme.mutedForeground),
+                                  color: colors.mutedForeground),
                               onPressed: (menuContext) async {
                                 await Future.delayed(
                                     const Duration(milliseconds: 100));
@@ -1408,7 +1409,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                               leading: material.Icon(
                                   material.Icons.folder_rounded,
                                   size: 18,
-                                  color: theme.colorScheme.mutedForeground),
+                                  color: colors.mutedForeground),
                               onPressed: (menuContext) =>
                                   _createFolder(menuContext),
                               child: const Text('New Folder'),

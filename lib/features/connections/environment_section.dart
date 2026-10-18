@@ -17,7 +17,7 @@ class EnvironmentSection extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final muted = Theme.of(context).colorScheme.mutedForeground;
+    final muted = context.colors.mutedForeground;
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [

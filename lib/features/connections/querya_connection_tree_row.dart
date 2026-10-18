@@ -103,9 +103,9 @@ class QueryaConnectionTreeRow extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
-    final muted = theme.colorScheme.mutedForeground;
+    final colors = context.colors;
+    final primary = colors.primary;
+    final muted = colors.mutedForeground;
     final wb = context.workbench;
     final row = material.CallbackShortcuts(
       bindings: {
@@ -168,7 +168,7 @@ class QueryaConnectionTreeRow extends material.StatelessWidget {
                       textStyle: isSelected
                           ? textStyle.copyWith(
                               fontWeight: material.FontWeight.w600,
-                              color: theme.colorScheme.foreground,
+                              color: colors.foreground,
                             )
                           : textStyle,
                     ),
@@ -207,7 +207,7 @@ class QueryaConnectionTreeRow extends material.StatelessWidget {
                 size: 18,
                 color: isPinned
                     ? wb.warning
-                    : theme.colorScheme.mutedForeground,
+                    : colors.mutedForeground,
               ),
               onPressed: (_) => onTogglePin!(),
               child: Text(isPinned ? 'Unpin from top' : 'Pin to top ⭐'),
@@ -218,7 +218,7 @@ class QueryaConnectionTreeRow extends material.StatelessWidget {
             leading: material.Icon(
               material.Icons.table_rows_outlined,
               size: 18,
-              color: theme.colorScheme.primary,
+              color: colors.primary,
             ),
             onPressed: (_) {
               final qualified = openSqlSchema != null && openSqlSchema!.isNotEmpty
@@ -243,7 +243,7 @@ class QueryaConnectionTreeRow extends material.StatelessWidget {
             leading: material.Icon(
               material.Icons.code_rounded,
               size: 18,
-              color: theme.colorScheme.mutedForeground,
+              color: colors.mutedForeground,
             ),
             onPressed: (_) {
               final qualified = openSqlSchema != null && openSqlSchema!.isNotEmpty
@@ -260,7 +260,7 @@ class QueryaConnectionTreeRow extends material.StatelessWidget {
             leading: material.Icon(
               material.Icons.refresh_rounded,
               size: 18,
-              color: theme.colorScheme.mutedForeground,
+              color: colors.mutedForeground,
             ),
             onPressed: (_) => onContextRefresh!(),
             child: const Text('Refresh'),
@@ -269,7 +269,7 @@ class QueryaConnectionTreeRow extends material.StatelessWidget {
           leading: material.Icon(
             material.Icons.copy_rounded,
             size: 18,
-            color: theme.colorScheme.mutedForeground,
+            color: colors.mutedForeground,
           ),
           onPressed: (_) {
             Clipboard.setData(ClipboardData(text: label));
@@ -283,7 +283,7 @@ class QueryaConnectionTreeRow extends material.StatelessWidget {
             leading: material.Icon(
               material.Icons.terminal_rounded,
               size: 18,
-              color: theme.colorScheme.mutedForeground,
+              color: colors.mutedForeground,
             ),
             onPressed: (_) => onOpenSqlWorkspace!(
               connection!,
@@ -300,7 +300,7 @@ class QueryaConnectionTreeRow extends material.StatelessWidget {
             leading: material.Icon(
               material.Icons.delete_outline_rounded,
               size: 18,
-              color: theme.colorScheme.destructive,
+              color: colors.destructive,
             ),
             onPressed: (_) => onContextDelete!(),
             child: Text(contextDeleteLabel ?? 'Delete'),

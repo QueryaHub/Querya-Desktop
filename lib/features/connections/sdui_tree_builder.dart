@@ -229,9 +229,9 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
   }
 
   material.Widget _buildNodeRow(SduiTreeNode node, {required int depth}) {
-    final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
-    final muted = theme.colorScheme.mutedForeground;
+    final colors = context.colors;
+    final primary = colors.primary;
+    final muted = colors.mutedForeground;
     final canExpand = node.expandable || node.hasChildren;
     final isExpanded = _expanded.contains(node.id);
     final isLoading = _loading.contains(node.id);
@@ -284,7 +284,7 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
         iconColor: iconColor,
         textStyle: material.TextStyle(
           fontSize: 11,
-          color: isBrowsable ? theme.colorScheme.foreground : muted,
+          color: isBrowsable ? colors.foreground : muted,
         ),
         verticalPadding: 3,
         expanded: canExpand ? isExpanded : null,
