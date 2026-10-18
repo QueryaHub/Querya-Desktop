@@ -1,8 +1,7 @@
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart' as material;
-import 'package:querya_desktop/core/motion/ticker_gated_polling.dart';
+import 'package:querya_desktop/core/motion/polling_controller.dart';
 import 'package:querya_desktop/core/stats/metric_history.dart';
 import 'package:querya_desktop/core/util/deep_collection_equals.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
@@ -31,7 +30,8 @@ class MysqlStatsView extends material.StatefulWidget {
   material.State<MysqlStatsView> createState() => _MysqlStatsViewState();
 }
 
-class _MysqlStatsViewState extends material.State<MysqlStatsView> {
+class _MysqlStatsViewState extends material.State<MysqlStatsView>
+    with PollingState<MysqlStatsView> {
   MysqlLease? _lease;
   Map<String, dynamic>? _stats;
 
@@ -39,7 +39,6 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
   final _history = MetricHistory();
   bool _loading = true;
   String? _error;
-  Timer? _timer;
 
   @override
   void initState() {
@@ -51,7 +50,7 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
   void didUpdateWidget(covariant MysqlStatsView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.connectionRow.id != widget.connectionRow.id) {
-      _timer?.cancel();
+      stopPolling();
       _disconnect();
       _load();
     }
@@ -59,7 +58,6 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
 
   @override
   void dispose() {
-    _timer?.cancel();
     _disconnect();
     super.dispose();
   }
@@ -70,7 +68,7 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
   }
 
   Future<void> _load() async {
-    _timer?.cancel();
+    stopPolling();
     _disconnect();
     if (!mounted) return;
     setState(() {
@@ -90,13 +88,14 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
       }
       _lease = lease;
       await _fetch();
-      if (mounted) _startTimer();
+      if (mounted) syncPolling();
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _error = e.toString();
         _loading = false;
       });
+      syncPolling();
     }
   }
 
@@ -108,6 +107,7 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
         _error = 'Not connected';
         _loading = false;
       });
+      syncPolling();
       return;
     }
     try {
@@ -124,6 +124,7 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
         _error = e.toString();
         _loading = false;
       });
+      syncPolling();
     }
   }
 
@@ -140,35 +141,29 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
         'queries_per_second', statusValue('Questions'), now);
   }
 
-  Future<void> _onPollTick() async {
+  @override
+  Duration? get pollInterval => _pollInterval;
+
+  @override
+  bool get pollShouldRun {
     final conn = _lease?.connection;
-    if (conn == null || !conn.isConnected) return;
-    try {
-      final stats = await conn.serverStats();
-      if (!mounted) return;
-      _recordHistory(stats);
-      // The sparklines move with every sample, so rebuild even when the numbers
-      // did not change.
-      setState(() => replaceIfChanged(_stats, stats, (v) => _stats = v));
-    } catch (_) {}
+    return conn != null && conn.isConnected && !_loading && _error == null;
   }
 
-  void _startTimer() {
-    _timer?.cancel();
-    _timer = Timer.periodic(_pollInterval, (_) => unawaited(_onPollTick()));
+  @override
+  Future<void> pollTick() async {
+    final conn = _lease?.connection;
+    if (conn == null || !conn.isConnected) return;
+    final stats = await conn.serverStats();
+    if (!mounted) return;
+    _recordHistory(stats);
+    // The sparklines move with every sample, so rebuild even when the numbers
+    // did not change.
+    setState(() => replaceIfChanged(_stats, stats, (v) => _stats = v));
   }
 
   @override
   material.Widget build(material.BuildContext context) {
-    final conn = _lease?.connection;
-    _timer = syncTickerGatedPeriodicTimer(
-      context: context,
-      timer: _timer,
-      shouldRun: conn != null && conn.isConnected && !_loading,
-      interval: _pollInterval,
-      onTick: () => unawaited(_onPollTick()),
-    );
-
     final cs = Theme.of(context).colorScheme;
 
     if (_loading) {
@@ -217,47 +212,50 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView> {
     final stats = _stats;
     if (stats == null) return material.Container(color: cs.background);
 
-    return material.Container(
-      color: cs.background,
-      child: material.RefreshIndicator(
-        onRefresh: _fetch,
-        child: material.LayoutBuilder(
-          builder: (context, constraints) {
-            final contentWidth = math.max(0.0, constraints.maxWidth - 48);
-            final isNarrow = contentWidth < 560;
-            return material.SingleChildScrollView(
-              physics: const material.AlwaysScrollableScrollPhysics(),
-              padding: const material.EdgeInsets.all(24),
-              child: material.SizedBox(
-                width: contentWidth,
-                child: material.Column(
-                  mainAxisSize: material.MainAxisSize.min,
-                  crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                  children: [
-                    _header(context),
-                    const Gap(24),
-                    _summaryChips(context, stats),
-                    const Gap(24),
-                    _gridRow(
-                      _connectionsCard(context, stats),
-                      _queriesCard(context, stats),
-                      isNarrow: isNarrow,
-                    ),
-                    const Gap(16),
-                    _gridRow(
-                      _networkCard(context, stats),
-                      _settingsCard(context, stats),
-                      isNarrow: isNarrow,
-                    ),
-                    const Gap(24),
-                    _databasesCard(context, stats),
-                  ],
+    return PollStaleOverlay(
+      status: polling.status,
+      child: material.Container(
+        color: cs.background,
+        child: material.RefreshIndicator(
+          onRefresh: _fetch,
+          child: material.LayoutBuilder(
+            builder: (context, constraints) {
+              final contentWidth = math.max(0.0, constraints.maxWidth - 48);
+              final isNarrow = contentWidth < 560;
+              return material.SingleChildScrollView(
+                physics: const material.AlwaysScrollableScrollPhysics(),
+                padding: const material.EdgeInsets.all(24),
+                child: material.SizedBox(
+                  width: contentWidth,
+                  child: material.Column(
+                    mainAxisSize: material.MainAxisSize.min,
+                    crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                    children: [
+                      _header(context),
+                      const Gap(24),
+                      _summaryChips(context, stats),
+                      const Gap(24),
+                      _gridRow(
+                        _connectionsCard(context, stats),
+                        _queriesCard(context, stats),
+                        isNarrow: isNarrow,
+                      ),
+                      const Gap(16),
+                      _gridRow(
+                        _networkCard(context, stats),
+                        _settingsCard(context, stats),
+                        isNarrow: isNarrow,
+                      ),
+                      const Gap(24),
+                      _databasesCard(context, stats),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
-      ),
+    ),
     );
   }
 

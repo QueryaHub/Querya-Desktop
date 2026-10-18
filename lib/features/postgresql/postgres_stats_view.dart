@@ -1,8 +1,7 @@
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart' as material;
-import 'package:querya_desktop/core/motion/ticker_gated_polling.dart';
+import 'package:querya_desktop/core/motion/polling_controller.dart';
 import 'package:querya_desktop/core/stats/metric_history.dart';
 import 'package:querya_desktop/core/util/deep_collection_equals.dart';
 import 'package:querya_desktop/core/database/postgres_connection.dart';
@@ -56,7 +55,8 @@ void recordServerStats(
   history.recordCounter('transactions_per_second', commits.toDouble(), now);
 }
 
-class _PostgresStatsViewState extends material.State<PostgresStatsView> {
+class _PostgresStatsViewState extends material.State<PostgresStatsView>
+    with PollingState<PostgresStatsView> {
   PgLease? _lease;
   PostgresConnection? get _connection => _lease?.connection;
 
@@ -66,7 +66,6 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
   final _history = MetricHistory();
   bool _loading = true;
   String? _error;
-  Timer? _timer;
 
   @override
   void initState() {
@@ -78,7 +77,7 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
   void didUpdateWidget(covariant PostgresStatsView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.connectionRow.id != widget.connectionRow.id) {
-      _timer?.cancel();
+      stopPolling();
       _disconnectCurrent();
       _load();
     }
@@ -86,7 +85,6 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
 
   @override
   void dispose() {
-    _timer?.cancel();
     _disconnectCurrent();
     super.dispose();
   }
@@ -99,7 +97,7 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
   }
 
   Future<void> _load() async {
-    _timer?.cancel();
+    stopPolling();
     _disconnectCurrent();
     if (!mounted) return;
     setState(() {
@@ -109,7 +107,7 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
     });
     if (widget.statsSource != null) {
       await _fetch();
-      if (mounted) _startTimer();
+      if (mounted) syncPolling();
       return;
     }
     try {
@@ -124,13 +122,14 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
       }
       _lease = lease;
       await _fetch();
-      if (mounted) _startTimer();
+      if (mounted) syncPolling();
     } catch (e) {
       if (mounted) {
         setState(() {
           _error = e.toString();
           _loading = false;
         });
+        syncPolling();
       }
     }
   }
@@ -155,6 +154,7 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
         _error = 'Not connected';
         _loading = false;
       });
+      syncPolling();
       return;
     }
     try {
@@ -178,37 +178,30 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
           _error = e.toString();
           _loading = false;
         });
+        syncPolling();
       }
     }
   }
 
-  Future<void> _onPollTick() async {
-    if (!_canPoll) return;
-    try {
-      final stats = await _serverStats();
-      if (!mounted) return;
-      _recordHistory(stats);
-      // The sparklines move with every sample, so rebuild even when the numbers
-      // did not change.
-      setState(() => replaceIfChanged(_stats, stats, (v) => _stats = v));
-    } catch (_) {}
-  }
+  @override
+  Duration? get pollInterval => _pollInterval;
 
-  void _startTimer() {
-    _timer?.cancel();
-    _timer = Timer.periodic(_pollInterval, (_) => unawaited(_onPollTick()));
+  @override
+  bool get pollShouldRun => _canPoll && !_loading && _error == null;
+
+  @override
+  Future<void> pollTick() async {
+    if (!_canPoll) return;
+    final stats = await _serverStats();
+    if (!mounted) return;
+    _recordHistory(stats);
+    // The sparklines move with every sample, so rebuild even when the numbers
+    // did not change.
+    setState(() => replaceIfChanged(_stats, stats, (v) => _stats = v));
   }
 
   @override
   material.Widget build(material.BuildContext context) {
-    _timer = syncTickerGatedPeriodicTimer(
-      context: context,
-      timer: _timer,
-      shouldRun: _canPoll && !_loading,
-      interval: _pollInterval,
-      onTick: () => unawaited(_onPollTick()),
-    );
-
     final cs = Theme.of(context).colorScheme;
 
     if (_loading) {
@@ -251,56 +244,59 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView> {
     final stats = _stats;
     if (stats == null) return material.Container(color: cs.background);
 
-    return material.Container(
-      color: cs.background,
-      child: material.RefreshIndicator(
-        onRefresh: _fetch,
-        child: material.LayoutBuilder(
-          builder: (context, constraints) {
-            final contentWidth = math.max(0.0, constraints.maxWidth - 48);
-            final isNarrow = contentWidth < 560;
-            return material.SingleChildScrollView(
-              physics: const material.AlwaysScrollableScrollPhysics(),
-              padding: const material.EdgeInsets.all(24),
-              child: material.SizedBox(
-                width: contentWidth,
-                child: material.Column(
-                  mainAxisSize: material.MainAxisSize.min,
-                  crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                  children: [
-                    _header(context),
-                    const Gap(24),
-                    _summaryChips(context, stats),
-                    const Gap(24),
-                    if (isNarrow)
-                      material.Column(
-                        crossAxisAlignment: material.CrossAxisAlignment.stretch,
-                        children: [
-                          _connectionsCard(context, stats),
-                          const Gap(16),
-                          _serverSettingsCard(context, stats),
-                        ],
-                      )
-                    else
-                      material.Row(
-                        crossAxisAlignment: material.CrossAxisAlignment.start,
-                        children: [
-                          material.Expanded(
-                              child: _connectionsCard(context, stats)),
-                          const Gap(16),
-                          material.Expanded(
-                              child: _serverSettingsCard(context, stats)),
-                        ],
-                      ),
-                    const Gap(16),
-                    _databasesCard(context, stats),
-                  ],
+    return PollStaleOverlay(
+      status: polling.status,
+      child: material.Container(
+        color: cs.background,
+        child: material.RefreshIndicator(
+          onRefresh: _fetch,
+          child: material.LayoutBuilder(
+            builder: (context, constraints) {
+              final contentWidth = math.max(0.0, constraints.maxWidth - 48);
+              final isNarrow = contentWidth < 560;
+              return material.SingleChildScrollView(
+                physics: const material.AlwaysScrollableScrollPhysics(),
+                padding: const material.EdgeInsets.all(24),
+                child: material.SizedBox(
+                  width: contentWidth,
+                  child: material.Column(
+                    mainAxisSize: material.MainAxisSize.min,
+                    crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                    children: [
+                      _header(context),
+                      const Gap(24),
+                      _summaryChips(context, stats),
+                      const Gap(24),
+                      if (isNarrow)
+                        material.Column(
+                          crossAxisAlignment: material.CrossAxisAlignment.stretch,
+                          children: [
+                            _connectionsCard(context, stats),
+                            const Gap(16),
+                            _serverSettingsCard(context, stats),
+                          ],
+                        )
+                      else
+                        material.Row(
+                          crossAxisAlignment: material.CrossAxisAlignment.start,
+                          children: [
+                            material.Expanded(
+                                child: _connectionsCard(context, stats)),
+                            const Gap(16),
+                            material.Expanded(
+                                child: _serverSettingsCard(context, stats)),
+                          ],
+                        ),
+                      const Gap(16),
+                      _databasesCard(context, stats),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
-      ),
+    ),
     );
   }
 

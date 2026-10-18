@@ -1,8 +1,7 @@
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart' as material;
-import 'package:querya_desktop/core/motion/ticker_gated_polling.dart';
+import 'package:querya_desktop/core/motion/polling_controller.dart';
 import 'package:querya_desktop/core/util/deep_collection_equals.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
@@ -47,12 +46,12 @@ class MongoStatsView extends material.StatefulWidget {
   material.State<MongoStatsView> createState() => _MongoStatsViewState();
 }
 
-class _MongoStatsViewState extends material.State<MongoStatsView> {
+class _MongoStatsViewState extends material.State<MongoStatsView>
+    with PollingState<MongoStatsView> {
   MongoConnection? _connection;
   Map<String, dynamic>? _serverStatus;
   bool _loading = true;
   String? _error;
-  Timer? _timer;
 
   /// `null` = auto-refresh off. Default matches previous 3s polling.
   Duration? _autoRefreshInterval = _defaultAutoRefresh;
@@ -70,7 +69,7 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
   void didUpdateWidget(covariant MongoStatsView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.connectionRow.id != widget.connectionRow.id) {
-      _timer?.cancel();
+      stopPolling();
       _disconnectCurrent();
       _load();
     }
@@ -78,7 +77,6 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
 
   @override
   void dispose() {
-    _timer?.cancel();
     _disconnectCurrent();
     super.dispose();
   }
@@ -89,7 +87,7 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
   }
 
   Future<void> _load() async {
-    _timer?.cancel();
+    stopPolling();
     _disconnectCurrent();
     if (!mounted) return;
     setState(() {
@@ -112,13 +110,14 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
       }
       _connection = conn;
       await _fetch();
-      if (mounted) _startTimer();
+      if (mounted) syncPolling();
     } catch (e) {
       if (mounted) {
         setState(() {
           _error = e.toString();
           _loading = false;
         });
+        syncPolling();
       }
     }
   }
@@ -146,6 +145,7 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
           _error = e.toString();
           _loading = false;
         });
+        syncPolling();
       }
     }
   }
@@ -165,30 +165,28 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
     }
   }
 
-  Future<void> _pollTick() async {
+  @override
+  Duration? get pollInterval => _autoRefreshInterval;
+
+  @override
+  bool get pollShouldRun => !_loading && _error == null && _connection != null;
+
+  /// A failed auto-refresh keeps the last good snapshot; the polling status
+  /// reports it.
+  @override
+  Future<void> pollTick() async {
     final c = _connection;
     if (c == null || !c.isConnected) return;
-    try {
-      final status = await MongoService.instance.executeCommand(
-        c,
-        'admin',
-        {'serverStatus': 1},
-      );
-      if (!mounted) return;
-      if (!replaceIfChanged(_serverStatus, status, (v) => _serverStatus = v)) {
-        return;
-      }
-      setState(() => _lastFetchedAt = DateTime.now());
-    } catch (_) {
-      // Keep last good snapshot on transient errors during auto-refresh.
+    final status = await MongoService.instance.executeCommand(
+      c,
+      'admin',
+      {'serverStatus': 1},
+    );
+    if (!mounted) return;
+    if (!replaceIfChanged(_serverStatus, status, (v) => _serverStatus = v)) {
+      return;
     }
-  }
-
-  void _startTimer() {
-    _timer?.cancel();
-    final interval = _autoRefreshInterval;
-    if (interval == null) return;
-    _timer = Timer.periodic(interval, (_) => unawaited(_pollTick()));
+    setState(() => _lastFetchedAt = DateTime.now());
   }
 
   String _formatClock(DateTime t) {
@@ -198,37 +196,26 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final interval = _autoRefreshInterval;
-    if (interval != null) {
-      _timer = syncTickerGatedPeriodicTimer(
-        context: context,
-        timer: _timer,
-        shouldRun: !_loading && _connection != null,
-        interval: interval,
-        onTick: () => unawaited(_pollTick()),
-      );
-    } else {
-      _timer?.cancel();
-      _timer = null;
-    }
-
     final cs = Theme.of(context).colorScheme;
 
-    return material.Container(
-      color: cs.background,
-      child: material.Column(
-        crossAxisAlignment: material.CrossAxisAlignment.stretch,
-        children: [
-          material.Padding(
-            padding: const material.EdgeInsets.fromLTRB(24, 20, 24, 16),
-            child: _header(context),
-          ),
-          const QueryaDivider(height: 1),
-          material.Expanded(
-            child: _buildBody(context, cs),
-          ),
-        ],
-      ),
+    return PollStaleOverlay(
+      status: polling.status,
+      child: material.Container(
+        color: cs.background,
+        child: material.Column(
+          crossAxisAlignment: material.CrossAxisAlignment.stretch,
+          children: [
+            material.Padding(
+              padding: const material.EdgeInsets.fromLTRB(24, 20, 24, 16),
+              child: _header(context),
+            ),
+            const QueryaDivider(height: 1),
+            material.Expanded(
+              child: _buildBody(context, cs),
+            ),
+          ],
+        ),
+    ),
     );
   }
 
@@ -464,7 +451,7 @@ class _MongoStatsViewState extends material.State<MongoStatsView> {
                 ],
                 onSelected: (value) {
                   setState(() => _autoRefreshInterval = value);
-                  _startTimer();
+                  syncPolling();
                 },
               ),
             ),

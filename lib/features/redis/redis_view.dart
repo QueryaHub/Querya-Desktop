@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart' as material;
-import 'package:querya_desktop/core/motion/ticker_gated_polling.dart';
+import 'package:querya_desktop/core/motion/polling_controller.dart';
 import 'package:querya_desktop/core/util/deep_collection_equals.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/database/redis_info.dart';
@@ -74,12 +74,12 @@ class RedisView extends material.StatefulWidget {
   material.State<RedisView> createState() => _RedisViewState();
 }
 
-class _RedisViewState extends material.State<RedisView> {
+class _RedisViewState extends material.State<RedisView>
+    with PollingState<RedisView> {
   RedisConnection? _connection;
   RedisInfoSections? _info;
   bool _loading = true;
   String? _error;
-  Timer? _timer;
 
   @override
   void initState() {
@@ -91,7 +91,7 @@ class _RedisViewState extends material.State<RedisView> {
   void didUpdateWidget(covariant RedisView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.connectionRow.id != widget.connectionRow.id) {
-      _timer?.cancel();
+      stopPolling();
       _disconnectCurrent();
       _load();
     }
@@ -99,7 +99,6 @@ class _RedisViewState extends material.State<RedisView> {
 
   @override
   void dispose() {
-    _timer?.cancel();
     _disconnectCurrent();
     super.dispose();
   }
@@ -118,7 +117,7 @@ class _RedisViewState extends material.State<RedisView> {
   }
 
   Future<void> _load({bool reconnect = false}) async {
-    _timer?.cancel();
+    stopPolling();
     if (!mounted) return;
     setState(() {
       _loading = true;
@@ -160,13 +159,14 @@ class _RedisViewState extends material.State<RedisView> {
       }
       _connection = conn;
       await _fetch();
-      if (mounted) _startTimer();
+      if (mounted) syncPolling();
     } catch (e) {
       if (mounted) {
         setState(() {
           _error = e.toString();
           _loading = false;
         });
+        syncPolling();
       }
     }
   }
@@ -193,51 +193,48 @@ class _RedisViewState extends material.State<RedisView> {
     setState(() => _loading = false);
   }
 
-  Future<void> _onPollTick() async {
+  @override
+  Duration? get pollInterval => _pollInterval;
+
+  @override
+  bool get pollShouldRun {
     final c = _connection;
-    if (c == null || !c.isConnected) return;
-    try {
-      final raw = await c.info();
-      final info = parseRedisInfo(raw);
-      if (!mounted) return;
-      if (!replaceIfChanged(_info, info, (v) => _info = v)) return;
-      setState(() => _info = info);
-    } catch (_) {}
+    return c != null && c.isConnected && !_loading && _error == null;
   }
 
-  void _startTimer() {
-    _timer?.cancel();
-    _timer = Timer.periodic(_pollInterval, (_) => unawaited(_onPollTick()));
+  @override
+  Future<void> pollTick() async {
+    final c = _connection;
+    if (c == null || !c.isConnected) return;
+    final raw = await c.info();
+    final info = parseRedisInfo(raw);
+    if (!mounted) return;
+    if (!replaceIfChanged(_info, info, (v) => _info = v)) return;
+    setState(() => _info = info);
   }
 
   @override
   material.Widget build(material.BuildContext context) {
-    final c = _connection;
-    _timer = syncTickerGatedPeriodicTimer(
-      context: context,
-      timer: _timer,
-      shouldRun: c != null && c.isConnected && !_loading,
-      interval: _pollInterval,
-      onTick: () => unawaited(_onPollTick()),
-    );
-
     final cs = Theme.of(context).colorScheme;
 
-    return material.Container(
-      color: cs.background,
-      child: material.Column(
-        crossAxisAlignment: material.CrossAxisAlignment.stretch,
-        children: [
-          material.Padding(
-            padding: const material.EdgeInsets.fromLTRB(24, 20, 24, 16),
-            child: _header(context),
-          ),
-          const QueryaDivider(height: 1),
-          material.Expanded(
-            child: _buildBody(context, cs),
-          ),
-        ],
-      ),
+    return PollStaleOverlay(
+      status: polling.status,
+      child: material.Container(
+        color: cs.background,
+        child: material.Column(
+          crossAxisAlignment: material.CrossAxisAlignment.stretch,
+          children: [
+            material.Padding(
+              padding: const material.EdgeInsets.fromLTRB(24, 20, 24, 16),
+              child: _header(context),
+            ),
+            const QueryaDivider(height: 1),
+            material.Expanded(
+              child: _buildBody(context, cs),
+            ),
+          ],
+        ),
+    ),
     );
   }
 
