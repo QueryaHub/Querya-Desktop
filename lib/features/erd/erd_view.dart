@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:math' show max, min;
+import 'dart:math' show max;
 import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
@@ -8,7 +8,6 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart'
     show HardwareKeyboard, LogicalKeyboardKey;
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
-import 'package:querya_desktop/features/erd/erd_canvas_controls.dart';
 import 'package:querya_desktop/features/erd/erd_card_measure.dart';
 import 'package:querya_desktop/core/erd/erd_catalog.dart';
 import 'package:querya_desktop/features/erd/erd_source.dart';
@@ -19,6 +18,7 @@ import 'package:querya_desktop/core/erd/erd_geometry.dart';
 import 'package:querya_desktop/features/erd/erd_group_dialog.dart';
 import 'package:querya_desktop/features/erd/erd_note_dialog.dart';
 import 'package:querya_desktop/features/erd/erd_view_controller.dart';
+import 'package:querya_desktop/features/erd/erd_viewport.dart';
 import 'package:querya_desktop/features/erd/erd_view_name_dialog.dart';
 import 'package:querya_desktop/core/erd/erd_group_ops.dart';
 import 'package:querya_desktop/core/erd/erd_layout.dart';
@@ -27,13 +27,13 @@ import 'package:querya_desktop/core/erd/erd_model.dart';
 import 'package:querya_desktop/core/erd/erd_note_ops.dart';
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
 import 'package:querya_desktop/core/erd/erd_router.dart';
+import 'package:querya_desktop/features/erd/widgets/erd_canvas.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_card_cache.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_card_inputs.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_edge_tip_label.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_export_menu.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_group_frame.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_note_card.dart';
-import 'package:querya_desktop/features/erd/widgets/erd_relation_painter.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_search_panel.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_status_body.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_group_menu.dart';
@@ -171,17 +171,7 @@ class _ErdViewState extends material.State<ErdView>
   final _searchController = material.TextEditingController();
   final _searchFocus = material.FocusNode();
   final _canvasFocus = material.FocusNode();
-  final _viewportKey = material.GlobalKey();
-
-  final _transform = material.TransformationController();
-
-  static const double _minScale = 0.2;
-  static const double _maxScale = 3;
-  static const double _zoomStep = 1.25;
-
-  /// Lowest zoom: [_minScale], or lower when the whole diagram needs it to
-  /// fit the viewport (a schema of a few hundred tables).
-  double _zoomFloor = _minScale;
+  final _viewport = ErdViewport();
 
   /// Saves of the layout wait for a pause in the changes.
   Timer? _saveTimer;
@@ -198,8 +188,8 @@ class _ErdViewState extends material.State<ErdView>
       _saveTimer!.cancel();
       unawaited(_saveNow());
     }
-    _transform.removeListener(_scheduleSave);
-    _transform.dispose();
+    _viewport.transform.removeListener(_scheduleSave);
+    _viewport.dispose();
     _hovered.dispose();
     _focus.dispose();
     for (final card in _cardStates.values) {
@@ -217,7 +207,7 @@ class _ErdViewState extends material.State<ErdView>
     super.initState();
     _searchFocus.addListener(_onSearchFocus);
     _hovered.addListener(_syncFocus);
-    _transform.addListener(_scheduleSave);
+    _viewport.transform.addListener(_scheduleSave);
     _load();
   }
 
@@ -293,9 +283,7 @@ class _ErdViewState extends material.State<ErdView>
         final translation = saved?.translation;
         if (scale != null && translation != null) {
           _restoring = true;
-          _transform.value = Matrix4.identity()
-            ..translate(translation.dx, translation.dy)
-            ..scale(scale);
+          _viewport.set(scale: scale, translation: translation);
           _restoring = false;
         } else {
           _fit();
@@ -427,9 +415,7 @@ class _ErdViewState extends material.State<ErdView>
       final scale = target.scale, translation = target.translation;
       if (scale != null && translation != null) {
         _restoring = true;
-        _transform.value = Matrix4.identity()
-          ..translate(translation.dx, translation.dy)
-          ..scale(scale);
+        _viewport.set(scale: scale, translation: translation);
         _restoring = false;
       } else {
         _fit();
@@ -503,22 +489,12 @@ class _ErdViewState extends material.State<ErdView>
     _showState(null, _c.base);
   }
 
-  /// Canvas point at the middle of what the viewport shows.
-  material.Offset _viewCentre() {
-    final vs = _viewportSize();
-    if (vs == null) return const material.Offset(60, 60);
-    final inverse = Matrix4.inverted(_transform.value);
-    final p = material.MatrixUtils.transformPoint(
-        inverse, vs.center(material.Offset.zero));
-    return p;
-  }
-
   Future<void> _addNote() async {
     final text = await showErdNoteDialog(context,
         title: 'New note', action: 'Add');
     if (text == null || !mounted) return;
     final note =
-        ErdNoteOps.create(_c.notes, text: text, centre: _viewCentre());
+        ErdNoteOps.create(_c.notes, text: text, centre: _viewport.centre());
     setState(() => _c.addNote(note));
     _scheduleSave();
   }
@@ -542,11 +518,11 @@ class _ErdViewState extends material.State<ErdView>
   }
 
   void _noteDragMove(String id, material.Offset screenDelta) {
-    setState(() => _c.moveNote(id, screenDelta, _scale));
+    setState(() => _c.moveNote(id, screenDelta, _viewport.scale));
   }
 
   void _noteResize(String id, material.Offset screenDelta) {
-    setState(() => _c.resizeNote(id, screenDelta, _scale));
+    setState(() => _c.resizeNote(id, screenDelta, _viewport.scale));
   }
 
   /// The table nearest to a note's middle, to attach it to.
@@ -596,7 +572,7 @@ class _ErdViewState extends material.State<ErdView>
     if (_c.draggingGroup != group.id || layout == null) return;
     final frame = layout.frameOf(group.tables);
     if (frame == null) return;
-    final scale = _scale;
+    final scale = _viewport.scale;
     var delta = screenDelta / (scale == 0 ? 1 : scale);
     delta = material.Offset(
         max(delta.dx, -frame.left), max(delta.dy, -frame.top));
@@ -639,8 +615,6 @@ class _ErdViewState extends material.State<ErdView>
 
   /// What the diagram shows and how it is arranged right now.
   ErdSavedLayout _current() {
-    final m = _transform.value;
-    final t = m.getTranslation();
     return ErdSavedLayout(
       positions: Map.of(_layout?.positions ?? const {}),
       collapsed: Set.of(_c.collapsed),
@@ -649,8 +623,8 @@ class _ErdViewState extends material.State<ErdView>
       headerColors: Map.of(_c.headerColors),
       groups: List.of(_c.groups),
       notes: List.of(_c.notes),
-      scale: m.getMaxScaleOnAxis(),
-      translation: material.Offset(t.x, t.y),
+      scale: _viewport.scale,
+      translation: _viewport.translation,
     );
   }
 
@@ -755,7 +729,7 @@ class _ErdViewState extends material.State<ErdView>
   void _dragMove(String table, material.Offset screenDelta) {
     final layout = _layout;
     if (_c.dragging != table || layout == null) return;
-    final scale = _transform.value.getMaxScaleOnAxis();
+    final scale = _viewport.scale;
     final delta = screenDelta / (scale == 0 ? 1 : scale);
     // The card follows the pointer at once; the edges are routed once per frame.
     setState(() {
@@ -793,42 +767,15 @@ class _ErdViewState extends material.State<ErdView>
   /// The table whose relations are highlighted: the one being dragged, then
   /// the picked one, then the one under the mouse.
 
-  double get _scale => _transform.value.getMaxScaleOnAxis();
-
-  /// Size of the diagram viewport, once it has been laid out.
-  material.Size? _viewportSize() {
-    final box = _viewportKey.currentContext?.findRenderObject() as RenderBox?;
-    return box != null && box.hasSize ? box.size : null;
-  }
-
-  /// Sets the zoom to [target], keeping the scene point under [focal] still.
-  void _setScale(double target, material.Offset focal) {
-    final s = target.clamp(_zoomFloor, _maxScale).toDouble();
-    final t = _transform.value.getTranslation();
-    final current = material.Offset(t.x, t.y);
-    final next = focal - (focal - current) * (s / _scale);
-    _transform.value = Matrix4.identity()..translate(next.dx, next.dy)..scale(s);
-  }
-
-  void _zoomBy(double factor) {
-    final vs = _viewportSize();
-    if (vs == null) return;
-    _setScale(_scale * factor, vs.center(material.Offset.zero));
-  }
+  void _zoomBy(double factor) => _viewport.zoomBy(factor);
 
   /// Fits the whole diagram into the viewport, centred, never enlarged.
   void _fit() {
     final layout = _layout;
-    final vs = _viewportSize();
-    if (layout == null || vs == null) return;
+    if (layout == null) return;
     // The cards and every note: a note placed away from the cards counts.
-    final size = _c.canvasSize(layout);
-    final s = ErdLayout.fitScale(size, vs);
-    final floor = min(_minScale, s);
-    if (floor != _zoomFloor) setState(() => _zoomFloor = floor);
-    final tx = (vs.width - size.width * s) / 2;
-    final ty = (vs.height - size.height * s) / 2;
-    _transform.value = Matrix4.identity()..translate(tx, ty)..scale(s);
+    final floorMoved = _viewport.fit(_c.canvasSize(layout));
+    if (floorMoved ?? false) setState(() {});
   }
 
   /// Picks a table from the search: centres it, closes the search and gives
@@ -846,15 +793,11 @@ class _ErdViewState extends material.State<ErdView>
   /// Picks a table and centres the view on it, keeping the zoom.
   void _selectTable(ErdSchema schema, String name) {
     final layout = _layout;
-    final vs = _viewportSize();
     final table = schema.tables.firstWhere((t) => t.name == name);
-    if (layout != null && vs != null) {
+    if (layout != null) {
       final p = layout.positions[name]!;
-      final centre = material.Offset(p.dx + layout.widthFor(name) / 2,
-          p.dy + ErdLayout.cardHeight(table) / 2);
-      final s = _scale;
-      final t = vs.center(material.Offset.zero) - centre * s;
-      _transform.value = Matrix4.identity()..translate(t.dx, t.dy)..scale(s);
+      _viewport.centreOn(material.Offset(p.dx + layout.widthFor(name) / 2,
+          p.dy + ErdLayout.cardHeight(table) / 2));
     }
     setState(() => _c.selected = name);
     _syncFocus();
@@ -933,13 +876,13 @@ class _ErdViewState extends material.State<ErdView>
       out[material.SingleActivator(key, meta: true, shift: shift)] = action;
     }
 
-    both(LogicalKeyboardKey.equal, () => _zoomBy(_zoomStep));
+    both(LogicalKeyboardKey.equal, () => _zoomBy(ErdViewport.zoomStep));
     // "+" is Shift+= on most layouts.
-    both(LogicalKeyboardKey.equal, () => _zoomBy(_zoomStep), shift: true);
-    both(LogicalKeyboardKey.add, () => _zoomBy(_zoomStep));
-    both(LogicalKeyboardKey.numpadAdd, () => _zoomBy(_zoomStep));
-    both(LogicalKeyboardKey.minus, () => _zoomBy(1 / _zoomStep));
-    both(LogicalKeyboardKey.numpadSubtract, () => _zoomBy(1 / _zoomStep));
+    both(LogicalKeyboardKey.equal, () => _zoomBy(ErdViewport.zoomStep), shift: true);
+    both(LogicalKeyboardKey.add, () => _zoomBy(ErdViewport.zoomStep));
+    both(LogicalKeyboardKey.numpadAdd, () => _zoomBy(ErdViewport.zoomStep));
+    both(LogicalKeyboardKey.minus, () => _zoomBy(1 / ErdViewport.zoomStep));
+    both(LogicalKeyboardKey.numpadSubtract, () => _zoomBy(1 / ErdViewport.zoomStep));
     both(LogicalKeyboardKey.digit0, _fit);
     both(LogicalKeyboardKey.keyF, _openSearch);
     out[const material.SingleActivator(LogicalKeyboardKey.escape)] = _escape;
@@ -1166,7 +1109,7 @@ class _ErdViewState extends material.State<ErdView>
   /// The relation within 6 screen px of [p] (canvas space), whatever the zoom.
   ErdRelation? _relationAt(material.Offset p) {
     ErdRelation? hit;
-    final scale = _scale;
+    final scale = _viewport.scale;
     var best = 6.0 / (scale <= 0 ? 1 : scale);
     for (final r in _routes) {
       final d = ErdGeometry.distanceToRoute(r.points, p);
@@ -1182,10 +1125,6 @@ class _ErdViewState extends material.State<ErdView>
     if (_c.pickedRelation != null) return;
     _edgeTipNotifier.value = null;
   }
-
-  /// "orders.customer_id → customers.id" next to the pointer.
-  material.Widget _edgeTipLabel(material.BuildContext context, ErdRelation r) =>
-      ErdEdgeTipLabel(relation: r);
 
   /// Find-a-table field and the tables it matches. Enter picks the first.
   material.Widget _searchPanel(ErdSchema schema) {
@@ -1304,7 +1243,6 @@ class _ErdViewState extends material.State<ErdView>
 
   @override
   material.Widget build(material.BuildContext context) {
-    final wb = context.workbench;
     final full = _schema;
     final schema = full == null ? null : _visibleOf(full);
     final layout = _layout;
@@ -1329,120 +1267,30 @@ class _ErdViewState extends material.State<ErdView>
           focusTable: widget.focusTable,
           onOpenFullDiagram: widget.onOpenFullDiagram);
     } else {
-      body = material.CallbackShortcuts(
+      body = ErdCanvas(
+        viewport: _viewport,
+        boundaryKey: _boundaryKey,
+        canvasFocus: _canvasFocus,
         bindings: _bindings(),
-        child: material.Focus(
-          focusNode: _canvasFocus,
-          autofocus: true,
-          child: material.Stack(
-            key: _viewportKey,
-            children: [
-              material.InteractiveViewer(
-                constrained: false,
-                transformationController: _transform,
-                // A card or group drag must not pan the canvas.
-                panEnabled: _c.dragging == null && _c.draggingGroup == null,
-                minScale: _zoomFloor,
-                maxScale: _maxScale,
-                boundaryMargin: const material.EdgeInsets.all(400),
-                child: material.RepaintBoundary(
-                  key: _boundaryKey,
-                  child: material.Container(
-                    color: wb.surface,
-                    width: _c.canvasSize(layout).width,
-                    height: _c.canvasSize(layout).height,
-                    child: material.GestureDetector(
-                      // A tap on an edge picks its relation, elsewhere it clears
-                      // the selection (#1281).
-                      behavior: material.HitTestBehavior.translucent,
-                      onTapUp: (d) => _tapCanvas(d.localPosition),
-                      child: material.Stack(
-                        children: [
-                          // Lowest layer: sees the pointer wherever no card is,
-                          // so edges can name themselves on hover.
-                          material.Positioned.fill(
-                            child: material.MouseRegion(
-                              opaque: false,
-                              onHover: (e) => _hoverCanvas(e.localPosition),
-                              onExit: (_) => _leaveCanvas(),
-                              child: const material.SizedBox.expand(),
-                            ),
-                          ),
-                          // Group frames under the edges and cards (#1282).
-                          for (final g in _c.allGroups(_schema))
-                            ..._groupFrame(g, layout),
-                          material.Positioned.fill(
-                            child: material.ValueListenableBuilder<String?>(
-                              valueListenable: _focus,
-                              builder: (context, focus, _) =>
-                                  material.CustomPaint(
-                                painter: ErdRelationPainter(
-                                  routes: _routes,
-                                  color: wb.mutedForeground,
-                                  highlight: wb.accent,
-                                  focus: focus,
-                                  picked: _c.pickedRelation,
-                                ),
-                              ),
-                            ),
-                          ),
-                          ..._cards(schema, layout),
-                          // Sticky notes above the cards (#1283).
-                          for (final n in _c.notes) _noteWidget(n),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              // The edge label sits above the zoomed canvas, in screen space,
-              // so it stays readable at any zoom and is never in a PNG.
-              material.Positioned.fill(
-                child: material.IgnorePointer(
-                  child: material.ListenableBuilder(
-                    listenable: material.Listenable.merge(
-                        [_edgeTipNotifier, _transform]),
-                    builder: (context, _) {
-                      final tip = _edgeTipNotifier.value;
-                      if (tip == null) return const material.SizedBox.shrink();
-                      final at = material.MatrixUtils.transformPoint(
-                          _transform.value, tip.$2);
-                      return material.Stack(
-                        children: [
-                          material.Positioned(
-                            key: const material.ValueKey('erd_edge_tip'),
-                            left: at.dx + 12,
-                            top: at.dy + 12,
-                            child: _edgeTipLabel(context, tip.$1),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-              ),
-              material.Positioned(
-                left: 8,
-                top: 8,
-                width: 260,
-                child: _searchPanel(schema),
-              ),
-              material.Positioned(
-                right: 8,
-                bottom: 8,
-                child: material.ValueListenableBuilder<Matrix4>(
-                  valueListenable: _transform,
-                  builder: (context, m, _) => ErdZoomControls(
-                    scale: m.getMaxScaleOnAxis(),
-                    onZoomIn: () => _zoomBy(_zoomStep),
-                    onZoomOut: () => _zoomBy(1 / _zoomStep),
-                    onFit: _fit,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+        canvasSize: _c.canvasSize(layout),
+        panEnabled: _c.dragging == null && _c.draggingGroup == null,
+        routes: _routes,
+        focus: _focus,
+        pickedRelation: _c.pickedRelation,
+        edgeTip: _edgeTipNotifier,
+        edgeTipLabel: (relation) => ErdEdgeTipLabel(relation: relation),
+        onTapUp: _tapCanvas,
+        onHover: _hoverCanvas,
+        onLeave: _leaveCanvas,
+        groupFrames: [
+          for (final g in _c.allGroups(_schema)) ..._groupFrame(g, layout),
+        ],
+        cards: _cards(schema, layout),
+        notes: [for (final n in _c.notes) _noteWidget(n)],
+        searchPanel: _searchPanel(schema),
+        onZoomIn: () => _zoomBy(ErdViewport.zoomStep),
+        onZoomOut: () => _zoomBy(1 / ErdViewport.zoomStep),
+        onFit: _fit,
       );
     }
     final ready = schema != null && layout != null && !schema.isEmpty;
