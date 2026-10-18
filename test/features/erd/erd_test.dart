@@ -13,6 +13,7 @@ import 'package:querya_desktop/core/erd/erd_layout.dart';
 import 'package:querya_desktop/core/erd/erd_model.dart';
 import 'package:querya_desktop/core/erd/erd_router.dart';
 import 'package:querya_desktop/features/erd/erd_view.dart';
+import 'package:querya_desktop/features/erd/widgets/erd_search_panel.dart';
 import 'package:querya_desktop/features/erd/erd_source.dart';
 import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
 
@@ -1002,6 +1003,67 @@ void main() {
       await t.pump();
       expect(erdCardBuilds, greaterThan(0));
       expect(erdCardBuilds, lessThanOrEqualTo(3));
+    });
+
+    testWidgets('a diagram of many tables mounts its cards over several frames',
+        (t) async {
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
+      final big = FakeSqlExecutionDelegate(onExecute: (sql) {
+        if (_unfiltered(sql) == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+          return SqlExecutionResult(rows: [
+            for (var i = 0; i < 100; i++) ['t$i', 'id', 'INTEGER', '1'],
+          ]);
+        }
+        return const SqlExecutionResult();
+      });
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(
+            source: SqlErdSource(delegate: big, dialect: SqlDialect.sqlite)),
+      ));
+      int cards() => find
+          .byWidgetPredicate((w) =>
+              w.key is material.ValueKey<String> &&
+              (w.key! as material.ValueKey<String>).value.startsWith('erd_table_t'))
+          .evaluate()
+          .length;
+      await t.pump();
+      await t.pump();
+      expect(cards(), inInclusiveRange(1, 99),
+          reason: 'the first frame does not carry every card');
+      for (var i = 0; i < 10; i++) {
+        await t.pump();
+      }
+      expect(cards(), 100);
+    });
+
+    testWidgets('opening the search rebuilds the diagram but not its cards',
+        (t) async {
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
+      final wide = FakeSqlExecutionDelegate(onExecute: (sql) {
+        if (_unfiltered(sql) == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+          return SqlExecutionResult(rows: [
+            for (var i = 0; i < 20; i++) ['t$i', 'id', 'INTEGER', '1'],
+          ]);
+        }
+        return const SqlExecutionResult();
+      });
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(
+            source: SqlErdSource(delegate: wide, dialect: SqlDialect.sqlite)),
+      ));
+      await t.pump();
+      await t.pump();
+      await t.pump();
+
+      // Ctrl+F sets state on the diagram; no card looks different afterwards.
+      erdCardBuilds = 0;
+      await t.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await t.sendKeyEvent(LogicalKeyboardKey.keyF);
+      await t.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await t.pump();
+      expect(find.byType(ErdSearchPanel), findsOneWidget);
+      expect(erdCardBuilds, 0,
+          reason: 'the diagram rebuilt, the 20 cards were reused');
     });
 
     testWidgets('Copy Mermaid puts the diagram on the clipboard', (t) async {

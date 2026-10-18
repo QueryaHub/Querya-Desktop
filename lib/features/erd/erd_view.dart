@@ -292,6 +292,9 @@ class _ErdViewState extends material.State<ErdView>
         _marked.clear();
         _setLayout(ErdLayoutEngine.withSaved(_compute(_visibleOf(schema)), saved));
         _loading = false;
+        _cardCache = {};
+        _mountedTables =
+            schema.tables.length > _progressiveFrom ? _mountChunk : 1 << 30;
       });
       if (schema.truncated) {
         showAppToast(
@@ -1397,6 +1400,129 @@ class _ErdViewState extends material.State<ErdView>
     );
   }
 
+  /// Cards built so far for the open diagram: a big one mounts a chunk per
+  /// frame (see [_mountedTables]) instead of in one long frame.
+  static const _progressiveFrom = 60;
+  static const _mountChunk = 24;
+  int _mountedTables = 1 << 30;
+  bool _mountPending = false;
+
+  /// Cards by table, with what they were built from. A rebuild of the diagram
+  /// (a pick, a drag, a toolbar change) reuses every card whose inputs did not
+  /// change, so Flutter skips its subtree instead of rebuilding 200 of them.
+  var _cardCache = <String, (_CardInputs, material.Widget)>{};
+
+  List<material.Widget> _cards(ErdSchema schema, ErdLayout layout) {
+    final tables = schema.tables;
+    final shown = min(tables.length, _mountedTables);
+    final menuKey = Object.hash(
+      Object.hashAll(_marked),
+      Object.hashAll([
+        for (final g in _groups)
+          Object.hash(g.id, g.name, Object.hashAll(g.tables)),
+      ]),
+    );
+    // The palette is built anew on each read; its slot colours are what the
+    // cards and the menu use.
+    final p = context.semanticPalette;
+    final palette = (p.type1, p.type2, p.type3, p.type4, p.type5);
+    final next = <String, (_CardInputs, material.Widget)>{};
+    final cards = <material.Widget>[];
+    for (var i = 0; i < shown; i++) {
+      final t = tables[i];
+      final inputs = _CardInputs(
+        columns: t.columns,
+        comment: t.comment,
+        position: layout.positions[t.name]!,
+        width: layout.widthFor(t.name),
+        headerColor: _headerColor(t.name),
+        collapsed: _collapsed.contains(t.name),
+        marked: _marked.contains(t.name),
+        dragging: _dragging == t.name,
+        junctionOf: _junctions[t.name],
+        menuKey: menuKey,
+        palette: palette,
+        onOpenTable: widget.onOpenTable,
+        onOpenInSql: widget.onOpenInSql,
+        onShowRelations: widget.onShowRelations,
+      );
+      final cached = _cardCache[t.name];
+      final card = cached != null && cached.$1 == inputs
+          ? cached.$2
+          : _card(t, layout);
+      next[t.name] = (inputs, card);
+      cards.add(card);
+    }
+    _cardCache = next;
+    if (shown < tables.length) _mountMore();
+    return cards;
+  }
+
+  /// Mounts the next chunk of cards after this frame.
+  void _mountMore() {
+    if (_mountPending) return;
+    _mountPending = true;
+    material.WidgetsBinding.instance.addPostFrameCallback((_) {
+      _mountPending = false;
+      if (!mounted) return;
+      setState(() => _mountedTables += _mountChunk);
+    });
+  }
+
+  material.Widget _card(ErdTable t, ErdLayout layout) {
+    return material.Positioned(
+    left: layout.positions[t.name]!.dx,
+    top: layout.positions[t.name]!.dy,
+    // Each card listens to its own focus, so a hover
+    // rebuilds only the cards it changes.
+    child: material.ValueListenableBuilder<ErdCardFocus>(
+      valueListenable: _cardState(t.name),
+      builder: (context, focus, _) => material.Opacity(
+        // Unrelated cards fade while a table is picked.
+        opacity: focus.faded ? 0.35 : 1,
+        child: ContextMenu(
+        items: ErdTableMenu.items(
+          table: t.name,
+          onOpenData: widget.onOpenTable,
+          onOpenInSql: widget.onOpenInSql,
+          onShowRelations: widget.onShowRelations,
+          collapsed: _collapsed.contains(t.name),
+          onToggleCollapsed: () =>
+              _toggleCollapsed(t.name),
+          onHide: () => _hide(t.name),
+          groupItems: _groupMenu(t.name),
+          slotColor: _slotColor,
+          onHeaderColor: (slot) =>
+              _setHeaderColor(t.name, slot),
+        ),
+        child: ErdTableCard(
+        table: t,
+        width: layout.widthFor(t.name),
+        headerColor: _headerColor(t.name),
+        highlighted: focus.highlighted,
+        focusColumn: focus.column,
+        junctionOf: _junctions[t.name],
+        dragging: _dragging == t.name,
+        onOpen: widget.onOpenTable == null
+            ? null
+            : () => widget.onOpenTable!(t.name),
+        marked: _marked.contains(t.name),
+        onSelect: () => _tapCard(t.name),
+        onHover: (inside) => _hovered.value = inside
+            ? t.name
+            : (_hovered.value == t.name
+                ? null
+                : _hovered.value),
+        onDragStart: () => _dragStart(t.name),
+        onDragMove: (d) => _dragMove(t.name, d),
+        onDragEnd: _dragEnd,
+      ),
+      ),
+      ),
+    ),
+  );
+  }
+
   @override
   material.Widget build(material.BuildContext context) {
     final wb = context.workbench;
@@ -1481,58 +1607,7 @@ class _ErdViewState extends material.State<ErdView>
                               ),
                             ),
                           ),
-                          for (final t in schema.tables)
-                            material.Positioned(
-                              left: layout.positions[t.name]!.dx,
-                              top: layout.positions[t.name]!.dy,
-                              // Each card listens to its own focus, so a hover
-                              // rebuilds only the cards it changes.
-                              child: material.ValueListenableBuilder<ErdCardFocus>(
-                                valueListenable: _cardState(t.name),
-                                builder: (context, focus, _) => material.Opacity(
-                                  // Unrelated cards fade while a table is picked.
-                                  opacity: focus.faded ? 0.35 : 1,
-                                  child: ContextMenu(
-                                  items: ErdTableMenu.items(
-                                    table: t.name,
-                                    onOpenData: widget.onOpenTable,
-                                    onOpenInSql: widget.onOpenInSql,
-                                    onShowRelations: widget.onShowRelations,
-                                    collapsed: _collapsed.contains(t.name),
-                                    onToggleCollapsed: () =>
-                                        _toggleCollapsed(t.name),
-                                    onHide: () => _hide(t.name),
-                                    groupItems: _groupMenu(t.name),
-                                    slotColor: _slotColor,
-                                    onHeaderColor: (slot) =>
-                                        _setHeaderColor(t.name, slot),
-                                  ),
-                                  child: ErdTableCard(
-                                  table: t,
-                                  width: layout.widthFor(t.name),
-                                  headerColor: _headerColor(t.name),
-                                  highlighted: focus.highlighted,
-                                  focusColumn: focus.column,
-                                  junctionOf: _junctions[t.name],
-                                  dragging: _dragging == t.name,
-                                  onOpen: widget.onOpenTable == null
-                                      ? null
-                                      : () => widget.onOpenTable!(t.name),
-                                  marked: _marked.contains(t.name),
-                                  onSelect: () => _tapCard(t.name),
-                                  onHover: (inside) => _hovered.value = inside
-                                      ? t.name
-                                      : (_hovered.value == t.name
-                                          ? null
-                                          : _hovered.value),
-                                  onDragStart: () => _dragStart(t.name),
-                                  onDragMove: (d) => _dragMove(t.name, d),
-                                  onDragEnd: _dragEnd,
-                                ),
-                                ),
-                                ),
-                              ),
-                            ),
+                          ..._cards(schema, layout),
                           // Sticky notes above the cards (#1283).
                           for (final n in _notes) _noteWidget(n),
                         ],
@@ -1702,4 +1777,68 @@ class _ErdViewState extends material.State<ErdView>
       ],
     );
   }
+}
+
+/// What a table card is built from outside its own focus: when all of it is
+/// equal to the last build's, the card is reused as it is.
+@immutable
+class _CardInputs {
+  const _CardInputs({
+    required this.columns,
+    required this.comment,
+    required this.position,
+    required this.width,
+    required this.headerColor,
+    required this.collapsed,
+    required this.marked,
+    required this.dragging,
+    required this.junctionOf,
+    required this.menuKey,
+    required this.palette,
+    required this.onOpenTable,
+    required this.onOpenInSql,
+    required this.onShowRelations,
+  });
+
+  final List<ErdColumn> columns;
+  final String? comment;
+  final material.Offset position;
+  final double width;
+  final material.Color headerColor;
+  final bool collapsed;
+  final bool marked;
+  final bool dragging;
+  final String? junctionOf;
+
+  /// Hash of what the card's menu lists: the marked tables and the groups.
+  final int menuKey;
+  final Object palette;
+  final Object? onOpenTable;
+  final Object? onOpenInSql;
+  final Object? onShowRelations;
+
+  @override
+  bool operator ==(Object other) {
+    if (other is! _CardInputs) return false;
+    if (columns.length != other.columns.length) return false;
+    for (var i = 0; i < columns.length; i++) {
+      if (!identical(columns[i], other.columns[i])) return false;
+    }
+    return comment == other.comment &&
+        position == other.position &&
+        width == other.width &&
+        headerColor == other.headerColor &&
+        collapsed == other.collapsed &&
+        marked == other.marked &&
+        dragging == other.dragging &&
+        junctionOf == other.junctionOf &&
+        menuKey == other.menuKey &&
+        palette == other.palette &&
+        onOpenTable == other.onOpenTable &&
+        onOpenInSql == other.onOpenInSql &&
+        onShowRelations == other.onShowRelations;
+  }
+
+  @override
+  int get hashCode => Object.hash(columns.length, position, width, menuKey);
 }
