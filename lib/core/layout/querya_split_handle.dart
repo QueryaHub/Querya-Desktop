@@ -2,7 +2,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 
 /// Accessible split-pane handle that supports mouse dragging and arrow keys.
 ///
@@ -77,7 +77,7 @@ class _QueryaSplitHandleState extends material.State<QueryaSplitHandle> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final colors = context.colors;
     final horizontal = widget.axis == material.Axis.horizontal;
     final duration = context.motionDuration(QueryaMotion.fast);
     final curve = context.motionCurve(QueryaMotion.enter);

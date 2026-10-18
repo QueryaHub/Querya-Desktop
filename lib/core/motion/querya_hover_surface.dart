@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
+
 import 'querya_motion.dart';
 import 'querya_motion_context.dart';
 
@@ -39,9 +41,9 @@ class _QueryaHoverSurfaceState extends State<QueryaHoverSurface> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final colors = context.colors;
     final hovered = widget.hoveredColor ??
-        scheme.onSurface.withValues(alpha: 0.06);
+        colors.foreground.withValues(alpha: 0.06);
     final duration = context.motionDuration(QueryaMotion.fast);
     final curve = context.motionCurve(QueryaMotion.enter);
 

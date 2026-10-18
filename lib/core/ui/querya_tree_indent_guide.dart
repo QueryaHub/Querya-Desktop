@@ -40,8 +40,7 @@ class QueryaTreeIndentGuide extends StatelessWidget {
 
     if (depth <= 0) return content;
 
-    final base = QueryaThemeScope.maybeOf(context)?.workbench.borderSubtle ??
-        Theme.of(context).colorScheme.outline;
+    final base = context.workbench.borderSubtle;
     final color = base.withValues(alpha: QueryaTreeTokens.guideAlpha);
 
     return CustomPaint(
