@@ -1422,7 +1422,10 @@ class _ErdViewState extends material.State<ErdView>
           Object.hash(g.id, g.name, Object.hashAll(g.tables)),
       ]),
     );
-    final palette = context.semanticPalette;
+    // The palette is built anew on each read; its slot colours are what the
+    // cards and the menu use.
+    final p = context.semanticPalette;
+    final palette = (p.type1, p.type2, p.type3, p.type4, p.type5);
     final next = <String, (_CardInputs, material.Widget)>{};
     final cards = <material.Widget>[];
     for (var i = 0; i < shown; i++) {
@@ -1830,7 +1833,7 @@ class _CardInputs {
         dragging == other.dragging &&
         junctionOf == other.junctionOf &&
         menuKey == other.menuKey &&
-        identical(palette, other.palette) &&
+        palette == other.palette &&
         onOpenTable == other.onOpenTable &&
         onOpenInSql == other.onOpenInSql &&
         onShowRelations == other.onShowRelations;
