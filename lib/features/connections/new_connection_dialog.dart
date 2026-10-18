@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/database/connection_type_choice.dart';
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
@@ -357,7 +358,7 @@ class _DbTypeCard extends material.StatelessWidget {
   });
 
   final ConnectionTypeChoice choice;
-  final ColorScheme theme;
+  final QueryaUiColors theme;
   final bool selected;
   final VoidCallback onTap;
 

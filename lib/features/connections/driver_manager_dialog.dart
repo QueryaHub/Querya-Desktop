@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
@@ -147,7 +148,7 @@ class _DriverRow extends material.StatelessWidget {
   });
 
   final _DriverInfo info;
-  final ColorScheme theme;
+  final QueryaUiColors theme;
 
   @override
   material.Widget build(material.BuildContext context) {
