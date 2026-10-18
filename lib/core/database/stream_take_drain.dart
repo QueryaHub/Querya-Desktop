@@ -10,16 +10,35 @@ Future<({List<T> items, bool truncated})> takeThenDrain<T>(
   Future<void> Function(int count)? onProgress,
 }) async {
   final items = <T>[];
+  final r = await forEachThenDrain<T>(
+    stream,
+    cap,
+    onItem: items.add,
+    onProgress: onProgress,
+  );
+  return (items: items, truncated: r.truncated);
+}
+
+/// [takeThenDrain] for a caller that consumes each of the first [cap] events
+/// as it arrives (packing it into columns) and has no use for the list.
+Future<({int count, bool truncated})> forEachThenDrain<T>(
+  Stream<T> stream,
+  int cap, {
+  required void Function(T item) onItem,
+  Future<void> Function(int count)? onProgress,
+}) async {
+  var count = 0;
   var truncated = false;
   await for (final item in stream) {
-    if (items.length >= cap) {
+    if (count >= cap) {
       truncated = true;
       continue;
     }
-    items.add(item);
+    onItem(item);
+    count++;
     if (onProgress != null) {
-      await onProgress(items.length);
+      await onProgress(count);
     }
   }
-  return (items: items, truncated: truncated);
+  return (count: count, truncated: truncated);
 }

@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
-import 'package:querya_desktop/core/database/compact_result_dataset.dart';
+import 'package:querya_desktop/core/database/result_columns_builder.dart';
 import 'package:querya_desktop/core/database/postgres_result_cells.dart';
 import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/database/postgres_sql.dart';
@@ -122,17 +122,8 @@ class PostgresSqlExecutionDelegate extends BaseSqlExecutionDelegate {
       );
     }
 
-    final rawRows = <List<Object?>>[];
-    var n = 0;
-    for (final row in result) {
-      if (n >= cap) break;
-      rawRows.add(row.toList());
-      n++;
-    }
-
-    final dataset = CompactResultDataset.fromRawRows(
+    final builder = ResultColumnsBuilder(
       cols,
-      rawRows,
       cellFormatter: (val, colIndex) {
         final typeOid = colIndex < schema.columns.length
             ? schema.columns[colIndex].typeOid
@@ -140,6 +131,13 @@ class PostgresSqlExecutionDelegate extends BaseSqlExecutionDelegate {
         return postgresResultCellToDisplayString(val, typeOid: typeOid);
       },
     );
+    var n = 0;
+    for (final row in result) {
+      if (n >= cap) break;
+      builder.addRow(row);
+      n++;
+    }
+    final dataset = builder.build();
 
     final isTruncated = result.length >= cap;
     final statusMsg = formatStatusMessage(

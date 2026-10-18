@@ -1,6 +1,7 @@
 import 'dart:collection';
 import 'dart:typed_data';
 
+import 'result_columns_builder.dart';
 import 'result_row_string_convert.dart';
 
 /// Supported compact column storage kinds.
@@ -215,173 +216,25 @@ class CompactResultDataset {
   /// Constructs a [CompactResultDataset] from raw rows, detecting column types
   /// and packing numeric columns into [Int64List] / [Float64List].
   ///
-  /// An optional [cellFormatter] callback can be provided to customize display string
-  /// formatting for driver-specific types (e.g. blobs, timestamps, boolean tinyints).
-  /// Non-null cells per column that go through the cell formatter while
-  /// [fromRawRows] decides the column's kind; the rest are type-tested.
-  static const int _formattedSamples = 60;
-
+  /// An optional [cellFormatter] callback can be provided to customize display
+  /// string formatting for driver-specific types (e.g. blobs, timestamps,
+  /// boolean tinyints). A driver that has the rows one at a time uses a
+  /// [ResultColumnsBuilder] instead and never holds them all.
   static CompactResultDataset fromRawRows(
     List<String> columnNames,
     List<List<Object?>> rawRows, {
     String Function(Object? value, int colIndex)? cellFormatter,
     StringInternPool? pool,
   }) {
-    final rowCount = rawRows.length;
-    final colCount = columnNames.length;
-    final internPool = pool ?? StringInternPool();
-
-    if (rowCount == 0 || colCount == 0) {
-      return CompactResultDataset(
-        columnNames: columnNames,
-        columns: const [],
-        rowCount: 0,
-        pool: internPool,
-      );
-    }
-
-    // 1. Detect column types by inspecting non-null samples
-    final kinds = List<CompactColumnKind>.filled(colCount, CompactColumnKind.generic);
-    for (var col = 0; col < colCount; col++) {
-      var allInt = true;
-      var allFloat = true;
-      var allString = true;
-      var sampleCount = 0;
-
-      for (var row = 0; row < rowCount; row++) {
-        final val = rawRows[row].length > col ? rawRows[row][col] : null;
-        if (val == null) continue;
-        sampleCount++;
-
-        // The driver formatters print a column's ints, numbers and strings
-        // by the column's type (bytea, binary, boolean...), not by the value,
-        // so the first [_formattedSamples] cells show whether the column
-        // prints as its values do. Formatting every cell only to decide the
-        // kind cost more than the packing itself (#1548).
-        if (cellFormatter != null && sampleCount <= _formattedSamples) {
-          final formatted = cellFormatter(val, col);
-          if (allInt && (val is! int || formatted != val.toString())) {
-            allInt = false;
-          }
-          if (allFloat && (val is! num || formatted != val.toString())) {
-            allFloat = false;
-          }
-          if (allString && (val is! String || formatted != val)) {
-            allString = false;
-          }
-        } else {
-          if (val is! int) {
-            allInt = false;
-          }
-          if (val is! num) {
-            allFloat = false;
-          }
-          if (val is! String) {
-            allString = false;
-          }
-        }
-
-        // Nothing left to learn: the column is generic.
-        if (!allInt && !allFloat && !allString) break;
-      }
-
-      if (sampleCount > 0) {
-        if (allInt) {
-          kinds[col] = CompactColumnKind.int64;
-        } else if (allFloat) {
-          kinds[col] = CompactColumnKind.float64;
-        } else if (allString) {
-          kinds[col] = CompactColumnKind.string;
-        } else {
-          kinds[col] = CompactColumnKind.generic;
-        }
-      } else {
-        kinds[col] = CompactColumnKind.string;
-      }
-    }
-
-    // 2. Allocate packed columnar buffers
-    final compactColumns = <CompactColumn>[];
-    final bitmapBytes = (rowCount + 7) >> 3;
-
-    for (var col = 0; col < colCount; col++) {
-      final kind = kinds[col];
-      switch (kind) {
-        case CompactColumnKind.int64:
-          final values = Int64List(rowCount);
-          final nullBitmap = Uint8List(bitmapBytes);
-          for (var row = 0; row < rowCount; row++) {
-            final val = rawRows[row].length > col ? rawRows[row][col] : null;
-            if (val == null) {
-              final byte = row >> 3;
-              final bit = row & 7;
-              nullBitmap[byte] |= (1 << bit);
-            } else if (val is int) {
-              values[row] = val;
-            } else if (val is num) {
-              values[row] = val.toInt();
-            }
-          }
-          compactColumns.add(Int64CompactColumn(
-            values: values,
-            nullBitmap: nullBitmap,
-            length: rowCount,
-          ));
-
-        case CompactColumnKind.float64:
-          final values = Float64List(rowCount);
-          final nullBitmap = Uint8List(bitmapBytes);
-          for (var row = 0; row < rowCount; row++) {
-            final val = rawRows[row].length > col ? rawRows[row][col] : null;
-            if (val == null) {
-              final byte = row >> 3;
-              final bit = row & 7;
-              nullBitmap[byte] |= (1 << bit);
-            } else if (val is num) {
-              values[row] = val.toDouble();
-            }
-          }
-          compactColumns.add(Float64CompactColumn(
-            values: values,
-            nullBitmap: nullBitmap,
-            length: rowCount,
-          ));
-
-        case CompactColumnKind.string:
-          final values = List<String?>.filled(rowCount, null);
-          for (var row = 0; row < rowCount; row++) {
-            final val = rawRows[row].length > col ? rawRows[row][col] : null;
-            if (val is String) {
-              values[row] = internPool.intern(val);
-            } else if (val != null) {
-              values[row] = internPool.intern(val.toString());
-            }
-          }
-          compactColumns.add(StringCompactColumn(
-            values: values,
-            length: rowCount,
-          ));
-
-        case CompactColumnKind.generic:
-          final values = List<Object?>.filled(rowCount, null);
-          for (var row = 0; row < rowCount; row++) {
-            final val = rawRows[row].length > col ? rawRows[row][col] : null;
-            values[row] = val;
-          }
-          compactColumns.add(GenericCompactColumn(
-            values: values,
-            length: rowCount,
-            formatter: cellFormatter != null ? (v) => cellFormatter(v, col) : null,
-          ));
-      }
-    }
-
-    return CompactResultDataset(
-      columnNames: columnNames,
-      columns: compactColumns,
-      rowCount: rowCount,
-      pool: internPool,
+    final builder = ResultColumnsBuilder(
+      columnNames,
+      cellFormatter: cellFormatter,
+      pool: pool,
     );
+    for (final row in rawRows) {
+      builder.addRow(row);
+    }
+    return builder.build();
   }
 }
 
