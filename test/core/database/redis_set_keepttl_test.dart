@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
+import '../../support/redis_connection_test_fake.dart';
 
 class _SetCommandFake extends RedisConnectionTestFake {
   final List<List<dynamic>> commands = [];

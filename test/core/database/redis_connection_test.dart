@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import '../../support/redis_connection_test_fake.dart';
 
 void main() {
   group('RedisConnection initial state', () {

@@ -3,12 +3,12 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
-import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/redis/redis_cli_workspace.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 import '../../support/querya_theme_test_shell.dart';
+import '../../support/redis_connection_test_fake.dart';
 
 class _CliTestRedisConnection extends RedisConnectionTestFake {
   @override
