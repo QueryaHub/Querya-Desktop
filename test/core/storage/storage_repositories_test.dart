@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/storage/activity_log_repository.dart';
 import 'package:querya_desktop/core/storage/app_settings_repository.dart';
 import 'package:querya_desktop/core/storage/folder_repository.dart';
+import 'package:querya_desktop/core/storage/local_db_models.dart';
 import 'package:querya_desktop/core/storage/local_db_schema.dart';
 import 'package:querya_desktop/core/storage/sql_query_history_repository.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
