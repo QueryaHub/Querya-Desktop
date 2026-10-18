@@ -81,13 +81,17 @@ Future<void> main() async {
   runApp(const QueryaApp());
 
   WidgetsBinding.instance.addPostFrameCallback((_) async {
+    var failed = false;
     try {
       await _runAll();
     } catch (e, st) {
-      stdout.writeln('BENCH error: $e\n$st');
+      // `flutter run` reports 0 whatever the app exits with, so the CI step
+      // looks for this line as well (scripts/ci/app_bench_report.py).
+      stdout.writeln('BENCH FAILED: $e\n$st');
+      failed = true;
     }
     await dataDir.delete(recursive: true).catchError((_) => dataDir);
-    exit(0);
+    exit(failed ? 1 : 0);
   });
 }
 
@@ -257,10 +261,25 @@ Future<void> _runAll() async {
   SqlEditorCommandBridge.instance.invokeNew();
   await _wait(300);
   await _runInActiveTab(ddl.toString());
+  // The script must have run: a failed or half-run script leaves the diagram
+  // of the demo's own tables, which looks like a slow ERD.
+  final ddlSession = ws.activeSession;
+  stdout.writeln('BENCH erd_ddl status=${ddlSession.statusLine} '
+      'error=${ddlSession.error}');
+  if (ddlSession.error != null) {
+    throw StateError('the 200-table script failed: ${ddlSession.error}');
+  }
   await _scenario('erd_open_200', () async {
-    await _tap(_byKey('open_diagram_tab'));
-    await _waitFor(() => _find((e) => e.widget.key == const ValueKey('erd_table_erd_t199')) != null,
-        'diagram of 200 tables');
+    // Not a tap on the toolbar button: with seven query tabs open the tab bar
+    // is full and the button is pushed out of the 1280x720 window, so the tap
+    // landed on a tab and the diagram never opened (#1546).
+    ws.openDiagramTab();
+    await _waitFor(() => ws.activeSession.isDiagram as bool, 'the Diagram tab',
+        onTimeout: () => _dumpErdState(ws));
+    await _waitFor(
+        () => _find((e) => e.widget.key == const ValueKey('erd_table_erd_t199')) != null,
+        'diagram of 200 tables',
+        onTimeout: () => _dumpErdState(ws));
     await _wait(800);
   });
   await _scenario('erd_hover', () => _hoverOver(_find((e) => e.widget is ErdView)!, 3000));
@@ -269,6 +288,22 @@ Future<void> _runAll() async {
     await _tap(_byKey('erd_auto_layout'));
     await _wait(1200);
   });
+}
+
+/// What the screen shows when the diagram did not come up: the active tab and
+/// how many table cards exist, so a failed run says which of the two it was.
+void _dumpErdState(dynamic ws) {
+  var cards = 0;
+  void visit(Element e) {
+    final k = e.widget.key;
+    if (k is ValueKey<String> && k.value.startsWith('erd_table_')) cards++;
+    e.visitChildren(visit);
+  }
+
+  WidgetsBinding.instance.rootElement!.visitChildren(visit);
+  final session = ws.activeSession;
+  stdout.writeln('BENCH erd_state activeTab="${session.title}" '
+      'isDiagram=${session.isDiagram} cards=$cards');
 }
 
 /// The SQL workspace of the open connection.

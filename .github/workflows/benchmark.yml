@@ -137,3 +137,13 @@ jobs:
           python3 scripts/ci/app_bench_report.py "$RUNNER_TEMP/app.log" > "$RUNNER_TEMP/app_report.txt"
           cat "$RUNNER_TEMP/app_report.txt"
           tail -n +2 "$RUNNER_TEMP/app_report.txt" >> "$GITHUB_STEP_SUMMARY"
+
+      # `flutter run` exits 0 whatever the app does; an aborted scenario run
+      # prints `BENCH FAILED`, so the job turns red instead of reporting only the
+      # scenarios that ran. The job stays informational (continue-on-error).
+      - name: Fail when the run aborted
+        run: |
+          if grep -q 'BENCH FAILED' "$RUNNER_TEMP/app.log"; then
+            grep -A3 'BENCH FAILED' "$RUNNER_TEMP/app.log" | head -n 8
+            exit 1
+          fi
