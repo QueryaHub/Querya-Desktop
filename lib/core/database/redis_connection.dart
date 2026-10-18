@@ -12,6 +12,7 @@ import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/database/redis_bulk.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:redis/redis.dart' as redis;
+import 'package:querya_desktop/core/util/log_ignored.dart';
 
 /// First page / load-more size for hash, list, set, and zset editors.
 const redisCollectionPageSize = 200;
@@ -181,7 +182,9 @@ class RedisConnection with SshTunnelHost {
     if (_socket != null) {
       try {
         _socket?.destroy();
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('redis_connection', e);
+      }
       _socket = null;
       _command = null;
       _conn = null;
@@ -276,7 +279,9 @@ class RedisConnection with SshTunnelHost {
       // a silent server): close it, or every failed try leaves one behind.
       try {
         socket?.destroy();
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('redis_connection', e);
+      }
       await releaseSshTunnel();
       rethrow;
     }
@@ -306,7 +311,9 @@ class RedisConnection with SshTunnelHost {
     _socket = null;
     try {
       sock?.destroy();
-    } catch (_) {}
+    } catch (e) {
+      logIgnored('redis_connection', e);
+    }
     final c = _conn;
     _conn = null;
     if (c != null && wasConnected) {
@@ -363,7 +370,9 @@ class RedisConnection with SshTunnelHost {
     if (!isConnected) return;
     try {
       await sendCommand([readOnly ? 'READONLY' : 'READWRITE']);
-    } catch (_) {}
+    } catch (e) {
+      logIgnored('redis_connection', e);
+    }
   }
 
   void _assertWritable() {
@@ -927,7 +936,9 @@ class RedisConnectionTestFake extends RedisConnection {
     if (c != null) {
       try {
         await c.close();
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('redis_connection', e);
+      }
     }
   }
 

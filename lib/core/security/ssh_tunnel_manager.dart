@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/foundation.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
+import 'package:querya_desktop/core/util/log_ignored.dart';
 
 /// Result of an SSH connection diagnostic test.
 class SshTestResult {
@@ -79,13 +80,19 @@ class _PooledTunnelSession {
     keepAliveTimer = null;
     try {
       await serverSocket.close();
-    } catch (_) {}
+    } catch (e) {
+      logIgnored('ssh_tunnel_manager', e);
+    }
     try {
       unawaited(client.close());
-    } catch (_) {}
+    } catch (e) {
+      logIgnored('ssh_tunnel_manager', e);
+    }
     try {
       unawaited(jumpClient?.close());
-    } catch (_) {}
+    } catch (e) {
+      logIgnored('ssh_tunnel_manager', e);
+    }
   }
 }
 
@@ -495,19 +502,29 @@ class SshTunnelManager {
       keepAliveTimer?.cancel();
       try {
         await serverSocket?.close();
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('ssh_tunnel_manager', e);
+      }
       try {
         unawaited(client?.close());
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('ssh_tunnel_manager', e);
+      }
       try {
         bastionSocket?.destroy();
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('ssh_tunnel_manager', e);
+      }
       try {
         unawaited(jumpClient?.close());
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('ssh_tunnel_manager', e);
+      }
       try {
         jumpSocket?.destroy();
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('ssh_tunnel_manager', e);
+      }
       rethrow;
     }
   }

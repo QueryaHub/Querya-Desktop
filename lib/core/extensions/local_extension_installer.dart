@@ -14,6 +14,7 @@ import 'package:querya_desktop/core/market/marketplace_repository.dart';
 import 'package:querya_desktop/core/security/archive_path_guard.dart';
 import 'package:querya_desktop/core/security/safe_zip_extractor.dart';
 import 'package:querya_desktop/core/updater/sha256_checksums.dart';
+import 'package:querya_desktop/core/util/log_ignored.dart';
 
 /// Installs an extension package from a local `.zip` / `.qext` archive (issue #316).
 ///
@@ -206,7 +207,9 @@ class LocalExtensionInstaller {
         // The new version is in place; a leftover backup is only clutter.
         try {
           await backup.delete(recursive: true);
-        } catch (_) {}
+        } catch (e) {
+          logIgnored('local_extension_installer', e);
+        }
       }
 
       await _reloadRegistry();
@@ -218,7 +221,9 @@ class LocalExtensionInstaller {
         if (!swapped && await staging.exists()) {
           await staging.delete(recursive: true);
         }
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('local_extension_installer', e);
+      }
       if (e is MarketplaceException) rethrow;
       throw MarketplaceException('Failed to install extension: $e');
     }

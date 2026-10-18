@@ -19,6 +19,7 @@ import 'package:querya_desktop/core/sdui/sdui_tree_schema.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/util/log_ignored.dart';
 
 /// Owns [PluginRpcBridge] sessions for extension-backed connections.
 class ExtensionDriverSession {
@@ -111,7 +112,9 @@ class ExtensionDriverSession {
     } catch (e) {
       try {
         await bridge.shutdown();
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('extension_driver_session', e);
+      }
       rethrow;
     }
 
@@ -142,12 +145,16 @@ class ExtensionDriverSession {
       }
       try {
         await bridge.sendRequest('db.disconnect', {'connectionId': tempId});
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('extension_driver_session', e);
+      }
       return version;
     } finally {
       try {
         await bridge.shutdown();
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('extension_driver_session', e);
+      }
     }
   }
 

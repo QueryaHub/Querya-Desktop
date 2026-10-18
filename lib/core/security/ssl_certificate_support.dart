@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
+import 'package:querya_desktop/core/util/log_ignored.dart';
 
 /// Querya-standard SSL certificate query parameters (aligned with PostgreSQL).
 const kSslRootCertParam = 'sslrootcert';
@@ -55,7 +56,8 @@ SslCertificatePaths extractSslCertificatePathsFromString(String? raw) {
       clientCert: params[kSslCertParam],
       clientKey: params[kSslKeyParam],
     );
-  } catch (_) {
+  } catch (e) {
+    logIgnored('ssl_certificate_support.paths', e);
     return const SslCertificatePaths();
   }
 }
@@ -169,7 +171,9 @@ Future<String?> resolveMongoTlsCertificateKeyFile({
   if (!Platform.isWindows) {
     try {
       await Process.run('chmod', ['700', dir.path]);
-    } catch (_) {}
+    } catch (e) {
+      logIgnored('ssl_certificate_support', e);
+    }
   }
   final merged = File('${dir.path}/client.pem');
   await merged.writeAsString('$certBytes\n$keyBytes\n', flush: true);
@@ -211,7 +215,9 @@ Future<void> cleanupMongoTlsTempFile(String? filePath) async {
     if (await parent.exists()) {
       await parent.delete(recursive: true);
     }
-  } catch (_) {}
+  } catch (e) {
+    logIgnored('ssl_certificate_support', e);
+  }
 }
 
 /// Cleans up any stale temporary MongoDB TLS directories left from previous sessions.
@@ -226,11 +232,15 @@ Future<void> cleanupStaleMongoTlsTempFiles() async {
         if (name.startsWith(kMongoTlsTempPrefix)) {
           try {
             await entity.delete(recursive: true);
-          } catch (_) {}
+          } catch (e) {
+            logIgnored('ssl_certificate_support', e);
+          }
         }
       }
     }
-  } catch (_) {}
+  } catch (e) {
+    logIgnored('ssl_certificate_support', e);
+  }
 }
 
 String buildRedisConnectionUri({

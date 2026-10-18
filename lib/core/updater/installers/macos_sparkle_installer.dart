@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:querya_desktop/core/util/log_ignored.dart';
 
 import '../app_updater_service.dart';
 import 'update_install_context.dart';
@@ -65,7 +66,9 @@ class MacosSparkleInstaller {
       // The app keeps running: do not leave the extracted update behind.
       try {
         await extractDir.delete(recursive: true);
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('macos_sparkle_installer', e);
+      }
       rethrow;
     }
 

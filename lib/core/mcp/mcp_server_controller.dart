@@ -11,6 +11,7 @@ import 'package:querya_desktop/core/mcp/mcp_query_service.dart';
 import 'package:querya_desktop/core/mcp/mcp_socket_host.dart';
 import 'package:querya_desktop/core/mcp/querya_mcp_server.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/util/log_ignored.dart';
 
 /// Owns the in-app MCP server: starts it when enabled in settings, stops it
 /// on shutdown, and reports status and tool calls to the UI.
@@ -163,7 +164,9 @@ class McpServerController {
       try {
         name = (await LocalDb.instance.getConnectionById(r.connectionId!))
             ?.name;
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('mcp_server_controller', e);
+      }
     }
     final sql = r.sql;
     await LocalDb.instance.recordMcpActivity(McpActivityEntry(

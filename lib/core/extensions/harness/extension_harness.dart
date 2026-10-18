@@ -9,6 +9,7 @@ import 'package:querya_desktop/core/extensions/harness/extension_protocol_profil
 import 'package:querya_desktop/core/extensions/rpc/json_rpc_stdio_client.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_launch_command.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_scratch_directory.dart';
+import 'package:querya_desktop/core/util/log_ignored.dart';
 
 /// How to start the plugin process.
 final class HarnessLaunchRequest {
@@ -133,7 +134,9 @@ final class _OsPluginProcess implements HarnessPluginProcess {
     _process.kill(ProcessSignal.sigkill);
     try {
       await _process.exitCode.timeout(const Duration(seconds: 2));
-    } catch (_) {}
+    } catch (e) {
+      logIgnored('extension_harness', e);
+    }
   }
 
   @override
@@ -537,6 +540,8 @@ Future<int?> _rssKb(int pid) async {
       final r = await Process.run('ps', ['-o', 'rss=', '-p', '$pid']);
       return r.exitCode == 0 ? int.tryParse('${r.stdout}'.trim()) : null;
     }
-  } catch (_) {}
+  } catch (e) {
+    logIgnored('extension_harness', e);
+  }
   return null;
 }

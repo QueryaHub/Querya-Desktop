@@ -6,6 +6,7 @@ import 'package:querya_desktop/core/mcp/mcp_access_store.dart';
 import 'package:querya_desktop/core/mcp/mcp_query_service.dart';
 import 'package:querya_desktop/core/mcp/mcp_redaction.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/util/log_ignored.dart';
 
 /// Why [McpMongoGuard] refused a filter or sort: a stable rule id
 /// for the audit log and the message the model reads.
@@ -287,7 +288,9 @@ class McpMongoService {
     } finally {
       try {
         await session?.close();
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('mcp_mongo_service', e);
+      }
     }
   }
 

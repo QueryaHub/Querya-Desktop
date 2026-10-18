@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:querya_desktop/core/util/log_ignored.dart';
 
 /// Backend for reading/writing per-connection secrets (password, connection string).
 /// In unit/widget tests, set [ConnectionSecretsStore.backend] to a memory implementation.
@@ -226,12 +227,16 @@ class ConnectionSecretsStore {
           if (legacyPassword != null) {
             try {
               await backend.delete(_legacyPasswordKey(connectionId));
-            } catch (_) {}
+            } catch (e) {
+              logIgnored('connection_secrets_store', e);
+            }
           }
           if (legacyConnectionString != null) {
             try {
               await backend.delete(_legacyConnectionStringKey(connectionId));
-            } catch (_) {}
+            } catch (e) {
+              logIgnored('connection_secrets_store', e);
+            }
           }
           password = effectivePassword;
           connectionString = effectiveConnectionString;
@@ -253,7 +258,9 @@ class ConnectionSecretsStore {
     try {
       await backend.delete(_legacyPasswordKey(connectionId));
       await backend.delete(_legacyConnectionStringKey(connectionId));
-    } catch (_) {}
+    } catch (e) {
+      logIgnored('connection_secrets_store', e);
+    }
   }
 
   /// One-time migration (issue #986): before keyring keys were namespaced by

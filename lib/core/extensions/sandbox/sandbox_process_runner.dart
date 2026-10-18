@@ -7,6 +7,7 @@ import 'package:querya_desktop/core/extensions/sandbox/sandbox_launch_command.da
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_os_isolation.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_scratch_directory.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_secret_guard.dart';
+import 'package:querya_desktop/core/util/log_ignored.dart';
 
 /// Live handle for a sandboxed OS process (Block E Level 2).
 class SandboxProcessHandle {
@@ -57,8 +58,12 @@ class SandboxProcessHandle {
         process.kill(ProcessSignal.sigkill);
         try {
           await process.exitCode.timeout(const Duration(seconds: 1));
-        } catch (_) {}
-      } catch (_) {}
+        } catch (e) {
+          logIgnored('sandbox_process_runner', e);
+        }
+      } catch (e) {
+        logIgnored('sandbox_process_runner', e);
+      }
     } catch (e) {
       debugPrint('SandboxProcessHandle.dispose($pluginId) kill: $e');
     }

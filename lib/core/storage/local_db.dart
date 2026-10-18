@@ -10,6 +10,7 @@ import 'package:querya_desktop/core/storage/app_data_root.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/update_backup.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:querya_desktop/core/util/log_ignored.dart';
 
 const _dbName = 'querya.db';
 const _dbVersion = 13;
@@ -940,17 +941,23 @@ class LocalDb {
     if (await walFile.exists()) {
       try {
         await walFile.delete();
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('local_db', e);
+      }
     }
     if (await shmFile.exists()) {
       try {
         await shmFile.delete();
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('local_db', e);
+      }
     }
     if (await lockFile.exists()) {
       try {
         await lockFile.delete();
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('local_db', e);
+      }
     }
   }
 
@@ -986,7 +993,9 @@ class LocalDb {
     if (await walFile.exists()) {
       try {
         await walFile.copy('$backupPath-wal');
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('local_db', e);
+      }
     }
     return backupPath;
   }
@@ -1000,10 +1009,14 @@ class LocalDb {
     if (await dbFile.exists()) {
       try {
         await backupDatabaseFile();
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('local_db', e);
+      }
       try {
         await dbFile.delete();
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('local_db', e);
+      }
     }
     await removeWalAndLockFiles();
   }
@@ -1229,7 +1242,9 @@ class ConnectionRow {
           return SshTunnelConfig.fromMap(sshMap);
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      logIgnored('local_db', e);
+    }
     return null;
   }
 
@@ -1256,7 +1271,9 @@ class ConnectionRow {
         if (decoded is Map<String, dynamic>) {
           opts = Map<String, dynamic>.from(decoded);
         }
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('local_db', e);
+      }
     }
     if (config == null || !config.enabled) {
       opts.remove('ssh_tunnel');
