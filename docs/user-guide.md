@@ -34,6 +34,12 @@ Command Palette (`Ctrl+P`) → **Export Team Profile…** writes a `team-profile
 - **Connection list and settings**: local SQLite (`querya.db` under the app support directory).
 - **Passwords / connection strings**: OS secure store (see [security.md](security.md)).
 
+### Updates, betas and going back
+
+- **Release channel** (Preferences → General): *Stable* gets the releases marked **Latest** on GitHub; *Beta / Early Access* also gets pre-releases (`0.5.0-beta.2`) and always the highest version. A beta is replaced by the final release of the same version (`0.5.0-beta.2` → `0.5.0`). The channel only applies to the portable zip / AppImage, the Windows setup and the macOS app; a Snap, Flatpak, AUR, `.deb` or `.rpm` install is updated by its package manager, stable only, and the row is shown as such.
+- **Before an in-app update** Querya copies `querya.db` next to itself as `querya.db.pre-<from>-<to>.bak` (the newest 3 are kept). If the copy fails you are asked whether to install anyway.
+- **Going back to an older version is not supported once a newer one has run.** A beta may change the format of the local data. An older build that finds data written by a newer one **refuses to open it and does not change it**: the startup screen names the newer format. To go back, close Querya, replace `querya.db` with the `.bak` made before the update (and delete any `querya.db-wal` / `-shm` next to it), then start the older version. Changes made since that copy are lost.
+
 ## Preferences
 
 Open **Edit → Preferences…** to change options that apply across the app:

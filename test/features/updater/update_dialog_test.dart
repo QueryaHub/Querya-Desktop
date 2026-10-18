@@ -184,6 +184,82 @@ void main() {
       expect(downloaded, isFalse);
     });
 
+    Future<void> pumpInstallable(
+      WidgetTester tester, {
+      required Future<void> Function(String, String) backup,
+      required Future<void> Function(File) install,
+    }) async {
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: SizedBox(
+            width: 800,
+            height: 700,
+            child: UpdateDialogContent(
+              initialManifest: _manifest,
+              isInstallBlocked: false,
+              hasUnsavedWork: () => false,
+              selectAsset: (_) => _asset,
+              download: (_, __) async => File('/tmp/querya-update.zip'),
+              backupLocalData: backup,
+              install: install,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.text('Download'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(find.text('Restart & Update Now'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+
+    testWidgets('the local data is copied before the update is installed (#1497)',
+        (tester) async {
+      final order = <String>[];
+      String? to;
+      await pumpInstallable(
+        tester,
+        backup: (from, target) async {
+          order.add('backup');
+          to = target;
+        },
+        install: (_) async => order.add('install'),
+      );
+
+      expect(order, ['backup', 'install']);
+      expect(to, '0.5.1');
+    });
+
+    testWidgets('a failed copy asks, and Cancel keeps the app as it is (#1497)',
+        (tester) async {
+      var installed = false;
+      await pumpInstallable(
+        tester,
+        backup: (_, __) async => throw const FileSystemException('disk full'),
+        install: (_) async => installed = true,
+      );
+
+      expect(find.text('Could not back up local data'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(installed, isFalse);
+    });
+
+    testWidgets('a failed copy can be overridden (#1497)', (tester) async {
+      var installed = false;
+      await pumpInstallable(
+        tester,
+        backup: (_, __) async => throw const FileSystemException('disk full'),
+        install: (_) async => installed = true,
+      );
+
+      await tester.tap(find.text('Install without a copy'));
+      await tester.pumpAndSettle();
+      expect(installed, isTrue);
+    });
+
     testWidgets('dirty restart cancel does not install', (tester) async {
       var installed = false;
       await tester.pumpWidget(

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
+import 'package:querya_desktop/core/updater/installers/update_install_context.dart';
 import 'package:querya_desktop/core/updater/update_manifest.dart';
 import 'package:querya_desktop/features/settings/preferences_about_section.dart';
 import 'package:querya_desktop/features/settings/preferences_appearance_section.dart';
@@ -576,11 +577,19 @@ class PreferencesDialogContentState
         ),
         const material.SizedBox(height: 16),
         PreferencesFieldRow(
+          key: const material.ValueKey('release_channel_row'),
           label: 'Release channel',
-          hint:
-              'Stable receives thoroughly tested monthly updates. Beta receives early releases with experimental features.',
+          // On a package install the channel does nothing: the package
+          // manager brings the updates, stable only (#1497).
+          hint: UpdateInstallContext.currentIsPackageManagerInstall
+              ? 'Updates come from your package manager (stable releases '
+                  'only), so the release channel does not apply to this install.'
+              : 'Stable receives thoroughly tested monthly updates. Beta receives early releases with experimental features.',
           control: PreferencesDropdownMenu<UpdateChannel>(
-            value: _updateChannel,
+            enabled: !UpdateInstallContext.currentIsPackageManagerInstall,
+            value: UpdateInstallContext.currentIsPackageManagerInstall
+                ? UpdateChannel.stable
+                : _updateChannel,
             onSelected: (v) {
               if (v != null) unawaited(_setUpdateChannel(v));
             },

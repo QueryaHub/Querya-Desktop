@@ -42,6 +42,10 @@ Credentials never reach the model: tools return only connection id, name, type, 
 
 **Audit:** every call is logged (Preferences → MCP Server → Recent calls).
 
+## Local database, updates and downgrades
+
+`querya.db` carries a schema version. Before an in-app update the file (and its `-wal`) is copied to `querya.db.pre-<from>-<to>.bak`, the newest three copies are kept, and a failed copy asks before the update goes on (#1497). On open, a version **newer than the build knows** raises `LocalDbNewerSchemaException`: nothing is migrated, nothing is written, and the file keeps its version number (without this, sqflite would stamp the older number on it and an older build would carry on with tables it does not understand). The startup recovery screen shows the message. Restoring the pre-update copy is the supported way back; see the [user guide](user-guide.md#updates-betas-and-going-back).
+
 ## Tests
 
 Automated tests use an **in-memory** secrets backend (see `test/flutter_test_config.dart`) so CI does not require a desktop keyring.
