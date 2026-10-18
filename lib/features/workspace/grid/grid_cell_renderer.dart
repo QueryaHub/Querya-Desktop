@@ -8,7 +8,7 @@ class _GridCell extends material.StatelessWidget {
     this.columnName = '',
     required this.text,
     required this.width,
-    required this.colorScheme,
+    required this.colors,
     required this.striped,
     this.rowStatus = StagedRowStatus.unchanged,
     this.cellStatus = StagedCellStatus.clean,
@@ -29,7 +29,7 @@ class _GridCell extends material.StatelessWidget {
   final String columnName;
   final String text;
   final double width;
-  final ColorScheme colorScheme;
+  final QueryaUiColors colors;
   final bool striped;
   final StagedRowStatus rowStatus;
   final StagedCellStatus cellStatus;
@@ -61,7 +61,7 @@ class _GridCell extends material.StatelessWidget {
           columnName == other.columnName &&
           text == other.text &&
           width == other.width &&
-          colorScheme == other.colorScheme &&
+          colors == other.colors &&
           striped == other.striped &&
           rowStatus == other.rowStatus &&
           cellStatus == other.cellStatus &&
@@ -110,12 +110,12 @@ class _GridCell extends material.StatelessWidget {
     final isModified = cellStatus == StagedCellStatus.modified;
 
     final style = _CellLook.style(
-      colorScheme,
+      colors,
       isNull: isNull,
       isDeleted: isDeleted,
     );
     final decoration = _CellLook.decoration(
-      colorScheme,
+      colors,
       background: isSelected
           ? _CellBackground.selected
           : (isDeleted
@@ -160,7 +160,7 @@ class _GridCell extends material.StatelessWidget {
               right: -8,
               child: material.CustomPaint(
                 size: const material.Size(6, 6),
-                painter: _TriangleCornerPainter(color: colorScheme.primary),
+                painter: _TriangleCornerPainter(color: colors.primary),
               ),
             ),
         ],
@@ -176,12 +176,12 @@ enum _CellBackground { selected, deleted, modified, inserted, striped, none }
 /// and shared (#1519): a scroll that builds a new row reuses them instead of
 /// allocating a style, a decoration, a border and four sides per cell.
 abstract final class _CellLook {
-  static ColorScheme? _scheme;
+  static QueryaUiColors? _scheme;
   static final _styles = List<material.TextStyle?>.filled(4, null);
   static final _decorations = <int, material.BoxDecoration>{};
 
   /// A new colour scheme (theme switch) drops what was built for the old one.
-  static void _forget(ColorScheme scheme) {
+  static void _forget(QueryaUiColors scheme) {
     if (identical(_scheme, scheme)) return;
     _scheme = scheme;
     _styles.fillRange(0, _styles.length, null);
@@ -189,7 +189,7 @@ abstract final class _CellLook {
   }
 
   static material.TextStyle style(
-    ColorScheme scheme, {
+    QueryaUiColors scheme, {
     required bool isNull,
     required bool isDeleted,
   }) {
@@ -213,7 +213,7 @@ abstract final class _CellLook {
   }
 
   static material.BoxDecoration decoration(
-    ColorScheme scheme, {
+    QueryaUiColors scheme, {
     required _CellBackground background,
     required bool right,
     required bool left,

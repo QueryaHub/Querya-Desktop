@@ -202,7 +202,7 @@ class _PreferencesAppearanceSectionState
                 c.selectedThemeLoadError!,
                 style: material.TextStyle(
                   fontSize: 12,
-                  color: Theme.of(context).colorScheme.destructive,
+                  color: context.colors.destructive,
                 ),
               ),
             ),
@@ -273,10 +273,10 @@ class _PreferencesAppearanceSectionState
           material.Container(
             padding: const material.EdgeInsets.all(14),
             decoration: material.BoxDecoration(
-              color: Theme.of(context).colorScheme.muted.withValues(alpha: 0.14),
+              color: context.colors.muted.withValues(alpha: 0.14),
               borderRadius: material.BorderRadius.circular(8),
               border: material.Border.all(
-                color: Theme.of(context).colorScheme.border.withValues(alpha: 0.25),
+                color: context.colors.border.withValues(alpha: 0.25),
               ),
             ),
             child: material.Column(
@@ -340,7 +340,7 @@ class _PreferencesAppearanceSectionState
                     _importError!,
                     style: material.TextStyle(
                       fontSize: 12,
-                      color: Theme.of(context).colorScheme.destructive,
+                      color: context.colors.destructive,
                     ),
                   ),
                 ],
@@ -350,7 +350,7 @@ class _PreferencesAppearanceSectionState
                     _folderOpenError!,
                     style: material.TextStyle(
                       fontSize: 12,
-                      color: Theme.of(context).colorScheme.destructive,
+                      color: context.colors.destructive,
                     ),
                   ),
                 ],

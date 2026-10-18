@@ -512,12 +512,10 @@ class _ResultsTabState extends material.State<ResultsTab> {
                 vertical: 4,
               ),
               decoration: material.BoxDecoration(
-                color: Theme.of(context).colorScheme.card,
+                color: context.colors.card,
                 border: material.Border(
                   bottom: material.BorderSide(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .border
+                    color: context.colors.border
                         .withValues(alpha: 0.35),
                   ),
                 ),

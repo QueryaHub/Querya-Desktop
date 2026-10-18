@@ -2,6 +2,7 @@ import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/layout/ui_scale_controller.dart';
 import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
@@ -17,7 +18,7 @@ class PreferencesHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     return Text(
       text,
       style: TextStyle(
@@ -289,7 +290,7 @@ class _InterfaceScaleSliderState extends material.State<InterfaceScaleSlider> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     final displayScale = _displayScale;
     final pct = (displayScale * 100).round();
     final fine = _fineControl;

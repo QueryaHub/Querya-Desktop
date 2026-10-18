@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
@@ -237,7 +238,7 @@ class PreferencesDialogContentState
   @override
   material.Widget build(material.BuildContext context) {
     _visited.add(_selectedCategory);
-    final theme = Theme.of(context).colorScheme;
+    final theme = context.colors;
     final onPopover = theme.popoverForeground;
 
     return material.CallbackShortcuts(
@@ -437,7 +438,7 @@ class PreferencesDialogContentState
     );
   }
 
-  material.Widget _buildPaneHost(PreferencesCategory cat, ColorScheme theme) {
+  material.Widget _buildPaneHost(PreferencesCategory cat, QueryaUiColors theme) {
     final selected = cat == _selectedCategory;
     return material.Offstage(
       key: material.ValueKey('preferences_pane_${cat.name}'),
@@ -460,7 +461,7 @@ class PreferencesDialogContentState
 
   material.Widget _buildCategoryRailTile(
     PreferencesCategory cat,
-    ColorScheme theme,
+    QueryaUiColors theme,
   ) {
     final isSelected = _selectedCategory == cat;
     final matches = _matchCountForCategory(cat);
@@ -535,7 +536,7 @@ class PreferencesDialogContentState
     );
   }
 
-  material.Widget _buildPane(PreferencesCategory cat, ColorScheme theme) {
+  material.Widget _buildPane(PreferencesCategory cat, QueryaUiColors theme) {
     switch (cat) {
       case PreferencesCategory.general:
         return _buildGeneralSection(theme);
@@ -556,7 +557,7 @@ class PreferencesDialogContentState
     }
   }
 
-  material.Widget _buildGeneralSection(ColorScheme theme) {
+  material.Widget _buildGeneralSection(QueryaUiColors theme) {
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.start,
       children: [
@@ -609,7 +610,7 @@ class PreferencesDialogContentState
     );
   }
 
-  material.Widget _buildSqlSection(ColorScheme theme) {
+  material.Widget _buildSqlSection(QueryaUiColors theme) {
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.start,
       children: [
@@ -701,7 +702,7 @@ class PreferencesDialogContentState
     );
   }
 
-  material.Widget _buildDataGridSection(ColorScheme theme) {
+  material.Widget _buildDataGridSection(QueryaUiColors theme) {
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.start,
       children: [

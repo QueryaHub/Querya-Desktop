@@ -250,13 +250,13 @@ class _PreferencesShortcutsSectionState
                         ),
                         decoration: material.BoxDecoration(
                           color: _selectedCategory == cat
-                              ? theme.colorScheme.primary.withValues(alpha: 0.16)
-                              : theme.colorScheme.muted.withValues(alpha: 0.3),
+                              ? context.colors.primary.withValues(alpha: 0.16)
+                              : context.colors.muted.withValues(alpha: 0.3),
                           borderRadius: material.BorderRadius.circular(16),
                           border: material.Border.all(
                             color: _selectedCategory == cat
-                                ? theme.colorScheme.primary.withValues(alpha: 0.5)
-                                : theme.colorScheme.border.withValues(alpha: 0.25),
+                                ? context.colors.primary.withValues(alpha: 0.5)
+                                : context.colors.border.withValues(alpha: 0.25),
                           ),
                         ),
                         child: material.Row(
@@ -270,8 +270,8 @@ class _PreferencesShortcutsSectionState
                                     ? material.FontWeight.w600
                                     : material.FontWeight.w400,
                                 color: _selectedCategory == cat
-                                    ? theme.colorScheme.primary
-                                    : theme.colorScheme.foreground,
+                                    ? context.colors.primary
+                                    : context.colors.foreground,
                               ),
                             ),
                             const material.SizedBox(width: 4),
@@ -280,8 +280,8 @@ class _PreferencesShortcutsSectionState
                               style: material.TextStyle(
                                 fontSize: 10,
                                 color: _selectedCategory == cat
-                                    ? theme.colorScheme.primary.withValues(alpha: 0.8)
-                                    : theme.colorScheme.mutedForeground,
+                                    ? context.colors.primary.withValues(alpha: 0.8)
+                                    : context.colors.mutedForeground,
                               ),
                             ),
                           ],
@@ -333,10 +333,10 @@ class _PreferencesShortcutsSectionState
           ),
           material.Container(
             decoration: material.BoxDecoration(
-              color: theme.colorScheme.muted.withValues(alpha: 0.16),
+              color: context.colors.muted.withValues(alpha: 0.16),
               borderRadius: material.BorderRadius.circular(8),
               border: material.Border.all(
-                color: theme.colorScheme.border.withValues(alpha: 0.25),
+                color: context.colors.border.withValues(alpha: 0.25),
               ),
             ),
             child: material.Column(
@@ -345,7 +345,7 @@ class _PreferencesShortcutsSectionState
                   if (i > 0)
                     QueryaDivider(
                       height: 1,
-                      color: theme.colorScheme.border.withValues(alpha: 0.18),
+                      color: context.colors.border.withValues(alpha: 0.18),
                     ),
                   _buildShortcutRow(context, entry.value[i], theme),
                 ],
@@ -426,7 +426,7 @@ class _PreferencesShortcutsSectionState
             color: wb.surface,
             borderRadius: material.BorderRadius.circular(4),
             border: material.Border.all(
-              color: theme.colorScheme.border.withValues(alpha: 0.4),
+              color: context.colors.border.withValues(alpha: 0.4),
             ),
             boxShadow: [
               material.BoxShadow(
@@ -443,7 +443,7 @@ class _PreferencesShortcutsSectionState
               fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
               fontSize: 11,
               fontWeight: material.FontWeight.w600,
-              color: theme.colorScheme.foreground,
+              color: context.colors.foreground,
             ),
           ),
         ),

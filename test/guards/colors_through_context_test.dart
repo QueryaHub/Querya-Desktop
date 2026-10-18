@@ -3,16 +3,19 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Epic #1465, #1731: colours are read through `context.colors`
-/// (`QueryaUiColors`), not through a theme's `colorScheme`. A folder joins
+/// (`QueryaUiColors`), not through a theme's `colorScheme`. `Theme.of` itself
+/// stays allowed for what is not a colour (brightness, radius) until #1735. A folder joins
 /// [migrated] in the PR that moves it; at the end the list is all of `lib/`.
 void main() {
   const migrated = <String>[
     'lib/features/connections',
     'lib/features/mongodb',
     'lib/features/redis',
+    'lib/features/settings',
+    'lib/features/workspace',
   ];
 
-  final banned = RegExp(r'\bcolorScheme\b|\bTheme\.of\(|\bColorScheme\b');
+  final banned = RegExp(r'\bcolorScheme\b|\bColorScheme\b');
 
   test('migrated folders read colours through context.colors', () {
     final offenders = <String>[];

@@ -1,6 +1,8 @@
 import 'dart:async' show Timer;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show KeyDownEvent, LogicalKeyboardKey;
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 import 'package:querya_desktop/shared/widgets/querya_icon_button.dart';
 import 'package:querya_desktop/shared/widgets/querya_text.dart';
@@ -216,7 +218,7 @@ class _DataGridFilterBarState extends material.State<DataGridFilterBar> {
 
     _overlayEntry = material.OverlayEntry(
       builder: (context) {
-        final cs = Theme.of(context).colorScheme;
+        final cs = context.colors;
 
         return material.Positioned(
           width: 320,
@@ -280,7 +282,7 @@ class _DataGridFilterBarState extends material.State<DataGridFilterBar> {
     overlay.insert(_overlayEntry!);
   }
 
-  material.Widget _buildSuggestionIcon(FilterSuggestionKind kind, ColorScheme cs) {
+  material.Widget _buildSuggestionIcon(FilterSuggestionKind kind, QueryaUiColors cs) {
     switch (kind) {
       case FilterSuggestionKind.column:
         return material.Icon(
@@ -334,7 +336,7 @@ class _DataGridFilterBarState extends material.State<DataGridFilterBar> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     final isFiltered = widget.filterText.trim().isNotEmpty;
 
     return material.CompositedTransformTarget(

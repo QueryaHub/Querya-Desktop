@@ -103,7 +103,7 @@ class _DestructiveQueryDialogState
   @override
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+    final cs = context.colors;
     final isDark = theme.brightness == Brightness.dark;
     final isCritical = widget.result.maxRiskLevel == 'CRITICAL';
 

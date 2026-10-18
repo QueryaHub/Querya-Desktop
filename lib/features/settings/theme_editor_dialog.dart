@@ -94,9 +94,9 @@ class _ThemeEditorDialogState extends material.State<ThemeEditorDialog> {
     try {
       initial = currentHex != null
           ? parseQueryaThemeColor(currentHex)
-          : Theme.of(context).colorScheme.primary;
+          : context.colors.primary;
     } on FormatException {
-      initial = Theme.of(context).colorScheme.primary;
+      initial = context.colors.primary;
     }
 
     final picked = await showThemeColorPickerDialog(
@@ -147,8 +147,7 @@ class _ThemeEditorDialogState extends material.State<ThemeEditorDialog> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+    final cs = context.colors;
 
     return QueryaModalDialog(
       constraints: WindowLayout.dialogConstraints(
@@ -294,7 +293,7 @@ class _ThemeEditorColorRow extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     Color? swatchColor;
     if (hex != null) {
       try {

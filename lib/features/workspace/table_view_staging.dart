@@ -287,7 +287,7 @@ class _SaveFailedDialogState extends material.State<_SaveFailedDialog> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     final info = widget.info;
     return QueryaDialogCard(
       constraints: const material.BoxConstraints(maxWidth: 480),

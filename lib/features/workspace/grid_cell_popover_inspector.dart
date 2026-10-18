@@ -321,7 +321,7 @@ class _GridCellInspectorDialogState
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     final rowLabel =
         widget.rowIndex != null ? ' (Row ${widget.rowIndex! + 1})' : '';
     final text = _isNull ? '' : _controller.text;

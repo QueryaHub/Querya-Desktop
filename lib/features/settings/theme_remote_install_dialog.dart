@@ -72,7 +72,7 @@ class _ThemeRemoteInstallDialogState
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     final host = Uri.tryParse(_urlController.text.trim())?.host;
 
     return QueryaModalDialog(
