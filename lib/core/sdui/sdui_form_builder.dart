@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:file_selector/file_selector.dart';
 import 'package:querya_desktop/core/sdui/sdui_form_schema.dart';

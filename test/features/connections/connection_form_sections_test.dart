@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart' show MaterialApp;
@@ -5,7 +6,6 @@ import '../../support/querya_theme_test_shell.dart';
 import 'package:querya_desktop/features/connections/forms/connection_auth_section.dart';
 import 'package:querya_desktop/features/connections/forms/connection_database_section.dart';
 import 'package:querya_desktop/features/connections/forms/connection_host_port_section.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 void main() {
   Widget buildApp(Widget child) {

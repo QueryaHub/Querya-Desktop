@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart' as material;
@@ -7,7 +8,6 @@ import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/sqlite/sqlite_sql_workspace.dart';
 import 'package:querya_desktop/features/workspace/workspace.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 import 'package:querya_desktop/shared/widgets/querya_button.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 

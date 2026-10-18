@@ -1,11 +1,10 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/main_screen/main_screen_workspace_state.dart';
 import 'package:querya_desktop/features/mongodb/mongo_stats_view.dart';
 import 'package:querya_desktop/features/redis/redis_view.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
-    hide TextExtension;
 import 'package:querya_desktop/shared/widgets/querya_button.dart';
 
 void main() {
@@ -64,7 +63,7 @@ void main() {
         (tester) async {
       var restored = false;
       await tester.pumpWidget(
-        shadcn.ShadcnApp(
+        material.MaterialApp(
           home: material.Scaffold(
             body: MongoStatsView(
               connectionRow: mongoConn,
@@ -91,7 +90,7 @@ void main() {
         (tester) async {
       var restored = false;
       await tester.pumpWidget(
-        shadcn.ShadcnApp(
+        material.MaterialApp(
           home: material.Scaffold(
             body: MongoStatsView(
               connectionRow: mongoConn,
@@ -119,7 +118,7 @@ void main() {
     testWidgets('shows Return to key when key is set', (tester) async {
       var restored = false;
       await tester.pumpWidget(
-        shadcn.ShadcnApp(
+        material.MaterialApp(
           home: material.Scaffold(
             body: RedisView(
               connectionRow: redisConn,
@@ -145,7 +144,7 @@ void main() {
     testWidgets('shows Return to db when only db is set', (tester) async {
       var restored = false;
       await tester.pumpWidget(
-        shadcn.ShadcnApp(
+        material.MaterialApp(
           home: material.Scaffold(
             body: RedisView(
               connectionRow: redisConn,

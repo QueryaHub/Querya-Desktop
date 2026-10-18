@@ -21,9 +21,8 @@ material.ThemeData materialThemeFromQuerya(QueryaUiColors scheme) {
 
   return material.ThemeData(
     useMaterial3: true,
-    // The app text face: shadcn_flutter carries it until the fonts move (#1736).
+    // The app text face (assets/fonts).
     fontFamily: 'GeistSans',
-    package: 'shadcn_flutter',
     // Safety net: stray Material popups must not ripple.
     splashFactory: material.NoSplash.splashFactory,
     colorScheme: materialScheme,

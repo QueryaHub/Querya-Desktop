@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:querya_desktop/core/extensions/extension_paths.dart';

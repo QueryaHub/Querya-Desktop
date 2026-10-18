@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:mongo_dart/mongo_dart.dart' show ObjectId;
@@ -6,7 +7,6 @@ import 'package:querya_desktop/features/mongodb/mongo_ejson.dart';
 import 'package:querya_desktop/features/workspace/result_grid_view.dart';
 import 'package:querya_desktop/shared/widgets/app_toast.dart';
 import 'package:gap/gap.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 import 'package:querya_desktop/shared/widgets/querya_button.dart';
 import 'package:querya_desktop/shared/widgets/querya_text.dart';
@@ -230,9 +230,12 @@ class _MongoDocumentsTableViewState extends State<MongoDocumentsTableView> {
                   ),
                 ],
               ] else ...[
-                Text('${widget.documents.length} rows · Click a row to select · Click column header to sort')
-                    .muted()
-                    .small(),
+                material.Flexible(
+                  child: Text(
+                    '${widget.documents.length} rows · Click a row to select · Click column header to sort',
+                    overflow: material.TextOverflow.ellipsis,
+                  ).muted().small(),
+                ),
               ],
             ],
           ),

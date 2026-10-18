@@ -51,7 +51,7 @@ QueryaTextField(
 QueryaTextField(controller: _password, obscureText: true) // show / hide button
 ```
 
-`leading` / `trailing` take an icon or a small button; `framed: false` is for a field inside a frame of its own (the code editor). The barrel hides shadcn's `TextField`; `test/guards/shadcn_imports_ratchet_test.dart` rejects it anywhere in `lib/`.
+`leading` / `trailing` take an icon or a small button; `framed: false` is for a field inside a frame of its own (the code editor). `test/guards/no_shadcn_test.dart` rejects a bare `TextField(` anywhere in `lib/`.
 
 ### `QueryaIconButton` / `QueryaToolbarButton`
 
@@ -273,7 +273,7 @@ workbench keys fall back as described in [theme.md](theme.md).
 | `no_raw_material_dialogs_test.dart` | `AlertDialog` | `QueryaModalDialog`, `QueryaConfirmDialog` |
 | `no_material_dropdowns_test.dart` | `DropdownButton(FormField)`, `PopupMenuButton`, `showMenu` | `QueryaDropdown`, `QueryaActionMenu` |
 | `no_raw_progress_indicators_test.dart` | `CircularProgressIndicator` outside `QueryaSpinner` | `QueryaSpinner` |
-| `shared_does_not_import_shadcn_test.dart` | a new `package:shadcn_flutter` import in `lib/shared/` (ratchet: the allow-list only shrinks) | Flutter primitives and the kit tokens |
+| `no_shadcn_test.dart` | any `package:shadcn_flutter` import, its pubspec entry or the vendored copy (#1736) | Flutter primitives and the kit |
 
 When adding a new shared component that replaces a Material one, add a guard
 test in the same style and mention it here.

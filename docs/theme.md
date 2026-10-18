@@ -59,7 +59,7 @@ flowchart TB
 |-------|---------|
 | **Workbench** | Sidebar, tabs, canvas, accents, git decoration |
 | **Editor** | SQL/JSON editor surface, selection, line numbers, syntax token hues |
-| **ColorScheme** | shadcn/Material widgets (buttons, inputs, dialogs) |
+| **Colors** (`QueryaUiColors`) | Material widgets and the UI kit (buttons, inputs, dialogs) |
 
 `ThemeController` merges layers, persists settings in `AppSettings`, and drives
 `QueryaApp` via `ListenableBuilder`.

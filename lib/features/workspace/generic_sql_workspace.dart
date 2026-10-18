@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
 import 'package:querya_desktop/core/database/query_error_text.dart';
 import 'package:querya_desktop/core/database/statement_queue.dart';

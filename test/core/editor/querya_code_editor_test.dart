@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/editor/querya_code_editor.dart';
@@ -5,7 +6,6 @@ import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:querya_desktop/core/editor/querya_highlight_controller.dart';
 import 'package:querya_desktop/core/editor/syntax_highlight_service.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 import '../../support/pump_syntax_highlight.dart';
 import '../../support/querya_theme_test_shell.dart';

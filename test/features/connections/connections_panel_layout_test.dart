@@ -9,7 +9,6 @@ import 'package:flutter/material.dart' show MaterialApp;
 import '../../support/querya_theme_test_shell.dart';
 import 'package:querya_desktop/core/ui/querya_tree_tokens.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 import '../../support/layout_overflow.dart';
 

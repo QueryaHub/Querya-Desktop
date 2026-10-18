@@ -6,6 +6,7 @@
 //       | select (mouse-drag selection through ResultsTab, incl. stats)
 //       | dialog (open / close showAppDialog repeatedly over a busy grid)
 //       | rerun (a new result set every 400 ms, like re-running a query)
+import 'package:flutter/widgets.dart';
 import 'dart:async';
 import 'dart:developer' as developer;
 import 'dart:io';
@@ -22,7 +23,6 @@ import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart'
 import 'package:querya_desktop/features/workspace/result_grid_view.dart';
 import 'package:querya_desktop/features/workspace/results_tab.dart';
 import 'package:querya_desktop/shared/widgets/app_dialog.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:vm_service/vm_service.dart' as vms;
 import 'package:vm_service/vm_service_io.dart' as vms_io;
 
@@ -171,7 +171,7 @@ Future<void> _run(DataGridStagingBuffer buffer) async {
           child: SizedBox(
             width: 420,
             height: 260,
-            child: Card(child: Center(child: Text('bench dialog'))),
+            child: material.Card(child: Center(child: Text('bench dialog'))),
           ),
         ),
       ));

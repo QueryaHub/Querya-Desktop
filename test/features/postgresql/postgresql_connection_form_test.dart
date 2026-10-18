@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/shared/widgets/querya_text_field.dart';
@@ -5,7 +6,6 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:flutter/material.dart' show MaterialApp;
 import '../../support/querya_theme_test_shell.dart';
 import 'package:querya_desktop/features/postgresql/postgresql_connection_form.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 void main() {
   group('showPostgresConnectionForm', () {

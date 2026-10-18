@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
@@ -8,7 +9,6 @@ import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/shared/widgets/querya_dropdown.dart';
 import 'package:querya_desktop/shared/widgets/querya_text.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
 
 /// Helper / hint copy in Preferences — readable on imported themes.
 class PreferencesHint extends StatelessWidget {
