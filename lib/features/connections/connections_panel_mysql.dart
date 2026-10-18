@@ -109,7 +109,7 @@ class _MysqlConnectionTileState extends State<_MysqlConnectionTile> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     final iconWidget = widget.iconAsset != null
         ? material.Image.asset(
             widget.iconAsset!,
@@ -121,18 +121,18 @@ class _MysqlConnectionTileState extends State<_MysqlConnectionTile> {
             errorBuilder: (_, __, ___) => material.Icon(
               widget.icon,
               size: QueryaIconSizes.sidebarConnectionIcon,
-              color: theme.colorScheme.primary,
+              color: colors.primary,
             ),
           )
         : material.Icon(widget.icon,
             size: QueryaIconSizes.sidebarConnectionIcon,
-            color: theme.colorScheme.primary);
+            color: colors.primary);
 
     return ContextMenu(
       items: [
         MenuButton(
           leading: material.Icon(material.Icons.refresh_rounded,
-              size: 18, color: theme.colorScheme.mutedForeground),
+              size: 18, color: colors.mutedForeground),
           onPressed: (_) {
             _databases = [];
             _loadDatabases();
@@ -142,25 +142,25 @@ class _MysqlConnectionTileState extends State<_MysqlConnectionTile> {
         if (widget.onMysqlOpenSqlWorkspace != null)
           MenuButton(
             leading: material.Icon(material.Icons.terminal_rounded,
-                size: 18, color: theme.colorScheme.mutedForeground),
+                size: 18, color: colors.mutedForeground),
             onPressed: (_) =>
                 widget.onMysqlOpenSqlWorkspace!(widget.connection),
             child: const Text('Open in SQL'),
           ),
         MenuButton(
           leading: material.Icon(material.Icons.edit_outlined,
-              size: 18, color: theme.colorScheme.mutedForeground),
+              size: 18, color: colors.mutedForeground),
           onPressed: (_) => widget.onEdit(),
           child: const Text('Edit connection…'),
         ),
         ...widget.moveItems,
         MenuButton(
           leading: material.Icon(material.Icons.delete_outline_rounded,
-              size: 18, color: theme.colorScheme.destructive),
+              size: 18, color: colors.destructive),
           onPressed: (_) => widget.onRemove(),
           child: Text(
             'Remove connection',
-            style: material.TextStyle(color: theme.colorScheme.destructive),
+            style: material.TextStyle(color: colors.destructive),
           ),
         ),
       ],
@@ -191,7 +191,7 @@ class _MysqlConnectionTileState extends State<_MysqlConnectionTile> {
                           child: material.Icon(
                             QueryaIcons.expandClosed,
                             size: QueryaIconSizes.sidebarExpand,
-                            color: theme.colorScheme.mutedForeground,
+                            color: colors.mutedForeground,
                           ),
                         ),
                       ),
@@ -222,7 +222,7 @@ class _MysqlConnectionTileState extends State<_MysqlConnectionTile> {
                                   maxLines: 1,
                                   style: material.TextStyle(
                                     fontSize: 13,
-                                    color: theme.colorScheme.foreground,
+                                    color: colors.foreground,
                                   ),
                                 ),
                                 if (widget.connection.host != null)
@@ -232,7 +232,7 @@ class _MysqlConnectionTileState extends State<_MysqlConnectionTile> {
                                     maxLines: 1,
                                     style: material.TextStyle(
                                       fontSize: 11,
-                                      color: theme.colorScheme.mutedForeground,
+                                      color: colors.mutedForeground,
                                     ),
                                   ),
                               ],
@@ -438,7 +438,7 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     return QueryaTreeIndentGuide(
       depth: 1,
       child: material.Column(
@@ -454,15 +454,15 @@ class _MysqlDatabaseNodeState extends State<_MysqlDatabaseNode> {
               child: material.Icon(
                 QueryaIcons.expandClosed,
                 size: QueryaIconSizes.treeExpand,
-                color: theme.colorScheme.mutedForeground,
+                color: colors.mutedForeground,
               ),
             ),
             icon: QueryaIcons.database,
             iconSize: QueryaIconSizes.treeConnection,
-            iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
+            iconColor: colors.primary.withValues(alpha: 0.7),
             textStyle: material.TextStyle(
               fontSize: 12,
-              color: theme.colorScheme.foreground,
+              color: colors.foreground,
             ),
             verticalPadding: 4,
             expanded: _expanded,
@@ -634,7 +634,7 @@ class _MysqlObjectGroupState extends State<_MysqlObjectGroup> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     final query = _filter.trim().toLowerCase();
     final matching = query.isEmpty
         ? widget.items
@@ -663,15 +663,15 @@ class _MysqlObjectGroupState extends State<_MysqlObjectGroup> {
               child: material.Icon(
                 QueryaIcons.expandClosed,
                 size: QueryaIconSizes.treeExpand,
-                color: theme.colorScheme.mutedForeground,
+                color: colors.mutedForeground,
               ),
             ),
             icon: widget.icon,
             iconSize: QueryaIconSizes.treeGroup,
-            iconColor: theme.colorScheme.mutedForeground,
+            iconColor: colors.mutedForeground,
             textStyle: material.TextStyle(
               fontSize: 11,
-              color: theme.colorScheme.mutedForeground,
+              color: colors.mutedForeground,
             ),
             expanded: _expanded,
             onTap: () => setState(() => _expanded = !_expanded),
@@ -748,11 +748,11 @@ class _MysqlObjectGroupState extends State<_MysqlObjectGroup> {
                             icon: widget.itemIcon,
                             iconSize: QueryaIconSizes.treeLeaf,
                             iconColor: QueryaTreeTokens.leafIconColor(
-                              theme.colorScheme.primary,
+                              colors.primary,
                             ),
                             textStyle: material.TextStyle(
                               fontSize: 11,
-                              color: theme.colorScheme.foreground,
+                              color: colors.foreground,
                             ),
                             verticalPadding: 2,
                             onTap: widget.onItemTap != null

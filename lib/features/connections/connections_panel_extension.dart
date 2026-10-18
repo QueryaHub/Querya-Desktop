@@ -150,7 +150,7 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     final material.Widget iconWidget;
     if (_iconFilePath != null) {
       iconWidget = DriverIconImage(
@@ -169,14 +169,14 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
         errorBuilder: (_, __, ___) => material.Icon(
           widget.icon,
           size: QueryaIconSizes.sidebarConnectionIcon,
-          color: theme.colorScheme.primary,
+          color: colors.primary,
         ),
       );
     } else {
       iconWidget = material.Icon(
         widget.icon,
         size: QueryaIconSizes.sidebarConnectionIcon,
-        color: theme.colorScheme.primary,
+        color: colors.primary,
       );
     }
 
@@ -184,7 +184,7 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
       items: [
         MenuButton(
           leading: material.Icon(material.Icons.refresh_rounded,
-              size: 18, color: theme.colorScheme.mutedForeground),
+              size: 18, color: colors.mutedForeground),
           onPressed: (_) {
             setState(() => _schema = null);
             _loadTree();
@@ -193,18 +193,18 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
         ),
         MenuButton(
           leading: material.Icon(material.Icons.edit_outlined,
-              size: 18, color: theme.colorScheme.mutedForeground),
+              size: 18, color: colors.mutedForeground),
           onPressed: (_) => widget.onEdit(),
           child: const Text('Edit connection…'),
         ),
         ...widget.moveItems,
         MenuButton(
           leading: material.Icon(material.Icons.delete_outline_rounded,
-              size: 18, color: theme.colorScheme.destructive),
+              size: 18, color: colors.destructive),
           onPressed: (_) => widget.onRemove(),
           child: Text(
             'Remove connection',
-            style: material.TextStyle(color: theme.colorScheme.destructive),
+            style: material.TextStyle(color: colors.destructive),
           ),
         ),
       ],
@@ -235,7 +235,7 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
                           child: material.Icon(
                             QueryaIcons.expandClosed,
                             size: QueryaIconSizes.sidebarExpand,
-                            color: theme.colorScheme.mutedForeground,
+                            color: colors.mutedForeground,
                           ),
                         ),
                       ),
@@ -268,7 +268,7 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
                                   maxLines: 1,
                                   style: material.TextStyle(
                                     fontSize: 13,
-                                    color: theme.colorScheme.foreground,
+                                    color: colors.foreground,
                                   ),
                                 ),
                                 if (widget.connection.host != null)
@@ -278,7 +278,7 @@ class _ExtensionConnectionTileState extends State<_ExtensionConnectionTile> {
                                     maxLines: 1,
                                     style: material.TextStyle(
                                       fontSize: 11,
-                                      color: theme.colorScheme.mutedForeground,
+                                      color: colors.mutedForeground,
                                     ),
                                   ),
                               ],

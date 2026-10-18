@@ -194,8 +194,8 @@ class _SshTunnelSectionState extends material.State<SshTunnelSection> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+    final colors = context.colors;
+    final cs = colors;
     final wb = context.workbench;
 
     return material.Container(
@@ -519,7 +519,7 @@ class _AuthTypeChip extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     return material.InkWell(
       onTap: onTap,

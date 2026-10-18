@@ -132,7 +132,7 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     final iconWidget = widget.iconAsset != null
         ? material.Image.asset(
             widget.iconAsset!,
@@ -144,18 +144,18 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
             errorBuilder: (_, __, ___) => material.Icon(
               widget.icon,
               size: QueryaIconSizes.sidebarConnectionIcon,
-              color: theme.colorScheme.primary,
+              color: colors.primary,
             ),
           )
         : material.Icon(widget.icon,
             size: QueryaIconSizes.sidebarConnectionIcon,
-            color: theme.colorScheme.primary);
+            color: colors.primary);
 
     return ContextMenu(
       items: [
         MenuButton(
           leading: material.Icon(material.Icons.refresh_rounded,
-              size: 18, color: theme.colorScheme.mutedForeground),
+              size: 18, color: colors.mutedForeground),
           onPressed: (_) {
             setState(() {
               _tables = [];
@@ -168,25 +168,25 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
         if (widget.onSqliteOpenSqlWorkspace != null)
           MenuButton(
             leading: material.Icon(material.Icons.terminal_rounded,
-                size: 18, color: theme.colorScheme.mutedForeground),
+                size: 18, color: colors.mutedForeground),
             onPressed: (_) =>
                 widget.onSqliteOpenSqlWorkspace!(widget.connection),
             child: const Text('Open in SQL'),
           ),
         MenuButton(
           leading: material.Icon(material.Icons.edit_outlined,
-              size: 18, color: theme.colorScheme.mutedForeground),
+              size: 18, color: colors.mutedForeground),
           onPressed: (_) => widget.onEdit(),
           child: const Text('Edit connection…'),
         ),
         ...widget.moveItems,
         MenuButton(
           leading: material.Icon(material.Icons.delete_outline_rounded,
-              size: 18, color: theme.colorScheme.destructive),
+              size: 18, color: colors.destructive),
           onPressed: (_) => widget.onRemove(),
           child: Text(
             'Remove connection',
-            style: material.TextStyle(color: theme.colorScheme.destructive),
+            style: material.TextStyle(color: colors.destructive),
           ),
         ),
       ],
@@ -217,7 +217,7 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
                           child: material.Icon(
                             QueryaIcons.expandClosed,
                             size: QueryaIconSizes.sidebarExpand,
-                            color: theme.colorScheme.mutedForeground,
+                            color: colors.mutedForeground,
                           ),
                         ),
                       ),
@@ -248,7 +248,7 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
                                   maxLines: 1,
                                   style: material.TextStyle(
                                     fontSize: 13,
-                                    color: theme.colorScheme.foreground,
+                                    color: colors.foreground,
                                   ),
                                 ),
                                 if ((widget.connection.host ??
@@ -261,7 +261,7 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
                                     maxLines: 1,
                                     style: material.TextStyle(
                                       fontSize: 11,
-                                      color: theme.colorScheme.mutedForeground,
+                                      color: colors.mutedForeground,
                                     ),
                                   ),
                               ],
@@ -398,7 +398,7 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     final query = _filter.trim().toLowerCase();
     final matching = query.isEmpty
         ? widget.items
@@ -427,15 +427,15 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
               child: material.Icon(
                 QueryaIcons.expandClosed,
                 size: QueryaIconSizes.treeExpand,
-                color: theme.colorScheme.mutedForeground,
+                color: colors.mutedForeground,
               ),
             ),
             icon: widget.icon,
             iconSize: QueryaIconSizes.treeGroup,
-            iconColor: theme.colorScheme.mutedForeground,
+            iconColor: colors.mutedForeground,
             textStyle: material.TextStyle(
               fontSize: 11,
-              color: theme.colorScheme.mutedForeground,
+              color: colors.mutedForeground,
             ),
             expanded: _expanded,
             onTap: () => setState(() => _expanded = !_expanded),
@@ -510,11 +510,11 @@ class _SqliteObjectGroupState extends State<_SqliteObjectGroup> {
                             icon: widget.itemIcon,
                             iconSize: QueryaIconSizes.treeLeaf,
                             iconColor: QueryaTreeTokens.leafIconColor(
-                              theme.colorScheme.primary,
+                              colors.primary,
                             ),
                             textStyle: material.TextStyle(
                               fontSize: 11,
-                              color: theme.colorScheme.foreground,
+                              color: colors.foreground,
                             ),
                             verticalPadding: 2,
                             onTap: widget.onItemTap != null

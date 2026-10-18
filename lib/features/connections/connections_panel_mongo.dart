@@ -134,7 +134,7 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     final iconWidget = widget.iconAsset != null
         ? material.Image.asset(
             widget.iconAsset!,
@@ -146,24 +146,24 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
             errorBuilder: (_, __, ___) => material.Icon(
               widget.icon,
               size: QueryaIconSizes.sidebarConnectionIcon,
-              color: theme.colorScheme.primary,
+              color: colors.primary,
             ),
           )
         : material.Icon(widget.icon,
             size: QueryaIconSizes.sidebarConnectionIcon,
-            color: theme.colorScheme.primary);
+            color: colors.primary);
 
     return ContextMenu(
       items: [
         MenuButton(
           leading: material.Icon(material.Icons.add_rounded,
-              size: 18, color: theme.colorScheme.mutedForeground),
+              size: 18, color: colors.mutedForeground),
           onPressed: (_) => _createDatabase(),
           child: const Text('Create database'),
         ),
         MenuButton(
           leading: material.Icon(material.Icons.refresh_rounded,
-              size: 18, color: theme.colorScheme.mutedForeground),
+              size: 18, color: colors.mutedForeground),
           onPressed: (_) {
             _databases = [];
             _loadDatabases();
@@ -172,18 +172,18 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
         ),
         MenuButton(
           leading: material.Icon(material.Icons.edit_outlined,
-              size: 18, color: theme.colorScheme.mutedForeground),
+              size: 18, color: colors.mutedForeground),
           onPressed: (_) => widget.onEdit(),
           child: const Text('Edit connection…'),
         ),
         ...widget.moveItems,
         MenuButton(
           leading: material.Icon(material.Icons.delete_outline_rounded,
-              size: 18, color: theme.colorScheme.destructive),
+              size: 18, color: colors.destructive),
           onPressed: (_) => widget.onRemove(),
           child: Text(
             'Remove connection',
-            style: material.TextStyle(color: theme.colorScheme.destructive),
+            style: material.TextStyle(color: colors.destructive),
           ),
         ),
       ],
@@ -216,7 +216,7 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
                           child: material.Icon(
                             QueryaIcons.expandClosed,
                             size: QueryaIconSizes.sidebarExpand,
-                            color: theme.colorScheme.mutedForeground,
+                            color: colors.mutedForeground,
                           ),
                         ),
                       ),
@@ -248,7 +248,7 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
                                   maxLines: 1,
                                   style: material.TextStyle(
                                     fontSize: 13,
-                                    color: theme.colorScheme.foreground,
+                                    color: colors.foreground,
                                   ),
                                 ),
                                 if (widget.connection.host != null)
@@ -258,7 +258,7 @@ class _MongoConnectionTileState extends State<_MongoConnectionTile> {
                                     maxLines: 1,
                                     style: material.TextStyle(
                                       fontSize: 11,
-                                      color: theme.colorScheme.mutedForeground,
+                                      color: colors.mutedForeground,
                                     ),
                                   ),
                               ],
@@ -467,7 +467,7 @@ class _MongoDatabaseNodeState extends State<_MongoDatabaseNode> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     final query = _filter.trim().toLowerCase();
     final matching = query.isEmpty
         ? _collections
@@ -502,17 +502,17 @@ class _MongoDatabaseNodeState extends State<_MongoDatabaseNode> {
                       child: material.Icon(
                         QueryaIcons.expandClosed,
                         size: QueryaIconSizes.treeExpand,
-                        color: theme.colorScheme.mutedForeground,
+                        color: colors.mutedForeground,
                       ),
                     ),
                   ),
                 ),
                 icon: QueryaIcons.database,
                 iconSize: QueryaIconSizes.treeConnection,
-                iconColor: theme.colorScheme.primary.withValues(alpha: 0.7),
+                iconColor: colors.primary.withValues(alpha: 0.7),
                 textStyle: material.TextStyle(
                   fontSize: 12,
-                  color: theme.colorScheme.foreground,
+                  color: colors.foreground,
                 ),
                 verticalPadding: 3,
                 expanded: _expanded,
@@ -641,7 +641,7 @@ class _MongoCollectionNode extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     return _ConnectionsTreeSelectionBuilder<bool>(
       select: (sel) =>
           sel.selectedConnectionId == connection.id &&
@@ -654,7 +654,7 @@ class _MongoCollectionNode extends StatelessWidget {
               leading: material.Icon(
                 material.Icons.description_outlined,
                 size: 18,
-                color: theme.colorScheme.primary,
+                color: colors.primary,
               ),
               onPressed: (_) => onTap(),
               child: const Text('Open collection'),
@@ -663,7 +663,7 @@ class _MongoCollectionNode extends StatelessWidget {
               leading: material.Icon(
                 material.Icons.copy_rounded,
                 size: 18,
-                color: theme.colorScheme.mutedForeground,
+                color: colors.mutedForeground,
               ),
               onPressed: (_) {
                 Clipboard.setData(ClipboardData(text: name));
@@ -675,7 +675,7 @@ class _MongoCollectionNode extends StatelessWidget {
               leading: material.Icon(
                 material.Icons.refresh_rounded,
                 size: 18,
-                color: theme.colorScheme.mutedForeground,
+                color: colors.mutedForeground,
               ),
               onPressed: (_) => onRefreshCollections(),
               child: const Text('Refresh'),
@@ -684,7 +684,7 @@ class _MongoCollectionNode extends StatelessWidget {
               leading: material.Icon(
                 material.Icons.delete_outline_rounded,
                 size: 18,
-                color: theme.colorScheme.destructive,
+                color: colors.destructive,
               ),
               onPressed: (_) => onDropCollection(name),
               child: const Text('Drop collection'),
@@ -695,10 +695,10 @@ class _MongoCollectionNode extends StatelessWidget {
             isSelected: isSelected,
             icon: material.Icons.table_chart_outlined,
             iconSize: QueryaIconSizes.treeLeaf,
-            iconColor: QueryaTreeTokens.leafIconColor(theme.colorScheme.primary),
+            iconColor: QueryaTreeTokens.leafIconColor(colors.primary),
             textStyle: material.TextStyle(
               fontSize: 11,
-              color: theme.colorScheme.foreground,
+              color: colors.foreground,
             ),
             verticalPadding: 2,
             onTap: onTap,

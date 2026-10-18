@@ -112,7 +112,7 @@ class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     final iconWidget = widget.iconAsset != null
         ? material.Image.asset(
             widget.iconAsset!,
@@ -124,18 +124,18 @@ class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
             errorBuilder: (_, __, ___) => material.Icon(
               widget.icon,
               size: QueryaIconSizes.sidebarConnectionIcon,
-              color: theme.colorScheme.primary,
+              color: colors.primary,
             ),
           )
         : material.Icon(widget.icon,
             size: QueryaIconSizes.sidebarConnectionIcon,
-            color: theme.colorScheme.primary);
+            color: colors.primary);
 
     return ContextMenu(
       items: [
         MenuButton(
           leading: material.Icon(material.Icons.refresh_rounded,
-              size: 18, color: theme.colorScheme.mutedForeground),
+              size: 18, color: colors.mutedForeground),
           onPressed: (_) {
             _databases = [];
             _loadDatabases();
@@ -144,18 +144,18 @@ class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
         ),
         MenuButton(
           leading: material.Icon(material.Icons.edit_outlined,
-              size: 18, color: theme.colorScheme.mutedForeground),
+              size: 18, color: colors.mutedForeground),
           onPressed: (_) => widget.onEdit(),
           child: const Text('Edit connection…'),
         ),
         ...widget.moveItems,
         MenuButton(
           leading: material.Icon(material.Icons.delete_outline_rounded,
-              size: 18, color: theme.colorScheme.destructive),
+              size: 18, color: colors.destructive),
           onPressed: (_) => widget.onRemove(),
           child: Text(
             'Remove connection',
-            style: material.TextStyle(color: theme.colorScheme.destructive),
+            style: material.TextStyle(color: colors.destructive),
           ),
         ),
       ],
@@ -186,7 +186,7 @@ class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
                           child: material.Icon(
                             QueryaIcons.expandClosed,
                             size: QueryaIconSizes.sidebarExpand,
-                            color: theme.colorScheme.mutedForeground,
+                            color: colors.mutedForeground,
                           ),
                         ),
                       ),
@@ -217,7 +217,7 @@ class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
                                   maxLines: 1,
                                   style: material.TextStyle(
                                     fontSize: 13,
-                                    color: theme.colorScheme.foreground,
+                                    color: colors.foreground,
                                   ),
                                 ),
                                 if (widget.connection.host != null)
@@ -227,7 +227,7 @@ class _PostgresConnectionTileState extends State<_PostgresConnectionTile> {
                                     maxLines: 1,
                                     style: material.TextStyle(
                                       fontSize: 11,
-                                      color: theme.colorScheme.mutedForeground,
+                                      color: colors.mutedForeground,
                                     ),
                                   ),
                               ],

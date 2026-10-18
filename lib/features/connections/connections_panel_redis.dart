@@ -122,7 +122,7 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     final iconWidget = widget.iconAsset != null
         ? material.Image.asset(
             widget.iconAsset!,
@@ -134,18 +134,18 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
             errorBuilder: (_, __, ___) => material.Icon(
               widget.icon,
               size: QueryaIconSizes.sidebarConnectionIcon,
-              color: theme.colorScheme.primary,
+              color: colors.primary,
             ),
           )
         : material.Icon(widget.icon,
             size: QueryaIconSizes.sidebarConnectionIcon,
-            color: theme.colorScheme.primary);
+            color: colors.primary);
 
     return ContextMenu(
       items: [
         MenuButton(
           leading: material.Icon(material.Icons.refresh_rounded,
-              size: 18, color: theme.colorScheme.mutedForeground),
+              size: 18, color: colors.mutedForeground),
           onPressed: (_) {
             _databases = [];
             _loadDatabases();
@@ -154,18 +154,18 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
         ),
         MenuButton(
           leading: material.Icon(material.Icons.edit_outlined,
-              size: 18, color: theme.colorScheme.mutedForeground),
+              size: 18, color: colors.mutedForeground),
           onPressed: (_) => widget.onEdit(),
           child: const Text('Edit connection…'),
         ),
         ...widget.moveItems,
         MenuButton(
           leading: material.Icon(material.Icons.delete_outline_rounded,
-              size: 18, color: theme.colorScheme.destructive),
+              size: 18, color: colors.destructive),
           onPressed: (_) => widget.onRemove(),
           child: Text(
             'Remove connection',
-            style: material.TextStyle(color: theme.colorScheme.destructive),
+            style: material.TextStyle(color: colors.destructive),
           ),
         ),
       ],
@@ -198,7 +198,7 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
                           child: material.Icon(
                             QueryaIcons.expandClosed,
                             size: QueryaIconSizes.sidebarExpand,
-                            color: theme.colorScheme.mutedForeground,
+                            color: colors.mutedForeground,
                           ),
                         ),
                       ),
@@ -230,7 +230,7 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
                                   maxLines: 1,
                                   style: material.TextStyle(
                                     fontSize: 13,
-                                    color: theme.colorScheme.foreground,
+                                    color: colors.foreground,
                                   ),
                                 ),
                                 if (widget.connection.host != null)
@@ -240,7 +240,7 @@ class _RedisConnectionTileState extends State<_RedisConnectionTile> {
                                     maxLines: 1,
                                     style: material.TextStyle(
                                       fontSize: 11,
-                                      color: theme.colorScheme.mutedForeground,
+                                      color: colors.mutedForeground,
                                     ),
                                   ),
                               ],
@@ -344,7 +344,7 @@ class _RedisDatabaseNode extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     return _ConnectionsTreeSelectionBuilder<bool>(
       select: (sel) =>
           sel.selectedConnectionId == connection.id &&
@@ -358,22 +358,22 @@ class _RedisDatabaseNode extends StatelessWidget {
             icon: QueryaIcons.database,
             iconSize: QueryaIconSizes.treeConnection,
             iconColor: keys > 0
-                ? theme.colorScheme.primary.withValues(alpha: 0.7)
-                : theme.colorScheme.mutedForeground.withValues(alpha: 0.5),
+                ? colors.primary.withValues(alpha: 0.7)
+                : colors.mutedForeground.withValues(alpha: 0.5),
             trailing: keys > 0
                 ? material.Text(
                     '$keys',
                     style: material.TextStyle(
                       fontSize: 10,
-                      color: theme.colorScheme.mutedForeground,
+                      color: colors.mutedForeground,
                     ),
                   )
                 : null,
             textStyle: material.TextStyle(
               fontSize: 12,
               color: keys > 0
-                  ? theme.colorScheme.foreground
-                  : theme.colorScheme.mutedForeground,
+                  ? colors.foreground
+                  : colors.mutedForeground,
             ),
             verticalPadding: 3,
             onTap: onTap,
